@@ -6,37 +6,35 @@ package dev.jsc.jscomputronics.common.operation;
  * Copyright (C) 2026 jvpts11
  *
  * This file is part of J's Computronics.
- *
- * J's Computronics is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License version 3
- * as published by the Free Software Foundation.
- *
- * J's Computronics is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
  */
 
 public enum OperationStatus {
+
     PENDING,
 
     PROCESSING,
 
-    IN_PROGRESS,
+    WAITING,
 
     COMPLETED,
 
+    COMPLETED_PARTIAL,
+
     FAILED,
 
-    DISCARDED,
+    RESOURCE_LOCKED,
 
-    ORPHANED;
+    DISCARDED;
 
     public boolean isTerminal() {
-        return this == COMPLETED || this == FAILED || this == DISCARDED;
+        return this == COMPLETED
+                || this == COMPLETED_PARTIAL
+                || this == FAILED
+                || this == RESOURCE_LOCKED
+                || this == DISCARDED;
     }
 
     public boolean isActive() {
-        return this == PENDING || this == PROCESSING || this == IN_PROGRESS;
+        return this == PENDING || this == PROCESSING || this == WAITING;
     }
 }

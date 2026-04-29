@@ -4,15 +4,6 @@
  * Copyright (C) 2026 jvpts11
  *
  * This file is part of J's Computronics.
- *
- * J's Computronics is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License version 3
- * as published by the Free Software Foundation.
- *
- * J's Computronics is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
  */
 package dev.jsc.jscomputronics.common.operation;
 
@@ -25,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OperationStatusTest {
 
     @Test
-    void hasSevenStates() {
-        assertEquals(7, OperationStatus.values().length);
+    void hasEightStates() {
+        assertEquals(8, OperationStatus.values().length);
     }
 
     @Test
@@ -36,9 +27,21 @@ class OperationStatusTest {
     }
 
     @Test
+    void completedPartial_isTerminal() {
+        assertTrue(OperationStatus.COMPLETED_PARTIAL.isTerminal());
+        assertFalse(OperationStatus.COMPLETED_PARTIAL.isActive());
+    }
+
+    @Test
     void failed_isTerminal() {
         assertTrue(OperationStatus.FAILED.isTerminal());
         assertFalse(OperationStatus.FAILED.isActive());
+    }
+
+    @Test
+    void resourceLocked_isTerminal() {
+        assertTrue(OperationStatus.RESOURCE_LOCKED.isTerminal());
+        assertFalse(OperationStatus.RESOURCE_LOCKED.isActive());
     }
 
     @Test
@@ -60,14 +63,22 @@ class OperationStatusTest {
     }
 
     @Test
-    void inProgress_isActiveNotTerminal() {
-        assertTrue(OperationStatus.IN_PROGRESS.isActive());
-        assertFalse(OperationStatus.IN_PROGRESS.isTerminal());
+    void waiting_isActiveNotTerminal() {
+        assertTrue(OperationStatus.WAITING.isActive());
+        assertFalse(OperationStatus.WAITING.isTerminal());
     }
 
     @Test
-    void orphaned_isNeitherActiveNorTerminal() {
-        assertFalse(OperationStatus.ORPHANED.isActive());
-        assertFalse(OperationStatus.ORPHANED.isTerminal());
+    void everyStateIsExactlyOneOfTerminalOrActive() {
+        for (var state : OperationStatus.values()) {
+            // Must be one or the other, never both, never neither.
+            boolean terminal = state.isTerminal();
+            boolean active = state.isActive();
+            assertTrue(
+                    terminal ^ active,
+                    "State " + state + " must be exactly one of {terminal, active}; "
+                            + "got terminal=" + terminal + ", active=" + active
+            );
+        }
     }
 }
