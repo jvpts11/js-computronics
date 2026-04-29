@@ -5,7 +5,4 @@
  *
  * This file is part of J's Computronics.
  */
-/**
- * Forge-style capability registrations and shared capability interfaces exposed across modules.
- */
 package dev.jsc.jscomputronics.common.capability;
