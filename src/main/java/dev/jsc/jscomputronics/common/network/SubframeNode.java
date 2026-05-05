@@ -39,4 +39,9 @@ public record SubframeNode(
         }
         return Math.round(ownCapacity * CONTRIBUTION_FACTOR);
     }
+
+    @Override
+    public NetworkCategory category() {
+        return null;
+    }
 }

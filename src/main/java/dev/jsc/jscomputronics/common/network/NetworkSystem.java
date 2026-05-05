@@ -22,6 +22,7 @@ public final class NetworkSystem {
 
     private final java.util.Map<NetworkUuid, List<SubframeNode>> subframesByNetwork = new java.util.HashMap<>();
 
+    private final java.util.Map<NetworkUuid, java.util.List<ServerNode>> serversByNetwork = new java.util.HashMap<>();
     // ConnectivityIndex facade — works in Phase 0
 
     public ConnectivityIndex connectivity() {
@@ -62,6 +63,29 @@ public final class NetworkSystem {
         return List.copyOf(list);
     }
 
+    public void registerServer(ServerNode server) {
+        java.util.Objects.requireNonNull(server, "server must not be null");
+        serversByNetwork
+                .computeIfAbsent(server.networkUuid(), k -> new java.util.ArrayList<>())
+                .add(server);
+    }
+
+    public java.util.List<ServerNode> serversOf(NetworkUuid networkUuid) {
+        var list = serversByNetwork.get(networkUuid);
+        if (list == null) {
+            return java.util.List.of();
+        }
+        return java.util.List.copyOf(list);
+    }
+
+    public long totalStorageOf(NetworkUuid networkUuid) {
+        long total = 0L;
+        for (var server : serversOf(networkUuid)) {
+            total += server.storageMB();
+        }
+        return total;
+    }
+
     public long totalOrchestrationCapacityOf(NetworkUuid networkUuid) {
         long total = mainframeOf(networkUuid)
                 .map(MainframeNode::contributedCapacity)
@@ -90,5 +114,6 @@ public final class NetworkSystem {
         connectivity.clear();
         mainframesByNetwork.clear();
         subframesByNetwork.clear();
+        serversByNetwork.clear();
     }
 }

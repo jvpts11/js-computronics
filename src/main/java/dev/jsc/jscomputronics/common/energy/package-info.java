@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Forge Energy integration, custom energy tiers, cable abstractions, and the global EnergyNetwork.
+ * Energy network system (Forge Energy / FE).
  */
 package dev.jsc.jscomputronics.common.energy;

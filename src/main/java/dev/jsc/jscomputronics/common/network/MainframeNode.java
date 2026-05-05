@@ -51,4 +51,9 @@ public record MainframeNode(NodeUuid nodeUuid,
         }
         return ownCapacity;
     }
+
+    @Override
+    public NetworkCategory category() {
+        return null;
+    }
 }

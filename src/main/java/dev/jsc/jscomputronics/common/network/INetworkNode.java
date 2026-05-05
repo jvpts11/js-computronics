@@ -10,11 +10,11 @@ package dev.jsc.jscomputronics.common.network;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 
-public sealed interface ComputerNode extends INetworkNode permits MainframeNode, SubframeNode {
+public sealed interface INetworkNode permits ComputerNode, ServiceNode{
 
     NodeUuid nodeUuid();
 
     NetworkUuid networkUuid();
 
-    long contributedCapacity();
+    NetworkCategory category();
 }
