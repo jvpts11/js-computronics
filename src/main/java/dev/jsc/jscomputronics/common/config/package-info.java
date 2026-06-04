@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Persistence foundation: SavedData and AttachmentType base classes.
+ * Configuration system: whitelist-based, range-validated, server-authoritative.
  */
-package dev.jsc.jscomputronics.common.persistence;
+package dev.jsc.jscomputronics.common.config;

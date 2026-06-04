@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Persistence foundation: SavedData and AttachmentType base classes.
+ * Optional integration with the Modonomicon guidebook mod.
  */
-package dev.jsc.jscomputronics.common.persistence;
+package dev.jsc.jscomputronics.integration.modonomicon;

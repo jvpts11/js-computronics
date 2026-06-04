@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Persistence foundation: SavedData and AttachmentType base classes.
+ * Custom mod event system: type-safe, testable, delegates to NeoForge.
  */
-package dev.jsc.jscomputronics.common.persistence;
+package dev.jsc.jscomputronics.common.event;

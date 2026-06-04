@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Persistence foundation: SavedData and AttachmentType base classes.
+ * Centralized formatting of mod-specific units (FE, MB, it/t, etc.).
  */
-package dev.jsc.jscomputronics.common.persistence;
+package dev.jsc.jscomputronics.common.format;
