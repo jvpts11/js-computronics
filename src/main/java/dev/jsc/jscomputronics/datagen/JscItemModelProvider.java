@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
@@ -39,5 +40,15 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/ethernet_cable_core")));
         getBuilder("hbw_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/hbw_cable_core")));
+
+        getBuilder("mainframe")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/mainframe")));
+        basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());
+        basicItem(ComputingModule.CPU_SERVO_2620.get());
+        basicItem(ComputingModule.CPU_SERVO_2690.get());
+        basicItem(ComputingModule.CPU_SERVO_2699.get());
+        basicItem(ComputingModule.RAM_DDR3_8192.get());
+        basicItem(ComputingModule.GPU_HD_7970.get());
+        basicItem(ComputingModule.PSU_650G.get());
     }
 }

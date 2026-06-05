@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "jsc:block/mainframe",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "jsc:block/mainframe"
+    },
+    "facing=south": {
+      "model": "jsc:block/mainframe",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "jsc:block/mainframe",
+      "y": 270
+    }
+  }
+}

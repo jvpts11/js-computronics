@@ -38,5 +38,7 @@ public final class JscDataGenerators {
                 new JscLanguageProvider(output));
         generator.addProvider(event.includeServer(),
                 new JscRecipeProvider(output, event.getLookupProvider()));
+        generator.addProvider(event.includeServer(),
+                new JscGameTestStructureProvider(output));
     }
 }

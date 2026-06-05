@@ -8,10 +8,28 @@
 package dev.jsc.jscomputronics.module.computing;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.hardware.CpuSocket;
+import dev.jsc.jscomputronics.common.hardware.CpuSpec;
+import dev.jsc.jscomputronics.common.hardware.GpuSpec;
+import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
+import dev.jsc.jscomputronics.common.hardware.PcieGeneration;
+import dev.jsc.jscomputronics.common.hardware.PsuSpec;
+import dev.jsc.jscomputronics.common.hardware.RamGeneration;
+import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
+import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.item.CpuItem;
+import dev.jsc.jscomputronics.module.computing.item.GpuItem;
+import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
+import dev.jsc.jscomputronics.module.computing.item.PsuItem;
+import dev.jsc.jscomputronics.module.computing.item.RamItem;
+import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.SoundType;
@@ -19,10 +37,13 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.material.MapColor;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
+import java.util.Set;
 
 /**
  * Registration entry point for the Computing module: the data network's physical blocks (cables now; computers, routers and racks later).
@@ -40,6 +61,9 @@ public final class ComputingModule {
 
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, JsComputronics.MODID);
+
+    public static final DeferredRegister<MenuType<?>> MENUS =
+            DeferredRegister.create(Registries.MENU, JsComputronics.MODID);
 
     private static BlockBehaviour.Properties cableProperties() {
         return BlockBehaviour.Properties.of()
@@ -70,9 +94,62 @@ public final class ComputingModule {
                     () -> BlockEntityType.Builder.of(DataCableBlockEntity::new,
                             ETHERNET_CABLE.get(), HBW_CABLE.get()).build(null));
 
+    // Hardware components (Standard era — minimal set to build a Mainframe)
+
+    public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(
+            "motherboard_mtx_p", () -> new MotherboardItem(new Item.Properties(),
+                    new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
+                            Set.of(RamGeneration.DDR3), 24, PcieGeneration.PCIE_3_0, 10, 8)));
+
+    public static final DeferredItem<CpuItem> CPU_SERVO_2620 = ITEMS.register(
+            "cpu_servo_2620", () -> new CpuItem(new Item.Properties(),
+                    new CpuSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 6, 2000, 95, false)));
+
+    public static final DeferredItem<CpuItem> CPU_SERVO_2690 = ITEMS.register(
+            "cpu_servo_2690", () -> new CpuItem(new Item.Properties(),
+                    new CpuSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 8, 2900, 135, false)));
+
+    public static final DeferredItem<CpuItem> CPU_SERVO_2699 = ITEMS.register(
+            "cpu_servo_2699", () -> new CpuItem(new Item.Properties(),
+                    new CpuSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 18, 2300, 145, false)));
+
+    public static final DeferredItem<RamItem> RAM_DDR3_8192 = ITEMS.register(
+            "ram_ddr3_8192", () -> new RamItem(new Item.Properties(),
+                    new RamSpec(HardwareEra.STANDARD, RamGeneration.DDR3, 2048, 15)));
+
+    public static final DeferredItem<GpuItem> GPU_HD_7970 = ITEMS.register(
+            "gpu_hd_7970", () -> new GpuItem(new Item.Properties(),
+                    new GpuSpec(HardwareEra.STANDARD, PcieGeneration.PCIE_3_0, 2048, 3072, 250)));
+
+    public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
+            "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
+
+    // Mainframe
+
+    private static BlockBehaviour.Properties mainframeProperties() {
+        return BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_GRAY)
+                .strength(3.5F)
+                .requiresCorrectToolForDrops();
+    }
+
+    public static final DeferredBlock<MainframeBlock> MAINFRAME = BLOCKS.register(
+            "mainframe", () -> new MainframeBlock(mainframeProperties()));
+
+    public static final DeferredItem<BlockItem> MAINFRAME_ITEM = ITEMS.register(
+            "mainframe", () -> new BlockItem(MAINFRAME.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MainframeBlockEntity>> MAINFRAME_BE =
+            BLOCK_ENTITIES.register("mainframe",
+                    () -> BlockEntityType.Builder.of(MainframeBlockEntity::new, MAINFRAME.get()).build(null));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<MainframeMenu>> MAINFRAME_MENU =
+            MENUS.register("mainframe", () -> IMenuTypeExtension.create(MainframeMenu::new));
+
     public static void register(final IEventBus modEventBus) {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
+        MENUS.register(modEventBus);
     }
 }

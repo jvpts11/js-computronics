@@ -48,6 +48,13 @@ public class JscBlockStateProvider extends BlockStateProvider {
 
         dataCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
         dataCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
+
+        final ModelFile mainframeModel = models().orientable(
+                "mainframe",
+                modLoc("block/mainframe_side"),
+                modLoc("block/mainframe_front"),
+                modLoc("block/mainframe_top"));
+        horizontalBlock(ComputingModule.MAINFRAME.get(), mainframeModel);
     }
 
     private void dataCable(final DataCableBlock block, final String name) {

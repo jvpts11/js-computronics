@@ -65,6 +65,25 @@ public final class ConnectivityIndex {
         return dsu.componentCount();
     }
 
+    public int componentSize(long encodedPos) {
+        return componentPositions(encodedPos).size();
+    }
+
+    public Set<Long> componentPositions(long encodedPos) {
+        final Integer id = posToId.get(encodedPos);
+        if (id == null) {
+            return Set.of();
+        }
+        final int root = dsu.find(id);
+        final Set<Long> result = new LinkedHashSet<>();
+        for (final Map.Entry<Long, Integer> entry : posToId.entrySet()) {
+            if (dsu.find(entry.getValue()) == root) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
+    }
+
     // Mutations
 
     public PlacementResult onCablePlaced(long encodedPos, Set<Long> neighbors) {
@@ -206,21 +225,24 @@ public final class ConnectivityIndex {
             }
         }
 
-        // Restore UUIDs: every member of a fragment carried the same UUID, so
-        // writing it per member converges on a consistent root → UUID map.
-        for (final Map.Entry<Long, NetworkUuid> entry : uuidByPos.entrySet()) {
-            final Integer id = posToId.get(entry.getKey());
-            if (id != null) {
-                rootToUuid.put(dsu.find(id), entry.getValue());
-            }
-        }
-
-        // Count the distinct components the affected region split into.
+        // Count the distinct fragments the affected component split into.
         final Set<Integer> fragmentRoots = new HashSet<>();
         for (final Long pos : affectedComponent) {
             final Integer id = posToId.get(pos);
             if (id != null) {
                 fragmentRoots.add(dsu.find(id));
+            }
+        }
+        final boolean severed = fragmentRoots.size() >= 2;
+
+        // Restore UUIDs. Networks untouched by this removal keep theirs. But
+        for (final Map.Entry<Long, NetworkUuid> entry : uuidByPos.entrySet()) {
+            if (severed && affectedComponent.contains(entry.getKey())) {
+                continue;
+            }
+            final Integer id = posToId.get(entry.getKey());
+            if (id != null) {
+                rootToUuid.put(dsu.find(id), entry.getValue());
             }
         }
         return new RemovalResult(previousUuid, fragmentRoots.size());

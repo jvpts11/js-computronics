@@ -30,5 +30,13 @@ public class JscLanguageProvider extends LanguageProvider {
         add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
+        addBlock(ComputingModule.MAINFRAME, "Mainframe");
+        add(ComputingModule.MOTHERBOARD_MTX_P.get(), "MTX-P Motherboard");
+        add(ComputingModule.CPU_SERVO_2620.get(), "Integra Servo 2620");
+        add(ComputingModule.CPU_SERVO_2690.get(), "Integra Servo 2690");
+        add(ComputingModule.CPU_SERVO_2699.get(), "Integra Servo 2699");
+        add(ComputingModule.RAM_DDR3_8192.get(), "Stratix DDR3-8192");
+        add(ComputingModule.GPU_HD_7970.get(), "Pyrix Radiance HD 7970");
+        add(ComputingModule.PSU_650G.get(), "MF PowerGold 650G");
     }
 }

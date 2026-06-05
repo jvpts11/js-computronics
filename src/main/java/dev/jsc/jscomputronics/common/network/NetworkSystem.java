@@ -57,6 +57,13 @@ public final class NetworkSystem {
         mainframesByNetwork.put(mainframe.networkUuid(), mainframe);
     }
 
+    public void unregisterMainframe(NetworkUuid network, NodeUuid node) {
+        final MainframeNode current = mainframesByNetwork.get(network);
+        if (current != null && current.nodeUuid().equals(node)) {
+            mainframesByNetwork.remove(network);
+        }
+    }
+
     public void registerSubframe(SubframeNode subframe) {
         java.util.Objects.requireNonNull(subframe, "subframe must not be null");
         subframesByNetwork

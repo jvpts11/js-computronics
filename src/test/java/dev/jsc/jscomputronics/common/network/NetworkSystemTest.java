@@ -168,6 +168,24 @@ class NetworkSystemTest {
     }
 
     @Test
+    void unregisterMainframe_removesOwnSnapshot() {
+        var mf = standaloneMainframe(38_400L);
+        system.registerMainframe(mf);
+        system.unregisterMainframe(net, mf.nodeUuid());
+        assertFalse(system.mainframeOf(net).isPresent());
+    }
+
+    @Test
+    void unregisterMainframe_ignoresForeignNode() {
+        // If another mainframe has taken the network over, a stale unregister
+        // from the old node must not evict the current owner.
+        var owner = standaloneMainframe(38_400L);
+        system.registerMainframe(owner);
+        system.unregisterMainframe(net, NodeUuid.random()); // some other node
+        assertEquals(owner, system.mainframeOf(net).orElseThrow());
+    }
+
+    @Test
     void clear_resetsEverything() {
         system.registerMainframe(standaloneMainframe(38_400L));
         system.registerSubframe(subframe(1000L, NodeUuid.random()));

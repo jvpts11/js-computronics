@@ -229,7 +229,8 @@ class ConnectivityIndexTest {
     }
 
     @Test
-    void removeBridgeCable_bothFragmentsKeepUuid() {
+    void removeBridgeCable_severedFragmentsLoseUuid() {
+        // Cutting bridge B from line A-B-C severs {A} from {C}. Neither fragment
         var uuid = NetworkUuid.random();
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
@@ -237,9 +238,36 @@ class ConnectivityIndexTest {
         index.assignUuid(pos(0, 0, 0), uuid);
         var result = index.onCableRemoved(pos(1, 0, 0));
         assertEquals(uuid, result.previousUuid().orElseThrow());
-        assertEquals(uuid, index.networkOf(pos(0, 0, 0)).orElseThrow());
-        assertEquals(uuid, index.networkOf(pos(2, 0, 0)).orElseThrow());
+        assertFalse(index.networkOf(pos(0, 0, 0)).isPresent());
+        assertFalse(index.networkOf(pos(2, 0, 0)).isPresent());
         assertFalse(index.inSameNetwork(pos(0, 0, 0), pos(2, 0, 0)));
+    }
+
+    @Test
+    void removeLeafCable_survivingFragmentKeepsUuid() {
+        // Removing a leaf does NOT sever the component, so the remainder keeps
+        // its UUID — only a genuine split resets identity.
+        var uuid = NetworkUuid.random();
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        index.assignUuid(pos(0, 0, 0), uuid);
+        index.onCableRemoved(pos(2, 0, 0)); // leaf C
+        assertEquals(uuid, index.networkOf(pos(0, 0, 0)).orElseThrow());
+        assertEquals(uuid, index.networkOf(pos(1, 0, 0)).orElseThrow());
+    }
+
+    @Test
+    void componentPositions_returnsWholeSegmentOnly() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        index.onCablePlaced(pos(10, 0, 0), Set.of()); // a separate segment
+        var segment = index.componentPositions(pos(0, 0, 0));
+        assertEquals(3, segment.size());
+        assertTrue(segment.contains(pos(0, 0, 0)));
+        assertTrue(segment.contains(pos(2, 0, 0)));
+        assertFalse(segment.contains(pos(10, 0, 0)));
     }
 
     @Test

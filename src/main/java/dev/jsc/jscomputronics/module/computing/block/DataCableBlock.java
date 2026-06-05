@@ -84,8 +84,11 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
     }
 
     private boolean connectsTo(final LevelAccessor level, final BlockPos pos, final Direction direction) {
-        final BlockState neighbor = level.getBlockState(pos.relative(direction));
-        return neighbor.getBlock() instanceof DataCableBlock other && other.tier == this.tier;
+        final var neighbor = level.getBlockState(pos.relative(direction)).getBlock();
+        if (neighbor instanceof DataCableBlock other) {
+            return other.tier == this.tier;
+        }
+        return neighbor instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
     }
 
     @Override
