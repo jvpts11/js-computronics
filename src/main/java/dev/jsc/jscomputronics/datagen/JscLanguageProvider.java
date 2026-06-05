@@ -25,5 +25,7 @@ public class JscLanguageProvider extends LanguageProvider {
     protected void addTranslations() {
         add("itemGroup.jsc.main", "J's Computronics");
         addBlock(IndustrialModule.MACERATOR, "Macerator");
+        addBlock(IndustrialModule.COAL_GENERATOR, "Coal Generator");
+        add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
     }
 }

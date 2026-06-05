@@ -18,7 +18,7 @@ import net.neoforged.neoforge.data.event.GatherDataEvent;
 /**
  * Entry point for all data generation, run via {@code ./gradlew runData}.
  */
-@EventBusSubscriber(modid = JsComputronics.MODID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = JsComputronics.MODID)
 public final class JscDataGenerators {
 
     private JscDataGenerators() {
@@ -36,5 +36,7 @@ public final class JscDataGenerators {
                 new JscItemModelProvider(output, existingFiles));
         generator.addProvider(event.includeClient(),
                 new JscLanguageProvider(output));
+        generator.addProvider(event.includeServer(),
+                new JscRecipeProvider(output, event.getLookupProvider()));
     }
 }

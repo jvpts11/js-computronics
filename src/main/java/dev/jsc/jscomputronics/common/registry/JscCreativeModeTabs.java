@@ -32,8 +32,11 @@ public final class JscCreativeModeTabs {
             CREATIVE_MODE_TABS.register("main", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.jsc.main"))
                     .icon(() -> new ItemStack(IndustrialModule.MACERATOR_ITEM.get()))
-                    .displayItems((parameters, output) ->
-                            output.accept(IndustrialModule.MACERATOR_ITEM.get()))
+                    .displayItems((parameters, output) -> {
+                        output.accept(IndustrialModule.MACERATOR_ITEM.get());
+                        output.accept(IndustrialModule.COAL_GENERATOR_ITEM.get());
+                        output.accept(IndustrialModule.IRON_DUST.get());
+                    })
                     .build());
 
     public static void register(final IEventBus modEventBus) {

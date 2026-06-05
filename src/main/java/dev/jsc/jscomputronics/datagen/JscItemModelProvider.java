@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
@@ -28,5 +29,9 @@ public class JscItemModelProvider extends ItemModelProvider {
         // block model is produced by the BlockStateProvider in the same run.
         getBuilder("macerator")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/macerator")));
+        getBuilder("coal_generator")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/coal_generator")));
+
+        basicItem(IndustrialModule.IRON_DUST.get());
     }
 }

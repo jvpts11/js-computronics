@@ -32,5 +32,13 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/macerator_top"));
 
         horizontalBlock(IndustrialModule.MACERATOR.get(), maceratorModel);
+
+        final ModelFile coalGeneratorModel = models().orientable(
+                "coal_generator",
+                modLoc("block/coal_generator_side"),
+                modLoc("block/coal_generator_front"),
+                modLoc("block/coal_generator_top"));
+
+        horizontalBlock(IndustrialModule.COAL_GENERATOR.get(), coalGeneratorModel);
     }
 }

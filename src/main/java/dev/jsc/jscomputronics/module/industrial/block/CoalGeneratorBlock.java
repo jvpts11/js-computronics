@@ -9,8 +9,8 @@ package dev.jsc.jscomputronics.module.industrial.block;
 
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
-import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
-import dev.jsc.jscomputronics.module.industrial.menu.MaceratorMenu;
+import dev.jsc.jscomputronics.module.industrial.blockentity.CoalGeneratorBlockEntity;
+import dev.jsc.jscomputronics.module.industrial.menu.CoalGeneratorMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -32,19 +32,19 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The Macerator — a Tier-1 industrial machine that grinds ores into dust (ore doubling).
+ * The Coal Generator — a Tier-1 FE source that burns furnace fuel.
  */
-public class MaceratorBlock extends HorizontalDirectionalBlock implements EntityBlock {
+public class CoalGeneratorBlock extends HorizontalDirectionalBlock implements EntityBlock {
 
-    public static final MapCodec<MaceratorBlock> CODEC = simpleCodec(MaceratorBlock::new);
+    public static final MapCodec<CoalGeneratorBlock> CODEC = simpleCodec(CoalGeneratorBlock::new);
 
-    public MaceratorBlock(final Properties properties) {
+    public CoalGeneratorBlock(final Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
     @Override
-    protected MapCodec<MaceratorBlock> codec() {
+    protected MapCodec<CoalGeneratorBlock> codec() {
         return CODEC;
     }
 
@@ -62,11 +62,11 @@ public class MaceratorBlock extends HorizontalDirectionalBlock implements Entity
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
-                && level.getBlockEntity(pos) instanceof MaceratorBlockEntity machine) {
+                && level.getBlockEntity(pos) instanceof CoalGeneratorBlockEntity machine) {
             serverPlayer.openMenu(
                     new SimpleMenuProvider(
-                            (id, inventory, p) -> new MaceratorMenu(id, inventory, machine),
-                            Component.translatable("block.jsc.macerator")),
+                            (id, inventory, p) -> new CoalGeneratorMenu(id, inventory, machine),
+                            Component.translatable("block.jsc.coal_generator")),
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
@@ -74,7 +74,7 @@ public class MaceratorBlock extends HorizontalDirectionalBlock implements Entity
 
     @Override
     public BlockEntity newBlockEntity(final BlockPos pos, final BlockState state) {
-        return new MaceratorBlockEntity(pos, state);
+        return new CoalGeneratorBlockEntity(pos, state);
     }
 
     @Override
@@ -84,8 +84,8 @@ public class MaceratorBlock extends HorizontalDirectionalBlock implements Entity
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, IndustrialModule.MACERATOR_BE.get(),
-                MaceratorBlockEntity::serverTick);
+        return createTickerHelper(type, IndustrialModule.COAL_GENERATOR_BE.get(),
+                CoalGeneratorBlockEntity::serverTick);
     }
 
     @SuppressWarnings("unchecked")
