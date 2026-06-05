@@ -27,6 +27,9 @@ replay_pid*
 build/
 !gradle-wrapper.properties
 
+# Datagen metadata cache — generated assets ARE committed, this hash cache is not.
+src/generated/resources/.cache/
+
 # ============================================================
 # IntelliJ IDEA
 # ============================================================
@@ -61,12 +64,6 @@ desktop.ini
 *~
 *.bak
 *.swp
-
-# ============================================================
-# ============================================================
-.cursor/
-.cursorrules
-.aider*
 
 # ============================================================
 # Design Docs
