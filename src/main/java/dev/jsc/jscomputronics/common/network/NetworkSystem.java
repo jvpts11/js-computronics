@@ -7,8 +7,11 @@
  */
 package dev.jsc.jscomputronics.common.network;
 
+import dev.jsc.jscomputronics.common.registry.JscAttachments;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +29,13 @@ public final class NetworkSystem {
     private final java.util.Map<NetworkUuid, List<SubframeNode>> subframesByNetwork = new java.util.HashMap<>();
 
     private final java.util.Map<NetworkUuid, java.util.List<ServerNode>> serversByNetwork = new java.util.HashMap<>();
+
+    // Per-level acquisition (Phase 1+)
+
+    public static NetworkSystem get(final ServerLevel level) {
+        return level.getData(JscAttachments.NETWORK_SYSTEM.get());
+    }
+
     // ConnectivityIndex facade — works in Phase 0
 
     public ConnectivityIndex connectivity() {
