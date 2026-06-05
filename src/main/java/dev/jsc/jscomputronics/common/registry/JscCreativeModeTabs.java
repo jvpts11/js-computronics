@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.common.registry;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -36,6 +37,8 @@ public final class JscCreativeModeTabs {
                         output.accept(IndustrialModule.MACERATOR_ITEM.get());
                         output.accept(IndustrialModule.COAL_GENERATOR_ITEM.get());
                         output.accept(IndustrialModule.IRON_DUST.get());
+                        output.accept(ComputingModule.ETHERNET_CABLE_ITEM.get());
+                        output.accept(ComputingModule.HBW_CABLE_ITEM.get());
                     })
                     .build());
 

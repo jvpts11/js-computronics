@@ -8,11 +8,16 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.client.model.generators.BlockStateProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
+import net.neoforged.neoforge.client.model.generators.MultiPartBlockStateBuilder;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.PipeBlock;
 
 /**
  * Generates blockstates and block models.
@@ -40,5 +45,33 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/coal_generator_top"));
 
         horizontalBlock(IndustrialModule.COAL_GENERATOR.get(), coalGeneratorModel);
+
+        dataCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
+        dataCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
+    }
+
+    private void dataCable(final DataCableBlock block, final String name) {
+        final ResourceLocation texture = modLoc("block/" + name);
+        final ModelFile core = models()
+                .withExistingParent(name + "_core", modLoc("block/cable_core"))
+                .texture("cable", texture);
+        final ModelFile arm = models()
+                .withExistingParent(name + "_arm", modLoc("block/cable_arm"))
+                .texture("cable", texture);
+
+        final MultiPartBlockStateBuilder builder = getMultipartBuilder(block);
+        builder.part().modelFile(core).addModel().end();
+        builder.part().modelFile(arm).addModel()
+                .condition(PipeBlock.DOWN, true).end();
+        builder.part().modelFile(arm).rotationX(180).addModel()
+                .condition(PipeBlock.UP, true).end();
+        builder.part().modelFile(arm).rotationX(270).addModel()
+                .condition(PipeBlock.NORTH, true).end();
+        builder.part().modelFile(arm).rotationX(270).rotationY(180).addModel()
+                .condition(PipeBlock.SOUTH, true).end();
+        builder.part().modelFile(arm).rotationX(270).rotationY(90).addModel()
+                .condition(PipeBlock.EAST, true).end();
+        builder.part().modelFile(arm).rotationX(270).rotationY(270).addModel()
+                .condition(PipeBlock.WEST, true).end();
     }
 }

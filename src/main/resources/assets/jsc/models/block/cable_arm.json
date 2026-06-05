@@ -1,0 +1,19 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "particle": "#cable"
+  },
+  "elements": [
+    {
+      "from": [5, 0, 5],
+      "to": [11, 5, 11],
+      "faces": {
+        "down":  {"texture": "#cable", "cullface": "down"},
+        "north": {"texture": "#cable"},
+        "south": {"texture": "#cable"},
+        "west":  {"texture": "#cable"},
+        "east":  {"texture": "#cable"}
+      }
+    }
+  ]
+}

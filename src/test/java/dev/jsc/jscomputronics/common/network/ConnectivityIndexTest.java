@@ -187,10 +187,91 @@ class ConnectivityIndexTest {
     }
 
     @Test
-    void onCableRemoved_throwsInPhase0() {
-        index.onCablePlaced(pos(0, 0, 0), Set.of());
-        assertThrows(UnsupportedOperationException.class,
+    void removeUnregisteredCable_throws() {
+        assertThrows(IllegalStateException.class,
                 () -> index.onCableRemoved(pos(0, 0, 0)));
+    }
+
+    @Test
+    void removeIsolatedCable_componentDisappears() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        var result = index.onCableRemoved(pos(0, 0, 0));
+        assertEquals(0, index.size());
+        assertEquals(0, index.componentCount());
+        assertFalse(index.contains(pos(0, 0, 0)));
+        assertEquals(0, result.resultingComponents());
+    }
+
+    @Test
+    void removeLeafCable_keepsRemainderConnected() {
+        // Line A-B-C; removing the leaf C leaves A-B as one component.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        var result = index.onCableRemoved(pos(2, 0, 0));
+        assertEquals(2, index.size());
+        assertEquals(1, index.componentCount());
+        assertTrue(index.inSameNetwork(pos(0, 0, 0), pos(1, 0, 0)));
+        assertEquals(1, result.resultingComponents());
+    }
+
+    @Test
+    void removeBridgeCable_splitsNetwork() {
+        // Line A-B-C; removing the middle B splits into {A} and {C}.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        var result = index.onCableRemoved(pos(1, 0, 0));
+        assertEquals(2, index.size());
+        assertEquals(2, index.componentCount());
+        assertFalse(index.inSameNetwork(pos(0, 0, 0), pos(2, 0, 0)));
+        assertEquals(2, result.resultingComponents());
+    }
+
+    @Test
+    void removeBridgeCable_bothFragmentsKeepUuid() {
+        var uuid = NetworkUuid.random();
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        index.assignUuid(pos(0, 0, 0), uuid);
+        var result = index.onCableRemoved(pos(1, 0, 0));
+        assertEquals(uuid, result.previousUuid().orElseThrow());
+        assertEquals(uuid, index.networkOf(pos(0, 0, 0)).orElseThrow());
+        assertEquals(uuid, index.networkOf(pos(2, 0, 0)).orElseThrow());
+        assertFalse(index.inSameNetwork(pos(0, 0, 0), pos(2, 0, 0)));
+    }
+
+    @Test
+    void removeCable_leavesOtherNetworksIntact() {
+        var uuidA = NetworkUuid.random();
+        var uuidB = NetworkUuid.random();
+        // Network A: a line of two.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.assignUuid(pos(0, 0, 0), uuidA);
+        // Network B: a separate line of two.
+        index.onCablePlaced(pos(10, 0, 0), Set.of());
+        index.onCablePlaced(pos(11, 0, 0), Set.of(pos(10, 0, 0)));
+        index.assignUuid(pos(10, 0, 0), uuidB);
+        // Remove a cable from A; B must be untouched.
+        index.onCableRemoved(pos(1, 0, 0));
+        assertEquals(uuidB, index.networkOf(pos(10, 0, 0)).orElseThrow());
+        assertEquals(uuidB, index.networkOf(pos(11, 0, 0)).orElseThrow());
+        assertTrue(index.inSameNetwork(pos(10, 0, 0), pos(11, 0, 0)));
+    }
+
+    @Test
+    void removeBridge_thenReplace_reunitesNetwork() {
+        // Remove the bridge, then place it back: the network reunites.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        index.onCableRemoved(pos(1, 0, 0));
+        assertEquals(2, index.componentCount());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0), pos(2, 0, 0)));
+        assertEquals(1, index.componentCount());
+        assertTrue(index.inSameNetwork(pos(0, 0, 0), pos(2, 0, 0)));
     }
 
     @Test

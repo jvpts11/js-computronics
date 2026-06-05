@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.common.data.LanguageProvider;
 import net.minecraft.data.PackOutput;
@@ -27,5 +28,7 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(IndustrialModule.MACERATOR, "Macerator");
         addBlock(IndustrialModule.COAL_GENERATOR, "Coal Generator");
         add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
+        addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
+        addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
     }
 }

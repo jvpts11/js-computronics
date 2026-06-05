@@ -33,5 +33,11 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/coal_generator")));
 
         basicItem(IndustrialModule.IRON_DUST.get());
+
+        // Cables show their core model in the inventory.
+        getBuilder("ethernet_cable")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/ethernet_cable_core")));
+        getBuilder("hbw_cable")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/hbw_cable_core")));
     }
 }

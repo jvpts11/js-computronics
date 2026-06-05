@@ -1,5 +1,7 @@
 {
   "block.jsc.coal_generator": "Coal Generator",
+  "block.jsc.ethernet_cable": "Ethernet Cable",
+  "block.jsc.hbw_cable": "HBW Cable",
   "block.jsc.macerator": "Macerator",
   "item.jsc.iron_dust": "Iron Dust",
   "itemGroup.jsc.main": "J's Computronics"
