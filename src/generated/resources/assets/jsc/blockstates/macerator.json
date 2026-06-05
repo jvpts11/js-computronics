@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "jsc:block/macerator",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "jsc:block/macerator"
+    },
+    "facing=south": {
+      "model": "jsc:block/macerator",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "jsc:block/macerator",
+      "y": 270
+    }
+  }
+}

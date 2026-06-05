@@ -8,6 +8,8 @@
 package dev.jsc.jscomputronics;
 
 import com.mojang.logging.LogUtils;
+import dev.jsc.jscomputronics.common.registry.JscCreativeModeTabs;
+import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -25,5 +27,9 @@ public class JsComputronics {
 
     public JsComputronics(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("J's Computronics {} loaded.", modContainer.getModInfo().getVersion());
+
+        // Module registration. When the module config system exists, each of
+        IndustrialModule.register(modEventBus);
+        JscCreativeModeTabs.register(modEventBus);
     }
 }
