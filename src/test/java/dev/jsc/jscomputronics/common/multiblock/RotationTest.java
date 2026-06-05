@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class RotationTest {
 
     @Test
-    void hasFourRotations() {
+    void values_hasFourRotations() {
         assertEquals(4, Rotation.values().length);
     }
 

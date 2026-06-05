@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Spatial connectivity index for the J's Computronics computation network.
+ */
 public final class ConnectivityIndex {
 
     private final DisjointSetUnion dsu = new DisjointSetUnion();
@@ -150,17 +153,15 @@ public final class ConnectivityIndex {
 
     public void onCableRemoved(long encodedPos) {
         throw new UnsupportedOperationException(
-                "onCableRemoved is deferred to Phase 1+. "
-                        + "requires runtime topology to perform "
-                        + "lazy rediscovery, not available in Phase 0.");
+                "onCableRemoved is deferred to Phase 1+ — it requires runtime "
+                        + "topology to perform lazy rediscovery, not available in Phase 0.");
     }
 
     public void clear() {
         posToId.clear();
         idToPos.clear();
         rootToUuid.clear();
-        // DSU is single-use per index instance — replace if needed.
-        // For Phase 0 this is fine because indexes are short-lived in tests.
+        dsu.clear();
     }
 
     // PlacementResult

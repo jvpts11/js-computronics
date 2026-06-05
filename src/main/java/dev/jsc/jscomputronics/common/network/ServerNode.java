@@ -12,6 +12,9 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 
 import java.util.Objects;
 
+/**
+ * Snapshot of a Server item operating inside a Server Rack.
+ */
 public record ServerNode(
         NodeUuid nodeUuid,
         NetworkUuid networkUuid,

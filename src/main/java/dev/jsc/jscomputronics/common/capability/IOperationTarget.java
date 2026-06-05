@@ -12,7 +12,7 @@ import dev.jsc.jscomputronics.common.network.NetworkCategory;
 /**
  * Contract for a {@link NetworkCategory#C Category C} node that can RECEIVE Operations from the Mainframe.
  */
-public interface IOperationTarget extends INetworkNode{
+public interface IOperationTarget extends INetworkNodeCapability{
     // Phase 1+: boolean canAccept(OperationType<?> type);
     // Phase 1+: void accept(Operation op, OperationContext ctx, OperationCallback cb);
 }

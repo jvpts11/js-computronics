@@ -19,6 +19,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Aggregates generators, consumers and cables of one topological network and distributes energy per tick.
+ */
 public final class EnergyNetwork {
 
     private final Map<Long, EnergyNode> nodes = new LinkedHashMap<>();

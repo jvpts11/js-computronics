@@ -16,7 +16,7 @@ import java.util.Optional;
 /**
  * Contract for any block that participates in a J's Computronics computation network as a {@link NetworkCategory#B Category B} or {@link NetworkCategory#C Category C} node.
  */
-public interface INetworkNode {
+public interface INetworkNodeCapability {
 
     NodeUuid getNodeUuid();
 

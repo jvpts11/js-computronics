@@ -12,6 +12,9 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 
 import java.util.Objects;
 
+/**
+ * Snapshot of a Subframe BlockEntity, as used by the {@link NetworkSystem}.
+ */
 public record SubframeNode(
         NodeUuid nodeUuid,
         NetworkUuid networkUuid,
@@ -42,6 +45,6 @@ public record SubframeNode(
 
     @Override
     public NetworkCategory category() {
-        return null;
+        return NetworkCategory.C;
     }
 }

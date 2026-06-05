@@ -20,12 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class INetworkNodeTest {
+class INetworkNodeCapabilityTest {
 
     /**
      * Fictional implementation used only to exercise the contract.
      */
-    private static final class FakeNode implements INetworkNode {
+    private static final class FakeNode implements INetworkNodeCapability {
         private final NodeUuid nodeUuid = NodeUuid.random();
         private final Optional<NetworkUuid> networkUuid;
         private final NetworkCategory category;

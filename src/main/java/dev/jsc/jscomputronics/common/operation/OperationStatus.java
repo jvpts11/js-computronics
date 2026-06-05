@@ -1,5 +1,3 @@
-package dev.jsc.jscomputronics.common.operation;
-
 /*
  * SPDX-License-Identifier: LGPL-3.0-only
  *
@@ -7,7 +5,11 @@ package dev.jsc.jscomputronics.common.operation;
  *
  * This file is part of J's Computronics.
  */
+package dev.jsc.jscomputronics.common.operation;
 
+/**
+ * Lifecycle states for an Operation.
+ */
 public enum OperationStatus {
 
     PENDING,

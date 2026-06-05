@@ -92,4 +92,17 @@ public class MainframeNodeTest {
                 0L
         ));
     }
+
+    @Test
+    void category_isC() {
+        var mf = new MainframeNode(
+                NodeUuid.random(),
+                NetworkUuid.random(),
+                38_400L,
+                FailoverRole.NONE,
+                Optional.empty(),
+                0L
+        );
+        assertEquals(NetworkCategory.C, mf.category());
+    }
 }

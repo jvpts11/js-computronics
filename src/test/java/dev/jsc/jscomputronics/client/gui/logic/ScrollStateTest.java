@@ -53,13 +53,13 @@ class ScrollStateTest {
     }
 
     @Test
-    void scrolledToTop() {
+    void scrolledToTop_resetsOffsetToZero() {
         ScrollState s = ScrollState.of(100, 10).scrolledBy(50).scrolledToTop();
         assertEquals(0, s.offset());
     }
 
     @Test
-    void scrolledToBottom() {
+    void scrolledToBottom_movesOffsetToMax() {
         ScrollState s = ScrollState.of(100, 10).scrolledToBottom();
         assertEquals(90, s.offset());
     }
@@ -104,7 +104,7 @@ class ScrollStateTest {
     }
 
     @Test
-    void isScrollable() {
+    void isScrollable_trueOnlyWhenItemsExceedRows() {
         assertTrue(ScrollState.of(100, 10).isScrollable());
         assertFalse(ScrollState.of(10, 10).isScrollable());
         assertFalse(ScrollState.of(3, 10).isScrollable());

@@ -1,13 +1,5 @@
 {
-  "itemGroup.jsc": "Example Mod Tab",
-  "block.jsc.example_block": "Example Block",
-  "item.jsc.example_item": "Example Item",
-
   "jsc.configuration.title": "J's Computronics Configs",
   "jsc.configuration.section.jsc.common.toml": "J's Computronics Configs",
-  "jsc.configuration.section.jsc.common.toml.title": "J's Computronics Configs",
-  "jsc.configuration.items": "Item List",
-  "jsc.configuration.logDirtBlock": "Log Dirt Block",
-  "jsc.configuration.magicNumberIntroduction": "Magic Number Text",
-  "jsc.configuration.magicNumber": "Magic Number"
+  "jsc.configuration.section.jsc.common.toml.title": "J's Computronics Configs"
 }

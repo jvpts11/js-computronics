@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NetworkUuidStateTest {
 
     @Test
-    void hasThreeStates() {
+    void values_hasThreeStates() {
         assertEquals(3, NetworkUuidState.values().length);
     }
 

@@ -101,6 +101,11 @@ public final class DisjointSetUnion {
         return componentCount;
     }
 
+    public void clear() {
+        size = 0;
+        componentCount = 0;
+    }
+
     private void validate(int x) {
         if (x < 0 || x >= size) {
             throw new IndexOutOfBoundsException(

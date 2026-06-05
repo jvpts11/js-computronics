@@ -4,15 +4,6 @@
  * Copyright (C) 2026 jvpts11
  *
  * This file is part of J's Computronics.
- *
- * J's Computronics is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License version 3
- * as published by the Free Software Foundation.
- *
- * J's Computronics is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
  */
 package dev.jsc.jscomputronics.common.operation;
 
@@ -157,6 +148,26 @@ class OperationTypeRegistryTest {
                 IndustrialTier.T2,
                 EnumSet.of(NetworkCategory.C),
                 args -> OperationStatus.COMPLETED
+        ));
+    }
+
+    @Test
+    void operationType_acceptsValidConstruction() {
+        var type = sampleType("valid_op");
+        assertEquals("jsc:valid_op", type.id());
+        assertSame(OperationCategory.STORAGE, type.category());
+        assertTrue(type.requiredCategories().contains(NetworkCategory.C));
+    }
+
+    @Test
+    void operationType_rejectsNullHandler() {
+        assertThrows(NullPointerException.class, () -> new OperationType<>(
+                "jsc:test",
+                DummyArgs.class,
+                OperationCategory.STORAGE,
+                IndustrialTier.T2,
+                EnumSet.of(NetworkCategory.C),
+                null
         ));
     }
 }

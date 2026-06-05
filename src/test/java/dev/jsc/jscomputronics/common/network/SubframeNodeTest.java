@@ -43,6 +43,7 @@ class SubframeNodeTest {
 
     @Test
     void contributionFactor_isCanonical() {
+        // The contribution factor is a fixed, canonical 0.6.
         assertEquals(0.6, SubframeNode.CONTRIBUTION_FACTOR);
     }
 
@@ -68,5 +69,16 @@ class SubframeNodeTest {
                 -1L,
                 Optional.empty()
         ));
+    }
+
+    @Test
+    void category_isC() {
+        var sub = new SubframeNode(
+                NodeUuid.random(),
+                NetworkUuid.random(),
+                38_400L,
+                Optional.of(NodeUuid.random())
+        );
+        assertEquals(NetworkCategory.C, sub.category());
     }
 }

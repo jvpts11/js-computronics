@@ -13,6 +13,9 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Snapshot of a Mainframe BlockEntity, as used by the {@link NetworkSystem}.
+ */
 public record MainframeNode(NodeUuid nodeUuid,
                                NetworkUuid networkUuid,
                                long ownCapacity,
@@ -54,6 +57,6 @@ public record MainframeNode(NodeUuid nodeUuid,
 
     @Override
     public NetworkCategory category() {
-        return null;
+        return NetworkCategory.C;
     }
 }

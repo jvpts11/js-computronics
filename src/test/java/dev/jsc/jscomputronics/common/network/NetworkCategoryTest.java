@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NetworkCategoryTest {
 
     @Test
-    void hasThreeCategoriesABC() {
+    void values_hasThreeCategoriesInOrderABC() {
         assertEquals(3, NetworkCategory.values().length);
         assertEquals(NetworkCategory.A, NetworkCategory.values()[0]);
         assertEquals(NetworkCategory.B, NetworkCategory.values()[1]);

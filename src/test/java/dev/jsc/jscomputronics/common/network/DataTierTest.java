@@ -46,6 +46,7 @@ class DataTierTest {
 
     @Test
     void noT5Tier_existsInDataCables() {
+        // There are exactly 5 data tiers, with no T5.
         DataTier[] tiers = DataTier.values();
         assertEquals(5, tiers.length);
         for (DataTier tier : tiers) {

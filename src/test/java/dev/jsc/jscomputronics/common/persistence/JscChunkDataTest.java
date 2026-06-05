@@ -92,7 +92,7 @@ class JscChunkDataTest {
     }
 
     @Test
-    void multipleNetworksInOneChunk() {
+    void of_storesMultipleNetworksInOneChunk() {
         NetworkUuid a = net();
         NetworkUuid b = net();
         JscChunkData data = JscChunkData.of(Set.of(a, b));

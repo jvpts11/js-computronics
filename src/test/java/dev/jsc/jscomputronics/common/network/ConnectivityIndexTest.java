@@ -218,7 +218,21 @@ class ConnectivityIndexTest {
         index.assignUuid(pos(0, 0, 0), NetworkUuid.random());
         index.clear();
         assertEquals(0, index.size());
+        assertEquals(0, index.componentCount());
         assertFalse(index.contains(pos(0, 0, 0)));
         assertFalse(index.networkOf(pos(0, 0, 0)).isPresent());
+    }
+
+    @Test
+    void clear_thenReuse_reportsConsistentCounts() {
+        // After clear, the index must behave like a fresh instance: the
+        // backing DSU component count must also reset, not carry stale data.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.clear();
+        index.onCablePlaced(pos(5, 0, 0), Set.of());
+        index.onCablePlaced(pos(6, 0, 0), Set.of(pos(5, 0, 0)));
+        assertEquals(2, index.size());
+        assertEquals(1, index.componentCount());
     }
 }

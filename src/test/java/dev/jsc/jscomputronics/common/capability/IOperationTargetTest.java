@@ -31,9 +31,9 @@ class IOperationTargetTest {
     }
 
     @Test
-    void implementing_isSubtypeOfINetworkNode() {
+    void implementing_isSubtypeOfINetworkNodeCapability() {
         var target = new FakeTarget();
-        assertTrue(target instanceof INetworkNode);
+        assertTrue(target instanceof INetworkNodeCapability);
     }
 
     @Test

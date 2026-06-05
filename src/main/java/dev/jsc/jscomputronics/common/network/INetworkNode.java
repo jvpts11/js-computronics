@@ -10,6 +10,9 @@ package dev.jsc.jscomputronics.common.network;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 
+/**
+ * Sealed root for any participant of the data network with a persistent identity (Category B and C nodes).
+ */
 public sealed interface INetworkNode permits ComputerNode, ServiceNode{
 
     NodeUuid nodeUuid();

@@ -10,6 +10,9 @@ package dev.jsc.jscomputronics.common.network;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 
+/**
+ * Sealed root for "computer-shaped" nodes in the network — Mainframes and Subframes.
+ */
 public sealed interface ComputerNode extends INetworkNode permits MainframeNode, SubframeNode {
 
     NodeUuid nodeUuid();

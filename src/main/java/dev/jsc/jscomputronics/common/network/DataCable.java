@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.network;
 
+/**
+ * A data network cable: carries items per tick between nodes.
+ */
 public interface DataCable {
 
     DataTier tier();

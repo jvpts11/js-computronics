@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.network;
 
+/**
+ * Canonical tiers for data network cables.
+ */
 public enum DataTier {
     T1_ETHERNET(500L, 64, "ethernet_cable"),
     T2_HBW(5_000L, 256, "hbw_cable"),

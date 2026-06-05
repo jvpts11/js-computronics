@@ -31,9 +31,9 @@ class IMonitorableTest {
     }
 
     @Test
-    void implementing_isSubtypeOfINetworkNode() {
+    void implementing_isSubtypeOfINetworkNodeCapability() {
         var m = new FakeMonitorable();
-        assertTrue(m instanceof INetworkNode);
+        assertTrue(m instanceof INetworkNodeCapability);
     }
 
     @Test

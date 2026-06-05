@@ -9,6 +9,9 @@ package dev.jsc.jscomputronics.common.uuid;
 
 import java.util.Optional;
 
+/**
+ * Pure functions modelling network UUID propagation rules across cable connections.
+ */
 public final class UuidPropagation {
 
     private UuidPropagation(){

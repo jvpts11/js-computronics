@@ -139,7 +139,7 @@ class JscEventDispatcherTest {
     }
 
     @Test
-    void cancelIsIdempotent() {
+    void cancel_isIdempotent() {
         NetworkPropagatedEvent event = new NetworkPropagatedEvent(net(), 100L, 200L);
         event.cancel();
         event.cancel();

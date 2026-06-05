@@ -10,6 +10,9 @@ package dev.jsc.jscomputronics.common.uuid;
 import java.util.UUID;
 import java.util.Objects;
 
+/**
+ * Strongly-typed wrapper for the UUID of an entire network.
+ */
 public record NetworkUuid(UUID value) {
 
     public NetworkUuid {

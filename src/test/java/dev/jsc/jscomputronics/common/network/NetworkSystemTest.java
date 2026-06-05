@@ -115,6 +115,8 @@ class NetworkSystemTest {
 
     @Test
     void totalCapacity_canonicalExample() {
+        // Worked example: a Threadkiller mainframe (38,400) plus 3 identical
+        // subframes. Expected: 38,400 + (3 × 38,400 × 0.6) = 38,400 + 69,120 = 107,520.
         var mf = standaloneMainframe(38_400L);
         system.registerMainframe(mf);
         var mfUuid = mf.nodeUuid();
@@ -126,7 +128,7 @@ class NetworkSystemTest {
 
     @Test
     void totalCapacity_idleSubframesContributeZero() {
-        // Subframe with no orchestrating Mainframe (empty Optional)
+        // A subframe with no orchestrating Mainframe (empty Optional)
         system.registerMainframe(standaloneMainframe(38_400L));
         system.registerSubframe(subframe(38_400L, null)); // idle
         assertEquals(38_400L, system.totalOrchestrationCapacityOf(net));
@@ -134,7 +136,8 @@ class NetworkSystemTest {
 
     @Test
     void totalCapacity_passiveMainframeContributesZero() {
-        // PASSIVE Mainframe is pure overhead (50% standby, but NOT
+        // A PASSIVE Mainframe is pure overhead (50% standby, but NOT
+        // a contribution to usable capacity).
         var partnerUuid = NodeUuid.random();
         var passive = mainframe(FailoverRole.PASSIVE, partnerUuid, 38_400L);
         system.registerMainframe(passive);

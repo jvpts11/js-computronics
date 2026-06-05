@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.network;
 
+/**
+ * The role a Mainframe plays in a Failover redundancy pair.
+ */
 public enum FailoverRole {
 
     NONE,

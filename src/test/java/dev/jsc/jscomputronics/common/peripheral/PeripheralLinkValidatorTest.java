@@ -139,7 +139,7 @@ class PeripheralLinkValidatorTest {
     }
 
     @Test
-    void bfsIgnoresCablesOfWrongType() {
+    void bfs_ignoresCablesOfWrongType() {
         // Path is OWNER -- C1(TELEMETRY) -- ENDPOINT, but owner needs COMPUTING.
         // Path should fail because BFS won't traverse the TELEMETRY cable.
         TestOwner owner = new TestOwner(PeripheralCableType.COMPUTING, 8);

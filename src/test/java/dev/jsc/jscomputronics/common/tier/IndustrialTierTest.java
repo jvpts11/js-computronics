@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class IndustrialTierTest {
 
     @Test
-    void hasTenTiersFromT0ToT9() {
+    void values_hasTenTiers() {
         assertEquals(10, IndustrialTier.values().length);
     }
 

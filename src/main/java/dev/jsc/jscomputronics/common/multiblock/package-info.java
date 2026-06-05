@@ -6,4 +6,7 @@
  * This file is part of J's Computronics.
  */
 
+/**
+ * Multiblock pattern matching system.
+ */
 package dev.jsc.jscomputronics.common.multiblock;

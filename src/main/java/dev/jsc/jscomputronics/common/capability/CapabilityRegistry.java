@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.capability;
 
+/**
+ * Central registry of NeoForge {@code BlockCapability} declarations for J's Computronics.
+ */
 public final class CapabilityRegistry {
     private CapabilityRegistry() {
         // No instances. Will hold static BlockCapability fields in Phase 1+.

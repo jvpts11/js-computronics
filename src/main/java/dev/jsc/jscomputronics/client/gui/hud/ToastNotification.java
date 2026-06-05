@@ -18,6 +18,6 @@ public final class ToastNotification {
     public static void show(final ToastData data) {
         // Phase 1+: build a vanilla Toast from `data` (title, description,
         throw new UnsupportedOperationException(
-                "ToastNotification.show is wired in a later module phase");
+                "ToastNotification.show is implemented in a later phase.");
     }
 }

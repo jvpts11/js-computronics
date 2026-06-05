@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.energy;
 
+/**
+ * Canonical cable tiers for the energy network.
+ */
 public enum EnergyTier {
 
     T1_COPPER(500L, "insulated_copper_cable"),

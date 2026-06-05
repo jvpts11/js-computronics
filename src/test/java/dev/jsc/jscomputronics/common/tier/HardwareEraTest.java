@@ -16,12 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class HardwareEraTest {
 
     @Test
-    void hasSixErasFromVintageToSingularity() {
+    void values_hasSixEras() {
         assertEquals(6, HardwareEra.values().length);
     }
 
     @Test
-    void erasAreOrderedAsExpected() {
+    void values_areOrderedVintageToSingularity() {
         assertEquals(HardwareEra.VINTAGE, HardwareEra.values()[0]);
         assertEquals(HardwareEra.LEGACY, HardwareEra.values()[1]);
         assertEquals(HardwareEra.STANDARD, HardwareEra.values()[2]);

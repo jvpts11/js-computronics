@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.uuid;
 
+/**
+ * Lifecycle state of a network UUID.
+ */
 public enum NetworkUuidState {
 
     ACTIVE,

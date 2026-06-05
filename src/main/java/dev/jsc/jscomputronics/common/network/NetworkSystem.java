@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Central facade for spatial connectivity, UUID lookup, and orchestration capacity queries on a J's Computronics network.
+ */
 public final class NetworkSystem {
 
     private final ConnectivityIndex connectivity = new ConnectivityIndex();
@@ -100,14 +103,14 @@ public final class NetworkSystem {
 
     public Optional<NodeUuid> nodeByPosition(long encodedPos) {
         throw new UnsupportedOperationException(
-                "nodeByPosition requires runtime BlockEntity lookup, deferred to Phase 1+ "
-                        ");
+                "nodeByPosition requires runtime BlockEntity lookup, "
+                        + "deferred to Phase 1+.");
     }
 
     public Optional<MainframeNode> failoverPartnerOf(NetworkUuid networkUuid) {
         throw new UnsupportedOperationException(
                 "failoverPartnerOf resolves a partner via cross-Mainframe lookup, "
-                        + "deferred to a later phase.");
+                        + "deferred to Phase 1+.");
     }
 
     public void clear() {

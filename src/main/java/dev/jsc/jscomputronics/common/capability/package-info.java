@@ -5,4 +5,7 @@
  *
  * This file is part of J's Computronics.
  */
+/**
+ * NeoForge {@code BlockCapability} declarations and the supporting interfaces that BlockEntities implement to expose them.
+ */
 package dev.jsc.jscomputronics.common.capability;

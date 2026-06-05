@@ -7,6 +7,9 @@
  */
 package dev.jsc.jscomputronics.common.peripheral;
 
+/**
+ * The three peripheral cable systems of the mod.
+ */
 public enum PeripheralCableType {
 
     COMPUTING(16, "peripheral_cable"),

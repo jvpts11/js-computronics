@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OperationStatusTest {
 
     @Test
-    void hasEightStates() {
+    void values_hasEightStates() {
         assertEquals(8, OperationStatus.values().length);
     }
 
@@ -69,7 +69,7 @@ class OperationStatusTest {
     }
 
     @Test
-    void everyStateIsExactlyOneOfTerminalOrActive() {
+    void everyState_isExactlyOneOfTerminalOrActive() {
         for (var state : OperationStatus.values()) {
             // Must be one or the other, never both, never neither.
             boolean terminal = state.isTerminal();
