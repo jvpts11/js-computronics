@@ -8,7 +8,6 @@
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
-import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.network.NetworkBridge;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
@@ -23,18 +22,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * BlockEntity backing a {@link DataCableBlock}.
+ * BlockEntity backing the Personal Router.
  */
-public class DataCableBlockEntity extends BlockEntity {
+public class PersonalRouterBlockEntity extends BlockEntity {
 
-    public DataCableBlockEntity(final BlockPos pos, final BlockState state) {
-        super(ComputingModule.DATA_CABLE_BE.get(), pos, state);
-    }
-
-    public DataTier tier() {
-        return getBlockState().getBlock() instanceof DataCableBlock cable
-                ? cable.tier()
-                : DataTier.T1_ETHERNET;
+    public PersonalRouterBlockEntity(final BlockPos pos, final BlockState state) {
+        super(ComputingModule.PERSONAL_ROUTER_BE.get(), pos, state);
     }
 
     @Override
@@ -44,20 +37,17 @@ public class DataCableBlockEntity extends BlockEntity {
             final ConnectivityIndex index = NetworkSystem.get(serverLevel).connectivity();
             final long encodedPos = worldPosition.asLong();
             if (!index.contains(encodedPos)) {
-                index.onCablePlaced(encodedPos, networkNeighbors(serverLevel));
+                index.onCablePlaced(encodedPos, bridgeNeighbors(serverLevel));
             }
         }
     }
 
-    private Set<Long> networkNeighbors(final ServerLevel serverLevel) {
+    private Set<Long> bridgeNeighbors(final ServerLevel serverLevel) {
         final Set<Long> neighbors = new HashSet<>();
-        final DataTier myTier = tier();
         for (final Direction direction : Direction.values()) {
             final BlockPos neighborPos = worldPosition.relative(direction);
             final var block = serverLevel.getBlockState(neighborPos).getBlock();
-            if (block instanceof DataCableBlock other && other.tier() == myTier) {
-                neighbors.add(neighborPos.asLong());
-            } else if (block instanceof NetworkBridge) {
+            if (block instanceof DataCableBlock || block instanceof NetworkBridge) {
                 neighbors.add(neighborPos.asLong());
             }
         }

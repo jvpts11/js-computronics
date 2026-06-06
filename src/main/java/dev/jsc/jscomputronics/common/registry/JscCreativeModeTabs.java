@@ -39,11 +39,15 @@ public final class JscCreativeModeTabs {
                         output.accept(IndustrialModule.IRON_DUST.get());
                         output.accept(ComputingModule.ETHERNET_CABLE_ITEM.get());
                         output.accept(ComputingModule.HBW_CABLE_ITEM.get());
+                        output.accept(ComputingModule.PERSONAL_ROUTER_ITEM.get());
                         output.accept(ComputingModule.MAINFRAME_ITEM.get());
+                        output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
                         output.accept(ComputingModule.MOTHERBOARD_MTX_P.get());
+                        output.accept(ComputingModule.MOTHERBOARD_ATX_P.get());
                         output.accept(ComputingModule.CPU_SERVO_2620.get());
                         output.accept(ComputingModule.CPU_SERVO_2690.get());
                         output.accept(ComputingModule.CPU_SERVO_2699.get());
+                        output.accept(ComputingModule.CPU_APEX_3450.get());
                         output.accept(ComputingModule.RAM_DDR3_8192.get());
                         output.accept(ComputingModule.GPU_HD_7970.get());
                         output.accept(ComputingModule.PSU_650G.get());

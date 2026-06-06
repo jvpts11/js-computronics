@@ -12,6 +12,8 @@ import dev.jsc.jscomputronics.common.hardware.CpuSpec;
 import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
+import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.network.FailoverRole;
 import dev.jsc.jscomputronics.common.network.MainframeNode;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
@@ -23,6 +25,8 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
+import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
@@ -56,9 +60,9 @@ public class MainframeBlockEntity extends BlockEntity {
     public static final int RAM_SLOTS_START = 5;
     public static final int RAM_SLOTS = 8;
     public static final int GPU_SLOTS_START = 13;
-    public static final int GPU_SLOTS = 4;
-    public static final int PSU_SLOT = 17;
-    public static final int TOTAL_SLOTS = 18;
+    public static final int GPU_SLOTS = 6;
+    public static final int PSU_SLOT = 19;
+    public static final int TOTAL_SLOTS = 20;
 
     private final ItemStackHandler inventory = new ItemStackHandler(TOTAL_SLOTS) {
         @Override
@@ -149,25 +153,44 @@ public class MainframeBlockEntity extends BlockEntity {
         if (!(inventory.getStackInSlot(PSU_SLOT).getItem() instanceof PsuItem psu)) {
             return null;
         }
+        // The motherboard bounds how many of each component count — a part sitting
+        final int cpuCount = Math.min(CPU_SLOTS, motherboard.spec().cpuSlots());
         final List<CpuSpec> cpus = new ArrayList<>();
-        for (int i = 0; i < CPU_SLOTS; i++) {
+        for (int i = 0; i < cpuCount; i++) {
             if (inventory.getStackInSlot(CPU_SLOTS_START + i).getItem() instanceof CpuItem cpu) {
                 cpus.add(cpu.spec());
             }
         }
+        final int ramCount = Math.min(RAM_SLOTS, motherboard.spec().ramSlots());
         final List<RamSpec> rams = new ArrayList<>();
-        for (int i = 0; i < RAM_SLOTS; i++) {
+        for (int i = 0; i < ramCount; i++) {
             if (inventory.getStackInSlot(RAM_SLOTS_START + i).getItem() instanceof RamItem ram) {
                 rams.add(ram.spec());
             }
         }
+        final int gpuCount = Math.min(GPU_SLOTS, motherboard.spec().pcieSlots());
         final List<GpuSpec> gpus = new ArrayList<>();
-        for (int i = 0; i < GPU_SLOTS; i++) {
+        for (int i = 0; i < gpuCount; i++) {
             if (inventory.getStackInSlot(GPU_SLOTS_START + i).getItem() instanceof GpuItem gpu) {
                 gpus.add(gpu.spec());
             }
         }
         return new ComputerBuild(motherboard.spec(), cpus, gpus, rams, psu.spec());
+    }
+
+    public int boardCpuSlots() {
+        return inventory.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
+                ? Math.min(CPU_SLOTS, m.spec().cpuSlots()) : 0;
+    }
+
+    public int boardRamSlots() {
+        return inventory.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
+                ? Math.min(RAM_SLOTS, m.spec().ramSlots()) : 0;
+    }
+
+    public int boardPcieSlots() {
+        return inventory.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
+                ? Math.min(GPU_SLOTS, m.spec().pcieSlots()) : 0;
     }
 
     public boolean buildValid() {
@@ -247,12 +270,16 @@ public class MainframeBlockEntity extends BlockEntity {
             conflict = false; // with no cable this mainframe shares its network with no one
         } else {
             final Optional<NetworkUuid> segment = index.networkOf(cable);
-            if (segment.isEmpty()) {
+            if (segment.isPresent()) {
+                effective = segment.get();
+            } else if (index.contains(cable)) {
+                // Registered but UUID-less: this mainframe claims the segment.
                 index.assignUuid(cable, own);
                 NetworkRegistrySavedData.get(level).addNetwork(own);
                 effective = own;
             } else {
-                effective = segment.get();
+                // The cable block is present (found by block-state scan) but its
+                effective = own;
             }
             conflict = sharesSegmentWithAnotherMainframe(level, index, cable);
         }
@@ -319,13 +346,36 @@ public class MainframeBlockEntity extends BlockEntity {
     }
 
     private long adjacentCable(final ServerLevel level) {
-        for (final Direction direction : Direction.values()) {
-            final BlockPos neighbor = worldPosition.relative(direction);
-            if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock) {
-                return neighbor.asLong();
+        // The Mainframe is a 3x2x2 multiblock; a cable may touch any external face of
+        final Direction facing = getBlockState().getValue(HorizontalDirectionalBlock.FACING);
+        final java.util.Set<Long> inside = new java.util.HashSet<>();
+        for (final BlockPos p : MainframeStructure.allPositions(worldPosition, facing)) {
+            if (p.equals(worldPosition)) {
+                inside.add(p.asLong());
+            } else if (level.getBlockEntity(p) instanceof MainframePartBlockEntity part
+                    && worldPosition.equals(part.controllerPos())) {
+                inside.add(p.asLong());
+            }
+        }
+        for (final long posLong : inside) {
+            final BlockPos p = BlockPos.of(posLong);
+            for (final Direction direction : Direction.values()) {
+                final BlockPos neighbor = p.relative(direction);
+                if (inside.contains(neighbor.asLong())) {
+                    continue; // a face internal to the multiblock
+                }
+                if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock cable
+                        && acceptsTier(cable.tier())) {
+                    return neighbor.asLong();
+                }
             }
         }
         return NO_CABLE;
+    }
+
+    private boolean acceptsTier(final DataTier tier) {
+        return getBlockState().getBlock() instanceof DataNetworkConnectable device
+                && device.acceptedCableTiers().contains(tier);
     }
 
     private MainframeNode snapshot(final NetworkUuid network) {
@@ -451,9 +501,12 @@ public class MainframeBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         super.setRemoved();
-        // Covers both destruction and chunk-unload, so the virtual-thread executor
-        // is never left running for a mainframe that is gone.
+        // Covers both destruction and chunk-unload: stop the virtual-thread executor
+        // and drop the registry snapshot, so neither leaks for a mainframe that is gone.
         closeDispatch();
+        if (level instanceof ServerLevel serverLevel) {
+            unregister(NetworkSystem.get(serverLevel));
+        }
     }
 
     @Override

@@ -20,14 +20,21 @@ import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
+import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
+import dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock;
+import dev.jsc.jscomputronics.module.computing.block.PersonalRouterBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.PersonalRouterBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.PsuItem;
 import dev.jsc.jscomputronics.module.computing.item.RamItem;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
+import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
@@ -94,12 +101,29 @@ public final class ComputingModule {
                     () -> BlockEntityType.Builder.of(DataCableBlockEntity::new,
                             ETHERNET_CABLE.get(), HBW_CABLE.get()).build(null));
 
+    // Routers
+
+    public static final DeferredBlock<PersonalRouterBlock> PERSONAL_ROUTER = BLOCKS.register(
+            "personal_router", () -> new PersonalRouterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_LIGHT_BLUE)
+                    .strength(0.5F)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> PERSONAL_ROUTER_ITEM = ITEMS.register(
+            "personal_router", () -> new BlockItem(PERSONAL_ROUTER.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PersonalRouterBlockEntity>> PERSONAL_ROUTER_BE =
+            BLOCK_ENTITIES.register("personal_router",
+                    () -> BlockEntityType.Builder.of(PersonalRouterBlockEntity::new,
+                            PERSONAL_ROUTER.get()).build(null));
+
     // Hardware components (Standard era — minimal set to build a Mainframe)
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(
             "motherboard_mtx_p", () -> new MotherboardItem(new Item.Properties(),
                     new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
-                            Set.of(RamGeneration.DDR3), 24, PcieGeneration.PCIE_3_0, 10, 8)));
+                            Set.of(RamGeneration.DDR3), 8, PcieGeneration.PCIE_3_0, 6, 8)));
 
     public static final DeferredItem<CpuItem> CPU_SERVO_2620 = ITEMS.register(
             "cpu_servo_2620", () -> new CpuItem(new Item.Properties(),
@@ -124,6 +148,15 @@ public final class ComputingModule {
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
 
+    public static final DeferredItem<MotherboardItem> MOTHERBOARD_ATX_P = ITEMS.register(
+            "motherboard_atx_p", () -> new MotherboardItem(new Item.Properties(),
+                    new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.AM3, 1,
+                            Set.of(RamGeneration.DDR3), 4, PcieGeneration.PCIE_3_0, 4, 4)));
+
+    public static final DeferredItem<CpuItem> CPU_APEX_3450 = ITEMS.register(
+            "cpu_apex_3450", () -> new CpuItem(new Item.Properties(),
+                    new CpuSpec(HardwareEra.STANDARD, CpuSocket.AM3, 4, 3450, 95, false)));
+
     // Mainframe
 
     private static BlockBehaviour.Properties mainframeProperties() {
@@ -137,14 +170,40 @@ public final class ComputingModule {
             "mainframe", () -> new MainframeBlock(mainframeProperties()));
 
     public static final DeferredItem<BlockItem> MAINFRAME_ITEM = ITEMS.register(
-            "mainframe", () -> new BlockItem(MAINFRAME.get(), new Item.Properties()));
+            "mainframe", () -> new dev.jsc.jscomputronics.module.computing.item.MainframeBlockItem(
+                    MAINFRAME.get(), new Item.Properties()));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MainframeBlockEntity>> MAINFRAME_BE =
             BLOCK_ENTITIES.register("mainframe",
                     () -> BlockEntityType.Builder.of(MainframeBlockEntity::new, MAINFRAME.get()).build(null));
 
+    public static final DeferredBlock<MainframePartBlock> MAINFRAME_PART = BLOCKS.register(
+            "mainframe_part", () -> new MainframePartBlock(mainframeProperties()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MainframePartBlockEntity>> MAINFRAME_PART_BE =
+            BLOCK_ENTITIES.register("mainframe_part",
+                    () -> BlockEntityType.Builder.of(MainframePartBlockEntity::new, MAINFRAME_PART.get()).build(null));
+
     public static final DeferredHolder<MenuType<?>, MenuType<MainframeMenu>> MAINFRAME_MENU =
-            MENUS.register("mainframe", () -> IMenuTypeExtension.create(MainframeMenu::new));
+            MENUS.register("mainframe", () -> IMenuTypeExtension.create(MainframeMenu::fromNetwork));
+
+    // Personal Computer
+
+    public static final DeferredBlock<PersonalComputerBlock> PERSONAL_COMPUTER = BLOCKS.register(
+            "personal_computer", () -> new PersonalComputerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(2.0F)));
+
+    public static final DeferredItem<BlockItem> PERSONAL_COMPUTER_ITEM = ITEMS.register(
+            "personal_computer", () -> new BlockItem(PERSONAL_COMPUTER.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PersonalComputerBlockEntity>> PERSONAL_COMPUTER_BE =
+            BLOCK_ENTITIES.register("personal_computer",
+                    () -> BlockEntityType.Builder.of(PersonalComputerBlockEntity::new,
+                            PERSONAL_COMPUTER.get()).build(null));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<PersonalComputerMenu>> PERSONAL_COMPUTER_MENU =
+            MENUS.register("personal_computer", () -> IMenuTypeExtension.create(PersonalComputerMenu::fromNetwork));
 
     public static void register(final IEventBus modEventBus) {
         BLOCKS.register(modEventBus);

@@ -35,8 +35,8 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
     public MainframeScreen(final MainframeMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
         this.imageWidth = 200;
-        this.imageHeight = 220;
-        this.inventoryLabelY = 128;
+        this.imageHeight = 240;
+        this.inventoryLabelY = 148;
     }
 
     @Override
@@ -44,10 +44,10 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         super.init();
         powerButton = addRenderableWidget(Button.builder(Component.literal("Turn On"),
                         b -> sendButton(MainframeMenu.BUTTON_POWER))
-                .bounds(leftPos + PANEL_X, topPos + 90, 62, 18).build());
+                .bounds(leftPos + PANEL_X, topPos + 96, 62, 18).build());
         autoButton = addRenderableWidget(Button.builder(Component.literal("Auto: OFF"),
                         b -> sendButton(MainframeMenu.BUTTON_AUTOSTART))
-                .bounds(leftPos + PANEL_X, topPos + 110, 62, 18).build());
+                .bounds(leftPos + PANEL_X, topPos + 116, 62, 18).build());
     }
 
     private void sendButton(final int id) {
@@ -68,26 +68,30 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         g.fill(x + imageWidth - 1, y, x + imageWidth, y + imageHeight, BEVEL_DARK);
 
         // Divider between the hardware area and the status/control panel.
-        g.fill(x + DIVIDER_X, y + 16, x + DIVIDER_X + 1, y + 124, DIVIDER);
+        g.fill(x + DIVIDER_X, y + 16, x + DIVIDER_X + 1, y + 146, DIVIDER);
 
-        slot(g, x + 8, y + 28);   // motherboard
-        slot(g, x + 8, y + 72);   // psu
-        for (int i = 0; i < 4; i++) {
-            slot(g, x + 44 + i * 18, y + 28); // cpu
+        slot(g, x + 8, y + 28);   // motherboard (always)
+        slot(g, x + 8, y + 72);   // psu (always)
+        // CPU/RAM/GPU appear only up to the count the installed board exposes.
+        final int cpu = Math.min(menu.boardCpuSlots(), 4);
+        final int ram = Math.min(menu.boardRamSlots(), 8);
+        final int gpu = Math.min(menu.boardPcieSlots(), 6);
+        for (int i = 0; i < cpu; i++) {
+            slot(g, x + 44 + i * 18, y + 28);
         }
-        for (int i = 0; i < 8; i++) {
-            slot(g, x + 44 + (i % 4) * 18, y + 60 + (i / 4) * 18); // ram
+        for (int i = 0; i < ram; i++) {
+            slot(g, x + 44 + (i % 4) * 18, y + 60 + (i / 4) * 18);
         }
-        for (int i = 0; i < 4; i++) {
-            slot(g, x + 44 + i * 18, y + 110); // gpu
+        for (int i = 0; i < gpu; i++) {
+            slot(g, x + 44 + (i % 3) * 18, y + 110 + (i / 3) * 18);
         }
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                slot(g, x + 8 + col * 18, y + 138 + row * 18);
+                slot(g, x + 8 + col * 18, y + 158 + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            slot(g, x + 8 + col * 18, y + 196);
+            slot(g, x + 8 + col * 18, y + 218);
         }
     }
 

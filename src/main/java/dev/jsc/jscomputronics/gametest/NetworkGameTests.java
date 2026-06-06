@@ -11,8 +11,13 @@ import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
+import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
+import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -58,7 +63,7 @@ public final class NetworkGameTests {
         final BlockPos cable = new BlockPos(3, 2, 2);
         final BlockPos b = new BlockPos(4, 2, 2);
         final MainframeBlockEntity beA = placeRunningMainframe(helper, a);
-        helper.setBlock(cable, ComputingModule.ETHERNET_CABLE.get());
+        helper.setBlock(cable, ComputingModule.HBW_CABLE.get());
         final MainframeBlockEntity beB = placeRunningMainframe(helper, b);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
@@ -75,7 +80,7 @@ public final class NetworkGameTests {
         final BlockPos cable = new BlockPos(3, 2, 2);
         final BlockPos b = new BlockPos(4, 2, 2);
         final MainframeBlockEntity beA = placeRunningMainframe(helper, a);
-        helper.setBlock(cable, ComputingModule.ETHERNET_CABLE.get());
+        helper.setBlock(cable, ComputingModule.HBW_CABLE.get());
         placeRunningMainframe(helper, b);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () ->
@@ -94,7 +99,7 @@ public final class NetworkGameTests {
         final BlockPos cable = new BlockPos(3, 2, 2);
         final BlockPos b = new BlockPos(4, 2, 2);
         final MainframeBlockEntity beA = placeRunningMainframe(helper, a);
-        helper.setBlock(cable, ComputingModule.ETHERNET_CABLE.get());
+        helper.setBlock(cable, ComputingModule.HBW_CABLE.get());
         final MainframeBlockEntity beB = placeRunningMainframe(helper, b);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () ->
@@ -114,9 +119,9 @@ public final class NetworkGameTests {
         final BlockPos c2 = new BlockPos(3, 2, 2);
         final BlockPos c3 = new BlockPos(4, 2, 2);
         placeRunningMainframe(helper, a);
-        helper.setBlock(c1, ComputingModule.ETHERNET_CABLE.get());
-        helper.setBlock(c2, ComputingModule.ETHERNET_CABLE.get());
-        helper.setBlock(c3, ComputingModule.ETHERNET_CABLE.get());
+        helper.setBlock(c1, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(c2, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(c3, ComputingModule.HBW_CABLE.get());
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(sameNetwork(helper, c1, c3), "c1 and c3 should start on one network");
@@ -128,6 +133,198 @@ public final class NetworkGameTests {
                     helper.assertTrue(networkOf(helper, c1).isPresent(), "c1 (next to mainframe) keeps a network");
                     helper.assertTrue(networkOf(helper, c3).isEmpty(), "severed far cable c3 must be network-less");
                 })
+                .thenSucceed();
+    }
+
+    // Personal Router (Ethernet <-> HBW bridge)
+
+    @GameTest(template = ARENA)
+    public static void personalRouter_bridgesEthernetAndHbw(final GameTestHelper helper) {
+        final BlockPos eth = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbw = new BlockPos(4, 2, 2);
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(sameNetwork(helper, eth, hbw),
+                        "Ethernet and HBW should share one network through the router"))
+                .thenExecute(() -> helper.setBlock(router, Blocks.AIR)) // remove the bridge
+                .thenExecuteAfter(SETTLE, () -> helper.assertFalse(sameNetwork(helper, eth, hbw),
+                        "removing the router must split Ethernet from HBW"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void ethernetAndHbw_doNotJoinDirectly(final GameTestHelper helper) {
+        final BlockPos eth = new BlockPos(2, 2, 2);
+        final BlockPos hbw = new BlockPos(3, 2, 2);
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> helper.assertFalse(sameNetwork(helper, eth, hbw),
+                        "different cable tiers must not join without a router"))
+                .thenSucceed();
+    }
+
+    // Personal Computer (assembly + passive network membership)
+
+    @GameTest(template = ARENA)
+    public static void personalComputer_assemblesAndPowers(final GameTestHelper helper) {
+        final BlockPos pc = new BlockPos(2, 2, 2);
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(computer.buildValid(), "ATX build should be valid");
+                    helper.assertTrue(computer.isRunning(), "PC should be running after power-on");
+                    helper.assertTrue(computer.capacity() > 0, "running PC reports capacity");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void personalComputer_joinsMainframeNetworkThroughRouter(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(computer.networkUuid() != null, "PC should be on a network");
+                    helper.assertTrue(mainframe.networkUuid() != null, "mainframe should own a network");
+                    helper.assertTrue(computer.networkUuid().equals(mainframe.networkUuid()),
+                            "PC must share the mainframe's network through the router");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void personalComputer_ignoresHbwCable(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos pc = new BlockPos(3, 2, 2); // PC directly against an HBW cable
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(mainframe.networkUuid() != null, "mainframe owns its network");
+                    helper.assertTrue(computer.networkUuid() == null,
+                            "a PC must not join via an HBW cable (Ethernet only)");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void mainframe_ignoresEthernetCable(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(2, 2, 2);
+        final BlockPos eth = new BlockPos(3, 2, 2); // Mainframe directly against an Ethernet cable
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(mainframe.networkUuid() != null, "mainframe owns its native network");
+                    helper.assertTrue(networkOf(helper, eth).isEmpty(),
+                            "a Mainframe must not assign its UUID to an Ethernet cable");
+                })
+                .thenSucceed();
+    }
+
+    // Mainframe multiblock (3x2x2 self-assembly)
+
+    @GameTest(template = ARENA)
+    public static void mainframe_formsAndDissolves(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(4, 2, 4);
+        final Direction facing = Direction.NORTH;
+        helper.setBlock(controller, ComputingModule.MAINFRAME.get().defaultBlockState()
+                .setValue(MainframeBlock.FACING, facing));
+        // Drive the self-assembly the way item placement would.
+        ((MainframeBlock) ComputingModule.MAINFRAME.get()).setPlacedBy(
+                helper.getLevel(), helper.absolutePos(controller),
+                helper.getBlockState(controller), null, ItemStack.EMPTY);
+
+        helper.startSequence()
+                .thenExecuteAfter(2, () -> {
+                    int count = 0;
+                    for (final BlockPos p : MainframeStructure.allPositions(controller, facing)) {
+                        final var block = helper.getBlockState(p).getBlock();
+                        if (block instanceof MainframeBlock || block instanceof MainframePartBlock) {
+                            count++;
+                        }
+                    }
+                    helper.assertTrue(count == MainframeStructure.BLOCK_COUNT,
+                            "the 3x2x2 footprint should hold " + MainframeStructure.BLOCK_COUNT
+                                    + " blocks, found " + count);
+                })
+                .thenExecute(() -> helper.setBlock(
+                        MainframeStructure.partPositions(controller, facing).get(0), Blocks.AIR))
+                .thenExecuteAfter(2, () -> {
+                    int remaining = 0;
+                    for (final BlockPos p : MainframeStructure.allPositions(controller, facing)) {
+                        final var block = helper.getBlockState(p).getBlock();
+                        if (block instanceof MainframeBlock || block instanceof MainframePartBlock) {
+                            remaining++;
+                        }
+                    }
+                    helper.assertTrue(remaining == 0,
+                            "breaking one part must dissolve the whole structure, " + remaining + " left");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void mainframe_readsCableOnAnyPartFace(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(4, 2, 4);
+        final Direction facing = Direction.NORTH;
+        final MainframeBlockEntity be = formRunningMainframe(helper, controller, facing);
+        // The far-right part sits two blocks from the controller; a cable on its
+        // outward face is never adjacent to the controller itself.
+        final BlockPos farPart = controller.relative(facing.getClockWise());
+        final BlockPos cable = farPart.relative(facing.getClockWise());
+        helper.setBlock(cable, ComputingModule.HBW_CABLE.get());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(be.networkUuid() != null, "controller must own a network");
+                    helper.assertTrue(networkOf(helper, cable).map(be.networkUuid()::equals).orElse(false),
+                            "a cable on a part face must carry the controller's network UUID");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void mainframe_centralColumnGetsCoreFace(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(4, 2, 4);
+        final Direction facing = Direction.NORTH;
+        formRunningMainframe(helper, controller, facing);
+        helper.startSequence()
+                .thenExecuteAfter(2, () -> {
+                    for (final BlockPos p : MainframeStructure.partPositions(controller, facing)) {
+                        final boolean expected = MainframeStructure.isCentralColumn(controller, facing, p);
+                        final var st = helper.getBlockState(p);
+                        helper.assertTrue(st.getBlock() instanceof MainframePartBlock, "part missing at " + p);
+                        helper.assertTrue(st.getValue(MainframePartBlock.CORE) == expected,
+                                "core flag at " + p + " should be " + expected);
+                    }
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void mainframe_teardownDropsNothing(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(4, 2, 4);
+        final Direction facing = Direction.NORTH;
+        formRunningMainframe(helper, controller, facing); // installs a full hardware build
+        helper.startSequence()
+                .thenExecuteAfter(2, () -> helper.setBlock(
+                        MainframeStructure.partPositions(controller, facing).get(0), Blocks.AIR))
+                .thenExecuteAfter(2, () -> helper.assertTrue(droppedItems(helper, controller) == 0,
+                        "dissolving the multiblock must not drop items (creative-safe teardown)"))
                 .thenSucceed();
     }
 
@@ -178,11 +375,42 @@ public final class NetworkGameTests {
         return be;
     }
 
+    private static MainframeBlockEntity formRunningMainframe(final GameTestHelper helper,
+                                                            final BlockPos controller, final Direction facing) {
+        helper.setBlock(controller, ComputingModule.MAINFRAME.get().defaultBlockState()
+                .setValue(MainframeBlock.FACING, facing));
+        ((MainframeBlock) ComputingModule.MAINFRAME.get()).setPlacedBy(
+                helper.getLevel(), helper.absolutePos(controller),
+                helper.getBlockState(controller), null, ItemStack.EMPTY);
+        final MainframeBlockEntity be = mainframeAt(helper, controller);
+        installValidBuild(be);
+        be.togglePower();
+        return be;
+    }
+
     private static MainframeBlockEntity mainframeAt(final GameTestHelper helper, final BlockPos relative) {
         if (helper.getBlockEntity(relative) instanceof MainframeBlockEntity be) {
             return be;
         }
         throw new IllegalStateException("no mainframe at " + relative);
+    }
+
+    private static PersonalComputerBlockEntity placeRunningPC(final GameTestHelper helper, final BlockPos relative) {
+        helper.setBlock(relative, ComputingModule.PERSONAL_COMPUTER.get());
+        if (!(helper.getBlockEntity(relative) instanceof PersonalComputerBlockEntity be)) {
+            throw new IllegalStateException("no personal computer at " + relative);
+        }
+        final ItemStackHandler hw = be.getHardware();
+        hw.setStackInSlot(PersonalComputerBlockEntity.MOTHERBOARD_SLOT,
+                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
+        hw.setStackInSlot(PersonalComputerBlockEntity.CPU_SLOT,
+                new ItemStack(ComputingModule.CPU_APEX_3450.get()));
+        hw.setStackInSlot(PersonalComputerBlockEntity.RAM_SLOTS_START,
+                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
+        hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,
+                new ItemStack(ComputingModule.PSU_650G.get()));
+        be.togglePower();
+        return be;
     }
 
     private static void installValidBuild(final MainframeBlockEntity be) {
@@ -195,6 +423,13 @@ public final class NetworkGameTests {
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
+    }
+
+    private static int droppedItems(final GameTestHelper helper, final BlockPos around) {
+        final net.minecraft.world.phys.AABB box =
+                new net.minecraft.world.phys.AABB(helper.absolutePos(around)).inflate(6.0);
+        return helper.getLevel().getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class, box).size();
     }
 
     private static Optional<NetworkUuid> networkOf(final GameTestHelper helper, final BlockPos relative) {

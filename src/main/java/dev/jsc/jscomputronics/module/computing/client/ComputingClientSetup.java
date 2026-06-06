@@ -15,7 +15,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
 /**
- * Client-only wiring for the Computing module: binds the Mainframe menu to its screen.
+ * Client-only wiring for the Computing module: binds each computer menu to its screen.
  */
 @EventBusSubscriber(modid = JsComputronics.MODID, value = Dist.CLIENT)
 public final class ComputingClientSetup {
@@ -26,5 +26,6 @@ public final class ComputingClientSetup {
     @SubscribeEvent
     public static void registerScreens(final RegisterMenuScreensEvent event) {
         event.register(ComputingModule.MAINFRAME_MENU.get(), MainframeScreen::new);
+        event.register(ComputingModule.PERSONAL_COMPUTER_MENU.get(), PersonalComputerScreen::new);
     }
 }

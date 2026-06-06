@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "jsc:block/personal_router"
+    }
+  }
+}

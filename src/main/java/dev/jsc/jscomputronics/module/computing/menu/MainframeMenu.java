@@ -9,7 +9,6 @@ package dev.jsc.jscomputronics.module.computing.menu;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -43,37 +42,79 @@ public class MainframeMenu extends AbstractContainerMenu {
         addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.MOTHERBOARD_SLOT, 8, 28));
         addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.PSU_SLOT, 8, 72));
         for (int i = 0; i < MainframeBlockEntity.CPU_SLOTS; i++) {
-            addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.CPU_SLOTS_START + i, 44 + i * 18, 28));
+            addSlot(new BoardSlot(hardware, MainframeBlockEntity.CPU_SLOTS_START + i,
+                    44 + i * 18, 28, i, be::boardCpuSlots));
         }
         for (int i = 0; i < MainframeBlockEntity.RAM_SLOTS; i++) {
-            addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.RAM_SLOTS_START + i,
-                    44 + (i % 4) * 18, 60 + (i / 4) * 18));
+            addSlot(new BoardSlot(hardware, MainframeBlockEntity.RAM_SLOTS_START + i,
+                    44 + (i % 4) * 18, 60 + (i / 4) * 18, i, be::boardRamSlots));
         }
         for (int i = 0; i < MainframeBlockEntity.GPU_SLOTS; i++) {
-            addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.GPU_SLOTS_START + i, 44 + i * 18, 110));
+            addSlot(new BoardSlot(hardware, MainframeBlockEntity.GPU_SLOTS_START + i,
+                    44 + (i % 3) * 18, 110 + (i / 3) * 18, i, be::boardPcieSlots));
         }
 
         addPlayerInventory(playerInventory);
         addDataSlots(this.data);
     }
 
-    public MainframeMenu(final int containerId, final Inventory playerInventory,
-                         final RegistryFriendlyByteBuf buf) {
-        this(containerId, playerInventory, resolve(playerInventory, buf.readBlockPos()));
+    /**
+     * A hardware slot usable only while its {@code relativeIndex} is within the count the installed motherboard offers — so CPU/RAM/PCIe slots appear and accept parts according to the board, exactly like the Personal Computer.
+     */
+    private final class BoardSlot extends SlotItemHandler {
+        private final int relativeIndex;
+        private final java.util.function.IntSupplier boardLimit;
+
+        private BoardSlot(final IItemHandler handler, final int index, final int x, final int y,
+                          final int relativeIndex, final java.util.function.IntSupplier boardLimit) {
+            super(handler, index, x, y);
+            this.relativeIndex = relativeIndex;
+            this.boardLimit = boardLimit;
+        }
+
+        @Override
+        public boolean isActive() {
+            // Within the board's slot count, or already holding a part — so a part
+            // is never trapped behind a smaller board swapped in later.
+            return relativeIndex < boardLimit.getAsInt() || hasItem();
+        }
+
+        @Override
+        public boolean mayPlace(final ItemStack stack) {
+            return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
+        }
     }
 
-    private static MainframeBlockEntity resolve(final Inventory inv, final BlockPos pos) {
-        return (MainframeBlockEntity) inv.player.level().getBlockEntity(pos);
+    public int boardCpuSlots() {
+        return blockEntity.boardCpuSlots();
+    }
+
+    public int boardRamSlots() {
+        return blockEntity.boardRamSlots();
+    }
+
+    public int boardPcieSlots() {
+        return blockEntity.boardPcieSlots();
+    }
+
+    @org.jetbrains.annotations.Nullable
+    public static MainframeMenu fromNetwork(final int containerId, final Inventory playerInventory,
+                                            final RegistryFriendlyByteBuf buf) {
+        if (playerInventory.player.level().getBlockEntity(buf.readBlockPos())
+                instanceof MainframeBlockEntity be) {
+            return new MainframeMenu(containerId, playerInventory, be);
+        }
+        return null;
     }
 
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 138 + row * 18));
+                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 158 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 196));
+            addSlot(new Slot(inventory, col, 8 + col * 18, 218));
         }
     }
 

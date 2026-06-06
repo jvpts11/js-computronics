@@ -49,12 +49,36 @@ public class JscBlockStateProvider extends BlockStateProvider {
         dataCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
         dataCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
 
+        // The Mainframe is a 3x2x2 server rack. The controller carries the control
+        // panel on its front, casing on the sides, a ventilation grille on top.
         final ModelFile mainframeModel = models().orientable(
                 "mainframe",
                 modLoc("block/mainframe_side"),
                 modLoc("block/mainframe_front"),
                 modLoc("block/mainframe_top"));
         horizontalBlock(ComputingModule.MAINFRAME.get(), mainframeModel);
+
+        // Parts: the central column wears the control-panel face, the side columns
+        final ModelFile partCasing = models().cubeColumn(
+                "mainframe_part", modLoc("block/mainframe_side"), modLoc("block/mainframe_top"));
+        final ModelFile partCore = models().cubeColumn(
+                "mainframe_part_core", modLoc("block/mainframe_front"), modLoc("block/mainframe_top"));
+        getVariantBuilder(ComputingModule.MAINFRAME_PART.get()).forAllStates(state ->
+                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(state.getValue(
+                                dev.jsc.jscomputronics.module.computing.block.MainframePartBlock.CORE)
+                                ? partCore : partCasing)
+                        .build());
+
+        simpleBlock(ComputingModule.PERSONAL_ROUTER.get(),
+                models().cubeAll("personal_router", modLoc("block/personal_router")));
+
+        final ModelFile personalComputerModel = models().orientable(
+                "personal_computer",
+                modLoc("block/personal_computer_side"),
+                modLoc("block/personal_computer_front"),
+                modLoc("block/personal_computer_top"));
+        horizontalBlock(ComputingModule.PERSONAL_COMPUTER.get(), personalComputerModel);
     }
 
     private void dataCable(final DataCableBlock block, final String name) {

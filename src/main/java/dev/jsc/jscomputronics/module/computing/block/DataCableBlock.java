@@ -88,7 +88,8 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         if (neighbor instanceof DataCableBlock other) {
             return other.tier == this.tier;
         }
-        return neighbor instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+        return neighbor instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable device
+                && device.acceptedCableTiers().contains(this.tier);
     }
 
     @Override

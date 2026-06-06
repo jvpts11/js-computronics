@@ -43,10 +43,16 @@ public class JscItemModelProvider extends ItemModelProvider {
 
         getBuilder("mainframe")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/mainframe")));
+        getBuilder("personal_router")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_router")));
+        getBuilder("personal_computer")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_computer")));
         basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());
+        basicItem(ComputingModule.MOTHERBOARD_ATX_P.get());
         basicItem(ComputingModule.CPU_SERVO_2620.get());
         basicItem(ComputingModule.CPU_SERVO_2690.get());
         basicItem(ComputingModule.CPU_SERVO_2699.get());
+        basicItem(ComputingModule.CPU_APEX_3450.get());
         basicItem(ComputingModule.RAM_DDR3_8192.get());
         basicItem(ComputingModule.GPU_HD_7970.get());
         basicItem(ComputingModule.PSU_650G.get());
