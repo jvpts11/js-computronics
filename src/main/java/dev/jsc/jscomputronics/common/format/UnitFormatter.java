@@ -16,10 +16,10 @@ import java.util.Objects;
  */
 public final class UnitFormatter {
 
-    private static long THOUSAND = 1_000L;
-    private static long MILLION = 1_000_000L;
-    private static long BILLION = 1_000_000_000L;
-    private static long TRILLION = 1_000_000_000_000L;
+    private static final long THOUSAND = 1_000L;
+    private static final long MILLION = 1_000_000L;
+    private static final long BILLION = 1_000_000_000L;
+    private static final long TRILLION = 1_000_000_000_000L;
 
     private final Locale locale;
     private final NumberFormat fullFormat;

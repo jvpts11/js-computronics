@@ -10,12 +10,15 @@ package dev.jsc.jscomputronics.module.computing;
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.hardware.CpuSocket;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
+import dev.jsc.jscomputronics.common.hardware.DiskSize;
+import dev.jsc.jscomputronics.common.hardware.DiskSpec;
 import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
 import dev.jsc.jscomputronics.common.hardware.PcieGeneration;
 import dev.jsc.jscomputronics.common.hardware.PsuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamGeneration;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
+import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
@@ -28,7 +31,9 @@ import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalRouterBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
+import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.PsuItem;
@@ -71,6 +76,30 @@ public final class ComputingModule {
 
     public static final DeferredRegister<MenuType<?>> MENUS =
             DeferredRegister.create(Registries.MENU, JsComputronics.MODID);
+
+    public static final DeferredRegister.DataComponents COMPONENTS =
+            DeferredRegister.createDataComponents(JsComputronics.MODID);
+
+    // Data components — a Server item carries its state in its NBT: the items it
+    // stores, the hardware it is built from, and its network node identity.
+
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<net.minecraft.world.item.component.ItemContainerContents>>
+            SERVER_STORAGE = COMPONENTS.registerComponentType("server_storage", b -> b
+                    .persistent(net.minecraft.world.item.component.ItemContainerContents.CODEC)
+                    .networkSynchronized(net.minecraft.world.item.component.ItemContainerContents.STREAM_CODEC));
+
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<net.minecraft.world.item.component.ItemContainerContents>>
+            SERVER_HARDWARE = COMPONENTS.registerComponentType("server_hardware", b -> b
+                    .persistent(net.minecraft.world.item.component.ItemContainerContents.CODEC)
+                    .networkSynchronized(net.minecraft.world.item.component.ItemContainerContents.STREAM_CODEC));
+
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<java.util.UUID>>
+            SERVER_NODE_UUID = COMPONENTS.registerComponentType("server_node_uuid", b -> b
+                    .persistent(net.minecraft.core.UUIDUtil.CODEC)
+                    .networkSynchronized(net.minecraft.core.UUIDUtil.STREAM_CODEC));
 
     private static BlockBehaviour.Properties cableProperties() {
         return BlockBehaviour.Properties.of()
@@ -118,12 +147,30 @@ public final class ComputingModule {
                     () -> BlockEntityType.Builder.of(PersonalRouterBlockEntity::new,
                             PERSONAL_ROUTER.get()).build(null));
 
+    // Server Rack — houses Server items as network nodes
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.ServerRackBlock> SERVER_RACK =
+            BLOCKS.register("server_rack",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.ServerRackBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.METAL)
+                                    .strength(1.5F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> SERVER_RACK_ITEM = ITEMS.register(
+            "server_rack", () -> new BlockItem(SERVER_RACK.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ServerRackBlockEntity>> SERVER_RACK_BE =
+            BLOCK_ENTITIES.register("server_rack",
+                    () -> BlockEntityType.Builder.of(ServerRackBlockEntity::new, SERVER_RACK.get()).build(null));
+
     // Hardware components (Standard era — minimal set to build a Mainframe)
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(
             "motherboard_mtx_p", () -> new MotherboardItem(new Item.Properties(),
                     new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
-                            Set.of(RamGeneration.DDR3), 8, PcieGeneration.PCIE_3_0, 6, 8)));
+                            Set.of(RamGeneration.DDR3), 8, PcieGeneration.PCIE_3_0, 6, 4, 8)));
 
     public static final DeferredItem<CpuItem> CPU_SERVO_2620 = ITEMS.register(
             "cpu_servo_2620", () -> new CpuItem(new Item.Properties(),
@@ -148,14 +195,76 @@ public final class ComputingModule {
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
 
+    public static final DeferredItem<MotherboardItem> MOTHERBOARD_EEB_P = ITEMS.register(
+            "motherboard_eeb_p", () -> new MotherboardItem(new Item.Properties(),
+                    new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 2,
+                            Set.of(RamGeneration.DDR3), 8, PcieGeneration.PCIE_3_0, 6, 6, 6)));
+
+    /**
+     * A registered disk item with its tier and size, for datagen and creative-tab iteration.
+     */
+    public record DiskEntry(StorageTier tier, DiskSize size, DeferredItem<DiskItem> item) {
+        public String displayName() {
+            return tier.productName() + " " + size.displayName();
+        }
+    }
+
+    public static final java.util.List<DiskEntry> DISKS = registerDisks();
+
+    private static java.util.List<DiskEntry> registerDisks() {
+        final java.util.List<DiskEntry> disks = new java.util.ArrayList<>();
+        for (final StorageTier tier : StorageTier.values()) {
+            for (final DiskSize size : DiskSize.values()) {
+                final String id = "disk_" + tier.name().toLowerCase(java.util.Locale.ROOT) + "_" + size.id();
+                final DeferredItem<DiskItem> item = ITEMS.register(id, () -> new DiskItem(
+                        new Item.Properties(),
+                        new DiskSpec(tier, size.capacityItems(), tier.tdpWatts())));
+                disks.add(new DiskEntry(tier, size, item));
+            }
+        }
+        return java.util.List.copyOf(disks);
+    }
+
+    public static DiskItem disk(final StorageTier tier, final DiskSize size) {
+        for (final DiskEntry entry : DISKS) {
+            if (entry.tier() == tier && entry.size() == size) {
+                return entry.item().get();
+            }
+        }
+        throw new IllegalArgumentException("no registered disk for " + tier + " " + size);
+    }
+
+    // Server items
+
+    public static final DeferredItem<Item> SERVER_CASE = ITEMS.register(
+            "server_case", () -> new Item(new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.ServerItem> SERVER =
+            ITEMS.register("server", () -> new dev.jsc.jscomputronics.module.computing.item.ServerItem(
+                    new Item.Properties()));
+
+    public static net.minecraft.world.item.ItemStack defaultServer() {
+        final net.minecraft.world.item.ItemStack stack = new net.minecraft.world.item.ItemStack(SERVER.get());
+        final java.util.List<net.minecraft.world.item.ItemStack> hardware = java.util.List.of(
+                new net.minecraft.world.item.ItemStack(MOTHERBOARD_EEB_P.get()),
+                new net.minecraft.world.item.ItemStack(CPU_SERVO_2620.get()),
+                new net.minecraft.world.item.ItemStack(RAM_DDR3_8192.get()),
+                new net.minecraft.world.item.ItemStack(PSU_650G.get()),
+                new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)),
+                new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)));
+        stack.set(SERVER_HARDWARE.get(),
+                net.minecraft.world.item.component.ItemContainerContents.fromItems(hardware));
+        return stack;
+    }
+
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_ATX_P = ITEMS.register(
             "motherboard_atx_p", () -> new MotherboardItem(new Item.Properties(),
                     new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.AM3, 1,
-                            Set.of(RamGeneration.DDR3), 4, PcieGeneration.PCIE_3_0, 4, 4)));
+                            Set.of(RamGeneration.DDR3), 4, PcieGeneration.PCIE_3_0, 4, 2, 4)));
 
-    public static final DeferredItem<CpuItem> CPU_APEX_3450 = ITEMS.register(
-            "cpu_apex_3450", () -> new CpuItem(new Item.Properties(),
-                    new CpuSpec(HardwareEra.STANDARD, CpuSocket.AM3, 4, 3450, 95, false)));
+    public static final DeferredItem<CpuItem> CPU_ASCENT_965 = ITEMS.register(
+            "cpu_ascent_965", () -> new CpuItem(new Item.Properties(),
+                    new CpuSpec(HardwareEra.STANDARD, CpuSocket.AM3, 4, 3400, 125, false)));
 
     // Mainframe
 
@@ -210,5 +319,6 @@ public final class ComputingModule {
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
         MENUS.register(modEventBus);
+        COMPONENTS.register(modEventBus);
     }
 }

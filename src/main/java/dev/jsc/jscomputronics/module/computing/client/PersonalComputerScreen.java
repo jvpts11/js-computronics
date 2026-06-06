@@ -99,6 +99,10 @@ public class PersonalComputerScreen extends AbstractContainerScreen<PersonalComp
             for (int i = 0; i < gpu; i++) {
                 slot(g, x + 44 + i * 18, y + 96);
             }
+            final int disk = Math.min(menu.boardDiskSlots(), 2);
+            for (int i = 0; i < disk; i++) {
+                slot(g, x + 8 + i * 18, y + 96);
+            }
             g.fill(x + 6, y + 120, x + 170, y + 121, DIVIDER); // above storage
             for (int i = 0; i < 18; i++) {
                 slot(g, x + 8 + (i % 9) * 18, y + 124 + (i / 9) * 18);
@@ -132,6 +136,7 @@ public class PersonalComputerScreen extends AbstractContainerScreen<PersonalComp
             g.drawString(font, "CPU", 44, 22, LABEL, false);
             g.drawString(font, "RAM", 44, 54, LABEL, false);
             g.drawString(font, "GPU", 44, 86, LABEL, false);
+            g.drawString(font, "Disk", 8, 86, LABEL, false);
             g.drawString(font, "Storage", 8, 113, LABEL, false);
 
             final String status;

@@ -53,6 +53,10 @@ public class MainframeMenu extends AbstractContainerMenu {
             addSlot(new BoardSlot(hardware, MainframeBlockEntity.GPU_SLOTS_START + i,
                     44 + (i % 3) * 18, 110 + (i / 3) * 18, i, be::boardPcieSlots));
         }
+        for (int i = 0; i < MainframeBlockEntity.DISK_SLOTS; i++) {
+            addSlot(new BoardSlot(hardware, MainframeBlockEntity.DISK_SLOTS_START + i,
+                    8 + (i % 2) * 18, 100 + (i / 2) * 18, i, be::boardDiskSlots));
+        }
 
         addPlayerInventory(playerInventory);
         addDataSlots(this.data);
@@ -95,6 +99,10 @@ public class MainframeMenu extends AbstractContainerMenu {
 
     public int boardPcieSlots() {
         return blockEntity.boardPcieSlots();
+    }
+
+    public int boardDiskSlots() {
+        return blockEntity.boardDiskSlots();
     }
 
     @org.jetbrains.annotations.Nullable

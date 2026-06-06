@@ -8,6 +8,8 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.hardware.DiskSize;
+import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
@@ -16,12 +18,16 @@ import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.ServerStorageHandler;
+import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -328,6 +334,97 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA)
+    public static void mainframe_buildPicksUpInstalledDisk(final GameTestHelper helper) {
+        final BlockPos a = new BlockPos(2, 2, 2);
+        final MainframeBlockEntity be = placeRunningMainframe(helper, a);
+        be.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(
+                        be.storageItems() == DiskSize.TB_1.capacityItems(),
+                        "build should report the installed disk's capacity; got " + be.storageItems()))
+                .thenSucceed();
+    }
+
+    // Server Rack (Servers register as Category-C nodes on the network)
+
+    @GameTest(template = ARENA)
+    public static void serverRack_registersAndUnregistersServer(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(3, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe) {
+            rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        } else {
+            helper.fail("no server rack block entity placed");
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(net != null, "mainframe owns a network");
+                    final var servers = NetworkSystem.get(helper.getLevel()).serversOf(net);
+                    helper.assertTrue(servers.size() == 1,
+                            "the rack's Server should register on the mainframe network; got " + servers.size());
+                    helper.assertTrue(servers.get(0).storageMB() > 0,
+                            "registered Server should report its disk storage");
+                })
+                .thenExecute(() -> helper.setBlock(rack, Blocks.AIR)) // break the rack
+                .thenExecuteAfter(SETTLE, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).serversOf(net).isEmpty(),
+                            "breaking the rack must unregister its Server");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkStorage_queriesSelectsAndInserts(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(3, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(net != null, "mainframe owns a network");
+
+                    // Seed the Server with 100 cobblestone across two slots.
+                    final ServerStorageHandler storage = rackBe.getServerStorage(0);
+                    storage.insertItem(0, new ItemStack(Items.COBBLESTONE, 64), false);
+                    storage.insertItem(1, new ItemStack(Items.COBBLESTONE, 36), false);
+
+                    final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), net);
+                    helper.assertTrue(ns.count(Items.COBBLESTONE) == 100,
+                            "QUERY: network holds 100 cobblestone; got "
+                                    + ns.count(Items.COBBLESTONE));
+
+                    // SELECT 30 into a destination handler.
+                    final ItemStackHandler dest = new ItemStackHandler(9);
+                    final long moved = ns.select(Items.COBBLESTONE, 30, dest);
+                    helper.assertTrue(moved == 30, "SELECT should move 30; got " + moved);
+                    helper.assertTrue(ns.count(Items.COBBLESTONE) == 70,
+                            "network should have 70 after SELECT");
+
+                    // INSERT 10 back.
+                    final int inserted = ns.insert(new ItemStack(Items.COBBLESTONE, 10));
+                    helper.assertTrue(inserted == 10, "INSERT should store 10; got " + inserted);
+                    helper.assertTrue(ns.count(Items.COBBLESTONE) == 80,
+                            "network should have 80 after INSERT");
+                })
+                .thenSucceed();
+    }
+
     // Operation dispatch (the virtual-thread runtime on the Mainframe)
 
     @GameTest(template = ARENA)
@@ -404,7 +501,7 @@ public final class NetworkGameTests {
         hw.setStackInSlot(PersonalComputerBlockEntity.MOTHERBOARD_SLOT,
                 new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
         hw.setStackInSlot(PersonalComputerBlockEntity.CPU_SLOT,
-                new ItemStack(ComputingModule.CPU_APEX_3450.get()));
+                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
         hw.setStackInSlot(PersonalComputerBlockEntity.RAM_SLOTS_START,
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,

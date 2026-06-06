@@ -52,9 +52,17 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.CPU_SERVO_2620.get());
         basicItem(ComputingModule.CPU_SERVO_2690.get());
         basicItem(ComputingModule.CPU_SERVO_2699.get());
-        basicItem(ComputingModule.CPU_APEX_3450.get());
+        basicItem(ComputingModule.CPU_ASCENT_965.get());
         basicItem(ComputingModule.RAM_DDR3_8192.get());
         basicItem(ComputingModule.GPU_HD_7970.get());
         basicItem(ComputingModule.PSU_650G.get());
+        basicItem(ComputingModule.MOTHERBOARD_EEB_P.get());
+        basicItem(ComputingModule.SERVER_CASE.get());
+        basicItem(ComputingModule.SERVER.get());
+        getBuilder("server_rack")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack")));
+        for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
+            basicItem(disk.item().get());
+        }
     }
 }

@@ -73,6 +73,10 @@ public class JscBlockStateProvider extends BlockStateProvider {
         simpleBlock(ComputingModule.PERSONAL_ROUTER.get(),
                 models().cubeAll("personal_router", modLoc("block/personal_router")));
 
+        // Server Rack: stacked server units on the four sides, ventilation on top.
+        simpleBlock(ComputingModule.SERVER_RACK.get(), models().cubeColumn(
+                "server_rack", modLoc("block/server_rack_front"), modLoc("block/mainframe_top")));
+
         final ModelFile personalComputerModel = models().orientable(
                 "personal_computer",
                 modLoc("block/personal_computer_side"),

@@ -22,7 +22,7 @@ class ComputerBuildTest {
 
     private static MotherboardSpec mtxStandard() {
         return new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
-                Set.of(RamGeneration.DDR3), 24, PcieGeneration.PCIE_3_0, 10, 8);
+                Set.of(RamGeneration.DDR3), 24, PcieGeneration.PCIE_3_0, 10, 4, 8);
     }
 
     private static CpuSpec standardCpu() {
@@ -40,6 +40,10 @@ class ComputerBuildTest {
 
     private static PsuSpec psu(final int watts) {
         return new PsuSpec(watts, 90);
+    }
+
+    private static DiskSpec disk(final StorageTier tier, final long capacityItems, final int tdp) {
+        return new DiskSpec(tier, capacityItems, tdp);
     }
 
     @Test
@@ -142,6 +146,59 @@ class ComputerBuildTest {
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(standardGpu()), List.of(ddr3()), psu(650));
         assertEquals(395, build.powerDraw());
+    }
+
+    @Test
+    void disklessConvenienceConstructor_hasNoDisks() {
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650));
+        assertTrue(build.disks().isEmpty());
+        assertEquals(0L, build.totalStorageItems());
+        assertEquals(0L, build.storageMb());
+    }
+
+    @Test
+    void totalStorageItems_sumsDisks() {
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650),
+                List.of(disk(StorageTier.HDD, 100_000, 6), disk(StorageTier.SSD, 50_000, 3)));
+        assertEquals(150_000L, build.totalStorageItems());
+    }
+
+    @Test
+    void storageMb_isItemsTimesFour() {
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650),
+                List.of(disk(StorageTier.NVME, 1_000, 4)));
+        assertEquals(4_000L, build.storageMb());
+    }
+
+    @Test
+    void powerDraw_includesDisks() {
+        // 130W CPU + 15W RAM + (6W + 3W) disks = 154W.
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650),
+                List.of(disk(StorageTier.HDD, 100_000, 6), disk(StorageTier.SSD, 50_000, 3)));
+        assertEquals(154, build.powerDraw());
+    }
+
+    @Test
+    void tooManyDisks_isNotPowered() {
+        // mtxStandard has 4 disk slots; 5 disks must fail validation.
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650),
+                List.of(disk(StorageTier.HDD, 100, 6), disk(StorageTier.HDD, 100, 6),
+                        disk(StorageTier.HDD, 100, 6), disk(StorageTier.HDD, 100, 6),
+                        disk(StorageTier.HDD, 100, 6)));
+        assertFalse(build.isPowered());
+    }
+
+    @Test
+    void disksWithinSlots_isPowered() {
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650),
+                List.of(disk(StorageTier.NVME, 262_144, 5), disk(StorageTier.SSD, 262_144, 3)));
+        assertTrue(build.isPowered());
     }
 
     @Test

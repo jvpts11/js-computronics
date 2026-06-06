@@ -85,6 +85,10 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         for (int i = 0; i < gpu; i++) {
             slot(g, x + 44 + (i % 3) * 18, y + 110 + (i / 3) * 18);
         }
+        final int disk = Math.min(menu.boardDiskSlots(), 4);
+        for (int i = 0; i < disk; i++) {
+            slot(g, x + 8 + (i % 2) * 18, y + 100 + (i / 2) * 18);
+        }
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 slot(g, x + 8 + col * 18, y + 158 + row * 18);
@@ -105,6 +109,7 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         super.renderLabels(g, mouseX, mouseY);
 
         g.drawString(font, "Board", 8, 18, LABEL, false);
+        g.drawString(font, "Disk", 8, 90, LABEL, false);
         g.drawString(font, "CPU", 44, 18, LABEL, false);
         g.drawString(font, "RAM", 44, 50, LABEL, false);
         g.drawString(font, "PSU", 8, 62, LABEL, false);

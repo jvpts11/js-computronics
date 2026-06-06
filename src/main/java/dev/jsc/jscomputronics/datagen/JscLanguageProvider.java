@@ -34,14 +34,22 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");
+        addBlock(ComputingModule.SERVER_RACK, "Server Rack");
         add(ComputingModule.MOTHERBOARD_MTX_P.get(), "MTX-P Motherboard");
         add(ComputingModule.MOTHERBOARD_ATX_P.get(), "ATX-P Motherboard");
         add(ComputingModule.CPU_SERVO_2620.get(), "Integra Servo 2620");
         add(ComputingModule.CPU_SERVO_2690.get(), "Integra Servo 2690");
         add(ComputingModule.CPU_SERVO_2699.get(), "Integra Servo 2699");
-        add(ComputingModule.CPU_APEX_3450.get(), "Integra Apex 3450");
+        add(ComputingModule.CPU_ASCENT_965.get(), "Velocion Ascent X4 965");
         add(ComputingModule.RAM_DDR3_8192.get(), "Stratix DDR3-8192");
         add(ComputingModule.GPU_HD_7970.get(), "Pyrix Radiance HD 7970");
         add(ComputingModule.PSU_650G.get(), "MF PowerGold 650G");
+        add(ComputingModule.MOTHERBOARD_EEB_P.get(), "EEB-P Server Board");
+        add(ComputingModule.SERVER_CASE.get(), "Server Case");
+        add(ComputingModule.SERVER.get(), "Server");
+        add("item.jsc.server.tooltip", "Operates only inside a Server Rack");
+        for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
+            add(disk.item().get(), disk.displayName());
+        }
     }
 }

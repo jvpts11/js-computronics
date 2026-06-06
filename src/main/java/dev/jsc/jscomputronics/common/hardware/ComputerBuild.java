@@ -18,7 +18,8 @@ public record ComputerBuild(MotherboardSpec motherboard,
                             List<CpuSpec> cpus,
                             List<GpuSpec> gpus,
                             List<RamSpec> rams,
-                            PsuSpec psu) {
+                            PsuSpec psu,
+                            List<DiskSpec> disks) {
 
     public ComputerBuild {
         Objects.requireNonNull(motherboard, "motherboard must not be null");
@@ -26,6 +27,12 @@ public record ComputerBuild(MotherboardSpec motherboard,
         cpus = List.copyOf(cpus); // defensive copies, reject null elements
         gpus = List.copyOf(gpus);
         rams = List.copyOf(rams);
+        disks = List.copyOf(disks);
+    }
+
+    public ComputerBuild(final MotherboardSpec motherboard, final List<CpuSpec> cpus,
+                         final List<GpuSpec> gpus, final List<RamSpec> rams, final PsuSpec psu) {
+        this(motherboard, cpus, gpus, rams, psu, List.of());
     }
 
     public long totalCapacity() {
@@ -48,6 +55,18 @@ public record ComputerBuild(MotherboardSpec motherboard,
         return sum;
     }
 
+    public long totalStorageItems() {
+        long sum = 0L;
+        for (final DiskSpec disk : disks) {
+            sum += disk.capacityItems();
+        }
+        return sum;
+    }
+
+    public long storageMb() {
+        return totalStorageItems() * DiskSpec.MB_PER_ITEM;
+    }
+
     public int powerDraw() {
         int draw = 0;
         for (final CpuSpec cpu : cpus) {
@@ -58,6 +77,9 @@ public record ComputerBuild(MotherboardSpec motherboard,
         }
         for (final RamSpec ram : rams) {
             draw += ram.tdpWatts();
+        }
+        for (final DiskSpec disk : disks) {
+            draw += disk.tdpWatts();
         }
         return draw;
     }
@@ -98,6 +120,11 @@ public record ComputerBuild(MotherboardSpec motherboard,
             if (!motherboard.acceptedRam().contains(ram.generation())) {
                 problems.add("RAM generation " + ram.generation() + " not accepted by board");
             }
+        }
+
+        if (disks.size() > motherboard.diskSlots()) {
+            problems.add("too many disks: " + disks.size() + " installed, "
+                    + motherboard.diskSlots() + " disk slots");
         }
 
         final int draw = powerDraw();

@@ -42,15 +42,22 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.PERSONAL_ROUTER_ITEM.get());
                         output.accept(ComputingModule.MAINFRAME_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
+                        output.accept(ComputingModule.SERVER_RACK_ITEM.get());
                         output.accept(ComputingModule.MOTHERBOARD_MTX_P.get());
                         output.accept(ComputingModule.MOTHERBOARD_ATX_P.get());
                         output.accept(ComputingModule.CPU_SERVO_2620.get());
                         output.accept(ComputingModule.CPU_SERVO_2690.get());
                         output.accept(ComputingModule.CPU_SERVO_2699.get());
-                        output.accept(ComputingModule.CPU_APEX_3450.get());
+                        output.accept(ComputingModule.CPU_ASCENT_965.get());
                         output.accept(ComputingModule.RAM_DDR3_8192.get());
                         output.accept(ComputingModule.GPU_HD_7970.get());
                         output.accept(ComputingModule.PSU_650G.get());
+                        output.accept(ComputingModule.MOTHERBOARD_EEB_P.get());
+                        output.accept(ComputingModule.SERVER_CASE.get());
+                        output.accept(ComputingModule.defaultServer());
+                        for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
+                            output.accept(disk.item().get());
+                        }
                     })
                     .build());
 

@@ -22,6 +22,7 @@ public record MotherboardSpec(HardwareEra era,
                               int ramSlots,
                               PcieGeneration pcieGeneration,
                               int pcieSlots,
+                              int diskSlots,
                               int peripheralPorts) {
 
     public MotherboardSpec {
@@ -40,6 +41,9 @@ public record MotherboardSpec(HardwareEra era,
         }
         if (pcieSlots < 0) {
             throw new IllegalArgumentException("pcieSlots must be >= 0; got " + pcieSlots);
+        }
+        if (diskSlots < 0) {
+            throw new IllegalArgumentException("diskSlots must be >= 0; got " + diskSlots);
         }
         if (peripheralPorts < 0) {
             throw new IllegalArgumentException("peripheralPorts must be >= 0; got " + peripheralPorts);

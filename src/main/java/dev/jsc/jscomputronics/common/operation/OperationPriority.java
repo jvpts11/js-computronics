@@ -12,7 +12,8 @@ package dev.jsc.jscomputronics.common.operation;
  */
 public enum OperationPriority {
     LOW,
+    MEDIUM_LOW,
     MEDIUM,
-    HIGH,
-    CRITICAL
+    MEDIUM_HIGH,
+    HIGH
 }

@@ -60,6 +60,10 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
             addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.GPU_SLOTS_START + i,
                     44 + i * 18, 96, i, be::boardPcieSlots));
         }
+        for (int i = 0; i < PersonalComputerBlockEntity.DISK_SLOTS; i++) {
+            addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.DISK_SLOTS_START + i,
+                    8 + i * 18, 96, i, be::boardDiskSlots));
+        }
 
         final IItemHandler storageHandler = be.getStorage();
         for (int i = 0; i < STORAGE_SLOTS; i++) {
@@ -146,6 +150,10 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
 
     public int boardPcieSlots() {
         return blockEntity.boardPcieSlots();
+    }
+
+    public int boardDiskSlots() {
+        return blockEntity.boardDiskSlots();
     }
 
     public void setActiveTab(final int tab) {

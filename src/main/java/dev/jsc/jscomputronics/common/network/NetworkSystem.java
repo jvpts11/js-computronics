@@ -30,6 +30,14 @@ public final class NetworkSystem {
 
     private final java.util.Map<NetworkUuid, java.util.List<ServerNode>> serversByNetwork = new java.util.HashMap<>();
 
+    private final java.util.Map<NodeUuid, ServerLocation> serverLocations = new java.util.HashMap<>();
+
+    /**
+     * The Rack block and internal slot that house a Server, for storage resolution.
+     */
+    public record ServerLocation(long rackPos, int slot) {
+    }
+
     // Per-level acquisition (Phase 1+)
 
     public static NetworkSystem get(final ServerLevel level) {
@@ -85,9 +93,32 @@ public final class NetworkSystem {
 
     public void registerServer(ServerNode server) {
         java.util.Objects.requireNonNull(server, "server must not be null");
-        serversByNetwork
-                .computeIfAbsent(server.networkUuid(), k -> new java.util.ArrayList<>())
-                .add(server);
+        final java.util.List<ServerNode> list =
+                serversByNetwork.computeIfAbsent(server.networkUuid(), k -> new java.util.ArrayList<>());
+        // Idempotent by node UUID: replace any existing snapshot of the same
+        // Server so a Rack re-registering each tick never duplicates entries.
+        list.removeIf(s -> s.nodeUuid().equals(server.nodeUuid()));
+        list.add(server);
+    }
+
+    public void registerServer(ServerNode server, long rackPos, int slot) {
+        registerServer(server);
+        serverLocations.put(server.nodeUuid(), new ServerLocation(rackPos, slot));
+    }
+
+    public Optional<ServerLocation> locationOf(NodeUuid node) {
+        return Optional.ofNullable(serverLocations.get(node));
+    }
+
+    public void unregisterServer(NetworkUuid network, NodeUuid node) {
+        final java.util.List<ServerNode> list = serversByNetwork.get(network);
+        if (list != null) {
+            list.removeIf(s -> s.nodeUuid().equals(node));
+            if (list.isEmpty()) {
+                serversByNetwork.remove(network);
+            }
+        }
+        serverLocations.remove(node);
     }
 
     public java.util.List<ServerNode> serversOf(NetworkUuid networkUuid) {
@@ -135,5 +166,6 @@ public final class NetworkSystem {
         mainframesByNetwork.clear();
         subframesByNetwork.clear();
         serversByNetwork.clear();
+        serverLocations.clear();
     }
 }

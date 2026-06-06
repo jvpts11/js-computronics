@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
+import dev.jsc.jscomputronics.common.hardware.DiskSpec;
 import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
@@ -28,6 +29,7 @@ import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
+import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.PsuItem;
@@ -62,7 +64,9 @@ public class MainframeBlockEntity extends BlockEntity {
     public static final int GPU_SLOTS_START = 13;
     public static final int GPU_SLOTS = 6;
     public static final int PSU_SLOT = 19;
-    public static final int TOTAL_SLOTS = 20;
+    public static final int DISK_SLOTS_START = 20;
+    public static final int DISK_SLOTS = 4;
+    public static final int TOTAL_SLOTS = 24;
 
     private final ItemStackHandler inventory = new ItemStackHandler(TOTAL_SLOTS) {
         @Override
@@ -129,6 +133,9 @@ public class MainframeBlockEntity extends BlockEntity {
         if (slot >= GPU_SLOTS_START && slot < GPU_SLOTS_START + GPU_SLOTS) {
             return stack.getItem() instanceof GpuItem;
         }
+        if (slot >= DISK_SLOTS_START && slot < DISK_SLOTS_START + DISK_SLOTS) {
+            return stack.getItem() instanceof DiskItem;
+        }
         return false;
     }
 
@@ -175,7 +182,14 @@ public class MainframeBlockEntity extends BlockEntity {
                 gpus.add(gpu.spec());
             }
         }
-        return new ComputerBuild(motherboard.spec(), cpus, gpus, rams, psu.spec());
+        final int diskCount = Math.min(DISK_SLOTS, motherboard.spec().diskSlots());
+        final List<DiskSpec> disks = new ArrayList<>();
+        for (int i = 0; i < diskCount; i++) {
+            if (inventory.getStackInSlot(DISK_SLOTS_START + i).getItem() instanceof DiskItem disk) {
+                disks.add(disk.spec());
+            }
+        }
+        return new ComputerBuild(motherboard.spec(), cpus, gpus, rams, psu.spec(), disks);
     }
 
     public int boardCpuSlots() {
@@ -191,6 +205,16 @@ public class MainframeBlockEntity extends BlockEntity {
     public int boardPcieSlots() {
         return inventory.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
                 ? Math.min(GPU_SLOTS, m.spec().pcieSlots()) : 0;
+    }
+
+    public int boardDiskSlots() {
+        return inventory.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
+                ? Math.min(DISK_SLOTS, m.spec().diskSlots()) : 0;
+    }
+
+    public long storageItems() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0L : build.totalStorageItems();
     }
 
     public boolean buildValid() {

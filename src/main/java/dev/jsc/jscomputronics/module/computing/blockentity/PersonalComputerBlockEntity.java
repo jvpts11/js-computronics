@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
+import dev.jsc.jscomputronics.common.hardware.DiskSpec;
 import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
@@ -19,6 +20,7 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
+import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.PsuItem;
@@ -52,7 +54,9 @@ public class PersonalComputerBlockEntity extends BlockEntity {
     public static final int GPU_SLOTS_START = 6;
     public static final int GPU_SLOTS = 4;
     public static final int PSU_SLOT = 10;
-    public static final int HARDWARE_SLOTS = 11;
+    public static final int DISK_SLOTS_START = 11;
+    public static final int DISK_SLOTS = 2;
+    public static final int HARDWARE_SLOTS = 13;
 
     public static final int STORAGE_SLOTS = 18;
 
@@ -118,6 +122,9 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         if (slot >= GPU_SLOTS_START && slot < GPU_SLOTS_START + GPU_SLOTS) {
             return stack.getItem() instanceof GpuItem;
         }
+        if (slot >= DISK_SLOTS_START && slot < DISK_SLOTS_START + DISK_SLOTS) {
+            return stack.getItem() instanceof DiskItem;
+        }
         return false;
     }
 
@@ -146,23 +153,35 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         if (!(hardware.getStackInSlot(PSU_SLOT).getItem() instanceof PsuItem psu)) {
             return null;
         }
+        // Every count is clamped to what the installed board exposes, so a part in
+        // a slot the board does not offer is ignored (same rule as the Mainframe).
         final List<CpuSpec> cpus = new ArrayList<>();
-        if (hardware.getStackInSlot(CPU_SLOT).getItem() instanceof CpuItem cpu) {
+        if (motherboard.spec().cpuSlots() >= 1
+                && hardware.getStackInSlot(CPU_SLOT).getItem() instanceof CpuItem cpu) {
             cpus.add(cpu.spec());
         }
+        final int ramCount = Math.min(RAM_SLOTS, motherboard.spec().ramSlots());
         final List<RamSpec> rams = new ArrayList<>();
-        for (int i = 0; i < RAM_SLOTS; i++) {
+        for (int i = 0; i < ramCount; i++) {
             if (hardware.getStackInSlot(RAM_SLOTS_START + i).getItem() instanceof RamItem ram) {
                 rams.add(ram.spec());
             }
         }
+        final int gpuCount = Math.min(GPU_SLOTS, motherboard.spec().pcieSlots());
         final List<GpuSpec> gpus = new ArrayList<>();
-        for (int i = 0; i < GPU_SLOTS; i++) {
+        for (int i = 0; i < gpuCount; i++) {
             if (hardware.getStackInSlot(GPU_SLOTS_START + i).getItem() instanceof GpuItem gpu) {
                 gpus.add(gpu.spec());
             }
         }
-        return new ComputerBuild(motherboard.spec(), cpus, gpus, rams, psu.spec());
+        final int diskCount = Math.min(DISK_SLOTS, motherboard.spec().diskSlots());
+        final List<DiskSpec> disks = new ArrayList<>();
+        for (int i = 0; i < diskCount; i++) {
+            if (hardware.getStackInSlot(DISK_SLOTS_START + i).getItem() instanceof DiskItem disk) {
+                disks.add(disk.spec());
+            }
+        }
+        return new ComputerBuild(motherboard.spec(), cpus, gpus, rams, psu.spec(), disks);
     }
 
     public boolean buildValid() {
@@ -219,6 +238,11 @@ public class PersonalComputerBlockEntity extends BlockEntity {
     public int boardPcieSlots() {
         return hardware.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
                 ? m.spec().pcieSlots() : 0;
+    }
+
+    public int boardDiskSlots() {
+        return hardware.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
+                ? Math.min(DISK_SLOTS, m.spec().diskSlots()) : 0;
     }
 
     // Network connection (passive: the PC reads its network from the cable)
