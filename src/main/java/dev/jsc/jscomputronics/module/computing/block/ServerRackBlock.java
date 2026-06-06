@@ -74,18 +74,14 @@ public class ServerRackBlock extends Block implements EntityBlock, DataNetworkCo
     @Override
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
-        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof ServerRackBlockEntity rack) {
-            final var servers = rack.getServers();
-            for (int i = servers.getSlots() - 1; i >= 0; i--) {
-                final ItemStack server = servers.getStackInSlot(i);
-                if (!server.isEmpty()) {
-                    servers.setStackInSlot(i, ItemStack.EMPTY);
-                    if (!player.addItem(server)) {
-                        player.drop(server, false);
-                    }
-                    break;
-                }
-            }
+        // Empty-handed right-click opens the Rack GUI, where the player drags
+        // Servers into the slot they choose (and pulls them back out).
+        if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                && level.getBlockEntity(pos) instanceof ServerRackBlockEntity rack) {
+            serverPlayer.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                    (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu(id, inv, rack),
+                    net.minecraft.network.chat.Component.translatable("block.jsc.server_rack")),
+                    buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
     }

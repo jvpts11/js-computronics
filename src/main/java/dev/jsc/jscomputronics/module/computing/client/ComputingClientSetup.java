@@ -27,5 +27,7 @@ public final class ComputingClientSetup {
     public static void registerScreens(final RegisterMenuScreensEvent event) {
         event.register(ComputingModule.MAINFRAME_MENU.get(), MainframeScreen::new);
         event.register(ComputingModule.PERSONAL_COMPUTER_MENU.get(), PersonalComputerScreen::new);
+        event.register(ComputingModule.SERVER_RACK_MENU.get(), ServerRackScreen::new);
+        event.register(ComputingModule.SERVER_ASSEMBLY_MENU.get(), ServerAssemblyScreen::new);
     }
 }

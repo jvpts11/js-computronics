@@ -89,6 +89,10 @@ public class MainframeMenu extends AbstractContainerMenu {
         }
     }
 
+    public net.minecraft.core.BlockPos blockPos() {
+        return blockEntity.getBlockPos();
+    }
+
     public int boardCpuSlots() {
         return blockEntity.boardCpuSlots();
     }

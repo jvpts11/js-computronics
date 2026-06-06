@@ -26,11 +26,22 @@ public final class NetworkSystem {
 
     private final java.util.Map<NetworkUuid, MainframeNode> mainframesByNetwork = new java.util.HashMap<>();
 
+    private final java.util.Map<NetworkUuid, Long> mainframePosByNetwork = new java.util.HashMap<>();
+
     private final java.util.Map<NetworkUuid, List<SubframeNode>> subframesByNetwork = new java.util.HashMap<>();
 
     private final java.util.Map<NetworkUuid, java.util.List<ServerNode>> serversByNetwork = new java.util.HashMap<>();
 
     private final java.util.Map<NodeUuid, ServerLocation> serverLocations = new java.util.HashMap<>();
+
+    private final java.util.Map<NetworkUuid, java.util.List<PersonalComputerNode>> pcsByNetwork =
+            new java.util.HashMap<>();
+
+    /**
+     * A Personal Computer attached to a network: a Category-C node that issues, but never orchestrates, Operations.
+     */
+    public record PersonalComputerNode(NodeUuid nodeUuid, NetworkUuid networkUuid, long capacity) {
+    }
 
     /**
      * The Rack block and internal slot that house a Server, for storage resolution.
@@ -65,10 +76,19 @@ public final class NetworkSystem {
         mainframesByNetwork.put(mainframe.networkUuid(), mainframe);
     }
 
+    public void recordMainframePosition(NetworkUuid network, long pos) {
+        mainframePosByNetwork.put(network, pos);
+    }
+
+    public Optional<Long> mainframePositionOf(NetworkUuid network) {
+        return Optional.ofNullable(mainframePosByNetwork.get(network));
+    }
+
     public void unregisterMainframe(NetworkUuid network, NodeUuid node) {
         final MainframeNode current = mainframesByNetwork.get(network);
         if (current != null && current.nodeUuid().equals(node)) {
             mainframesByNetwork.remove(network);
+            mainframePosByNetwork.remove(network);
         }
     }
 
@@ -108,6 +128,29 @@ public final class NetworkSystem {
 
     public Optional<ServerLocation> locationOf(NodeUuid node) {
         return Optional.ofNullable(serverLocations.get(node));
+    }
+
+    public void registerPersonalComputer(PersonalComputerNode pc) {
+        java.util.Objects.requireNonNull(pc, "pc must not be null");
+        final java.util.List<PersonalComputerNode> list =
+                pcsByNetwork.computeIfAbsent(pc.networkUuid(), k -> new java.util.ArrayList<>());
+        list.removeIf(p -> p.nodeUuid().equals(pc.nodeUuid()));
+        list.add(pc);
+    }
+
+    public void unregisterPersonalComputer(NetworkUuid network, NodeUuid node) {
+        final java.util.List<PersonalComputerNode> list = pcsByNetwork.get(network);
+        if (list != null) {
+            list.removeIf(p -> p.nodeUuid().equals(node));
+            if (list.isEmpty()) {
+                pcsByNetwork.remove(network);
+            }
+        }
+    }
+
+    public java.util.List<PersonalComputerNode> personalComputersOf(NetworkUuid networkUuid) {
+        final var list = pcsByNetwork.get(networkUuid);
+        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
     }
 
     public void unregisterServer(NetworkUuid network, NodeUuid node) {
@@ -164,8 +207,10 @@ public final class NetworkSystem {
     public void clear() {
         connectivity.clear();
         mainframesByNetwork.clear();
+        mainframePosByNetwork.clear();
         subframesByNetwork.clear();
         serversByNetwork.clear();
         serverLocations.clear();
+        pcsByNetwork.clear();
     }
 }

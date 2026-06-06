@@ -101,6 +101,8 @@ public class PersonalComputerBlockEntity extends BlockEntity {
     private NodeUuid nodeUuid;
     @Nullable
     private NetworkUuid networkUuid;
+    @Nullable
+    private NetworkUuid registeredNetwork;
 
     public PersonalComputerBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.PERSONAL_COMPUTER_BE.get(), pos, state);
@@ -222,6 +224,19 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         return buildValid() ? currentBuild().ramBuffer() : 0L;
     }
 
+    // Network metadata. The PC NEVER touches network storage directly — every
+
+    private boolean onServerNetwork() {
+        return networkUuid != null && level instanceof ServerLevel;
+    }
+
+    public int networkServerCount() {
+        if (!onServerNetwork()) {
+            return 0;
+        }
+        return NetworkSystem.get((ServerLevel) level).serversOf(networkUuid).size();
+    }
+
     // Motherboard-derived slot availability
     // The installed board's spec decides how many CPU/RAM/GPU slots are usable;
 
@@ -245,6 +260,15 @@ public class PersonalComputerBlockEntity extends BlockEntity {
                 ? Math.min(DISK_SLOTS, m.spec().diskSlots()) : 0;
     }
 
+    public int usableStorageSlots() {
+        final ComputerBuild build = currentBuild();
+        if (build == null) {
+            return 0;
+        }
+        final long capacity = build.totalStorageItems();
+        return capacity <= 0 ? 0 : (int) Math.min(STORAGE_SLOTS, (capacity + 63) / 64);
+    }
+
     // Network connection (passive: the PC reads its network from the cable)
 
     private static final long NO_CABLE = Long.MIN_VALUE;
@@ -257,14 +281,31 @@ public class PersonalComputerBlockEntity extends BlockEntity {
     }
 
     private void tick(final ServerLevel level) {
-        if (!isRunning()) {
-            networkUuid = null;
-            return;
+        final NetworkSystem system = NetworkSystem.get(level);
+        NetworkUuid resolved = null;
+        if (isRunning()) {
+            final long cable = adjacentCable(level);
+            resolved = cable == NO_CABLE ? null : system.connectivity().networkOf(cable).orElse(null);
         }
-        final long cable = adjacentCable(level);
-        networkUuid = cable == NO_CABLE
-                ? null
-                : NetworkSystem.get(level).connectivity().networkOf(cable).orElse(null);
+
+        // Self-healing node registration: drop the old entry if the network changed
+        if (registeredNetwork != null && !registeredNetwork.equals(resolved)) {
+            system.unregisterPersonalComputer(registeredNetwork, nodeUuid());
+            registeredNetwork = null;
+        }
+        networkUuid = resolved;
+        if (resolved != null) {
+            system.registerPersonalComputer(
+                    new NetworkSystem.PersonalComputerNode(nodeUuid(), resolved, capacity()));
+            registeredNetwork = resolved;
+        }
+    }
+
+    public void onBroken(final ServerLevel level) {
+        if (registeredNetwork != null) {
+            NetworkSystem.get(level).unregisterPersonalComputer(registeredNetwork, nodeUuid());
+            registeredNetwork = null;
+        }
     }
 
     private long adjacentCable(final ServerLevel level) {
@@ -300,7 +341,7 @@ public class PersonalComputerBlockEntity extends BlockEntity {
 
     // A Personal Computer runs a single Operation queue; GPUs add parallel queues
     // only on a Mainframe/Subframe, so the PC never surfaces a queue count.
-    public static final int DATA_COUNT = 6;
+    public static final int DATA_COUNT = 7;
 
     private final int[] clientData = new int[DATA_COUNT];
 
@@ -312,6 +353,7 @@ public class PersonalComputerBlockEntity extends BlockEntity {
             case 3 -> (int) Math.min(Integer.MAX_VALUE, ramBuffer());
             case 4 -> autoStart ? 1 : 0;
             case 5 -> networkUuid != null ? 1 : 0;
+            case 6 -> networkServerCount();
             default -> 0;
         };
     }

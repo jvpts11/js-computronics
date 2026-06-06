@@ -84,10 +84,12 @@ public final class ComputingModule {
     // stores, the hardware it is built from, and its network node identity.
 
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
-            net.minecraft.core.component.DataComponentType<net.minecraft.world.item.component.ItemContainerContents>>
+            net.minecraft.core.component.DataComponentType<
+                    dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents>>
             SERVER_STORAGE = COMPONENTS.registerComponentType("server_storage", b -> b
-                    .persistent(net.minecraft.world.item.component.ItemContainerContents.CODEC)
-                    .networkSynchronized(net.minecraft.world.item.component.ItemContainerContents.STREAM_CODEC));
+                    .persistent(dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.CODEC)
+                    .networkSynchronized(
+                            dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.STREAM_CODEC));
 
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<net.minecraft.world.item.component.ItemContainerContents>>
@@ -165,6 +167,16 @@ public final class ComputingModule {
             BLOCK_ENTITIES.register("server_rack",
                     () -> BlockEntityType.Builder.of(ServerRackBlockEntity::new, SERVER_RACK.get()).build(null));
 
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu>> SERVER_RACK_MENU =
+            MENUS.register("server_rack", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu>> SERVER_ASSEMBLY_MENU =
+            MENUS.register("server_assembly", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu::fromNetwork));
+
     // Hardware components (Standard era — minimal set to build a Mainframe)
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(
@@ -236,8 +248,9 @@ public final class ComputingModule {
 
     // Server items
 
-    public static final DeferredItem<Item> SERVER_CASE = ITEMS.register(
-            "server_case", () -> new Item(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.ServerCaseItem> SERVER_CASE =
+            ITEMS.register("server_case",
+                    () -> new dev.jsc.jscomputronics.module.computing.item.ServerCaseItem(new Item.Properties()));
 
     public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.ServerItem> SERVER =
             ITEMS.register("server", () -> new dev.jsc.jscomputronics.module.computing.item.ServerItem(
@@ -245,12 +258,21 @@ public final class ComputingModule {
 
     public static net.minecraft.world.item.ItemStack defaultServer() {
         final net.minecraft.world.item.ItemStack stack = new net.minecraft.world.item.ItemStack(SERVER.get());
-        final java.util.List<net.minecraft.world.item.ItemStack> hardware = java.util.List.of(
-                new net.minecraft.world.item.ItemStack(MOTHERBOARD_EEB_P.get()),
-                new net.minecraft.world.item.ItemStack(CPU_SERVO_2620.get()),
-                new net.minecraft.world.item.ItemStack(RAM_DDR3_8192.get()),
-                new net.minecraft.world.item.ItemStack(PSU_650G.get()),
-                new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)),
+        final net.minecraft.core.NonNullList<net.minecraft.world.item.ItemStack> hardware =
+                net.minecraft.core.NonNullList.withSize(
+                        dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.SLOTS,
+                        net.minecraft.world.item.ItemStack.EMPTY);
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.MOBO,
+                new net.minecraft.world.item.ItemStack(MOTHERBOARD_EEB_P.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.CPU_START,
+                new net.minecraft.world.item.ItemStack(CPU_SERVO_2620.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.RAM_START,
+                new net.minecraft.world.item.ItemStack(RAM_DDR3_8192.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.PSU,
+                new net.minecraft.world.item.ItemStack(PSU_650G.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
+                new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START + 1,
                 new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)));
         stack.set(SERVER_HARDWARE.get(),
                 net.minecraft.world.item.component.ItemContainerContents.fromItems(hardware));

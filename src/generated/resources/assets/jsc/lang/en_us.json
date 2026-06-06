@@ -40,5 +40,9 @@
   "item.jsc.server": "Server",
   "item.jsc.server.tooltip": "Operates only inside a Server Rack",
   "item.jsc.server_case": "Server Case",
-  "itemGroup.jsc.main": "J's Computronics"
+  "item.jsc.server_case.tooltip": "Crafting ingredient for a Server",
+  "itemGroup.jsc.computing": "J's Computronics: Computing",
+  "itemGroup.jsc.industrial": "J's Computronics: Industrial",
+  "menu.jsc.network_overview": "Network Overview",
+  "menu.jsc.server_assembly": "Server Assembly"
 }

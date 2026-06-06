@@ -81,6 +81,17 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
+                            final BlockState newState, final boolean movedByPiston) {
+        if (!state.is(newState.getBlock())
+                && level instanceof net.minecraft.server.level.ServerLevel serverLevel
+                && level.getBlockEntity(pos) instanceof PersonalComputerBlockEntity computer) {
+            computer.onBroken(serverLevel); // drop this PC's network-node registration
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    @Override
     @Nullable
     public BlockEntity newBlockEntity(final BlockPos pos, final BlockState state) {
         return new PersonalComputerBlockEntity(pos, state);

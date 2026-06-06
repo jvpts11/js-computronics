@@ -27,6 +27,7 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
 
     public static final int TAB_LOCAL = 0;
     public static final int TAB_NETWORK = 1;
+    public static final int TAB_STORAGE = 2;
 
     public static final int BUTTON_POWER = 0;
     public static final int BUTTON_AUTOSTART = 1;
@@ -40,6 +41,9 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
     private final ContainerData data;
     private final ContainerLevelAccess access;
     private int activeTab = TAB_LOCAL;
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry>
+            networkItems = java.util.List.of();
 
     public PersonalComputerMenu(final int containerId, final Inventory playerInventory,
                                 final PersonalComputerBlockEntity be) {
@@ -65,9 +69,11 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
                     8 + i * 18, 96, i, be::boardDiskSlots));
         }
 
+        // Local storage lives on its own Storage tab and only as many slots as the
+        // installed disks back — a computer has no local storage without a disk.
         final IItemHandler storageHandler = be.getStorage();
         for (int i = 0; i < STORAGE_SLOTS; i++) {
-            addSlot(new TabSlot(storageHandler, i, 8 + (i % 9) * 18, 124 + (i / 9) * 18));
+            addSlot(new StorageSlot(storageHandler, i, 8 + (i % 9) * 18, 30 + (i / 9) * 18, i));
         }
 
         addPlayerInventory(playerInventory);
@@ -136,8 +142,40 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         }
     }
 
+    /**
+     * A local-storage slot: active only on the Storage tab, and only up to the disk-backed count.
+     */
+    private final class StorageSlot extends SlotItemHandler {
+        private final int relativeIndex;
+
+        private StorageSlot(final IItemHandler handler, final int index, final int x, final int y,
+                            final int relativeIndex) {
+            super(handler, index, x, y);
+            this.relativeIndex = relativeIndex;
+        }
+
+        @Override
+        public boolean isActive() {
+            // Already-held items stay reachable so a disk pulled later never traps them.
+            return activeTab == TAB_STORAGE && (relativeIndex < blockEntity.usableStorageSlots() || hasItem());
+        }
+
+        @Override
+        public boolean mayPlace(final ItemStack stack) {
+            return relativeIndex < blockEntity.usableStorageSlots() && super.mayPlace(stack);
+        }
+    }
+
     public int activeTab() {
         return activeTab;
+    }
+
+    public int usableStorageSlots() {
+        return blockEntity.usableStorageSlots();
+    }
+
+    public net.minecraft.core.BlockPos pcPos() {
+        return blockEntity.getBlockPos();
     }
 
     public int boardCpuSlots() {
@@ -157,9 +195,19 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
     }
 
     public void setActiveTab(final int tab) {
-        if (tab == TAB_LOCAL || tab == TAB_NETWORK) {
+        if (tab == TAB_LOCAL || tab == TAB_NETWORK || tab == TAB_STORAGE) {
             activeTab = tab;
         }
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry>
+            networkItems() {
+        return networkItems;
+    }
+
+    public void setNetworkItems(
+            final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry> items) {
+        this.networkItems = items;
     }
 
     public boolean isRunning() {
@@ -186,6 +234,10 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         return data.get(5) != 0;
     }
 
+    public int networkServerCount() {
+        return data.get(6);
+    }
+
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
         if (id == BUTTON_POWER) {
@@ -197,7 +249,14 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
             return true;
         }
         if (id >= BUTTON_TAB_BASE) {
-            setActiveTab(id - BUTTON_TAB_BASE);
+            final int tab = id - BUTTON_TAB_BASE;
+            setActiveTab(tab);
+            // Opening the Network tab dispatches a QUERY Operation; its reply fills the view.
+            if (tab == TAB_NETWORK
+                    && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                        .dispatchQuery(serverPlayer, blockEntity);
+            }
             return true;
         }
         return false;
@@ -210,13 +269,21 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(final Player player, final int index) {
-        // The hardware/storage slots are hidden on the Network tab; don't quick-move
-        // items into slots the player cannot see.
-        if (activeTab != TAB_LOCAL) {
-            return ItemStack.EMPTY;
-        }
         final Slot slot = slots.get(index);
         if (slot == null || !slot.hasItem()) {
+            return ItemStack.EMPTY;
+        }
+        // Network tab: shift-clicking an inventory item deposits it into the network
+        if (activeTab == TAB_NETWORK) {
+            if (index >= COMPUTER_SLOTS
+                    && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+                final ItemStack stack = slot.getItem();
+                if (!stack.isEmpty()
+                        && dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                                .dispatchInsert(serverPlayer, blockEntity, stack.copy())) {
+                    slot.set(ItemStack.EMPTY);
+                }
+            }
             return ItemStack.EMPTY;
         }
         final ItemStack stack = slot.getItem();

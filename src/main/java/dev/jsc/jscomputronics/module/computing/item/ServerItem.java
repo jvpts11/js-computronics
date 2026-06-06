@@ -36,8 +36,24 @@ public class ServerItem extends Item {
         super(properties.stacksTo(1));
     }
 
-    public static ItemContainerContents storage(final ItemStack stack) {
-        return stack.getOrDefault(ComputingModule.SERVER_STORAGE.get(), ItemContainerContents.EMPTY);
+    @Override
+    public net.minecraft.world.InteractionResultHolder<ItemStack> use(
+            final net.minecraft.world.level.Level level, final net.minecraft.world.entity.player.Player player,
+            final net.minecraft.world.InteractionHand hand) {
+        // Reopen the assembly GUI so the player can change this Server's build.
+        if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            serverPlayer.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                    (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu(id, inv, hand),
+                    Component.translatable("menu.jsc.server_assembly")),
+                    buf -> buf.writeEnum(hand));
+        }
+        return net.minecraft.world.InteractionResultHolder.sidedSuccess(
+                player.getItemInHand(hand), level.isClientSide());
+    }
+
+    public static dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents storage(final ItemStack stack) {
+        return stack.getOrDefault(ComputingModule.SERVER_STORAGE.get(),
+                dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.EMPTY);
     }
 
     public static ItemContainerContents hardware(final ItemStack stack) {
@@ -50,13 +66,18 @@ public class ServerItem extends Item {
 
     @Nullable
     public static ComputerBuild build(final ItemStack stack) {
+        return buildFrom(hardware(stack).nonEmptyItems());
+    }
+
+    @Nullable
+    public static ComputerBuild buildFrom(final Iterable<ItemStack> parts) {
         MotherboardSpec board = null;
         PsuSpec psu = null;
         final List<CpuSpec> cpus = new ArrayList<>();
         final List<RamSpec> rams = new ArrayList<>();
         final List<GpuSpec> gpus = new ArrayList<>();
         final List<DiskSpec> disks = new ArrayList<>();
-        for (final ItemStack part : hardware(stack).nonEmptyItems()) {
+        for (final ItemStack part : parts) {
             if (part.getItem() instanceof MotherboardItem m) {
                 board = m.spec();
             } else if (part.getItem() instanceof PsuItem p) {
@@ -85,10 +106,13 @@ public class ServerItem extends Item {
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
-        final long stored = storage(stack).stream().filter(s -> !s.isEmpty()).count();
+        final long stored = storage(stack).total();
+        final ComputerBuild assembled = build(stack);
+        final long capacity = assembled == null ? 0L : assembled.totalStorageItems();
         tooltip.add(Component.translatable("item.jsc.server.tooltip")
                 .withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal(stored + " stored item stacks").withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.literal(stored + " / " + capacity + " items stored")
+                .withStyle(ChatFormatting.DARK_GRAY));
         final UUID uuid = nodeUuid(stack);
         if (uuid != null) {
             tooltip.add(Component.literal("Node " + uuid.toString().substring(0, 8))

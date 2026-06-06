@@ -48,12 +48,21 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         autoButton = addRenderableWidget(Button.builder(Component.literal("Auto: OFF"),
                         b -> sendButton(MainframeMenu.BUTTON_AUTOSTART))
                 .bounds(leftPos + PANEL_X, topPos + 116, 62, 18).build());
+        addRenderableWidget(Button.builder(Component.literal("Network"),
+                        b -> openNetworkOverview())
+                .bounds(leftPos + PANEL_X, topPos + 136, 62, 18).build());
     }
 
     private void sendButton(final int id) {
         if (minecraft != null && minecraft.gameMode != null) {
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
         }
+    }
+
+    private void openNetworkOverview() {
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.jsc.jscomputronics.module.computing.operation.payload.RequestNetworkNodesPayload(
+                        menu.blockPos()));
     }
 
     @Override

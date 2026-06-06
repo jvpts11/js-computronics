@@ -24,7 +24,8 @@ public class JscLanguageProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
-        add("itemGroup.jsc.main", "J's Computronics");
+        add("itemGroup.jsc.industrial", "J's Computronics: Industrial");
+        add("itemGroup.jsc.computing", "J's Computronics: Computing");
         addBlock(IndustrialModule.MACERATOR, "Macerator");
         addBlock(IndustrialModule.COAL_GENERATOR, "Coal Generator");
         add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
@@ -48,6 +49,9 @@ public class JscLanguageProvider extends LanguageProvider {
         add(ComputingModule.SERVER_CASE.get(), "Server Case");
         add(ComputingModule.SERVER.get(), "Server");
         add("item.jsc.server.tooltip", "Operates only inside a Server Rack");
+        add("item.jsc.server_case.tooltip", "Crafting ingredient for a Server");
+        add("menu.jsc.server_assembly", "Server Assembly");
+        add("menu.jsc.network_overview", "Network Overview");
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             add(disk.item().get(), disk.displayName());
         }

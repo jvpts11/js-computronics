@@ -57,6 +57,9 @@ public class ServerRackBlockEntity extends BlockEntity {
 
     private final Map<UUID, NetworkUuid> registered = new HashMap<>();
 
+    private final net.minecraft.world.inventory.ContainerData data =
+            new net.minecraft.world.inventory.SimpleContainerData(1);
+
     public ServerRackBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.SERVER_RACK_BE.get(), pos, state);
     }
@@ -65,8 +68,12 @@ public class ServerRackBlockEntity extends BlockEntity {
         return servers;
     }
 
-    public ServerStorageHandler getServerStorage(final int slot) {
-        return new ServerStorageHandler(this, slot);
+    public net.minecraft.world.inventory.ContainerData getDataAccess() {
+        return data;
+    }
+
+    public dev.jsc.jscomputronics.module.computing.storage.ServerStore getServerStorage(final int slot) {
+        return new dev.jsc.jscomputronics.module.computing.storage.ServerStore(this, slot);
     }
 
     public static void serverTick(final Level level, final BlockPos pos,
@@ -79,11 +86,17 @@ public class ServerRackBlockEntity extends BlockEntity {
     private void tick(final ServerLevel level) {
         final NetworkSystem system = NetworkSystem.get(level);
         final NetworkUuid network = adjacentNetwork(level, system);
+        data.set(0, network != null ? 1 : 0);
 
         final Set<UUID> present = new HashSet<>();
         for (int i = 0; i < CAPACITY; i++) {
             final ItemStack stack = servers.getStackInSlot(i);
             if (!(stack.getItem() instanceof ServerItem)) {
+                continue;
+            }
+            // Only an assembled Server (board + PSU) is a real node; an empty
+            // Server sitting in the Rack is inert storage and not registered.
+            if (ServerItem.build(stack) == null) {
                 continue;
             }
             final UUID node = ensureNodeUuid(stack);

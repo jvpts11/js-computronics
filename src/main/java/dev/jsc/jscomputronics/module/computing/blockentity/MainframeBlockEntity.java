@@ -20,6 +20,7 @@ import dev.jsc.jscomputronics.common.network.MainframeNode;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.operation.OperationDispatch;
 import dev.jsc.jscomputronics.common.operation.OperationPriority;
+import dev.jsc.jscomputronics.common.operation.OperationTask;
 import dev.jsc.jscomputronics.common.operation.SelfTestOperationTask;
 import dev.jsc.jscomputronics.common.persistence.NetworkRegistrySavedData;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
@@ -261,8 +262,6 @@ public class MainframeBlockEntity extends BlockEntity {
 
     // Network connection
 
-    private static final long NO_CABLE = Long.MIN_VALUE;
-
     public static void serverTick(final Level level, final BlockPos pos,
                                   final BlockState state, final MainframeBlockEntity be) {
         if (level instanceof ServerLevel serverLevel) {
@@ -286,37 +285,65 @@ public class MainframeBlockEntity extends BlockEntity {
         final ConnectivityIndex index = system.connectivity();
         final NetworkUuid own = nativeNetworkUuid();
 
-        final long cable = adjacentCable(level);
+        // Every cable touching ANY external face of the multiblock — not just the
+        // first one found — so a cable on any side joins the mainframe's network.
+        final java.util.Set<Long> cables = adjacentCables(level);
+
         final NetworkUuid effective;
         final boolean conflict;
-        if (cable == NO_CABLE) {
+        if (cables.isEmpty()) {
             effective = own;
             conflict = false; // with no cable this mainframe shares its network with no one
         } else {
-            final Optional<NetworkUuid> segment = index.networkOf(cable);
-            if (segment.isPresent()) {
-                effective = segment.get();
-            } else if (index.contains(cable)) {
-                // Registered but UUID-less: this mainframe claims the segment.
-                index.assignUuid(cable, own);
-                NetworkRegistrySavedData.get(level).addNetwork(own);
-                effective = own;
-            } else {
-                // The cable block is present (found by block-state scan) but its
-                effective = own;
+            // Adopt the network of any touched cable that already carries one (so a
+            NetworkUuid existing = null;
+            for (final long cable : cables) {
+                final Optional<NetworkUuid> segment = index.networkOf(cable);
+                if (segment.isPresent()) {
+                    existing = segment.get();
+                    break;
+                }
             }
-            conflict = sharesSegmentWithAnotherMainframe(level, index, cable);
+            effective = existing != null ? existing : own;
+            if (existing == null) {
+                NetworkRegistrySavedData.get(level).addNetwork(own);
+            }
+            boolean shared = false;
+            for (final long cable : cables) {
+                if (sharesSegmentWithAnotherMainframe(level, index, cable)) {
+                    shared = true;
+                    break;
+                }
+            }
+            conflict = shared;
         }
 
         setConflict(level, conflict);
         if (conflict) {
             networkUuid = null;
             unregister(system);
-        } else {
-            networkUuid = effective;
-            system.registerMainframe(snapshot(effective));
-            registeredNetwork = effective;
+            return;
         }
+
+        // Pull every touched cable component into the one effective network. A
+        for (final long cable : cables) {
+            if (index.contains(cable) && !effective.equals(index.networkOf(cable).orElse(null))) {
+                index.assignUuid(cable, effective);
+            }
+        }
+
+        networkUuid = effective;
+        system.registerMainframe(snapshot(effective));
+        system.recordMainframePosition(effective, worldPosition.asLong());
+        registeredNetwork = effective;
+    }
+
+    public boolean submitOperation(final OperationTask task, final OperationPriority priority) {
+        if (dispatch == null || !isRunning()) {
+            return false;
+        }
+        dispatch.submit(task, priority);
+        return true;
     }
 
     private void leaveNetwork(final ServerLevel level) {
@@ -369,7 +396,7 @@ public class MainframeBlockEntity extends BlockEntity {
         networkConflict = conflict;
     }
 
-    private long adjacentCable(final ServerLevel level) {
+    private java.util.Set<Long> adjacentCables(final ServerLevel level) {
         // The Mainframe is a 3x2x2 multiblock; a cable may touch any external face of
         final Direction facing = getBlockState().getValue(HorizontalDirectionalBlock.FACING);
         final java.util.Set<Long> inside = new java.util.HashSet<>();
@@ -381,6 +408,9 @@ public class MainframeBlockEntity extends BlockEntity {
                 inside.add(p.asLong());
             }
         }
+        // Collect EVERY cable on an external face, not just the first — the mainframe
+        // bridges all of them into its single network.
+        final java.util.Set<Long> cables = new java.util.LinkedHashSet<>();
         for (final long posLong : inside) {
             final BlockPos p = BlockPos.of(posLong);
             for (final Direction direction : Direction.values()) {
@@ -390,11 +420,11 @@ public class MainframeBlockEntity extends BlockEntity {
                 }
                 if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock cable
                         && acceptsTier(cable.tier())) {
-                    return neighbor.asLong();
+                    cables.add(neighbor.asLong());
                 }
             }
         }
-        return NO_CABLE;
+        return cables;
     }
 
     private boolean acceptsTier(final DataTier tier) {
