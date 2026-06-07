@@ -36,10 +36,10 @@ public class ServerRackMenu extends AbstractContainerMenu {
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
         this.data = be.getDataAccess();
 
-        // One vertical 1U bay per slot, stacked like blades in a rack.
+        // One bay row per slot: the Server slot anchors a status line in the manifest.
         final IItemHandler servers = be.getServers();
         for (int i = 0; i < RACK_SLOTS; i++) {
-            addSlot(new SlotItemHandler(servers, i, 14, 22 + i * 18));
+            addSlot(new SlotItemHandler(servers, i, 12, 71 + i * 18));
         }
         addPlayerInventory(playerInventory);
         addDataSlots(data);
@@ -66,11 +66,11 @@ public class ServerRackMenu extends AbstractContainerMenu {
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 178 + row * 18));
+                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 220 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 236));
+            addSlot(new Slot(inventory, col, 8 + col * 18, 278));
         }
     }
 

@@ -36,24 +36,25 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
         this.hand = hand;
         final ServerHardwareHandler hw = new ServerHardwareHandler(owner, hand);
 
-        // Left column: board + PSU on one row, disks in a 2-wide grid below.
-        addSlot(new SlotItemHandler(hw, ServerHardwareHandler.MOBO, 8, 28));
-        addSlot(new SlotItemHandler(hw, ServerHardwareHandler.PSU, 26, 28));
+        // The spec readout (tiles + tracks + problems, in a smaller font) sits on top;
+        // the bays follow. Left column: board + PSU on one row, disks in a 2-wide grid.
+        addSlot(new SlotItemHandler(hw, ServerHardwareHandler.MOBO, 8, 96));
+        addSlot(new SlotItemHandler(hw, ServerHardwareHandler.PSU, 26, 96));
         for (int i = 0; i < ServerHardwareHandler.DISK; i++) {
             addSlot(new SlotItemHandler(hw, ServerHardwareHandler.DISK_START + i,
-                    8 + (i % 2) * 18, 58 + (i / 2) * 18));
+                    8 + (i % 2) * 18, 126 + (i / 2) * 18));
         }
         // Middle column: CPUs on a row, RAM in 2 rows, GPUs in 2 rows.
         for (int i = 0; i < ServerHardwareHandler.CPU; i++) {
-            addSlot(new SlotItemHandler(hw, ServerHardwareHandler.CPU_START + i, 52 + i * 18, 28));
+            addSlot(new SlotItemHandler(hw, ServerHardwareHandler.CPU_START + i, 52 + i * 18, 96));
         }
         for (int i = 0; i < ServerHardwareHandler.RAM; i++) {
             addSlot(new SlotItemHandler(hw, ServerHardwareHandler.RAM_START + i,
-                    52 + (i % 4) * 18, 58 + (i / 4) * 18));
+                    52 + (i % 4) * 18, 126 + (i / 4) * 18));
         }
         for (int i = 0; i < ServerHardwareHandler.GPU; i++) {
             addSlot(new SlotItemHandler(hw, ServerHardwareHandler.GPU_START + i,
-                    52 + (i % 3) * 18, 106 + (i / 3) * 18));
+                    52 + (i % 3) * 18, 174 + (i / 3) * 18));
         }
 
         addPlayerInventory(playerInventory);
@@ -73,14 +74,23 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
         return ServerItem.buildFrom(parts);
     }
 
+    @org.jetbrains.annotations.Nullable
+    public java.util.UUID nodeUuid() {
+        return ServerItem.nodeUuid(owner.getItemInHand(hand));
+    }
+
+    public long storedItems() {
+        return ServerItem.storage(owner.getItemInHand(hand)).total();
+    }
+
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 160 + row * 18));
+                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 214 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 218));
+            addSlot(new Slot(inventory, col, 8 + col * 18, 272));
         }
     }
 

@@ -46,8 +46,9 @@ public class JscBlockStateProvider extends BlockStateProvider {
 
         horizontalBlock(IndustrialModule.COAL_GENERATOR.get(), coalGeneratorModel);
 
-        dataCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
-        dataCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
+        pipeCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
+        pipeCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
+        pipeCable(ComputingModule.PERIPHERAL_CABLE.get(), "peripheral_cable");
 
         // The Mainframe is a 3x2x2 server rack. The controller carries the control
         // panel on its front, casing on the sides, a ventilation grille on top.
@@ -73,9 +74,20 @@ public class JscBlockStateProvider extends BlockStateProvider {
         simpleBlock(ComputingModule.PERSONAL_ROUTER.get(),
                 models().cubeAll("personal_router", modLoc("block/personal_router")));
 
-        // Server Rack: stacked server units on the four sides, ventilation on top.
-        simpleBlock(ComputingModule.SERVER_RACK.get(), models().cubeColumn(
-                "server_rack", modLoc("block/server_rack_front"), modLoc("block/mainframe_top")));
+        // Server Rack: a 2x3x2 multiblock cabinet that reads as one tall rack. Every
+        final ModelFile rackBay = models().cubeColumn(
+                "server_rack", modLoc("block/server_rack_front"), modLoc("block/mainframe_top"));
+        final ModelFile rackHeader = models().cubeColumn(
+                "server_rack_part", modLoc("block/server_rack_upper"), modLoc("block/mainframe_top"));
+        getVariantBuilder(ComputingModule.SERVER_RACK.get()).forAllStates(state ->
+                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(rackBay).build());
+        getVariantBuilder(ComputingModule.SERVER_RACK_PART.get()).forAllStates(state ->
+                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(state.getValue(
+                                dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.TOP)
+                                ? rackHeader : rackBay)
+                        .build());
 
         final ModelFile personalComputerModel = models().orientable(
                 "personal_computer",
@@ -83,9 +95,31 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/personal_computer_front"),
                 modLoc("block/personal_computer_top"));
         horizontalBlock(ComputingModule.PERSONAL_COMPUTER.get(), personalComputerModel);
+
+        // Monitor: a screen on the front, casing on the other faces. The screen has
+        final ModelFile monitorOff = models().orientable(
+                "monitor",
+                modLoc("block/monitor_side"),
+                modLoc("block/monitor_front"),
+                modLoc("block/monitor_side"));
+        final ModelFile monitorOn = models().orientable(
+                "monitor_on",
+                modLoc("block/monitor_side"),
+                modLoc("block/monitor_front_on"),
+                modLoc("block/monitor_side"));
+        getVariantBuilder(ComputingModule.MONITOR.get()).forAllStates(state -> {
+            final boolean lit = state.getValue(
+                    net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT);
+            final net.minecraft.core.Direction facing = state.getValue(
+                    net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                    .modelFile(lit ? monitorOn : monitorOff)
+                    .rotationY((int) facing.toYRot() % 360)
+                    .build();
+        });
     }
 
-    private void dataCable(final DataCableBlock block, final String name) {
+    private void pipeCable(final net.minecraft.world.level.block.Block block, final String name) {
         final ResourceLocation texture = modLoc("block/" + name);
         final ModelFile core = models()
                 .withExistingParent(name + "_core", modLoc("block/cable_core"))

@@ -140,12 +140,30 @@ public class ServerRackBlockEntity extends BlockEntity {
     }
 
     private NetworkUuid adjacentNetwork(final ServerLevel level, final NetworkSystem system) {
-        for (final Direction direction : Direction.values()) {
-            final BlockPos neighbor = worldPosition.relative(direction);
-            if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock) {
-                final var net = system.connectivity().networkOf(neighbor.asLong());
-                if (net.isPresent()) {
-                    return net.get();
+        final Direction facing = getBlockState().getValue(
+                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+        final Set<Long> inside = new HashSet<>();
+        for (final BlockPos p : dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                .allPositions(worldPosition, facing)) {
+            if (p.equals(worldPosition)) {
+                inside.add(p.asLong());
+            } else if (level.getBlockEntity(p) instanceof ServerRackPartBlockEntity part
+                    && worldPosition.equals(part.controllerPos())) {
+                inside.add(p.asLong());
+            }
+        }
+        for (final long posLong : inside) {
+            final BlockPos p = BlockPos.of(posLong);
+            for (final Direction direction : Direction.values()) {
+                final BlockPos neighbor = p.relative(direction);
+                if (inside.contains(neighbor.asLong())) {
+                    continue; // a face internal to the cabinet
+                }
+                if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock) {
+                    final var net = system.connectivity().networkOf(neighbor.asLong());
+                    if (net.isPresent()) {
+                        return net.get();
+                    }
                 }
             }
         }

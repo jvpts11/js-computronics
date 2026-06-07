@@ -1,0 +1,403 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jsc.jscomputronics.module.computing.menu;
+
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
+import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
+import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry;
+import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.SlotItemHandler;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Menu for the Monitor terminal — the tabbed interface a Monitor opens onto the computer it is linked to.
+ */
+public class ComputerTerminalMenu extends AbstractContainerMenu {
+
+    public static final int TAB_LOCAL = 0;
+    public static final int TAB_STORAGE = 1;
+    public static final int TAB_NETWORK = 2;
+    public static final int TAB_OPS = 3;
+    public static final int TAB_TASKS = 4;
+
+    // Slot layout (relative to the screen's top-left). The screen draws the slot
+    // backgrounds and the inventory at these exact positions.
+    public static final int STORAGE_COLS = 9;
+    public static final int STORAGE_X = 68;
+    public static final int STORAGE_Y = 40;
+    public static final int INV_X = 41;
+    public static final int INV_Y = 148;
+    public static final int HOTBAR_Y = 206;
+
+    private static final double MONITOR_REACH = 16.0;
+
+    private static final int DATA_COUNT = 24;
+    private static final int DATA_USABLE_SLOTS = 18;
+
+    private final Level level;
+    @Nullable
+    private final ComputerTerminalHost host;
+    private final BlockPos hostPos;
+    private final BlockPos monitorPos;
+    private final int storageCount;
+
+    private int activeTab = TAB_LOCAL;
+
+    private java.util.List<NetworkItemEntry> networkItems = java.util.List.of();
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload.ServerHolding>
+            serverBreakdown = java.util.List.of();
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord>
+            operationsLog = java.util.List.of();
+
+    private final int[] clientData = new int[DATA_COUNT];
+
+    private final ContainerData data = new ContainerData() {
+        @Override
+        public int get(final int index) {
+            if (level.isClientSide) {
+                return index >= 0 && index < clientData.length ? clientData[index] : 0;
+            }
+            return serverValue(index);
+        }
+
+        @Override
+        public void set(final int index, final int value) {
+            if (index >= 0 && index < clientData.length) {
+                clientData[index] = value;
+            }
+        }
+
+        @Override
+        public int getCount() {
+            return DATA_COUNT;
+        }
+    };
+
+    public ComputerTerminalMenu(final int containerId, final Inventory playerInventory,
+                                @Nullable final ComputerTerminalHost host,
+                                final BlockPos hostPos, final BlockPos monitorPos) {
+        super(ComputingModule.COMPUTER_TERMINAL_MENU.get(), containerId);
+        this.level = playerInventory.player.level();
+        this.host = host;
+        this.hostPos = hostPos.immutable();
+        this.monitorPos = monitorPos.immutable();
+
+        final IItemHandler storage = host == null ? null : host.localStorage();
+        this.storageCount = storage == null ? 0 : storage.getSlots();
+        if (storage != null) {
+            for (int i = 0; i < storageCount; i++) {
+                final int col = i % STORAGE_COLS;
+                final int row = i / STORAGE_COLS;
+                addSlot(new StorageSlot(storage, i, STORAGE_X + col * 18, STORAGE_Y + row * 18));
+            }
+        }
+        addPlayerInventory(playerInventory);
+        addDataSlots(data);
+    }
+
+    /**
+     * A storage slot active only on the Storage tab and within the disk-gated count.
+     */
+    private final class StorageSlot extends SlotItemHandler {
+        private StorageSlot(final IItemHandler handler, final int index, final int x, final int y) {
+            super(handler, index, x, y);
+        }
+
+        @Override
+        public boolean isActive() {
+            return activeTab == TAB_STORAGE && getSlotIndex() < usableStorageSlots();
+        }
+    }
+
+    private void addPlayerInventory(final Inventory inventory) {
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                addSlot(new Slot(inventory, col + row * 9 + 9, INV_X + col * 18, INV_Y + row * 18));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            addSlot(new Slot(inventory, col, INV_X + col * 18, HOTBAR_Y));
+        }
+    }
+
+    @Nullable
+    public static ComputerTerminalMenu fromNetwork(final int containerId, final Inventory playerInventory,
+                                                   final RegistryFriendlyByteBuf buf) {
+        final BlockPos monitorPos = buf.readBlockPos();
+        final BlockPos hostPos = buf.readBlockPos();
+        final var be = playerInventory.player.level().getBlockEntity(hostPos);
+        if (be instanceof ComputerTerminalHost terminalHost) {
+            return new ComputerTerminalMenu(containerId, playerInventory, terminalHost, hostPos, monitorPos);
+        }
+        return null;
+    }
+
+    private int serverValue(final int index) {
+        if (host == null) {
+            return 0;
+        }
+        return switch (index) {
+            case 0 -> host.computerRunning() ? 1 : 0;
+            case 1 -> host.computerBuildValid() ? 1 : 0;
+            case 2 -> host.networkLinkState();
+            case 3 -> clampInt(host.orchestrationCapacity());
+            case 4 -> host.computerQueues();
+            case 5 -> clampInt(host.computerRamBuffer());
+            case 6 -> host.networkServerCount();
+            case 7 -> host.installedCpus();
+            case 8 -> host.cpuSlots();
+            case 9 -> host.installedRam();
+            case 10 -> host.ramSlots();
+            case 11 -> host.installedGpus();
+            case 12 -> host.gpuSlots();
+            case 13 -> host.installedDisks();
+            case 14 -> host.diskSlots();
+            case 15 -> clampInt(host.localStorageUsed());
+            case 16 -> clampInt(host.localStorageCapacity());
+            case 17 -> host.isMainframeHost() ? 1 : 0;
+            case DATA_USABLE_SLOTS -> host.usableStorageSlots();
+            case 19 -> host.pendingOperations();
+            case 20 -> host.runningOperations();
+            case 21 -> host.completedOperations();
+            case 22 -> host.networkPcCount();
+            case 23 -> host.networkSubframeCount();
+            default -> 0;
+        };
+    }
+
+    private static int clampInt(final long value) {
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(0, value));
+    }
+
+    // Tabs
+
+    public int activeTab() {
+        return activeTab;
+    }
+
+    public void setActiveTab(final int tab) {
+        this.activeTab = tab;
+    }
+
+    @Override
+    public boolean clickMenuButton(final Player player, final int id) {
+        if (id >= TAB_LOCAL && id <= TAB_TASKS) {
+            this.activeTab = id;
+            // Opening Network/Operations asks the server for a fresh snapshot/log.
+            if (host != null && host.networkUuid() != null
+                    && player instanceof ServerPlayer serverPlayer && level instanceof ServerLevel serverLevel) {
+                if (id == TAB_NETWORK) {
+                    ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
+                } else if (id == TAB_OPS || id == TAB_TASKS) {
+                    ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public void setNetworkItems(final java.util.List<NetworkItemEntry> items) {
+        this.networkItems = items;
+    }
+
+    public java.util.List<NetworkItemEntry> networkItems() {
+        return networkItems;
+    }
+
+    public void setServerBreakdown(
+            final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload.ServerHolding> rows) {
+        this.serverBreakdown = rows;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload.ServerHolding> serverBreakdown() {
+        return serverBreakdown;
+    }
+
+    public void setOperationsLog(
+            final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> ops) {
+        this.operationsLog = ops;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> operationsLog() {
+        return operationsLog;
+    }
+
+    public BlockPos monitorPos() {
+        return monitorPos;
+    }
+
+    public BlockPos hostPos() {
+        return hostPos;
+    }
+
+    // Screen accessors (read from the synced data on the client)
+
+    public boolean running() {
+        return data.get(0) != 0;
+    }
+
+    public boolean buildValid() {
+        return data.get(1) != 0;
+    }
+
+    public int networkLinkState() {
+        return data.get(2);
+    }
+
+    public long capacity() {
+        return data.get(3);
+    }
+
+    public int queues() {
+        return data.get(4);
+    }
+
+    public long ramBuffer() {
+        return data.get(5);
+    }
+
+    public int serverCount() {
+        return data.get(6);
+    }
+
+    public int installedCpus() {
+        return data.get(7);
+    }
+
+    public int cpuSlots() {
+        return data.get(8);
+    }
+
+    public int installedRam() {
+        return data.get(9);
+    }
+
+    public int ramSlots() {
+        return data.get(10);
+    }
+
+    public int installedGpus() {
+        return data.get(11);
+    }
+
+    public int gpuSlots() {
+        return data.get(12);
+    }
+
+    public int installedDisks() {
+        return data.get(13);
+    }
+
+    public int diskSlots() {
+        return data.get(14);
+    }
+
+    public long storageUsed() {
+        return data.get(15);
+    }
+
+    public long storageCapacity() {
+        return data.get(16);
+    }
+
+    public boolean mainframeHost() {
+        return data.get(17) != 0;
+    }
+
+    public int usableStorageSlots() {
+        return data.get(DATA_USABLE_SLOTS);
+    }
+
+    public int pendingOps() {
+        return data.get(19);
+    }
+
+    public int runningOps() {
+        return data.get(20);
+    }
+
+    public int completedOps() {
+        return data.get(21);
+    }
+
+    public int pcCount() {
+        return data.get(22);
+    }
+
+    public int subframeCount() {
+        return data.get(23);
+    }
+
+    public int storageSlotCount() {
+        return storageCount;
+    }
+
+    @Override
+    public boolean stillValid(final Player player) {
+        // Reach is to the Monitor, and the Monitor must still link to this computer.
+        if (!(level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor)) {
+            return false;
+        }
+        final BlockPos owner = monitor.ownerPos();
+        return owner != null && owner.equals(hostPos)
+                && player.distanceToSqr(monitorPos.getX() + 0.5, monitorPos.getY() + 0.5,
+                monitorPos.getZ() + 0.5) <= MONITOR_REACH * MONITOR_REACH;
+    }
+
+    @Override
+    public ItemStack quickMoveStack(final Player player, final int index) {
+        final Slot slot = slots.get(index);
+        if (slot == null || !slot.hasItem()) {
+            return ItemStack.EMPTY;
+        }
+        final ItemStack stack = slot.getItem();
+        final ItemStack original = stack.copy();
+        final int invStart = storageCount;
+        final int invEnd = storageCount + 36;
+
+        if (index < invStart) {
+            // storage -> player inventory
+            if (!moveItemStackTo(stack, invStart, invEnd, true)) {
+                return ItemStack.EMPTY;
+            }
+        } else {
+            // player inventory -> storage, but only while the Storage tab is open
+            final int limit = activeTab == TAB_STORAGE ? Math.min(storageCount, usableStorageSlots()) : 0;
+            if (limit <= 0 || !moveItemStackTo(stack, 0, limit, false)) {
+                return ItemStack.EMPTY;
+            }
+        }
+
+        if (stack.isEmpty()) {
+            slot.setByPlayer(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+        if (stack.getCount() == original.getCount()) {
+            return ItemStack.EMPTY;
+        }
+        slot.onTake(player, stack);
+        return original;
+    }
+}

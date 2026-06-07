@@ -38,9 +38,15 @@ import org.jetbrains.annotations.Nullable;
  * The Mainframe — the network's orchestrator.
  */
 public class MainframeBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, dev.jsc.jscomputronics.common.network.DataNetworkConnectable {
+        implements EntityBlock, dev.jsc.jscomputronics.common.network.DataNetworkConnectable,
+        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
 
     public static final MapCodec<MainframeBlock> CODEC = simpleCodec(MainframeBlock::new);
+
+    @Override
+    public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType peripheralType() {
+        return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    }
 
     public MainframeBlock(final Properties properties) {
         super(properties);

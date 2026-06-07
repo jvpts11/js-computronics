@@ -9,48 +9,181 @@ package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
- * Screen for the Mainframe (and the template for every computer GUI): hardware sections on the left (board, PSU, CPU, RAM, GPU), a divided status/control panel on the right (OFFLINE / READY / POWERED, capacity, queues, buffer, plus the Power and Auto-start buttons).
+ * Screen for the Mainframe: a flat-dark "computer OS" hardware-assembly surface.
  */
 public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
 
-    private static final int PANEL = 0xFFC6C6C6;
-    private static final int BEVEL_LIGHT = 0xFFFFFFFF;
-    private static final int BEVEL_DARK = 0xFF555555;
-    private static final int SLOT_BORDER = 0xFF373737;
-    private static final int SLOT_FILL = 0xFF8B8B8B;
-    private static final int DIVIDER = 0xFF9A9A9A;
-    private static final int LABEL = 0xFF404040;
-    private static final int PANEL_X = 130;
-    private static final int DIVIDER_X = 122;
+    private static final int COL_R = 126;
+    private static final int COL_R_W = 110;
+    private static final int BTN_H = 14;
 
-    private Button powerButton;
-    private Button autoButton;
+    // Control row (relative to the GUI top-left).
+    private static final int BTN_Y = 162;
+    private static final int POWER_X = 8;
+    private static final int POWER_W = 72;
+    private static final int AUTO_X = 84;
+    private static final int AUTO_W = 72;
+    private static final int NODES_X = 160;
+    private static final int NODES_W = 76;
 
     public MainframeScreen(final MainframeMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 200;
-        this.imageHeight = 240;
-        this.inventoryLabelY = 148;
+        this.imageWidth = 244;
+        this.imageHeight = 262;
+        this.titleLabelX = -10000;
+        this.inventoryLabelY = -10000;
     }
 
     @Override
-    protected void init() {
-        super.init();
-        powerButton = addRenderableWidget(Button.builder(Component.literal("Turn On"),
-                        b -> sendButton(MainframeMenu.BUTTON_POWER))
-                .bounds(leftPos + PANEL_X, topPos + 96, 62, 18).build());
-        autoButton = addRenderableWidget(Button.builder(Component.literal("Auto: OFF"),
-                        b -> sendButton(MainframeMenu.BUTTON_AUTOSTART))
-                .bounds(leftPos + PANEL_X, topPos + 116, 62, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Network"),
-                        b -> openNetworkOverview())
-                .bounds(leftPos + PANEL_X, topPos + 136, 62, 18).build());
+    protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
+        final int x = leftPos;
+        final int y = topPos;
+        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
+        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
+        JscOsTheme.vLine(g, x + COL_R - 5, y + 24, 134);
+
+        // Hardware cells, only up to the count the installed board exposes.
+        JscOsTheme.slot(g, x + 8, y + 40);   // motherboard
+        JscOsTheme.slot(g, x + 8, y + 73);   // psu
+        final int cpu = Math.min(menu.boardCpuSlots(), 4);
+        final int ram = Math.min(menu.boardRamSlots(), 8);
+        final int gpu = Math.min(menu.boardPcieSlots(), 6);
+        final int disk = Math.min(menu.boardDiskSlots(), 4);
+        for (int i = 0; i < cpu; i++) {
+            JscOsTheme.slot(g, x + 44 + i * 18, y + 40);
+        }
+        for (int i = 0; i < ram; i++) {
+            JscOsTheme.slot(g, x + 44 + (i % 4) * 18, y + 73 + (i / 4) * 18);
+        }
+        for (int i = 0; i < gpu; i++) {
+            JscOsTheme.slot(g, x + 44 + (i % 3) * 18, y + 124 + (i / 3) * 18);
+        }
+        for (int i = 0; i < disk; i++) {
+            JscOsTheme.slot(g, x + 8 + (i % 2) * 18, y + 124 + (i / 2) * 18);
+        }
+
+        // Right spec column.
+        JscOsTheme.panel(g, x + COL_R, y + 27, COL_R_W, 22);   // CAPACITY
+        JscOsTheme.panel(g, x + COL_R, y + 52, COL_R_W, 18);   // QUEUES
+        JscOsTheme.panel(g, x + COL_R, y + 73, COL_R_W, 18);   // RAM BUFFER
+        JscOsTheme.panel(g, x + COL_R, y + 108, COL_R_W, 42);  // OPERATIONS
+
+        final boolean auto = menu.isAutoStart();
+        JscOsTheme.button(g, x + POWER_X, y + BTN_Y, POWER_W, BTN_H,
+                !auto && hover(mouseX, mouseY, POWER_X, BTN_Y, POWER_W, BTN_H));
+        JscOsTheme.button(g, x + AUTO_X, y + BTN_Y, AUTO_W, BTN_H, hover(mouseX, mouseY, AUTO_X, BTN_Y, AUTO_W, BTN_H));
+        JscOsTheme.button(g, x + NODES_X, y + BTN_Y, NODES_W, BTN_H, hover(mouseX, mouseY, NODES_X, BTN_Y, NODES_W, BTN_H));
+
+        // Player inventory.
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                JscOsTheme.slot(g, x + 8 + col * 18, y + 182 + row * 18);
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            JscOsTheme.slot(g, x + 8 + col * 18, y + 240);
+        }
+    }
+
+    @Override
+    protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
+        JscOsTheme.text(g, font, "MAINFRAME", 12, 11, JscOsTheme.TEXT);
+        final String status;
+        final int statusColor;
+        if (menu.networkState() == 2) {
+            status = "CONFLICT";
+            statusColor = JscOsTheme.RED;
+        } else if (!menu.buildValid()) {
+            status = "OFFLINE";
+            statusColor = JscOsTheme.RED;
+        } else if (menu.isRunning()) {
+            status = "ONLINE";
+            statusColor = JscOsTheme.GREEN;
+        } else {
+            status = "READY";
+            statusColor = JscOsTheme.AMBER;
+        }
+        final int pillX = 232 - font.width(status);
+        JscOsTheme.text(g, font, status, pillX, 11, statusColor);
+        g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
+
+        // Hardware group labels (no counters — the drawn cells show installed vs available).
+        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.DIM);
+        g.fill(30, 61, 34, 65, psuColor());
+        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "DISK", 8, 111, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "GPU", 44, 111, JscOsTheme.DIM);
+
+        // Right column: spec tiles.
+        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.TEXT);
+        JscOsTheme.tileText(g, font, COL_R, 52, "QUEUES", String.valueOf(menu.parallelQueues()), "", JscOsTheme.TEXT);
+        JscOsTheme.tileText(g, font, COL_R, 73, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.TEXT);
+
+        JscOsTheme.text(g, font, "NETWORK", COL_R, 96, JscOsTheme.DIM);
+        final int net = menu.networkState();
+        final String netStr = net == 2 ? "CONFLICT" : net == 1 ? "LINKED" : "--";
+        final int netColor = net == 2 ? JscOsTheme.RED : net == 1 ? JscOsTheme.GREEN : JscOsTheme.DIM;
+        JscOsTheme.textRight(g, font, netStr, COL_R + COL_R_W, 96, netColor);
+
+        // Operations dispatch — one row per metric (label left, value right).
+        final int running = menu.runningOps();
+        opRow(g, "QUEUED", String.valueOf(menu.pendingOps()), 113, JscOsTheme.TEXT);
+        opRow(g, "RUNNING", String.valueOf(running), 124, running > 0 ? JscOsTheme.GREEN : JscOsTheme.TEXT);
+        opRow(g, "DONE", JscOsTheme.fmt(menu.completedOps()), 135, JscOsTheme.TEXT);
+
+        // Control row captions.
+        final boolean auto = menu.isAutoStart();
+        final String powerCap = auto ? "AUTO" : (menu.isManualOn() ? "TURN OFF" : "TURN ON");
+        JscOsTheme.textCenter(g, font, powerCap, POWER_X + POWER_W / 2, BTN_Y + 4, auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+        JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + AUTO_W / 2, BTN_Y + 4,
+                auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+        JscOsTheme.textCenter(g, font, "NODES", NODES_X + NODES_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
+    }
+
+    private void opRow(final GuiGraphics g, final String key, final String value, final int y, final int valueColor) {
+        JscOsTheme.text(g, font, key, COL_R + 4, y, JscOsTheme.DIM);
+        JscOsTheme.textRight(g, font, value, COL_R + COL_R_W - 4, y, valueColor);
+    }
+
+    private int psuColor() {
+        if (!menu.hasPsu()) {
+            return JscOsTheme.DIM;
+        }
+        return menu.buildValid() ? JscOsTheme.GREEN : JscOsTheme.AMBER;
+    }
+
+    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
+        final int mx = mouseX - leftPos;
+        final int my = mouseY - topPos;
+        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
+    }
+
+    @Override
+    public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
+        if (button == 0) {
+            if (!menu.isAutoStart() && hover((int) mouseX, (int) mouseY, POWER_X, BTN_Y, POWER_W, BTN_H)) {
+                sendButton(MainframeMenu.BUTTON_POWER);
+                return true;
+            }
+            if (hover((int) mouseX, (int) mouseY, AUTO_X, BTN_Y, AUTO_W, BTN_H)) {
+                sendButton(MainframeMenu.BUTTON_AUTOSTART);
+                return true;
+            }
+            if (hover((int) mouseX, (int) mouseY, NODES_X, BTN_Y, NODES_W, BTN_H)) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new dev.jsc.jscomputronics.module.computing.operation.payload.RequestNetworkNodesPayload(
+                                menu.blockPos()));
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void sendButton(final int id) {
@@ -59,106 +192,8 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         }
     }
 
-    private void openNetworkOverview() {
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new dev.jsc.jscomputronics.module.computing.operation.payload.RequestNetworkNodesPayload(
-                        menu.blockPos()));
-    }
-
-    @Override
-    protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
-        final int x = leftPos;
-        final int y = topPos;
-
-        g.fill(x, y, x + imageWidth, y + imageHeight, PANEL);
-        g.fill(x, y, x + imageWidth, y + 1, BEVEL_LIGHT);
-        g.fill(x, y, x + 1, y + imageHeight, BEVEL_LIGHT);
-        g.fill(x, y + imageHeight - 1, x + imageWidth, y + imageHeight, BEVEL_DARK);
-        g.fill(x + imageWidth - 1, y, x + imageWidth, y + imageHeight, BEVEL_DARK);
-
-        // Divider between the hardware area and the status/control panel.
-        g.fill(x + DIVIDER_X, y + 16, x + DIVIDER_X + 1, y + 146, DIVIDER);
-
-        slot(g, x + 8, y + 28);   // motherboard (always)
-        slot(g, x + 8, y + 72);   // psu (always)
-        // CPU/RAM/GPU appear only up to the count the installed board exposes.
-        final int cpu = Math.min(menu.boardCpuSlots(), 4);
-        final int ram = Math.min(menu.boardRamSlots(), 8);
-        final int gpu = Math.min(menu.boardPcieSlots(), 6);
-        for (int i = 0; i < cpu; i++) {
-            slot(g, x + 44 + i * 18, y + 28);
-        }
-        for (int i = 0; i < ram; i++) {
-            slot(g, x + 44 + (i % 4) * 18, y + 60 + (i / 4) * 18);
-        }
-        for (int i = 0; i < gpu; i++) {
-            slot(g, x + 44 + (i % 3) * 18, y + 110 + (i / 3) * 18);
-        }
-        final int disk = Math.min(menu.boardDiskSlots(), 4);
-        for (int i = 0; i < disk; i++) {
-            slot(g, x + 8 + (i % 2) * 18, y + 100 + (i / 2) * 18);
-        }
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                slot(g, x + 8 + col * 18, y + 158 + row * 18);
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            slot(g, x + 8 + col * 18, y + 218);
-        }
-    }
-
-    private static void slot(final GuiGraphics g, final int x, final int y) {
-        g.fill(x - 1, y - 1, x + 17, y + 17, SLOT_BORDER);
-        g.fill(x, y, x + 16, y + 16, SLOT_FILL);
-    }
-
-    @Override
-    protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        super.renderLabels(g, mouseX, mouseY);
-
-        g.drawString(font, "Board", 8, 18, LABEL, false);
-        g.drawString(font, "Disk", 8, 90, LABEL, false);
-        g.drawString(font, "CPU", 44, 18, LABEL, false);
-        g.drawString(font, "RAM", 44, 50, LABEL, false);
-        g.drawString(font, "PSU", 8, 62, LABEL, false);
-        g.drawString(font, "GPU", 44, 100, LABEL, false);
-
-        final String status;
-        final int color;
-        if (!menu.buildValid()) {
-            status = "OFFLINE";
-            color = 0xFFA53D3D;
-        } else if (menu.isRunning()) {
-            status = "POWERED";
-            color = 0xFF3DA53D;
-        } else {
-            status = "READY";
-            color = 0xFFB0902A;
-        }
-        g.drawString(font, status, PANEL_X, 20, color, false);
-        g.drawString(font, menu.capacity() + " it/t", PANEL_X, 36, LABEL, false);
-        g.drawString(font, menu.parallelQueues() + " queue(s)", PANEL_X, 47, LABEL, false);
-        g.drawString(font, menu.ramBuffer() + " buffer", PANEL_X, 58, LABEL, false);
-
-        final int net = menu.networkState();
-        final String netLabel = net == 2 ? "Net: CONFLICT" : net == 1 ? "Net: linked" : "Net: --";
-        final int netColor = net == 2 ? 0xFFA53D3D : net == 1 ? 0xFF3DA53D : LABEL;
-        g.drawString(font, netLabel, PANEL_X, 69, netColor, false);
-
-        // Live Operation dispatch counters: queued, running on virtual threads, done.
-        final int running = menu.runningOps();
-        g.drawString(font, "Q" + menu.pendingOps() + " R" + running + " D" + menu.completedOps(),
-                PANEL_X, 80, running > 0 ? 0xFF3DA53D : LABEL, false);
-    }
-
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        final boolean auto = menu.isAutoStart();
-        powerButton.active = !auto;
-        powerButton.setMessage(Component.literal(
-                auto ? "Auto" : (menu.isManualOn() ? "Turn Off" : "Turn On")));
-        autoButton.setMessage(Component.literal("Auto: " + (auto ? "ON" : "OFF")));
         super.render(g, mouseX, mouseY, partialTick);
         renderTooltip(g, mouseX, mouseY);
     }

@@ -9,118 +9,199 @@ package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.common.format.Unit;
 import dev.jsc.jscomputronics.common.format.UnitFormatter;
+import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.ServerItem;
 import dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Screen for the Server Rack: the housed Servers as vertical 1U bays, each with rack rails, mounting holes, the Server slot, its label, and a link LED — above the player inventory.
+ * Screen for the Server Rack: a flat-dark "bay manifest".
  */
 public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
 
-    private static final int PANEL = 0xFFC6C6C6;
-    private static final int BEVEL_LIGHT = 0xFFFFFFFF;
-    private static final int BEVEL_DARK = 0xFF555555;
-    private static final int SLOT_BORDER = 0xFF373737;
-    private static final int SLOT_FILL = 0xFF8B8B8B;
-    private static final int RAIL = 0xFFA8A8A8;
-    private static final int RAIL_LIGHT = 0xFFD4D4D4;
-    private static final int RAIL_DARK = 0xFF6F6F6F;
-    private static final int HOLE = 0xFF5A5A5A;
-    private static final int LABEL = 0xFF404040;
-    private static final int EMPTY_LABEL = 0xFF7A7A7A;
-    private static final int LED_ON = 0xFF3DA53D;
-    private static final int LED_OFF = 0xFF777777;
+    private static final int CAP = ServerRackBlockEntity.CAPACITY;
+    private static final int BAY_Y = 70;
+    private static final int BAY_PITCH = 18;
+    private static final int ROW_LEFT = 8;
+    private static final int ROW_W = 228;
+    private static final int TRACK_X = 92;
+    private static final int TRACK_W = 76;
 
     private final UnitFormatter fmt = UnitFormatter.forCurrentLocale();
 
     public ServerRackScreen(final ServerRackMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 176;
-        this.imageHeight = 254;
-        this.inventoryLabelY = 168;
+        this.imageWidth = 244;
+        this.imageHeight = 300;
+        this.titleLabelX = -10000;
+        this.inventoryLabelY = -10000;
     }
 
     @Override
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
-        g.fill(x, y, x + imageWidth, y + imageHeight, PANEL);
-        g.fill(x, y, x + imageWidth, y + 1, BEVEL_LIGHT);
-        g.fill(x, y, x + 1, y + imageHeight, BEVEL_LIGHT);
-        g.fill(x, y + imageHeight - 1, x + imageWidth, y + imageHeight, BEVEL_DARK);
-        g.fill(x + imageWidth - 1, y, x + imageWidth, y + imageHeight, BEVEL_DARK);
+        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
+        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
 
-        for (int i = 0; i < ServerRackBlockEntity.CAPACITY; i++) {
-            final int by = y + 22 + i * 18;
-            // 1U rail: a bevelled bar spanning the panel, with two mounting holes.
-            g.fill(x + 6, by - 1, x + 170, by + 17, RAIL);
-            g.fill(x + 6, by - 1, x + 170, by, RAIL_LIGHT);
-            g.fill(x + 6, by - 1, x + 7, by + 17, RAIL_LIGHT);
-            g.fill(x + 6, by + 16, x + 170, by + 17, RAIL_DARK);
-            g.fill(x + 169, by - 1, x + 170, by + 17, RAIL_DARK);
-            g.fill(x + 9, by + 5, x + 15, by + 11, HOLE);
-            g.fill(x + 161, by + 5, x + 167, by + 11, HOLE);
-            slot(g, x + 14, by);
+        // Summary tiles.
+        JscOsTheme.panel(g, x + 8, y + 34, 73, 18);
+        JscOsTheme.panel(g, x + 85, y + 34, 73, 18);
+        JscOsTheme.panel(g, x + 162, y + 34, 74, 18);
+        JscOsTheme.hLine(g, x + 8, y + 56, 228);
+
+        // Bay rows.
+        for (int i = 0; i < CAP; i++) {
+            final int top = y + BAY_Y + i * BAY_PITCH;
+            JscOsTheme.panel(g, x + ROW_LEFT, top, ROW_W, 17);
+            final ItemStack server = menu.serverInBay(i);
+            final boolean populated = server.getItem() instanceof ServerItem;
+            if (populated) {
+                g.fill(x + ROW_LEFT + 1, top, x + ROW_LEFT + 3, top + 17, JscOsTheme.ACCENT);
+            }
+            JscOsTheme.slot(g, x + 12, top + 1);
+            if (populated) {
+                final ComputerBuild build = ServerItem.build(server);
+                if (build != null) {
+                    final long cap = build.totalStorageItems();
+                    final long used = ServerItem.storage(server).total();
+                    final double frac = cap <= 0 ? 0.0 : Math.min(1.0, (double) used / cap);
+                    JscOsTheme.track(g, x + TRACK_X, top + 7, TRACK_W, frac, frac >= 0.9 ? JscOsTheme.RED : JscOsTheme.GREEN);
+                }
+            }
         }
 
+        // Player inventory.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                slot(g, x + 8 + col * 18, y + 178 + row * 18);
+                JscOsTheme.slot(g, x + 8 + col * 18, y + 220 + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            slot(g, x + 8 + col * 18, y + 236);
+            JscOsTheme.slot(g, x + 8 + col * 18, y + 278);
         }
-    }
-
-    private static void slot(final GuiGraphics g, final int x, final int y) {
-        g.fill(x - 1, y - 1, x + 17, y + 17, SLOT_BORDER);
-        g.fill(x, y, x + 16, y + 16, SLOT_FILL);
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        super.renderLabels(g, mouseX, mouseY);
-
-        // Header network-link indicator.
         final boolean linked = menu.networkLinked();
-        led(g, 122, 6, linked);
-        g.drawString(font, linked ? "Linked" : "Offline", 133, 6, linked ? LED_ON : EMPTY_LABEL, false);
+        JscOsTheme.text(g, font, "SERVER RACK", 12, 11, JscOsTheme.TEXT);
+        final String pill = linked ? "LINKED" : "OFFLINE";
+        final int pillColor = linked ? JscOsTheme.GREEN : JscOsTheme.RED;
+        final int pillX = 232 - font.width(pill);
+        JscOsTheme.text(g, font, pill, pillX, 11, pillColor);
+        g.fill(pillX - 6, 11, pillX - 2, 15, pillColor);
 
-        for (int i = 0; i < ServerRackBlockEntity.CAPACITY; i++) {
-            final int ty = 22 + i * 18 + 5;
-            final ItemStack server = menu.serverInBay(i);
-            if (server.getItem() instanceof ServerItem) {
-                final boolean assembled = ServerItem.build(server) != null;
-                final UUID uuid = ServerItem.nodeUuid(server);
-                final String id = uuid != null ? uuid.toString().substring(0, 6) : "server";
-                final long mb = ServerItem.storageMb(server);
-                final String text = assembled ? id + "  " + fmt.compact(mb, Unit.MB) : id + "  (incomplete)";
-                g.drawString(font, text, 36, ty, LABEL, false);
-                led(g, 154, ty, linked && assembled);
-            } else {
-                g.drawString(font, "— empty —", 36, ty, EMPTY_LABEL, false);
+        // Aggregate the cabinet.
+        int used = 0;
+        long totalMb = 0L;
+        long totalStored = 0L;
+        long totalCapItems = 0L;
+        int online = 0;
+        for (int i = 0; i < CAP; i++) {
+            final ItemStack s = menu.serverInBay(i);
+            if (!(s.getItem() instanceof ServerItem)) {
+                continue;
+            }
+            used++;
+            final ComputerBuild build = ServerItem.build(s);
+            totalMb += ServerItem.storageMb(s);
+            totalStored += ServerItem.storage(s).total();
+            if (build != null) {
+                totalCapItems += build.totalStorageItems();
+                if (linked) {
+                    online++;
+                }
             }
         }
-    }
 
-    private static void led(final GuiGraphics g, final int x, final int y, final boolean on) {
-        final int c = on ? LED_ON : LED_OFF;
-        g.fill(x + 1, y, x + 6, y + 7, c);
-        g.fill(x, y + 1, x + 7, y + 6, c);
+        JscOsTheme.textS(g, font, "RACK SUMMARY", 8, 26, JscOsTheme.DIM);
+        JscOsTheme.textSRight(g, font, used + " / " + CAP + " bays", 236, 26, JscOsTheme.DIM);
+        JscOsTheme.tileTextS(g, font, 8, 34, "BAYS", used + "/" + CAP, JscOsTheme.TEXT);
+        JscOsTheme.tileTextS(g, font, 85, 34, "CAPACITY", fmt.compact(totalMb, Unit.MB), JscOsTheme.TEXT);
+        final int storedColor = totalCapItems > 0 && totalStored >= totalCapItems * 9 / 10 ? JscOsTheme.RED : JscOsTheme.GREEN;
+        JscOsTheme.tileTextS(g, font, 162, 34, "STORED", JscOsTheme.fmt(totalStored), storedColor);
+
+        JscOsTheme.textS(g, font, "BAYS", 8, 60, JscOsTheme.DIM);
+        JscOsTheme.textSRight(g, font, online + " online", 236, 60, JscOsTheme.DIM);
+
+        for (int i = 0; i < CAP; i++) {
+            final int top = BAY_Y + i * BAY_PITCH;
+            final ItemStack server = menu.serverInBay(i);
+            if (!(server.getItem() instanceof ServerItem)) {
+                JscOsTheme.textS(g, font, "— empty —", 34, top + 6, JscOsTheme.DIM);
+                continue;
+            }
+            final ComputerBuild build = ServerItem.build(server);
+            final UUID uuid = ServerItem.nodeUuid(server);
+            final String id = uuid != null ? uuid.toString().substring(0, 6) : "server";
+            JscOsTheme.textS(g, font, id, 34, top + 6, JscOsTheme.TEXT);
+            final String state;
+            final int color;
+            if (build == null) {
+                state = "INCOMPLETE";
+                color = JscOsTheme.RED;
+            } else if (linked) {
+                state = "ONLINE";
+                color = JscOsTheme.GREEN;
+            } else {
+                state = "READY";
+                color = JscOsTheme.AMBER;
+            }
+            JscOsTheme.textSRight(g, font, state, 236, top + 6, color);
+        }
     }
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
         renderTooltip(g, mouseX, mouseY);
+        renderBayTooltip(g, mouseX, mouseY);
+    }
+
+    private void renderBayTooltip(final GuiGraphics g, final int mouseX, final int mouseY) {
+        final int relX = mouseX - leftPos;
+        final int relY = mouseY - topPos;
+        if (relX < ROW_LEFT || relX >= ROW_LEFT + ROW_W) {
+            return;
+        }
+        final int row = (relY - BAY_Y) / BAY_PITCH;
+        if (row < 0 || row >= CAP || (relY - BAY_Y) % BAY_PITCH > 16) {
+            return;
+        }
+        // The Server slot itself already shows the vanilla item tooltip.
+        if (relX >= 11 && relX < 29) {
+            return;
+        }
+        final ItemStack server = menu.serverInBay(row);
+        if (!(server.getItem() instanceof ServerItem)) {
+            return;
+        }
+        final List<Component> lines = new ArrayList<>();
+        final UUID uuid = ServerItem.nodeUuid(server);
+        lines.add(Component.literal(uuid != null ? "Node " + uuid.toString().substring(0, 8) : "Unassigned node"));
+        final ComputerBuild build = ServerItem.build(server);
+        if (build == null) {
+            lines.add(Component.literal("Incomplete — needs a board + PSU").withStyle(ChatFormatting.RED));
+        } else {
+            final long cap = build.totalStorageItems();
+            final long stored = ServerItem.storage(server).total();
+            lines.add(Component.literal(stored + " / " + cap + " items").withStyle(ChatFormatting.GRAY));
+            lines.add(Component.literal(fmt.compact(build.storageMb(), Unit.MB) + " capacity").withStyle(ChatFormatting.GRAY));
+            if (!menu.networkLinked()) {
+                lines.add(Component.literal("Rack cable not on a network").withStyle(ChatFormatting.YELLOW));
+            }
+        }
+        g.renderComponentTooltip(font, lines, mouseX, mouseY);
     }
 }

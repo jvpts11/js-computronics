@@ -17,12 +17,19 @@ import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
+import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;
+import dev.jsc.jscomputronics.module.computing.block.ServerRackBlock;
+import dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
+import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertFromTerminalOperationTask;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperationTask;
+import dev.jsc.jscomputronics.module.computing.operation.NetworkSelectToStorageOperationTask;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -140,6 +147,31 @@ public final class NetworkGameTests {
                     helper.assertFalse(sameNetwork(helper, c1, c3), "c1 and c3 must split into two networks");
                     helper.assertTrue(networkOf(helper, c1).isPresent(), "c1 (next to mainframe) keeps a network");
                     helper.assertTrue(networkOf(helper, c3).isEmpty(), "severed far cable c3 must be network-less");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void mainframeDestroyed_erasesNetworkFromCables(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos c1 = new BlockPos(2, 2, 2);
+        final BlockPos c2 = new BlockPos(3, 2, 2);
+        placeRunningMainframe(helper, m);
+        helper.setBlock(c1, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(c2, ComputingModule.HBW_CABLE.get());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(networkOf(helper, c1).isPresent(),
+                            "cables should carry the mainframe's network while it runs");
+                    helper.assertTrue(networkOf(helper, c2).isPresent(),
+                            "the whole cable run should be networked");
+                })
+                .thenExecute(() -> helper.setBlock(m, Blocks.AIR)) // destroy the mainframe
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(networkOf(helper, c1).isEmpty(),
+                            "destroying the mainframe must erase the network from its cables");
+                    helper.assertTrue(networkOf(helper, c2).isEmpty(),
+                            "no cable may keep a network once its only mainframe is gone");
                 })
                 .thenSucceed();
     }
@@ -384,6 +416,52 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void serverRack_formsCabinetAndReadsCableOnPartFace(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(4, 2, 2);     // controller; footprint x[4,5] y[2,4] z[2,3]
+        final BlockPos part = new BlockPos(4, 3, 2);     // a front part, one up from the controller
+        // A cable run from the part's outward face to the mainframe — it touches the
+        final BlockPos[] cables = {
+            new BlockPos(3, 3, 2), // against the part's west face
+            new BlockPos(2, 3, 2),
+            new BlockPos(2, 2, 2), // claimed by the mainframe
+        };
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        for (final BlockPos c : cables) {
+            helper.setBlock(c, ComputingModule.HBW_CABLE.get());
+        }
+        // Place the controller and drive its self-assembly so all 11 parts exist.
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        ((ServerRackBlock) ComputingModule.SERVER_RACK.get()).setPlacedBy(
+                helper.getLevel(), helper.absolutePos(rack), helper.getBlockState(rack), null, ItemStack.EMPTY);
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(helper.getBlockState(part).getBlock() instanceof ServerRackPartBlock,
+                            "placing the rack must raise its structural parts");
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(net != null, "mainframe owns a network");
+                    // The controller touches no cable; only a part does.
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).serversOf(net).size() == 1,
+                            "a cable on a rack PART face must join the rack to the network");
+                })
+                .thenExecute(() -> helper.setBlock(part, Blocks.AIR)) // break one part
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(helper.getBlockState(rack).isAir(),
+                            "breaking a part must take the controller down too");
+                    helper.assertTrue(helper.getBlockState(part).isAir(),
+                            "the broken part must be gone");
+                    helper.assertTrue(helper.getBlockState(new BlockPos(5, 4, 3)).isAir(),
+                            "the whole cabinet must dissolve, including the far-top-back corner");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void networkStorage_queriesSelectsAndInserts(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);
@@ -547,6 +625,129 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA)
+    public static void terminalSelect_landsInPcLocalStorage(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        // A disk gives the PC local storage, so a SELECT lands there.
+        computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    final NetworkUuid net = computer.networkUuid();
+                    helper.assertTrue(net != null, "PC must be on the network");
+                    final boolean accepted = mainframe.submitOperation(
+                            new NetworkSelectToStorageOperationTask(helper.getLevel(), net, Items.COBBLESTONE, 50,
+                                    helper.absolutePos(pc), null, null),
+                            OperationPriority.MEDIUM);
+                    helper.assertTrue(accepted, "Mainframe should accept the SELECT-to-storage Operation");
+                })
+                .thenExecuteAfter(8, () -> {
+                    long inStorage = 0L;
+                    final ItemStackHandler store = computer.getStorage();
+                    for (int i = 0; i < store.getSlots(); i++) {
+                        if (store.getStackInSlot(i).is(Items.COBBLESTONE)) {
+                            inStorage += store.getStackInSlot(i).getCount();
+                        }
+                    }
+                    helper.assertTrue(inStorage == 50,
+                            "SELECT must land 50 cobblestone in the PC's local storage; got " + inStorage);
+                    // The Operation is logged with provenance for the Operations tab.
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(log.size() == 1, "the SELECT should be logged once; got " + log.size());
+                    helper.assertTrue(log.get(0).moved() == 50,
+                            "logged op should record 50 moved; got " + log.get(0).moved());
+                    helper.assertTrue(!log.get(0).moves().isEmpty(),
+                            "logged op should carry provenance moves (from which server)");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void terminalInsert_movesIntoNetwork(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(net != null, "mainframe must own a network");
+                    final boolean accepted = mainframe.submitOperation(
+                            new NetworkInsertFromTerminalOperationTask(helper.getLevel(), net,
+                                    new ItemStack(Items.COBBLESTONE, 64), null),
+                            OperationPriority.MEDIUM);
+                    helper.assertTrue(accepted, "Mainframe should accept the terminal INSERT Operation");
+                })
+                .thenExecuteAfter(8, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    final long held = NetworkStorage.of(helper.getLevel(), net).count(Items.COBBLESTONE);
+                    helper.assertTrue(held == 64,
+                            "INSERT must deposit 64 cobblestone into the network; got " + held);
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(log.size() == 1, "the INSERT should be logged once; got " + log.size());
+                    helper.assertTrue(log.get(0).type() == OperationRecord.TYPE_INSERT,
+                            "logged op should be an INSERT");
+                    helper.assertTrue(log.get(0).moved() == 64,
+                            "logged op should record 64 moved; got " + log.get(0).moved());
+                    helper.assertTrue(!log.get(0).moves().isEmpty(),
+                            "logged op should carry provenance moves (to which server)");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void operationLog_persistsAcrossReload(final GameTestHelper helper) {
+        final BlockPos a = new BlockPos(2, 2, 2);
+        final MainframeBlockEntity be = placeRunningMainframe(helper, a);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    be.recordOperation(OperationRecord.TYPE_INSERT, new ItemStack(Items.COBBLESTONE), 64, 64,
+                            OperationRecord.STATUS_COMPLETED,
+                            java.util.List.of(new OperationRecord.MoveRow("you", 64, "SRV-abc123")));
+                    helper.assertTrue(be.recentOperations().size() == 1, "one op should be recorded");
+
+                    final var registries = helper.getLevel().registryAccess();
+                    final net.minecraft.nbt.CompoundTag saved = be.saveWithFullMetadata(registries);
+                    final var reloaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                            helper.absolutePos(a), be.getBlockState(), saved, registries);
+                    helper.assertTrue(reloaded instanceof MainframeBlockEntity, "reloaded BE should be a Mainframe");
+
+                    final var log = ((MainframeBlockEntity) reloaded).recentOperations();
+                    helper.assertTrue(log.size() == 1, "the op must survive reload; got " + log.size());
+                    final OperationRecord rec = log.get(0);
+                    helper.assertTrue(rec.type() == OperationRecord.TYPE_INSERT, "type must persist");
+                    helper.assertTrue(rec.moved() == 64, "moved must persist; got " + rec.moved());
+                    helper.assertTrue(rec.icon().is(Items.COBBLESTONE), "icon item must persist");
+                    helper.assertTrue(!rec.moves().isEmpty() && rec.moves().get(0).to().equals("SRV-abc123"),
+                            "provenance must persist");
+                })
+                .thenSucceed();
+    }
+
     // Operation dispatch (the virtual-thread runtime on the Mainframe)
 
     @GameTest(template = ARENA)
@@ -612,6 +813,87 @@ public final class NetworkGameTests {
             return be;
         }
         throw new IllegalStateException("no mainframe at " + relative);
+    }
+
+    @GameTest(template = ARENA)
+    public static void monitor_autoLinksAndUnlinksOnCableBreak(final GameTestHelper helper) {
+        final BlockPos pc = new BlockPos(1, 2, 2);
+        final BlockPos cable = new BlockPos(2, 2, 2);
+        final BlockPos mon = new BlockPos(3, 2, 2);
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        // A GPU lets the computer host up to 4 monitors.
+        computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.GPU_SLOTS_START,
+                new ItemStack(ComputingModule.GPU_HD_7970.get()));
+        helper.setBlock(cable, ComputingModule.PERIPHERAL_CABLE.get());
+        helper.setBlock(mon, ComputingModule.MONITOR.get());
+        if (!(helper.getBlockEntity(mon) instanceof MonitorBlockEntity monitor)) {
+            helper.fail("no monitor");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(25, () -> {
+                    helper.assertTrue(monitor.ownerPos() != null
+                                    && monitor.ownerPos().equals(helper.absolutePos(pc)),
+                            "monitor should auto-link to the PC over the peripheral cable");
+                    helper.assertTrue(computer.linkedEndpoints().contains(helper.absolutePos(mon).asLong()),
+                            "PC should list the monitor as a linked endpoint");
+                })
+                .thenExecute(() -> helper.setBlock(cable, Blocks.AIR))
+                .thenExecuteAfter(25, () -> {
+                    helper.assertTrue(monitor.ownerPos() == null,
+                            "monitor should unlink when the peripheral cable is cut");
+                    helper.assertTrue(computer.linkedEndpoints().isEmpty(),
+                            "PC should drop the endpoint after the cable is cut");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void monitor_screenLightsUpAfterLinkingAndDarkensOnCut(final GameTestHelper helper) {
+        final BlockPos pc = new BlockPos(1, 2, 2);
+        final BlockPos cable = new BlockPos(2, 2, 2);
+        final BlockPos mon = new BlockPos(3, 2, 2);
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.GPU_SLOTS_START,
+                new ItemStack(ComputingModule.GPU_HD_7970.get()));
+        helper.setBlock(cable, ComputingModule.PERIPHERAL_CABLE.get());
+        helper.setBlock(mon, ComputingModule.MONITOR.get());
+        helper.startSequence()
+                // The link is near-instant; the screen boots ~20 ticks later, so by 30 ticks it is lit.
+                .thenExecuteAfter(30, () -> helper.assertTrue(
+                        helper.getBlockState(mon).getValue(MonitorBlock.LIT),
+                        "monitor screen should be lit after the boot delay once linked"))
+                .thenExecute(() -> helper.setBlock(cable, Blocks.AIR))
+                .thenExecuteAfter(SETTLE, () -> helper.assertFalse(
+                        helper.getBlockState(mon).getValue(MonitorBlock.LIT),
+                        "monitor screen should darken the moment the link is cut"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void monitor_linksThroughMainframePartFace(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(3, 2, 3);
+        final Direction facing = Direction.NORTH;
+        final MainframeBlockEntity be = formRunningMainframe(helper, controller, facing);
+        // A GPU lets the Mainframe host monitors (maxEndpoints = GPUs * 4).
+        be.getInventory().setStackInSlot(MainframeBlockEntity.GPU_SLOTS_START,
+                new ItemStack(ComputingModule.GPU_HD_7970.get()));
+        // A cable on the far side-column part's outward face never touches the controller.
+        final BlockPos farPart = controller.relative(facing.getClockWise());
+        final BlockPos cable = farPart.relative(facing.getClockWise());
+        final BlockPos mon = cable.relative(facing.getClockWise());
+        helper.setBlock(cable, ComputingModule.PERIPHERAL_CABLE.get());
+        helper.setBlock(mon, ComputingModule.MONITOR.get());
+        if (!(helper.getBlockEntity(mon) instanceof MonitorBlockEntity monitor)) {
+            helper.fail("no monitor");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> helper.assertTrue(
+                        monitor.ownerPos() != null
+                                && monitor.ownerPos().equals(helper.absolutePos(controller)),
+                        "monitor must link to the Mainframe through a cable on a PART face"))
+                .thenSucceed();
     }
 
     private static PersonalComputerBlockEntity placeRunningPC(final GameTestHelper helper, final BlockPos relative) {

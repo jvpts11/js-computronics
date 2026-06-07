@@ -31,7 +31,10 @@ public class JscLanguageProvider extends LanguageProvider {
         add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
+        addBlock(ComputingModule.PERIPHERAL_CABLE, "Peripheral Cable");
         addBlock(ComputingModule.PERSONAL_ROUTER, "Personal Router");
+        addBlock(ComputingModule.MONITOR, "Monitor");
+        add("block.jsc.monitor.unlinked", "No computer linked");
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");

@@ -40,11 +40,15 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/ethernet_cable_core")));
         getBuilder("hbw_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/hbw_cable_core")));
+        getBuilder("peripheral_cable")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/peripheral_cable_core")));
 
         getBuilder("mainframe")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/mainframe")));
         getBuilder("personal_router")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_router")));
+        getBuilder("monitor")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/monitor")));
         getBuilder("personal_computer")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_computer")));
         basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());

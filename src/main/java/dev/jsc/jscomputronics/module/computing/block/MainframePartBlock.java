@@ -10,6 +10,8 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
@@ -36,9 +38,16 @@ import org.jetbrains.annotations.Nullable;
  * A structural part of the Mainframe multiblock — one of the 11 non-controller blocks.
  */
 public class MainframePartBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable {
+        implements EntityBlock, DataNetworkConnectable, PeripheralConnectable {
 
     public static final MapCodec<MainframePartBlock> CODEC = simpleCodec(MainframePartBlock::new);
+
+    @Override
+    public PeripheralCableType peripheralType() {
+        // The whole Mainframe footprint is a COMPUTING peripheral owner, so a
+        // Peripheral Cable may attach to any part's face, not just the controller.
+        return PeripheralCableType.COMPUTING;
+    }
 
     public static final BooleanProperty CORE = BooleanProperty.create("core");
 

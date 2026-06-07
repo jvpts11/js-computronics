@@ -39,23 +39,23 @@ public class MainframeMenu extends AbstractContainerMenu {
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
 
         final IItemHandler hardware = be.getInventory();
-        addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.MOTHERBOARD_SLOT, 8, 28));
-        addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.PSU_SLOT, 8, 72));
+        addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.MOTHERBOARD_SLOT, 8, 40));
+        addSlot(new SlotItemHandler(hardware, MainframeBlockEntity.PSU_SLOT, 8, 73));
         for (int i = 0; i < MainframeBlockEntity.CPU_SLOTS; i++) {
             addSlot(new BoardSlot(hardware, MainframeBlockEntity.CPU_SLOTS_START + i,
-                    44 + i * 18, 28, i, be::boardCpuSlots));
+                    44 + i * 18, 40, i, be::boardCpuSlots));
         }
         for (int i = 0; i < MainframeBlockEntity.RAM_SLOTS; i++) {
             addSlot(new BoardSlot(hardware, MainframeBlockEntity.RAM_SLOTS_START + i,
-                    44 + (i % 4) * 18, 60 + (i / 4) * 18, i, be::boardRamSlots));
+                    44 + (i % 4) * 18, 73 + (i / 4) * 18, i, be::boardRamSlots));
         }
         for (int i = 0; i < MainframeBlockEntity.GPU_SLOTS; i++) {
             addSlot(new BoardSlot(hardware, MainframeBlockEntity.GPU_SLOTS_START + i,
-                    44 + (i % 3) * 18, 110 + (i / 3) * 18, i, be::boardPcieSlots));
+                    44 + (i % 3) * 18, 124 + (i / 3) * 18, i, be::boardPcieSlots));
         }
         for (int i = 0; i < MainframeBlockEntity.DISK_SLOTS; i++) {
             addSlot(new BoardSlot(hardware, MainframeBlockEntity.DISK_SLOTS_START + i,
-                    8 + (i % 2) * 18, 100 + (i / 2) * 18, i, be::boardDiskSlots));
+                    8 + (i % 2) * 18, 124 + (i / 2) * 18, i, be::boardDiskSlots));
         }
 
         addPlayerInventory(playerInventory);
@@ -87,6 +87,14 @@ public class MainframeMenu extends AbstractContainerMenu {
         public boolean mayPlace(final ItemStack stack) {
             return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
         }
+    }
+
+    public boolean hasBoard() {
+        return slots.get(0).hasItem();
+    }
+
+    public boolean hasPsu() {
+        return slots.get(1).hasItem();
     }
 
     public net.minecraft.core.BlockPos blockPos() {
@@ -122,11 +130,11 @@ public class MainframeMenu extends AbstractContainerMenu {
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 158 + row * 18));
+                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 182 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 218));
+            addSlot(new Slot(inventory, col, 8 + col * 18, 240));
         }
     }
 

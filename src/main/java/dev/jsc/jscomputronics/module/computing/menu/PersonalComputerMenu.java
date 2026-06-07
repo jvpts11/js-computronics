@@ -21,29 +21,18 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
- * Menu for the Personal Computer.
+ * Menu for the Personal Computer: a single hardware-assembly surface (motherboard, PSU, CPU, RAM, GPU, disks — each restricted to its component category and clamped to the count the installed motherboard offers) plus the player inventory.
  */
 public class PersonalComputerMenu extends AbstractContainerMenu {
 
-    public static final int TAB_LOCAL = 0;
-    public static final int TAB_NETWORK = 1;
-    public static final int TAB_STORAGE = 2;
-
     public static final int BUTTON_POWER = 0;
     public static final int BUTTON_AUTOSTART = 1;
-    public static final int BUTTON_TAB_BASE = 10;
 
     private static final int HARDWARE_SLOTS = PersonalComputerBlockEntity.HARDWARE_SLOTS;
-    private static final int STORAGE_SLOTS = PersonalComputerBlockEntity.STORAGE_SLOTS;
-    private static final int COMPUTER_SLOTS = HARDWARE_SLOTS + STORAGE_SLOTS;
 
     private final PersonalComputerBlockEntity blockEntity;
     private final ContainerData data;
     private final ContainerLevelAccess access;
-    private int activeTab = TAB_LOCAL;
-
-    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry>
-            networkItems = java.util.List.of();
 
     public PersonalComputerMenu(final int containerId, final Inventory playerInventory,
                                 final PersonalComputerBlockEntity be) {
@@ -53,27 +42,20 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
 
         final IItemHandler hw = be.getHardware();
-        addSlot(new TabSlot(hw, PersonalComputerBlockEntity.MOTHERBOARD_SLOT, 8, 32));
-        addSlot(new TabSlot(hw, PersonalComputerBlockEntity.PSU_SLOT, 8, 64));
-        addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.CPU_SLOT, 44, 32, 0, be::boardCpuSlots));
+        addSlot(new SlotItemHandler(hw, PersonalComputerBlockEntity.MOTHERBOARD_SLOT, 8, 40));
+        addSlot(new SlotItemHandler(hw, PersonalComputerBlockEntity.PSU_SLOT, 8, 73));
+        addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.CPU_SLOT, 44, 40, 0, be::boardCpuSlots));
         for (int i = 0; i < PersonalComputerBlockEntity.RAM_SLOTS; i++) {
             addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.RAM_SLOTS_START + i,
-                    44 + i * 18, 64, i, be::boardRamSlots));
+                    44 + i * 18, 73, i, be::boardRamSlots));
         }
         for (int i = 0; i < PersonalComputerBlockEntity.GPU_SLOTS; i++) {
             addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.GPU_SLOTS_START + i,
-                    44 + i * 18, 96, i, be::boardPcieSlots));
+                    44 + i * 18, 106, i, be::boardPcieSlots));
         }
         for (int i = 0; i < PersonalComputerBlockEntity.DISK_SLOTS; i++) {
             addSlot(new BoardSlot(hw, PersonalComputerBlockEntity.DISK_SLOTS_START + i,
-                    8 + i * 18, 96, i, be::boardDiskSlots));
-        }
-
-        // Local storage lives on its own Storage tab and only as many slots as the
-        // installed disks back — a computer has no local storage without a disk.
-        final IItemHandler storageHandler = be.getStorage();
-        for (int i = 0; i < STORAGE_SLOTS; i++) {
-            addSlot(new StorageSlot(storageHandler, i, 8 + (i % 9) * 18, 30 + (i / 9) * 18, i));
+                    8 + i * 18, 106, i, be::boardDiskSlots));
         }
 
         addPlayerInventory(playerInventory);
@@ -93,30 +75,16 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 172 + row * 18));
+                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 138 + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 232));
+            addSlot(new Slot(inventory, col, 8 + col * 18, 196));
         }
     }
 
     /**
-     * A computer slot that is only active (visible, interactive) on the Local tab.
-     */
-    private final class TabSlot extends SlotItemHandler {
-        private TabSlot(final IItemHandler handler, final int index, final int x, final int y) {
-            super(handler, index, x, y);
-        }
-
-        @Override
-        public boolean isActive() {
-            return activeTab == TAB_LOCAL;
-        }
-    }
-
-    /**
-     * A Local-tab slot that is only usable while its {@code relativeIndex} is within the count the installed motherboard offers — so CPU/RAM/GPU slots appear and accept parts according to the board, not a fixed maximum.
+     * A hardware slot usable only while its {@code relativeIndex} is within the count the installed motherboard offers — so CPU/RAM/GPU/disk slots appear and accept parts according to the board, not a fixed maximum.
      */
     private final class BoardSlot extends SlotItemHandler {
         private final int relativeIndex;
@@ -133,45 +101,13 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         public boolean isActive() {
             // Within the board's slot count, or already holding a part — so a
             // component is never trapped behind a smaller board swapped in later.
-            return activeTab == TAB_LOCAL && (relativeIndex < boardLimit.getAsInt() || hasItem());
+            return relativeIndex < boardLimit.getAsInt() || hasItem();
         }
 
         @Override
         public boolean mayPlace(final ItemStack stack) {
             return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
         }
-    }
-
-    /**
-     * A local-storage slot: active only on the Storage tab, and only up to the disk-backed count.
-     */
-    private final class StorageSlot extends SlotItemHandler {
-        private final int relativeIndex;
-
-        private StorageSlot(final IItemHandler handler, final int index, final int x, final int y,
-                            final int relativeIndex) {
-            super(handler, index, x, y);
-            this.relativeIndex = relativeIndex;
-        }
-
-        @Override
-        public boolean isActive() {
-            // Already-held items stay reachable so a disk pulled later never traps them.
-            return activeTab == TAB_STORAGE && (relativeIndex < blockEntity.usableStorageSlots() || hasItem());
-        }
-
-        @Override
-        public boolean mayPlace(final ItemStack stack) {
-            return relativeIndex < blockEntity.usableStorageSlots() && super.mayPlace(stack);
-        }
-    }
-
-    public int activeTab() {
-        return activeTab;
-    }
-
-    public int usableStorageSlots() {
-        return blockEntity.usableStorageSlots();
     }
 
     public net.minecraft.core.BlockPos pcPos() {
@@ -194,20 +130,12 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         return blockEntity.boardDiskSlots();
     }
 
-    public void setActiveTab(final int tab) {
-        if (tab == TAB_LOCAL || tab == TAB_NETWORK || tab == TAB_STORAGE) {
-            activeTab = tab;
-        }
+    public boolean hasBoard() {
+        return slots.get(0).hasItem();
     }
 
-    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry>
-            networkItems() {
-        return networkItems;
-    }
-
-    public void setNetworkItems(
-            final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry> items) {
-        this.networkItems = items;
+    public boolean hasPsu() {
+        return slots.get(1).hasItem();
     }
 
     public boolean isRunning() {
@@ -248,17 +176,6 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
             blockEntity.toggleAutoStart();
             return true;
         }
-        if (id >= BUTTON_TAB_BASE) {
-            final int tab = id - BUTTON_TAB_BASE;
-            setActiveTab(tab);
-            // Opening the Network tab dispatches a QUERY Operation; its reply fills the view.
-            if (tab == TAB_NETWORK
-                    && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
-                        .dispatchQuery(serverPlayer, blockEntity);
-            }
-            return true;
-        }
         return false;
     }
 
@@ -273,30 +190,17 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         if (slot == null || !slot.hasItem()) {
             return ItemStack.EMPTY;
         }
-        // Network tab: shift-clicking an inventory item deposits it into the network
-        if (activeTab == TAB_NETWORK) {
-            if (index >= COMPUTER_SLOTS
-                    && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-                final ItemStack stack = slot.getItem();
-                if (!stack.isEmpty()
-                        && dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
-                                .dispatchInsert(serverPlayer, blockEntity, stack.copy())) {
-                    slot.set(ItemStack.EMPTY);
-                }
-            }
-            return ItemStack.EMPTY;
-        }
         final ItemStack stack = slot.getItem();
         final ItemStack original = stack.copy();
         final int total = slots.size();
 
-        if (index < COMPUTER_SLOTS) {
-            if (!moveItemStackTo(stack, COMPUTER_SLOTS, total, true)) {
+        if (index < HARDWARE_SLOTS) {
+            if (!moveItemStackTo(stack, HARDWARE_SLOTS, total, true)) {
                 return ItemStack.EMPTY;
             }
-        } else if (!moveItemStackTo(stack, 0, COMPUTER_SLOTS, false)) {
-            // Components land in their hardware slot (category-restricted); anything
-            // else falls through to local storage.
+        } else if (!moveItemStackTo(stack, 0, HARDWARE_SLOTS, false)) {
+            // Components land in their category-restricted hardware slot; anything
+            // else has nowhere to go and stays in the inventory.
             return ItemStack.EMPTY;
         }
 

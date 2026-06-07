@@ -55,7 +55,52 @@ import java.util.Optional;
 /**
  * The Mainframe BlockEntity: the binding that turns installed hardware item stacks into a {@link ComputerBuild} and exposes the powered state, capacity and parallel-queue count.
  */
-public class MainframeBlockEntity extends BlockEntity {
+public class MainframeBlockEntity extends BlockEntity
+        implements dev.jsc.jscomputronics.common.peripheral.PeripheralOwner,
+        dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost {
+
+    private final java.util.Set<Long> linkedMonitors = new java.util.LinkedHashSet<>();
+
+    @Override
+    public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType cableType() {
+        return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    }
+
+    @Override
+    public java.util.List<Long> linkedEndpoints() {
+        return java.util.List.copyOf(linkedMonitors);
+    }
+
+    @Override
+    public int maxEndpoints() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.gpus().size() * 4;
+    }
+
+    @Override
+    public void onEndpointLinked(final long endpointPos) {
+        if (linkedMonitors.add(endpointPos)) {
+            setChanged();
+        }
+    }
+
+    @Override
+    public void onEndpointUnlinked(final long endpointPos) {
+        if (linkedMonitors.remove(endpointPos)) {
+            setChanged();
+        }
+    }
+
+    @Override
+    public java.util.Set<Long> occupiedPositions(final long ownerPos) {
+        // The whole 3x2x2 footprint is one connection surface: a peripheral cable
+        final Direction facing = getBlockState().getValue(HorizontalDirectionalBlock.FACING);
+        final java.util.Set<Long> positions = new java.util.HashSet<>();
+        for (final BlockPos p : MainframeStructure.allPositions(worldPosition, facing)) {
+            positions.add(p.asLong());
+        }
+        return positions;
+    }
 
     public static final int MOTHERBOARD_SLOT = 0;
     public static final int CPU_SLOTS_START = 1;
@@ -93,6 +138,15 @@ public class MainframeBlockEntity extends BlockEntity {
         }
     };
 
+    public static final int STORAGE_SLOTS = 27;
+
+    private final ItemStackHandler storage = new ItemStackHandler(STORAGE_SLOTS) {
+        @Override
+        protected void onContentsChanged(final int slot) {
+            setChanged();
+        }
+    };
+
     @Nullable
     private ComputerBuild cachedBuild;
     private boolean buildDirty = true;
@@ -113,6 +167,10 @@ public class MainframeBlockEntity extends BlockEntity {
     @Nullable
     private OperationDispatch dispatch;
     private int dispatchQueues;
+
+    private static final int OPERATION_LOG_MAX = 32;
+    private final java.util.Deque<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord>
+            operationLog = new java.util.ArrayDeque<>();
 
     public MainframeBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.MAINFRAME_BE.get(), pos, state);
@@ -142,6 +200,10 @@ public class MainframeBlockEntity extends BlockEntity {
 
     public ItemStackHandler getInventory() {
         return inventory;
+    }
+
+    public ItemStackHandler getStorage() {
+        return storage;
     }
 
     @Nullable
@@ -361,7 +423,25 @@ public class MainframeBlockEntity extends BlockEntity {
 
     public void onBroken() {
         if (level instanceof ServerLevel serverLevel) {
+            eraseOwnedNetwork(serverLevel);
             unregister(NetworkSystem.get(serverLevel));
+        }
+    }
+
+    private void eraseOwnedNetwork(final ServerLevel level) {
+        final NetworkSystem system = NetworkSystem.get(level);
+        final ConnectivityIndex index = system.connectivity();
+        final java.util.Set<NetworkUuid> owned = new java.util.LinkedHashSet<>();
+        if (registeredNetwork != null) {
+            owned.add(registeredNetwork);
+        }
+        for (final long cable : adjacentCables(level)) {
+            index.networkOf(cable).ifPresent(owned::add);
+        }
+        final NetworkRegistrySavedData registry = NetworkRegistrySavedData.get(level);
+        for (final NetworkUuid net : owned) {
+            index.clearNetwork(net);
+            registry.removeNetwork(net);
         }
     }
 
@@ -480,6 +560,21 @@ public class MainframeBlockEntity extends BlockEntity {
         return dispatch == null ? 0L : dispatch.completedCount();
     }
 
+    public void recordOperation(final byte type, final ItemStack icon, final long requested,
+                                final long moved, final byte status,
+                                final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.MoveRow> moves) {
+        operationLog.addFirst(new dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord(
+                type, icon, requested, moved, status, java.util.List.copyOf(moves)));
+        while (operationLog.size() > OPERATION_LOG_MAX) {
+            operationLog.removeLast();
+        }
+        setChanged();
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> recentOperations() {
+        return java.util.List.copyOf(operationLog);
+    }
+
     public NodeUuid nodeUuid() {
         if (nodeUuid == null) {
             nodeUuid = NodeUuid.random();
@@ -503,6 +598,155 @@ public class MainframeBlockEntity extends BlockEntity {
 
     public boolean hasNetworkConflict() {
         return networkConflict;
+    }
+
+    // ComputerTerminalHost — read-only monitoring for the Monitor terminal
+
+    @Override
+    public boolean computerRunning() {
+        return isRunning();
+    }
+
+    @Override
+    public boolean computerBuildValid() {
+        return buildValid();
+    }
+
+    @Override
+    public int networkLinkState() {
+        return networkConflict ? 2 : (networkUuid != null ? 1 : 0);
+    }
+
+    @Override
+    public long orchestrationCapacity() {
+        return capacity();
+    }
+
+    @Override
+    public int computerQueues() {
+        return parallelQueues();
+    }
+
+    @Override
+    public long computerRamBuffer() {
+        return ramBuffer();
+    }
+
+    @Override
+    public int networkServerCount() {
+        if (networkUuid != null && level instanceof ServerLevel serverLevel) {
+            return NetworkSystem.get(serverLevel).serversOf(networkUuid).size();
+        }
+        return 0;
+    }
+
+    @Override
+    public int installedCpus() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.cpus().size();
+    }
+
+    @Override
+    public int cpuSlots() {
+        return boardCpuSlots();
+    }
+
+    @Override
+    public int installedRam() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.rams().size();
+    }
+
+    @Override
+    public int ramSlots() {
+        return boardRamSlots();
+    }
+
+    @Override
+    public int installedGpus() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.gpus().size();
+    }
+
+    @Override
+    public int gpuSlots() {
+        return boardPcieSlots();
+    }
+
+    @Override
+    public int installedDisks() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.disks().size();
+    }
+
+    @Override
+    public int diskSlots() {
+        return boardDiskSlots();
+    }
+
+    @Override
+    public long localStorageUsed() {
+        long used = 0L;
+        for (int i = 0; i < storage.getSlots(); i++) {
+            used += storage.getStackInSlot(i).getCount();
+        }
+        return used;
+    }
+
+    @Override
+    public long localStorageCapacity() {
+        return storageItems();
+    }
+
+    @Override
+    public net.neoforged.neoforge.items.IItemHandler localStorage() {
+        return storage;
+    }
+
+    @Override
+    public int usableStorageSlots() {
+        final ComputerBuild build = currentBuild();
+        if (build == null) {
+            return 0;
+        }
+        final long capacity = build.totalStorageItems();
+        return capacity <= 0 ? 0 : (int) Math.min(STORAGE_SLOTS, (capacity + 63) / 64);
+    }
+
+    @Override
+    public int pendingOperations() {
+        return pendingOps();
+    }
+
+    @Override
+    public int runningOperations() {
+        return runningOps();
+    }
+
+    @Override
+    public int completedOperations() {
+        return (int) Math.min(Integer.MAX_VALUE, completedOps());
+    }
+
+    @Override
+    public int networkPcCount() {
+        if (networkUuid != null && level instanceof ServerLevel serverLevel) {
+            return NetworkSystem.get(serverLevel).personalComputersOf(networkUuid).size();
+        }
+        return 0;
+    }
+
+    @Override
+    public int networkSubframeCount() {
+        if (networkUuid != null && level instanceof ServerLevel serverLevel) {
+            return NetworkSystem.get(serverLevel).subframesOf(networkUuid).size();
+        }
+        return 0;
+    }
+
+    @Override
+    public boolean isMainframeHost() {
+        return true;
     }
 
     public static final int DATA_COUNT = 11;
@@ -569,6 +813,9 @@ public class MainframeBlockEntity extends BlockEntity {
         if (tag.contains("Inventory")) {
             inventory.deserializeNBT(registries, tag.getCompound("Inventory"));
         }
+        if (tag.contains("Storage")) {
+            storage.deserializeNBT(registries, tag.getCompound("Storage"));
+        }
         manualOn = tag.getBoolean("ManualOn");
         autoStart = tag.getBoolean("AutoStart");
         if (tag.contains("NodeUuid")) {
@@ -577,6 +824,16 @@ public class MainframeBlockEntity extends BlockEntity {
         if (tag.contains("NetworkUuid")) {
             nativeNetworkUuid = NetworkUuid.fromString(tag.getString("NetworkUuid"));
         }
+        linkedMonitors.clear();
+        for (final long monitor : tag.getLongArray("LinkedMonitors")) {
+            linkedMonitors.add(monitor);
+        }
+        operationLog.clear();
+        final net.minecraft.nbt.ListTag ops = tag.getList("OperationLog", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        for (int i = 0; i < ops.size() && i < OPERATION_LOG_MAX; i++) {
+            operationLog.addLast(dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord
+                    .fromNbt(ops.getCompound(i), registries));
+        }
         buildDirty = true;
     }
 
@@ -584,6 +841,7 @@ public class MainframeBlockEntity extends BlockEntity {
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Inventory", inventory.serializeNBT(registries));
+        tag.put("Storage", storage.serializeNBT(registries));
         tag.putBoolean("ManualOn", manualOn);
         tag.putBoolean("AutoStart", autoStart);
         if (nodeUuid != null) {
@@ -591,6 +849,16 @@ public class MainframeBlockEntity extends BlockEntity {
         }
         if (nativeNetworkUuid != null) {
             tag.putString("NetworkUuid", nativeNetworkUuid.asString());
+        }
+        if (!linkedMonitors.isEmpty()) {
+            tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
+        }
+        if (!operationLog.isEmpty()) {
+            final net.minecraft.nbt.ListTag ops = new net.minecraft.nbt.ListTag();
+            for (final dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord rec : operationLog) {
+                ops.add(rec.toNbt(registries));
+            }
+            tag.put("OperationLog", ops);
         }
     }
 }

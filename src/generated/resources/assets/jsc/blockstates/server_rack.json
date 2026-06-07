@@ -1,6 +1,15 @@
 {
   "variants": {
-    "": {
+    "facing=east": {
+      "model": "jsc:block/server_rack"
+    },
+    "facing=north": {
+      "model": "jsc:block/server_rack"
+    },
+    "facing=south": {
+      "model": "jsc:block/server_rack"
+    },
+    "facing=west": {
       "model": "jsc:block/server_rack"
     }
   }

@@ -180,6 +180,10 @@ public final class ConnectivityIndex {
         rootToUuid.put(root, uuid);
     }
 
+    public void clearNetwork(NetworkUuid uuid) {
+        rootToUuid.values().removeIf(uuid::equals);
+    }
+
     public RemovalResult onCableRemoved(long encodedPos) {
         if (!posToId.containsKey(encodedPos)) {
             throw new IllegalStateException(

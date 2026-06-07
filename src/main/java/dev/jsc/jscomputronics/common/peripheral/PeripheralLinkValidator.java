@@ -154,18 +154,23 @@ public final class PeripheralLinkValidator {
         final Set<Long> visited = new HashSet<>();
         final Deque<long[]> queue = new ArrayDeque<>();
 
-        // Seed BFS with source's neighbors. Source itself is the owner
-        // BE (not a cable), so we don't enqueue it.
-        visited.add(source);
-        for (final long neighbor : neighborLookup.neighborsOf(source)) {
-            if (neighbor == target) {
-                // Owner adjacent to endpoint — zero cables between them.
-                return new PathSearchResult.Found(0);
-            }
-            if (visited.add(neighbor)
-                    && cableLookup.cableTypeAt(neighbor)
-                    .filter(t -> t == requiredType).isPresent()) {
-                queue.addLast(new long[]{neighbor, 1L});
+        // The source may be a multiblock owner: seed BFS from every face of every
+        final Set<Long> sources = ownerLookup.ownerAt(source)
+                .map(owner -> owner.occupiedPositions(source))
+                .filter(positions -> !positions.isEmpty())
+                .orElseGet(() -> Set.of(source));
+        visited.addAll(sources);
+        for (final long src : sources) {
+            for (final long neighbor : neighborLookup.neighborsOf(src)) {
+                if (neighbor == target) {
+                    // Owner adjacent to endpoint — zero cables between them.
+                    return new PathSearchResult.Found(0);
+                }
+                if (visited.add(neighbor)
+                        && cableLookup.cableTypeAt(neighbor)
+                        .filter(t -> t == requiredType).isPresent()) {
+                    queue.addLast(new long[]{neighbor, 1L});
+                }
             }
         }
 

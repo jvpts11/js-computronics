@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "top=false": {
+      "model": "jsc:block/server_rack"
+    },
+    "top=true": {
+      "model": "jsc:block/server_rack_part"
+    }
+  }
+}

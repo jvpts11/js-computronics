@@ -29,5 +29,6 @@ public final class ComputingClientSetup {
         event.register(ComputingModule.PERSONAL_COMPUTER_MENU.get(), PersonalComputerScreen::new);
         event.register(ComputingModule.SERVER_RACK_MENU.get(), ServerRackScreen::new);
         event.register(ComputingModule.SERVER_ASSEMBLY_MENU.get(), ServerAssemblyScreen::new);
+        event.register(ComputingModule.COMPUTER_TERMINAL_MENU.get(), ComputerTerminalScreen::new);
     }
 }

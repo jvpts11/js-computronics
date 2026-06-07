@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.common.peripheral;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Contract for a BlockEntity that OWNS a set of peripheral endpoints via cables of one peripheral system.
@@ -23,4 +24,8 @@ public interface PeripheralOwner {
     void onEndpointLinked(long endpointPos);
 
     void onEndpointUnlinked(long endpointPos);
+
+    default Set<Long> occupiedPositions(long ownerPos) {
+        return Set.of(ownerPos);
+    }
 }

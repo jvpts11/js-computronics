@@ -14,10 +14,13 @@ import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.network.ServerNode;
 import dev.jsc.jscomputronics.common.network.SubframeNode;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
+import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -31,8 +34,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Registers and handles the network storage payloads that let a Personal Computer's Network tab drive the storage operations: the client asks to SELECT, the server runs it through the network and replies with a fresh snapshot of what the network holds.
@@ -56,6 +61,16 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRequestNodes);
         registrar.playToClient(NetworkNodesPayload.TYPE, NetworkNodesPayload.STREAM_CODEC,
                 ComputingPayloads::handleNodes);
+        registrar.playToServer(TerminalSelectPayload.TYPE, TerminalSelectPayload.STREAM_CODEC,
+                ComputingPayloads::handleTerminalSelect);
+        registrar.playToServer(TerminalInsertPayload.TYPE, TerminalInsertPayload.STREAM_CODEC,
+                ComputingPayloads::handleTerminalInsert);
+        registrar.playToServer(RequestServerBreakdownPayload.TYPE, RequestServerBreakdownPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestBreakdown);
+        registrar.playToClient(ServerBreakdownPayload.TYPE, ServerBreakdownPayload.STREAM_CODEC,
+                ComputingPayloads::handleServerBreakdown);
+        registrar.playToClient(OperationsLogPayload.TYPE, OperationsLogPayload.STREAM_CODEC,
+                ComputingPayloads::handleOpsLog);
     }
 
     private static void handleSelect(final NetworkSelectPayload payload, final IPayloadContext context) {
@@ -147,10 +162,165 @@ public final class ComputingPayloads {
 
     private static void handleSnapshot(final NetworkSnapshotPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof PersonalComputerMenu menu) {
-                menu.setNetworkItems(payload.items());
+            if (context.player().containerMenu
+                    instanceof dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu terminal) {
+                terminal.setNetworkItems(payload.items());
             }
         });
+    }
+
+    public static void dispatchTerminalQuery(final ServerPlayer player, final NetworkUuid net,
+                                             final ServerLevel level) {
+        final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+        if (mainframe != null) {
+            mainframe.submitOperation(
+                    new dev.jsc.jscomputronics.module.computing.operation.NetworkQueryOperationTask(level, net, player),
+                    dev.jsc.jscomputronics.common.operation.OperationPriority.MEDIUM);
+        }
+    }
+
+    private static void handleTerminalSelect(final TerminalSelectPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host != null && host.networkUuid() != null
+                    && context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level) {
+                final NetworkUuid net = host.networkUuid();
+                final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+                if (mainframe != null) {
+                    final Set<NodeUuid> sources =
+                            payload.serverKeys().isEmpty() ? null : toNodes(payload.serverKeys());
+                    mainframe.submitOperation(
+                            new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectToStorageOperationTask(
+                                    level, net, payload.item(), payload.quantity(), payload.hostPos(), player, sources),
+                            dev.jsc.jscomputronics.common.operation.OperationPriority.MEDIUM);
+                }
+            }
+        });
+    }
+
+    private static void handleTerminalInsert(final TerminalInsertPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host == null || host.networkUuid() == null
+                    || !(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(player.containerMenu instanceof ComputerTerminalMenu menu)) {
+                return;
+            }
+            final NetworkUuid net = host.networkUuid();
+            final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+            if (mainframe == null) {
+                return;
+            }
+            final int idx = payload.slotIndex();
+            final boolean fromCursor = idx == TerminalInsertPayload.CURSOR || idx == TerminalInsertPayload.CURSOR_ONE;
+            // A slot source must be a player-inventory slot, never a storage slot.
+            if (!fromCursor && (idx < menu.storageSlotCount() || idx >= menu.slots.size())) {
+                return;
+            }
+            final net.minecraft.world.inventory.Slot slot = fromCursor ? null : menu.getSlot(idx);
+            final ItemStack source = fromCursor ? menu.getCarried() : slot.getItem();
+            if (source.isEmpty()) {
+                return;
+            }
+            // Take the items off the source now ("in flight"); the Operation returns overflow.
+            final ItemStack inFlight;
+            if (idx == TerminalInsertPayload.CURSOR_ONE) {
+                inFlight = source.copyWithCount(1);
+                source.shrink(1);
+                menu.setCarried(source.isEmpty() ? ItemStack.EMPTY : source);
+            } else if (fromCursor) {
+                inFlight = source.copy();
+                menu.setCarried(ItemStack.EMPTY);
+            } else {
+                inFlight = source.copy();
+                slot.set(ItemStack.EMPTY);
+            }
+            menu.broadcastChanges();
+            final boolean dispatched = mainframe.submitOperation(
+                    new dev.jsc.jscomputronics.module.computing.operation.NetworkInsertFromTerminalOperationTask(
+                            level, net, inFlight, player),
+                    dev.jsc.jscomputronics.common.operation.OperationPriority.MEDIUM);
+            if (!dispatched) {
+                // Error path (no live dispatcher): hand the items straight to the inventory.
+                player.getInventory().placeItemBackInInventory(inFlight);
+            }
+        });
+    }
+
+    private static void handleRequestBreakdown(final RequestServerBreakdownPayload payload,
+                                               final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host != null && host.networkUuid() != null
+                    && context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level) {
+                PacketDistributor.sendToPlayer(player, collectBreakdown(level, host.networkUuid(), payload.item()));
+            }
+        });
+    }
+
+    private static void handleServerBreakdown(final ServerBreakdownPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof ComputerTerminalMenu menu) {
+                menu.setServerBreakdown(payload.servers());
+            }
+        });
+    }
+
+    public static void dispatchTerminalOpsLog(final ServerPlayer player, final NetworkUuid net,
+                                              final ServerLevel level) {
+        final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+        PacketDistributor.sendToPlayer(player, new OperationsLogPayload(
+                mainframe != null ? mainframe.recentOperations() : List.of()));
+    }
+
+    private static void handleOpsLog(final OperationsLogPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof ComputerTerminalMenu menu) {
+                menu.setOperationsLog(payload.operations());
+            }
+        });
+    }
+
+    private static ComputerTerminalHost openTerminal(final IPayloadContext context,
+                                                     final BlockPos monitorPos, final BlockPos hostPos) {
+        if (context.player() instanceof ServerPlayer player
+                && player.containerMenu instanceof ComputerTerminalMenu menu
+                && menu.monitorPos().equals(monitorPos)
+                && menu.hostPos().equals(hostPos)
+                && player.level().getBlockEntity(hostPos) instanceof ComputerTerminalHost host) {
+            return host;
+        }
+        return null;
+    }
+
+    private static ServerBreakdownPayload collectBreakdown(final ServerLevel level, final NetworkUuid net,
+                                                           final Item item) {
+        final Map<NodeUuid, Long> perServer =
+                dev.jsc.jscomputronics.module.computing.operation.NetworkStorage.of(level, net).breakdown(item);
+        final List<ServerBreakdownPayload.ServerHolding> rows = new ArrayList<>();
+        for (final Map.Entry<NodeUuid, Long> e : perServer.entrySet()) {
+            if (rows.size() >= ServerBreakdownPayload.MAX) {
+                break;
+            }
+            final String key = e.getKey().asString();
+            rows.add(new ServerBreakdownPayload.ServerHolding(key, "SRV-" + shortId(key), e.getValue()));
+        }
+        return new ServerBreakdownPayload(rows);
+    }
+
+    private static Set<NodeUuid> toNodes(final List<String> keys) {
+        final Set<NodeUuid> nodes = new HashSet<>();
+        for (final String key : keys) {
+            try {
+                nodes.add(NodeUuid.fromString(key));
+            } catch (final IllegalArgumentException ignored) {
+                // skip a malformed key rather than fail the whole request
+            }
+        }
+        return nodes;
     }
 
     private static void handleRequestNodes(final RequestNetworkNodesPayload payload, final IPayloadContext context) {

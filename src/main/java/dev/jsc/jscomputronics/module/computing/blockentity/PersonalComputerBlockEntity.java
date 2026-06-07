@@ -45,7 +45,9 @@ import java.util.Optional;
 /**
  * The Personal Computer BlockEntity: the player's hands-on access point to the network.
  */
-public class PersonalComputerBlockEntity extends BlockEntity {
+public class PersonalComputerBlockEntity extends BlockEntity
+        implements dev.jsc.jscomputronics.common.peripheral.PeripheralOwner,
+        dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost {
 
     public static final int MOTHERBOARD_SLOT = 0;
     public static final int CPU_SLOT = 1;
@@ -237,6 +239,41 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         return NetworkSystem.get((ServerLevel) level).serversOf(networkUuid).size();
     }
 
+    // Peripheral ownership — Monitors (and later Drives/Printers) linked over
+    // Peripheral Cable. A computer hosts up to 4 monitors per installed GPU.
+
+    private final java.util.Set<Long> linkedMonitors = new java.util.LinkedHashSet<>();
+
+    @Override
+    public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType cableType() {
+        return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    }
+
+    @Override
+    public java.util.List<Long> linkedEndpoints() {
+        return java.util.List.copyOf(linkedMonitors);
+    }
+
+    @Override
+    public int maxEndpoints() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.gpus().size() * 4;
+    }
+
+    @Override
+    public void onEndpointLinked(final long endpointPos) {
+        if (linkedMonitors.add(endpointPos)) {
+            setChanged();
+        }
+    }
+
+    @Override
+    public void onEndpointUnlinked(final long endpointPos) {
+        if (linkedMonitors.remove(endpointPos)) {
+            setChanged();
+        }
+    }
+
     // Motherboard-derived slot availability
     // The installed board's spec decides how many CPU/RAM/GPU slots are usable;
 
@@ -337,6 +374,107 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         return networkUuid;
     }
 
+    // ComputerTerminalHost — read-only monitoring for the Monitor terminal
+
+    @Override
+    public boolean computerRunning() {
+        return isRunning();
+    }
+
+    @Override
+    public boolean computerBuildValid() {
+        return buildValid();
+    }
+
+    @Override
+    public int networkLinkState() {
+        return networkUuid != null ? 1 : 0; // a PC never conflicts; it only reads a network
+    }
+
+    @Override
+    public long orchestrationCapacity() {
+        return capacity();
+    }
+
+    @Override
+    public int computerQueues() {
+        return isRunning() ? 1 : 0; // a PC runs a single Operation queue
+    }
+
+    @Override
+    public long computerRamBuffer() {
+        return ramBuffer();
+    }
+
+    @Override
+    public int installedCpus() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.cpus().size();
+    }
+
+    @Override
+    public int cpuSlots() {
+        return boardCpuSlots();
+    }
+
+    @Override
+    public int installedRam() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.rams().size();
+    }
+
+    @Override
+    public int ramSlots() {
+        return boardRamSlots();
+    }
+
+    @Override
+    public int installedGpus() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.gpus().size();
+    }
+
+    @Override
+    public int gpuSlots() {
+        return boardPcieSlots();
+    }
+
+    @Override
+    public int installedDisks() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0 : build.disks().size();
+    }
+
+    @Override
+    public int diskSlots() {
+        return boardDiskSlots();
+    }
+
+    @Override
+    public long localStorageUsed() {
+        long used = 0L;
+        for (int i = 0; i < storage.getSlots(); i++) {
+            used += storage.getStackInSlot(i).getCount();
+        }
+        return used;
+    }
+
+    @Override
+    public long localStorageCapacity() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0L : build.totalStorageItems();
+    }
+
+    @Override
+    public net.neoforged.neoforge.items.IItemHandler localStorage() {
+        return storage;
+    }
+
+    @Override
+    public boolean isMainframeHost() {
+        return false;
+    }
+
     // Screen sync
 
     // A Personal Computer runs a single Operation queue; GPUs add parallel queues
@@ -398,6 +536,10 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         if (tag.contains("NodeUuid")) {
             nodeUuid = NodeUuid.fromString(tag.getString("NodeUuid"));
         }
+        linkedMonitors.clear();
+        for (final long monitor : tag.getLongArray("LinkedMonitors")) {
+            linkedMonitors.add(monitor);
+        }
         buildDirty = true;
     }
 
@@ -410,6 +552,9 @@ public class PersonalComputerBlockEntity extends BlockEntity {
         tag.putBoolean("AutoStart", autoStart);
         if (nodeUuid != null) {
             tag.putString("NodeUuid", nodeUuid.asString());
+        }
+        if (!linkedMonitors.isEmpty()) {
+            tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }
     }
 }

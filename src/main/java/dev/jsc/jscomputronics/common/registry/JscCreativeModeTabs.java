@@ -48,8 +48,10 @@ public final class JscCreativeModeTabs {
                         // Blocks & network infrastructure.
                         output.accept(ComputingModule.ETHERNET_CABLE_ITEM.get());
                         output.accept(ComputingModule.HBW_CABLE_ITEM.get());
+                        output.accept(ComputingModule.PERIPHERAL_CABLE_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_ROUTER_ITEM.get());
                         output.accept(ComputingModule.MAINFRAME_ITEM.get());
+                        output.accept(ComputingModule.MONITOR_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
                         output.accept(ComputingModule.SERVER_RACK_ITEM.get());
                         // Server items.

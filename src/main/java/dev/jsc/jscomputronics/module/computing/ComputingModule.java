@@ -125,6 +125,24 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> HBW_CABLE_ITEM = ITEMS.register(
             "hbw_cable", () -> new BlockItem(HBW_CABLE.get(), new Item.Properties()));
 
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PeripheralCableBlock> PERIPHERAL_CABLE =
+            BLOCKS.register("peripheral_cable",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.PeripheralCableBlock(cableProperties()));
+
+    public static final DeferredItem<BlockItem> PERIPHERAL_CABLE_ITEM = ITEMS.register(
+            "peripheral_cable", () -> new BlockItem(PERIPHERAL_CABLE.get(), new Item.Properties()));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.MonitorBlock> MONITOR =
+            BLOCKS.register("monitor", () -> new dev.jsc.jscomputronics.module.computing.block.MonitorBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_BLACK)
+                            .strength(1.0F)
+                            .sound(SoundType.METAL)
+                            .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> MONITOR_ITEM = ITEMS.register(
+            "monitor", () -> new BlockItem(MONITOR.get(), new Item.Properties()));
+
     // Block entities
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DataCableBlockEntity>> DATA_CABLE_BE =
@@ -149,6 +167,13 @@ public final class ComputingModule {
                     () -> BlockEntityType.Builder.of(PersonalRouterBlockEntity::new,
                             PERSONAL_ROUTER.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity>> MONITOR_BE =
+            BLOCK_ENTITIES.register("monitor",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity::new,
+                            MONITOR.get()).build(null));
+
     // Server Rack — houses Server items as network nodes
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.ServerRackBlock> SERVER_RACK =
@@ -163,9 +188,25 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> SERVER_RACK_ITEM = ITEMS.register(
             "server_rack", () -> new BlockItem(SERVER_RACK.get(), new Item.Properties()));
 
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock> SERVER_RACK_PART =
+            BLOCKS.register("server_rack_part",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.METAL)
+                                    .strength(1.5F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ServerRackBlockEntity>> SERVER_RACK_BE =
             BLOCK_ENTITIES.register("server_rack",
                     () -> BlockEntityType.Builder.of(ServerRackBlockEntity::new, SERVER_RACK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity>> SERVER_RACK_PART_BE =
+            BLOCK_ENTITIES.register("server_rack_part",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity::new,
+                            SERVER_RACK_PART.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu>> SERVER_RACK_MENU =
@@ -176,6 +217,11 @@ public final class ComputingModule {
             MenuType<dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu>> SERVER_ASSEMBLY_MENU =
             MENUS.register("server_assembly", () -> IMenuTypeExtension.create(
                     dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu>> COMPUTER_TERMINAL_MENU =
+            MENUS.register("computer_terminal", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu::fromNetwork));
 
     // Hardware components (Standard era — minimal set to build a Mainframe)
 
