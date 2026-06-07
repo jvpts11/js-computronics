@@ -25,6 +25,9 @@ import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
+import dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart;
+import dev.jsc.jscomputronics.module.computing.block.part.ImportBusPart;
+import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertFromTerminalOperationTask;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperationTask;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkSelectToStorageOperationTask;
@@ -744,6 +747,326 @@ public final class NetworkGameTests {
                     helper.assertTrue(rec.icon().is(Items.COBBLESTONE), "icon item must persist");
                     helper.assertTrue(!rec.moves().isEmpty() && rec.moves().get(0).to().equals("SRV-abc123"),
                             "provenance must persist");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void importBus_movesChestItemsIntoNetwork(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        // Import Bus part on the east face of the cable end, facing a barrel of cobblestone.
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.EAST, new ImportBusPart());
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container container) {
+            container.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+        }
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 50, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    final long held = NetworkStorage.of(helper.getLevel(), net).count(Items.COBBLESTONE);
+                    helper.assertTrue(held > 0, "import bus must move items into the network; got " + held);
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_INSERT,
+                            "the import should be logged as an INSERT");
+                    helper.assertTrue(!log.get(0).moves().isEmpty()
+                                    && log.get(0).moves().get(0).from().equals("import"),
+                            "provenance should read 'import'");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void exportBus_movesNetworkItemsIntoChest(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        // Export Bus part on the east face of the cable end, facing a barrel.
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.EAST, new ExportBusPart());
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable
+                            && cable.getPart(Direction.EAST) instanceof ExportBusPart bus) {
+                        bus.setFilter(new ItemStack(Items.COBBLESTONE));
+                    }
+                })
+                .thenExecuteAfter(50, () -> {
+                    long inBarrel = 0L;
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container container) {
+                        for (int i = 0; i < container.getContainerSize(); i++) {
+                            if (container.getItem(i).is(Items.COBBLESTONE)) {
+                                inBarrel += container.getItem(i).getCount();
+                            }
+                        }
+                    }
+                    helper.assertTrue(inBarrel > 0, "export bus must move items into the chest; got " + inBarrel);
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_DELETE,
+                            "the export should be logged as a DELETE");
+                    helper.assertTrue(!log.get(0).moves().isEmpty()
+                                    && log.get(0).moves().get(0).to().equals("export"),
+                            "provenance should go to 'export'");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cablePart_survivesReload(final GameTestHelper helper) {
+        final BlockPos cablePos = new BlockPos(2, 2, 2);
+        helper.setBlock(cablePos, ComputingModule.HBW_CABLE.get());
+        if (!(helper.getBlockEntity(cablePos) instanceof DataCableBlockEntity cable)) {
+            helper.fail("no cable block entity");
+            return;
+        }
+        final ExportBusPart part = new ExportBusPart();
+        cable.addPart(Direction.EAST, part);
+        part.setFilter(new ItemStack(Items.COBBLESTONE));
+        part.adjustMin(5);
+        part.adjustMax(20);
+
+        final var registries = helper.getLevel().registryAccess();
+        final net.minecraft.nbt.CompoundTag saved = cable.saveWithFullMetadata(registries);
+        final var reloaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                helper.absolutePos(cablePos), cable.getBlockState(), saved, registries);
+        helper.assertTrue(reloaded instanceof DataCableBlockEntity, "reloaded BE should be a cable");
+
+        final DataCableBlockEntity back = (DataCableBlockEntity) reloaded;
+        helper.assertTrue(back.hasPart(Direction.EAST), "the part must survive on the same face");
+        helper.assertTrue(!back.hasPart(Direction.WEST), "no part should appear on an empty face");
+        helper.assertTrue(back.getPart(Direction.EAST) instanceof ExportBusPart, "the part type must persist");
+        final ExportBusPart reloadedPart = (ExportBusPart) back.getPart(Direction.EAST);
+        helper.assertTrue(reloadedPart.filterItem() == Items.COBBLESTONE, "the filter must persist");
+        helper.assertTrue(reloadedPart.getDataAccess().get(0) == 5, "min must persist");
+        helper.assertTrue(reloadedPart.getDataAccess().get(1) == 20, "max must persist");
+        helper.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkIndex_catalogsServersAndLocks(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 40))
+                .thenExecuteAfter(4, () -> {
+                    final long stored = rackBe.getServerStorage(0).count(Items.COBBLESTONE);
+                    helper.assertTrue(stored > 0L, "the server should hold cobblestone; got " + stored);
+                    final var index = mainframe.networkIndex();
+                    helper.assertTrue(index.available(Items.COBBLESTONE) == stored,
+                            "index must catalog the stored amount; got " + index.available(Items.COBBLESTONE)
+                                    + " vs " + stored);
+
+                    final java.util.UUID op = new java.util.UUID(0L, 7L);
+                    final long want = stored / 2L;
+                    final var plan = index.lock(op, Items.COBBLESTONE, want);
+                    helper.assertTrue(plan.allocated() == want, "lock should reserve " + want);
+                    helper.assertTrue(index.available(Items.COBBLESTONE) == stored - want,
+                            "locked items must drop availability");
+
+                    index.unlock(op);
+                    helper.assertTrue(index.available(Items.COBBLESTONE) == stored,
+                            "unlock must restore availability");
+                    helper.assertTrue(!index.isLocked(op), "no lock should remain after unlock");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkSelect_movesItemsOverTimeAndUnlocks(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final BlockPos barrel = new BlockPos(4, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+
+        final long[] stored = {0L};
+        final dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[] op = {null};
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 40))
+                .thenExecuteAfter(4, () -> {
+                    stored[0] = rackBe.getServerStorage(0).count(Items.COBBLESTONE);
+                    helper.assertTrue(stored[0] > 0L, "the server should hold cobblestone");
+                    final var dest = helper.getLevel().getCapability(
+                            net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+                            helper.absolutePos(barrel), null);
+                    helper.assertTrue(dest != null, "the barrel must expose an item handler");
+                    op[0] = mainframe.submitNetworkSelect(Items.COBBLESTONE, stored[0], dest, "select");
+                    helper.assertTrue(op[0] != null, "the SELECT must be accepted");
+                })
+                .thenExecuteAfter(30, () -> {
+                    helper.assertTrue(op[0].isDone(), "the SELECT must finish");
+                    helper.assertTrue(op[0].status() == OperationRecord.STATUS_COMPLETED,
+                            "the SELECT must complete fully; status " + op[0].status());
+                    long inBarrel = 0L;
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container container) {
+                        for (int i = 0; i < container.getContainerSize(); i++) {
+                            if (container.getItem(i).is(Items.COBBLESTONE)) {
+                                inBarrel += container.getItem(i).getCount();
+                            }
+                        }
+                    }
+                    helper.assertTrue(inBarrel == stored[0],
+                            "every selected item must reach the barrel; got " + inBarrel + " of " + stored[0]);
+                    helper.assertTrue(rackBe.getServerStorage(0).count(Items.COBBLESTONE) == 0L,
+                            "the items must have left the server");
+                    helper.assertTrue(!mainframe.networkIndex().isLocked(op[0].operationId()),
+                            "the lock must be released on completion");
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_SELECT,
+                            "the SELECT must be logged");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkInsert_writesItemsIntoServersOverTime(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        final dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation[] op = {null};
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () ->
+                        op[0] = mainframe.submitNetworkInsert(Items.COBBLESTONE, 40, "you"))
+                .thenExecuteAfter(30, () -> {
+                    helper.assertTrue(op[0] != null && op[0].isDone(), "the INSERT must finish");
+                    helper.assertTrue(op[0].status() == OperationRecord.STATUS_COMPLETED,
+                            "the INSERT must store everything; status " + op[0].status());
+                    helper.assertTrue(op[0].writtenTotal() == 40L,
+                            "40 items must be written; got " + op[0].writtenTotal());
+                    helper.assertTrue(rackBe.getServerStorage(0).count(Items.COBBLESTONE) == 40L,
+                            "the server must hold the inserted items");
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_INSERT,
+                            "the INSERT must be logged");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkInsert_failsAndReportsLeftoverWhenNetworkFull(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    final var store = rackBe.getServerStorage(0);
+                    store.insert(Items.COBBLESTONE, store.free()); // fill the only server to capacity
+                    helper.assertTrue(store.free() == 0L, "the server must be full for this test");
+
+                    final var op = mainframe.submitNetworkInsert(Items.DIRT, 16, "you");
+                    helper.assertTrue(op != null && op.isDone(),
+                            "an INSERT into a full network finishes immediately");
+                    helper.assertTrue(op.status() == OperationRecord.STATUS_FAILED,
+                            "nothing fit, so it FAILED; status " + op.status());
+                    helper.assertTrue(op.writtenTotal() == 0L, "nothing was written");
+                    helper.assertTrue(op.leftover() == 16L,
+                            "the whole request is leftover; got " + op.leftover());
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkDelete_pullsItemsOutAndLogsDelete(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final BlockPos barrel = new BlockPos(4, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+
+        final long[] stored = {0L};
+        final dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[] op = {null};
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 32))
+                .thenExecuteAfter(4, () -> {
+                    stored[0] = rackBe.getServerStorage(0).count(Items.COBBLESTONE);
+                    final var dest = helper.getLevel().getCapability(
+                            net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+                            helper.absolutePos(barrel), null);
+                    op[0] = mainframe.submitNetworkDelete(Items.COBBLESTONE, stored[0], dest, "export");
+                    helper.assertTrue(op[0] != null, "the DELETE must be accepted");
+                })
+                .thenExecuteAfter(30, () -> {
+                    helper.assertTrue(op[0].isDone() && op[0].status() == OperationRecord.STATUS_COMPLETED,
+                            "the DELETE must complete");
+                    helper.assertTrue(rackBe.getServerStorage(0).count(Items.COBBLESTONE) == 0L,
+                            "the items must leave the network");
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_DELETE,
+                            "it must be logged as a DELETE, not a SELECT");
                 })
                 .thenSucceed();
     }

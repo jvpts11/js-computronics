@@ -167,6 +167,11 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     private OperationDispatch dispatch;
     private int dispatchQueues;
+    private final dev.jsc.jscomputronics.module.computing.operation.NetworkIndex networkIndex =
+            new dev.jsc.jscomputronics.module.computing.operation.NetworkIndex();
+    private final java.util.List<dev.jsc.jscomputronics.module.computing.operation.NetworkOperation>
+            activeOperations = new java.util.ArrayList<>();
+    private long completedTotal;
 
     private static final int OPERATION_LOG_MAX = 32;
     private final java.util.Deque<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord>
@@ -336,10 +341,17 @@ public class MainframeBlockEntity extends BlockEntity
         if (isRunning()) {
             updateNetwork(level);
             runDispatch();
+            // Refresh the in-RAM storage catalog once per tick from the network's servers.
+            networkIndex.rebuild(level, networkUuid());
+            tickOperations();
         } else {
             leaveNetwork(level);
             closeDispatch();
         }
+    }
+
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkIndex networkIndex() {
+        return networkIndex;
     }
 
     private void updateNetwork(final ServerLevel level) {
@@ -531,9 +543,16 @@ public class MainframeBlockEntity extends BlockEntity
 
     private void closeDispatch() {
         if (dispatch != null) {
+            // Fold the dying dispatcher's tally into the persisted lifetime total so the
+            // completed count carries across power cycles and chunk unloads.
+            completedTotal += dispatch.completedCount();
             dispatch.close();
             dispatch = null;
             dispatchQueues = 0;
+            // The index lives in RAM: powering off clears the catalog (rebuilt on next start) and
+            // abandons in-flight Operations (their locks go with the cleared index).
+            networkIndex.clear();
+            activeOperations.clear();
         }
     }
 
@@ -557,18 +576,88 @@ public class MainframeBlockEntity extends BlockEntity
     }
 
     public long completedOps() {
-        return dispatch == null ? 0L : dispatch.completedCount();
+        return completedTotal + (dispatch == null ? 0L : dispatch.completedCount());
     }
 
     public void recordOperation(final byte type, final ItemStack icon, final long requested,
                                 final long moved, final byte status,
                                 final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.MoveRow> moves) {
-        operationLog.addFirst(new dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord(
+        recordOperation(new dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord(
                 type, icon, requested, moved, status, java.util.List.copyOf(moves)));
+    }
+
+    public void recordOperation(
+            final dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord record) {
+        operationLog.addFirst(record);
         while (operationLog.size() > OPERATION_LOG_MAX) {
             operationLog.removeLast();
         }
         setChanged();
+    }
+
+    // Multi-tick network Operations (decomposed into SubOperations)
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
+            final net.minecraft.world.item.Item item, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+        return submitPull(item, demand, destination, destinationLabel,
+                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT);
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkDelete(
+            final net.minecraft.world.item.Item item, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+        return submitPull(item, demand, destination, destinationLabel,
+                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_DELETE);
+    }
+
+    @Nullable
+    private dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitPull(
+            final net.minecraft.world.item.Item item, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final byte recordType) {
+        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+            return null;
+        }
+        final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation(
+                serverLevel, networkUuid(), item, demand, destination, destinationLabel, recordType,
+                java.util.UUID.randomUUID(), networkIndex);
+        activeOperations.add(operation);
+        return operation;
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation submitNetworkInsert(
+            final net.minecraft.world.item.Item item, final long demand, final String sourceLabel) {
+        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+            return null;
+        }
+        final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation(
+                serverLevel, networkUuid(), item, demand, sourceLabel, networkIndex);
+        activeOperations.add(operation);
+        return operation;
+    }
+
+    private void tickOperations() {
+        if (activeOperations.isEmpty()) {
+            return;
+        }
+        final long[] shares = dev.jsc.jscomputronics.common.operation.exec.EqualShare.split(
+                capacity(), activeOperations.size());
+        for (int i = 0; i < activeOperations.size(); i++) {
+            activeOperations.get(i).tick(shares[i]);
+        }
+        final java.util.Iterator<dev.jsc.jscomputronics.module.computing.operation.NetworkOperation> it =
+                activeOperations.iterator();
+        while (it.hasNext()) {
+            final var operation = it.next();
+            if (operation.isDone()) {
+                recordOperation(operation.toRecord());
+                it.remove();
+            }
+        }
     }
 
     public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> recentOperations() {
@@ -828,6 +917,7 @@ public class MainframeBlockEntity extends BlockEntity
         for (final long monitor : tag.getLongArray("LinkedMonitors")) {
             linkedMonitors.add(monitor);
         }
+        completedTotal = tag.getLong("CompletedTotal");
         operationLog.clear();
         final net.minecraft.nbt.ListTag ops = tag.getList("OperationLog", net.minecraft.nbt.Tag.TAG_COMPOUND);
         for (int i = 0; i < ops.size() && i < OPERATION_LOG_MAX; i++) {
@@ -853,6 +943,9 @@ public class MainframeBlockEntity extends BlockEntity
         if (!linkedMonitors.isEmpty()) {
             tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }
+        // Save the full lifetime total (persisted base plus the live dispatcher's tally);
+        // the live dispatcher itself is transient, so the snapshot reloads as the new base.
+        tag.putLong("CompletedTotal", completedOps());
         if (!operationLog.isEmpty()) {
             final net.minecraft.nbt.ListTag ops = new net.minecraft.nbt.ListTag();
             for (final dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord rec : operationLog) {

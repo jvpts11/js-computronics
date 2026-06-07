@@ -165,7 +165,7 @@ public final class NetworkStorage {
         return stored;
     }
 
-    public long delete(final Item item, final long amount) {
+    public long drop(final Item item, final long amount) {
         long destroyed = 0L;
         for (final Entry entry : entries) {
             if (destroyed >= amount) {

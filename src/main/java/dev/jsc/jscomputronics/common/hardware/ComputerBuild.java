@@ -55,6 +55,14 @@ public record ComputerBuild(MotherboardSpec motherboard,
         return sum;
     }
 
+    public StorageTier fastestDiskTier() {
+        StorageTier best = StorageTier.HDD;
+        for (final DiskSpec disk : disks) {
+            best = best.faster(disk.tier());
+        }
+        return best;
+    }
+
     public long totalStorageItems() {
         long sum = 0L;
         for (final DiskSpec disk : disks) {
