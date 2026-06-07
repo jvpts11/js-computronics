@@ -27,6 +27,7 @@ public record OperationRecord(byte type, ItemStack icon, long requested, long mo
 
     public static final byte TYPE_SELECT = 0;
     public static final byte TYPE_INSERT = 1;
+    public static final byte TYPE_DELETE = 2;
 
     public static final byte STATUS_COMPLETED = 0;
     public static final byte STATUS_PARTIAL = 1;

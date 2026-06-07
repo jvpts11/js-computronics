@@ -117,6 +117,8 @@ public class JscBlockStateProvider extends BlockStateProvider {
                     .rotationY((int) facing.toYRot() % 360)
                     .build();
         });
+
+        // Interaction buses are not blocks: they are parts mounted on a data cable's face,
     }
 
     private void pipeCable(final net.minecraft.world.level.block.Block block, final String name) {

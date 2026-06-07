@@ -54,6 +54,8 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.MONITOR_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
                         output.accept(ComputingModule.SERVER_RACK_ITEM.get());
+                        output.accept(ComputingModule.IMPORT_BUS_ITEM.get());
+                        output.accept(ComputingModule.EXPORT_BUS_ITEM.get());
                         // Server items.
                         output.accept(ComputingModule.SERVER_CASE.get());
                         // An empty Server: the player assembles it by right-clicking.

@@ -65,6 +65,10 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.SERVER.get());
         getBuilder("server_rack")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack")));
+        getBuilder("import_bus")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/import_bus_part")));
+        getBuilder("export_bus")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/export_bus_part")));
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             basicItem(disk.item().get());
         }

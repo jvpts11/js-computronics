@@ -83,6 +83,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private int netScrollRow;
     private int selectedOp;
+    private int opScroll;
     private int taskSubTab;
 
     @org.jetbrains.annotations.Nullable
@@ -453,13 +454,24 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private void opsBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
         final List<OperationRecord> ops = menu.operationsLog();
-        for (int i = 0; i < OPS_ROWS && i < ops.size(); i++) {
+        final int start = clampOpScroll(ops.size());
+        for (int i = 0; i < OPS_ROWS && start + i < ops.size(); i++) {
             final int ry = cy + 32 + i * 12;
-            final boolean sel = i == selectedOp;
+            final boolean sel = (start + i) == selectedOp;
             g.fill(cx, ry, cx + cw, ry + 11, sel ? TAB_ON : PANEL);
             if (sel) {
                 g.fill(cx, ry, cx + 2, ry + 11, ACCENT);
             }
+        }
+        // Scrollbar on the list's right edge whenever the history overflows the visible rows.
+        if (ops.size() > OPS_ROWS) {
+            final int trackTop = cy + 32;
+            final int trackH = OPS_ROWS * 12 - 1;
+            final int maxOff = ops.size() - OPS_ROWS;
+            final int thumbH = Math.max(8, trackH * OPS_ROWS / ops.size());
+            final int thumbY = trackTop + (trackH - thumbH) * start / maxOff;
+            g.fill(cx + cw - 2, trackTop, cx + cw, trackTop + trackH, LINE);
+            g.fill(cx + cw - 2, thumbY, cx + cw, thumbY + thumbH, ACCENT);
         }
         g.fill(cx, cy + 90, cx + cw, cy + 140, PANEL);
         g.fill(cx, cy + 90, cx + cw, cy + 91, LINE);
@@ -477,8 +489,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             g.drawString(font, "No operations yet.", cx, cy + 40, DIM, false);
             return;
         }
-        for (int i = 0; i < OPS_ROWS && i < ops.size(); i++) {
-            opListRow(g, cx, cy + 34 + i * 12, cw, ops.get(i));
+        final int start = clampOpScroll(ops.size());
+        for (int i = 0; i < OPS_ROWS && start + i < ops.size(); i++) {
+            opListRow(g, cx, cy + 34 + i * 12, cw, ops.get(start + i));
         }
         if (selectedOp >= 0 && selectedOp < ops.size()) {
             final OperationRecord op = ops.get(selectedOp);
@@ -574,8 +587,12 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private void opListRow(final GuiGraphics g, final int cx, final int ry, final int cw,
                            final OperationRecord op) {
-        final boolean insert = op.type() == OperationRecord.TYPE_INSERT;
-        g.drawString(font, insert ? "INSERT" : "SELECT", cx + 4, ry, insert ? AMBER : ACCENT2, false);
+        final byte type = op.type();
+        final String label = type == OperationRecord.TYPE_INSERT ? "INSERT"
+                : type == OperationRecord.TYPE_DELETE ? "DELETE" : "SELECT";
+        final int typeColor = type == OperationRecord.TYPE_INSERT ? AMBER
+                : type == OperationRecord.TYPE_DELETE ? RED : ACCENT2;
+        g.drawString(font, label, cx + 4, ry, typeColor, false);
         final String q = fmt(op.moved());
         final int nameW = Math.max(0, cw - 44 - font.width(q) - 8);
         final String name = font.plainSubstrByWidth(op.icon().getHoverName().getString(), nameW);
@@ -626,6 +643,12 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         return sub >= 0 && sub < 3 ? sub : -1;
     }
 
+    private int clampOpScroll(final int size) {
+        final int max = Math.max(0, size - OPS_ROWS);
+        opScroll = Math.max(0, Math.min(max, opScroll));
+        return opScroll;
+    }
+
     private int opsRowAt(final int mx, final int my) {
         if (mx < leftPos + CONTENT_X || mx >= leftPos + imageWidth - 6) {
             return -1;
@@ -635,7 +658,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             return -1;
         }
         final int row = rel / 12;
-        return row >= 0 && row < OPS_ROWS && row < menu.operationsLog().size() ? row : -1;
+        if (row < 0 || row >= OPS_ROWS) {
+            return -1;
+        }
+        final int idx = opScroll + row;
+        return idx < menu.operationsLog().size() ? idx : -1;
     }
 
     private void tile(final GuiGraphics g, final int x, final int y, final String key,
@@ -977,6 +1004,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             final int rows = (visibleItems().size() + NET_COLS - 1) / NET_COLS;
             final int max = Math.max(0, rows - NET_ROWS);
             netScrollRow = Math.max(0, Math.min(max, netScrollRow - (int) Math.signum(dy)));
+            return true;
+        }
+        if (menu.activeTab() == ComputerTerminalMenu.TAB_OPS && dy != 0) {
+            final int max = Math.max(0, menu.operationsLog().size() - OPS_ROWS);
+            opScroll = Math.max(0, Math.min(max, opScroll - (int) Math.signum(dy)));
             return true;
         }
         return super.mouseScrolled(mx, my, dx, dy);

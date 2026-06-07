@@ -1,0 +1,45 @@
+{
+  "parent": "block/block",
+  "textures": {
+    "side": "jsc:block/import_bus",
+    "particle": "jsc:block/import_bus"
+  },
+  "elements": [
+    {
+      "from": [5, 5, 3],
+      "to": [11, 11, 5],
+      "faces": {
+        "north": {"texture": "#side"},
+        "south": {"texture": "#side"},
+        "east": {"texture": "#side"},
+        "west": {"texture": "#side"},
+        "up": {"texture": "#side"},
+        "down": {"texture": "#side"}
+      }
+    },
+    {
+      "from": [4, 4, 1],
+      "to": [12, 12, 3],
+      "faces": {
+        "north": {"texture": "#side"},
+        "south": {"texture": "#side"},
+        "east": {"texture": "#side"},
+        "west": {"texture": "#side"},
+        "up": {"texture": "#side"},
+        "down": {"texture": "#side"}
+      }
+    },
+    {
+      "from": [2, 2, 0],
+      "to": [14, 14, 1],
+      "faces": {
+        "north": {"texture": "#side"},
+        "south": {"texture": "#side"},
+        "east": {"texture": "#side"},
+        "west": {"texture": "#side"},
+        "up": {"texture": "#side"},
+        "down": {"texture": "#side"}
+      }
+    }
+  ]
+}

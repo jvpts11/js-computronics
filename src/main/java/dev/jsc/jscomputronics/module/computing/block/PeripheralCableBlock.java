@@ -28,7 +28,8 @@ public class PeripheralCableBlock extends PipeBlock implements PeripheralConnect
     public static final MapCodec<PeripheralCableBlock> CODEC = simpleCodec(PeripheralCableBlock::new);
 
     public PeripheralCableBlock(final Properties properties) {
-        super(0.125F, properties);
+        // 0.1875 matches the 6px cable_core model, so the selection/collision box covers the
+        super(0.1875F, properties);
         BlockState defaultState = stateDefinition.any();
         for (final BooleanProperty property : PROPERTY_BY_DIRECTION.values()) {
             defaultState = defaultState.setValue(property, false);

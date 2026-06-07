@@ -39,6 +39,10 @@ public class JscLanguageProvider extends LanguageProvider {
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");
         addBlock(ComputingModule.SERVER_RACK, "Server Rack");
+        add(ComputingModule.IMPORT_BUS_ITEM.get(), "Import Bus");
+        add("item.jsc.import_bus.tooltip", "Right-click a data cable to attach; pulls items into the network");
+        add(ComputingModule.EXPORT_BUS_ITEM.get(), "Export Bus");
+        add("item.jsc.export_bus.tooltip", "Right-click a data cable to attach; pushes the filtered item out");
         add(ComputingModule.MOTHERBOARD_MTX_P.get(), "MTX-P Motherboard");
         add(ComputingModule.MOTHERBOARD_ATX_P.get(), "ATX-P Motherboard");
         add(ComputingModule.CPU_SERVO_2620.get(), "Integra Servo 2620");

@@ -174,6 +174,23 @@ public final class ComputingModule {
                             dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity::new,
                             MONITOR.get()).build(null));
 
+    // Interaction buses — move items between the network and adjacent inventories
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.block.part.CablePartItem> IMPORT_BUS_ITEM =
+            ITEMS.register("import_bus", () -> new dev.jsc.jscomputronics.module.computing.block.part.CablePartItem(
+                    new Item.Properties(),
+                    dev.jsc.jscomputronics.module.computing.block.part.CablePartType.IMPORT));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.block.part.CablePartItem> EXPORT_BUS_ITEM =
+            ITEMS.register("export_bus", () -> new dev.jsc.jscomputronics.module.computing.block.part.CablePartItem(
+                    new Item.Properties(),
+                    dev.jsc.jscomputronics.module.computing.block.part.CablePartType.EXPORT));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu>> EXPORT_BUS_MENU =
+            MENUS.register("export_bus", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu::fromNetwork));
+
     // Server Rack — houses Server items as network nodes
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.ServerRackBlock> SERVER_RACK =
