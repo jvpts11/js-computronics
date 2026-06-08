@@ -34,6 +34,7 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
@@ -85,13 +86,6 @@ public class PersonalComputerBlockEntity extends BlockEntity
         }
     };
 
-    private final ItemStackHandler storage = new ItemStackHandler(STORAGE_SLOTS) {
-        @Override
-        protected void onContentsChanged(final int slot) {
-            setChanged();
-        }
-    };
-
     @Nullable
     private ComputerBuild cachedBuild;
     private boolean buildDirty = true;
@@ -101,6 +95,7 @@ public class PersonalComputerBlockEntity extends BlockEntity
 
     @Nullable
     private NodeUuid nodeUuid;
+    private String computerName = "";
     @Nullable
     private NetworkUuid networkUuid;
     @Nullable
@@ -136,8 +131,12 @@ public class PersonalComputerBlockEntity extends BlockEntity
         return hardware;
     }
 
-    public ItemStackHandler getStorage() {
-        return storage;
+    public dev.jsc.jscomputronics.module.computing.storage.LocalStore localStore() {
+        final java.util.List<ItemStack> disks = new java.util.ArrayList<>(DISK_SLOTS);
+        for (int i = 0; i < DISK_SLOTS; i++) {
+            disks.add(hardware.getStackInSlot(DISK_SLOTS_START + i));
+        }
+        return new dev.jsc.jscomputronics.module.computing.storage.LocalStore(disks, this::setChanged);
     }
 
     @Nullable
@@ -333,7 +332,8 @@ public class PersonalComputerBlockEntity extends BlockEntity
         networkUuid = resolved;
         if (resolved != null) {
             system.registerPersonalComputer(
-                    new NetworkSystem.PersonalComputerNode(nodeUuid(), resolved, capacity()));
+                    new NetworkSystem.PersonalComputerNode(nodeUuid(), resolved, capacity(),
+                            worldPosition.asLong()));
             registeredNetwork = resolved;
         }
     }
@@ -367,6 +367,23 @@ public class PersonalComputerBlockEntity extends BlockEntity
             setChanged();
         }
         return nodeUuid;
+    }
+
+    public String customName() {
+        return computerName;
+    }
+
+    public void setCustomName(final String name) {
+        final String trimmed = name.strip();
+        final String capped = trimmed.length() > 32 ? trimmed.substring(0, 32) : trimmed;
+        if (!capped.equals(computerName)) {
+            computerName = capped;
+            setChanged();
+            // Re-sync the update tag so the assembly GUI shows the new name when reopened.
+            if (level != null) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+            }
+        }
     }
 
     @Nullable
@@ -452,11 +469,7 @@ public class PersonalComputerBlockEntity extends BlockEntity
 
     @Override
     public long localStorageUsed() {
-        long used = 0L;
-        for (int i = 0; i < storage.getSlots(); i++) {
-            used += storage.getStackInSlot(i).getCount();
-        }
-        return used;
+        return localStore().used();
     }
 
     @Override
@@ -467,7 +480,11 @@ public class PersonalComputerBlockEntity extends BlockEntity
 
     @Override
     public net.neoforged.neoforge.items.IItemHandler localStorage() {
-        return storage;
+        return new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(localStore());
+    }
+
+    public java.util.Map<dev.jsc.jscomputronics.module.computing.storage.StorageKey, Long> localSnapshot() {
+        return localStore().view();
     }
 
     @Override
@@ -528,11 +545,9 @@ public class PersonalComputerBlockEntity extends BlockEntity
         if (tag.contains("Hardware")) {
             hardware.deserializeNBT(registries, tag.getCompound("Hardware"));
         }
-        if (tag.contains("Storage")) {
-            storage.deserializeNBT(registries, tag.getCompound("Storage"));
-        }
         manualOn = tag.getBoolean("ManualOn");
         autoStart = tag.getBoolean("AutoStart");
+        computerName = tag.getString("ComputerName");
         if (tag.contains("NodeUuid")) {
             nodeUuid = NodeUuid.fromString(tag.getString("NodeUuid"));
         }
@@ -544,12 +559,24 @@ public class PersonalComputerBlockEntity extends BlockEntity
     }
 
     @Override
+    public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
+        // Sync the player-given name to the client so the assembly GUI's name field shows it.
+        final CompoundTag tag = super.getUpdateTag(registries);
+        if (!computerName.isEmpty()) {
+            tag.putString("ComputerName", computerName);
+        }
+        return tag;
+    }
+
+    @Override
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Hardware", hardware.serializeNBT(registries));
-        tag.put("Storage", storage.serializeNBT(registries));
         tag.putBoolean("ManualOn", manualOn);
         tag.putBoolean("AutoStart", autoStart);
+        if (!computerName.isEmpty()) {
+            tag.putString("ComputerName", computerName);
+        }
         if (nodeUuid != null) {
             tag.putString("NodeUuid", nodeUuid.asString());
         }

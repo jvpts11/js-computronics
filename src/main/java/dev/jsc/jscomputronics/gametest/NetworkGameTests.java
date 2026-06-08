@@ -11,7 +11,6 @@ import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.hardware.DiskSize;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.operation.OperationPriority;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
@@ -28,10 +27,8 @@ import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart;
 import dev.jsc.jscomputronics.module.computing.block.part.ImportBusPart;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertFromTerminalOperationTask;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperationTask;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkSelectToStorageOperationTask;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -570,14 +567,10 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
                     helper.assertTrue(net != null, "mainframe owns a network");
-                    final boolean accepted = mainframe.submitOperation(
-                            new NetworkInsertOperationTask(helper.getLevel(), net,
-                                    new ItemStack(Items.COBBLESTONE, 40), null),
-                            OperationPriority.MEDIUM);
-                    helper.assertTrue(accepted, "Mainframe should accept the INSERT Operation");
+                    final var op = mainframe.submitNetworkInsert(Items.COBBLESTONE, 40, "test");
+                    helper.assertTrue(op != null, "Mainframe should dispatch the INSERT Operation");
                 })
-                // The dispatcher needs a couple ticks: run the task on a virtual
-                // thread, then drain its main-thread item move on a later tick.
+                // The timed Operation streams over a few ticks (disk latency, then the write).
                 .thenExecuteAfter(8, () -> {
                     final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid());
                     helper.assertTrue(ns.count(Items.COBBLESTONE) == 40,
@@ -653,22 +646,19 @@ public final class NetworkGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
-                    final NetworkUuid net = computer.networkUuid();
-                    helper.assertTrue(net != null, "PC must be on the network");
-                    final boolean accepted = mainframe.submitOperation(
-                            new NetworkSelectToStorageOperationTask(helper.getLevel(), net, Items.COBBLESTONE, 50,
-                                    helper.absolutePos(pc), null, null),
-                            OperationPriority.MEDIUM);
-                    helper.assertTrue(accepted, "Mainframe should accept the SELECT-to-storage Operation");
+                    helper.assertTrue(computer.networkUuid() != null, "PC must be on the network");
+                })
+                // Let the Mainframe's in-RAM catalog pick up the freshly seeded items before the SELECT
+                // locks against it (the terminal only ever lets a player pick an already-indexed item).
+                .thenExecuteAfter(2, () -> {
+                    // The terminal SELECT-to-storage resolves the computer's local storage as the
+                    // destination; route the timed pull straight into it.
+                    final var op = mainframe.submitNetworkSelect(Items.COBBLESTONE, 50,
+                            computer.localStorage(), "storage", null);
+                    helper.assertTrue(op != null, "Mainframe should dispatch the SELECT-to-storage Operation");
                 })
                 .thenExecuteAfter(8, () -> {
-                    long inStorage = 0L;
-                    final ItemStackHandler store = computer.getStorage();
-                    for (int i = 0; i < store.getSlots(); i++) {
-                        if (store.getStackInSlot(i).is(Items.COBBLESTONE)) {
-                            inStorage += store.getStackInSlot(i).getCount();
-                        }
-                    }
+                    final long inStorage = computer.localStore().count(StorageKey.of(Items.COBBLESTONE));
                     helper.assertTrue(inStorage == 50,
                             "SELECT must land 50 cobblestone in the PC's local storage; got " + inStorage);
                     // The Operation is logged with provenance for the Operations tab.
@@ -678,6 +668,51 @@ public final class NetworkGameTests {
                             "logged op should record 50 moved; got " + log.get(0).moved());
                     helper.assertTrue(!log.get(0).moves().isEmpty(),
                             "logged op should carry provenance moves (from which server)");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void localStorage_cappedByDiskCapacity(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        // A 200 MB disk holds only 50 items — far less than the slot grid (18 x 64) could.
+        computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.MB_200)));
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    helper.assertTrue(computer.networkUuid() != null, "PC must be on the network");
+                })
+                .thenExecuteAfter(2, () -> {
+                    // Ask for far more than the 50-item disk can hold.
+                    final var op = mainframe.submitNetworkSelect(Items.COBBLESTONE, 200,
+                            computer.localStorage(), "storage", null);
+                    helper.assertTrue(op != null, "Mainframe should dispatch the SELECT");
+                })
+                .thenExecuteAfter(8, () -> {
+                    final long inStorage = computer.localStore().count(StorageKey.of(Items.COBBLESTONE));
+                    final long inNet = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(inStorage == 50,
+                            "local storage must cap at the 50-item disk capacity; got " + inStorage);
+                    helper.assertTrue(inStorage + inNet == 200,
+                            "the rest must stay in the network, nothing lost; storage=" + inStorage + " net=" + inNet);
                 })
                 .thenSucceed();
     }
@@ -699,11 +734,8 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
                     helper.assertTrue(net != null, "mainframe must own a network");
-                    final boolean accepted = mainframe.submitOperation(
-                            new NetworkInsertFromTerminalOperationTask(helper.getLevel(), net,
-                                    new ItemStack(Items.COBBLESTONE, 64), null),
-                            OperationPriority.MEDIUM);
-                    helper.assertTrue(accepted, "Mainframe should accept the terminal INSERT Operation");
+                    final var op = mainframe.submitNetworkInsert(Items.COBBLESTONE, 64, "terminal");
+                    helper.assertTrue(op != null, "Mainframe should dispatch the terminal INSERT Operation");
                 })
                 .thenExecuteAfter(8, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
@@ -839,6 +871,217 @@ public final class NetworkGameTests {
                     helper.assertTrue(!log.get(0).moves().isEmpty()
                                     && log.get(0).moves().get(0).to().equals("export"),
                             "provenance should go to 'export'");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void insert_abandonsCleanlyOnPowerOff(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        // A large INSERT: far beyond one tick of the server's RAM-bounded write rate, so it is
+        // certainly still in flight when power is cut a few ticks in.
+        final long demand = 200_000L;
+        final java.util.concurrent.atomic.AtomicReference<
+                dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation> opBox =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var op = mainframe.submitNetworkInsert(Items.COBBLESTONE, demand, "test");
+                    helper.assertTrue(op != null, "the INSERT should dispatch on a running mainframe");
+                    opBox.set(op);
+                })
+                .thenExecuteAfter(6, () -> {
+                    final var op = opBox.get();
+                    helper.assertFalse(op.isDone(), "the INSERT should still be in flight before power-off");
+                    helper.assertTrue(op.writtenTotal() > 0L,
+                            "it should have written some before power-off; written=" + op.writtenTotal());
+                    mainframe.togglePower(); // power off mid-flight -> closeDispatch must abandon it
+                })
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var op = opBox.get();
+                    helper.assertFalse(mainframe.isRunning(), "mainframe should be powered off");
+                    helper.assertTrue(op.isDone(), "a power-off must settle the in-flight INSERT (no wedge)");
+                    final long written = op.writtenTotal();
+                    helper.assertTrue(written > 0L && written < demand,
+                            "it was abandoned mid-flight; written=" + written);
+                    helper.assertTrue(op.leftover() == demand - written,
+                            "leftover must account for every unwritten item; leftover=" + op.leftover()
+                                    + " written=" + written);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void select_abortsWhenDestinationGone(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        // A large pull into a roomy sink, so it spans many ticks (it cannot finish before we cut it).
+        final long seeded = 60_000L;
+        final ItemStackHandler dest = new ItemStackHandler(1000);
+        final java.util.concurrent.atomic.AtomicBoolean gone = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicReference<
+                dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation> opBox =
+                new java.util.concurrent.atomic.AtomicReference<>();
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, seeded))
+                // Let the in-RAM catalog see the seeded items before the SELECT locks against it.
+                .thenExecuteAfter(2, () -> {
+                    final var op = mainframe.submitNetworkSelect(
+                            Items.COBBLESTONE, seeded, dest, "test", null);
+                    helper.assertTrue(op != null, "the SELECT should dispatch on a running mainframe");
+                    op.abortWhen(gone::get);
+                    opBox.set(op);
+                })
+                .thenExecuteAfter(3, () -> {
+                    helper.assertFalse(opBox.get().isDone(), "the SELECT should still be pulling before its sink is gone");
+                    gone.set(true); // the destination vanished (the requesting player logged out)
+                })
+                .thenExecuteAfter(2, () -> {
+                    final var op = opBox.get();
+                    helper.assertTrue(op.isDone(), "the SELECT must settle once its destination is gone");
+                    long inDest = 0L;
+                    for (int i = 0; i < dest.getSlots(); i++) {
+                        if (dest.getStackInSlot(i).is(Items.COBBLESTONE)) {
+                            inDest += dest.getStackInSlot(i).getCount();
+                        }
+                    }
+                    final long inNet = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(inDest > 0L && inDest < seeded,
+                            "it moved some but not all before aborting; inDest=" + inDest);
+                    helper.assertTrue(inDest + inNet == seeded,
+                            "no items lost or created on abort; dest=" + inDest + " net=" + inNet);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void activeOperations_reportLiveProgress(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertFalse(mainframe.hasActiveOperations(), "idle before any submit");
+                    helper.assertTrue(mainframe.submitNetworkInsert(Items.COBBLESTONE, 200_000L, "test") != null,
+                            "the large INSERT should dispatch");
+                })
+                .thenExecuteAfter(4, () -> {
+                    helper.assertTrue(mainframe.hasActiveOperations(), "an Operation should be in flight");
+                    final var live = mainframe.activeOperationRecords();
+                    helper.assertTrue(live.size() == 1, "exactly one in-flight Operation; got " + live.size());
+                    final var rec = live.get(0);
+                    helper.assertTrue(rec.status() == OperationRecord.STATUS_PROCESSING,
+                            "an in-flight Operation reads PROCESSING");
+                    helper.assertTrue(rec.requested() == 200_000L, "requested is the demand");
+                    helper.assertTrue(rec.moved() > 0L && rec.moved() < 200_000L,
+                            "moved reflects live progress; got " + rec.moved());
+                    helper.assertTrue(rec.icon().is(Items.COBBLESTONE), "the icon is the moved item");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void localStorage_travelsWithDisk(final GameTestHelper helper) {
+        final BlockPos pc = new BlockPos(2, 2, 2);
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(computer.localStore().insert(StorageKey.of(Items.COBBLESTONE), 100) == 100L,
+                            "should store 100 in local storage");
+                    helper.assertTrue(computer.localStore().used() == 100L, "local storage holds 100");
+                    // Pull the disk out of the computer.
+                    final ItemStack disk = computer.getHardware().extractItem(
+                            PersonalComputerBlockEntity.DISK_SLOTS_START, 1, false);
+                    helper.assertFalse(disk.isEmpty(), "the disk should come out");
+                    // The items travel WITH the disk; local storage is empty without it.
+                    final var contents = disk.get(ComputingModule.DISK_STORAGE.get());
+                    helper.assertTrue(contents != null && contents.count(Items.COBBLESTONE) == 100L,
+                            "the pulled disk must carry its 100 cobblestone");
+                    helper.assertTrue(computer.localStore().used() == 0L,
+                            "local storage is empty once the disk is removed; got " + computer.localStore().used());
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void networkStorage_preservesComponents(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        final ItemStack named = new ItemStack(Items.DIAMOND_SWORD);
+        named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                net.minecraft.network.chat.Component.literal("Excalibur"));
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), net);
+                    helper.assertTrue(ns.insert(named.copyWithCount(1)) == 1, "the named sword should store");
+                    ns.insert(new ItemStack(Items.DIAMOND_SWORD, 1)); // a plain one too
+                })
+                .thenExecuteAfter(2, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), net);
+                    // The named and the plain sword are distinct keys, counted separately.
+                    helper.assertTrue(ns.count(StorageKey.of(named)) == 1L,
+                            "the named variant is its own key; got " + ns.count(StorageKey.of(named)));
+                    helper.assertTrue(ns.count(Items.DIAMOND_SWORD) == 2L,
+                            "two swords total across variants; got " + ns.count(Items.DIAMOND_SWORD));
+                    // Pull the named one back out and confirm it kept its custom name.
+                    final ItemStackHandler dest = new ItemStackHandler(4);
+                    helper.assertTrue(ns.select(StorageKey.of(named), 1, dest) == 1L, "named SELECT moves 1");
+                    final ItemStack out = dest.getStackInSlot(0);
+                    helper.assertTrue(ItemStack.isSameItemSameComponents(out, named),
+                            "the pulled sword must keep its components; got '" + out.getHoverName().getString() + "'");
+                    helper.assertTrue(ns.count(Items.DIAMOND_SWORD) == 1L, "only the plain sword remains");
                 })
                 .thenSucceed();
     }
@@ -1027,6 +1270,31 @@ public final class NetworkGameTests {
                     helper.assertTrue(op.writtenTotal() == 0L, "nothing was written");
                     helper.assertTrue(op.leftover() == 16L,
                             "the whole request is leftover; got " + op.leftover());
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void server_withoutCpu_servesNoNetworkStorage(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.cpulessServer());
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 20))
+                .thenExecuteAfter(6, () -> {
+                    helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 0L,
+                            "a CPU-less Server must not appear in the network index");
+                    final var net = mainframe.networkUuid();
+                    helper.assertTrue(NetworkStorage.of(helper.getLevel(), net).count(Items.COBBLESTONE) == 0L,
+                            "and it serves no storage to the network");
                 })
                 .thenSucceed();
     }

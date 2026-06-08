@@ -13,6 +13,10 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord
 import dev.jsc.jscomputronics.module.computing.operation.payload.RequestServerBreakdownPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalInsertPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalDepositPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalUploadPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalWithdrawPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkServersPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalSelectPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -96,12 +100,27 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final String[] TASK_SUBTABS = {"Processes", "Hardware", "Devices"};
 
     // Request popup state (open only while popupEntry != null).
-    private static final int POPUP_W = 190;
-    private static final int POPUP_H = 158;
+    private static final int POPUP_W = 204;
+    private static final int POPUP_H = 178;
+    private static final int[] STEP_AMOUNTS = {-1000, -100, -10, -1, 1, 10, 100, 1000};
+    private static final String[] STEP_LABELS = {"----", "---", "--", "-", "+", "++", "+++", "++++"};
+    private EditBox qtyBox;
+    private boolean syncingQty;
     @org.jetbrains.annotations.Nullable
     private NetworkItemEntry popupEntry;
     private int popupQty = 1;
+    private boolean popupFromStorage;
     private final Set<String> deselectedServers = new HashSet<>();
+    private boolean advancedMode;
+    private int destServerIndex;
+    private static final int REQ_H_SIMPLE = 102;
+    private static final int REQ_H_ADVANCED = 200;
+
+    @org.jetbrains.annotations.Nullable
+    private OperationRecord popupOp;
+    private int opPopupScroll;
+    private static final int OP_POPUP_ROWS = 7;
+    private static final int TASK_OP_ROWS = 4;
 
     public ComputerTerminalScreen(final ComputerTerminalMenu menu, final Inventory inventory,
                                   final Component title) {
@@ -125,6 +144,18 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         box.setResponder(s -> netScrollRow = 0);
         addRenderableWidget(box);
         searchBox = box;
+
+        // The request popup's editable quantity field (digits only); visible only while the popup is up.
+        final EditBox qty = new EditBox(font, popupX() + 8, popupY() + 30, 118, 14, Component.literal("Qty"));
+        qty.setTextColor(TEXT);
+        qty.setMaxLength(12);
+        qty.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
+        qty.setResponder(this::onQtyTyped);
+        qty.visible = false;
+        qty.active = false;
+        addRenderableWidget(qty);
+        qtyBox = qty;
+
         syncSearchBoxVisibility();
     }
 
@@ -132,11 +163,42 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         if (searchBox == null) {
             return;
         }
-        final boolean show = menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK && popupEntry == null;
+        final boolean show = isGridTab() && popupEntry == null && popupOp == null;
         searchBox.visible = show;
         searchBox.active = show;
         if (!show) {
             searchBox.setFocused(false);
+        }
+        if (qtyBox != null) {
+            final boolean p = popupEntry != null;
+            qtyBox.visible = p;
+            qtyBox.active = p;
+            if (!p) {
+                qtyBox.setFocused(false);
+            }
+        }
+    }
+
+    private void onQtyTyped(final String s) {
+        if (popupEntry == null || syncingQty) {
+            return;
+        }
+        try {
+            final long v = s.isEmpty() ? 0L : Long.parseLong(s);
+            popupQty = (int) Math.max(0L, Math.min((long) Integer.MAX_VALUE, Math.min(popupEntry.total(), v)));
+        } catch (final NumberFormatException ignored) {
+            // Over-long input: leave the last valid quantity in place.
+        }
+    }
+
+    private void setPopupQty(final int value) {
+        final int max = (int) Math.max(1L, Math.min((long) Integer.MAX_VALUE,
+                popupEntry == null ? 1L : popupEntry.total()));
+        popupQty = Math.max(1, Math.min(max, value));
+        if (qtyBox != null) {
+            syncingQty = true;
+            qtyBox.setValue(String.valueOf(popupQty));
+            syncingQty = false;
         }
     }
 
@@ -230,18 +292,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private void storageBg(final GuiGraphics g, final int x, final int y,
                            final int cx, final int cy, final int cw) {
-        final int usable = menu.usableStorageSlots();
-        for (int i = 0; i < usable && i < menu.storageSlotCount(); i++) {
-            final int col = i % ComputerTerminalMenu.STORAGE_COLS;
-            final int row = i / ComputerTerminalMenu.STORAGE_COLS;
-            slotBg(g, x + ComputerTerminalMenu.STORAGE_X + col * 18, y + ComputerTerminalMenu.STORAGE_Y + row * 18);
-        }
-        if (usable > 0) {
-            // Capacity bar well below the 3-row grid (rows top out near cy+94).
-            final long cap = menu.storageCapacity();
-            final double sf = cap <= 0 ? 0 : Math.min(1.0, (double) menu.storageUsed() / cap);
-            inlineTrack(g, cx, cy + 100, cw, sf, cap <= 0 ? DIM : (sf > 0.9 ? RED : GREEN));
-        }
+        // The Storage tab is a disk-backed quantity view: the same item grid + deposit bar as the
+        // Network tab, drawn from the local-storage snapshot (visibleItems() sources it by tab).
+        networkBg(g, x, y);
     }
 
     private static void slotBg(final GuiGraphics g, final int x, final int y) {
@@ -335,17 +388,17 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private void storageLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        // Subheader sits ABOVE the slot grid (grid top is cy+34), so it never overlaps it.
-        g.drawString(font, "LOCAL STORAGE", cx, cy + 20, DIM, false);
-        final int disks = menu.installedDisks();
-        final String diskStr = disks + (disks == 1 ? " disk" : " disks");
-        g.drawString(font, diskStr, cx + cw - font.width(diskStr), cy + 20, DIM, false);
-        if (menu.usableStorageSlots() <= 0) {
-            g.drawString(font, "Install a disk to add local storage.", cx, cy + 44, DIM, false);
-            return;
-        }
-        final String cap = fmt(menu.storageUsed()) + "/" + fmt(menu.storageCapacity());
-        barLabel(g, cx, cy + 100, cw, "Capacity", cap);
+        final String cap = menu.storageCapacity() <= 0 ? "no disk"
+                : fmt(menu.storageUsed()) + "/" + fmt(menu.storageCapacity());
+        g.drawString(font, "LOCAL STORAGE  " + cap, cx, cy + 20, DIM, false);
+        final int shown = visibleItems().size();
+        final String t = shown + (shown == 1 ? " type" : " types");
+        g.drawString(font, t, cx + cw - font.width(t), cy + 20, DIM, false);
+        g.drawCenteredString(font, sortByQuantity ? "Qty" : "Name", SORT_X + SORT_W / 2,
+                TOOLBAR_Y + 3, ACCENT);
+        final boolean holding = !menu.getCarried().isEmpty();
+        g.drawCenteredString(font, "DEPOSIT TO STORAGE", NET_X + DEPOSIT_W / 2, DEPOSIT_Y + 3,
+                holding ? ACCENT : DIM);
     }
 
     // Network tab — a virtual item grid drawn from the snapshot
@@ -381,7 +434,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private List<NetworkItemEntry> visibleItems() {
         final String q = searchBox == null ? "" : searchBox.getValue().trim().toLowerCase(Locale.ROOT);
         final List<NetworkItemEntry> out = new ArrayList<>();
-        for (final NetworkItemEntry e : menu.networkItems()) {
+        final List<NetworkItemEntry> source = menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE
+                ? menu.localItems() : menu.networkItems();
+        for (final NetworkItemEntry e : source) {
             if (q.isEmpty()
                     || e.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)) {
                 out.add(e);
@@ -513,15 +568,17 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private void moveRow(final GuiGraphics g, final int cx, final int my, final OperationRecord.MoveRow mv) {
-        g.drawString(font, mv.from(), cx + 6, my, DIM, false);
+        g.drawString(font, font.plainSubstrByWidth(mv.from(), 62), cx + 6, my, DIM, false);
         g.drawString(font, ">", cx + 72, my, ACCENT, false);
-        g.drawString(font, fmt(mv.qty()) + " " + mv.to(), cx + 82, my, TEXT, false);
+        g.drawString(font, font.plainSubstrByWidth(fmt(mv.qty()) + " " + mv.to(), POPUP_W - 88),
+                cx + 82, my, TEXT, false);
     }
 
     private static int statusColor(final byte status) {
         return switch (status) {
             case OperationRecord.STATUS_COMPLETED -> GREEN;
             case OperationRecord.STATUS_PARTIAL -> AMBER;
+            case OperationRecord.STATUS_PROCESSING -> ACCENT2;
             default -> RED;
         };
     }
@@ -530,7 +587,26 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         return switch (status) {
             case OperationRecord.STATUS_COMPLETED -> "COMPLETED";
             case OperationRecord.STATUS_PARTIAL -> "PARTIAL";
+            case OperationRecord.STATUS_PROCESSING -> "PROCESSING";
             default -> "FAILED";
+        };
+    }
+
+    private static String opTypeLabel(final byte type) {
+        return switch (type) {
+            case OperationRecord.TYPE_INSERT -> "INSERT";
+            case OperationRecord.TYPE_DELETE -> "DELETE";
+            case OperationRecord.TYPE_MOVE -> "MOVE";
+            default -> "SELECT";
+        };
+    }
+
+    private static int opTypeColor(final byte type) {
+        return switch (type) {
+            case OperationRecord.TYPE_INSERT -> AMBER;
+            case OperationRecord.TYPE_DELETE -> RED;
+            case OperationRecord.TYPE_MOVE -> GREEN;
+            default -> ACCENT2;
         };
     }
 
@@ -575,24 +651,41 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private void tasksProcesses(final GuiGraphics g, final int cx, final int cy, final int cw) {
         final int tileW = (cw - 8) / 3;
-        tile(g, cx, cy + 44, "RUNNING", String.valueOf(menu.runningOps()), "");
+        final List<OperationRecord> active = menu.activeOps();
+        tile(g, cx, cy + 44, "IN FLIGHT", String.valueOf(active.size()), "");
         tile(g, cx + tileW + 4, cy + 44, "PENDING", String.valueOf(menu.pendingOps()), "");
         tile(g, cx + 2 * (tileW + 4), cy + 44, "DONE", fmt(menu.completedOps()), "");
-        g.drawString(font, "RECENT", cx, cy + 78, DIM, false);
-        final List<OperationRecord> ops = menu.operationsLog();
-        for (int i = 0; i < 3 && i < ops.size(); i++) {
-            opListRow(g, cx, cy + 90 + i * 12, cw, ops.get(i));
+        g.drawString(font, "IN PROGRESS", cx, cy + 78, DIM, false);
+        if (active.isEmpty()) {
+            g.drawString(font, "Idle - no Operations running.", cx, cy + 90, DIM, false);
+            return;
         }
+        for (int i = 0; i < TASK_OP_ROWS && i < active.size(); i++) {
+            taskOpRow(g, cx, cy + 90 + i * 14, cw, active.get(i));
+        }
+        if (active.size() > TASK_OP_ROWS) {
+            g.drawString(font, "+" + (active.size() - TASK_OP_ROWS) + " more",
+                    cx, cy + 90 + TASK_OP_ROWS * 14, DIM, false);
+        }
+    }
+
+    private void taskOpRow(final GuiGraphics g, final int cx, final int ry, final int cw,
+                           final OperationRecord op) {
+        final byte type = op.type();
+        g.drawString(font, opTypeLabel(type), cx + 4, ry, opTypeColor(type), false);
+        final double f = op.requested() <= 0 ? 0 : Math.min(1.0, (double) op.moved() / op.requested());
+        final String pct = (int) Math.round(f * 100) + "%";
+        final int nameW = Math.max(0, cw - 44 - font.width(pct) - 8);
+        g.drawString(font, font.plainSubstrByWidth(op.icon().getHoverName().getString(), nameW),
+                cx + 44, ry, TEXT, false);
+        g.drawString(font, pct, cx + cw - font.width(pct) - 4, ry, ACCENT, false);
+        track(g, cx + 4, ry + 9, cw - 8, f, ACCENT2);
     }
 
     private void opListRow(final GuiGraphics g, final int cx, final int ry, final int cw,
                            final OperationRecord op) {
         final byte type = op.type();
-        final String label = type == OperationRecord.TYPE_INSERT ? "INSERT"
-                : type == OperationRecord.TYPE_DELETE ? "DELETE" : "SELECT";
-        final int typeColor = type == OperationRecord.TYPE_INSERT ? AMBER
-                : type == OperationRecord.TYPE_DELETE ? RED : ACCENT2;
-        g.drawString(font, label, cx + 4, ry, typeColor, false);
+        g.drawString(font, opTypeLabel(type), cx + 4, ry, opTypeColor(type), false);
         final String q = fmt(op.moved());
         final int nameW = Math.max(0, cw - 44 - font.width(q) - 8);
         final String name = font.plainSubstrByWidth(op.icon().getHoverName().getString(), nameW);
@@ -731,18 +824,94 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     // Interaction
 
     @Override
+    public boolean keyPressed(final int key, final int scan, final int mods) {
+        // The request popup is modal: ESC closes it, Enter submits, typing goes to the quantity field,
+        // and every other key is swallowed so the inventory key ('E') never closes the GUI mid-edit.
+        if (popupEntry != null) {
+            if (key == 256) {
+                closeRequest();
+                return true;
+            }
+            if (key == 257 || key == 335) {
+                // Enter submits: a Storage popup withdraws to the inventory; a Network popup requests.
+                if (popupFromStorage) {
+                    sendStorageAction(false);
+                } else {
+                    sendRequest();
+                }
+                return true;
+            }
+            if (qtyBox != null && qtyBox.isFocused()) {
+                qtyBox.keyPressed(key, scan, mods);
+            }
+            return true;
+        }
+        // While the search field has focus, route typing to it; ESC unfocuses it; never let a letter
+        // key fall through and close the GUI.
+        if (searchBox != null && searchBox.isFocused()) {
+            if (key == 256) {
+                searchBox.setFocused(false);
+                setFocused(null);
+                return true;
+            }
+            searchBox.keyPressed(key, scan, mods);
+            return true;
+        }
+        return super.keyPressed(key, scan, mods);
+    }
+
+    @Override
+    public boolean charTyped(final char c, final int mods) {
+        if (popupEntry != null && qtyBox != null && qtyBox.isFocused()) {
+            return qtyBox.charTyped(c, mods);
+        }
+        if (searchBox != null && searchBox.isFocused()) {
+            return searchBox.charTyped(c, mods);
+        }
+        return super.charTyped(c, mods);
+    }
+
+    @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         if (popupEntry != null) {
             return handlePopupClick(mouseX, mouseY, button);
         }
-        // Network deposit: holding a stack and clicking the grid or deposit bar inserts it
-        // into the network (left = whole stack, right = one item).
-        if (menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK && !menu.getCarried().isEmpty()
+        if (popupOp != null) {
+            return handleOpPopupClick(mouseX, mouseY, button);
+        }
+        // Clicking the search field selects it for typing; clicking elsewhere deselects it. Container
+        // screens don't reliably route focus to widgets, so do it explicitly.
+        if (searchBox != null && searchBox.visible) {
+            if (searchBox.isMouseOver(mouseX, mouseY)) {
+                setFocused(searchBox);
+                searchBox.setFocused(true);
+                return searchBox.mouseClicked(mouseX, mouseY, button);
+            }
+            searchBox.setFocused(false);
+        }
+        // Deposit: holding a stack and clicking the grid or deposit bar inserts it into the network
+        // (Network tab) or the computer's local storage (Storage tab) — left = whole stack, right = one.
+        if (isGridTab() && !menu.getCarried().isEmpty()
                 && (button == 0 || button == 1)
                 && (overDepositBar(mouseX, mouseY) || overNetworkGrid(mouseX, mouseY))) {
-            PacketDistributor.sendToServer(new TerminalInsertPayload(menu.monitorPos(), menu.hostPos(),
-                    button == 1 ? TerminalInsertPayload.CURSOR_ONE : TerminalInsertPayload.CURSOR));
+            if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
+                PacketDistributor.sendToServer(new TerminalLocalDepositPayload(menu.monitorPos(), menu.hostPos(),
+                        button == 1 ? TerminalLocalDepositPayload.CURSOR_ONE : TerminalLocalDepositPayload.CURSOR));
+            } else {
+                PacketDistributor.sendToServer(new TerminalInsertPayload(menu.monitorPos(), menu.hostPos(),
+                        button == 1 ? TerminalInsertPayload.CURSOR_ONE : TerminalInsertPayload.CURSOR));
+            }
             return true;
+        }
+        // Storage tab: clicking an item with an empty cursor opens the actions popup, where the player
+        // sets a quantity and sends it to their inventory or up into the network.
+        if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE && menu.getCarried().isEmpty()
+                && button == 0) {
+            final NetworkItemEntry e = networkItemAt((int) mouseX, (int) mouseY);
+            if (e != null) {
+                openStorageRequest(e);
+                return true;
+            }
         }
         if (button == 0) {
             for (int i = 0; i < tabCount(); i++) {
@@ -759,22 +928,26 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                     return true;
                 }
             }
-            if (menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK) {
+            if (isGridTab()) {
                 if (inRect(mouseX, mouseY, leftPos + SORT_X, topPos + TOOLBAR_Y, SORT_W, TOOLBAR_H)) {
                     sortByQuantity = !sortByQuantity;
                     netScrollRow = 0;
                     return true;
                 }
-                final NetworkItemEntry e = networkItemAt((int) mouseX, (int) mouseY);
-                if (e != null) {
-                    openRequest(e);
-                    return true;
+                // The Network tab opens a request popup; the Storage tab withdraws directly (above).
+                if (menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK) {
+                    final NetworkItemEntry e = networkItemAt((int) mouseX, (int) mouseY);
+                    if (e != null) {
+                        openRequest(e);
+                        return true;
+                    }
                 }
             }
             if (menu.activeTab() == ComputerTerminalMenu.TAB_OPS) {
                 final int row = opsRowAt((int) mouseX, (int) mouseY);
                 if (row >= 0) {
                     selectedOp = row;
+                    openOpPopup(menu.operationsLog().get(row)); // click a logged op -> SubOperations popup
                     return true;
                 }
             }
@@ -784,6 +957,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                     taskSubTab = sub;
                     return true;
                 }
+                final int opRow = taskOpRowAt((int) mouseX, (int) mouseY);
+                if (opRow >= 0) {
+                    openOpPopup(menu.activeOps().get(opRow)); // click an in-flight op -> SubOperations popup
+                    return true;
+                }
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -791,12 +969,17 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     protected void slotClicked(final Slot slot, final int slotId, final int button, final ClickType type) {
-        // On the Network tab, shift-clicking an inventory stack deposits it into the
-        // network instead of doing the (no-op) storage quick-move.
-        if (menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK && type == ClickType.QUICK_MOVE
+        // On the Network/Storage tabs, shift-clicking an inventory stack deposits it into the network
+        // or local storage respectively, instead of a (no-op) quick-move.
+        if (isGridTab() && type == ClickType.QUICK_MOVE
                 && slot != null && slot.hasItem() && slot.index >= menu.storageSlotCount()) {
-            PacketDistributor.sendToServer(new TerminalInsertPayload(
-                    menu.monitorPos(), menu.hostPos(), slot.index));
+            if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
+                PacketDistributor.sendToServer(new TerminalLocalDepositPayload(
+                        menu.monitorPos(), menu.hostPos(), slot.index));
+            } else {
+                PacketDistributor.sendToServer(new TerminalInsertPayload(
+                        menu.monitorPos(), menu.hostPos(), slot.index));
+            }
             return;
         }
         super.slotClicked(slot, slotId, button, type);
@@ -805,6 +988,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private boolean overNetworkGrid(final double mx, final double my) {
         return mx >= leftPos + NET_X && mx < leftPos + NET_X + NET_COLS * 18
                 && my >= topPos + NET_Y && my < topPos + NET_Y + NET_ROWS * 18;
+    }
+
+    private boolean isGridTab() {
+        return menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK
+                || menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE;
     }
 
     private boolean overDepositBar(final double mx, final double my) {
@@ -827,60 +1015,216 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private void openRequest(final NetworkItemEntry e) {
         popupEntry = e;
-        popupQty = (int) Math.max(1, Math.min(e.total(), 64));
+        popupFromStorage = false;
         deselectedServers.clear();
-        menu.setServerBreakdown(List.of()); // clear stale rows; the reply repopulates
-        syncSearchBoxVisibility(); // hide the search field behind the popup
+        advancedMode = false;
+        destServerIndex = 0;
+        menu.setServerBreakdown(List.of());  // clear stale rows; the reply repopulates
+        menu.setNetworkServers(List.of());   // ditto the destination picker's computer list
+        syncSearchBoxVisibility(); // hide the search field, reveal the quantity field
+        setPopupQty((int) Math.min(64L, Math.max(1L, e.total())));
+        setFocused(qtyBox);
+        if (qtyBox != null) {
+            qtyBox.setFocused(true);
+        }
+        // The reply carries BOTH the per-server breakdown (advanced sources) and the full computer list
+        // (the advanced destination picker).
         PacketDistributor.sendToServer(new RequestServerBreakdownPayload(
-                menu.monitorPos(), menu.hostPos(), e.icon().getItem()));
+                menu.monitorPos(), menu.hostPos(), e.icon()));
+    }
+
+    private void openStorageRequest(final NetworkItemEntry e) {
+        popupEntry = e;
+        popupFromStorage = true;
+        advancedMode = false;
+        syncSearchBoxVisibility();
+        setPopupQty((int) Math.min(64L, Math.max(1L, e.total())));
+        setFocused(qtyBox);
+        if (qtyBox != null) {
+            qtyBox.setFocused(true);
+        }
     }
 
     private void closeRequest() {
         popupEntry = null;
+        popupFromStorage = false;
         deselectedServers.clear();
+        advancedMode = false;
         syncSearchBoxVisibility();
     }
 
-    private boolean handlePopupClick(final double mouseX, final double mouseY, final int button) {
-        if (button != 0 || popupEntry == null) {
-            if (button == 1) {
-                closeRequest(); // right-click closes
-                return true;
+    private int reqPopupH() {
+        return !popupFromStorage && advancedMode ? REQ_H_ADVANCED : REQ_H_SIMPLE;
+    }
+
+    private void toggleAdvanced() {
+        advancedMode = !advancedMode;
+    }
+
+    // Operation-detail popup (SubOperations of a clicked Operation)
+
+    private void openOpPopup(final OperationRecord op) {
+        popupOp = op;
+        opPopupScroll = 0;
+        syncSearchBoxVisibility();
+    }
+
+    private void closeOpPopup() {
+        popupOp = null;
+        syncSearchBoxVisibility();
+    }
+
+    private boolean handleOpPopupClick(final double mouseX, final double mouseY, final int button) {
+        if (button == 1) {
+            closeOpPopup();
+            return true;
+        }
+        if (button == 0) {
+            final int px = popupX();
+            final int py = popupY();
+            if (mouseX < px || mouseX >= px + POPUP_W || mouseY < py || mouseY >= py + POPUP_H) {
+                closeOpPopup();
             }
-            return true; // swallow other clicks while the popup is up
+        }
+        return true; // swallow clicks while the popup is up
+    }
+
+    private int clampOpPopupScroll(final int size) {
+        final int max = Math.max(0, size - OP_POPUP_ROWS);
+        opPopupScroll = Math.max(0, Math.min(max, opPopupScroll));
+        return opPopupScroll;
+    }
+
+    private void renderOpPopup(final GuiGraphics g) {
+        if (popupOp == null) {
+            return;
+        }
+        // Push above the item grid and dim the screen, so the tab rail and header behind never show
+        // through the panel (flat fills draw below items otherwise).
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 350);
+        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xE0070A0F);
+        final int px = popupX();
+        final int py = popupY();
+        g.fill(px - 2, py - 2, px + POPUP_W + 2, py + POPUP_H + 2, 0xFF0A1A1F);
+        g.fill(px, py, px + POPUP_W, py + POPUP_H, PANEL);
+        g.fill(px, py, px + POPUP_W, py + 1, ACCENT);
+        g.renderItem(popupOp.icon(), px + 6, py + 5);
+        final String label = opTypeLabel(popupOp.type());
+        g.drawString(font, label + "  " + popupOp.icon().getHoverName().getString(), px + 28, py + 6, TEXT, false);
+        g.drawString(font, fmt(popupOp.moved()) + " of " + fmt(popupOp.requested()) + "  "
+                + statusLabel(popupOp.status()), px + 28, py + 17, statusColor(popupOp.status()), false);
+        final double f = popupOp.requested() <= 0
+                ? (popupOp.status() == OperationRecord.STATUS_PROCESSING ? 0 : 1)
+                : Math.min(1.0, (double) popupOp.moved() / popupOp.requested());
+        track(g, px + 6, py + 30, POPUP_W - 12, f,
+                popupOp.status() == OperationRecord.STATUS_PROCESSING ? ACCENT2 : statusColor(popupOp.status()));
+        g.drawString(font, "SUBOPERATIONS", px + 6, py + 42, DIM, false);
+        final List<OperationRecord.MoveRow> moves = popupOp.moves();
+        if (moves.isEmpty()) {
+            g.drawString(font, "No movement yet.", px + 6, py + 56, DIM, false);
+        } else {
+            final int start = clampOpPopupScroll(moves.size());
+            for (int i = 0; i < OP_POPUP_ROWS && start + i < moves.size(); i++) {
+                moveRow(g, px, py + 56 + i * 12, moves.get(start + i));
+            }
+        }
+        final String hint = "right-click to close";
+        g.drawString(font, hint, px + POPUP_W - font.width(hint) - 6, py + POPUP_H - 10, DIM, false);
+        g.pose().popPose();
+    }
+
+    private int taskOpRowAt(final int mx, final int my) {
+        if (menu.activeTab() != ComputerTerminalMenu.TAB_TASKS || taskSubTab != 0) {
+            return -1;
+        }
+        if (mx < leftPos + CONTENT_X || mx >= leftPos + imageWidth - 6) {
+            return -1;
+        }
+        final int rel = my - (topPos + 6 + 90);
+        if (rel < 0) {
+            return -1;
+        }
+        final int row = rel / 14;
+        return row >= 0 && row < Math.min(TASK_OP_ROWS, menu.activeOps().size()) ? row : -1;
+    }
+
+    private boolean handlePopupClick(final double mouseX, final double mouseY, final int button) {
+        if (button == 1) {
+            closeRequest(); // right-click closes
+            return true;
+        }
+        if (button != 0) {
+            return true;
         }
         final int px = popupX();
         final int py = popupY();
+        final int ph = reqPopupH();
         // Outside the box closes.
-        if (mouseX < px || mouseX >= px + POPUP_W || mouseY < py || mouseY >= py + POPUP_H) {
+        if (mouseX < px || mouseX >= px + POPUP_W || mouseY < py || mouseY >= py + ph) {
             closeRequest();
             return true;
         }
-        final int available = (int) Math.min(Integer.MAX_VALUE, popupEntry.total());
-        final boolean shift = hasShiftDown();
-        final int step = shift ? 16 : 1;
-        // Minus / plus stepper.
-        if (inRect(mouseX, mouseY, px + 8, py + 30, 16, 16)) {
-            popupQty = Math.max(1, popupQty - step);
+        // Advanced toggle (Network tab only; never on the Storage popup).
+        if (!popupFromStorage && inRect(mouseX, mouseY, px + POPUP_W - 44, py + 5, 36, 12)) {
+            toggleAdvanced();
             return true;
         }
-        if (inRect(mouseX, mouseY, px + POPUP_W - 24, py + 30, 16, 16)) {
-            popupQty = Math.min(available, popupQty + step);
+        // Quantity field: focus it so the player can type, and let the EditBox place its cursor.
+        if (inRect(mouseX, mouseY, px + 7, py + 29, 120, 16)) {
+            setFocused(qtyBox);
+            qtyBox.setFocused(true);
+            qtyBox.mouseClicked(mouseX, mouseY, button);
             return true;
         }
-        // Server-row checkboxes.
-        final List<ServerBreakdownPayload.ServerHolding> servers = menu.serverBreakdown();
-        for (int i = 0; i < Math.min(POPUP_SERVER_ROWS, servers.size()); i++) {
-            if (inRect(mouseX, mouseY, px + 8, py + 62 + i * 12, POPUP_W - 16, 11)) {
-                final String key = servers.get(i).key();
-                if (!deselectedServers.remove(key)) {
-                    deselectedServers.add(key);
-                }
+        // Max: request everything available.
+        if (inRect(mouseX, mouseY, px + POPUP_W - 58, py + 30, 50, 14)) {
+            setPopupQty((int) Math.min(Integer.MAX_VALUE, popupEntry.total()));
+            return true;
+        }
+        // Steppers: -1000/-100/-10/-1 then +1/+10/+100/+1000.
+        for (int i = 0; i < STEP_AMOUNTS.length; i++) {
+            if (inRect(mouseX, mouseY, px + 8 + i * 23, py + 48, 22, 14)) {
+                setPopupQty(popupQty + STEP_AMOUNTS[i]);
                 return true;
             }
         }
-        // Request button.
-        if (inRect(mouseX, mouseY, px + 8, py + POPUP_H - 22, POPUP_W - 16, 16)) {
+        // Storage popup: two action buttons (to inventory / to network); no sources or destination.
+        if (popupFromStorage) {
+            final int by = py + ph - 22;
+            if (inRect(mouseX, mouseY, px + 8, by, 90, 16)) {
+                sendStorageAction(false);
+            } else if (inRect(mouseX, mouseY, px + 104, by, 90, 16)) {
+                sendStorageAction(true);
+            }
+            return true;
+        }
+        // Advanced mode: source-server checkboxes (PULL FROM) and the destination computer cycle.
+        if (advancedMode) {
+            final List<ServerBreakdownPayload.ServerHolding> servers = menu.serverBreakdown();
+            for (int i = 0; i < Math.min(POPUP_SERVER_ROWS, servers.size()); i++) {
+                if (inRect(mouseX, mouseY, px + 8, py + 78 + i * 12, POPUP_W - 16, 11)) {
+                    final String key = servers.get(i).key();
+                    if (!deselectedServers.remove(key)) {
+                        deselectedServers.add(key);
+                    }
+                    return true;
+                }
+            }
+            final int count = menu.networkServers().size();
+            if (count > 0) {
+                if (inRect(mouseX, mouseY, px + 8, py + 152, 14, 14)) {
+                    destServerIndex = Math.floorMod(destServerIndex - 1, count);
+                    return true;
+                }
+                if (inRect(mouseX, mouseY, px + POPUP_W - 22, py + 152, 14, 14)) {
+                    destServerIndex = Math.floorMod(destServerIndex + 1, count);
+                    return true;
+                }
+            }
+        }
+        // Action button (REQUEST in simple mode, SEND to a computer in advanced mode).
+        if (inRect(mouseX, mouseY, px + 8, py + ph - 22, POPUP_W - 16, 16)) {
             sendRequest();
             return true;
         }
@@ -891,26 +1235,48 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         if (popupEntry == null || popupQty <= 0) {
             return;
         }
-        // Selected = every shown server minus the unchecked ones; empty means "all".
-        final List<ServerBreakdownPayload.ServerHolding> servers = menu.serverBreakdown();
         final List<String> keys = new ArrayList<>();
         boolean anyDeselected = false;
-        for (final ServerBreakdownPayload.ServerHolding s : servers) {
-            if (deselectedServers.contains(s.key())) {
-                anyDeselected = true;
-            } else {
-                keys.add(s.key());
+        int kind = TerminalSelectPayload.DEST_AUTO;
+        String destServer = "";
+        // Sources and destination are advanced-only; a simple request pulls from everywhere to the
+        // auto destination (local storage, else inventory).
+        if (advancedMode) {
+            for (final ServerBreakdownPayload.ServerHolding s : menu.serverBreakdown()) {
+                if (deselectedServers.contains(s.key())) {
+                    anyDeselected = true;
+                } else {
+                    keys.add(s.key());
+                }
             }
-        }
-        // An empty key list means "all servers" on the wire; so if the player
-        // explicitly unchecked every server, there is no source — do nothing.
-        if (anyDeselected && keys.isEmpty() && !servers.isEmpty()) {
-            closeRequest();
-            return;
+            if (anyDeselected && keys.isEmpty() && !menu.serverBreakdown().isEmpty()) {
+                closeRequest(); // every source unchecked — nothing to pull from
+                return;
+            }
+            final List<NetworkServersPayload.ServerEntry> comp = menu.networkServers();
+            if (comp.isEmpty()) {
+                return; // no destination computer yet — keep the popup open
+            }
+            kind = TerminalSelectPayload.DEST_SERVER;
+            destServer = comp.get(Math.floorMod(destServerIndex, comp.size())).key();
         }
         PacketDistributor.sendToServer(new TerminalSelectPayload(
-                menu.monitorPos(), menu.hostPos(), popupEntry.icon().getItem(), popupQty,
-                anyDeselected ? keys : List.of()));
+                menu.monitorPos(), menu.hostPos(), popupEntry.icon(), popupQty,
+                anyDeselected ? keys : List.of(), kind, destServer));
+        closeRequest();
+    }
+
+    private void sendStorageAction(final boolean toNetwork) {
+        if (popupEntry == null || popupQty <= 0) {
+            return;
+        }
+        if (toNetwork) {
+            PacketDistributor.sendToServer(new TerminalLocalUploadPayload(
+                    menu.monitorPos(), menu.hostPos(), popupEntry.icon(), popupQty));
+        } else {
+            PacketDistributor.sendToServer(new TerminalLocalWithdrawPayload(
+                    menu.monitorPos(), menu.hostPos(), popupEntry.icon(), popupQty));
+        }
         closeRequest();
     }
 
@@ -919,73 +1285,122 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
-    private void renderPopup(final GuiGraphics g, final int mouseX, final int mouseY) {
+    private void renderPopup(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         if (popupEntry == null) {
             return;
         }
-        // Items (the grid + inventory) render at a higher z than flat fills, so the
+        // Items (the grid + inventory) render at a higher z than flat fills, so the popup must sit
+        // above them or they show through. Push the whole popup — and the quantity field — forward.
         g.pose().pushPose();
         g.pose().translate(0, 0, 350);
-        // Dim the whole terminal behind the popup.
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xE0070A0F);
         final int px = popupX();
         final int py = popupY();
-        g.fill(px - 1, py - 1, px + POPUP_W + 1, py + POPUP_H + 1, ACCENT);
-        g.fill(px, py, px + POPUP_W, py + POPUP_H, 0xFF0F151C);
+        final int ph = reqPopupH();
+        g.fill(px - 1, py - 1, px + POPUP_W + 1, py + ph + 1, ACCENT);
+        g.fill(px, py, px + POPUP_W, py + ph, 0xFF0F151C);
 
-        // Header: icon + name + available.
-        g.renderItem(popupEntry.icon(), px + 8, py + 6);
-        g.drawString(font, popupEntry.icon().getHoverName(), px + 28, py + 7, TEXT, false);
-        g.drawString(font, fmt(popupEntry.total()) + " available", px + 28, py + 18, DIM, false);
+        // Header: icon + name + available, plus the advanced-mode toggle (Network tab only).
+        g.renderItem(popupEntry.icon(), px + 8, py + 5);
+        g.drawString(font, font.plainSubstrByWidth(popupEntry.icon().getHoverName().getString(), POPUP_W - 78),
+                px + 28, py + 6, TEXT, false);
+        g.drawString(font, fmt(popupEntry.total()) + (popupFromStorage ? " in local" : " available"),
+                px + 28, py + 17, DIM, false);
+        if (!popupFromStorage) {
+            final boolean advHover = inRect(mouseX, mouseY, px + POPUP_W - 44, py + 5, 36, 12);
+            g.fill(px + POPUP_W - 44, py + 5, px + POPUP_W - 8, py + 17,
+                    advancedMode ? ACCENT : (advHover ? 0xFF24323C : 0xFF1A222B));
+            g.drawCenteredString(font, "ADV", px + POPUP_W - 26, py + 7, advancedMode ? 0xFF0F151C : DIM);
+        }
 
-        // Quantity stepper.
-        button(g, px + 8, py + 30, "-");
-        button(g, px + POPUP_W - 24, py + 30, "+");
-        g.fill(px + 26, py + 30, px + POPUP_W - 26, py + 46, TRACK);
-        g.fill(px + 26, py + 30, px + POPUP_W - 26, py + 31, LINE);
-        g.drawCenteredString(font, String.valueOf(popupQty), px + POPUP_W / 2, py + 35, TEXT);
+        // Quantity: editable field (re-rendered here so it sits ON the popup) + a Max button.
+        g.fill(px + 7, py + 29, px + 127, py + 45, TRACK);
+        qtyBox.render(g, mouseX, mouseY, partialTick);
+        final boolean maxHover = inRect(mouseX, mouseY, px + POPUP_W - 58, py + 30, 50, 14);
+        g.fill(px + POPUP_W - 58, py + 30, px + POPUP_W - 8, py + 44, maxHover ? 0xFF2BB3A4 : 0xFF1F9488);
+        g.drawCenteredString(font, "MAX", px + POPUP_W - 33, py + 33, 0xFFFFFFFF);
 
-        // Source servers.
-        g.drawString(font, "PULL FROM", px + 8, py + 52, DIM, false);
+        // Stepper row: ---- --- -- - (1000/100/10/1 down) then + ++ +++ ++++ (up).
+        for (int i = 0; i < STEP_LABELS.length; i++) {
+            final int bx = px + 8 + i * 23;
+            final boolean hover = inRect(mouseX, mouseY, bx, py + 48, 22, 14);
+            g.fill(bx, py + 48, bx + 22, py + 62, hover ? 0xFF24323C : 0xFF1A222B);
+            g.drawCenteredString(font, STEP_LABELS[i], bx + 11, py + 51, STEP_AMOUNTS[i] > 0 ? ACCENT : AMBER);
+        }
+
+        if (popupFromStorage) {
+            renderStorageActions(g, mouseX, mouseY, px, py, ph);
+        } else if (advancedMode) {
+            renderAdvanced(g, mouseX, mouseY, px, py, ph);
+        } else {
+            renderSimple(g, mouseX, mouseY, px, py, ph);
+        }
+        g.pose().popPose();
+    }
+
+    private void renderSimple(final GuiGraphics g, final int mouseX, final int mouseY,
+                              final int px, final int py, final int ph) {
+        final boolean hasStorage = menu.usableStorageSlots() > 0;
+        g.drawString(font, hasStorage ? "Lands in this computer's storage" : "Needs internal storage (no disk)",
+                px + 8, py + 70, hasStorage ? DIM : AMBER, false);
+        actionButton(g, mouseX, mouseY, px + 8, py + ph - 22, POPUP_W - 16, "REQUEST " + fmt(popupQty));
+    }
+
+    private void renderStorageActions(final GuiGraphics g, final int mouseX, final int mouseY,
+                                      final int px, final int py, final int ph) {
+        g.drawString(font, "Send local items to:", px + 8, py + 70, DIM, false);
+        final int by = py + ph - 22;
+        actionButton(g, mouseX, mouseY, px + 8, by, 90, "TO INVENTORY");
+        actionButton(g, mouseX, mouseY, px + 104, by, 90, "TO NETWORK");
+    }
+
+    private void renderAdvanced(final GuiGraphics g, final int mouseX, final int mouseY,
+                                final int px, final int py, final int ph) {
+        g.drawString(font, "PULL FROM", px + 8, py + 66, DIM, false);
         final List<ServerBreakdownPayload.ServerHolding> servers = menu.serverBreakdown();
         if (servers.isEmpty()) {
-            g.drawString(font, "all servers", px + POPUP_W - 8 - font.width("all servers"), py + 52, DIM, false);
+            g.drawString(font, "all servers", px + POPUP_W - 8 - font.width("all servers"), py + 66, DIM, false);
         }
         for (int i = 0; i < Math.min(POPUP_SERVER_ROWS, servers.size()); i++) {
             final ServerBreakdownPayload.ServerHolding s = servers.get(i);
-            final int ry = py + 62 + i * 12;
+            final int ry = py + 78 + i * 12;
             final boolean on = !deselectedServers.contains(s.key());
             g.fill(px + 8, ry, px + 18, ry + 10, on ? ACCENT : 0xFF2A3340);
             g.fill(px + 9, ry + 1, px + 17, ry + 9, on ? ACCENT : 0xFF11161D);
-            g.drawString(font, s.label(), px + 22, ry + 1, on ? TEXT : DIM, false);
+            g.drawString(font, font.plainSubstrByWidth(s.label(), 120), px + 22, ry + 1, on ? TEXT : DIM, false);
             final String c = fmt(s.count());
             g.drawString(font, c, px + POPUP_W - 8 - font.width(c), ry + 1, DIM, false);
         }
         if (servers.size() > POPUP_SERVER_ROWS) {
             g.drawString(font, "+" + (servers.size() - POPUP_SERVER_ROWS) + " more (included)",
-                    px + 22, py + 62 + POPUP_SERVER_ROWS * 12, DIM, false);
+                    px + 22, py + 78 + POPUP_SERVER_ROWS * 12, DIM, false);
         }
 
-        // Destination note (kept short so it never overflows the box).
-        final boolean hasStorage = menu.usableStorageSlots() > 0;
-        final String dest = hasStorage ? "Lands to this computer's storage"
-                : "Lands to inventory if <=10 blocks";
-        g.drawString(font, dest, px + 8, py + POPUP_H - 36, DIM, false);
-
-        // Request button.
-        final int bx = px + 8;
-        final int bw = POPUP_W - 16;
-        final int by = py + POPUP_H - 22;
-        final boolean hover = inRect(mouseX, mouseY, bx, by, bw, 16);
-        g.fill(bx, by, bx + bw, by + 16, hover ? 0xFF2BB3A4 : 0xFF1F9488);
-        g.drawCenteredString(font, "REQUEST " + popupQty, px + POPUP_W / 2, by + 4, 0xFF04110E);
-        g.pose().popPose();
+        // SEND TO: cycle through every computer that can receive items.
+        g.drawString(font, "SEND TO", px + 8, py + 140, DIM, false);
+        final List<NetworkServersPayload.ServerEntry> comp = menu.networkServers();
+        if (comp.isEmpty()) {
+            g.drawString(font, "No computers available", px + 8, py + 154, AMBER, false);
+        } else {
+            final NetworkServersPayload.ServerEntry target = comp.get(Math.floorMod(destServerIndex, comp.size()));
+            final boolean lh = inRect(mouseX, mouseY, px + 8, py + 152, 14, 14);
+            final boolean rh = inRect(mouseX, mouseY, px + POPUP_W - 22, py + 152, 14, 14);
+            g.fill(px + 8, py + 152, px + 22, py + 166, lh ? 0xFF24323C : 0xFF1A222B);
+            g.drawCenteredString(font, "<", px + 15, py + 155, ACCENT);
+            g.fill(px + POPUP_W - 22, py + 152, px + POPUP_W - 8, py + 166, rh ? 0xFF24323C : 0xFF1A222B);
+            g.drawCenteredString(font, ">", px + POPUP_W - 15, py + 155, ACCENT);
+            final String text = font.plainSubstrByWidth(
+                    target.name() + "  (" + fmt(target.free()) + " free)", POPUP_W - 52);
+            g.drawString(font, text, px + 26, py + 155, TEXT, false);
+        }
+        actionButton(g, mouseX, mouseY, px + 8, py + ph - 22, POPUP_W - 16, "SEND " + fmt(popupQty));
     }
 
-    private void button(final GuiGraphics g, final int x, final int y, final String label) {
-        g.fill(x, y, x + 16, y + 16, 0xFF11161D);
-        g.fill(x, y, x + 16, y + 1, LINE);
-        g.drawCenteredString(font, label, x + 8, y + 4, ACCENT);
+    private void actionButton(final GuiGraphics g, final int mouseX, final int mouseY,
+                              final int x, final int y, final int w, final String label) {
+        final boolean hover = inRect(mouseX, mouseY, x, y, w, 16);
+        g.fill(x, y, x + w, y + 16, hover ? 0xFF2BB3A4 : 0xFF1F9488);
+        g.drawCenteredString(font, label, x + w / 2, y + 4, 0xFFFFFFFF);
     }
 
     private static String fmt(final long n) {
@@ -1000,7 +1415,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     public boolean mouseScrolled(final double mx, final double my, final double dx, final double dy) {
-        if (menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK && dy != 0) {
+        if (popupOp != null && dy != 0) {
+            opPopupScroll = Math.max(0, opPopupScroll - (int) Math.signum(dy));
+            return true;
+        }
+        if (isGridTab() && dy != 0) {
             final int rows = (visibleItems().size() + NET_COLS - 1) / NET_COLS;
             final int max = Math.max(0, rows - NET_ROWS);
             netScrollRow = Math.max(0, Math.min(max, netScrollRow - (int) Math.signum(dy)));
@@ -1020,12 +1439,16 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         super.render(g, mouseX, mouseY, partialTick);
         renderTooltip(g, mouseX, mouseY);
         if (popupEntry != null) {
-            renderPopup(g, mouseX, mouseY);
-        } else if (menu.activeTab() == ComputerTerminalMenu.TAB_NETWORK) {
+            renderPopup(g, mouseX, mouseY, partialTick);
+        } else if (popupOp != null) {
+            renderOpPopup(g);
+        } else if (isGridTab()) {
+            final boolean local = menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE;
+            final String where = local ? "in storage" : "on the network";
             renderNetworkHover(g, mouseX, mouseY);
             if (overDepositBar(mouseX, mouseY)) {
                 g.renderComponentTooltip(font, List.of(
-                        Component.literal("Deposit into the network"),
+                        Component.literal(local ? "Deposit into local storage" : "Deposit into the network"),
                         Component.literal("Click: deposit held stack").withStyle(ChatFormatting.GRAY),
                         Component.literal("Right-click: deposit one").withStyle(ChatFormatting.GRAY),
                         Component.literal("Shift-click an inventory item").withStyle(ChatFormatting.GRAY)),
@@ -1034,11 +1457,16 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             }
             final NetworkItemEntry e = networkItemAt(mouseX, mouseY);
             if (e != null) {
-                g.renderComponentTooltip(font, List.of(
-                        e.icon().getHoverName(),
-                        Component.literal(String.format("%,d", e.total()) + " on the network")
-                                .withStyle(ChatFormatting.GRAY)),
-                        mouseX, mouseY);
+                final List<Component> lines = new ArrayList<>();
+                lines.add(e.icon().getHoverName());
+                lines.add(Component.literal(String.format("%,d", e.total()) + " " + where)
+                        .withStyle(ChatFormatting.GRAY));
+                if (local) {
+                    lines.add(Component.literal("Click: take a stack").withStyle(ChatFormatting.DARK_GRAY));
+                    lines.add(Component.literal("Shift-click: take all  -  Right-click: take one")
+                            .withStyle(ChatFormatting.DARK_GRAY));
+                }
+                g.renderComponentTooltip(font, lines, mouseX, mouseY);
             }
         }
     }

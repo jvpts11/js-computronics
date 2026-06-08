@@ -8,36 +8,53 @@
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
 /**
- * Client to server: a Monitor terminal asked to SELECT {@code quantity} of {@code item} from the chosen source Servers into the computer's local storage.
+ * Client to server: a Monitor terminal asked to SELECT {@code quantity} of {@code stack}'s type (item AND components, so an enchanted item is pulled as that exact enchanted item) from the chosen source Servers to a chosen destination — the computer's local storage, the player's inventory, or another Server on the network (a MOVE).
  */
-public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, Item item, long quantity,
-                                    List<String> serverKeys) implements CustomPacketPayload {
+public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, ItemStack stack, long quantity,
+                                    List<String> serverKeys, int destKind, String destServer)
+        implements CustomPacketPayload {
 
     public static final int MAX_SERVERS = 64;
+
+    public static final int DEST_AUTO = 0;
+    public static final int DEST_INVENTORY = 1;
+    public static final int DEST_LOCAL = 2;
+    public static final int DEST_SERVER = 3;
 
     public static final CustomPacketPayload.Type<TerminalSelectPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("jsc", "terminal_select"));
 
+    // Built by hand because the record has more components than StreamCodec.composite carries.
     public static final StreamCodec<RegistryFriendlyByteBuf, TerminalSelectPayload> STREAM_CODEC =
-            StreamCodec.composite(
-                    BlockPos.STREAM_CODEC, TerminalSelectPayload::monitorPos,
-                    BlockPos.STREAM_CODEC, TerminalSelectPayload::hostPos,
-                    ByteBufCodecs.registry(Registries.ITEM), TerminalSelectPayload::item,
-                    ByteBufCodecs.VAR_LONG, TerminalSelectPayload::quantity,
-                    ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(MAX_SERVERS)),
-                    TerminalSelectPayload::serverKeys,
-                    TerminalSelectPayload::new);
+            StreamCodec.of(
+                    (buf, p) -> {
+                        BlockPos.STREAM_CODEC.encode(buf, p.monitorPos());
+                        BlockPos.STREAM_CODEC.encode(buf, p.hostPos());
+                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, p.stack());
+                        buf.writeVarLong(p.quantity());
+                        ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(MAX_SERVERS))
+                                .encode(buf, p.serverKeys());
+                        buf.writeVarInt(p.destKind());
+                        ByteBufCodecs.STRING_UTF8.encode(buf, p.destServer());
+                    },
+                    buf -> new TerminalSelectPayload(
+                            BlockPos.STREAM_CODEC.decode(buf),
+                            BlockPos.STREAM_CODEC.decode(buf),
+                            ItemStack.OPTIONAL_STREAM_CODEC.decode(buf),
+                            buf.readVarLong(),
+                            ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(MAX_SERVERS)).decode(buf),
+                            buf.readVarInt(),
+                            ByteBufCodecs.STRING_UTF8.decode(buf)));
 
     @Override
     public CustomPacketPayload.Type<TerminalSelectPayload> type() {

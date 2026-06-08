@@ -51,6 +51,8 @@ public interface ComputerTerminalHost {
 
     net.neoforged.neoforge.items.IItemHandler localStorage();
 
+    dev.jsc.jscomputronics.module.computing.storage.LocalStore localStore();
+
     int usableStorageSlots();
 
     default int pendingOperations() {

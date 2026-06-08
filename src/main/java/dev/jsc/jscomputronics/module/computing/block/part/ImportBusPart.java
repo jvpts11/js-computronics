@@ -7,17 +7,15 @@
  */
 package dev.jsc.jscomputronics.module.computing.block.part;
 
-import dev.jsc.jscomputronics.common.operation.OperationPriority;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkImportOperationTask;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 
@@ -33,7 +31,8 @@ public final class ImportBusPart implements CablePart {
     private Direction face = Direction.NORTH;
 
     private ItemStack buffer = ItemStack.EMPTY;
-    private boolean pendingFlush;
+    private dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation activeOp;
+    private StorageKey flushedKey;
     private int ticksSinceFlush;
 
     @Override
@@ -49,8 +48,24 @@ public final class ImportBusPart implements CablePart {
 
     @Override
     public void serverTick() {
-        if (pendingFlush) {
-            return;
+        // Wait for the in-flight flush to finish, then re-buffer whatever the network could not store.
+        if (activeOp != null) {
+            if (!activeOp.isDone()) {
+                return;
+            }
+            final long leftover = activeOp.leftover();
+            if (leftover > 0L && flushedKey != null) {
+                final ItemStack back = flushedKey.stack((int) Math.min(Integer.MAX_VALUE, leftover));
+                if (buffer.isEmpty()) {
+                    buffer = back;
+                } else if (ItemStack.isSameItemSameComponents(buffer, back)) {
+                    buffer.grow(back.getCount());
+                }
+                host.setChanged();
+            }
+            activeOp = null;
+            flushedKey = null;
+            ticksSinceFlush = 0;
         }
         final ServerLevel level = host.serverLevel();
         if (level == null) {
@@ -67,24 +82,24 @@ public final class ImportBusPart implements CablePart {
         boolean typeChange = false;
         if (front != null) {
             if (buffer.isEmpty()) {
-                final Item incoming = firstType(front);
-                if (incoming != null) {
-                    final int pulled = pullSameType(front, incoming, cap);
+                final ItemStack incoming = firstStack(front);
+                if (!incoming.isEmpty()) {
+                    final int pulled = pullSameStack(front, incoming, cap);
                     if (pulled > 0) {
-                        buffer = new ItemStack(incoming, pulled);
+                        buffer = incoming.copyWithCount(pulled);
                         host.setChanged();
                     }
                 }
             } else {
                 final int room = cap - buffer.getCount();
                 if (room > 0) {
-                    final int pulled = pullSameType(front, buffer.getItem(), room);
+                    final int pulled = pullSameStack(front, buffer, room);
                     if (pulled > 0) {
                         buffer.grow(pulled);
                         host.setChanged();
                     }
                 }
-                typeChange = hasOtherType(front, buffer.getItem());
+                typeChange = hasOtherStack(front, buffer);
             }
         }
 
@@ -99,37 +114,23 @@ public final class ImportBusPart implements CablePart {
         }
         final ItemStack payload = buffer;
         buffer = ItemStack.EMPTY;
-        pendingFlush = true;
         ticksSinceFlush = 0;
-        if (!mainframe.submitOperation(
-                new NetworkImportOperationTask(level, network, payload, host.getBlockPos(), face),
-                OperationPriority.MEDIUM)) {
-            buffer = payload; // dispatch failed: keep the items
-            pendingFlush = false;
+        // Push the buffered items into the network as a timed INSERT; whatever does not fit comes
+        // back as the Operation's leftover and is re-buffered when it finishes (above).
+        activeOp = mainframe.submitNetworkInsert(StorageKey.of(payload), payload.getCount(), "import");
+        flushedKey = StorageKey.of(payload);
+        if (activeOp == null) {
+            buffer = payload; // dispatch failed (not running): keep the items
+            flushedKey = null;
         }
         host.setChanged();
     }
 
-    public void onImportComplete(final ItemStack leftover) {
-        pendingFlush = false;
-        ticksSinceFlush = 0;
-        if (!leftover.isEmpty()) {
-            if (buffer.isEmpty()) {
-                buffer = leftover;
-            } else if (ItemStack.isSameItemSameComponents(buffer, leftover)) {
-                buffer.grow(leftover.getCount());
-            }
-        }
-        if (host != null) {
-            host.setChanged();
-        }
-    }
-
-    private static int pullSameType(final IItemHandler handler, final Item incoming, final int max) {
+    private static int pullSameStack(final IItemHandler handler, final ItemStack proto, final int max) {
         int pulled = 0;
         for (int i = 0; i < handler.getSlots() && pulled < max; i++) {
             final ItemStack inSlot = handler.getStackInSlot(i);
-            if (inSlot.isEmpty() || !inSlot.is(incoming)) {
+            if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, proto)) {
                 continue;
             }
             pulled += handler.extractItem(i, max - pulled, false).getCount();
@@ -137,20 +138,20 @@ public final class ImportBusPart implements CablePart {
         return pulled;
     }
 
-    private static Item firstType(final IItemHandler handler) {
+    private static ItemStack firstStack(final IItemHandler handler) {
         for (int i = 0; i < handler.getSlots(); i++) {
             final ItemStack inSlot = handler.getStackInSlot(i);
             if (!inSlot.isEmpty()) {
-                return inSlot.getItem();
+                return inSlot.copyWithCount(1);
             }
         }
-        return null;
+        return ItemStack.EMPTY;
     }
 
-    private static boolean hasOtherType(final IItemHandler handler, final Item kept) {
+    private static boolean hasOtherStack(final IItemHandler handler, final ItemStack kept) {
         for (int i = 0; i < handler.getSlots(); i++) {
             final ItemStack inSlot = handler.getStackInSlot(i);
-            if (!inSlot.isEmpty() && !inSlot.is(kept)) {
+            if (!inSlot.isEmpty() && !ItemStack.isSameItemSameComponents(inSlot, kept)) {
                 return true;
             }
         }

@@ -140,13 +140,6 @@ public class MainframeBlockEntity extends BlockEntity
 
     public static final int STORAGE_SLOTS = 27;
 
-    private final ItemStackHandler storage = new ItemStackHandler(STORAGE_SLOTS) {
-        @Override
-        protected void onContentsChanged(final int slot) {
-            setChanged();
-        }
-    };
-
     @Nullable
     private ComputerBuild cachedBuild;
     private boolean buildDirty = true;
@@ -207,8 +200,12 @@ public class MainframeBlockEntity extends BlockEntity
         return inventory;
     }
 
-    public ItemStackHandler getStorage() {
-        return storage;
+    public dev.jsc.jscomputronics.module.computing.storage.LocalStore localStore() {
+        final java.util.List<ItemStack> disks = new java.util.ArrayList<>(DISK_SLOTS);
+        for (int i = 0; i < DISK_SLOTS; i++) {
+            disks.add(inventory.getStackInSlot(DISK_SLOTS_START + i));
+        }
+        return new dev.jsc.jscomputronics.module.computing.storage.LocalStore(disks, this::setChanged);
     }
 
     @Nullable
@@ -549,10 +546,13 @@ public class MainframeBlockEntity extends BlockEntity
             dispatch.close();
             dispatch = null;
             dispatchQueues = 0;
-            // The index lives in RAM: powering off clears the catalog (rebuilt on next start) and
-            // abandons in-flight Operations (their locks go with the cleared index).
-            networkIndex.clear();
+            // Settle every in-flight multi-tick Operation first, so a holder polling isDone() (an
+            for (final var operation : activeOperations) {
+                operation.abandon();
+            }
             activeOperations.clear();
+            // The index lives in RAM: powering off clears the catalog, rebuilt on the next start.
+            networkIndex.clear();
         }
     }
 
@@ -599,31 +599,88 @@ public class MainframeBlockEntity extends BlockEntity
 
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+        return submitPull(key, demand, destination, destinationLabel,
+                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT, null);
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final net.minecraft.world.item.Item item, final long demand,
             final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
-        return submitPull(item, demand, destination, destinationLabel,
-                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT);
+        return submitNetworkSelect(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
+                demand, destination, destinationLabel);
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+        return submitPull(key, demand, destination, destinationLabel,
+                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT, sources);
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
+            final net.minecraft.world.item.Item item, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+        return submitNetworkSelect(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
+                demand, destination, destinationLabel, sources);
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkMove(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+        return submitPull(key, demand, destination, destinationLabel,
+                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_MOVE, sources);
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkDelete(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+        return submitPull(key, demand, destination, destinationLabel,
+                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_DELETE, null);
     }
 
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkDelete(
             final net.minecraft.world.item.Item item, final long demand,
             final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
-        return submitPull(item, demand, destination, destinationLabel,
-                dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_DELETE);
+        return submitNetworkDelete(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
+                demand, destination, destinationLabel);
     }
 
     @Nullable
     private dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitPull(
-            final net.minecraft.world.item.Item item, final long demand,
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
             final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
-            final byte recordType) {
+            final byte recordType,
+            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
         if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
             return null;
         }
         final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation(
-                serverLevel, networkUuid(), item, demand, destination, destinationLabel, recordType,
-                java.util.UUID.randomUUID(), networkIndex);
+                serverLevel, networkUuid(), key, demand, destination, destinationLabel, recordType,
+                java.util.UUID.randomUUID(), networkIndex, sources);
+        activeOperations.add(operation);
+        return operation;
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation submitNetworkInsert(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final String sourceLabel) {
+        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+            return null;
+        }
+        final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation(
+                serverLevel, networkUuid(), key, demand, sourceLabel, networkIndex);
         activeOperations.add(operation);
         return operation;
     }
@@ -631,21 +688,19 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation submitNetworkInsert(
             final net.minecraft.world.item.Item item, final long demand, final String sourceLabel) {
-        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
-            return null;
-        }
-        final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation(
-                serverLevel, networkUuid(), item, demand, sourceLabel, networkIndex);
-        activeOperations.add(operation);
-        return operation;
+        return submitNetworkInsert(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
+                demand, sourceLabel);
     }
 
     private void tickOperations() {
         if (activeOperations.isEmpty()) {
             return;
         }
+        // The Mainframe processes at most its RAM buffer per tick: a buffer smaller than the CPU
+        // leaves the CPU idle waiting on RAM, so the capacity it splits is the lesser of the two.
+        final long effectiveCapacity = Math.min(capacity(), ramBuffer());
         final long[] shares = dev.jsc.jscomputronics.common.operation.exec.EqualShare.split(
-                capacity(), activeOperations.size());
+                effectiveCapacity, activeOperations.size());
         for (int i = 0; i < activeOperations.size(); i++) {
             activeOperations.get(i).tick(shares[i]);
         }
@@ -662,6 +717,19 @@ public class MainframeBlockEntity extends BlockEntity
 
     public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> recentOperations() {
         return java.util.List.copyOf(operationLog);
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> activeOperationRecords() {
+        final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> out =
+                new java.util.ArrayList<>(activeOperations.size());
+        for (final var operation : activeOperations) {
+            out.add(operation.liveRecord());
+        }
+        return out;
+    }
+
+    public boolean hasActiveOperations() {
+        return !activeOperations.isEmpty();
     }
 
     public NodeUuid nodeUuid() {
@@ -775,11 +843,7 @@ public class MainframeBlockEntity extends BlockEntity
 
     @Override
     public long localStorageUsed() {
-        long used = 0L;
-        for (int i = 0; i < storage.getSlots(); i++) {
-            used += storage.getStackInSlot(i).getCount();
-        }
-        return used;
+        return localStore().used();
     }
 
     @Override
@@ -789,7 +853,11 @@ public class MainframeBlockEntity extends BlockEntity
 
     @Override
     public net.neoforged.neoforge.items.IItemHandler localStorage() {
-        return storage;
+        return new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(localStore());
+    }
+
+    public java.util.Map<dev.jsc.jscomputronics.module.computing.storage.StorageKey, Long> localSnapshot() {
+        return localStore().view();
     }
 
     @Override
@@ -902,9 +970,6 @@ public class MainframeBlockEntity extends BlockEntity
         if (tag.contains("Inventory")) {
             inventory.deserializeNBT(registries, tag.getCompound("Inventory"));
         }
-        if (tag.contains("Storage")) {
-            storage.deserializeNBT(registries, tag.getCompound("Storage"));
-        }
         manualOn = tag.getBoolean("ManualOn");
         autoStart = tag.getBoolean("AutoStart");
         if (tag.contains("NodeUuid")) {
@@ -931,7 +996,6 @@ public class MainframeBlockEntity extends BlockEntity
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Inventory", inventory.serializeNBT(registries));
-        tag.put("Storage", storage.serializeNBT(registries));
         tag.putBoolean("ManualOn", manualOn);
         tag.putBoolean("AutoStart", autoStart);
         if (nodeUuid != null) {

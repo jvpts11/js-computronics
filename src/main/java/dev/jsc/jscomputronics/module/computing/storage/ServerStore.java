@@ -51,15 +51,19 @@ public final class ServerStore {
         return Math.max(0L, capacity() - used());
     }
 
-    public Map<Item, Long> view() {
+    public Map<StorageKey, Long> view() {
         return contents().items();
+    }
+
+    public long count(final StorageKey key) {
+        return contents().count(key);
     }
 
     public long count(final Item item) {
         return contents().count(item);
     }
 
-    public long insert(final Item item, final long amount) {
+    public long insert(final StorageKey key, final long amount) {
         if (amount <= 0L) {
             return 0L;
         }
@@ -68,33 +72,41 @@ public final class ServerStore {
             return 0L;
         }
         final long stored = Math.min(amount, room);
-        final Map<Item, Long> next = new HashMap<>(view());
-        next.merge(item, stored, Long::sum);
+        final Map<StorageKey, Long> next = new HashMap<>(view());
+        next.merge(key, stored, Long::sum);
         write(next);
         return stored;
     }
 
-    public long extract(final Item item, final long amount) {
+    public long insert(final Item item, final long amount) {
+        return insert(StorageKey.of(item), amount);
+    }
+
+    public long extract(final StorageKey key, final long amount) {
         if (amount <= 0L) {
             return 0L;
         }
-        final long have = count(item);
+        final long have = count(key);
         final long taken = Math.min(amount, have);
         if (taken <= 0L) {
             return 0L;
         }
-        final Map<Item, Long> next = new HashMap<>(view());
+        final Map<StorageKey, Long> next = new HashMap<>(view());
         final long left = have - taken;
         if (left <= 0L) {
-            next.remove(item);
+            next.remove(key);
         } else {
-            next.put(item, left);
+            next.put(key, left);
         }
         write(next);
         return taken;
     }
 
-    private void write(final Map<Item, Long> items) {
+    public long extract(final Item item, final long amount) {
+        return extract(StorageKey.of(item), amount);
+    }
+
+    private void write(final Map<StorageKey, Long> items) {
         server().set(ComputingModule.SERVER_STORAGE.get(), new ServerStorageContents(items));
         rack.setChanged();
     }

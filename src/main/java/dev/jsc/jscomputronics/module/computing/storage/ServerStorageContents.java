@@ -8,28 +8,29 @@
 package dev.jsc.jscomputronics.module.computing.storage;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * A Server's stored items as a type → quantity map, not as 64-per-slot vanilla slots.
  */
-public record ServerStorageContents(Map<Item, Long> items) {
+public record ServerStorageContents(Map<StorageKey, Long> items) {
 
     public static final ServerStorageContents EMPTY = new ServerStorageContents(Map.of());
 
     public ServerStorageContents {
-        final Map<Item, Long> kept = new LinkedHashMap<>();
-        for (final Map.Entry<Item, Long> entry : items.entrySet()) {
+        final Map<StorageKey, Long> kept = new LinkedHashMap<>();
+        for (final Map.Entry<StorageKey, Long> entry : items.entrySet()) {
             if (entry.getValue() != null && entry.getValue() > 0L) {
                 kept.put(entry.getKey(), entry.getValue());
             }
@@ -37,13 +38,41 @@ public record ServerStorageContents(Map<Item, Long> items) {
         items = Collections.unmodifiableMap(kept);
     }
 
+    /**
+     * One persisted line: a count-1 prototype stack (carrying its components) plus the quantity.
+     */
+    private record Line(ItemStack prototype, long count) {
+        static final Codec<Line> CODEC = RecordCodecBuilder.create(builder -> builder.group(
+                ItemStack.CODEC.fieldOf("item").forGetter(Line::prototype),
+                Codec.LONG.fieldOf("count").forGetter(Line::count)
+        ).apply(builder, Line::new));
+
+        static final StreamCodec<RegistryFriendlyByteBuf, Line> STREAM_CODEC = StreamCodec.composite(
+                ItemStack.STREAM_CODEC, Line::prototype,
+                ByteBufCodecs.VAR_LONG, Line::count,
+                Line::new);
+    }
+
+    private static ServerStorageContents fromLines(final List<Line> lines) {
+        final Map<StorageKey, Long> map = new LinkedHashMap<>();
+        for (final Line line : lines) {
+            map.merge(StorageKey.of(line.prototype()), line.count(), Long::sum);
+        }
+        return new ServerStorageContents(map);
+    }
+
+    private static List<Line> toLines(final ServerStorageContents contents) {
+        final List<Line> lines = new ArrayList<>(contents.items.size());
+        contents.items.forEach((key, count) -> lines.add(new Line(key.prototype(), count)));
+        return lines;
+    }
+
     public static final Codec<ServerStorageContents> CODEC =
-            Codec.unboundedMap(BuiltInRegistries.ITEM.byNameCodec(), Codec.LONG)
-                    .xmap(ServerStorageContents::new, ServerStorageContents::items);
+            Line.CODEC.listOf().xmap(ServerStorageContents::fromLines, ServerStorageContents::toLines);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ServerStorageContents> STREAM_CODEC =
-            ByteBufCodecs.map(HashMap::new, ByteBufCodecs.registry(Registries.ITEM), ByteBufCodecs.VAR_LONG)
-                    .map(ServerStorageContents::new, sc -> new HashMap<>(sc.items()));
+            Line.STREAM_CODEC.apply(ByteBufCodecs.list())
+                    .map(ServerStorageContents::fromLines, ServerStorageContents::toLines);
 
     public long total() {
         long sum = 0L;
@@ -53,7 +82,17 @@ public record ServerStorageContents(Map<Item, Long> items) {
         return sum;
     }
 
+    public long count(final StorageKey key) {
+        return items.getOrDefault(key, 0L);
+    }
+
     public long count(final Item item) {
-        return items.getOrDefault(item, 0L);
+        long sum = 0L;
+        for (final Map.Entry<StorageKey, Long> entry : items.entrySet()) {
+            if (entry.getKey().item() == item) {
+                sum += entry.getValue();
+            }
+        }
+        return sum;
     }
 }

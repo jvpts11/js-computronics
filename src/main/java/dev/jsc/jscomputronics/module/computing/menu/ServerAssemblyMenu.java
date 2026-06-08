@@ -83,6 +83,20 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
         return ServerItem.storage(owner.getItemInHand(hand)).total();
     }
 
+    public String serverName() {
+        return ServerItem.customName(owner.getItemInHand(hand));
+    }
+
+    public void setServerName(final String name) {
+        final String capped = name.strip();
+        ServerItem.setCustomName(owner.getItemInHand(hand),
+                capped.length() > dev.jsc.jscomputronics.module.computing.operation.payload.RenameServerPayload.MAX_LEN
+                        ? capped.substring(0,
+                            dev.jsc.jscomputronics.module.computing.operation.payload.RenameServerPayload.MAX_LEN)
+                        : capped);
+        broadcastChanges();
+    }
+
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {

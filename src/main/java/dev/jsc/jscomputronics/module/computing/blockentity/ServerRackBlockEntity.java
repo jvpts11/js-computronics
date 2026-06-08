@@ -94,9 +94,9 @@ public class ServerRackBlockEntity extends BlockEntity {
             if (!(stack.getItem() instanceof ServerItem)) {
                 continue;
             }
-            // Only an assembled Server (board + PSU) is a real node; an empty
-            // Server sitting in the Rack is inert storage and not registered.
-            if (ServerItem.build(stack) == null) {
+            // A Server is a node only when it is a valid, powered computer: a complete build with a
+            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = ServerItem.build(stack);
+            if (build == null || !build.isPowered()) {
                 continue;
             }
             final UUID node = ensureNodeUuid(stack);

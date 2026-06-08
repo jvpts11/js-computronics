@@ -10,7 +10,9 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
@@ -81,8 +83,9 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                 && level.getBlockEntity(pos) instanceof MonitorBlockEntity monitor) {
             final BlockPos owner = monitor.ownerPos();
             if (owner == null) {
-                serverPlayer.displayClientMessage(
-                        Component.translatable("block.jsc.monitor.unlinked"), true);
+                // Explain WHY the screen is dark instead of a generic "not linked", so a missing GPU
+                // (the most common cause) or a full host is obvious rather than silent.
+                serverPlayer.displayClientMessage(diagnoseUnlinked(level, pos), true);
             } else {
                 openTerminal(serverPlayer, level, pos, owner);
             }
@@ -94,13 +97,38 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                                      final BlockPos monitorPos, final BlockPos owner) {
         if (level.getBlockEntity(owner) instanceof ComputerTerminalHost host) {
             final Component title = level.getBlockState(owner).getBlock().getName();
+            // Reopen on the tab the player last used here (persisted on the Monitor).
+            final int initialTab =
+                    level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor
+                            ? monitor.lastTab() : ComputerTerminalMenu.TAB_NETWORK;
             player.openMenu(new SimpleMenuProvider(
-                    (id, inv, p) -> new ComputerTerminalMenu(id, inv, host, owner, monitorPos), title),
+                    (id, inv, p) -> new ComputerTerminalMenu(id, inv, host, owner, monitorPos, initialTab), title),
                     buf -> {
                         buf.writeBlockPos(monitorPos);
                         buf.writeBlockPos(owner);
+                        buf.writeVarInt(initialTab);
                     });
         }
+    }
+
+    private static Component diagnoseUnlinked(final Level level, final BlockPos monitorPos) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return Component.translatable("block.jsc.monitor.unlinked");
+        }
+        final java.util.OptionalLong host =
+                PeripheralLinks.discoverOwner(serverLevel, monitorPos.asLong());
+        if (host.isEmpty()) {
+            return Component.translatable("block.jsc.monitor.no_computer");
+        }
+        if (serverLevel.getBlockEntity(BlockPos.of(host.getAsLong())) instanceof PeripheralOwner owner) {
+            if (owner.maxEndpoints() <= 0) {
+                return Component.translatable("block.jsc.monitor.no_gpu");
+            }
+            if (owner.linkedEndpoints().size() >= owner.maxEndpoints()) {
+                return Component.translatable("block.jsc.monitor.at_capacity");
+            }
+        }
+        return Component.translatable("block.jsc.monitor.unlinked");
     }
 
     @Override

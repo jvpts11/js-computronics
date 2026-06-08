@@ -11,14 +11,16 @@ import dev.jsc.jscomputronics.common.format.Unit;
 import dev.jsc.jscomputronics.common.format.UnitFormatter;
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu;
+import dev.jsc.jscomputronics.module.computing.operation.payload.RenameServerPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Screen for assembling a Server: a flat-dark "computer OS" modal.
@@ -26,6 +28,8 @@ import java.util.UUID;
 public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssemblyMenu> {
 
     private final UnitFormatter fmt = UnitFormatter.forCurrentLocale();
+
+    private EditBox nameBox;
 
     public ServerAssemblyScreen(final ServerAssemblyMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
@@ -36,11 +40,67 @@ public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssembly
     }
 
     @Override
+    protected void init() {
+        super.init();
+        // Name field in the header — renaming a computer happens here, in its assembly GUI, never via
+        // an anvil. Each keystroke syncs the name to the held Server.
+        nameBox = new EditBox(font, leftPos + 52, topPos + 8, 104, 11, Component.literal("Name"));
+        nameBox.setBordered(false);
+        nameBox.setMaxLength(RenameServerPayload.MAX_LEN);
+        nameBox.setTextColor(JscOsTheme.TEXT);
+        nameBox.setHint(Component.literal("Name this server...").withStyle(ChatFormatting.DARK_GRAY));
+        nameBox.setValue(menu.serverName());
+        nameBox.setResponder(s -> PacketDistributor.sendToServer(new RenameServerPayload(s)));
+        addRenderableWidget(nameBox);
+    }
+
+    @Override
+    public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
+        // Clicking the name field selects it for typing; clicking elsewhere deselects it.
+        if (nameBox != null) {
+            if (nameBox.isMouseOver(mouseX, mouseY)) {
+                setFocused(nameBox);
+                nameBox.setFocused(true);
+                return nameBox.mouseClicked(mouseX, mouseY, button);
+            }
+            nameBox.setFocused(false);
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean keyPressed(final int key, final int scan, final int mods) {
+        // While the name field has focus, route typing to it and never let a key (e.g. the inventory
+        // key 'E') reach the screen and close the GUI. ESC just unfocuses the field.
+        if (nameBox != null && nameBox.isFocused()) {
+            if (key == 256) {
+                nameBox.setFocused(false);
+                setFocused(null);
+                return true;
+            }
+            nameBox.keyPressed(key, scan, mods);
+            return true;
+        }
+        return super.keyPressed(key, scan, mods);
+    }
+
+    @Override
+    public boolean charTyped(final char c, final int mods) {
+        if (nameBox != null && nameBox.isFocused()) {
+            return nameBox.charTyped(c, mods);
+        }
+        return super.charTyped(c, mods);
+    }
+
+    @Override
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
         JscOsTheme.window(g, x, y, imageWidth, imageHeight);
         JscOsTheme.headerBar(g, x + 6, y + 6, 232);
+        // Name field background (the field itself is an EditBox drawn over this).
+        g.fill(x + 50, y + 7, x + 158, y + 19, 0xFF11161D);
+        g.fill(x + 50, y + 18, x + 158, y + 19, 0xFF24323C);
 
         final ComputerBuild build = menu.currentBuild();
 
@@ -94,7 +154,7 @@ public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssembly
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         final ComputerBuild build = menu.currentBuild();
 
-        JscOsTheme.text(g, font, "SERVER ASSEMBLY", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "SERVER", 12, 11, JscOsTheme.TEXT);
         final String status;
         final int statusColor;
         if (build == null) {
@@ -113,10 +173,6 @@ public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssembly
         final int pillX = 232 - font.width(status);
         JscOsTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
-        final UUID uuid = menu.nodeUuid();
-        if (uuid != null) {
-            JscOsTheme.textSRight(g, font, uuid.toString().substring(0, 8), pillX - 8, 12, JscOsTheme.DIM);
-        }
 
         // Spec tiles.
         JscOsTheme.tileTextS(g, font, 8, 26, "ORCH", build == null ? "0" : fmt.compact(build.totalCapacity(), Unit.IT_PER_TICK), JscOsTheme.TEXT);

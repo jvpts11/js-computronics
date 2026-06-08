@@ -98,6 +98,11 @@ public record ComputerBuild(MotherboardSpec motherboard,
         if (cpus.isEmpty()) {
             problems.add("no CPU installed");
         }
+        // Every computer needs RAM to do work: with a zero buffer the CPU has nothing to stage
+        // through and can move nothing. A box without RAM is not a working computer.
+        if (rams.isEmpty()) {
+            problems.add("no RAM installed");
+        }
         if (cpus.size() > motherboard.cpuSlots()) {
             problems.add("too many CPUs: " + cpus.size() + " installed, "
                     + motherboard.cpuSlots() + " sockets");

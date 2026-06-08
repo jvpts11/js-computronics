@@ -23,8 +23,6 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.SlotItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -55,19 +53,31 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     private final Level level;
     @Nullable
     private final ComputerTerminalHost host;
+    @Nullable
+    private final ServerPlayer serverPlayer;
     private final BlockPos hostPos;
     private final BlockPos monitorPos;
     private final int storageCount;
+    private int refreshTick;
+    private boolean initialDataSent;
 
-    private int activeTab = TAB_LOCAL;
+    private int activeTab;
 
     private java.util.List<NetworkItemEntry> networkItems = java.util.List.of();
+
+    private java.util.List<NetworkItemEntry> localItems = java.util.List.of();
 
     private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload.ServerHolding>
             serverBreakdown = java.util.List.of();
 
     private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord>
             operationsLog = java.util.List.of();
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord>
+            activeOps = java.util.List.of();
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkServersPayload.ServerEntry>
+            networkServers = java.util.List.of();
 
     private final int[] clientData = new int[DATA_COUNT];
 
@@ -95,38 +105,26 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     public ComputerTerminalMenu(final int containerId, final Inventory playerInventory,
                                 @Nullable final ComputerTerminalHost host,
-                                final BlockPos hostPos, final BlockPos monitorPos) {
+                                final BlockPos hostPos, final BlockPos monitorPos, final int initialTab) {
         super(ComputingModule.COMPUTER_TERMINAL_MENU.get(), containerId);
         this.level = playerInventory.player.level();
+        this.serverPlayer = playerInventory.player instanceof ServerPlayer sp ? sp : null;
         this.host = host;
         this.hostPos = hostPos.immutable();
         this.monitorPos = monitorPos.immutable();
-
-        final IItemHandler storage = host == null ? null : host.localStorage();
-        this.storageCount = storage == null ? 0 : storage.getSlots();
-        if (storage != null) {
-            for (int i = 0; i < storageCount; i++) {
-                final int col = i % STORAGE_COLS;
-                final int row = i / STORAGE_COLS;
-                addSlot(new StorageSlot(storage, i, STORAGE_X + col * 18, STORAGE_Y + row * 18));
-            }
+        // Open on the player's last-used tab; fall back to Network, and never land on the
+        // Mainframe-only Task Manager when the host is a plain computer.
+        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_TASKS ? initialTab : TAB_NETWORK;
+        if (tab == TAB_TASKS && (host == null || !host.isMainframeHost())) {
+            tab = TAB_NETWORK;
         }
+        this.activeTab = tab;
+
+        // The Storage tab is now a disk-backed quantity view (like the Network tab), not vanilla
+        // slots, so the menu holds only the player inventory; local items are synced via snapshot.
+        this.storageCount = 0;
         addPlayerInventory(playerInventory);
         addDataSlots(data);
-    }
-
-    /**
-     * A storage slot active only on the Storage tab and within the disk-gated count.
-     */
-    private final class StorageSlot extends SlotItemHandler {
-        private StorageSlot(final IItemHandler handler, final int index, final int x, final int y) {
-            super(handler, index, x, y);
-        }
-
-        @Override
-        public boolean isActive() {
-            return activeTab == TAB_STORAGE && getSlotIndex() < usableStorageSlots();
-        }
     }
 
     private void addPlayerInventory(final Inventory inventory) {
@@ -145,9 +143,10 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
                                                    final RegistryFriendlyByteBuf buf) {
         final BlockPos monitorPos = buf.readBlockPos();
         final BlockPos hostPos = buf.readBlockPos();
+        final int initialTab = buf.readVarInt();
         final var be = playerInventory.player.level().getBlockEntity(hostPos);
         if (be instanceof ComputerTerminalHost terminalHost) {
-            return new ComputerTerminalMenu(containerId, playerInventory, terminalHost, hostPos, monitorPos);
+            return new ComputerTerminalMenu(containerId, playerInventory, terminalHost, hostPos, monitorPos, initialTab);
         }
         return null;
     }
@@ -203,18 +202,32 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     public boolean clickMenuButton(final Player player, final int id) {
         if (id >= TAB_LOCAL && id <= TAB_TASKS) {
             this.activeTab = id;
-            // Opening Network/Operations asks the server for a fresh snapshot/log.
-            if (host != null && host.networkUuid() != null
-                    && player instanceof ServerPlayer serverPlayer && level instanceof ServerLevel serverLevel) {
-                if (id == TAB_NETWORK) {
-                    ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
-                } else if (id == TAB_OPS || id == TAB_TASKS) {
-                    ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
-                }
+            // Remember the tab on the Monitor so reopening this terminal lands here again.
+            if (level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor) {
+                monitor.setLastTab(id);
+            }
+            if (player instanceof ServerPlayer sp && level instanceof ServerLevel serverLevel) {
+                dispatchTabData(id, sp, serverLevel);
             }
             return true;
         }
         return false;
+    }
+
+    private void dispatchTabData(final int id, final ServerPlayer serverPlayer, final ServerLevel serverLevel) {
+        if (host == null) {
+            return;
+        }
+        if (id == TAB_STORAGE) {
+            ComputingPayloads.dispatchLocalSnapshot(serverPlayer, host);
+        } else if (host.networkUuid() != null) {
+            if (id == TAB_NETWORK) {
+                ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
+            } else if (id == TAB_OPS || id == TAB_TASKS) {
+                ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
+                ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
+            }
+        }
     }
 
     public void setNetworkItems(final java.util.List<NetworkItemEntry> items) {
@@ -223,6 +236,14 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     public java.util.List<NetworkItemEntry> networkItems() {
         return networkItems;
+    }
+
+    public void setLocalItems(final java.util.List<NetworkItemEntry> items) {
+        this.localItems = items;
+    }
+
+    public java.util.List<NetworkItemEntry> localItems() {
+        return localItems;
     }
 
     public void setServerBreakdown(
@@ -234,6 +255,15 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
         return serverBreakdown;
     }
 
+    public void setNetworkServers(
+            final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkServersPayload.ServerEntry> servers) {
+        this.networkServers = servers;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.NetworkServersPayload.ServerEntry> networkServers() {
+        return networkServers;
+    }
+
     public void setOperationsLog(
             final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> ops) {
         this.operationsLog = ops;
@@ -241,6 +271,44 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> operationsLog() {
         return operationsLog;
+    }
+
+    public void setActiveOps(
+            final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> ops) {
+        this.activeOps = ops;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> activeOps() {
+        return activeOps;
+    }
+
+    @Override
+    public void broadcastChanges() {
+        super.broadcastChanges();
+        if (serverPlayer == null || host == null || !(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        // Populate the first-shown tab once, right after the terminal opens. clickMenuButton only
+        if (!initialDataSent) {
+            initialDataSent = true;
+            dispatchTabData(activeTab, serverPlayer, serverLevel);
+        }
+        if (host.networkUuid() == null) {
+            return;
+        }
+        if (++refreshTick < 10) {
+            return;
+        }
+        refreshTick = 0;
+        // The Task Manager always re-syncs (so finished ops drop off); the Network grid re-queries
+        // only while something is in flight (its snapshot is already pushed on deposit/withdraw/settle).
+        if (activeTab == TAB_TASKS || activeTab == TAB_OPS) {
+            ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
+        }
+        if (activeTab == TAB_NETWORK
+                && ComputingPayloads.networkHasActiveOps(serverLevel, host.networkUuid())) {
+            ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
+        }
     }
 
     public BlockPos monitorPos() {

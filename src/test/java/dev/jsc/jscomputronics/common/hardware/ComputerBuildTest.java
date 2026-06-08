@@ -62,6 +62,13 @@ class ComputerBuildTest {
     }
 
     @Test
+    void noRam_isNotPowered() {
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(), psu(650));
+        assertFalse(build.isPowered(), "a computer with no RAM is not a working build");
+    }
+
+    @Test
     void tooManyCpus_isNotPowered() {
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu(), standardCpu(), standardCpu(), standardCpu(), standardCpu()),

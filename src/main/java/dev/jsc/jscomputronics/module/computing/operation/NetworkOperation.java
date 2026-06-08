@@ -18,5 +18,9 @@ public interface NetworkOperation {
 
     boolean isDone();
 
+    void abandon();
+
     OperationRecord toRecord();
+
+    OperationRecord liveRecord();
 }

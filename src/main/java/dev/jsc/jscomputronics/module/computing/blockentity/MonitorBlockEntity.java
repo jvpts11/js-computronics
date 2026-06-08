@@ -14,6 +14,7 @@ import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
 import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;
+import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -36,6 +37,7 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
     @Nullable
     private Long linkedOwner;
     private int bootTicks;
+    private int lastTab = ComputerTerminalMenu.TAB_NETWORK;
 
     public MonitorBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.MONITOR_BE.get(), pos, state);
@@ -66,6 +68,17 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
     @Nullable
     public BlockPos ownerPos() {
         return linkedOwner == null ? null : BlockPos.of(linkedOwner);
+    }
+
+    public int lastTab() {
+        return lastTab;
+    }
+
+    public void setLastTab(final int tab) {
+        if (tab != lastTab && tab >= 0) {
+            lastTab = tab;
+            setChanged();
+        }
     }
 
     public static void serverTick(final Level level, final BlockPos pos,
@@ -128,6 +141,9 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         linkedOwner = tag.contains("LinkedOwner") ? tag.getLong("LinkedOwner") : null;
+        if (tag.contains("LastTab")) {
+            lastTab = tag.getInt("LastTab");
+        }
     }
 
     @Override
@@ -136,5 +152,6 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
         if (linkedOwner != null) {
             tag.putLong("LinkedOwner", linkedOwner);
         }
+        tag.putInt("LastTab", lastTab);
     }
 }

@@ -92,6 +92,14 @@ public final class ComputingModule {
                             dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.STREAM_CODEC));
 
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<
+                    dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents>>
+            DISK_STORAGE = COMPONENTS.registerComponentType("disk_storage", b -> b
+                    .persistent(dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.CODEC)
+                    .networkSynchronized(
+                            dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.STREAM_CODEC));
+
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<net.minecraft.world.item.component.ItemContainerContents>>
             SERVER_HARDWARE = COMPONENTS.registerComponentType("server_hardware", b -> b
                     .persistent(net.minecraft.world.item.component.ItemContainerContents.CODEC)
@@ -102,6 +110,12 @@ public final class ComputingModule {
             SERVER_NODE_UUID = COMPONENTS.registerComponentType("server_node_uuid", b -> b
                     .persistent(net.minecraft.core.UUIDUtil.CODEC)
                     .networkSynchronized(net.minecraft.core.UUIDUtil.STREAM_CODEC));
+
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<String>>
+            COMPUTER_NAME = COMPONENTS.registerComponentType("computer_name", b -> b
+                    .persistent(com.mojang.serialization.Codec.STRING)
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8));
 
     private static BlockBehaviour.Properties cableProperties() {
         return BlockBehaviour.Properties.of()
@@ -336,6 +350,25 @@ public final class ComputingModule {
         hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
                 new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)));
         hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START + 1,
+                new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)));
+        stack.set(SERVER_HARDWARE.get(),
+                net.minecraft.world.item.component.ItemContainerContents.fromItems(hardware));
+        return stack;
+    }
+
+    public static net.minecraft.world.item.ItemStack cpulessServer() {
+        final net.minecraft.world.item.ItemStack stack = new net.minecraft.world.item.ItemStack(SERVER.get());
+        final net.minecraft.core.NonNullList<net.minecraft.world.item.ItemStack> hardware =
+                net.minecraft.core.NonNullList.withSize(
+                        dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.SLOTS,
+                        net.minecraft.world.item.ItemStack.EMPTY);
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.MOBO,
+                new net.minecraft.world.item.ItemStack(MOTHERBOARD_EEB_P.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.RAM_START,
+                new net.minecraft.world.item.ItemStack(RAM_DDR3_8192.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.PSU,
+                new net.minecraft.world.item.ItemStack(PSU_650G.get()));
+        hardware.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
                 new net.minecraft.world.item.ItemStack(disk(StorageTier.NVME, DiskSize.TB_1)));
         stack.set(SERVER_HARDWARE.get(),
                 net.minecraft.world.item.component.ItemContainerContents.fromItems(hardware));

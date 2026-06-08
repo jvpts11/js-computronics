@@ -7,13 +7,12 @@
  */
 package dev.jsc.jscomputronics.module.computing.block.part;
 
-import dev.jsc.jscomputronics.common.operation.OperationPriority;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkExportOperationTask;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -56,7 +55,7 @@ public final class ExportBusPart implements CablePart {
     private int mode = MODE_CONTINUOUS;
     private boolean linked;
     private boolean active = true;
-    private boolean pendingExport;
+    private dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation activeOp;
     private int ticksSinceExport;
 
     private final ContainerData data = new ContainerData() {
@@ -147,8 +146,12 @@ public final class ExportBusPart implements CablePart {
         }
         final NetworkUuid network = host.network();
         linked = network != null;
-        if (pendingExport) {
-            return;
+        // Wait for the in-flight DELETE to finish before starting another.
+        if (activeOp != null) {
+            if (!activeOp.isDone()) {
+                return;
+            }
+            activeOp = null;
         }
         if (mode == MODE_REDSTONE && !level.hasNeighborSignal(host.getBlockPos())) {
             return;
@@ -166,34 +169,32 @@ public final class ExportBusPart implements CablePart {
         if (dest == null) {
             return;
         }
-        final Item item = filterStack.getItem();
+        // Export the exact filtered variant (item + components), so an enchanted filter pulls only
+        // the enchanted item, not every bare copy.
+        final StorageKey key = StorageKey.of(filterStack);
         final MainframeBlockEntity mainframe = host.mainframe();
         if (mainframe == null) {
             return;
         }
         // Don't spin failed DELETEs forever once the network holds none of the item.
-        if (NetworkStorage.of(level, network).count(item) <= 0L) {
+        if (NetworkStorage.of(level, network).count(key) <= 0L) {
             return;
         }
         // Throughput follows the network's orchestration capacity (items/tick), not a fixed batch.
         final int batch = (int) Math.max(BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
-        final long want = computeWant(dest, item, batch);
+        final long want = computeWant(dest, key, batch);
         if (want <= 0L) {
             return;
         }
-        pendingExport = true;
-        if (!mainframe.submitOperation(
-                new NetworkExportOperationTask(level, network, item, want, host.getBlockPos(), face),
-                OperationPriority.MEDIUM)) {
-            pendingExport = false;
-        }
+        // Pull the item out of the network into the faced inventory as a timed DELETE Operation,
+        activeOp = mainframe.submitNetworkDelete(key, want, dest, "export");
     }
 
-    private long computeWant(final IItemHandler dest, final Item item, final int batch) {
+    private long computeWant(final IItemHandler dest, final StorageKey key, final int batch) {
         if (max <= 0) {
             return batch; // no cap: push up to the network throughput each cycle
         }
-        final int destCount = countOf(dest, item);
+        final int destCount = countOf(dest, key);
         if (destCount >= max) {
             active = false;
             return 0L;
@@ -207,16 +208,11 @@ public final class ExportBusPart implements CablePart {
         return Math.min((long) batch, (long) (max - destCount));
     }
 
-    public void onExportComplete() {
-        pendingExport = false;
-        markHostChanged();
-    }
-
-    private static int countOf(final IItemHandler handler, final Item item) {
+    private static int countOf(final IItemHandler handler, final StorageKey key) {
         int total = 0;
         for (int i = 0; i < handler.getSlots(); i++) {
             final ItemStack inSlot = handler.getStackInSlot(i);
-            if (inSlot.is(item)) {
+            if (ItemStack.isSameItemSameComponents(inSlot, key.prototype())) {
                 total += inSlot.getCount();
             }
         }

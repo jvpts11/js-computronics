@@ -13,6 +13,7 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -58,10 +59,10 @@ public final class NetworkStorage {
         return new NetworkStorage(entries);
     }
 
-    public Map<Item, Long> query() {
-        final Map<Item, Long> totals = new HashMap<>();
+    public Map<StorageKey, Long> query() {
+        final Map<StorageKey, Long> totals = new HashMap<>();
         for (final Entry entry : entries) {
-            entry.store().view().forEach((item, count) -> totals.merge(item, count, Long::sum));
+            entry.store().view().forEach((key, count) -> totals.merge(key, count, Long::sum));
         }
         return totals;
     }
@@ -74,10 +75,18 @@ public final class NetworkStorage {
         return total;
     }
 
-    public Map<NodeUuid, Long> breakdown(final Item item) {
+    public long count(final StorageKey key) {
+        long total = 0L;
+        for (final Entry entry : entries) {
+            total += entry.store().count(key);
+        }
+        return total;
+    }
+
+    public Map<NodeUuid, Long> breakdown(final StorageKey key) {
         final Map<NodeUuid, Long> perServer = new LinkedHashMap<>();
         for (final Entry entry : entries) {
-            final long count = entry.store().count(item);
+            final long count = entry.store().count(key);
             if (count > 0L) {
                 perServer.merge(entry.node(), count, Long::sum);
             }
@@ -85,40 +94,44 @@ public final class NetworkStorage {
         return perServer;
     }
 
-    public long select(final Item item, final long amount, final IItemHandler destination) {
-        return select(item, amount, destination, null);
+    public long select(final StorageKey key, final long amount, final IItemHandler destination) {
+        return select(key, amount, destination, null);
     }
 
-    public long select(final Item item, final long amount, final IItemHandler destination,
+    public long select(final Item item, final long amount, final IItemHandler destination) {
+        return select(StorageKey.of(item), amount, destination, null);
+    }
+
+    public long select(final StorageKey key, final long amount, final IItemHandler destination,
                        @Nullable final Set<NodeUuid> allowed) {
         long total = 0L;
-        for (final long pulled : selectBreakdown(item, amount, destination, allowed).values()) {
+        for (final long pulled : selectBreakdown(key, amount, destination, allowed).values()) {
             total += pulled;
         }
         return total;
     }
 
-    public Map<NodeUuid, Long> selectBreakdown(final Item item, final long amount,
+    public Map<NodeUuid, Long> selectBreakdown(final StorageKey key, final long amount,
                                                final IItemHandler destination,
                                                @Nullable final Set<NodeUuid> allowed) {
         final Map<NodeUuid, Long> pulled = new LinkedHashMap<>();
-        final int batchSize = Math.max(1, new ItemStack(item).getMaxStackSize());
+        final int batchSize = Math.max(1, key.stack(1).getMaxStackSize());
         long moved = 0L;
         for (final Entry entry : entries) {
             if (allowed != null && !allowed.contains(entry.node())) {
                 continue;
             }
             final ServerStore store = entry.store();
-            long available = store.count(item);
+            long available = store.count(key);
             while (moved < amount && available > 0L) {
                 final int batch = (int) Math.min(Math.min(amount - moved, available), batchSize);
-                final ItemStack offered = new ItemStack(item, batch);
+                final ItemStack offered = key.stack(batch);
                 final ItemStack leftover = ItemHandlerHelper.insertItem(destination, offered, false);
                 final int accepted = batch - leftover.getCount();
                 if (accepted <= 0) {
                     return pulled; // destination full
                 }
-                store.extract(item, accepted);
+                store.extract(key, accepted);
                 moved += accepted;
                 available -= accepted;
                 pulled.merge(entry.node(), (long) accepted, Long::sum);
@@ -134,13 +147,13 @@ public final class NetworkStorage {
         if (stack.isEmpty()) {
             return 0;
         }
-        final Item item = stack.getItem();
+        final StorageKey key = StorageKey.of(stack);
         long remaining = stack.getCount();
         for (final Entry entry : entries) {
             if (remaining <= 0L) {
                 break;
             }
-            remaining -= entry.store().insert(item, remaining);
+            remaining -= entry.store().insert(key, remaining);
         }
         return (int) (stack.getCount() - remaining);
     }
@@ -150,13 +163,13 @@ public final class NetworkStorage {
         if (stack.isEmpty()) {
             return stored;
         }
-        final Item item = stack.getItem();
+        final StorageKey key = StorageKey.of(stack);
         long remaining = stack.getCount();
         for (final Entry entry : entries) {
             if (remaining <= 0L) {
                 break;
             }
-            final long accepted = entry.store().insert(item, remaining);
+            final long accepted = entry.store().insert(key, remaining);
             if (accepted > 0L) {
                 stored.merge(entry.node(), accepted, Long::sum);
                 remaining -= accepted;

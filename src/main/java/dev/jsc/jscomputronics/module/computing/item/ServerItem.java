@@ -64,6 +64,19 @@ public class ServerItem extends Item {
         return stack.get(ComputingModule.SERVER_NODE_UUID.get());
     }
 
+    public static String customName(final ItemStack stack) {
+        return stack.getOrDefault(ComputingModule.COMPUTER_NAME.get(), "");
+    }
+
+    public static void setCustomName(final ItemStack stack, final String name) {
+        final String trimmed = name.strip();
+        if (trimmed.isEmpty()) {
+            stack.remove(ComputingModule.COMPUTER_NAME.get());
+        } else {
+            stack.set(ComputingModule.COMPUTER_NAME.get(), trimmed);
+        }
+    }
+
     @Nullable
     public static ComputerBuild build(final ItemStack stack) {
         return buildFrom(hardware(stack).nonEmptyItems());

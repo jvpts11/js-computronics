@@ -40,7 +40,7 @@ public final class NetworkSystem {
     /**
      * A Personal Computer attached to a network: a Category-C node that issues, but never orchestrates, Operations.
      */
-    public record PersonalComputerNode(NodeUuid nodeUuid, NetworkUuid networkUuid, long capacity) {
+    public record PersonalComputerNode(NodeUuid nodeUuid, NetworkUuid networkUuid, long capacity, long pos) {
     }
 
     /**

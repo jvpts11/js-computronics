@@ -20,16 +20,15 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * A multi-tick INSERT: writes an item into the network's servers over time — the inverse of a SELECT.
@@ -40,7 +39,7 @@ public final class NetworkInsertOperation implements NetworkOperation {
 
     private final ServerLevel level;
     private final NetworkUuid network;
-    private final Item item;
+    private final StorageKey key;
     private final long demand;
     private final String sourceLabel;
 
@@ -52,15 +51,16 @@ public final class NetworkInsertOperation implements NetworkOperation {
     private int stalledTicks;
     private boolean done;
     private byte status = OperationRecord.STATUS_PARTIAL;
+    private Runnable onSettle;
 
-    private record Source(NodeUuid server, TransferState state) {
+    private record Source(NodeUuid server, TransferState state, long hardwareCap) {
     }
 
-    public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final Item item,
+    public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final String sourceLabel, final NetworkIndex index) {
         this.level = level;
         this.network = network;
-        this.item = item;
+        this.key = key;
         this.demand = demand;
         this.sourceLabel = sourceLabel;
 
@@ -73,7 +73,8 @@ public final class NetworkInsertOperation implements NetworkOperation {
         final Allocation plan = StorageAllocator.allocate(free, demand);
         plan.perServer().forEach((server, quantity) -> {
             final StorageTier tier = tiers.getOrDefault(server, StorageTier.HDD);
-            sources.add(new Source(server, new TransferState(quantity, tier.latencyTicks())));
+            sources.add(new Source(server, new TransferState(quantity, tier.latencyTicks()),
+                    NetworkIndex.serverThroughputCap(level, server)));
         });
         this.progress = new OperationProgress(sources.stream().map(Source::state).toList());
         if (sources.isEmpty()) {
@@ -93,7 +94,8 @@ public final class NetworkInsertOperation implements NetworkOperation {
         for (int i = 0; i < sources.size(); i++) {
             final Source source = sources.get(i);
             final boolean wasWaiting = source.state().waitingOnLatency();
-            final long planned = source.state().planTick(shares[i]);
+            // The server absorbs writes at the slower of its orchestration share and its hardware.
+            final long planned = source.state().planTick(Math.min(shares[i], source.hardwareCap()));
             if (wasWaiting && planned == 0L) {
                 waiting = true;
             }
@@ -101,7 +103,7 @@ public final class NetworkInsertOperation implements NetworkOperation {
                 continue;
             }
             final ServerStore store = storeOf(source.server());
-            final long written = store == null ? 0L : store.insert(item, planned);
+            final long written = store == null ? 0L : store.insert(key, planned);
             source.state().commit(written);
             if (written > 0L) {
                 writtenTotal += written;
@@ -133,11 +135,29 @@ public final class NetworkInsertOperation implements NetworkOperation {
         done = true;
         status = writtenTotal >= demand ? OperationRecord.STATUS_COMPLETED
                 : writtenTotal > 0L ? OperationRecord.STATUS_PARTIAL : OperationRecord.STATUS_FAILED;
+        if (onSettle != null) {
+            onSettle.run();
+        }
     }
 
     @Override
     public boolean isDone() {
         return done;
+    }
+
+    public NetworkInsertOperation onSettle(final Runnable callback) {
+        this.onSettle = callback;
+        if (done && callback != null) {
+            callback.run();
+        }
+        return this;
+    }
+
+    @Override
+    public void abandon() {
+        // Settling fixes the status from what was already written; the holder then sees isDone() and
+        // re-buffers the unwritten remainder reported by leftover(), so no buffered items are lost.
+        finish();
     }
 
     public byte status() {
@@ -154,11 +174,20 @@ public final class NetworkInsertOperation implements NetworkOperation {
 
     @Override
     public OperationRecord toRecord() {
+        return buildRecord(status);
+    }
+
+    @Override
+    public OperationRecord liveRecord() {
+        return buildRecord(done ? status : OperationRecord.STATUS_PROCESSING);
+    }
+
+    private OperationRecord buildRecord(final byte recordStatus) {
         final List<OperationRecord.MoveRow> moves = new ArrayList<>();
         writtenPerServer.forEach((server, written) ->
                 moves.add(new OperationRecord.MoveRow(sourceLabel, written, "SRV-" + shortId(server.asString()))));
-        return new OperationRecord(OperationRecord.TYPE_INSERT, new ItemStack(item), demand, writtenTotal,
-                status, List.copyOf(moves));
+        return new OperationRecord(OperationRecord.TYPE_INSERT, key.stack(1), demand, writtenTotal,
+                recordStatus, List.copyOf(moves));
     }
 
     private static String shortId(final String uuid) {

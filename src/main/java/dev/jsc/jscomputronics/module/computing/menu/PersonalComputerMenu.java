@@ -114,6 +114,10 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
         return blockEntity.getBlockPos();
     }
 
+    public String customName() {
+        return blockEntity.customName();
+    }
+
     public int boardCpuSlots() {
         return blockEntity.boardCpuSlots();
     }
