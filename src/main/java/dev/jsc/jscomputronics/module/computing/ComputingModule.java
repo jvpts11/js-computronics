@@ -11,6 +11,7 @@ import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.hardware.CpuSocket;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
 import dev.jsc.jscomputronics.common.hardware.DiskSize;
+import dev.jsc.jscomputronics.common.hardware.CraftingCardSpec;
 import dev.jsc.jscomputronics.common.hardware.DiskSpec;
 import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
@@ -21,6 +22,7 @@ import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jsc.jscomputronics.common.tier.IndustrialTier;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
@@ -33,6 +35,7 @@ import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlock
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalRouterBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
+import dev.jsc.jscomputronics.module.computing.item.CraftingCardItem;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
@@ -337,6 +340,10 @@ public final class ComputingModule {
     public static final DeferredItem<GpuItem> GPU_HD_7970 = ITEMS.register(
             "gpu_hd_7970", () -> new GpuItem(new Item.Properties(),
                     new GpuSpec(HardwareEra.STANDARD, PcieGeneration.PCIE_3_0, 2048, 3072, 250)));
+
+    public static final DeferredItem<CraftingCardItem> CRAFTING_CARD_T2 = ITEMS.register(
+            "crafting_card_t2", () -> new CraftingCardItem(new Item.Properties(),
+                    new CraftingCardSpec(IndustrialTier.T2, PcieGeneration.PCIE_1_0, 0.5, 75)));
 
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));

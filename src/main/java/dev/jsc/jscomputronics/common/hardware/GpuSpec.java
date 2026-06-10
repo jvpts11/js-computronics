@@ -18,7 +18,7 @@ public record GpuSpec(HardwareEra era,
                       PcieGeneration bus,
                       int cores,
                       int vramMb,
-                      int tdpWatts) {
+                      int tdpWatts) implements ExpansionCardSpec {
 
     public GpuSpec {
         Objects.requireNonNull(era, "era must not be null");
@@ -36,5 +36,10 @@ public record GpuSpec(HardwareEra era,
 
     public long threads() {
         return (long) cores * 4L;
+    }
+
+    @Override
+    public ExpansionCardKind kind() {
+        return ExpansionCardKind.GPU;
     }
 }

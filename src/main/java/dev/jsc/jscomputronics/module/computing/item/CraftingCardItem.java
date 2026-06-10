@@ -7,8 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.item;
 
+import dev.jsc.jscomputronics.common.hardware.CraftingCardSpec;
 import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
-import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -18,18 +18,18 @@ import net.minecraft.world.item.TooltipFlag;
 import java.util.List;
 
 /**
- * A GPU component item.
+ * A Crafting Card component item: the PCIe card a Crafting Computer needs to execute recipes.
  */
-public class GpuItem extends Item implements ExpansionCardItem {
+public class CraftingCardItem extends Item implements ExpansionCardItem {
 
-    private final GpuSpec spec;
+    private final CraftingCardSpec spec;
 
-    public GpuItem(final Properties properties, final GpuSpec spec) {
+    public CraftingCardItem(final Properties properties, final CraftingCardSpec spec) {
         super(properties);
         this.spec = spec;
     }
 
-    public GpuSpec spec() {
+    public CraftingCardSpec spec() {
         return spec;
     }
 
@@ -41,11 +41,9 @@ public class GpuItem extends Item implements ExpansionCardItem {
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
-        tooltip.add(Component.literal(
-                spec.cores() + " cores  -  " + spec.vramMb() + " MB VRAM")
+        tooltip.add(Component.literal("Executes recipes  -  " + spec.cpuFactor() + "x CPU")
                 .withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal(
-                "+1 parallel queue  -  " + spec.tdpWatts() + " W")
+        tooltip.add(Component.literal(spec.tier() + "  -  " + spec.tdpWatts() + " W")
                 .withStyle(ChatFormatting.DARK_GRAY));
         tooltip.add(Component.literal(spec.bus().toString()).withStyle(ChatFormatting.DARK_GRAY));
     }

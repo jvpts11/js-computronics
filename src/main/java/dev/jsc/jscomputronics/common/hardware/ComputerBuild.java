@@ -16,7 +16,7 @@ import java.util.Objects;
  */
 public record ComputerBuild(MotherboardSpec motherboard,
                             List<CpuSpec> cpus,
-                            List<GpuSpec> gpus,
+                            List<ExpansionCardSpec> pcieCards,
                             List<RamSpec> rams,
                             PsuSpec psu,
                             List<DiskSpec> disks) {
@@ -25,14 +25,35 @@ public record ComputerBuild(MotherboardSpec motherboard,
         Objects.requireNonNull(motherboard, "motherboard must not be null");
         Objects.requireNonNull(psu, "psu must not be null");
         cpus = List.copyOf(cpus); // defensive copies, reject null elements
-        gpus = List.copyOf(gpus);
+        pcieCards = List.copyOf(pcieCards);
         rams = List.copyOf(rams);
         disks = List.copyOf(disks);
     }
 
     public ComputerBuild(final MotherboardSpec motherboard, final List<CpuSpec> cpus,
-                         final List<GpuSpec> gpus, final List<RamSpec> rams, final PsuSpec psu) {
-        this(motherboard, cpus, gpus, rams, psu, List.of());
+                         final List<ExpansionCardSpec> pcieCards, final List<RamSpec> rams,
+                         final PsuSpec psu) {
+        this(motherboard, cpus, pcieCards, rams, psu, List.of());
+    }
+
+    public List<GpuSpec> gpus() {
+        final List<GpuSpec> out = new ArrayList<>();
+        for (final ExpansionCardSpec card : pcieCards) {
+            if (card instanceof GpuSpec gpu) {
+                out.add(gpu);
+            }
+        }
+        return out;
+    }
+
+    public List<ExpansionCardSpec> cardsOfKind(final ExpansionCardKind kind) {
+        final List<ExpansionCardSpec> out = new ArrayList<>();
+        for (final ExpansionCardSpec card : pcieCards) {
+            if (card.kind() == kind) {
+                out.add(card);
+            }
+        }
+        return out;
     }
 
     public long totalCapacity() {
@@ -44,7 +65,13 @@ public record ComputerBuild(MotherboardSpec motherboard,
     }
 
     public int parallelQueues() {
-        return 1 + gpus.size();
+        int gpuCount = 0;
+        for (final ExpansionCardSpec card : pcieCards) {
+            if (card.kind() == ExpansionCardKind.GPU) {
+                gpuCount++;
+            }
+        }
+        return 1 + gpuCount;
     }
 
     public long ramBuffer() {
@@ -80,8 +107,8 @@ public record ComputerBuild(MotherboardSpec motherboard,
         for (final CpuSpec cpu : cpus) {
             draw += cpu.tdpWatts();
         }
-        for (final GpuSpec gpu : gpus) {
-            draw += gpu.tdpWatts();
+        for (final ExpansionCardSpec card : pcieCards) {
+            draw += card.tdpWatts();
         }
         for (final RamSpec ram : rams) {
             draw += ram.tdpWatts();
@@ -114,13 +141,13 @@ public record ComputerBuild(MotherboardSpec motherboard,
             }
         }
 
-        if (gpus.size() > motherboard.pcieSlots()) {
-            problems.add("too many GPUs: " + gpus.size() + " installed, "
+        if (pcieCards.size() > motherboard.pcieSlots()) {
+            problems.add("too many PCIe cards: " + pcieCards.size() + " installed, "
                     + motherboard.pcieSlots() + " PCIe slots");
         }
-        for (final GpuSpec gpu : gpus) {
-            if (!gpu.bus().fitsInto(motherboard.pcieGeneration())) {
-                problems.add("GPU bus " + gpu.bus() + " is newer than board bus "
+        for (final ExpansionCardSpec card : pcieCards) {
+            if (!card.bus().fitsInto(motherboard.pcieGeneration())) {
+                problems.add("PCIe card bus " + card.bus() + " is newer than board bus "
                         + motherboard.pcieGeneration());
             }
         }

@@ -10,7 +10,7 @@ package dev.jsc.jscomputronics.module.computing.item;
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
 import dev.jsc.jscomputronics.common.hardware.DiskSpec;
-import dev.jsc.jscomputronics.common.hardware.GpuSpec;
+import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
 import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
 import dev.jsc.jscomputronics.common.hardware.PsuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
@@ -88,7 +88,7 @@ public class ServerItem extends Item {
         PsuSpec psu = null;
         final List<CpuSpec> cpus = new ArrayList<>();
         final List<RamSpec> rams = new ArrayList<>();
-        final List<GpuSpec> gpus = new ArrayList<>();
+        final List<ExpansionCardSpec> pcieCards = new ArrayList<>();
         final List<DiskSpec> disks = new ArrayList<>();
         for (final ItemStack part : parts) {
             if (part.getItem() instanceof MotherboardItem m) {
@@ -99,8 +99,8 @@ public class ServerItem extends Item {
                 cpus.add(c.spec());
             } else if (part.getItem() instanceof RamItem r) {
                 rams.add(r.spec());
-            } else if (part.getItem() instanceof GpuItem g) {
-                gpus.add(g.spec());
+            } else if (part.getItem() instanceof ExpansionCardItem card) {
+                pcieCards.add(card.cardSpec());
             } else if (part.getItem() instanceof DiskItem d) {
                 disks.add(d.spec());
             }
@@ -108,7 +108,7 @@ public class ServerItem extends Item {
         if (board == null || psu == null) {
             return null;
         }
-        return new ComputerBuild(board, cpus, gpus, rams, psu, disks);
+        return new ComputerBuild(board, cpus, pcieCards, rams, psu, disks);
     }
 
     public static long storageMb(final ItemStack stack) {

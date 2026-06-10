@@ -160,6 +160,52 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void cablePlaced_extendsNetworkUuid(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos c1 = new BlockPos(2, 2, 2);
+        final BlockPos c2 = new BlockPos(3, 2, 2);
+        final BlockPos c3 = new BlockPos(4, 2, 2);
+        placeRunningMainframe(helper, m);
+        helper.setBlock(c1, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(c2, ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] uuid = new NetworkUuid[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(networkOf(helper, c2).isPresent(), "c2 is networked before extending");
+                    uuid[0] = networkOf(helper, c2).orElseThrow();
+                    helper.assertTrue(networkOf(helper, c3).isEmpty(), "c3 is not placed yet");
+                })
+                .thenExecute(() -> helper.setBlock(c3, ComputingModule.HBW_CABLE.get())) // extend at runtime
+                .thenExecuteAfter(SETTLE, () ->
+                        helper.assertTrue(networkOf(helper, c3).equals(Optional.of(uuid[0])),
+                                "a cable placed onto a live network joins it and inherits the UUID"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cableReplaced_rejoinsSeveredFragment(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos c1 = new BlockPos(2, 2, 2);
+        final BlockPos c2 = new BlockPos(3, 2, 2);
+        final BlockPos c3 = new BlockPos(4, 2, 2);
+        placeRunningMainframe(helper, m);
+        helper.setBlock(c1, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(c2, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(c3, ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] uuid = new NetworkUuid[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> uuid[0] = networkOf(helper, c3).orElseThrow())
+                .thenExecute(() -> helper.setBlock(c2, Blocks.AIR)) // sever -> c3 fragment goes network-less
+                .thenExecuteAfter(SETTLE, () ->
+                        helper.assertTrue(networkOf(helper, c3).isEmpty(), "severed far cable loses the network"))
+                .thenExecute(() -> helper.setBlock(c2, ComputingModule.HBW_CABLE.get())) // re-place the bridge
+                .thenExecuteAfter(SETTLE, () ->
+                        helper.assertTrue(networkOf(helper, c3).equals(Optional.of(uuid[0])),
+                                "re-placing the cable rejoins the fragment and restores its UUID"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void mainframeDestroyed_orphansNetworkAndReAdopts(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos c1 = new BlockPos(2, 2, 2);

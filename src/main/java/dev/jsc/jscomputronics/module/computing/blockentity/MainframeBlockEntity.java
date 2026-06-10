@@ -10,7 +10,7 @@ package dev.jsc.jscomputronics.module.computing.blockentity;
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
 import dev.jsc.jscomputronics.common.hardware.DiskSpec;
-import dev.jsc.jscomputronics.common.hardware.GpuSpec;
+import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
@@ -32,7 +32,7 @@ import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
-import dev.jsc.jscomputronics.module.computing.item.GpuItem;
+import dev.jsc.jscomputronics.module.computing.item.ExpansionCardItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.PsuItem;
 import dev.jsc.jscomputronics.module.computing.item.RamItem;
@@ -195,7 +195,7 @@ public class MainframeBlockEntity extends BlockEntity
             return stack.getItem() instanceof RamItem;
         }
         if (slot >= GPU_SLOTS_START && slot < GPU_SLOTS_START + GPU_SLOTS) {
-            return stack.getItem() instanceof GpuItem;
+            return stack.getItem() instanceof ExpansionCardItem;
         }
         if (slot >= DISK_SLOTS_START && slot < DISK_SLOTS_START + DISK_SLOTS) {
             return stack.getItem() instanceof DiskItem;
@@ -248,10 +248,10 @@ public class MainframeBlockEntity extends BlockEntity
             }
         }
         final int gpuCount = Math.min(GPU_SLOTS, motherboard.spec().pcieSlots());
-        final List<GpuSpec> gpus = new ArrayList<>();
+        final List<ExpansionCardSpec> pcieCards = new ArrayList<>();
         for (int i = 0; i < gpuCount; i++) {
-            if (inventory.getStackInSlot(GPU_SLOTS_START + i).getItem() instanceof GpuItem gpu) {
-                gpus.add(gpu.spec());
+            if (inventory.getStackInSlot(GPU_SLOTS_START + i).getItem() instanceof ExpansionCardItem card) {
+                pcieCards.add(card.cardSpec());
             }
         }
         final int diskCount = Math.min(DISK_SLOTS, motherboard.spec().diskSlots());
@@ -261,7 +261,7 @@ public class MainframeBlockEntity extends BlockEntity
                 disks.add(disk.spec());
             }
         }
-        return new ComputerBuild(motherboard.spec(), cpus, gpus, rams, psu.spec(), disks);
+        return new ComputerBuild(motherboard.spec(), cpus, pcieCards, rams, psu.spec(), disks);
     }
 
     public int boardCpuSlots() {

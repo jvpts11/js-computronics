@@ -73,6 +73,7 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.CPU_ASCENT_965.get());
                         output.accept(ComputingModule.RAM_DDR3_8192.get());
                         output.accept(ComputingModule.GPU_HD_7970.get());
+                        output.accept(ComputingModule.CRAFTING_CARD_T2.get());
                         output.accept(ComputingModule.PSU_650G.get());
                         // Disks (every tier × size).
                         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
