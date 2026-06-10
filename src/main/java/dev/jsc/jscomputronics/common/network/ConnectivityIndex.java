@@ -287,6 +287,25 @@ public final class ConnectivityIndex {
         return new RemovalResult(previousUuid, fragmentRoots.size());
     }
 
+    public Set<Long> reachableFrom(final long start, final Set<Long> blocked) {
+        final Set<Long> visited = new LinkedHashSet<>();
+        if (blocked.contains(start) || !posToId.containsKey(start)) {
+            return visited;
+        }
+        final Deque<Long> queue = new ArrayDeque<>();
+        visited.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            final Long current = queue.poll();
+            for (final Long neighbor : adjacency.getOrDefault(current, Set.of())) {
+                if (!blocked.contains(neighbor) && visited.add(neighbor)) {
+                    queue.add(neighbor);
+                }
+            }
+        }
+        return visited;
+    }
+
     private Set<Long> collectComponent(long start) {
         final Set<Long> visited = new LinkedHashSet<>();
         final Deque<Long> queue = new ArrayDeque<>();

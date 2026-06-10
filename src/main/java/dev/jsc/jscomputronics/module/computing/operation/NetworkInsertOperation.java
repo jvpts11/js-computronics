@@ -53,7 +53,10 @@ public final class NetworkInsertOperation implements NetworkOperation {
     private byte status = OperationRecord.STATUS_PARTIAL;
     private Runnable onSettle;
 
-    private record Source(NodeUuid server, TransferState state, long hardwareCap) {
+    /**
+     * One SubOperation: a destination server's timed write, with its own identity and hardware cap.
+     */
+    private record Source(java.util.UUID subId, NodeUuid server, TransferState state, long hardwareCap) {
     }
 
     public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
@@ -78,7 +81,8 @@ public final class NetworkInsertOperation implements NetworkOperation {
         final Allocation plan = StorageAllocator.allocate(free, demand);
         plan.perServer().forEach((server, quantity) -> {
             final StorageTier tier = tiers.getOrDefault(server, StorageTier.HDD);
-            sources.add(new Source(server, new TransferState(quantity, tier.latencyTicks()),
+            sources.add(new Source(java.util.UUID.randomUUID(), server,
+                    new TransferState(quantity, tier.latencyTicks()),
                     NetworkIndex.serverThroughputCap(level, server)));
         });
         this.progress = new OperationProgress(sources.stream().map(Source::state).toList());
@@ -179,20 +183,37 @@ public final class NetworkInsertOperation implements NetworkOperation {
 
     @Override
     public OperationRecord toRecord() {
-        return buildRecord(status);
+        return buildRecord(status, false);
     }
 
     @Override
     public OperationRecord liveRecord() {
-        return buildRecord(done ? status : OperationRecord.STATUS_PROCESSING);
+        return buildRecord(done ? status : OperationRecord.STATUS_PROCESSING, true);
     }
 
-    private OperationRecord buildRecord(final byte recordStatus) {
+    private OperationRecord buildRecord(final byte recordStatus, final boolean includeSubs) {
         final List<OperationRecord.MoveRow> moves = new ArrayList<>();
         writtenPerServer.forEach((server, written) ->
                 moves.add(new OperationRecord.MoveRow(sourceLabel, written, "SRV-" + shortId(server.asString()))));
+        final List<OperationRecord.SubRow> subs = includeSubs ? subRows() : List.of();
         return new OperationRecord(OperationRecord.TYPE_INSERT, key, demand, writtenTotal,
-                recordStatus, List.copyOf(moves));
+                recordStatus, List.copyOf(moves), subs);
+    }
+
+    private List<OperationRecord.SubRow> subRows() {
+        final List<OperationRecord.SubRow> subs = new ArrayList<>(Math.min(sources.size(),
+                OperationRecord.MAX_SUBS));
+        for (final Source source : sources) {
+            if (subs.size() >= OperationRecord.MAX_SUBS) {
+                break;
+            }
+            final byte state = source.state().isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
+                    : source.state().waitingOnLatency() ? OperationRecord.SubRow.SUB_READING
+                    : OperationRecord.SubRow.SUB_STREAMING;
+            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server().asString()),
+                    source.state().total(), source.state().moved(), state));
+        }
+        return subs;
     }
 
     private static String shortId(final String uuid) {

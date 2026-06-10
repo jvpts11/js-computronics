@@ -33,6 +33,8 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
         addBlock(ComputingModule.PERIPHERAL_CABLE, "Peripheral Cable");
         addBlock(ComputingModule.PERSONAL_ROUTER, "Personal Router");
+        addBlock(ComputingModule.SERVER_ROUTER, "Server Router");
+        addBlock(ComputingModule.DATACENTER_STATION, "Datacenter Station");
         addBlock(ComputingModule.MONITOR, "Monitor");
         addBlock(ComputingModule.TANK, "Tank");
         add("block.jsc.monitor.unlinked", "No computer linked");

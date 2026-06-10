@@ -25,7 +25,12 @@ import dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
+import dev.jsc.jscomputronics.module.computing.datacenter.DatacenterSection;
+import dev.jsc.jscomputronics.module.computing.datacenter.LoadBalanceMode;
+import dev.jsc.jscomputronics.module.computing.datacenter.LoadBalancer;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart;
 import dev.jsc.jscomputronics.module.computing.block.part.ImportBusPart;
@@ -1587,6 +1592,492 @@ public final class NetworkGameTests {
                                 && monitor.ownerPos().equals(helper.absolutePos(controller)),
                         "monitor must link to the Mainframe through a cable on a PART face"))
                 .thenSucceed();
+    }
+
+    // Server Router (topology element: bridges faces, sections racks per face)
+
+    @GameTest(template = ARENA)
+    public static void serverRouter_bridgesNetworkAcrossFaces(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwA = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbwB = new BlockPos(4, 2, 2);
+        final BlockPos rack = new BlockPos(5, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbwA, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(hbwB, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rack);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(net != null, "mainframe owns a network");
+                    helper.assertTrue(sameNetwork(helper, hbwA, hbwB),
+                            "the Server Router bridges the cables on its two faces into one network");
+                    helper.assertTrue(networkOf(helper, router).map(net::equals).orElse(false),
+                            "the router sits on the mainframe's network");
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).serversOf(net).size() == 1,
+                            "the rack behind the router registers its Server on the mainframe network");
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).routersOf(net).size() == 1,
+                            "the router registers itself as a topology element on the network");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void serverRouter_groupsRacksIntoSectionsAndDetectsInput(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwIn = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbwEast = new BlockPos(4, 2, 2);
+        final BlockPos rackEast = new BlockPos(5, 2, 2);
+        final BlockPos hbwSouth = new BlockPos(3, 2, 3);
+        final BlockPos rackSouth = new BlockPos(3, 2, 4);
+        placeRunningMainframe(helper, m);
+        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(hbwSouth, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rackEast);
+        seedServer(helper, rackSouth);
+        if (!(helper.getBlockEntity(router) instanceof ServerRouterBlockEntity routerBe)) {
+            helper.fail("no server router");
+            return;
+        }
+        helper.startSequence()
+                // Let the racks register their Servers, then force a fresh topology compute.
+                .thenExecuteAfter(SETTLE + 4, routerBe::recomputeNow)
+                .thenExecute(() -> {
+                    helper.assertTrue(routerBe.inputFace() == Direction.WEST,
+                            "the face toward the Mainframe is the input; got " + routerBe.inputFace());
+                    final java.util.List<DatacenterSection> sections = routerBe.sections();
+                    helper.assertTrue(sections.size() == 2,
+                            "two output faces with racks form two sections; got " + sections.size());
+                    for (final DatacenterSection section : sections) {
+                        helper.assertTrue(section.rackCount() == 1,
+                                "each section has one rack; got " + section.rackCount());
+                        helper.assertTrue(section.serverCount() == 1,
+                                "each section has one Server; got " + section.serverCount());
+                    }
+                    final java.util.Set<Direction> faces = new java.util.HashSet<>();
+                    for (final DatacenterSection section : sections) {
+                        faces.add(section.face());
+                    }
+                    helper.assertTrue(faces.contains(Direction.EAST) && faces.contains(Direction.SOUTH),
+                            "sections hang off the EAST and SOUTH output faces; got " + faces);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void serverRouter_removalSplitsNetworkAndUnregisters(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwA = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbwB = new BlockPos(4, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbwA, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(hbwB, ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] net = new NetworkUuid[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    net[0] = mainframe.networkUuid();
+                    helper.assertTrue(net[0] != null, "mainframe owns a network");
+                    helper.assertTrue(sameNetwork(helper, hbwA, hbwB),
+                            "the router bridges the two cable runs while present");
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).routersOf(net[0]).size() == 1,
+                            "the router is registered while present");
+                })
+                .thenExecute(() -> helper.setBlock(router, Blocks.AIR)) // remove the router
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertFalse(sameNetwork(helper, hbwA, hbwB),
+                            "removing the router splits its two cable runs apart");
+                    helper.assertTrue(networkOf(helper, hbwB).isEmpty(),
+                            "the far run, cut off from the Mainframe, becomes network-less");
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).routersOf(net[0]).isEmpty(),
+                            "the removed router unregisters itself from the network");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void loadBalancer_roundRobinSpreadsAcrossServers(final GameTestHelper helper) {
+        final BlockPos rackA = new BlockPos(2, 2, 2);
+        final BlockPos rackB = new BlockPos(4, 2, 2);
+        helper.setBlock(rackA, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rackB, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rackA);
+        seedServer(helper, rackB);
+        if (!(helper.getBlockEntity(rackA) instanceof ServerRackBlockEntity a)
+                || !(helper.getBlockEntity(rackB) instanceof ServerRackBlockEntity b)) {
+            helper.fail("no server racks");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final ServerStore sa = a.getServerStorage(0);
+                    final ServerStore sb = b.getServerStorage(0);
+                    final long stored = LoadBalancer.insert(java.util.List.of(sa, sb),
+                            StorageKey.of(Items.COBBLESTONE), 128L, LoadBalanceMode.ROUND_ROBIN);
+                    helper.assertTrue(stored == 128L, "round-robin should store all 128; got " + stored);
+                    helper.assertTrue(sa.count(Items.COBBLESTONE) == 64L && sb.count(Items.COBBLESTONE) == 64L,
+                            "round-robin should spread evenly (64/64); got "
+                                    + sa.count(Items.COBBLESTONE) + "/" + sb.count(Items.COBBLESTONE));
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void datacenterStation_bindsSectionAndSeesServers(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwIn = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbwEast = new BlockPos(4, 2, 2);
+        final BlockPos rack = new BlockPos(5, 2, 2);
+        final BlockPos station = new BlockPos(2, 3, 2); // on top of the input cable, on the network
+        placeRunningMainframe(helper, m);
+        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rack);
+        helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
+        if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)) {
+            helper.fail("no datacenter station");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    st.ensureBound();
+                    helper.assertTrue(st.network() != null, "the Station reads its segment's network");
+                    helper.assertTrue(st.section() != null, "the Station binds to the router's section");
+                    helper.assertTrue(st.sectionServers().size() == 1,
+                            "the bound section sees its one Server; got " + st.sectionServers().size());
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void datacenterStation_bindsTheBranchItSitsOn(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwIn = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbwEast = new BlockPos(4, 2, 2);
+        final BlockPos rackEast = new BlockPos(5, 2, 2);
+        final BlockPos hbwSouth = new BlockPos(3, 2, 3);
+        final BlockPos rackSouth = new BlockPos(3, 2, 4);
+        final BlockPos station = new BlockPos(4, 3, 2); // touching the EAST branch cable
+        placeRunningMainframe(helper, m);
+        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(hbwSouth, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rackEast);
+        seedServer(helper, rackSouth);
+        helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
+        if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)) {
+            helper.fail("no datacenter station");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    st.ensureBound();
+                    final DatacenterSection bound = st.section();
+                    helper.assertTrue(bound != null, "the Station binds a section");
+                    helper.assertTrue(bound.face() == Direction.EAST,
+                            "the Station must bind the branch it is cabled into (EAST); got " + bound.face());
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void datacenterStation_sectionScopedSelectPulls(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwIn = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hbwEast = new BlockPos(4, 2, 2);
+        final BlockPos rack = new BlockPos(5, 2, 2);
+        final BlockPos station = new BlockPos(2, 3, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rack);
+        helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
+        if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)
+                || !(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("missing station or rack");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 100);
+                    st.ensureBound();
+                })
+                .thenExecuteAfter(2, () -> {
+                    final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources =
+                            new java.util.HashSet<>(st.sectionServers());
+                    helper.assertTrue(!sources.isEmpty(), "the section resolves its Servers");
+                    final ItemStackHandler dest = new ItemStackHandler(9);
+                    final var op = mainframe.submitNetworkSelect(StorageKey.of(Items.COBBLESTONE), 40L,
+                            new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null),
+                            "datacenter", sources);
+                    helper.assertTrue(op != null, "the section-scoped SELECT is dispatched");
+                })
+                .thenExecuteAfter(10, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left == 60L,
+                            "the section-scoped SELECT pulled 40 from the section; left " + left);
+                })
+                .thenSucceed();
+    }
+
+    // Operation scheduling (parallel queues), LOCK contention, index maintenance
+
+    @GameTest(template = ARENA, timeoutTicks = 140)
+    public static void operationQueue_excessOpsStayPendingThenRun(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        final ItemStackHandler fullDest = fullHandler();
+        final ItemStackHandler goodDest = new ItemStackHandler(9);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    seededRack(helper).getServerStorage(0).insert(Items.COBBLESTONE, 100);
+                })
+                .thenExecuteAfter(2, () -> {
+                    // op1 occupies the single queue and stalls against the full destination.
+                    helper.assertTrue(mainframe.submitNetworkSelect(Items.COBBLESTONE, 40,
+                            port(fullDest), "full") != null, "op1 dispatched");
+                    // op2 is ready (60 unlocked cobblestone cover its 30) but has no free queue.
+                    helper.assertTrue(mainframe.submitNetworkSelect(Items.COBBLESTONE, 30,
+                            port(goodDest), "good") != null, "op2 dispatched");
+                })
+                .thenExecuteAfter(6, () -> {
+                    final var records = mainframe.activeOperationRecords();
+                    helper.assertTrue(records.size() == 2, "both ops in flight; got " + records.size());
+                    helper.assertTrue(records.get(0).status() == OperationRecord.STATUS_PROCESSING,
+                            "op1 holds the queue (PROCESSING); got " + records.get(0).status());
+                    helper.assertTrue(!records.get(0).subs().isEmpty(),
+                            "the streaming op exposes its SubOperation rows");
+                    helper.assertTrue(records.get(1).status() == OperationRecord.STATUS_PENDING,
+                            "op2 queues behind the single queue (PENDING); got " + records.get(1).status());
+                })
+                .thenExecuteAfter(90, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left == 70,
+                            "op1 moved nothing (full dest) and op2 moved its 30 after promotion; left " + left);
+                    final var log = mainframe.recentOperations();
+                    helper.assertTrue(log.size() >= 2, "both ops logged; got " + log.size());
+                    helper.assertTrue(log.get(0).status() == OperationRecord.STATUS_COMPLETED
+                                    && log.get(0).moved() == 30,
+                            "op2 completed its 30 after the queue freed");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 140)
+    public static void lockContention_waitsThenAcquiresWhenLockFrees(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        final ItemStackHandler fullDest = fullHandler();
+        final ItemStackHandler goodDest = new ItemStackHandler(9);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () ->
+                        seededRack(helper).getServerStorage(0).insert(Items.COBBLESTONE, 100))
+                .thenExecuteAfter(2, () -> {
+                    helper.assertTrue(mainframe.submitNetworkSelect(Items.COBBLESTONE, 100,
+                            port(fullDest), "full") != null, "the lock holder dispatched");
+                    helper.assertTrue(mainframe.submitNetworkSelect(Items.COBBLESTONE, 20,
+                            port(goodDest), "good") != null, "the contender dispatched");
+                })
+                .thenExecuteAfter(6, () -> {
+                    final var records = mainframe.activeOperationRecords();
+                    helper.assertTrue(records.size() == 2, "both ops in flight; got " + records.size());
+                    helper.assertTrue(records.get(1).status() == OperationRecord.STATUS_WAITING,
+                            "the contender WAITs on the holder's lock; got " + records.get(1).status());
+                })
+                .thenExecuteAfter(90, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left == 80,
+                            "the contender acquired the freed lock and moved its 20; left " + left);
+                    helper.assertTrue(mainframe.recentOperations().get(0).status()
+                                    == OperationRecord.STATUS_COMPLETED,
+                            "the contender completed after acquiring");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 120)
+    public static void lockContention_timesOutAsResourceLocked(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        final ItemStackHandler fullDest = fullHandler();
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () ->
+                        seededRack(helper).getServerStorage(0).insert(Items.COBBLESTONE, 100))
+                .thenExecuteAfter(2, () -> helper.assertTrue(
+                        mainframe.submitNetworkSelect(Items.COBBLESTONE, 100, port(fullDest), "full") != null,
+                        "the lock holder dispatched"))
+                .thenExecuteAfter(4, () -> {
+                    // All 100 are locked by the stalled holder: this contender starts WAITING.
+                    final var contender = new dev.jsc.jscomputronics.module.computing.operation
+                            .NetworkSelectOperation(helper.getLevel(), mainframe.networkUuid(),
+                            StorageKey.of(Items.COBBLESTONE), 50, port(new ItemStackHandler(9)), "test",
+                            OperationRecord.TYPE_SELECT, java.util.UUID.randomUUID(),
+                            mainframe.networkIndex(), null, 3);
+                    helper.assertTrue(contender.isWaiting(), "the contender starts WAITING");
+                    for (int i = 0; i < 5; i++) {
+                        contender.tick(1_000L); // retries past its 3-tick timeout
+                    }
+                    helper.assertTrue(contender.isDone(), "the wait timed out");
+                    helper.assertTrue(contender.status() == OperationRecord.STATUS_RESOURCE_LOCKED,
+                            "timeout settles as RESOURCE_LOCKED; got " + contender.status());
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void analyzeIncremental_tracksDirectStoreWrites(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () ->
+                        seededRack(helper).getServerStorage(0).insert(Items.COBBLESTONE, 30))
+                .thenExecuteAfter(2, () -> {
+                    helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 30,
+                            "the catalog sees the direct insert; got "
+                                    + mainframe.networkIndex().available(Items.COBBLESTONE));
+                    seededRack(helper).getServerStorage(0).extract(Items.COBBLESTONE, 10);
+                })
+                .thenExecuteAfter(2, () -> helper.assertTrue(
+                        mainframe.networkIndex().available(Items.COBBLESTONE) == 20,
+                        "the catalog sees the direct extract; got "
+                                + mainframe.networkIndex().available(Items.COBBLESTONE)))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void vacuum_freesGhostEntries(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () ->
+                        seededRack(helper).getServerStorage(0).insert(Items.COBBLESTONE, 50))
+                .thenExecuteAfter(2, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 50,
+                            "catalog populated before the ghost");
+                    final var system = NetworkSystem.get(helper.getLevel());
+                    final var node = system.serversOf(net).get(0).nodeUuid();
+                    // Unregister the server: its catalog rows are now ghosts (same tick, no re-scan yet).
+                    system.unregisterServer(net, node);
+                    final int freed = mainframe.networkIndex().vacuum(helper.getLevel(), net);
+                    helper.assertTrue(freed >= 1, "vacuum frees the ghost rows; freed " + freed);
+                    helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 0,
+                            "the ghost no longer answers queries");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void drop_typeDestroysOnlyTargetType(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    final ServerStore store = seededRack(helper).getServerStorage(0);
+                    store.insert(Items.COBBLESTONE, 50);
+                    store.insert(Items.DIRT, 30);
+                })
+                .thenExecuteAfter(2, () -> {
+                    final long destroyed = mainframe.networkIndex().dropType(helper.getLevel(),
+                            mainframe.networkUuid(), StorageKey.of(Items.COBBLESTONE), null);
+                    helper.assertTrue(destroyed == 50, "dropType destroys all 50 cobblestone; got " + destroyed);
+                    final ServerStore store = seededRack(helper).getServerStorage(0);
+                    helper.assertTrue(store.count(Items.COBBLESTONE) == 0, "the dropped type is gone");
+                    helper.assertTrue(store.count(Items.DIRT) == 30, "every other type is untouched");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void drop_allWipesNetworkAndIndexReflectsIt(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    final ServerStore store = seededRack(helper).getServerStorage(0);
+                    store.insert(Items.COBBLESTONE, 50);
+                    store.insert(Items.DIRT, 30);
+                })
+                .thenExecuteAfter(2, () -> {
+                    helper.assertTrue(mainframe.networkIndex().catalogSize() == 2,
+                            "two types catalogued before the wipe; got " + mainframe.networkIndex().catalogSize());
+                    final long destroyed = mainframe.networkIndex().dropAll(helper.getLevel(), mainframe.networkUuid());
+                    helper.assertTrue(destroyed == 80, "dropAll destroys all 80 units; got " + destroyed);
+                    helper.assertTrue(seededRack(helper).getServerStorage(0).used() == 0, "the server is emptied");
+                })
+                // The per-tick ANALYZE drops the now-empty rows from the catalog.
+                .thenExecuteAfter(2, () -> helper.assertTrue(mainframe.networkIndex().catalogSize() == 0,
+                        "the index reflects the wiped network; got " + mainframe.networkIndex().catalogSize()))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void maintenance_indexStatsReflectNetwork(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = storageNetwork(helper);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    final ServerStore store = seededRack(helper).getServerStorage(0);
+                    store.insert(Items.COBBLESTONE, 50);
+                    store.insert(Items.DIRT, 30);
+                })
+                .thenExecuteAfter(2, () -> {
+                    final var index = mainframe.networkIndex();
+                    helper.assertTrue(index.catalogSize() == 2, "2 types; got " + index.catalogSize());
+                    helper.assertTrue(index.indexedServerCount() == 1, "1 server; got " + index.indexedServerCount());
+                    helper.assertTrue(index.activeLockCount() == 0, "no locks idle; got " + index.activeLockCount());
+                    helper.assertTrue(mainframe.indexedTypes() == 2 && mainframe.indexedServers() == 1,
+                            "the host exposes the same stats to the terminal");
+                })
+                .thenSucceed();
+    }
+
+    private static MainframeBlockEntity storageNetwork(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, new BlockPos(1, 2, 2));
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.SERVER_RACK.get());
+        seedServer(helper, new BlockPos(3, 2, 2));
+        return mainframe;
+    }
+
+    private static ServerRackBlockEntity seededRack(final GameTestHelper helper) {
+        if (helper.getBlockEntity(new BlockPos(3, 2, 2)) instanceof ServerRackBlockEntity rack) {
+            return rack;
+        }
+        throw new IllegalStateException("no rack at (3,2,2)");
+    }
+
+    private static ItemStackHandler fullHandler() {
+        final ItemStackHandler handler = new ItemStackHandler(1);
+        handler.setStackInSlot(0, new ItemStack(Items.STICK, 64));
+        return handler;
+    }
+
+    private static dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort port(
+            final ItemStackHandler handler) {
+        return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(handler, null);
+    }
+
+    private static void seedServer(final GameTestHelper helper, final BlockPos rack) {
+        if (helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe) {
+            rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        } else {
+            helper.fail("no server rack at " + rack);
+        }
     }
 
     private static PersonalComputerBlockEntity placeRunningPC(final GameTestHelper helper, final BlockPos relative) {

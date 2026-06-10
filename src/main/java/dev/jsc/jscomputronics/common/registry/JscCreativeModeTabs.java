@@ -50,6 +50,8 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.HBW_CABLE_ITEM.get());
                         output.accept(ComputingModule.PERIPHERAL_CABLE_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_ROUTER_ITEM.get());
+                        output.accept(ComputingModule.SERVER_ROUTER_ITEM.get());
+                        output.accept(ComputingModule.DATACENTER_STATION_ITEM.get());
                         output.accept(ComputingModule.MAINFRAME_ITEM.get());
                         output.accept(ComputingModule.MONITOR_ITEM.get());
                         output.accept(ComputingModule.TANK_ITEM.get());

@@ -35,6 +35,7 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     public static final int TAB_NETWORK = 2;
     public static final int TAB_OPS = 3;
     public static final int TAB_TASKS = 4;
+    public static final int TAB_MAINTENANCE = 5;
 
     // Slot layout (relative to the screen's top-left). The screen draws the slot
     // backgrounds and the inventory at these exact positions.
@@ -44,10 +45,11 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     public static final int INV_X = 41;
     public static final int INV_Y = 148;
     public static final int HOTBAR_Y = 206;
+    public static final int MAINFRAME_INV_DROP = 22;
 
     private static final double MONITOR_REACH = 16.0;
 
-    private static final int DATA_COUNT = 24;
+    private static final int DATA_COUNT = 29;
     private static final int DATA_USABLE_SLOTS = 18;
 
     private final Level level;
@@ -62,6 +64,8 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     private boolean initialDataSent;
 
     private int activeTab;
+
+    private final int invDrop;
 
     private java.util.List<NetworkItemEntry> networkItems = java.util.List.of();
 
@@ -114,11 +118,12 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
         this.monitorPos = monitorPos.immutable();
         // Open on the player's last-used tab; fall back to Network, and never land on the
         // Mainframe-only Task Manager when the host is a plain computer.
-        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_TASKS ? initialTab : TAB_NETWORK;
-        if (tab == TAB_TASKS && (host == null || !host.isMainframeHost())) {
+        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_MAINTENANCE ? initialTab : TAB_NETWORK;
+        if ((tab == TAB_TASKS || tab == TAB_MAINTENANCE) && (host == null || !host.isMainframeHost())) {
             tab = TAB_NETWORK;
         }
         this.activeTab = tab;
+        this.invDrop = host != null && host.isMainframeHost() ? MAINFRAME_INV_DROP : 0;
 
         // The Storage tab is now a disk-backed quantity view (like the Network tab), not vanilla
         // slots, so the menu holds only the player inventory; local items are synced via snapshot.
@@ -130,12 +135,24 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     private void addPlayerInventory(final Inventory inventory) {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, INV_X + col * 18, INV_Y + row * 18));
+                addSlot(new Slot(inventory, col + row * 9 + 9, INV_X + col * 18, INV_Y + invDrop + row * 18));
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, INV_X + col * 18, HOTBAR_Y));
+            addSlot(new Slot(inventory, col, INV_X + col * 18, HOTBAR_Y + invDrop));
         }
+    }
+
+    public int invY() {
+        return INV_Y + invDrop;
+    }
+
+    public int hotbarY() {
+        return HOTBAR_Y + invDrop;
+    }
+
+    public int invDrop() {
+        return invDrop;
     }
 
     @Nullable
@@ -180,6 +197,11 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
             case 21 -> host.completedOperations();
             case 22 -> host.networkPcCount();
             case 23 -> host.networkSubframeCount();
+            case 24 -> host.indexedTypes();
+            case 25 -> host.indexedServers();
+            case 26 -> host.activeLocks();
+            case 27 -> clampInt(host.networkStorageUsed());
+            case 28 -> clampInt(host.networkStorageTotal());
             default -> 0;
         };
     }
@@ -200,7 +222,7 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
-        if (id >= TAB_LOCAL && id <= TAB_TASKS) {
+        if (id >= TAB_LOCAL && id <= TAB_MAINTENANCE) {
             this.activeTab = id;
             // Remember the tab on the Monitor so reopening this terminal lands here again.
             if (level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor) {
@@ -226,6 +248,11 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
             } else if (id == TAB_OPS || id == TAB_TASKS) {
                 ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
+            } else if (id == TAB_MAINTENANCE) {
+                // The DROP popup needs the network's data types (the TYPES grid) and the list of
+                // Servers it can wipe (the SERVER picker); the index stats arrive via ContainerData.
+                ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
+                ComputingPayloads.dispatchNetworkServers(serverPlayer, host.networkUuid(), serverLevel);
             }
         }
     }
@@ -391,6 +418,26 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     public boolean mainframeHost() {
         return data.get(17) != 0;
+    }
+
+    public int indexedTypes() {
+        return data.get(24);
+    }
+
+    public int indexedServers() {
+        return data.get(25);
+    }
+
+    public int activeLocks() {
+        return data.get(26);
+    }
+
+    public long networkStorageUsed() {
+        return data.get(27);
+    }
+
+    public long networkStorageTotal() {
+        return data.get(28);
     }
 
     public int usableStorageSlots() {

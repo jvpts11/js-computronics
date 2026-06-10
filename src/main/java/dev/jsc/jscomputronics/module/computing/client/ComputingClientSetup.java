@@ -30,6 +30,8 @@ public final class ComputingClientSetup {
         event.register(ComputingModule.MAINFRAME_MENU.get(), MainframeScreen::new);
         event.register(ComputingModule.PERSONAL_COMPUTER_MENU.get(), PersonalComputerScreen::new);
         event.register(ComputingModule.SERVER_RACK_MENU.get(), ServerRackScreen::new);
+        event.register(ComputingModule.SERVER_ROUTER_MENU.get(), ServerRouterScreen::new);
+        event.register(ComputingModule.DATACENTER_STATION_MENU.get(), DatacenterStationScreen::new);
         event.register(ComputingModule.SERVER_ASSEMBLY_MENU.get(), ServerAssemblyScreen::new);
         event.register(ComputingModule.COMPUTER_TERMINAL_MENU.get(), ComputerTerminalScreen::new);
         event.register(ComputingModule.EXPORT_BUS_MENU.get(), ExportBusScreen::new);

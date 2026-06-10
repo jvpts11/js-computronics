@@ -58,6 +58,19 @@ public final class NetworkStorage {
         return new NetworkStorage(entries);
     }
 
+    public static NetworkStorage ofServers(final ServerLevel level, final java.util.Collection<NodeUuid> nodes) {
+        final NetworkSystem system = NetworkSystem.get(level);
+        final List<Entry> entries = new ArrayList<>();
+        for (final NodeUuid node : nodes) {
+            system.locationOf(node).ifPresent(loc -> {
+                if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+                    entries.add(new Entry(node, rack.getServerStorage(loc.slot())));
+                }
+            });
+        }
+        return new NetworkStorage(entries);
+    }
+
     public Map<StorageKey, Long> query() {
         final Map<StorageKey, Long> totals = new HashMap<>();
         for (final Entry entry : entries) {

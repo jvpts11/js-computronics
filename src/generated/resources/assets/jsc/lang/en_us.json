@@ -1,5 +1,6 @@
 {
   "block.jsc.coal_generator": "Coal Generator",
+  "block.jsc.datacenter_station": "Datacenter Station",
   "block.jsc.ethernet_cable": "Ethernet Cable",
   "block.jsc.hbw_cable": "HBW Cable",
   "block.jsc.macerator": "Macerator",
@@ -13,6 +14,7 @@
   "block.jsc.personal_computer": "Personal Computer",
   "block.jsc.personal_router": "Personal Router",
   "block.jsc.server_rack": "Server Rack",
+  "block.jsc.server_router": "Server Router",
   "block.jsc.tank": "Tank",
   "item.jsc.cpu_ascent_965": "Velocion Ascent X4 965",
   "item.jsc.cpu_servo_2620": "Integra Servo 2620",

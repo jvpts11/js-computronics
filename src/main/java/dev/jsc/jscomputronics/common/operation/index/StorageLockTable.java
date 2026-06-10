@@ -107,6 +107,10 @@ public final class StorageLockTable<K> {
         return byOperation.containsKey(operation);
     }
 
+    public int lockingOperationCount() {
+        return byOperation.size();
+    }
+
     public void clear() {
         byOperation.clear();
         aggregate.clear();

@@ -384,4 +384,41 @@ class ConnectivityIndexTest {
         assertEquals(1, index.componentCount());
         assertTrue(index.contains(pos(0, 0, 0)));
     }
+
+    @Test
+    void reachableFrom_blockingRouter_isolatesOneBranch() {
+        // A router R at the centre with two cable branches; blocking R separates the branches —
+        // this is how a Server Router computes one datacenter section per output face.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());                // router R
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));    // branch A: A1
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));    // A2
+        index.onCablePlaced(pos(-1, 0, 0), Set.of(pos(0, 0, 0)));   // branch B: B1
+        index.onCablePlaced(pos(-2, 0, 0), Set.of(pos(-1, 0, 0)));  // B2
+
+        var branchA = index.reachableFrom(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        assertEquals(2, branchA.size());
+        assertTrue(branchA.contains(pos(1, 0, 0)));
+        assertTrue(branchA.contains(pos(2, 0, 0)));
+        assertFalse(branchA.contains(pos(0, 0, 0)), "the blocked router is never entered");
+        assertFalse(branchA.contains(pos(-1, 0, 0)), "the other branch is unreachable across the router");
+    }
+
+    @Test
+    void reachableFrom_withoutBlock_spansWholeComponent() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        index.onCablePlaced(pos(-1, 0, 0), Set.of(pos(0, 0, 0)));
+        assertEquals(3, index.reachableFrom(pos(1, 0, 0), Set.of()).size());
+    }
+
+    @Test
+    void reachableFrom_blockedStart_isEmpty() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        assertTrue(index.reachableFrom(pos(0, 0, 0), Set.of(pos(0, 0, 0))).isEmpty());
+    }
+
+    @Test
+    void reachableFrom_unregisteredStart_isEmpty() {
+        assertTrue(index.reachableFrom(pos(7, 7, 7), Set.of()).isEmpty());
+    }
 }

@@ -122,6 +122,9 @@ public final class ServerStore {
 
     private void write(final Map<StorageKey, Long> items) {
         server().set(ComputingModule.SERVER_STORAGE.get(), new ServerStorageContents(items));
+        // An in-place component write never passes through the item handler, so bump the bay's
+        // change counter here — this is what lets the NetworkIndex re-read only changed bays.
+        rack.markStorageChanged(serverSlot);
         rack.setChanged();
     }
 }

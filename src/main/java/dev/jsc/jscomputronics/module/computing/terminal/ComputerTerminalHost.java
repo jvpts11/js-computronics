@@ -75,5 +75,25 @@ public interface ComputerTerminalHost {
         return 0;
     }
 
+    default int indexedTypes() {
+        return 0;
+    }
+
+    default int indexedServers() {
+        return 0;
+    }
+
+    default int activeLocks() {
+        return 0;
+    }
+
+    default long networkStorageUsed() {
+        return 0L;
+    }
+
+    default long networkStorageTotal() {
+        return 0L;
+    }
+
     boolean isMainframeHost();
 }

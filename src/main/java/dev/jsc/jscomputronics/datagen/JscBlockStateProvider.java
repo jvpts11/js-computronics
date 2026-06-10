@@ -74,6 +74,12 @@ public class JscBlockStateProvider extends BlockStateProvider {
         simpleBlock(ComputingModule.PERSONAL_ROUTER.get(),
                 models().cubeAll("personal_router", modLoc("block/personal_router")));
 
+        simpleBlock(ComputingModule.SERVER_ROUTER.get(),
+                models().cubeAll("server_router", modLoc("block/server_router")));
+
+        simpleBlock(ComputingModule.DATACENTER_STATION.get(),
+                models().cubeAll("datacenter_station", modLoc("block/datacenter_station")));
+
         // Tank: glass walls in a metal casing frame, so it reads as a containment vessel rather than a
         simpleBlock(ComputingModule.TANK.get(), models()
                 .cubeBottomTop("tank", mcLoc("block/glass"),

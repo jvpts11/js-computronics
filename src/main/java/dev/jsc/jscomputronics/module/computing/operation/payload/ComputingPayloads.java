@@ -17,16 +17,26 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
+import dev.jsc.jscomputronics.module.computing.datacenter.LoadBalancer;
+import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
+import dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu;
+import dev.jsc.jscomputronics.module.computing.menu.DatacenterStationMenu;
+import net.minecraft.network.chat.Component;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.Item;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -88,6 +98,219 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleLocalUpload);
         registrar.playToServer(RenamePcPayload.TYPE, RenamePcPayload.STREAM_CODEC,
                 ComputingPayloads::handleRenamePc);
+        registrar.playToServer(RenameServerRouterPayload.TYPE, RenameServerRouterPayload.STREAM_CODEC,
+                ComputingPayloads::handleRenameServerRouter);
+        registrar.playToClient(DatacenterSnapshotPayload.TYPE, DatacenterSnapshotPayload.STREAM_CODEC,
+                ComputingPayloads::handleDatacenterSnapshot);
+        registrar.playToServer(DatacenterStationActionPayload.TYPE, DatacenterStationActionPayload.STREAM_CODEC,
+                ComputingPayloads::handleDatacenterAction);
+        registrar.playToServer(DatacenterSelectPayload.TYPE, DatacenterSelectPayload.STREAM_CODEC,
+                ComputingPayloads::handleDatacenterSelect);
+        registrar.playToServer(TerminalMaintenancePayload.TYPE, TerminalMaintenancePayload.STREAM_CODEC,
+                ComputingPayloads::handleTerminalMaintenance);
+        registrar.playToServer(TerminalDropPayload.TYPE, TerminalDropPayload.STREAM_CODEC,
+                ComputingPayloads::handleTerminalDrop);
+    }
+
+    private static void handleRenameServerRouter(final RenameServerRouterPayload payload,
+                                                 final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.containerMenu instanceof ServerRouterMenu menu
+                    && menu.routerPos().equals(payload.routerPos())
+                    && player.level().getBlockEntity(payload.routerPos())
+                            instanceof ServerRouterBlockEntity router) {
+                router.setCustomName(payload.name());
+            }
+        });
+    }
+
+    private static void handleDatacenterSnapshot(final DatacenterSnapshotPayload payload,
+                                                 final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof DatacenterStationMenu menu) {
+                menu.setSnapshot(payload);
+            }
+        });
+    }
+
+    private static void handleDatacenterAction(final DatacenterStationActionPayload payload,
+                                               final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof DatacenterStationMenu menu)
+                    || !menu.stationPos().equals(payload.stationPos())
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.stationPos()) instanceof DatacenterStationBlockEntity station)) {
+                return;
+            }
+            switch (payload.action()) {
+                case DatacenterStationActionPayload.ACTION_NEXT_SECTION -> station.bindNext();
+                case DatacenterStationActionPayload.ACTION_CYCLE_BALANCE -> station.cycleLoadBalanceMode();
+                case DatacenterStationActionPayload.ACTION_INSERT_CURSOR -> depositCursor(menu, station, level, false);
+                case DatacenterStationActionPayload.ACTION_INSERT_CURSOR_ONE -> depositCursor(menu, station, level, true);
+                default -> {
+                    // ACTION_REFRESH: just re-send the snapshot below.
+                }
+            }
+            sendDatacenterSnapshot(player, level, station);
+        });
+    }
+
+    private static void depositCursor(final DatacenterStationMenu menu, final DatacenterStationBlockEntity station,
+                                      final ServerLevel level, final boolean single) {
+        final ItemStack cursor = menu.getCarried();
+        if (cursor.isEmpty()) {
+            return;
+        }
+        final List<NodeUuid> servers = station.sectionServers();
+        final List<ServerStore> stores = sectionStores(level, servers);
+        if (stores.isEmpty()) {
+            return;
+        }
+        final StorageKey key = StorageKey.of(cursor);
+        final long want = single ? 1L : cursor.getCount();
+        final long stored = LoadBalancer.insert(stores, key, want, station.loadBalanceMode());
+        if (stored > 0L) {
+            cursor.shrink((int) stored);
+            menu.setCarried(cursor.isEmpty() ? ItemStack.EMPTY : cursor);
+            // The cursor changed outside a normal slot click; without a broadcast the client keeps
+            // showing the old stack (a ghost cursor).
+            menu.broadcastChanges();
+        }
+    }
+
+    private static List<ServerStore> sectionStores(final ServerLevel level, final List<NodeUuid> servers) {
+        final NetworkSystem system = NetworkSystem.get(level);
+        final List<ServerStore> stores = new ArrayList<>();
+        for (final NodeUuid node : servers) {
+            system.locationOf(node).ifPresent(loc -> {
+                if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+                    stores.add(rack.getServerStorage(loc.slot()));
+                }
+            });
+        }
+        return stores;
+    }
+
+    public static void sendDatacenterSnapshot(final ServerPlayer player, final ServerLevel level,
+                                              final DatacenterStationBlockEntity station) {
+        if (player == null || player.isRemoved()) {
+            return;
+        }
+        final List<NodeUuid> servers = station.sectionServers();
+        final List<ServerStore> stores = sectionStores(level, servers);
+
+        final Map<StorageKey, Long> totals = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
+                .ofServers(level, servers).query();
+        final List<NetworkItemEntry> items = new ArrayList<>(Math.min(totals.size(), DatacenterSnapshotPayload.MAX_ITEMS));
+        totals.entrySet().stream().limit(DatacenterSnapshotPayload.MAX_ITEMS)
+                .forEach(e -> items.add(new NetworkItemEntry(e.getKey(), e.getValue())));
+
+        // The "giant computer" view: the section's Servers summed into one machine — storage,
+        // orchestration capacity (CPU) and RAM buffer — plus a per-Server line with its real name.
+        long used = 0L;
+        long total = 0L;
+        long cpu = 0L;
+        long ram = 0L;
+        final NetworkSystem sys = NetworkSystem.get(level);
+        final List<DatacenterSnapshotPayload.ServerLine> lines = new ArrayList<>();
+        for (int i = 0; i < servers.size() && i < DatacenterSnapshotPayload.MAX_SERVERS; i++) {
+            final NodeUuid node = servers.get(i);
+            final ServerStore store = i < stores.size() ? stores.get(i) : null;
+            final long u = store == null ? 0L : store.usedWeight();
+            final long t = store == null ? 0L : store.capacityWeight();
+            used += u;
+            total += t;
+            String name = "srv-" + node.asString().substring(0, 4);
+            final var loc = sys.locationOf(node);
+            if (loc.isPresent()
+                    && level.getBlockEntity(BlockPos.of(loc.get().rackPos())) instanceof ServerRackBlockEntity rack) {
+                final ItemStack stack = rack.getServers().getStackInSlot(loc.get().slot());
+                final var build = dev.jsc.jscomputronics.module.computing.item.ServerItem.build(stack);
+                if (build != null) {
+                    cpu += build.totalCapacity();
+                    ram += build.ramBuffer();
+                }
+                final String custom = dev.jsc.jscomputronics.module.computing.item.ServerItem.customName(stack);
+                if (!custom.isEmpty()) {
+                    name = custom;
+                }
+            }
+            lines.add(new DatacenterSnapshotPayload.ServerLine(name, u, t));
+        }
+
+        // Operations in flight on the network's Mainframe (the orchestrator the section runs under).
+        int activeOps = 0;
+        final BlockPos mfPosForOps = station.mainframePos();
+        if (mfPosForOps != null && level.getBlockEntity(mfPosForOps) instanceof MainframeBlockEntity mf) {
+            activeOps = mf.activeOperationRecords().size();
+        }
+
+        // MOVE destinations: the network's computers with local storage (PCs + the Mainframe).
+        final List<DatacenterSnapshotPayload.DestEntry> dests = new ArrayList<>();
+        final NetworkUuid net = station.network();
+        if (net != null) {
+            final NetworkSystem system = NetworkSystem.get(level);
+            for (final var pc : system.personalComputersOf(net)) {
+                if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe
+                        && pcBe.localStorageCapacity() > 0L) {
+                    final String name = pcBe.customName().isEmpty()
+                            ? "PC-" + pc.nodeUuid().asString().substring(0, 4) : pcBe.customName();
+                    dests.add(new DatacenterSnapshotPayload.DestEntry(pc.pos(), name));
+                }
+            }
+            system.mainframePositionOf(net).ifPresent(mfPos -> {
+                if (level.getBlockEntity(BlockPos.of(mfPos))
+                        instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host
+                        && host.localStorageCapacity() > 0L) {
+                    dests.add(new DatacenterSnapshotPayload.DestEntry(mfPos, "Mainframe"));
+                }
+            });
+        }
+
+        PacketDistributor.sendToPlayer(player, new DatacenterSnapshotPayload(
+                station.sectionLabel(), servers.size(), used, total,
+                station.loadBalanceMode().ordinal(), station.availableSections().size(),
+                cpu, ram, activeOps, items, lines, dests));
+    }
+
+    private static void handleDatacenterSelect(final DatacenterSelectPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (payload.quantity() <= 0L) {
+                return; // never dispatch a zero/negative pull (a broken or hostile client)
+            }
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof DatacenterStationMenu menu)
+                    || !menu.stationPos().equals(payload.stationPos())
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.stationPos()) instanceof DatacenterStationBlockEntity station)) {
+                return;
+            }
+            final BlockPos mainframePos = station.mainframePos();
+            if (mainframePos == null
+                    || !(level.getBlockEntity(mainframePos) instanceof MainframeBlockEntity mainframe)
+                    || !(level.getBlockEntity(BlockPos.of(payload.destPos()))
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost dest)) {
+                return;
+            }
+            // The destination must live on the STATION'S network — the client only ever picks from the
+            // snapshot's list, so any other position is a spoofed packet reaching into a foreign network.
+            final NetworkUuid stationNet = station.network();
+            if (stationNet == null || !stationNet.equals(dest.networkUuid())) {
+                return;
+            }
+            final java.util.Set<NodeUuid> sources = new java.util.HashSet<>(station.sectionServers());
+            if (sources.isEmpty()) {
+                return;
+            }
+            final var op = mainframe.submitNetworkMove(payload.key(), payload.quantity(),
+                    dest.localStorage(), "datacenter", sources);
+            if (op != null) {
+                op.onSettle(() -> sendDatacenterSnapshot(player, level, station));
+            }
+            sendDatacenterSnapshot(player, level, station);
+        });
     }
 
     private static void handleRenamePc(final RenamePcPayload payload, final IPayloadContext context) {
@@ -187,6 +410,123 @@ public final class ComputingPayloads {
     public static boolean networkHasActiveOps(final ServerLevel level, final NetworkUuid network) {
         final MainframeBlockEntity mainframe = resolveMainframe(level, network);
         return mainframe != null && mainframe.hasActiveOperations();
+    }
+
+    private static void handleTerminalMaintenance(final TerminalMaintenancePayload payload,
+                                                  final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host == null || !host.isMainframeHost() || host.networkUuid() == null
+                    || !(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            final NetworkUuid net = host.networkUuid();
+            final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+            if (mainframe == null) {
+                return;
+            }
+            final dev.jsc.jscomputronics.module.computing.operation.NetworkIndex index = mainframe.networkIndex();
+            byte opType;
+            long count;
+            ItemStack icon;
+            String message;
+            switch (payload.action()) {
+                case TerminalMaintenancePayload.ACTION_ANALYZE -> {
+                    index.analyzeIncremental(level, net);
+                    opType = OperationRecord.TYPE_ANALYZE;
+                    count = index.catalogSize();
+                    icon = labelledIcon(Items.SPYGLASS, "index");
+                    message = "ANALYZE complete - " + count + " types reconciled";
+                }
+                case TerminalMaintenancePayload.ACTION_REINDEX -> {
+                    index.rebuild(level, net);
+                    opType = OperationRecord.TYPE_REINDEX;
+                    count = index.catalogSize();
+                    icon = labelledIcon(Items.COMPASS, "index");
+                    message = "REINDEX complete - catalog rebuilt from disks";
+                }
+                case TerminalMaintenancePayload.ACTION_VACUUM -> {
+                    final int freed = index.vacuum(level, net);
+                    opType = OperationRecord.TYPE_VACUUM;
+                    count = freed;
+                    icon = labelledIcon(Items.HOPPER, "ghost rows");
+                    message = "VACUUM freed " + freed + (freed == 1 ? " ghost entry" : " ghost entries");
+                }
+                default -> {
+                    return;
+                }
+            }
+            // Index maintenance is instantaneous; log it COMPLETED so the Operations tab records that it ran.
+            mainframe.recordOperation(opType, icon, count, count,
+                    OperationRecord.STATUS_COMPLETED, java.util.List.of());
+            player.displayClientMessage(Component.literal(message), true);
+            dispatchTerminalQuery(player, net, level); // the catalog may have changed — refresh the grid
+        });
+    }
+
+    private static void handleTerminalDrop(final TerminalDropPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host == null || !host.isMainframeHost() || host.networkUuid() == null
+                    || !(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            final NetworkUuid net = host.networkUuid();
+            final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+            if (mainframe == null) {
+                return;
+            }
+            final dev.jsc.jscomputronics.module.computing.operation.NetworkIndex index = mainframe.networkIndex();
+            long destroyed = 0L;
+            String label;
+            StorageKey recordKey;
+            switch (payload.scope()) {
+                case TerminalDropPayload.SCOPE_NETWORK -> {
+                    destroyed = index.dropAll(level, net);
+                    label = "the network";
+                    recordKey = StorageKey.of(labelledIcon(Items.TNT, "network"));
+                }
+                case TerminalDropPayload.SCOPE_SERVER -> {
+                    if (payload.serverKey().isEmpty()) {
+                        return;
+                    }
+                    final NodeUuid node;
+                    try {
+                        node = NodeUuid.fromString(payload.serverKey());
+                    } catch (final IllegalArgumentException malformed) {
+                        return;
+                    }
+                    destroyed = index.dropServer(level, node);
+                    label = "a server";
+                    recordKey = StorageKey.of(labelledIcon(Items.TNT, serverLabel(level, node)));
+                }
+                case TerminalDropPayload.SCOPE_TYPES -> {
+                    for (final StorageKey key : payload.types()) {
+                        destroyed += index.dropType(level, net, key, null);
+                    }
+                    final int n = payload.types().size();
+                    label = n + (n == 1 ? " type" : " types");
+                    // A single-type DROP shows that data's real icon; many types collapse to a tagged marker.
+                    recordKey = n == 1 ? payload.types().get(0) : StorageKey.of(labelledIcon(Items.TNT, n + " types"));
+                }
+                default -> {
+                    return;
+                }
+            }
+            mainframe.recordOperation(new OperationRecord(OperationRecord.TYPE_DROP, recordKey,
+                    destroyed, destroyed, OperationRecord.STATUS_COMPLETED, java.util.List.of()));
+            player.displayClientMessage(Component.literal(
+                    "DROP destroyed " + destroyed + " from " + label), true);
+            dispatchTerminalQuery(player, net, level);
+        });
+    }
+
+    private static ItemStack labelledIcon(final net.minecraft.world.item.Item item, final String label) {
+        final ItemStack stack = new ItemStack(item);
+        stack.set(DataComponents.CUSTOM_NAME, Component.literal(label));
+        return stack;
     }
 
     private static MainframeBlockEntity resolveMainframe(final ServerLevel level, final NetworkUuid network) {
@@ -517,6 +857,29 @@ public final class ComputingPayloads {
             }
         }
         return new NetworkServersPayload(rows);
+    }
+
+    private static NetworkServersPayload collectServers(final ServerLevel level, final NetworkUuid net) {
+        final NetworkSystem system = NetworkSystem.get(level);
+        final List<NetworkServersPayload.ServerEntry> rows = new ArrayList<>();
+        for (final ServerNode server : system.serversOf(net)) {
+            if (rows.size() >= NetworkServersPayload.MAX) {
+                break;
+            }
+            final NodeUuid node = server.nodeUuid();
+            final long free = system.locationOf(node)
+                    .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
+                            ? rack.getServerStorage(loc.slot()).free() : 0L)
+                    .orElse(0L);
+            rows.add(new NetworkServersPayload.ServerEntry(node.asString(), serverLabel(level, node), free));
+        }
+        return new NetworkServersPayload(rows);
+    }
+
+    public static void dispatchNetworkServers(final ServerPlayer player, final NetworkUuid net,
+                                              final ServerLevel level) {
+        PacketDistributor.sendToPlayer(player, collectServers(level, net));
     }
 
     private static String pcLabel(final PersonalComputerBlockEntity pc, final NodeUuid node) {

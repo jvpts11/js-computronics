@@ -12,7 +12,9 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntr
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RequestServerBreakdownPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalDropPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalInsertPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalMaintenancePayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalDepositPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalUploadPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalWithdrawPayload;
@@ -62,7 +64,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final int RAIL_X = 4;
     private static final int RAIL_W = 56;
     private static final int TAB_Y0 = 6;
-    private static final int TAB_H = 28;
+    private static final int TAB_H = 27;
     private static final int CONTENT_X = 63;
 
     // Network item grid (a virtual grid — not real slots; rendered from the snapshot).
@@ -85,7 +87,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final int DEPOSIT_W = NET_COLS * 18 - 2;
     private static final int DEPOSIT_H = 14;
 
-    private static final String[] TAB_NAMES = {"Local", "Storage", "Network", "Operations", "Tasks"};
+    private static final String[] TAB_NAMES = {"Local", "Storage", "Network", "Operations", "Tasks", "Maint"};
 
     private int netScrollRow;
     private int selectedOp;
@@ -124,11 +126,33 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final int OP_POPUP_ROWS = 7;
     private static final int TASK_OP_ROWS = 4;
 
+    // Maintenance tab layout (content-relative Y offsets from the content top cy).
+    private static final int MNT_TILE_ROW1_Y = 32;
+    private static final int MNT_TILE_ROW2_Y = 56;
+    private static final int MNT_TILE_H = 22;
+    private static final int MNT_ACTIONS_Y = 82;
+    private static final int MNT_BTN_ROW1_Y = 94;    // ANALYZE | VACUUM
+    private static final int MNT_BTN_REINDEX_Y = 112;
+    private static final int MNT_BTN_DROP_Y = 130;
+    private static final int MNT_BTN_H = 15;
+
+    private boolean dropOpen;
+    private int dropScope = TerminalDropPayload.SCOPE_NETWORK;
+    private final Set<StorageKey> dropTypes = new java.util.LinkedHashSet<>();
+    private int dropServerIndex;
+    private int dropTypeScrollRow;
+    private String maintHint = "";
+    private static final int DROP_W = 206;
+    private static final int DROP_H = 146;
+    private static final int DROP_GRID_COLS = 9;
+    private static final int DROP_GRID_ROWS = 3;
+
     public ComputerTerminalScreen(final ComputerTerminalMenu menu, final Inventory inventory,
                                   final Component title) {
         super(menu, inventory, title);
         this.imageWidth = 244;
-        this.imageHeight = 230;
+        // The Mainframe terminal is taller: its tab rail holds a 6th (Maintenance) tab.
+        this.imageHeight = 230 + menu.invDrop();
         // The terminal draws all of its own labels.
         this.titleLabelX = -10000;
         this.inventoryLabelY = -10000;
@@ -205,7 +229,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private int tabCount() {
-        return menu.mainframeHost() ? 5 : 4;
+        return menu.mainframeHost() ? 6 : 4;
     }
 
     private int contentW() {
@@ -222,9 +246,10 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.fill(x - 1, y - 1, x + imageWidth + 1, y + imageHeight + 1, OUTER);
         g.fill(x, y, x + imageWidth, y + imageHeight, SCREEN);
 
-        // Tab rail.
-        g.fill(x + RAIL_X, y + TAB_Y0, x + RAIL_X + RAIL_W, y + TAB_Y0 + 140, RAIL);
-        g.fill(x + RAIL_X + RAIL_W, y + TAB_Y0, x + RAIL_X + RAIL_W + 1, y + TAB_Y0 + 140, LINE);
+        // Tab rail — its height tracks the inventory (taller on the Mainframe's 6-tab terminal).
+        final int railH = menu.invY() - TAB_Y0 - 2;
+        g.fill(x + RAIL_X, y + TAB_Y0, x + RAIL_X + RAIL_W, y + TAB_Y0 + railH, RAIL);
+        g.fill(x + RAIL_X + RAIL_W, y + TAB_Y0, x + RAIL_X + RAIL_W + 1, y + TAB_Y0 + railH, LINE);
         for (int i = 0; i < tabCount(); i++) {
             final int tx = x + RAIL_X;
             final int ty = y + TAB_Y0 + i * TAB_H;
@@ -249,17 +274,18 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case ComputerTerminalMenu.TAB_NETWORK -> networkBg(g, x, y);
             case ComputerTerminalMenu.TAB_OPS -> opsBg(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_TASKS -> tasksBg(g, cx, cy, cw);
+            case ComputerTerminalMenu.TAB_MAINTENANCE -> maintenanceBg(g, cx, cy, cw, mouseX, mouseY);
             default -> { /* nothing */ }
         }
 
-        // Player inventory backgrounds (always visible).
+        // Player inventory backgrounds (always visible; the Mainframe's sit lower).
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                slotBg(g, x + ComputerTerminalMenu.INV_X + col * 18, y + ComputerTerminalMenu.INV_Y + row * 18);
+                slotBg(g, x + ComputerTerminalMenu.INV_X + col * 18, y + menu.invY() + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            slotBg(g, x + ComputerTerminalMenu.INV_X + col * 18, y + ComputerTerminalMenu.HOTBAR_Y);
+            slotBg(g, x + ComputerTerminalMenu.INV_X + col * 18, y + menu.hotbarY());
         }
     }
 
@@ -359,6 +385,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case ComputerTerminalMenu.TAB_NETWORK -> networkLabels(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_OPS -> opsLabels(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_TASKS -> tasksLabels(g, cx, cy, cw);
+            case ComputerTerminalMenu.TAB_MAINTENANCE -> maintenanceLabels(g, cx, cy, cw);
             default -> placeholder(g, cx, cy, "Not available yet");
         }
     }
@@ -578,8 +605,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static int statusColor(final byte status) {
         return switch (status) {
             case OperationRecord.STATUS_COMPLETED -> GREEN;
-            case OperationRecord.STATUS_PARTIAL -> AMBER;
+            case OperationRecord.STATUS_PARTIAL, OperationRecord.STATUS_WAITING -> AMBER;
             case OperationRecord.STATUS_PROCESSING -> ACCENT2;
+            case OperationRecord.STATUS_PENDING -> DIM;
             default -> RED;
         };
     }
@@ -589,6 +617,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case OperationRecord.STATUS_COMPLETED -> "COMPLETED";
             case OperationRecord.STATUS_PARTIAL -> "PARTIAL";
             case OperationRecord.STATUS_PROCESSING -> "PROCESSING";
+            case OperationRecord.STATUS_WAITING -> "WAITING";
+            case OperationRecord.STATUS_RESOURCE_LOCKED -> "RESOURCE LOCKED";
+            case OperationRecord.STATUS_PENDING -> "PENDING";
             default -> "FAILED";
         };
     }
@@ -598,6 +629,10 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case OperationRecord.TYPE_INSERT -> "INSERT";
             case OperationRecord.TYPE_DELETE -> "DELETE";
             case OperationRecord.TYPE_MOVE -> "MOVE";
+            case OperationRecord.TYPE_ANALYZE -> "ANALYZE";
+            case OperationRecord.TYPE_REINDEX -> "REINDEX";
+            case OperationRecord.TYPE_VACUUM -> "VACUUM";
+            case OperationRecord.TYPE_DROP -> "DROP";
             default -> "SELECT";
         };
     }
@@ -605,8 +640,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static int opTypeColor(final byte type) {
         return switch (type) {
             case OperationRecord.TYPE_INSERT -> AMBER;
-            case OperationRecord.TYPE_DELETE -> RED;
+            case OperationRecord.TYPE_DELETE, OperationRecord.TYPE_DROP -> RED;
             case OperationRecord.TYPE_MOVE -> GREEN;
+            case OperationRecord.TYPE_ANALYZE, OperationRecord.TYPE_REINDEX, OperationRecord.TYPE_VACUUM -> DIM;
             default -> ACCENT2;
         };
     }
@@ -723,6 +759,303 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.drawString(font, c, cx + cw - font.width(c) - 4, y, count > 0 ? GREEN : DIM, false);
     }
 
+    // Maintenance tab (Mainframe-only): index stats + ANALYZE / VACUUM / REINDEX / DROP
+
+    private void maintenanceBg(final GuiGraphics g, final int cx, final int cy, final int cw,
+                               final int mouseX, final int mouseY) {
+        // Four index stat tiles (2x2).
+        final int tileW = (cw - 4) / 2;
+        for (int r = 0; r < 2; r++) {
+            final int ty = cy + (r == 0 ? MNT_TILE_ROW1_Y : MNT_TILE_ROW2_Y);
+            for (int col = 0; col < 2; col++) {
+                final int tx = cx + col * (tileW + 4);
+                g.fill(tx, ty, tx + tileW, ty + MNT_TILE_H, PANEL);
+                g.fill(tx, ty, tx + tileW, ty + 1, LINE);
+            }
+        }
+        // Action-button backgrounds (labels are drawn over them in maintenanceLabels).
+        final int halfW = (cw - 4) / 2;
+        maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_ROW1_Y, halfW, 0xFF1C6F86, 0xFF2A93AE);
+        maintBtnBg(g, mouseX, mouseY, cx + halfW + 4, cy + MNT_BTN_ROW1_Y, halfW, 0xFF1C6F86, 0xFF2A93AE);
+        maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_REINDEX_Y, cw, 0xFF7A5A1E, 0xFFA8801F);
+        maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_DROP_Y, cw, 0xFF7A241C, 0xFFB23228);
+    }
+
+    private void maintBtnBg(final GuiGraphics g, final int mx, final int my, final int x, final int y,
+                            final int w, final int base, final int hover) {
+        final boolean hov = inRect(mx, my, x, y, w, MNT_BTN_H);
+        g.fill(x, y, x + w, y + MNT_BTN_H, hov ? hover : base);
+        g.fill(x, y, x + w, y + 1, 0x33FFFFFF);
+    }
+
+    private void maintenanceLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
+        g.drawString(font, "STORAGE INDEX", cx, cy + 20, DIM, false);
+        final int tileW = (cw - 4) / 2;
+        tile(g, cx, cy + MNT_TILE_ROW1_Y, "TYPES", fmt(menu.indexedTypes()), "");
+        tile(g, cx + tileW + 4, cy + MNT_TILE_ROW1_Y, "SERVERS", String.valueOf(menu.indexedServers()), "");
+        tile(g, cx, cy + MNT_TILE_ROW2_Y, "LOCKS", String.valueOf(menu.activeLocks()), "");
+        final long used = menu.networkStorageUsed();
+        final long total = menu.networkStorageTotal();
+        tile(g, cx + tileW + 4, cy + MNT_TILE_ROW2_Y, "STORAGE",
+                total <= 0 ? "0" : fmt(used) + "/" + fmt(total), "");
+
+        g.drawString(font, "ACTIONS", cx, cy + MNT_ACTIONS_Y, DIM, false);
+        final int halfW = (cw - 4) / 2;
+        g.drawCenteredString(font, "ANALYZE", cx + halfW / 2, cy + MNT_BTN_ROW1_Y + 4, 0xFFFFFFFF);
+        g.drawCenteredString(font, "VACUUM", cx + halfW + 4 + halfW / 2, cy + MNT_BTN_ROW1_Y + 4, 0xFFFFFFFF);
+        g.drawCenteredString(font, "REINDEX", cx + cw / 2, cy + MNT_BTN_REINDEX_Y + 4, 0xFFFFFFFF);
+        g.drawCenteredString(font, "DROP DATA...", cx + cw / 2, cy + MNT_BTN_DROP_Y + 4, 0xFFFFFFFF);
+        if (!maintHint.isEmpty()) {
+            g.drawString(font, maintHint, cx, cy + MNT_BTN_DROP_Y + MNT_BTN_H + 2, ACCENT, false);
+        }
+    }
+
+    private int maintButtonAt(final int mx, final int my) {
+        final int cx = leftPos + CONTENT_X;
+        final int cy = topPos + 6;
+        final int cw = contentW();
+        final int halfW = (cw - 4) / 2;
+        if (inRect(mx, my, cx, cy + MNT_BTN_ROW1_Y, halfW, MNT_BTN_H)) {
+            return 0;
+        }
+        if (inRect(mx, my, cx + halfW + 4, cy + MNT_BTN_ROW1_Y, halfW, MNT_BTN_H)) {
+            return 1;
+        }
+        if (inRect(mx, my, cx, cy + MNT_BTN_REINDEX_Y, cw, MNT_BTN_H)) {
+            return 2;
+        }
+        if (inRect(mx, my, cx, cy + MNT_BTN_DROP_Y, cw, MNT_BTN_H)) {
+            return 3;
+        }
+        return -1;
+    }
+
+    private void openDrop() {
+        dropOpen = true;
+        dropScope = TerminalDropPayload.SCOPE_NETWORK;
+        dropTypes.clear();
+        dropServerIndex = 0;
+        dropTypeScrollRow = 0;
+        syncSearchBoxVisibility();
+    }
+
+    private void closeDrop() {
+        dropOpen = false;
+        dropTypes.clear();
+        syncSearchBoxVisibility();
+    }
+
+    private int dropX() {
+        return leftPos + (imageWidth - DROP_W) / 2;
+    }
+
+    private int dropY() {
+        return topPos + (imageHeight - DROP_H) / 2;
+    }
+
+    private boolean dropConfirmEnabled() {
+        return switch (dropScope) {
+            case TerminalDropPayload.SCOPE_SERVER -> !menu.networkServers().isEmpty();
+            case TerminalDropPayload.SCOPE_TYPES -> !dropTypes.isEmpty();
+            default -> true; // SCOPE_NETWORK
+        };
+    }
+
+    private void renderDropPopup(final GuiGraphics g, final int mouseX, final int mouseY) {
+        if (!dropOpen) {
+            return;
+        }
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 350);
+        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xE0070A0F);
+        final int px = dropX();
+        final int py = dropY();
+        g.fill(px - 1, py - 1, px + DROP_W + 1, py + DROP_H + 1, RED);
+        g.fill(px, py, px + DROP_W, py + DROP_H, 0xFF0F151C);
+
+        g.drawString(font, "DROP DATA", px + 8, py + 6, RED, false);
+        g.drawString(font, "Irreversible data loss", px + 8, py + 17, DIM, false);
+
+        // Scope selector: NETWORK | SERVER | TYPES.
+        final int segW = (DROP_W - 16) / 3;
+        final String[] names = {"NETWORK", "SERVER", "TYPES"};
+        for (int i = 0; i < 3; i++) {
+            final int bx = px + 8 + i * segW;
+            final boolean on = dropScope == i;
+            final boolean hov = inRect(mouseX, mouseY, bx, py + 30, segW - 2, 14);
+            g.fill(bx, py + 30, bx + segW - 2, py + 44, on ? RED : (hov ? 0xFF24323C : 0xFF1A222B));
+            g.drawCenteredString(font, names[i], bx + (segW - 2) / 2, py + 33, on ? 0xFFFFFFFF : DIM);
+        }
+
+        final int bodyY = py + 50;
+        switch (dropScope) {
+            case TerminalDropPayload.SCOPE_SERVER -> renderDropServer(g, mouseX, mouseY, px, bodyY);
+            case TerminalDropPayload.SCOPE_TYPES -> renderDropTypes(g, px, bodyY);
+            default -> { // SCOPE_NETWORK
+                g.drawString(font, "Destroys ALL public storage on", px + 8, bodyY, TEXT, false);
+                g.drawString(font, "the entire network.", px + 8, bodyY + 11, TEXT, false);
+                g.drawString(font, fmt(menu.indexedTypes()) + " types over " + menu.indexedServers()
+                        + " servers", px + 8, bodyY + 28, AMBER, false);
+            }
+        }
+
+        // CANCEL | CONFIRM DROP.
+        final int by = py + DROP_H - 22;
+        final boolean cancelHov = inRect(mouseX, mouseY, px + 8, by, 70, 16);
+        g.fill(px + 8, by, px + 78, by + 16, cancelHov ? 0xFF2A3340 : 0xFF1A222B);
+        g.drawCenteredString(font, "CANCEL", px + 43, by + 4, TEXT);
+        final boolean canConfirm = dropConfirmEnabled();
+        final boolean confHov = inRect(mouseX, mouseY, px + 84, by, DROP_W - 92, 16);
+        g.fill(px + 84, by, px + DROP_W - 8, by + 16,
+                !canConfirm ? 0xFF3A2420 : (confHov ? 0xFFB23228 : 0xFF8A241C));
+        g.drawCenteredString(font, "CONFIRM DROP", px + 84 + (DROP_W - 92) / 2, by + 4,
+                canConfirm ? 0xFFFFFFFF : DIM);
+        g.pose().popPose();
+    }
+
+    private void renderDropServer(final GuiGraphics g, final int mouseX, final int mouseY,
+                                  final int px, final int bodyY) {
+        final List<NetworkServersPayload.ServerEntry> servers = menu.networkServers();
+        if (servers.isEmpty()) {
+            g.drawString(font, "No Servers on the network.", px + 8, bodyY, AMBER, false);
+            return;
+        }
+        final NetworkServersPayload.ServerEntry target =
+                servers.get(Math.floorMod(dropServerIndex, servers.size()));
+        final boolean lh = inRect(mouseX, mouseY, px + 8, bodyY, 14, 14);
+        final boolean rh = inRect(mouseX, mouseY, px + DROP_W - 22, bodyY, 14, 14);
+        g.fill(px + 8, bodyY, px + 22, bodyY + 14, lh ? 0xFF24323C : 0xFF1A222B);
+        g.drawCenteredString(font, "<", px + 15, bodyY + 3, ACCENT);
+        g.fill(px + DROP_W - 22, bodyY, px + DROP_W - 8, bodyY + 14, rh ? 0xFF24323C : 0xFF1A222B);
+        g.drawCenteredString(font, ">", px + DROP_W - 15, bodyY + 3, ACCENT);
+        g.drawCenteredString(font, font.plainSubstrByWidth(target.name(), DROP_W - 56),
+                px + DROP_W / 2, bodyY + 3, TEXT);
+        g.drawString(font, "Wipes this server's storage.", px + 8, bodyY + 20, TEXT, false);
+        g.drawString(font, fmt(target.free()) + " free now", px + 8, bodyY + 32, DIM, false);
+    }
+
+    private void renderDropTypes(final GuiGraphics g, final int px, final int bodyY) {
+        final List<NetworkItemEntry> items = menu.networkItems();
+        if (items.isEmpty()) {
+            g.drawString(font, "No data types on the network.", px + 8, bodyY, AMBER, false);
+            return;
+        }
+        final int gridX = px + (DROP_W - DROP_GRID_COLS * 18) / 2;
+        final int rows = (items.size() + DROP_GRID_COLS - 1) / DROP_GRID_COLS;
+        dropTypeScrollRow = Math.max(0, Math.min(Math.max(0, rows - DROP_GRID_ROWS), dropTypeScrollRow));
+        final int start = dropTypeScrollRow * DROP_GRID_COLS;
+        for (int r = 0; r < DROP_GRID_ROWS; r++) {
+            for (int col = 0; col < DROP_GRID_COLS; col++) {
+                final int sx = gridX + col * 18;
+                final int sy = bodyY + r * 18;
+                slotBg(g, sx, sy);
+                final int idx = start + r * DROP_GRID_COLS + col;
+                if (idx < items.size()) {
+                    final NetworkItemEntry e = items.get(idx);
+                    drawDataIcon(g, e.key(), e.total(), sx, sy);
+                    if (dropTypes.contains(e.key())) {
+                        g.pose().pushPose();
+                        g.pose().translate(0, 0, 200); // frame the slot ABOVE the rendered item
+                        g.fill(sx - 1, sy - 1, sx + 17, sy, RED);
+                        g.fill(sx - 1, sy + 16, sx + 17, sy + 17, RED);
+                        g.fill(sx - 1, sy, sx, sy + 16, RED);
+                        g.fill(sx + 16, sy, sx + 17, sy + 16, RED);
+                        g.pose().popPose();
+                    }
+                }
+            }
+        }
+        g.drawString(font, dropTypes.size() + " of " + items.size() + " selected",
+                px + 8, bodyY + DROP_GRID_ROWS * 18 + 2, AMBER, false);
+    }
+
+    private boolean handleDropClick(final double mouseX, final double mouseY, final int button) {
+        if (button == 1) {
+            closeDrop();
+            return true;
+        }
+        if (button != 0) {
+            return true;
+        }
+        final int px = dropX();
+        final int py = dropY();
+        // Scope selector.
+        final int segW = (DROP_W - 16) / 3;
+        for (int i = 0; i < 3; i++) {
+            if (inRect(mouseX, mouseY, px + 8 + i * segW, py + 30, segW - 2, 14)) {
+                dropScope = i;
+                return true;
+            }
+        }
+        final int bodyY = py + 50;
+        if (dropScope == TerminalDropPayload.SCOPE_SERVER && !menu.networkServers().isEmpty()) {
+            if (inRect(mouseX, mouseY, px + 8, bodyY, 14, 14)) {
+                dropServerIndex--;
+                return true;
+            }
+            if (inRect(mouseX, mouseY, px + DROP_W - 22, bodyY, 14, 14)) {
+                dropServerIndex++;
+                return true;
+            }
+        }
+        if (dropScope == TerminalDropPayload.SCOPE_TYPES) {
+            final int idx = dropTypeCellAt((int) mouseX, (int) mouseY, px, bodyY);
+            final List<NetworkItemEntry> items = menu.networkItems();
+            if (idx >= 0 && idx < items.size()) {
+                final StorageKey key = items.get(idx).key();
+                if (!dropTypes.remove(key) && dropTypes.size() < TerminalDropPayload.MAX_TYPES) {
+                    dropTypes.add(key);
+                }
+                return true;
+            }
+        }
+        final int by = py + DROP_H - 22;
+        if (inRect(mouseX, mouseY, px + 8, by, 70, 16)) {
+            closeDrop();
+            return true;
+        }
+        if (inRect(mouseX, mouseY, px + 84, by, DROP_W - 92, 16) && dropConfirmEnabled()) {
+            sendDrop();
+            closeDrop();
+            return true;
+        }
+        if (mouseX < px || mouseX >= px + DROP_W || mouseY < py || mouseY >= py + DROP_H) {
+            closeDrop();
+        }
+        return true; // modal: swallow clicks while the DROP popup is up
+    }
+
+    private int dropTypeCellAt(final int mx, final int my, final int px, final int bodyY) {
+        final int gridX = px + (DROP_W - DROP_GRID_COLS * 18) / 2;
+        final int relX = mx - gridX;
+        final int relY = my - bodyY;
+        if (relX < 0 || relX >= DROP_GRID_COLS * 18 || relY < 0 || relY >= DROP_GRID_ROWS * 18) {
+            return -1;
+        }
+        return (dropTypeScrollRow + relY / 18) * DROP_GRID_COLS + relX / 18;
+    }
+
+    private void sendMaintenance(final int action) {
+        PacketDistributor.sendToServer(
+                new TerminalMaintenancePayload(menu.monitorPos(), menu.hostPos(), action));
+    }
+
+    private void sendDrop() {
+        final List<StorageKey> types = dropScope == TerminalDropPayload.SCOPE_TYPES
+                ? new ArrayList<>(dropTypes) : List.of();
+        String serverKey = "";
+        if (dropScope == TerminalDropPayload.SCOPE_SERVER) {
+            final List<NetworkServersPayload.ServerEntry> servers = menu.networkServers();
+            if (servers.isEmpty()) {
+                return;
+            }
+            serverKey = servers.get(Math.floorMod(dropServerIndex, servers.size())).key();
+        }
+        PacketDistributor.sendToServer(new TerminalDropPayload(
+                menu.monitorPos(), menu.hostPos(), dropScope, types, serverKey));
+        maintHint = "DROP logged";
+    }
+
     private int taskSubTabAt(final int mx, final int my) {
         final int barY = topPos + 6 + 26;
         if (my < barY || my >= barY + 14) {
@@ -804,7 +1137,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                     g.fill(x + 5, ly, x + 14, ly + 2, c);
                 }
             }
-            default -> { // Tasks — CPU chip
+            case 4 -> { // Tasks — CPU chip
                 g.fill(x + 4, y + 4, x + 12, y + 5, c);
                 g.fill(x + 4, y + 11, x + 12, y + 12, c);
                 g.fill(x + 4, y + 4, x + 5, y + 12, c);
@@ -819,6 +1152,14 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 g.fill(x + 12, y + 6, x + 14, y + 7, c);
                 g.fill(x + 12, y + 9, x + 14, y + 10, c);
             }
+            default -> { // Maintenance — a wrench laid diagonally (C-shaped open jaw, diagonal shaft)
+                g.fill(x + 2, y + 2, x + 7, y + 4, c); // jaw: top lip
+                g.fill(x + 2, y + 2, x + 4, y + 7, c); // jaw: left side
+                g.fill(x + 2, y + 5, x + 7, y + 7, c); // jaw: bottom lip (mouth opens toward the shaft)
+                for (int s = 0; s < 7; s++) {          // shaft running to the bottom-right handle
+                    g.fill(x + 6 + s, y + 6 + s, x + 8 + s, y + 8 + s, c);
+                }
+            }
         }
     }
 
@@ -826,6 +1167,13 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     public boolean keyPressed(final int key, final int scan, final int mods) {
+        // The DROP popup is modal: ESC closes it; every other key is swallowed.
+        if (dropOpen) {
+            if (key == 256) {
+                closeDrop();
+            }
+            return true;
+        }
         // The request popup is modal: ESC closes it, Enter submits, typing goes to the quantity field,
         // and every other key is swallowed so the inventory key ('E') never closes the GUI mid-edit.
         if (popupEntry != null) {
@@ -874,6 +1222,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
+        if (dropOpen) {
+            return handleDropClick(mouseX, mouseY, button);
+        }
         if (popupEntry != null) {
             return handlePopupClick(mouseX, mouseY, button);
         }
@@ -962,6 +1313,30 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 if (opRow >= 0) {
                     openOpPopup(menu.activeOps().get(opRow)); // click an in-flight op -> SubOperations popup
                     return true;
+                }
+            }
+            if (menu.activeTab() == ComputerTerminalMenu.TAB_MAINTENANCE) {
+                switch (maintButtonAt((int) mouseX, (int) mouseY)) {
+                    case 0 -> {
+                        sendMaintenance(TerminalMaintenancePayload.ACTION_ANALYZE);
+                        maintHint = "ANALYZE logged";
+                        return true;
+                    }
+                    case 1 -> {
+                        sendMaintenance(TerminalMaintenancePayload.ACTION_VACUUM);
+                        maintHint = "VACUUM logged";
+                        return true;
+                    }
+                    case 2 -> {
+                        sendMaintenance(TerminalMaintenancePayload.ACTION_REINDEX);
+                        maintHint = "REINDEX logged";
+                        return true;
+                    }
+                    case 3 -> {
+                        openDrop();
+                        return true;
+                    }
+                    default -> { /* clicked empty space */ }
                 }
             }
         }
@@ -1100,6 +1475,18 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         if (popupOp == null) {
             return;
         }
+        // While the clicked Operation is still in flight, track its newest live record (the popup
+        if (popupOp.status() == OperationRecord.STATUS_PROCESSING
+                || popupOp.status() == OperationRecord.STATUS_WAITING
+                || popupOp.status() == OperationRecord.STATUS_PENDING) {
+            for (final OperationRecord live : menu.activeOps()) {
+                if (live.type() == popupOp.type() && live.key().equals(popupOp.key())
+                        && live.requested() == popupOp.requested()) {
+                    popupOp = live;
+                    break;
+                }
+            }
+        }
         // Push above the item grid and dim the screen, so the tab rail and header behind never show
         // through the panel (flat fills draw below items otherwise).
         g.pose().pushPose();
@@ -1121,8 +1508,16 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         track(g, px + 6, py + 30, POPUP_W - 12, f,
                 popupOp.status() == OperationRecord.STATUS_PROCESSING ? ACCENT2 : statusColor(popupOp.status()));
         g.drawString(font, "SUBOPERATIONS", px + 6, py + 42, DIM, false);
+        // A live Operation carries its real SubOperation rows (per-server share, progress, state);
+        // a finished log entry carries only its provenance moves — render whichever it has.
+        final List<OperationRecord.SubRow> subs = popupOp.subs();
         final List<OperationRecord.MoveRow> moves = popupOp.moves();
-        if (moves.isEmpty()) {
+        if (!subs.isEmpty()) {
+            final int start = clampOpPopupScroll(subs.size());
+            for (int i = 0; i < OP_POPUP_ROWS && start + i < subs.size(); i++) {
+                subRow(g, px, py + 56 + i * 12, subs.get(start + i));
+            }
+        } else if (moves.isEmpty()) {
             g.drawString(font, "No movement yet.", px + 6, py + 56, DIM, false);
         } else {
             final int start = clampOpPopupScroll(moves.size());
@@ -1133,6 +1528,24 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final String hint = "right-click to close";
         g.drawString(font, hint, px + POPUP_W - font.width(hint) - 6, py + POPUP_H - 10, DIM, false);
         g.pose().popPose();
+    }
+
+    private void subRow(final GuiGraphics g, final int px, final int my, final OperationRecord.SubRow sub) {
+        g.drawString(font, font.plainSubstrByWidth(sub.server(), 62), px + 6, my, DIM, false);
+        g.drawString(font, fmt(sub.moved()) + " / " + fmt(sub.planned()), px + 72, my, TEXT, false);
+        final String state = switch (sub.state()) {
+            case OperationRecord.SubRow.SUB_READING -> "READING";
+            case OperationRecord.SubRow.SUB_STREAMING -> "STREAMING";
+            case OperationRecord.SubRow.SUB_COMPLETED -> "DONE";
+            default -> "QUEUED";
+        };
+        final int color = switch (sub.state()) {
+            case OperationRecord.SubRow.SUB_READING -> AMBER;
+            case OperationRecord.SubRow.SUB_STREAMING -> ACCENT2;
+            case OperationRecord.SubRow.SUB_COMPLETED -> GREEN;
+            default -> DIM;
+        };
+        g.drawString(font, state, px + POPUP_W - font.width(state) - 6, my, color, false);
     }
 
     private int taskOpRowAt(final int mx, final int my) {
@@ -1436,6 +1849,12 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     public boolean mouseScrolled(final double mx, final double my, final double dx, final double dy) {
+        if (dropOpen && dy != 0) {
+            if (dropScope == TerminalDropPayload.SCOPE_TYPES) {
+                dropTypeScrollRow = Math.max(0, dropTypeScrollRow - (int) Math.signum(dy));
+            }
+            return true;
+        }
         if (popupOp != null && dy != 0) {
             opPopupScroll = Math.max(0, opPopupScroll - (int) Math.signum(dy));
             return true;
@@ -1459,7 +1878,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         syncSearchBoxVisibility();
         super.render(g, mouseX, mouseY, partialTick);
         renderTooltip(g, mouseX, mouseY);
-        if (popupEntry != null) {
+        if (dropOpen) {
+            renderDropPopup(g, mouseX, mouseY);
+        } else if (popupEntry != null) {
             renderPopup(g, mouseX, mouseY, partialTick);
         } else if (popupOp != null) {
             renderOpPopup(g);

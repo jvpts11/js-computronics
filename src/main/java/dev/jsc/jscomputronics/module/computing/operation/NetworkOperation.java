@@ -18,6 +18,10 @@ public interface NetworkOperation {
 
     boolean isDone();
 
+    default boolean isWaiting() {
+        return false;
+    }
+
     void abandon();
 
     OperationRecord toRecord();

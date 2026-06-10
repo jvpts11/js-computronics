@@ -360,8 +360,8 @@ public class MainframeBlockEntity extends BlockEntity
             return;
         }
         runDispatch();
-        // Refresh the in-RAM storage catalog once per tick from the network's servers.
-        networkIndex.rebuild(level, networkUuid());
+        // Reconcile the in-RAM storage catalog with the network's servers: a changes-only ANALYZE
+        networkIndex.analyzeIncremental(level, networkUuid());
         tickOperations();
     }
 
@@ -666,11 +666,33 @@ public class MainframeBlockEntity extends BlockEntity
     }
 
     public int pendingOps() {
-        return dispatch == null ? 0 : dispatch.pendingCount();
+        final int slots = Math.max(1, parallelQueues());
+        int used = 0;
+        int queued = 0;
+        for (final var operation : activeOperations) {
+            if (operation.isDone()) {
+                continue;
+            }
+            if (operation.isWaiting()) {
+                queued++; // blocked on another Operation's LOCK — not streaming
+            } else if (used < slots) {
+                used++;
+            } else {
+                queued++;
+            }
+        }
+        return queued + (dispatch == null ? 0 : dispatch.pendingCount());
     }
 
     public int runningOps() {
-        return dispatch == null ? 0 : dispatch.runningCount();
+        final int slots = Math.max(1, parallelQueues());
+        int used = 0;
+        for (final var operation : activeOperations) {
+            if (!operation.isDone() && !operation.isWaiting() && used < slots) {
+                used++;
+            }
+        }
+        return used + (dispatch == null ? 0 : dispatch.runningCount());
     }
 
     public long completedOps() {
@@ -795,20 +817,35 @@ public class MainframeBlockEntity extends BlockEntity
         if (activeOperations.isEmpty()) {
             return;
         }
-        // The Mainframe processes at most its RAM buffer per tick: a buffer smaller than the CPU
-        // leaves the CPU idle waiting on RAM, so the capacity it splits is the lesser of the two.
+        // A queue processes at most the RAM buffer per tick: a buffer smaller than the CPU leaves
+        // the CPU idle waiting on RAM, so the effective rate is the lesser of the two.
         final long effectiveCapacity = Math.min(capacity(), ramBuffer());
-        final long[] shares = dev.jsc.jscomputronics.common.operation.exec.EqualShare.split(
-                effectiveCapacity, activeOperations.size());
-        for (int i = 0; i < activeOperations.size(); i++) {
-            activeOperations.get(i).tick(shares[i]);
+        final int slots = Math.max(1, parallelQueues());
+        int used = 0;
+        for (final var operation : activeOperations) {
+            if (operation.isDone()) {
+                continue;
+            }
+            if (operation.isWaiting()) {
+                operation.tick(0L); // lock retry + timeout only; holds no queue slot
+            } else if (used < slots) {
+                used++;
+                operation.tick(effectiveCapacity);
+            }
+            // Ready Operations beyond the queue count stay PENDING this tick: no progress,
+            // no latency countdown — their disks have not started reading yet.
         }
         final java.util.Iterator<dev.jsc.jscomputronics.module.computing.operation.NetworkOperation> it =
                 activeOperations.iterator();
         while (it.hasNext()) {
             final var operation = it.next();
             if (operation.isDone()) {
-                recordOperation(operation.toRecord());
+                final var record = operation.toRecord();
+                recordOperation(record);
+                if (record.status() == dev.jsc.jscomputronics.module.computing.operation.payload
+                        .OperationRecord.STATUS_COMPLETED) {
+                    completedTotal++; // network Operations count toward the lifetime tally too
+                }
                 it.remove();
             }
         }
@@ -821,8 +858,19 @@ public class MainframeBlockEntity extends BlockEntity
     public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> activeOperationRecords() {
         final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> out =
                 new java.util.ArrayList<>(activeOperations.size());
+        final int slots = Math.max(1, parallelQueues());
+        int used = 0;
         for (final var operation : activeOperations) {
-            out.add(operation.liveRecord());
+            var record = operation.liveRecord();
+            if (!operation.isDone() && !operation.isWaiting()) {
+                if (used < slots) {
+                    used++;
+                } else {
+                    record = record.withStatus(dev.jsc.jscomputronics.module.computing.operation.payload
+                            .OperationRecord.STATUS_PENDING);
+                }
+            }
+            out.add(record);
         }
         return out;
     }
@@ -1019,6 +1067,36 @@ public class MainframeBlockEntity extends BlockEntity
     @Override
     public boolean isMainframeHost() {
         return true;
+    }
+
+    @Override
+    public int indexedTypes() {
+        return networkIndex.catalogSize();
+    }
+
+    @Override
+    public int indexedServers() {
+        return networkIndex.indexedServerCount();
+    }
+
+    @Override
+    public int activeLocks() {
+        return networkIndex.activeLockCount();
+    }
+
+    @Override
+    public long networkStorageUsed() {
+        return networkIndex.usedWeight()
+                / dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
+    }
+
+    @Override
+    public long networkStorageTotal() {
+        if (networkUuid == null || !(level instanceof ServerLevel serverLevel)) {
+            return 0L;
+        }
+        return NetworkSystem.get(serverLevel).totalStorageOf(networkUuid)
+                / dev.jsc.jscomputronics.common.hardware.DiskSpec.MB_PER_ITEM;
     }
 
     public static final int DATA_RUNNING = 0;

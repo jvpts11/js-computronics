@@ -37,6 +37,9 @@ public final class NetworkSystem {
     private final java.util.Map<NetworkUuid, java.util.List<PersonalComputerNode>> pcsByNetwork =
             new java.util.HashMap<>();
 
+    private final java.util.Map<NetworkUuid, java.util.List<ServerRouterElement>> routersByNetwork =
+            new java.util.HashMap<>();
+
     /**
      * A Personal Computer attached to a network: a Category-C node that issues, but never orchestrates, Operations.
      */
@@ -190,6 +193,31 @@ public final class NetworkSystem {
         return total;
     }
 
+    // Server Router (topology element) registry
+
+    public void registerRouter(final ServerRouterElement router) {
+        java.util.Objects.requireNonNull(router, "router must not be null");
+        final java.util.List<ServerRouterElement> list =
+                routersByNetwork.computeIfAbsent(router.networkUuid(), k -> new java.util.ArrayList<>());
+        list.removeIf(r -> r.pos() == router.pos());
+        list.add(router);
+    }
+
+    public void unregisterRouter(final NetworkUuid network, final long pos) {
+        final java.util.List<ServerRouterElement> list = routersByNetwork.get(network);
+        if (list != null) {
+            list.removeIf(r -> r.pos() == pos);
+            if (list.isEmpty()) {
+                routersByNetwork.remove(network);
+            }
+        }
+    }
+
+    public java.util.List<ServerRouterElement> routersOf(final NetworkUuid networkUuid) {
+        final var list = routersByNetwork.get(networkUuid);
+        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+    }
+
     // Phase 1+ stubs — depend on runtime topology / BlockEntities
 
     public Optional<NodeUuid> nodeByPosition(long encodedPos) {
@@ -212,5 +240,6 @@ public final class NetworkSystem {
         serversByNetwork.clear();
         serverLocations.clear();
         pcsByNetwork.clear();
+        routersByNetwork.clear();
     }
 }

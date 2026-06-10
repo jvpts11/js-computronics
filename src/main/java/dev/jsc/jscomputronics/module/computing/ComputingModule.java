@@ -181,6 +181,44 @@ public final class ComputingModule {
                     () -> BlockEntityType.Builder.of(PersonalRouterBlockEntity::new,
                             PERSONAL_ROUTER.get()).build(null));
 
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.ServerRouterBlock> SERVER_ROUTER =
+            BLOCKS.register("server_router",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.ServerRouterBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(0.6F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> SERVER_ROUTER_ITEM = ITEMS.register(
+            "server_router", () -> new BlockItem(SERVER_ROUTER.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity>> SERVER_ROUTER_BE =
+            BLOCK_ENTITIES.register("server_router",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity::new,
+                            SERVER_ROUTER.get()).build(null));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.DatacenterStationBlock> DATACENTER_STATION =
+            BLOCKS.register("datacenter_station",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.DatacenterStationBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(0.6F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> DATACENTER_STATION_ITEM = ITEMS.register(
+            "datacenter_station", () -> new BlockItem(DATACENTER_STATION.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity>> DATACENTER_STATION_BE =
+            BLOCK_ENTITIES.register("datacenter_station",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity::new,
+                            DATACENTER_STATION.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>,
             BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity>> MONITOR_BE =
             BLOCK_ENTITIES.register("monitor",
@@ -452,6 +490,16 @@ public final class ComputingModule {
 
     public static final DeferredHolder<MenuType<?>, MenuType<PersonalComputerMenu>> PERSONAL_COMPUTER_MENU =
             MENUS.register("personal_computer", () -> IMenuTypeExtension.create(PersonalComputerMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu>> SERVER_ROUTER_MENU =
+            MENUS.register("server_router", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.DatacenterStationMenu>> DATACENTER_STATION_MENU =
+            MENUS.register("datacenter_station", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.DatacenterStationMenu::fromNetwork));
 
     public static void register(final IEventBus modEventBus) {
         BLOCKS.register(modEventBus);

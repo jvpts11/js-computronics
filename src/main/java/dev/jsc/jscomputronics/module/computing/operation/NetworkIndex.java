@@ -19,6 +19,7 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.ServerItem;
+import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -38,9 +39,11 @@ public final class NetworkIndex {
 
     private final Map<StorageKey, List<ItemLocation>> catalog = new LinkedHashMap<>();
     private final StorageLockTable<StorageKey> locks = new StorageLockTable<>();
+    private final Map<NodeUuid, Long> indexedModCounts = new LinkedHashMap<>();
 
     public void rebuild(final ServerLevel level, final NetworkUuid network) {
         catalog.clear();
+        indexedModCounts.clear();
         if (network == null) {
             return;
         }
@@ -49,8 +52,93 @@ public final class NetworkIndex {
             system.locationOf(server.nodeUuid()).ifPresent(loc -> {
                 if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
                     indexServer(rack, loc.slot(), server.nodeUuid());
+                    indexedModCounts.put(server.nodeUuid(), rack.storageModCount(loc.slot()));
                 }
             });
+        }
+    }
+
+    public void analyzeIncremental(final ServerLevel level, final NetworkUuid network) {
+        if (network == null) {
+            catalog.clear();
+            indexedModCounts.clear();
+            return;
+        }
+        final NetworkSystem system = NetworkSystem.get(level);
+        // Resolve the live servers and pick out the ones needing a re-read.
+        final Map<NodeUuid, NetworkSystem.ServerLocation> live = new LinkedHashMap<>();
+        final List<NodeUuid> dirty = new ArrayList<>();
+        for (final ServerNode server : system.serversOf(network)) {
+            system.locationOf(server.nodeUuid()).ifPresent(loc -> {
+                if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+                    live.put(server.nodeUuid(), loc);
+                    final Long seen = indexedModCounts.get(server.nodeUuid());
+                    if (seen == null || seen != rack.storageModCount(loc.slot())) {
+                        dirty.add(server.nodeUuid());
+                    }
+                }
+            });
+        }
+        // Servers no longer on the network (or unresolvable) leave the catalog entirely.
+        final List<NodeUuid> gone = new ArrayList<>();
+        for (final NodeUuid indexed : indexedModCounts.keySet()) {
+            if (!live.containsKey(indexed)) {
+                gone.add(indexed);
+            }
+        }
+        if (dirty.isEmpty() && gone.isEmpty()) {
+            return; // nothing changed — the whole pass cost only counter comparisons
+        }
+        final java.util.Set<NodeUuid> stale = new java.util.HashSet<>(dirty);
+        stale.addAll(gone);
+        dropServers(stale);
+        for (final NodeUuid node : gone) {
+            indexedModCounts.remove(node);
+        }
+        for (final NodeUuid node : dirty) {
+            final NetworkSystem.ServerLocation loc = live.get(node);
+            if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+                indexServer(rack, loc.slot(), node);
+                indexedModCounts.put(node, rack.storageModCount(loc.slot()));
+            }
+        }
+    }
+
+    public int vacuum(final ServerLevel level, final NetworkUuid network) {
+        final java.util.Set<NodeUuid> registered = new java.util.HashSet<>();
+        if (network != null) {
+            for (final ServerNode server : NetworkSystem.get(level).serversOf(network)) {
+                registered.add(server.nodeUuid());
+            }
+        }
+        int freed = 0;
+        final var entries = catalog.entrySet().iterator();
+        while (entries.hasNext()) {
+            final List<ItemLocation> rows = entries.next().getValue();
+            final var rowIt = rows.iterator();
+            while (rowIt.hasNext()) {
+                final ItemLocation row = rowIt.next();
+                if (row.quantity() <= 0L || !registered.contains(row.server())) {
+                    rowIt.remove();
+                    freed++;
+                }
+            }
+            if (rows.isEmpty()) {
+                entries.remove();
+            }
+        }
+        indexedModCounts.keySet().retainAll(registered);
+        return freed;
+    }
+
+    private void dropServers(final java.util.Set<NodeUuid> servers) {
+        final var entries = catalog.entrySet().iterator();
+        while (entries.hasNext()) {
+            final List<ItemLocation> rows = entries.next().getValue();
+            rows.removeIf(row -> servers.contains(row.server()));
+            if (rows.isEmpty()) {
+                entries.remove();
+            }
         }
     }
 
@@ -103,6 +191,16 @@ public final class NetworkIndex {
         long total = 0L;
         for (final ItemLocation location : catalog.getOrDefault(key, List.of())) {
             total += Math.max(0L, location.quantity() - locks.lockedOn(key, location.server()));
+        }
+        return total;
+    }
+
+    public long grossAvailable(final StorageKey key, final java.util.Set<NodeUuid> allowed) {
+        long total = 0L;
+        for (final ItemLocation location : catalog.getOrDefault(key, List.of())) {
+            if (allowed == null || allowed.contains(location.server())) {
+                total += location.quantity();
+            }
         }
         return total;
     }
@@ -191,5 +289,82 @@ public final class NetworkIndex {
     public void clear() {
         catalog.clear();
         locks.clear();
+        indexedModCounts.clear();
+    }
+
+    // Readout (for the Mainframe terminal's Maintenance tab)
+
+    public int catalogSize() {
+        return catalog.size();
+    }
+
+    public int indexedServerCount() {
+        return indexedModCounts.size();
+    }
+
+    public int activeLockCount() {
+        return locks.lockingOperationCount();
+    }
+
+    public long usedWeight() {
+        long weight = 0L;
+        for (final Map.Entry<StorageKey, List<ItemLocation>> entry : catalog.entrySet()) {
+            for (final ItemLocation location : entry.getValue()) {
+                weight += entry.getKey().weight(location.quantity());
+            }
+        }
+        return weight;
+    }
+
+    // DROP (destruction — irreversible; only the Mainframe Maintenance tab calls this)
+
+    @org.jetbrains.annotations.Nullable
+    private static ServerStore storeOf(final ServerLevel level, final NodeUuid server) {
+        return NetworkSystem.get(level).locationOf(server)
+                .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack
+                        ? rack.getServerStorage(loc.slot()) : null)
+                .orElse(null);
+    }
+
+    public long dropType(final ServerLevel level, final NetworkUuid network, final StorageKey key,
+                         @org.jetbrains.annotations.Nullable final java.util.Set<NodeUuid> allowed) {
+        if (network == null) {
+            return 0L;
+        }
+        long destroyed = 0L;
+        for (final ServerNode server : NetworkSystem.get(level).serversOf(network)) {
+            if (allowed != null && !allowed.contains(server.nodeUuid())) {
+                continue;
+            }
+            final ServerStore store = storeOf(level, server.nodeUuid());
+            if (store != null) {
+                destroyed += store.extract(key, store.count(key));
+            }
+        }
+        return destroyed;
+    }
+
+    public long dropServer(final ServerLevel level, final NodeUuid server) {
+        final ServerStore store = storeOf(level, server);
+        if (store == null) {
+            return 0L;
+        }
+        long destroyed = 0L;
+        // Copy the keys first: extract mutates the store's view as it goes.
+        for (final StorageKey key : new java.util.ArrayList<>(store.view().keySet())) {
+            destroyed += store.extract(key, store.count(key));
+        }
+        return destroyed;
+    }
+
+    public long dropAll(final ServerLevel level, final NetworkUuid network) {
+        if (network == null) {
+            return 0L;
+        }
+        long destroyed = 0L;
+        for (final ServerNode server : NetworkSystem.get(level).serversOf(network)) {
+            destroyed += dropServer(level, server.nodeUuid());
+        }
+        return destroyed;
     }
 }

@@ -51,9 +51,22 @@ public class ServerRackBlockEntity extends BlockEntity {
 
         @Override
         protected void onContentsChanged(final int slot) {
+            markStorageChanged(slot);
             setChanged();
         }
     };
+
+    private final long[] storageModCounts = new long[CAPACITY];
+
+    public void markStorageChanged(final int slot) {
+        if (slot >= 0 && slot < storageModCounts.length) {
+            storageModCounts[slot]++;
+        }
+    }
+
+    public long storageModCount(final int slot) {
+        return slot >= 0 && slot < storageModCounts.length ? storageModCounts[slot] : 0L;
+    }
 
     private final Map<UUID, NetworkUuid> registered = new HashMap<>();
 
