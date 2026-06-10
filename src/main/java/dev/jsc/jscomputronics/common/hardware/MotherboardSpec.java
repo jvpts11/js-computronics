@@ -15,7 +15,8 @@ import java.util.Set;
 /**
  * Immutable specification of a motherboard — the chassis that bounds an assembly: which CPU socket and how many of them, how many RAM slots and which generations they accept, how many PCIe slots and their bus generation, and how many peripheral ports.
  */
-public record MotherboardSpec(HardwareEra era,
+public record MotherboardSpec(FormFactor formFactor,
+                              HardwareEra era,
                               CpuSocket socket,
                               int cpuSlots,
                               Set<RamGeneration> acceptedRam,
@@ -26,6 +27,7 @@ public record MotherboardSpec(HardwareEra era,
                               int peripheralPorts) {
 
     public MotherboardSpec {
+        Objects.requireNonNull(formFactor, "formFactor must not be null");
         Objects.requireNonNull(era, "era must not be null");
         Objects.requireNonNull(socket, "socket must not be null");
         Objects.requireNonNull(pcieGeneration, "pcieGeneration must not be null");

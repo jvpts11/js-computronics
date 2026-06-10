@@ -7,17 +7,17 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 
 /**
- * Client to server: the player clicked {@code stack} in a Monitor terminal's Network tab and the request popup wants the per-Server breakdown for that exact type (item AND components).
+ * Client to server: the player clicked {@code key} in a Monitor terminal's Network tab and the request popup wants the per-Server breakdown for that exact data type (item or fluid, with components).
  */
-public record RequestServerBreakdownPayload(BlockPos monitorPos, BlockPos hostPos, ItemStack stack)
+public record RequestServerBreakdownPayload(BlockPos monitorPos, BlockPos hostPos, StorageKey key)
         implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<RequestServerBreakdownPayload> TYPE =
@@ -28,7 +28,7 @@ public record RequestServerBreakdownPayload(BlockPos monitorPos, BlockPos hostPo
             StreamCodec.composite(
                     BlockPos.STREAM_CODEC, RequestServerBreakdownPayload::monitorPos,
                     BlockPos.STREAM_CODEC, RequestServerBreakdownPayload::hostPos,
-                    ItemStack.OPTIONAL_STREAM_CODEC, RequestServerBreakdownPayload::stack,
+                    StorageKey.STREAM_CODEC, RequestServerBreakdownPayload::key,
                     RequestServerBreakdownPayload::new);
 
     @Override

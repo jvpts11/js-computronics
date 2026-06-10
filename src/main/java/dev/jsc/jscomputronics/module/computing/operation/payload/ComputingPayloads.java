@@ -29,6 +29,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidUtil;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -53,10 +56,6 @@ public final class ComputingPayloads {
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent event) {
         final PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToServer(NetworkSelectPayload.TYPE, NetworkSelectPayload.STREAM_CODEC,
-                ComputingPayloads::handleSelect);
-        registrar.playToServer(NetworkInsertPayload.TYPE, NetworkInsertPayload.STREAM_CODEC,
-                ComputingPayloads::handleInsert);
         registrar.playToClient(NetworkSnapshotPayload.TYPE, NetworkSnapshotPayload.STREAM_CODEC,
                 ComputingPayloads::handleSnapshot);
         registrar.playToServer(RequestNetworkNodesPayload.TYPE, RequestNetworkNodesPayload.STREAM_CODEC,
@@ -108,7 +107,7 @@ public final class ComputingPayloads {
             if (host == null || host.networkUuid() == null
                     || !(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
-                    || payload.stack().isEmpty() || payload.quantity() <= 0L) {
+                    || payload.quantity() <= 0L) {
                 return;
             }
             final NetworkUuid net = host.networkUuid();
@@ -116,7 +115,7 @@ public final class ComputingPayloads {
             if (mainframe == null) {
                 return;
             }
-            final StorageKey key = StorageKey.of(payload.stack());
+            final StorageKey key = payload.key();
             // Take the items out of local storage and carry them in the Operation; whatever the network
             // cannot hold is returned to local storage when it settles, so nothing is ever lost.
             final long taken = host.localStore().extract(key,
@@ -150,80 +149,7 @@ public final class ComputingPayloads {
         });
     }
 
-    private static void handleSelect(final NetworkSelectPayload payload, final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (openPc(context, payload.pcPos()) instanceof PersonalComputerBlockEntity pc) {
-                dispatchSelect((ServerPlayer) context.player(), pc, payload.item(), payload.quantity());
-            }
-        });
-    }
-
-    private static void handleInsert(final NetworkInsertPayload payload, final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (openPc(context, payload.pcPos()) instanceof PersonalComputerBlockEntity pc
-                    && context.player() instanceof ServerPlayer player
-                    && player.containerMenu instanceof PersonalComputerMenu menu) {
-                final ItemStack carried = menu.getCarried();
-                if (carried.isEmpty()) {
-                    return;
-                }
-                final ItemStack payloadStack = payload.all() ? carried.copy() : carried.copyWithCount(1);
-                // Take the items off the cursor now; the Operation returns any overflow.
-                carried.shrink(payloadStack.getCount());
-                menu.setCarried(carried.isEmpty() ? ItemStack.EMPTY : carried);
-                menu.broadcastChanges();
-                if (!dispatchInsert(player, pc, payloadStack)) {
-                    player.getInventory().placeItemBackInInventory(payloadStack);
-                }
-            }
-        });
-    }
-
-    private static PersonalComputerBlockEntity openPc(final IPayloadContext context, final BlockPos pos) {
-        if (context.player() instanceof ServerPlayer player
-                && player.containerMenu instanceof PersonalComputerMenu menu
-                && menu.pcPos().equals(pos)
-                && player.level().getBlockEntity(pos) instanceof PersonalComputerBlockEntity pc) {
-            return pc;
-        }
-        return null;
-    }
-
-    // Network-operation dispatch — the ONLY way storage is touched. Every PC
-
-    public static boolean dispatchSelect(final ServerPlayer player, final PersonalComputerBlockEntity pc,
-                                         final net.minecraft.world.item.Item item, final long quantity) {
-        return dispatch(player, pc, (level, net, mf) -> {
-            final var op = mf.submitNetworkSelect(item, quantity,
-                    new net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper(player.getInventory()),
-                    "inventory");
-            if (op == null) {
-                return false;
-            }
-            // Stop the pull if the player logs out mid-stream: their inventory is saved and orphaned
-            // on disconnect, so writing into it afterwards would destroy the items.
-            op.abortWhen(player::isRemoved).onSettle(() -> sendSnapshot(player, level, net));
-            return true;
-        });
-    }
-
-    public static boolean dispatchInsert(final ServerPlayer player, final PersonalComputerBlockEntity pc,
-                                         final ItemStack payload) {
-        return dispatch(player, pc, (level, net, mf) -> {
-            final var op = mf.submitNetworkInsert(StorageKey.of(payload), payload.getCount(), "inventory");
-            if (op == null) {
-                return false;
-            }
-            op.onSettle(() -> {
-                final long leftover = op.leftover();
-                if (leftover > 0L) {
-                    returnToPlayer(player, payload.copyWithCount((int) leftover));
-                }
-                sendSnapshot(player, level, net);
-            });
-            return true;
-        });
-    }
+    // Network-operation dispatch — the ONLY way storage is touched. Every request
 
     private static void returnToPlayer(final ServerPlayer player, final ItemStack stack) {
         if (stack.isEmpty()) {
@@ -301,7 +227,7 @@ public final class ComputingPayloads {
             }
             final NetworkUuid net = host.networkUuid();
             final MainframeBlockEntity mainframe = resolveMainframe(level, net);
-            if (mainframe == null || payload.stack().isEmpty()) {
+            if (mainframe == null) {
                 return;
             }
             // Resolve where the pulled items land: the computer's own local storage (simple/auto) or
@@ -318,7 +244,7 @@ public final class ComputingPayloads {
                     return; // the only chosen source was the destination — nothing to move
                 }
             }
-            final StorageKey key = StorageKey.of(payload.stack());
+            final StorageKey key = payload.key();
             final var op = dest.move()
                     ? mainframe.submitNetworkMove(key, payload.quantity(), dest.handler(), dest.label(), sources)
                     : mainframe.submitNetworkSelect(key, payload.quantity(), dest.handler(), dest.label(), sources);
@@ -331,7 +257,7 @@ public final class ComputingPayloads {
     /**
      * A resolved SELECT destination: where the pulled items land, the provenance label, whether it is a MOVE (into another Server), and that target Server's node (so it can be excluded as a source).
      */
-    private record Dest(net.neoforged.neoforge.items.IItemHandler handler, String label,
+    private record Dest(dev.jsc.jscomputronics.module.computing.storage.DataSink handler, String label,
                         boolean move, @Nullable NodeUuid target) {
     }
 
@@ -441,6 +367,11 @@ public final class ComputingPayloads {
             if (source.isEmpty()) {
                 return;
             }
+            // A fluid container (a filled bucket, etc.) deposits its FLUID into the network and leaves
+            // the emptied container — fluid is data too. One container per click.
+            if (depositFluidContainer(mainframe, menu, slot, fromCursor, source, player, level, net)) {
+                return;
+            }
             // Take the items off the source now ("in flight"); the Operation returns overflow.
             final ItemStack inFlight;
             if (idx == TerminalInsertPayload.CURSOR_ONE) {
@@ -473,6 +404,57 @@ public final class ComputingPayloads {
         });
     }
 
+    private static boolean depositFluidContainer(final MainframeBlockEntity mainframe,
+            final ComputerTerminalMenu menu, final net.minecraft.world.inventory.Slot slot,
+            final boolean fromCursor, final ItemStack source, final ServerPlayer player,
+            final ServerLevel level, final NetworkUuid network) {
+        final var handler = FluidUtil.getFluidHandler(source.copyWithCount(1));
+        if (handler.isEmpty()) {
+            return false;
+        }
+        final FluidStack drained = handler.get().drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.EXECUTE);
+        if (drained.isEmpty()) {
+            return false; // an empty container is not a fluid to deposit — try the item path
+        }
+        // A fluid container is atomic: only deposit when the network has room for the whole amount, so
+        long freeWeight = 0L;
+        for (final var room : mainframe.networkIndex().freeSpace(level, network)) {
+            freeWeight += room.quantity();
+            if (freeWeight >= drained.getAmount()) {
+                break;
+            }
+        }
+        if (freeWeight < drained.getAmount()) {
+            return true;
+        }
+        final var op = mainframe.submitNetworkInsert(StorageKey.of(drained), drained.getAmount(), "terminal");
+        if (op == null) {
+            return true; // no dispatcher: do nothing, keep the full container in hand
+        }
+        // Remove one container from the source and hand back the emptied one.
+        source.shrink(1);
+        if (fromCursor) {
+            menu.setCarried(source.isEmpty() ? ItemStack.EMPTY : source);
+        } else {
+            slot.set(source.isEmpty() ? ItemStack.EMPTY : source);
+        }
+        menu.broadcastChanges();
+        returnToPlayer(player, handler.get().getContainer());
+        op.onSettle(() -> {
+            final long leftover = op.leftover();
+            if (leftover > 0L) {
+                // The network could not hold it all; hand back a filled container of the remainder.
+                final ItemStack refilled = FluidUtil.getFilledBucket(
+                        drained.copyWithAmount((int) Math.min(leftover, Integer.MAX_VALUE)));
+                if (!refilled.isEmpty()) {
+                    returnToPlayer(player, refilled);
+                }
+            }
+            sendSnapshot(player, level, network);
+        });
+        return true;
+    }
+
     private static void handleRequestBreakdown(final RequestServerBreakdownPayload payload,
                                                final IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -480,7 +462,7 @@ public final class ComputingPayloads {
             if (host != null && host.networkUuid() != null
                     && context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level) {
-                PacketDistributor.sendToPlayer(player, collectBreakdown(level, host.networkUuid(), payload.stack()));
+                PacketDistributor.sendToPlayer(player, collectBreakdown(level, host.networkUuid(), payload.key()));
                 // The advanced-mode destination picker needs every computer that can hold items (the
                 // Mainframe's local storage and every Server), not just those holding the clicked item.
                 PacketDistributor.sendToPlayer(player, collectComputers(level, host.networkUuid()));
@@ -584,9 +566,9 @@ public final class ComputingPayloads {
     }
 
     private static ServerBreakdownPayload collectBreakdown(final ServerLevel level, final NetworkUuid net,
-                                                           final ItemStack stack) {
+                                                           final StorageKey key) {
         final Map<NodeUuid, Long> perServer = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
-                .of(level, net).breakdown(StorageKey.of(stack));
+                .of(level, net).breakdown(key);
         final List<ServerBreakdownPayload.ServerHolding> rows = new ArrayList<>();
         for (final Map.Entry<NodeUuid, Long> e : perServer.entrySet()) {
             if (rows.size() >= ServerBreakdownPayload.MAX) {
@@ -694,7 +676,7 @@ public final class ComputingPayloads {
         // Bounded by the wire cap so encoding never overflows the StreamCodec. The entry carries the
         // full stack (components and all), so the terminal shows the enchanted item, not a bare one.
         totals.entrySet().stream().limit(NetworkSnapshotPayload.MAX_ENTRIES)
-                .forEach(e -> entries.add(new NetworkItemEntry(e.getKey().stack(1), e.getValue())));
+                .forEach(e -> entries.add(new NetworkItemEntry(e.getKey(), e.getValue())));
         PacketDistributor.sendToPlayer(player, new NetworkSnapshotPayload(entries));
     }
 
@@ -713,7 +695,7 @@ public final class ComputingPayloads {
         final List<NetworkItemEntry> entries = new ArrayList<>(
                 Math.min(view.size(), LocalStorageSnapshotPayload.MAX_ENTRIES));
         view.entrySet().stream().limit(LocalStorageSnapshotPayload.MAX_ENTRIES)
-                .forEach(e -> entries.add(new NetworkItemEntry(e.getKey().stack(1), e.getValue())));
+                .forEach(e -> entries.add(new NetworkItemEntry(e.getKey(), e.getValue())));
         PacketDistributor.sendToPlayer(player, new LocalStorageSnapshotPayload(entries));
     }
 
@@ -721,10 +703,13 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
             if (host == null || !(context.player() instanceof ServerPlayer player)
-                    || payload.stack().isEmpty() || payload.quantity() <= 0L) {
+                    || payload.quantity() <= 0L) {
                 return;
             }
-            final StorageKey key = StorageKey.of(payload.stack());
+            final StorageKey key = payload.key();
+            if (key.isFluid()) {
+                return; // a fluid cannot be held in the inventory — withdraw it via an Export Bus
+            }
             final int maxStack = Math.max(1, key.stack(1).getMaxStackSize());
             // Take only as much as the player's inventory can actually hold, so a "withdraw all" on a
             // huge stack never extracts more than fits — items must never be destroyed by overflow.

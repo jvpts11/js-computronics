@@ -49,16 +49,28 @@ public final class LocalStore {
         return total;
     }
 
-    public long used() {
+    public long capacityWeight() {
+        return capacity() * StorageKey.MB_EQ_PER_ITEM;
+    }
+
+    public long usedWeight() {
         long total = 0L;
         for (final ItemStack disk : disks) {
-            total += contentsOf(disk).total();
+            total += contentsOf(disk).usedWeight();
         }
         return total;
     }
 
+    public long freeWeight() {
+        return Math.max(0L, capacityWeight() - usedWeight());
+    }
+
+    public long used() {
+        return usedWeight() / StorageKey.MB_EQ_PER_ITEM;
+    }
+
     public long free() {
-        return Math.max(0L, capacity() - used());
+        return freeWeight() / StorageKey.MB_EQ_PER_ITEM;
     }
 
     public Map<StorageKey, Long> view() {
@@ -81,16 +93,18 @@ public final class LocalStore {
         if (amount <= 0L) {
             return 0L;
         }
+        final long unitWeight = key.weight(1L); // 1000 for an item, 1 per mB of fluid
         long remaining = amount;
         for (final ItemStack disk : disks) {
             if (remaining <= 0L) {
                 break;
             }
-            final long room = diskCapacity(disk) - contentsOf(disk).total();
-            if (room <= 0L) {
+            final long roomWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM - contentsOf(disk).usedWeight();
+            final long roomNative = roomWeight / unitWeight;
+            if (roomNative <= 0L) {
                 continue;
             }
-            final long put = Math.min(remaining, room);
+            final long put = Math.min(remaining, roomNative);
             final Map<StorageKey, Long> next = new HashMap<>(contentsOf(disk).items());
             next.merge(key, put, Long::sum);
             setContents(disk, next);

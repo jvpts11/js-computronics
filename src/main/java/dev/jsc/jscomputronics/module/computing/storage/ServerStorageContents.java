@@ -39,16 +39,16 @@ public record ServerStorageContents(Map<StorageKey, Long> items) {
     }
 
     /**
-     * One persisted line: a count-1 prototype stack (carrying its components) plus the quantity.
+     * One persisted line: the data key (item OR fluid, carrying its components) plus the quantity.
      */
-    private record Line(ItemStack prototype, long count) {
+    private record Line(StorageKey key, long count) {
         static final Codec<Line> CODEC = RecordCodecBuilder.create(builder -> builder.group(
-                ItemStack.CODEC.fieldOf("item").forGetter(Line::prototype),
+                StorageKey.CODEC.fieldOf("item").forGetter(Line::key),
                 Codec.LONG.fieldOf("count").forGetter(Line::count)
         ).apply(builder, Line::new));
 
         static final StreamCodec<RegistryFriendlyByteBuf, Line> STREAM_CODEC = StreamCodec.composite(
-                ItemStack.STREAM_CODEC, Line::prototype,
+                StorageKey.STREAM_CODEC, Line::key,
                 ByteBufCodecs.VAR_LONG, Line::count,
                 Line::new);
     }
@@ -56,14 +56,14 @@ public record ServerStorageContents(Map<StorageKey, Long> items) {
     private static ServerStorageContents fromLines(final List<Line> lines) {
         final Map<StorageKey, Long> map = new LinkedHashMap<>();
         for (final Line line : lines) {
-            map.merge(StorageKey.of(line.prototype()), line.count(), Long::sum);
+            map.merge(line.key(), line.count(), Long::sum);
         }
         return new ServerStorageContents(map);
     }
 
     private static List<Line> toLines(final ServerStorageContents contents) {
         final List<Line> lines = new ArrayList<>(contents.items.size());
-        contents.items.forEach((key, count) -> lines.add(new Line(key.prototype(), count)));
+        contents.items.forEach((key, count) -> lines.add(new Line(key, count)));
         return lines;
     }
 
@@ -78,6 +78,14 @@ public record ServerStorageContents(Map<StorageKey, Long> items) {
         long sum = 0L;
         for (final long count : items.values()) {
             sum += count;
+        }
+        return sum;
+    }
+
+    public long usedWeight() {
+        long sum = 0L;
+        for (final Map.Entry<StorageKey, Long> entry : items.entrySet()) {
+            sum += entry.getKey().weight(entry.getValue());
         }
         return sum;
     }

@@ -94,7 +94,9 @@ public final class ServerHardwareHandler implements IItemHandlerModifiable {
     @Override
     public boolean isItemValid(final int slot, final ItemStack stack) {
         if (slot == MOBO) {
-            return stack.getItem() instanceof MotherboardItem;
+            // A Server accepts only an EEB-form-factor board, not any motherboard.
+            return MotherboardItem.fits(stack,
+                    java.util.Set.of(dev.jsc.jscomputronics.common.hardware.FormFactor.EEB));
         }
         if (slot == PSU) {
             return stack.getItem() instanceof PsuItem;

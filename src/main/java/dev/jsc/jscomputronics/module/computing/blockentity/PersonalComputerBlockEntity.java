@@ -107,7 +107,9 @@ public class PersonalComputerBlockEntity extends BlockEntity
 
     public static boolean isValidForSlot(final int slot, final ItemStack stack) {
         if (slot == MOTHERBOARD_SLOT) {
-            return stack.getItem() instanceof MotherboardItem;
+            // A Personal Computer accepts only an ATX-form-factor board, not any motherboard.
+            return MotherboardItem.fits(stack,
+                    java.util.Set.of(dev.jsc.jscomputronics.common.hardware.FormFactor.ATX));
         }
         if (slot == CPU_SLOT) {
             return stack.getItem() instanceof CpuItem;
@@ -283,12 +285,12 @@ public class PersonalComputerBlockEntity extends BlockEntity
 
     public int boardRamSlots() {
         return hardware.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
-                ? m.spec().ramSlots() : 0;
+                ? Math.min(RAM_SLOTS, m.spec().ramSlots()) : 0;
     }
 
     public int boardPcieSlots() {
         return hardware.getStackInSlot(MOTHERBOARD_SLOT).getItem() instanceof MotherboardItem m
-                ? m.spec().pcieSlots() : 0;
+                ? Math.min(GPU_SLOTS, m.spec().pcieSlots()) : 0;
     }
 
     public int boardDiskSlots() {
@@ -479,7 +481,7 @@ public class PersonalComputerBlockEntity extends BlockEntity
     }
 
     @Override
-    public net.neoforged.neoforge.items.IItemHandler localStorage() {
+    public dev.jsc.jscomputronics.module.computing.storage.DataSink localStorage() {
         return new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(localStore());
     }
 
@@ -496,19 +498,26 @@ public class PersonalComputerBlockEntity extends BlockEntity
 
     // A Personal Computer runs a single Operation queue; GPUs add parallel queues
     // only on a Mainframe/Subframe, so the PC never surfaces a queue count.
-    public static final int DATA_COUNT = 7;
+    public static final int DATA_RUNNING = 0;
+    public static final int DATA_BUILD_VALID = 1;
+    public static final int DATA_CAPACITY = 2;
+    public static final int DATA_RAM_BUFFER = 3;
+    public static final int DATA_AUTOSTART = 4;
+    public static final int DATA_ON_NETWORK = 5;
+    public static final int DATA_SERVER_COUNT = 6;
+    public static final int DATA_COUNT = DATA_SERVER_COUNT + 1;
 
     private final int[] clientData = new int[DATA_COUNT];
 
     private int computeData(final int index) {
         return switch (index) {
-            case 0 -> isRunning() ? 1 : 0;
-            case 1 -> buildValid() ? 1 : 0;
-            case 2 -> (int) Math.min(Integer.MAX_VALUE, capacity());
-            case 3 -> (int) Math.min(Integer.MAX_VALUE, ramBuffer());
-            case 4 -> autoStart ? 1 : 0;
-            case 5 -> networkUuid != null ? 1 : 0;
-            case 6 -> networkServerCount();
+            case DATA_RUNNING -> isRunning() ? 1 : 0;
+            case DATA_BUILD_VALID -> buildValid() ? 1 : 0;
+            case DATA_CAPACITY -> (int) Math.min(Integer.MAX_VALUE, capacity());
+            case DATA_RAM_BUFFER -> (int) Math.min(Integer.MAX_VALUE, ramBuffer());
+            case DATA_AUTOSTART -> autoStart ? 1 : 0;
+            case DATA_ON_NETWORK -> networkUuid != null ? 1 : 0;
+            case DATA_SERVER_COUNT -> networkServerCount();
             default -> 0;
         };
     }

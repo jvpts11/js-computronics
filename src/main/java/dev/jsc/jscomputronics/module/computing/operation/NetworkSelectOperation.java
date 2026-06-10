@@ -16,10 +16,10 @@ import dev.jsc.jscomputronics.common.operation.exec.TransferState;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
+import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.IItemHandler;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,7 +39,7 @@ public final class NetworkSelectOperation implements NetworkOperation {
     private final NetworkUuid network;
     private final StorageKey key;
     private final long demand;
-    private final IItemHandler destination;
+    private final DataSink destination;
     private final String destinationLabel;
     private final byte recordType;
     private final UUID operationId;
@@ -63,7 +63,7 @@ public final class NetworkSelectOperation implements NetworkOperation {
     }
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
-                                  final long demand, final IItemHandler destination,
+                                  final long demand, final DataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
                                   final java.util.Set<NodeUuid> sourceFilter) {
@@ -208,7 +208,7 @@ public final class NetworkSelectOperation implements NetworkOperation {
         final List<OperationRecord.MoveRow> moves = new ArrayList<>();
         movedPerServer.forEach((server, moved) ->
                 moves.add(new OperationRecord.MoveRow("SRV-" + shortId(server.asString()), moved, destinationLabel)));
-        return new OperationRecord(recordType, key.stack(1), demand, movedTotal,
+        return new OperationRecord(recordType, key, demand, movedTotal,
                 recordStatus, List.copyOf(moves));
     }
 

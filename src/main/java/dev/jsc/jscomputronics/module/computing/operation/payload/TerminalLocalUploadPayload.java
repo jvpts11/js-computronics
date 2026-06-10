@@ -7,18 +7,18 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 
 /**
- * Client to server: the player chose to UPLOAD up to {@code quantity} of {@code stack}'s exact type (item + components) from the computer's local storage into the network (a timed INSERT routed through the Mainframe).
+ * Client to server: UPLOAD up to {@code quantity} of {@code key}'s exact data type (item OR fluid, with components) from the computer's local storage into the network (a timed INSERT routed through the Mainframe).
  */
-public record TerminalLocalUploadPayload(BlockPos monitorPos, BlockPos hostPos, ItemStack stack, long quantity)
+public record TerminalLocalUploadPayload(BlockPos monitorPos, BlockPos hostPos, StorageKey key, long quantity)
         implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<TerminalLocalUploadPayload> TYPE =
@@ -28,7 +28,7 @@ public record TerminalLocalUploadPayload(BlockPos monitorPos, BlockPos hostPos, 
             StreamCodec.composite(
                     BlockPos.STREAM_CODEC, TerminalLocalUploadPayload::monitorPos,
                     BlockPos.STREAM_CODEC, TerminalLocalUploadPayload::hostPos,
-                    ItemStack.OPTIONAL_STREAM_CODEC, TerminalLocalUploadPayload::stack,
+                    StorageKey.STREAM_CODEC, TerminalLocalUploadPayload::key,
                     ByteBufCodecs.VAR_LONG, TerminalLocalUploadPayload::quantity,
                     TerminalLocalUploadPayload::new);
 

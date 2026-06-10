@@ -140,49 +140,58 @@ public class MainframeMenu extends AbstractContainerMenu {
 
     public static final int BUTTON_POWER = 0;
     public static final int BUTTON_AUTOSTART = 1;
+    public static final int BUTTON_FAILOVER = 2;
 
     public boolean isRunning() {
-        return data.get(0) != 0;
+        return data.get(MainframeBlockEntity.DATA_RUNNING) != 0;
     }
 
     public boolean buildValid() {
-        return data.get(1) != 0;
+        return data.get(MainframeBlockEntity.DATA_BUILD_VALID) != 0;
     }
 
     public long capacity() {
-        return data.get(2);
+        return data.get(MainframeBlockEntity.DATA_CAPACITY);
     }
 
     public int parallelQueues() {
-        return data.get(3);
+        return data.get(MainframeBlockEntity.DATA_PARALLEL_QUEUES);
     }
 
     public long ramBuffer() {
-        return data.get(4);
+        return data.get(MainframeBlockEntity.DATA_RAM_BUFFER);
     }
 
     public boolean isAutoStart() {
-        return data.get(5) != 0;
+        return data.get(MainframeBlockEntity.DATA_AUTOSTART) != 0;
     }
 
     public boolean isManualOn() {
-        return data.get(6) != 0;
+        return data.get(MainframeBlockEntity.DATA_MANUAL_ON) != 0;
     }
 
     public int networkState() {
-        return data.get(7);
+        return data.get(MainframeBlockEntity.DATA_NETWORK_STATE);
     }
 
     public int pendingOps() {
-        return data.get(8);
+        return data.get(MainframeBlockEntity.DATA_PENDING_OPS);
     }
 
     public int runningOps() {
-        return data.get(9);
+        return data.get(MainframeBlockEntity.DATA_RUNNING_OPS);
     }
 
     public int completedOps() {
-        return data.get(10);
+        return data.get(MainframeBlockEntity.DATA_COMPLETED_OPS);
+    }
+
+    public boolean failoverEnabled() {
+        return data.get(MainframeBlockEntity.DATA_FAILOVER_ENABLED) != 0;
+    }
+
+    public int failoverRole() {
+        return data.get(MainframeBlockEntity.DATA_FAILOVER_ROLE);
     }
 
     @Override
@@ -193,6 +202,10 @@ public class MainframeMenu extends AbstractContainerMenu {
         }
         if (id == BUTTON_AUTOSTART) {
             blockEntity.toggleAutoStart();
+            return true;
+        }
+        if (id == BUTTON_FAILOVER) {
+            blockEntity.toggleFailover();
             return true;
         }
         return false;

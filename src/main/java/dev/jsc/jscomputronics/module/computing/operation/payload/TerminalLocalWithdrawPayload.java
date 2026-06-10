@@ -7,18 +7,18 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 
 /**
- * Client to server: the player clicked an item in the Storage tab to WITHDRAW up to {@code quantity} of {@code stack}'s exact type (item + components) from the computer's local storage into their inventory.
+ * Client to server: the player clicked a row in the Storage tab to WITHDRAW up to {@code quantity} of {@code key}'s exact type (item with components) from the computer's local storage into their inventory.
  */
-public record TerminalLocalWithdrawPayload(BlockPos monitorPos, BlockPos hostPos, ItemStack stack, long quantity)
+public record TerminalLocalWithdrawPayload(BlockPos monitorPos, BlockPos hostPos, StorageKey key, long quantity)
         implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<TerminalLocalWithdrawPayload> TYPE =
@@ -28,7 +28,7 @@ public record TerminalLocalWithdrawPayload(BlockPos monitorPos, BlockPos hostPos
             StreamCodec.composite(
                     BlockPos.STREAM_CODEC, TerminalLocalWithdrawPayload::monitorPos,
                     BlockPos.STREAM_CODEC, TerminalLocalWithdrawPayload::hostPos,
-                    ItemStack.OPTIONAL_STREAM_CODEC, TerminalLocalWithdrawPayload::stack,
+                    StorageKey.STREAM_CODEC, TerminalLocalWithdrawPayload::key,
                     ByteBufCodecs.VAR_LONG, TerminalLocalWithdrawPayload::quantity,
                     TerminalLocalWithdrawPayload::new);
 

@@ -11,16 +11,19 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.IItemHandler;
+
+import java.util.List;
 
 /**
- * An Import Bus part: pulls items out of the inventory its mounted face touches and pushes them into the network as INSERT Operations dispatched by the Mainframe.
+ * An Import Bus part: pulls whatever data its mounted face touches — items OR fluids, with no distinction — and pushes it into the network as INSERT Operations dispatched by the Mainframe.
  */
 public final class ImportBusPart implements CablePart {
 
@@ -30,7 +33,8 @@ public final class ImportBusPart implements CablePart {
     private DataCableBlockEntity host;
     private Direction face = Direction.NORTH;
 
-    private ItemStack buffer = ItemStack.EMPTY;
+    private StorageKey bufferKey;
+    private long bufferAmount;
     private dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation activeOp;
     private StorageKey flushedKey;
     private int ticksSinceFlush;
@@ -54,13 +58,9 @@ public final class ImportBusPart implements CablePart {
                 return;
             }
             final long leftover = activeOp.leftover();
-            if (leftover > 0L && flushedKey != null) {
-                final ItemStack back = flushedKey.stack((int) Math.min(Integer.MAX_VALUE, leftover));
-                if (buffer.isEmpty()) {
-                    buffer = back;
-                } else if (ItemStack.isSameItemSameComponents(buffer, back)) {
-                    buffer.grow(back.getCount());
-                }
+            if (leftover > 0L && flushedKey != null && bufferKey == null) {
+                bufferKey = flushedKey;
+                bufferAmount = leftover;
                 host.setChanged();
             }
             activeOp = null;
@@ -74,37 +74,39 @@ public final class ImportBusPart implements CablePart {
         final NetworkUuid network = host.network();
         final MainframeBlockEntity mainframe = network == null ? null : host.mainframe();
         // The batch size and pull rate follow the network's orchestration capacity.
-        final int cap = mainframe == null ? MIN_BATCH
-                : (int) Math.max(MIN_BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
-        final IItemHandler front = host.neighborHandler(face);
+        final long cap = mainframe == null ? MIN_BATCH
+                : Math.max(MIN_BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
+        final ExternalDataPort port = host.neighborPort(face);
         ticksSinceFlush++;
 
         boolean typeChange = false;
-        if (front != null) {
-            if (buffer.isEmpty()) {
-                final ItemStack incoming = firstStack(front);
-                if (!incoming.isEmpty()) {
-                    final int pulled = pullSameStack(front, incoming, cap);
-                    if (pulled > 0) {
-                        buffer = incoming.copyWithCount(pulled);
+        if (!port.isEmpty()) {
+            if (bufferKey == null) {
+                final List<StorageKey> available = port.available();
+                if (!available.isEmpty()) {
+                    final StorageKey pick = available.get(0);
+                    final long pulled = port.extract(pick, cap, false);
+                    if (pulled > 0L) {
+                        bufferKey = pick;
+                        bufferAmount = pulled;
                         host.setChanged();
                     }
                 }
             } else {
-                final int room = cap - buffer.getCount();
-                if (room > 0) {
-                    final int pulled = pullSameStack(front, buffer, room);
-                    if (pulled > 0) {
-                        buffer.grow(pulled);
+                final long room = cap - bufferAmount;
+                if (room > 0L) {
+                    final long pulled = port.extract(bufferKey, room, false);
+                    if (pulled > 0L) {
+                        bufferAmount += pulled;
                         host.setChanged();
                     }
                 }
-                typeChange = hasOtherStack(front, buffer);
+                typeChange = port.available().stream().anyMatch(k -> !k.equals(bufferKey));
             }
         }
 
-        final boolean flush = !buffer.isEmpty()
-                && (buffer.getCount() >= cap || ticksSinceFlush >= FLUSH_TICKS || typeChange);
+        final boolean flush = bufferKey != null
+                && (bufferAmount >= cap || ticksSinceFlush >= FLUSH_TICKS || typeChange);
         if (!flush) {
             return;
         }
@@ -112,50 +114,21 @@ public final class ImportBusPart implements CablePart {
             ticksSinceFlush = 0; // not networked: hold the buffer, do not spin
             return;
         }
-        final ItemStack payload = buffer;
-        buffer = ItemStack.EMPTY;
+        final StorageKey payloadKey = bufferKey;
+        final long payloadAmount = bufferAmount;
+        bufferKey = null;
+        bufferAmount = 0L;
         ticksSinceFlush = 0;
-        // Push the buffered items into the network as a timed INSERT; whatever does not fit comes
-        // back as the Operation's leftover and is re-buffered when it finishes (above).
-        activeOp = mainframe.submitNetworkInsert(StorageKey.of(payload), payload.getCount(), "import");
-        flushedKey = StorageKey.of(payload);
+        // Push the buffered data into the network as a timed INSERT; whatever does not fit comes back
+        // as the Operation's leftover and is re-buffered when it finishes (above).
+        activeOp = mainframe.submitNetworkInsert(payloadKey, payloadAmount, "import");
+        flushedKey = payloadKey;
         if (activeOp == null) {
-            buffer = payload; // dispatch failed (not running): keep the items
+            bufferKey = payloadKey; // dispatch failed (not running): keep the data
+            bufferAmount = payloadAmount;
             flushedKey = null;
         }
         host.setChanged();
-    }
-
-    private static int pullSameStack(final IItemHandler handler, final ItemStack proto, final int max) {
-        int pulled = 0;
-        for (int i = 0; i < handler.getSlots() && pulled < max; i++) {
-            final ItemStack inSlot = handler.getStackInSlot(i);
-            if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, proto)) {
-                continue;
-            }
-            pulled += handler.extractItem(i, max - pulled, false).getCount();
-        }
-        return pulled;
-    }
-
-    private static ItemStack firstStack(final IItemHandler handler) {
-        for (int i = 0; i < handler.getSlots(); i++) {
-            final ItemStack inSlot = handler.getStackInSlot(i);
-            if (!inSlot.isEmpty()) {
-                return inSlot.copyWithCount(1);
-            }
-        }
-        return ItemStack.EMPTY;
-    }
-
-    private static boolean hasOtherStack(final IItemHandler handler, final ItemStack kept) {
-        for (int i = 0; i < handler.getSlots(); i++) {
-            final ItemStack inSlot = handler.getStackInSlot(i);
-            if (!inSlot.isEmpty() && !ItemStack.isSameItemSameComponents(inSlot, kept)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -165,24 +138,35 @@ public final class ImportBusPart implements CablePart {
 
     @Override
     public void dropContents(final ServerLevel level) {
-        if (!buffer.isEmpty() && host != null) {
+        // Drop a buffered item back into the world; a buffered fluid (rare, transient) is discarded.
+        if (bufferKey != null && !bufferKey.isFluid() && host != null) {
             net.minecraft.world.Containers.dropItemStack(level,
-                    host.getBlockPos().getX(), host.getBlockPos().getY(), host.getBlockPos().getZ(), buffer);
-            buffer = ItemStack.EMPTY;
+                    host.getBlockPos().getX(), host.getBlockPos().getY(), host.getBlockPos().getZ(),
+                    bufferKey.stack((int) Math.min(bufferAmount, Integer.MAX_VALUE)));
         }
+        bufferKey = null;
+        bufferAmount = 0L;
     }
 
     @Override
     public void save(final CompoundTag tag, final HolderLookup.Provider registries) {
-        if (!buffer.isEmpty()) {
-            tag.put("Buffer", buffer.save(registries));
+        if (bufferKey != null && bufferAmount > 0L) {
+            StorageKey.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), bufferKey)
+                    .result().ifPresent(encoded -> tag.put("BufferKey", encoded));
+            tag.putLong("BufferAmount", bufferAmount);
         }
     }
 
     @Override
     public void load(final CompoundTag tag, final HolderLookup.Provider registries) {
-        buffer = tag.contains("Buffer")
-                ? ItemStack.parseOptional(registries, tag.getCompound("Buffer"))
-                : ItemStack.EMPTY;
+        bufferKey = null;
+        bufferAmount = 0L;
+        if (tag.contains("BufferKey")) {
+            StorageKey.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get("BufferKey"))
+                    .result().ifPresent(key -> {
+                        bufferKey = key;
+                        bufferAmount = tag.getLong("BufferAmount");
+                    });
+        }
     }
 }

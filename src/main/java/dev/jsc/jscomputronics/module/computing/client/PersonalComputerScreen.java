@@ -96,9 +96,11 @@ public class PersonalComputerScreen extends AbstractContainerScreen<PersonalComp
         if (menu.boardCpuSlots() > 0) {
             JscOsTheme.slot(g, x + 44, y + 40);
         }
-        final int ram = Math.min(menu.boardRamSlots(), 4);
-        final int gpu = Math.min(menu.boardPcieSlots(), 4);
-        final int disk = Math.min(menu.boardDiskSlots(), 2);
+        // The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
+        // screen draws exactly what the menu exposes — one source of truth, no duplicated cap literal.
+        final int ram = menu.boardRamSlots();
+        final int gpu = menu.boardPcieSlots();
+        final int disk = menu.boardDiskSlots();
         for (int i = 0; i < ram; i++) {
             JscOsTheme.slot(g, x + 44 + i * 18, y + 73);
         }

@@ -17,6 +17,7 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalDe
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalUploadPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalLocalWithdrawPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkServersPayload;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalSelectPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -39,23 +40,24 @@ import java.util.Set;
  */
 public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerminalMenu> {
 
-    // Flat palette (ARGB). No rounded corners anywhere.
-    private static final int OUTER = 0xFF05070A;
-    private static final int SCREEN = 0xFF0B0E13;
-    private static final int RAIL = 0xFF0E131A;
-    private static final int PANEL = 0xFF11161D;
-    private static final int LINE = 0xFF1D2530;
-    private static final int TRACK = 0xFF0A0E14;
-    private static final int SLOT_BG = 0xFF0A0D12;
-    private static final int SLOT_EDGE = 0xFF1C2531;
-    private static final int ACCENT = 0xFF39D6C4;
-    private static final int ACCENT2 = 0xFF2AA7E0;
-    private static final int GREEN = 0xFF5FE07A;
-    private static final int AMBER = 0xFFF0B23A;
-    private static final int RED = 0xFFEF6A5A;
-    private static final int TEXT = 0xFFCDD6E2;
-    private static final int DIM = 0xFF7D8A9C;
-    private static final int TAB_ON = 0xFF15212A;
+    // Flat palette (ARGB), sourced from the shared OS theme so the Monitor terminal never drifts from
+    // the other computing GUIs. No rounded corners anywhere.
+    private static final int OUTER = JscOsTheme.OUTER;
+    private static final int SCREEN = JscOsTheme.SCREEN;
+    private static final int RAIL = JscOsTheme.RAIL;
+    private static final int PANEL = JscOsTheme.PANEL;
+    private static final int LINE = JscOsTheme.LINE;
+    private static final int TRACK = JscOsTheme.TRACK;
+    private static final int SLOT_BG = JscOsTheme.SLOT_BG;
+    private static final int SLOT_EDGE = JscOsTheme.SLOT_EDGE;
+    private static final int ACCENT = JscOsTheme.ACCENT;
+    private static final int ACCENT2 = JscOsTheme.ACCENT2;
+    private static final int GREEN = JscOsTheme.GREEN;
+    private static final int AMBER = JscOsTheme.AMBER;
+    private static final int RED = JscOsTheme.RED;
+    private static final int TEXT = JscOsTheme.TEXT;
+    private static final int DIM = JscOsTheme.DIM;
+    private static final int TAB_ON = JscOsTheme.TAB_ON;
 
     private static final int RAIL_X = 4;
     private static final int RAIL_W = 56;
@@ -423,8 +425,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 final int idx = start + row * NET_COLS + col;
                 if (idx < items.size()) {
                     final NetworkItemEntry e = items.get(idx);
-                    g.renderItem(e.icon(), sx, sy);
-                    g.renderItemDecorations(font, e.icon(), sx, sy, fmt(e.total()));
+                    drawDataIcon(g, e.key(), e.total(), sx, sy);
                 }
             }
         }
@@ -438,15 +439,15 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 ? menu.localItems() : menu.networkItems();
         for (final NetworkItemEntry e : source) {
             if (q.isEmpty()
-                    || e.icon().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)) {
+                    || e.name().getString().toLowerCase(Locale.ROOT).contains(q)) {
                 out.add(e);
             }
         }
         if (sortByQuantity) {
             out.sort((a, b) -> Long.compare(b.total(), a.total()));
         } else {
-            out.sort((a, b) -> a.icon().getHoverName().getString()
-                    .compareToIgnoreCase(b.icon().getHoverName().getString()));
+            out.sort((a, b) -> a.name().getString()
+                    .compareToIgnoreCase(b.name().getString()));
         }
         return out;
     }
@@ -531,7 +532,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.fill(cx, cy + 90, cx + cw, cy + 140, PANEL);
         g.fill(cx, cy + 90, cx + cw, cy + 91, LINE);
         if (selectedOp >= 0 && selectedOp < ops.size()) {
-            g.renderItem(ops.get(selectedOp).icon(), cx + 5, cy + 96);
+            drawDataIcon(g, ops.get(selectedOp).key(), -1L, cx + 5, cy + 96);
         }
     }
 
@@ -550,7 +551,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         }
         if (selectedOp >= 0 && selectedOp < ops.size()) {
             final OperationRecord op = ops.get(selectedOp);
-            g.drawString(font, op.icon().getHoverName().getString(), cx + 24, cy + 96, TEXT, false);
+            g.drawString(font, op.name().getString(), cx + 24, cy + 96, TEXT, false);
             final String sub = fmt(op.moved()) + " of " + fmt(op.requested()) + "  " + statusLabel(op.status());
             g.drawString(font, sub, cx + 24, cy + 106, statusColor(op.status()), false);
             // At most two provenance rows fit in the box; if there are more sources,
@@ -676,7 +677,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final double f = op.requested() <= 0 ? 0 : Math.min(1.0, (double) op.moved() / op.requested());
         final String pct = (int) Math.round(f * 100) + "%";
         final int nameW = Math.max(0, cw - 44 - font.width(pct) - 8);
-        g.drawString(font, font.plainSubstrByWidth(op.icon().getHoverName().getString(), nameW),
+        g.drawString(font, font.plainSubstrByWidth(op.name().getString(), nameW),
                 cx + 44, ry, TEXT, false);
         g.drawString(font, pct, cx + cw - font.width(pct) - 4, ry, ACCENT, false);
         track(g, cx + 4, ry + 9, cw - 8, f, ACCENT2);
@@ -688,7 +689,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.drawString(font, opTypeLabel(type), cx + 4, ry, opTypeColor(type), false);
         final String q = fmt(op.moved());
         final int nameW = Math.max(0, cw - 44 - font.width(q) - 8);
-        final String name = font.plainSubstrByWidth(op.icon().getHoverName().getString(), nameW);
+        final String name = font.plainSubstrByWidth(op.name().getString(), nameW);
         g.drawString(font, name, cx + 44, ry, TEXT, false);
         g.drawString(font, q, cx + cw - font.width(q) - 4, ry, statusColor(op.status()), false);
     }
@@ -1030,7 +1031,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         // The reply carries BOTH the per-server breakdown (advanced sources) and the full computer list
         // (the advanced destination picker).
         PacketDistributor.sendToServer(new RequestServerBreakdownPayload(
-                menu.monitorPos(), menu.hostPos(), e.icon()));
+                menu.monitorPos(), menu.hostPos(), e.key()));
     }
 
     private void openStorageRequest(final NetworkItemEntry e) {
@@ -1109,9 +1110,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.fill(px - 2, py - 2, px + POPUP_W + 2, py + POPUP_H + 2, 0xFF0A1A1F);
         g.fill(px, py, px + POPUP_W, py + POPUP_H, PANEL);
         g.fill(px, py, px + POPUP_W, py + 1, ACCENT);
-        g.renderItem(popupOp.icon(), px + 6, py + 5);
+        drawDataIcon(g, popupOp.key(), -1L, px + 6, py + 5);
         final String label = opTypeLabel(popupOp.type());
-        g.drawString(font, label + "  " + popupOp.icon().getHoverName().getString(), px + 28, py + 6, TEXT, false);
+        g.drawString(font, label + "  " + popupOp.name().getString(), px + 28, py + 6, TEXT, false);
         g.drawString(font, fmt(popupOp.moved()) + " of " + fmt(popupOp.requested()) + "  "
                 + statusLabel(popupOp.status()), px + 28, py + 17, statusColor(popupOp.status()), false);
         final double f = popupOp.requested() <= 0
@@ -1261,7 +1262,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             destServer = comp.get(Math.floorMod(destServerIndex, comp.size())).key();
         }
         PacketDistributor.sendToServer(new TerminalSelectPayload(
-                menu.monitorPos(), menu.hostPos(), popupEntry.icon(), popupQty,
+                menu.monitorPos(), menu.hostPos(), popupEntry.key(), popupQty,
                 anyDeselected ? keys : List.of(), kind, destServer));
         closeRequest();
     }
@@ -1272,10 +1273,10 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         }
         if (toNetwork) {
             PacketDistributor.sendToServer(new TerminalLocalUploadPayload(
-                    menu.monitorPos(), menu.hostPos(), popupEntry.icon(), popupQty));
+                    menu.monitorPos(), menu.hostPos(), popupEntry.key(), popupQty));
         } else {
             PacketDistributor.sendToServer(new TerminalLocalWithdrawPayload(
-                    menu.monitorPos(), menu.hostPos(), popupEntry.icon(), popupQty));
+                    menu.monitorPos(), menu.hostPos(), popupEntry.key(), popupQty));
         }
         closeRequest();
     }
@@ -1301,10 +1302,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.fill(px, py, px + POPUP_W, py + ph, 0xFF0F151C);
 
         // Header: icon + name + available, plus the advanced-mode toggle (Network tab only).
-        g.renderItem(popupEntry.icon(), px + 8, py + 5);
-        g.drawString(font, font.plainSubstrByWidth(popupEntry.icon().getHoverName().getString(), POPUP_W - 78),
+        drawDataIcon(g, popupEntry.key(), -1L, px + 8, py + 5);
+        g.drawString(font, font.plainSubstrByWidth(popupEntry.name().getString(), POPUP_W - 78),
                 px + 28, py + 6, TEXT, false);
-        g.drawString(font, fmt(popupEntry.total()) + (popupFromStorage ? " in local" : " available"),
+        g.drawString(font, fmt(popupEntry.total()) + (popupEntry.isFluid() ? " mB" : "")
+                        + (popupFromStorage ? " in local" : " available"),
                 px + 28, py + 17, DIM, false);
         if (!popupFromStorage) {
             final boolean advHover = inRect(mouseX, mouseY, px + POPUP_W - 44, py + 5, 36, 12);
@@ -1403,6 +1405,25 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.drawCenteredString(font, label, x + w / 2, y + 4, 0xFFFFFFFF);
     }
 
+    private void drawDataIcon(final GuiGraphics g, final StorageKey key, final long count,
+                              final int x, final int y) {
+        if (key.isFluid()) {
+            FluidSprite.draw(g, key.fluidPrototype(), x, y);
+            if (count >= 0L) {
+                final String c = fmt(count);
+                g.pose().pushPose();
+                g.pose().translate(0, 0, 200);
+                g.drawString(font, c, x + 17 - font.width(c), y + 9, 0xFFFFFFFF, true);
+                g.pose().popPose();
+            }
+        } else {
+            g.renderItem(key.stack(1), x, y);
+            if (count >= 0L) {
+                g.renderItemDecorations(font, key.stack(1), x, y, fmt(count));
+            }
+        }
+    }
+
     private static String fmt(final long n) {
         if (n < 10_000) {
             return String.format("%,d", n);
@@ -1458,7 +1479,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             final NetworkItemEntry e = networkItemAt(mouseX, mouseY);
             if (e != null) {
                 final List<Component> lines = new ArrayList<>();
-                lines.add(e.icon().getHoverName());
+                lines.add(e.name());
                 lines.add(Component.literal(String.format("%,d", e.total()) + " " + where)
                         .withStyle(ChatFormatting.GRAY));
                 if (local) {

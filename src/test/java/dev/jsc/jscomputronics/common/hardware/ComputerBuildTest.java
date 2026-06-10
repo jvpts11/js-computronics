@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ComputerBuildTest {
 
     private static MotherboardSpec mtxStandard() {
-        return new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
+        return new MotherboardSpec(FormFactor.MTX, HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
                 Set.of(RamGeneration.DDR3), 24, PcieGeneration.PCIE_3_0, 10, 4, 8);
     }
 

@@ -127,9 +127,9 @@ public final class NetworkIndex {
         for (final ServerNode server : system.serversOf(network)) {
             system.locationOf(server.nodeUuid()).ifPresent(loc -> {
                 if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
-                    final long free = rack.getServerStorage(loc.slot()).free();
-                    if (free > 0L) {
-                        out.add(new ItemLocation(server.nodeUuid(), tierOf(rack, loc.slot()), free));
+                    final long freeWeight = rack.getServerStorage(loc.slot()).freeWeight();
+                    if (freeWeight > 0L) {
+                        out.add(new ItemLocation(server.nodeUuid(), tierOf(rack, loc.slot()), freeWeight));
                     }
                 }
             });

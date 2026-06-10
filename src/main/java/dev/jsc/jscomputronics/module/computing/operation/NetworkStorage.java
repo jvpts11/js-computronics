@@ -12,14 +12,13 @@ import dev.jsc.jscomputronics.common.network.ServerNode;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
+import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -94,15 +93,15 @@ public final class NetworkStorage {
         return perServer;
     }
 
-    public long select(final StorageKey key, final long amount, final IItemHandler destination) {
+    public long select(final StorageKey key, final long amount, final DataSink destination) {
         return select(key, amount, destination, null);
     }
 
-    public long select(final Item item, final long amount, final IItemHandler destination) {
+    public long select(final Item item, final long amount, final DataSink destination) {
         return select(StorageKey.of(item), amount, destination, null);
     }
 
-    public long select(final StorageKey key, final long amount, final IItemHandler destination,
+    public long select(final StorageKey key, final long amount, final DataSink destination,
                        @Nullable final Set<NodeUuid> allowed) {
         long total = 0L;
         for (final long pulled : selectBreakdown(key, amount, destination, allowed).values()) {
@@ -112,10 +111,10 @@ public final class NetworkStorage {
     }
 
     public Map<NodeUuid, Long> selectBreakdown(final StorageKey key, final long amount,
-                                               final IItemHandler destination,
+                                               final DataSink destination,
                                                @Nullable final Set<NodeUuid> allowed) {
         final Map<NodeUuid, Long> pulled = new LinkedHashMap<>();
-        final int batchSize = Math.max(1, key.stack(1).getMaxStackSize());
+        final long batchSize = key.batch();
         long moved = 0L;
         for (final Entry entry : entries) {
             if (allowed != null && !allowed.contains(entry.node())) {
@@ -124,17 +123,15 @@ public final class NetworkStorage {
             final ServerStore store = entry.store();
             long available = store.count(key);
             while (moved < amount && available > 0L) {
-                final int batch = (int) Math.min(Math.min(amount - moved, available), batchSize);
-                final ItemStack offered = key.stack(batch);
-                final ItemStack leftover = ItemHandlerHelper.insertItem(destination, offered, false);
-                final int accepted = batch - leftover.getCount();
-                if (accepted <= 0) {
+                final long batch = Math.min(Math.min(amount - moved, available), batchSize);
+                final long accepted = destination.insert(key, batch, false);
+                if (accepted <= 0L) {
                     return pulled; // destination full
                 }
                 store.extract(key, accepted);
                 moved += accepted;
                 available -= accepted;
-                pulled.merge(entry.node(), (long) accepted, Long::sum);
+                pulled.merge(entry.node(), accepted, Long::sum);
             }
             if (moved >= amount) {
                 break;

@@ -152,6 +152,8 @@ public class ServerRackBlockEntity extends BlockEntity {
                 inside.add(p.asLong());
             }
         }
+        // Collect EVERY cable touching any external face — the whole cabinet is one connection surface.
+        final Set<Long> cables = new HashSet<>();
         for (final long posLong : inside) {
             final BlockPos p = BlockPos.of(posLong);
             for (final Direction direction : Direction.values()) {
@@ -160,11 +162,17 @@ public class ServerRackBlockEntity extends BlockEntity {
                     continue; // a face internal to the cabinet
                 }
                 if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock) {
-                    final var net = system.connectivity().networkOf(neighbor.asLong());
-                    if (net.isPresent()) {
-                        return net.get();
-                    }
+                    cables.add(neighbor.asLong());
                 }
+            }
+        }
+        // Bridge the cable runs this rack touches into one segment, so a Mainframe on one side and a
+        // standby on the other are on a single network connected through the rack.
+        system.connectivity().bridge(cables);
+        for (final long cable : cables) {
+            final var net = system.connectivity().networkOf(cable);
+            if (net.isPresent()) {
+                return net.get();
             }
         }
         return null;

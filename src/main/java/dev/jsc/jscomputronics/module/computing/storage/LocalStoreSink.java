@@ -7,13 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.storage;
 
-import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.IItemHandler;
-
 /**
- * An insert-only {@link IItemHandler} adapter over a {@link LocalStore}, so a timed SELECT can stream pulled items into a computer's disk-backed local storage through the standard handler interface (it only ever inserts into a SELECT destination).
+ * A {@link DataSink} over a computer's disk-backed {@link LocalStore}, so a timed SELECT/MOVE can stream any data (items or fluids) into local storage, bounded by the installed disks' free data weight.
  */
-public final class LocalStoreSink implements IItemHandler {
+public final class LocalStoreSink implements DataSink {
 
     private final LocalStore store;
 
@@ -22,44 +19,13 @@ public final class LocalStoreSink implements IItemHandler {
     }
 
     @Override
-    public int getSlots() {
-        return 1;
-    }
-
-    @Override
-    public ItemStack getStackInSlot(final int slot) {
-        return ItemStack.EMPTY;
-    }
-
-    @Override
-    public ItemStack insertItem(final int slot, final ItemStack stack, final boolean simulate) {
-        if (stack.isEmpty()) {
-            return ItemStack.EMPTY;
+    public long insert(final StorageKey key, final long amount, final boolean simulate) {
+        if (amount <= 0L) {
+            return 0L;
         }
-        final long room = store.free();
-        if (room <= 0L) {
-            return stack;
+        if (simulate) {
+            return Math.min(amount, store.freeWeight() / key.weight(1L));
         }
-        final int accepted = (int) Math.min(stack.getCount(), room);
-        if (!simulate && accepted > 0) {
-            store.insert(StorageKey.of(stack), accepted);
-        }
-        return accepted >= stack.getCount() ? ItemStack.EMPTY
-                : stack.copyWithCount(stack.getCount() - accepted);
-    }
-
-    @Override
-    public ItemStack extractItem(final int slot, final int amount, final boolean simulate) {
-        return ItemStack.EMPTY;
-    }
-
-    @Override
-    public int getSlotLimit(final int slot) {
-        return Integer.MAX_VALUE;
-    }
-
-    @Override
-    public boolean isItemValid(final int slot, final ItemStack stack) {
-        return true;
+        return store.insert(key, amount);
     }
 }

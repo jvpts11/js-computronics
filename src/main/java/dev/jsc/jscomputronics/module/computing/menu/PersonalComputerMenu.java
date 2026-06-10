@@ -143,31 +143,31 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
     }
 
     public boolean isRunning() {
-        return data.get(0) != 0;
+        return data.get(PersonalComputerBlockEntity.DATA_RUNNING) != 0;
     }
 
     public boolean buildValid() {
-        return data.get(1) != 0;
+        return data.get(PersonalComputerBlockEntity.DATA_BUILD_VALID) != 0;
     }
 
     public long capacity() {
-        return data.get(2);
+        return data.get(PersonalComputerBlockEntity.DATA_CAPACITY);
     }
 
     public long ramBuffer() {
-        return data.get(3);
+        return data.get(PersonalComputerBlockEntity.DATA_RAM_BUFFER);
     }
 
     public boolean isAutoStart() {
-        return data.get(4) != 0;
+        return data.get(PersonalComputerBlockEntity.DATA_AUTOSTART) != 0;
     }
 
     public boolean isOnNetwork() {
-        return data.get(5) != 0;
+        return data.get(PersonalComputerBlockEntity.DATA_ON_NETWORK) != 0;
     }
 
     public int networkServerCount() {
-        return data.get(6);
+        return data.get(PersonalComputerBlockEntity.DATA_SERVER_COUNT);
     }
 
     @Override

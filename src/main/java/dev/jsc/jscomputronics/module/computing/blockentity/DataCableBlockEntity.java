@@ -47,6 +47,8 @@ public class DataCableBlockEntity extends BlockEntity {
 
     private final CablePart[] parts = new CablePart[6];
     private final byte[] partTypes = {-1, -1, -1, -1, -1, -1};
+    @Nullable
+    private NetworkUuid loadedNetwork;
 
     public DataCableBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.DATA_CABLE_BE.get(), pos, state);
@@ -108,6 +110,18 @@ public class DataCableBlockEntity extends BlockEntity {
         }
         return serverLevel.getCapability(Capabilities.ItemHandler.BLOCK,
                 worldPosition.relative(face), face.getOpposite());
+    }
+
+    public dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort neighborPort(final Direction face) {
+        final ServerLevel serverLevel = serverLevel();
+        if (serverLevel == null) {
+            return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(null, null);
+        }
+        final net.minecraft.core.BlockPos at = worldPosition.relative(face);
+        final Direction side = face.getOpposite();
+        return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(
+                serverLevel.getCapability(Capabilities.ItemHandler.BLOCK, at, side),
+                serverLevel.getCapability(Capabilities.FluidHandler.BLOCK, at, side));
     }
 
     // Part hosting
@@ -197,6 +211,10 @@ public class DataCableBlockEntity extends BlockEntity {
             if (!index.contains(encodedPos)) {
                 index.onCablePlaced(encodedPos, networkNeighbors(serverLevel));
             }
+            // Restore this cable's persisted network identity when its segment has none yet, so an
+            if (loadedNetwork != null && index.networkOf(encodedPos).isEmpty()) {
+                index.assignUuid(encodedPos, loadedNetwork);
+            }
         }
     }
 
@@ -237,6 +255,11 @@ public class DataCableBlockEntity extends BlockEntity {
         if (!list.isEmpty()) {
             tag.put("Parts", list);
         }
+        // Persist the network identity so an orphaned segment keeps it across a reload (see onLoad).
+        final NetworkUuid network = network();
+        if (network != null) {
+            tag.putString("Network", network.asString());
+        }
     }
 
     @Override
@@ -259,6 +282,9 @@ public class DataCableBlockEntity extends BlockEntity {
             parts[idx] = part;
             partTypes[idx] = type.id();
         }
+        loadedNetwork = tag.contains("Network")
+                ? NetworkUuid.fromString(tag.getString("Network"))
+                : null;
     }
 
     @Override

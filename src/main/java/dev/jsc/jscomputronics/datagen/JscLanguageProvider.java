@@ -34,6 +34,7 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.PERIPHERAL_CABLE, "Peripheral Cable");
         addBlock(ComputingModule.PERSONAL_ROUTER, "Personal Router");
         addBlock(ComputingModule.MONITOR, "Monitor");
+        addBlock(ComputingModule.TANK, "Tank");
         add("block.jsc.monitor.unlinked", "No computer linked");
         add("block.jsc.monitor.no_computer", "No computer found in range over a Peripheral Cable");
         add("block.jsc.monitor.no_gpu", "The computer has no GPU - install a GPU to host monitors (4 per GPU)");

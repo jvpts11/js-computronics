@@ -7,7 +7,9 @@
  */
 package dev.jsc.jscomputronics.module.computing.menu;
 
+import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler;
 import dev.jsc.jscomputronics.module.computing.item.ServerItem;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -28,36 +30,89 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
 
     private final Player owner;
     private final InteractionHand hand;
+    private final ServerHardwareHandler hw;
 
     public ServerAssemblyMenu(final int containerId, final Inventory playerInventory,
                               final InteractionHand hand) {
         super(ComputingModule.SERVER_ASSEMBLY_MENU.get(), containerId);
         this.owner = playerInventory.player;
         this.hand = hand;
-        final ServerHardwareHandler hw = new ServerHardwareHandler(owner, hand);
+        this.hw = new ServerHardwareHandler(owner, hand);
 
         // The spec readout (tiles + tracks + problems, in a smaller font) sits on top;
         // the bays follow. Left column: board + PSU on one row, disks in a 2-wide grid.
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.MOBO, 8, 96));
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.PSU, 26, 96));
         for (int i = 0; i < ServerHardwareHandler.DISK; i++) {
-            addSlot(new SlotItemHandler(hw, ServerHardwareHandler.DISK_START + i,
-                    8 + (i % 2) * 18, 126 + (i / 2) * 18));
+            addSlot(new BoardSlot(ServerHardwareHandler.DISK_START + i,
+                    8 + (i % 2) * 18, 126 + (i / 2) * 18, i, this::boardDiskSlots));
         }
         // Middle column: CPUs on a row, RAM in 2 rows, GPUs in 2 rows.
         for (int i = 0; i < ServerHardwareHandler.CPU; i++) {
-            addSlot(new SlotItemHandler(hw, ServerHardwareHandler.CPU_START + i, 52 + i * 18, 96));
+            addSlot(new BoardSlot(ServerHardwareHandler.CPU_START + i, 52 + i * 18, 96, i, this::boardCpuSlots));
         }
         for (int i = 0; i < ServerHardwareHandler.RAM; i++) {
-            addSlot(new SlotItemHandler(hw, ServerHardwareHandler.RAM_START + i,
-                    52 + (i % 4) * 18, 126 + (i / 4) * 18));
+            addSlot(new BoardSlot(ServerHardwareHandler.RAM_START + i,
+                    52 + (i % 4) * 18, 126 + (i / 4) * 18, i, this::boardRamSlots));
         }
         for (int i = 0; i < ServerHardwareHandler.GPU; i++) {
-            addSlot(new SlotItemHandler(hw, ServerHardwareHandler.GPU_START + i,
-                    52 + (i % 3) * 18, 174 + (i / 3) * 18));
+            addSlot(new BoardSlot(ServerHardwareHandler.GPU_START + i,
+                    52 + (i % 3) * 18, 174 + (i / 3) * 18, i, this::boardGpuSlots));
         }
 
         addPlayerInventory(playerInventory);
+    }
+
+    /**
+     * A hardware slot usable only while its {@code relativeIndex} is within the count the installed board offers — so the CPU/RAM/GPU/disk bays appear and accept parts according to the board, and none of them do until a board is installed (the limit is then 0).
+     */
+    private final class BoardSlot extends SlotItemHandler {
+        private final int relativeIndex;
+        private final java.util.function.IntSupplier boardLimit;
+
+        private BoardSlot(final int index, final int x, final int y,
+                          final int relativeIndex, final java.util.function.IntSupplier boardLimit) {
+            super(hw, index, x, y);
+            this.relativeIndex = relativeIndex;
+            this.boardLimit = boardLimit;
+        }
+
+        @Override
+        public boolean isActive() {
+            // Within the board's count, or already holding a part — so a part is never trapped behind
+            // a smaller board swapped in later.
+            return relativeIndex < boardLimit.getAsInt() || hasItem();
+        }
+
+        @Override
+        public boolean mayPlace(final ItemStack stack) {
+            return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
+        }
+    }
+
+    private MotherboardSpec boardSpec() {
+        return hw.getStackInSlot(ServerHardwareHandler.MOBO).getItem() instanceof MotherboardItem board
+                ? board.spec() : null;
+    }
+
+    public int boardCpuSlots() {
+        final MotherboardSpec spec = boardSpec();
+        return spec == null ? 0 : Math.min(ServerHardwareHandler.CPU, spec.cpuSlots());
+    }
+
+    public int boardRamSlots() {
+        final MotherboardSpec spec = boardSpec();
+        return spec == null ? 0 : Math.min(ServerHardwareHandler.RAM, spec.ramSlots());
+    }
+
+    public int boardGpuSlots() {
+        final MotherboardSpec spec = boardSpec();
+        return spec == null ? 0 : Math.min(ServerHardwareHandler.GPU, spec.pcieSlots());
+    }
+
+    public int boardDiskSlots() {
+        final MotherboardSpec spec = boardSpec();
+        return spec == null ? 0 : Math.min(ServerHardwareHandler.DISK, spec.diskSlots());
     }
 
     public static ServerAssemblyMenu fromNetwork(final int containerId, final Inventory playerInventory,

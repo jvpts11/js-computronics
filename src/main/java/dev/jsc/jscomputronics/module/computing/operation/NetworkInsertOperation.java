@@ -65,10 +65,15 @@ public final class NetworkInsertOperation implements NetworkOperation {
         this.sourceLabel = sourceLabel;
 
         // Choose where to write: fill the fastest-tier servers first, up to each server's free space.
-        final List<ItemLocation> free = index.freeSpace(level, network);
+        final long unitWeight = key.weight(1L);
+        final List<ItemLocation> free = new ArrayList<>();
         final Map<NodeUuid, StorageTier> tiers = new HashMap<>();
-        for (final ItemLocation room : free) {
-            tiers.put(room.server(), room.tier());
+        for (final ItemLocation room : index.freeSpace(level, network)) {
+            final long roomNative = room.quantity() / unitWeight;
+            if (roomNative > 0L) {
+                free.add(room.withQuantity(roomNative));
+                tiers.put(room.server(), room.tier());
+            }
         }
         final Allocation plan = StorageAllocator.allocate(free, demand);
         plan.perServer().forEach((server, quantity) -> {
@@ -186,7 +191,7 @@ public final class NetworkInsertOperation implements NetworkOperation {
         final List<OperationRecord.MoveRow> moves = new ArrayList<>();
         writtenPerServer.forEach((server, written) ->
                 moves.add(new OperationRecord.MoveRow(sourceLabel, written, "SRV-" + shortId(server.asString()))));
-        return new OperationRecord(OperationRecord.TYPE_INSERT, key.stack(1), demand, writtenTotal,
+        return new OperationRecord(OperationRecord.TYPE_INSERT, key, demand, writtenTotal,
                 recordStatus, List.copyOf(moves));
     }
 

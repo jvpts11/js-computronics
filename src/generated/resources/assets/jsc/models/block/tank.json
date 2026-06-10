@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "bottom": "jsc:block/mainframe_side",
+    "side": "minecraft:block/glass",
+    "top": "jsc:block/mainframe_side"
+  }
+}

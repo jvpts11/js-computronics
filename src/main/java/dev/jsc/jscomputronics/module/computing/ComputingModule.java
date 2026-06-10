@@ -188,6 +188,24 @@ public final class ComputingModule {
                             dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity::new,
                             MONITOR.get()).build(null));
 
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.TankBlock> TANK =
+            BLOCKS.register("tank", () -> new dev.jsc.jscomputronics.module.computing.block.TankBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.COLOR_LIGHT_BLUE)
+                            .strength(0.6F)
+                            .sound(SoundType.GLASS)
+                            .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> TANK_ITEM = ITEMS.register(
+            "tank", () -> new BlockItem(TANK.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.TankBlockEntity>> TANK_BE =
+            BLOCK_ENTITIES.register("tank",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.TankBlockEntity::new,
+                            TANK.get()).build(null));
+
     // Interaction buses — move items between the network and adjacent inventories
 
     public static final DeferredItem<dev.jsc.jscomputronics.module.computing.block.part.CablePartItem> IMPORT_BUS_ITEM =
@@ -258,7 +276,8 @@ public final class ComputingModule {
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(
             "motherboard_mtx_p", () -> new MotherboardItem(new Item.Properties(),
-                    new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
+                    new MotherboardSpec(dev.jsc.jscomputronics.common.hardware.FormFactor.MTX,
+                            HardwareEra.STANDARD, CpuSocket.LGA_2011, 4,
                             Set.of(RamGeneration.DDR3), 8, PcieGeneration.PCIE_3_0, 6, 4, 8)));
 
     public static final DeferredItem<CpuItem> CPU_SERVO_2620 = ITEMS.register(
@@ -286,7 +305,8 @@ public final class ComputingModule {
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_EEB_P = ITEMS.register(
             "motherboard_eeb_p", () -> new MotherboardItem(new Item.Properties(),
-                    new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 2,
+                    new MotherboardSpec(dev.jsc.jscomputronics.common.hardware.FormFactor.EEB,
+                            HardwareEra.STANDARD, CpuSocket.LGA_2011, 2,
                             Set.of(RamGeneration.DDR3), 8, PcieGeneration.PCIE_3_0, 6, 6, 6)));
 
     /**
@@ -377,7 +397,8 @@ public final class ComputingModule {
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_ATX_P = ITEMS.register(
             "motherboard_atx_p", () -> new MotherboardItem(new Item.Properties(),
-                    new MotherboardSpec(HardwareEra.STANDARD, CpuSocket.AM3, 1,
+                    new MotherboardSpec(dev.jsc.jscomputronics.common.hardware.FormFactor.ATX,
+                            HardwareEra.STANDARD, CpuSocket.AM3, 1,
                             Set.of(RamGeneration.DDR3), 4, PcieGeneration.PCIE_3_0, 4, 2, 4)));
 
     public static final DeferredItem<CpuItem> CPU_ASCENT_965 = ITEMS.register(

@@ -10,10 +10,13 @@ package dev.jsc.jscomputronics.common.network;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -167,6 +170,38 @@ public final class ConnectivityIndex {
         }
         for (Integer id : toRemove) {
             rootToUuid.remove(id);
+        }
+    }
+
+    public void bridge(Collection<Long> positions) {
+        final List<Integer> ids = new ArrayList<>();
+        NetworkUuid surviving = null;
+        for (final long pos : positions) {
+            final Integer id = posToId.get(pos);
+            if (id == null) {
+                continue;
+            }
+            ids.add(id);
+            if (surviving == null) {
+                surviving = rootToUuid.get(dsu.find(id));
+            }
+        }
+        if (ids.size() < 2) {
+            return; // nothing to bridge — a device touching one run (or none) changes nothing
+        }
+        int root = dsu.find(ids.get(0));
+        boolean merged = false;
+        for (int k = 1; k < ids.size(); k++) {
+            if (dsu.union(root, ids.get(k))) {
+                merged = true;
+            }
+            root = dsu.find(root);
+        }
+        if (merged) {
+            cleanupOrphanedUuids(root);
+            if (surviving != null) {
+                rootToUuid.put(root, surviving);
+            }
         }
     }
 

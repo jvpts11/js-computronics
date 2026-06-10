@@ -7,22 +7,26 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One entry in a network's Operations log, with provenance: what was moved, how much was requested vs actually moved, the final status, and the per-source moves (from which Server, how much, to where) so the terminal can show exactly where the items came from and went.
+ * One entry in a network's Operations log, with provenance: what was moved, how much was requested vs actually moved, the final status, and the per-source moves (from which Server, how much, to where) so the terminal can show exactly where the data came from and went.
  */
-public record OperationRecord(byte type, ItemStack icon, long requested, long moved, byte status,
+public record OperationRecord(byte type, StorageKey key, long requested, long moved, byte status,
                               List<MoveRow> moves) {
 
     public static final byte TYPE_SELECT = 0;
@@ -36,6 +40,18 @@ public record OperationRecord(byte type, ItemStack icon, long requested, long mo
     public static final byte STATUS_PROCESSING = 3;
 
     public static final int MAX_MOVES = 32;
+
+    public ItemStack icon() {
+        return key.stack(1);
+    }
+
+    public Component name() {
+        return key.displayName();
+    }
+
+    public boolean isFluid() {
+        return key.isFluid();
+    }
 
     /**
      * One provenance row.
@@ -58,7 +74,7 @@ public record OperationRecord(byte type, ItemStack icon, long requested, long mo
             StreamCodec.of(
                     (buf, rec) -> {
                         buf.writeByte(rec.type());
-                        ItemStack.STREAM_CODEC.encode(buf, rec.icon());
+                        StorageKey.STREAM_CODEC.encode(buf, rec.key());
                         buf.writeVarLong(rec.requested());
                         buf.writeVarLong(rec.moved());
                         buf.writeByte(rec.status());
@@ -66,7 +82,7 @@ public record OperationRecord(byte type, ItemStack icon, long requested, long mo
                     },
                     buf -> new OperationRecord(
                             buf.readByte(),
-                            ItemStack.STREAM_CODEC.decode(buf),
+                            StorageKey.STREAM_CODEC.decode(buf),
                             buf.readVarLong(),
                             buf.readVarLong(),
                             buf.readByte(),
@@ -75,7 +91,8 @@ public record OperationRecord(byte type, ItemStack icon, long requested, long mo
     public CompoundTag toNbt(final HolderLookup.Provider registries) {
         final CompoundTag tag = new CompoundTag();
         tag.putByte("type", type);
-        tag.put("icon", icon.save(registries));
+        StorageKey.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), key)
+                .result().ifPresent(encoded -> tag.put("icon", encoded));
         tag.putLong("requested", requested);
         tag.putLong("moved", moved);
         tag.putByte("status", status);
@@ -92,14 +109,16 @@ public record OperationRecord(byte type, ItemStack icon, long requested, long mo
     }
 
     public static OperationRecord fromNbt(final CompoundTag tag, final HolderLookup.Provider registries) {
-        final ItemStack icon = ItemStack.parseOptional(registries, tag.getCompound("icon"));
+        final StorageKey key = StorageKey.CODEC
+                .parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get("icon"))
+                .result().orElseGet(() -> StorageKey.of(Items.BARRIER));
         final List<MoveRow> moves = new ArrayList<>();
         final ListTag moveList = tag.getList("moves", Tag.TAG_COMPOUND);
         for (int i = 0; i < moveList.size(); i++) {
             final CompoundTag m = moveList.getCompound(i);
             moves.add(new MoveRow(m.getString("from"), m.getLong("qty"), m.getString("to")));
         }
-        return new OperationRecord(tag.getByte("type"), icon, tag.getLong("requested"),
+        return new OperationRecord(tag.getByte("type"), key, tag.getLong("requested"),
                 tag.getLong("moved"), tag.getByte("status"), List.copyOf(moves));
     }
 }

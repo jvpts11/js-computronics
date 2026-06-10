@@ -43,12 +43,24 @@ public final class ServerStore {
         return build == null ? 0L : build.totalStorageItems();
     }
 
+    public long capacityWeight() {
+        return capacity() * StorageKey.MB_EQ_PER_ITEM;
+    }
+
+    public long usedWeight() {
+        return contents().usedWeight();
+    }
+
+    public long freeWeight() {
+        return Math.max(0L, capacityWeight() - usedWeight());
+    }
+
     public long used() {
-        return contents().total();
+        return usedWeight() / StorageKey.MB_EQ_PER_ITEM;
     }
 
     public long free() {
-        return Math.max(0L, capacity() - used());
+        return freeWeight() / StorageKey.MB_EQ_PER_ITEM;
     }
 
     public Map<StorageKey, Long> view() {
@@ -67,11 +79,13 @@ public final class ServerStore {
         if (amount <= 0L) {
             return 0L;
         }
-        final long room = free();
-        if (room <= 0L) {
+        // Room in native units = free data weight / this type's weight-per-unit (1000 for an item,
+        // 1 for a mB of fluid), so a disk holds any mix bounded by the same capacity.
+        final long roomNative = freeWeight() / key.weight(1L);
+        if (roomNative <= 0L) {
             return 0L;
         }
-        final long stored = Math.min(amount, room);
+        final long stored = Math.min(amount, roomNative);
         final Map<StorageKey, Long> next = new HashMap<>(view());
         next.merge(key, stored, Long::sum);
         write(next);

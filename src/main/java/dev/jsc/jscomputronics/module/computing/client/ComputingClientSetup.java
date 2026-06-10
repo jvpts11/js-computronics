@@ -38,6 +38,7 @@ public final class ComputingClientSetup {
     @SubscribeEvent
     public static void registerRenderers(final EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(ComputingModule.DATA_CABLE_BE.get(), DataCableRenderer::new);
+        event.registerBlockEntityRenderer(ComputingModule.TANK_BE.get(), TankRenderer::new);
     }
 
     @SubscribeEvent

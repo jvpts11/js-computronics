@@ -8,70 +8,102 @@
 package dev.jsc.jscomputronics.common.persistence;
 
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
 
 import java.util.Collections;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * Immutable snapshot of which networks exist in one dimension.
+ * Immutable snapshot of which networks exist in one dimension and the lifecycle state of each.
  */
 public final class NetworkRegistryState {
 
-    private final Set<NetworkUuid> networks;
+    private final Map<NetworkUuid, NetworkUuidState> states;
 
-    private NetworkRegistryState(final Set<NetworkUuid> networks) {
+    private NetworkRegistryState(final Map<NetworkUuid, NetworkUuidState> states) {
         // Defensive copy + unmodifiable wrapper; preserve insertion order.
-        this.networks = Collections.unmodifiableSet(new LinkedHashSet<>(networks));
+        this.states = Collections.unmodifiableMap(new LinkedHashMap<>(states));
     }
 
     public static NetworkRegistryState empty() {
-        return new NetworkRegistryState(new LinkedHashSet<>());
+        return new NetworkRegistryState(new LinkedHashMap<>());
     }
 
     public static NetworkRegistryState of(final Set<NetworkUuid> networks) {
         Objects.requireNonNull(networks, "networks must not be null");
+        final Map<NetworkUuid, NetworkUuidState> map = new LinkedHashMap<>();
         for (final NetworkUuid uuid : networks) {
             Objects.requireNonNull(uuid, "network UUID must not be null");
+            map.put(uuid, NetworkUuidState.ACTIVE);
         }
-        return new NetworkRegistryState(networks);
+        return new NetworkRegistryState(map);
+    }
+
+    public static NetworkRegistryState ofStates(final Map<NetworkUuid, NetworkUuidState> states) {
+        Objects.requireNonNull(states, "states must not be null");
+        states.forEach((uuid, state) -> {
+            Objects.requireNonNull(uuid, "network UUID must not be null");
+            Objects.requireNonNull(state, "network state must not be null");
+        });
+        return new NetworkRegistryState(states);
     }
 
     public NetworkRegistryState withNetwork(final NetworkUuid uuid) {
         Objects.requireNonNull(uuid, "uuid must not be null");
-        if (networks.contains(uuid)) {
+        if (states.containsKey(uuid)) {
             return this;
         }
-        final Set<NetworkUuid> next = new LinkedHashSet<>(networks);
-        next.add(uuid);
+        final Map<NetworkUuid, NetworkUuidState> next = new LinkedHashMap<>(states);
+        next.put(uuid, NetworkUuidState.ACTIVE);
+        return new NetworkRegistryState(next);
+    }
+
+    public NetworkRegistryState withState(final NetworkUuid uuid, final NetworkUuidState state) {
+        Objects.requireNonNull(uuid, "uuid must not be null");
+        Objects.requireNonNull(state, "state must not be null");
+        if (state == states.get(uuid)) {
+            return this;
+        }
+        final Map<NetworkUuid, NetworkUuidState> next = new LinkedHashMap<>(states);
+        next.put(uuid, state);
         return new NetworkRegistryState(next);
     }
 
     public NetworkRegistryState withoutNetwork(final NetworkUuid uuid) {
         Objects.requireNonNull(uuid, "uuid must not be null");
-        if (!networks.contains(uuid)) {
+        if (!states.containsKey(uuid)) {
             return this;
         }
-        final Set<NetworkUuid> next = new LinkedHashSet<>(networks);
+        final Map<NetworkUuid, NetworkUuidState> next = new LinkedHashMap<>(states);
         next.remove(uuid);
         return new NetworkRegistryState(next);
     }
 
     public boolean contains(final NetworkUuid uuid) {
-        return networks.contains(Objects.requireNonNull(uuid));
+        return states.containsKey(Objects.requireNonNull(uuid));
+    }
+
+    public NetworkUuidState stateOf(final NetworkUuid uuid) {
+        return states.get(Objects.requireNonNull(uuid));
     }
 
     public int size() {
-        return networks.size();
+        return states.size();
     }
 
     public boolean isEmpty() {
-        return networks.isEmpty();
+        return states.isEmpty();
     }
 
     public Set<NetworkUuid> networks() {
-        return networks;
+        return states.keySet();
+    }
+
+    public Map<NetworkUuid, NetworkUuidState> states() {
+        return states;
     }
 
     @Override
@@ -82,16 +114,16 @@ public final class NetworkRegistryState {
         if (!(o instanceof NetworkRegistryState other)) {
             return false;
         }
-        return networks.equals(other.networks);
+        return states.equals(other.states);
     }
 
     @Override
     public int hashCode() {
-        return networks.hashCode();
+        return states.hashCode();
     }
 
     @Override
     public String toString() {
-        return "NetworkRegistryState" + networks;
+        return "NetworkRegistryState" + states;
     }
 }

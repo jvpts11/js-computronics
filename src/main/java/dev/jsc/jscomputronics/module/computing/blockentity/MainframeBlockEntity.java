@@ -24,6 +24,7 @@ import dev.jsc.jscomputronics.common.operation.OperationTask;
 import dev.jsc.jscomputronics.common.operation.SelfTestOperationTask;
 import dev.jsc.jscomputronics.common.persistence.NetworkRegistrySavedData;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
@@ -152,6 +153,9 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     private NetworkUuid networkUuid;
     private boolean networkConflict;
+    private boolean failoverEnabled;
+    private FailoverRole failoverRole = FailoverRole.NONE;
+    private int failoverWaitTicks;
     @Nullable
     private NetworkUuid nativeNetworkUuid;
     @Nullable
@@ -167,6 +171,7 @@ public class MainframeBlockEntity extends BlockEntity
     private long completedTotal;
 
     private static final int OPERATION_LOG_MAX = 32;
+    private static final int FAILOVER_PROMOTE_DELAY = 60;
     private final java.util.Deque<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord>
             operationLog = new java.util.ArrayDeque<>();
 
@@ -176,7 +181,9 @@ public class MainframeBlockEntity extends BlockEntity
 
     public static boolean isValidForSlot(final int slot, final ItemStack stack) {
         if (slot == MOTHERBOARD_SLOT) {
-            return stack.getItem() instanceof MotherboardItem;
+            // A Mainframe accepts only an MTX-form-factor board, not any motherboard.
+            return MotherboardItem.fits(stack,
+                    java.util.Set.of(dev.jsc.jscomputronics.common.hardware.FormFactor.MTX));
         }
         if (slot == PSU_SLOT) {
             return stack.getItem() instanceof PsuItem;
@@ -335,16 +342,27 @@ public class MainframeBlockEntity extends BlockEntity
 
     private void tick(final ServerLevel level) {
         nativeNetworkUuid(); // the mainframe owns a network identity from placement on
-        if (isRunning()) {
-            updateNetwork(level);
-            runDispatch();
-            // Refresh the in-RAM storage catalog once per tick from the network's servers.
-            networkIndex.rebuild(level, networkUuid());
-            tickOperations();
-        } else {
+        if (!isRunning()) {
             leaveNetwork(level);
             closeDispatch();
+            return;
         }
+        updateNetwork(level);
+        if (networkConflict) {
+            // A contested network collapses: discard every in-flight Operation (its progress is
+            closeDispatch();
+            return;
+        }
+        if (failoverRole == FailoverRole.PASSIVE) {
+            // A Passive standby holds no dispatcher and runs no Operations until it is promoted; the
+            // Active member owns the network. closeDispatch settles anything left from a demotion.
+            closeDispatch();
+            return;
+        }
+        runDispatch();
+        // Refresh the in-RAM storage catalog once per tick from the network's servers.
+        networkIndex.rebuild(level, networkUuid());
+        tickOperations();
     }
 
     public dev.jsc.jscomputronics.module.computing.operation.NetworkIndex networkIndex() {
@@ -354,59 +372,104 @@ public class MainframeBlockEntity extends BlockEntity
     private void updateNetwork(final ServerLevel level) {
         final NetworkSystem system = NetworkSystem.get(level);
         final ConnectivityIndex index = system.connectivity();
-        final NetworkUuid own = nativeNetworkUuid();
-
-        // Every cable touching ANY external face of the multiblock — not just the
-        // first one found — so a cable on any side joins the mainframe's network.
         final java.util.Set<Long> cables = adjacentCables(level);
+        // Bridge every cable run this Mainframe touches into one segment, so the topology connected
+        // through the Mainframe is a single network.
+        index.bridge(cables);
 
-        final NetworkUuid effective;
-        final boolean conflict;
-        if (cables.isEmpty()) {
-            effective = own;
-            conflict = false; // with no cable this mainframe shares its network with no one
-        } else {
-            // Adopt the network of any touched cable that already carries one (so a
-            NetworkUuid existing = null;
-            for (final long cable : cables) {
-                final Optional<NetworkUuid> segment = index.networkOf(cable);
-                if (segment.isPresent()) {
-                    existing = segment.get();
-                    break;
-                }
+        // The network already laid on a touched cable, if any — a primary's network to join, or an
+        NetworkUuid adopted = null;
+        for (final long cable : cables) {
+            final Optional<NetworkUuid> segment = index.networkOf(cable);
+            if (segment.isPresent()) {
+                adopted = segment.get();
+                break;
             }
-            effective = existing != null ? existing : own;
-            if (existing == null) {
-                NetworkRegistrySavedData.get(level).addNetwork(own);
-            }
-            boolean shared = false;
-            for (final long cable : cables) {
-                if (sharesSegmentWithAnotherMainframe(level, index, cable)) {
-                    shared = true;
-                    break;
-                }
-            }
-            conflict = shared;
         }
 
-        setConflict(level, conflict);
-        if (conflict) {
+        final java.util.List<MainframeBlockEntity> peers = otherRunningMainframesOnSegment(level, index, cables);
+        final boolean primaryPeerPresent = peers.stream().anyMatch(peer -> !peer.failoverEnabled);
+
+        if (!failoverEnabled) {
+            failoverRole = FailoverRole.NONE;
+            failoverWaitTicks = 0;
+            final NetworkUuid effective = adopted != null ? adopted : nativeNetworkUuid();
+            if (adopted == null) {
+                NetworkRegistrySavedData.get(level).addNetwork(effective);
+            }
+            setConflict(level, primaryPeerPresent);
+            if (primaryPeerPresent) {
+                // Two primaries on one network: collapse it until they are physically separated.
+                NetworkRegistrySavedData.get(level).setNetworkState(effective, NetworkUuidState.CONFLICTED);
+                networkUuid = null;
+                unregister(system);
+                return;
+            }
+            orchestrate(level, system, index, cables, effective);
+            return;
+        }
+
+        setConflict(level, false); // a standby never holds the network in conflict on its own
+        if (adopted == null) {
+            // Not on any network yet: dormant until it reaches a primary's network.
+            failoverRole = FailoverRole.PASSIVE;
+            failoverWaitTicks = 0;
             networkUuid = null;
             unregister(system);
             return;
         }
+        if (primaryPeerPresent) {
+            // The primary owns and orchestrates this network; the standby merely stands by on it.
+            failoverRole = FailoverRole.PASSIVE;
+            failoverWaitTicks = 0;
+            networkUuid = adopted;
+            unregister(system);
+            return;
+        }
+        // No primary present — it is gone and the network is orphaned. The lowest-positioned standby
+        // takes that SAME network over after the takeover delay; the rest keep standing by.
+        final boolean superiorStandbyPresent = peers.stream()
+                .anyMatch(peer -> peer.worldPosition.asLong() < worldPosition.asLong());
+        updateFailoverRole(superiorStandbyPresent);
+        if (failoverRole == FailoverRole.PASSIVE) {
+            networkUuid = adopted;
+            unregister(system);
+            return;
+        }
+        orchestrate(level, system, index, cables, adopted);
+    }
 
-        // Pull every touched cable component into the one effective network. A
+    private void orchestrate(final ServerLevel level, final NetworkSystem system, final ConnectivityIndex index,
+                             final java.util.Set<Long> cables, final NetworkUuid effective) {
+        // A cable whose BlockEntity has not registered yet (mid chunk-load) is skipped, picked up later.
         for (final long cable : cables) {
             if (index.contains(cable) && !effective.equals(index.networkOf(cable).orElse(null))) {
                 index.assignUuid(cable, effective);
             }
         }
-
         networkUuid = effective;
+        // Restore the network from any prior CONFLICTED or ORPHANED state — adopting it revives it.
+        NetworkRegistrySavedData.get(level).setNetworkState(effective, NetworkUuidState.ACTIVE);
         system.registerMainframe(snapshot(effective));
         system.recordMainframePosition(effective, worldPosition.asLong());
         registeredNetwork = effective;
+    }
+
+    private void updateFailoverRole(final boolean superiorPresent) {
+        if (superiorPresent) {
+            failoverRole = FailoverRole.PASSIVE; // a preferred Active is running — stand by
+            failoverWaitTicks = 0;
+        } else if (failoverRole == FailoverRole.PASSIVE) {
+            // The Active this member was backing is gone; take over after the promotion delay.
+            if (++failoverWaitTicks >= FAILOVER_PROMOTE_DELAY) {
+                failoverRole = FailoverRole.ACTIVE;
+                failoverWaitTicks = 0;
+            }
+        } else {
+            // Lowest-positioned and not standing by — own the network immediately (initial election).
+            failoverRole = FailoverRole.ACTIVE;
+            failoverWaitTicks = 0;
+        }
     }
 
     public boolean submitOperation(final OperationTask task, final OperationPriority priority) {
@@ -431,13 +494,20 @@ public class MainframeBlockEntity extends BlockEntity
     }
 
     public void onBroken() {
-        if (level instanceof ServerLevel serverLevel) {
-            eraseOwnedNetwork(serverLevel);
-            unregister(NetworkSystem.get(serverLevel));
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
         }
+        final NetworkSystem system = NetworkSystem.get(serverLevel);
+        // The LAST Mainframe out orphans the network — whatever its failover role. While another
+        final boolean survivorPresent = !otherRunningMainframesOnSegment(
+                serverLevel, system.connectivity(), adjacentCables(serverLevel)).isEmpty();
+        if (!survivorPresent) {
+            orphanOwnedNetwork(serverLevel);
+        }
+        unregister(system);
     }
 
-    private void eraseOwnedNetwork(final ServerLevel level) {
+    private void orphanOwnedNetwork(final ServerLevel level) {
         final NetworkSystem system = NetworkSystem.get(level);
         final ConnectivityIndex index = system.connectivity();
         final java.util.Set<NetworkUuid> owned = new java.util.LinkedHashSet<>();
@@ -449,28 +519,56 @@ public class MainframeBlockEntity extends BlockEntity
         }
         final NetworkRegistrySavedData registry = NetworkRegistrySavedData.get(level);
         for (final NetworkUuid net : owned) {
-            index.clearNetwork(net);
-            registry.removeNetwork(net);
+            registry.setNetworkState(net, NetworkUuidState.ORPHANED);
         }
     }
 
-    private boolean sharesSegmentWithAnotherMainframe(final ServerLevel level,
-                                                      final ConnectivityIndex index,
-                                                      final long anchorCable) {
-        for (final long cablePos : index.componentPositions(anchorCable)) {
-            final BlockPos base = BlockPos.of(cablePos);
-            for (final Direction direction : Direction.values()) {
-                final BlockPos neighbor = base.relative(direction);
-                if (neighbor.equals(worldPosition)) {
+    private void eraseOwnedNetwork(final ServerLevel level) {
+        final NetworkSystem system = NetworkSystem.get(level);
+        final ConnectivityIndex index = system.connectivity();
+        final NetworkRegistrySavedData registry = NetworkRegistrySavedData.get(level);
+        for (final NetworkUuid net : new java.util.LinkedHashSet<>(java.util.Arrays.asList(networkUuid, registeredNetwork))) {
+            if (net != null) {
+                index.clearNetwork(net);
+                registry.removeNetwork(net);
+            }
+        }
+        networkUuid = null;
+        unregister(system);
+    }
+
+    private java.util.List<MainframeBlockEntity> otherRunningMainframesOnSegment(
+            final ServerLevel level, final ConnectivityIndex index, final java.util.Set<Long> cables) {
+        final java.util.Map<Long, MainframeBlockEntity> found = new java.util.LinkedHashMap<>();
+        final java.util.Set<Long> scanned = new java.util.HashSet<>();
+        for (final long anchor : cables) {
+            for (final long cablePos : index.componentPositions(anchor)) {
+                if (!scanned.add(cablePos)) {
                     continue;
                 }
-                if (level.getBlockEntity(neighbor) instanceof MainframeBlockEntity other
-                        && other.isRunning()) {
-                    return true;
+                final BlockPos base = BlockPos.of(cablePos);
+                for (final Direction direction : Direction.values()) {
+                    final MainframeBlockEntity mainframe = mainframeBehind(level, base.relative(direction));
+                    if (mainframe != null && mainframe != this && mainframe.isRunning()) {
+                        found.putIfAbsent(mainframe.worldPosition.asLong(), mainframe);
+                    }
                 }
             }
         }
-        return false;
+        return new java.util.ArrayList<>(found.values());
+    }
+
+    @Nullable
+    private MainframeBlockEntity mainframeBehind(final ServerLevel level, final BlockPos pos) {
+        final BlockEntity be = level.getBlockEntity(pos);
+        if (be instanceof MainframeBlockEntity mainframe) {
+            return mainframe;
+        }
+        if (be instanceof MainframePartBlockEntity part && part.controllerPos() != null
+                && level.getBlockEntity(part.controllerPos()) instanceof MainframeBlockEntity controller) {
+            return controller;
+        }
+        return null;
     }
 
     private void setConflict(final ServerLevel level, final boolean conflict) {
@@ -583,7 +681,8 @@ public class MainframeBlockEntity extends BlockEntity
                                 final long moved, final byte status,
                                 final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.MoveRow> moves) {
         recordOperation(new dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord(
-                type, icon, requested, moved, status, java.util.List.copyOf(moves)));
+                type, dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(icon),
+                requested, moved, status, java.util.List.copyOf(moves)));
     }
 
     public void recordOperation(
@@ -600,7 +699,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT, null);
     }
@@ -608,7 +707,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final net.minecraft.world.item.Item item, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel) {
         return submitNetworkSelect(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
                 demand, destination, destinationLabel);
     }
@@ -616,7 +715,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
             final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT, sources);
@@ -625,7 +724,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final net.minecraft.world.item.Item item, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
             final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
         return submitNetworkSelect(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
                 demand, destination, destinationLabel, sources);
@@ -634,7 +733,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkMove(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
             final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_MOVE, sources);
@@ -643,7 +742,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkDelete(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_DELETE, null);
     }
@@ -651,7 +750,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkDelete(
             final net.minecraft.world.item.Item item, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel) {
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel) {
         return submitNetworkDelete(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
                 demand, destination, destinationLabel);
     }
@@ -659,7 +758,7 @@ public class MainframeBlockEntity extends BlockEntity
     @Nullable
     private dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitPull(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
-            final net.neoforged.neoforge.items.IItemHandler destination, final String destinationLabel,
+            final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
             final byte recordType,
             final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
         if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
@@ -757,6 +856,22 @@ public class MainframeBlockEntity extends BlockEntity
         return networkConflict;
     }
 
+    public boolean failoverEnabled() {
+        return failoverEnabled;
+    }
+
+    public FailoverRole failoverRole() {
+        return failoverRole;
+    }
+
+    public void toggleFailover() {
+        failoverEnabled = !failoverEnabled;
+        if (failoverEnabled && level instanceof ServerLevel serverLevel) {
+            eraseOwnedNetwork(serverLevel);
+        }
+        setChanged();
+    }
+
     // ComputerTerminalHost — read-only monitoring for the Monitor terminal
 
     @Override
@@ -771,7 +886,7 @@ public class MainframeBlockEntity extends BlockEntity
 
     @Override
     public int networkLinkState() {
-        return networkConflict ? 2 : (networkUuid != null ? 1 : 0);
+        return networkConflict ? NET_STATE_CONFLICT : (networkUuid != null ? NET_STATE_LINKED : NET_STATE_NONE);
     }
 
     @Override
@@ -852,7 +967,7 @@ public class MainframeBlockEntity extends BlockEntity
     }
 
     @Override
-    public net.neoforged.neoforge.items.IItemHandler localStorage() {
+    public dev.jsc.jscomputronics.module.computing.storage.DataSink localStorage() {
         return new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(localStore());
     }
 
@@ -906,23 +1021,43 @@ public class MainframeBlockEntity extends BlockEntity
         return true;
     }
 
-    public static final int DATA_COUNT = 11;
+    public static final int DATA_RUNNING = 0;
+    public static final int DATA_BUILD_VALID = 1;
+    public static final int DATA_CAPACITY = 2;
+    public static final int DATA_PARALLEL_QUEUES = 3;
+    public static final int DATA_RAM_BUFFER = 4;
+    public static final int DATA_AUTOSTART = 5;
+    public static final int DATA_MANUAL_ON = 6;
+    public static final int DATA_NETWORK_STATE = 7;
+    public static final int DATA_PENDING_OPS = 8;
+    public static final int DATA_RUNNING_OPS = 9;
+    public static final int DATA_COMPLETED_OPS = 10;
+    public static final int DATA_FAILOVER_ENABLED = 11;
+    public static final int DATA_FAILOVER_ROLE = 12;
+    public static final int DATA_COUNT = DATA_FAILOVER_ROLE + 1;
+
+    public static final int NET_STATE_NONE = 0;
+    public static final int NET_STATE_LINKED = 1;
+    public static final int NET_STATE_CONFLICT = 2;
 
     private final int[] clientData = new int[DATA_COUNT];
 
     private int computeData(final int index) {
         return switch (index) {
-            case 0 -> isRunning() ? 1 : 0;
-            case 1 -> buildValid() ? 1 : 0;
-            case 2 -> (int) Math.min(Integer.MAX_VALUE, capacity());
-            case 3 -> parallelQueues();
-            case 4 -> (int) Math.min(Integer.MAX_VALUE, ramBuffer());
-            case 5 -> autoStart ? 1 : 0;
-            case 6 -> manualOn ? 1 : 0;
-            case 7 -> networkConflict ? 2 : (networkUuid != null ? 1 : 0);
-            case 8 -> pendingOps();
-            case 9 -> runningOps();
-            case 10 -> (int) Math.min(Integer.MAX_VALUE, completedOps());
+            case DATA_RUNNING -> isRunning() ? 1 : 0;
+            case DATA_BUILD_VALID -> buildValid() ? 1 : 0;
+            case DATA_CAPACITY -> (int) Math.min(Integer.MAX_VALUE, capacity());
+            case DATA_PARALLEL_QUEUES -> parallelQueues();
+            case DATA_RAM_BUFFER -> (int) Math.min(Integer.MAX_VALUE, ramBuffer());
+            case DATA_AUTOSTART -> autoStart ? 1 : 0;
+            case DATA_MANUAL_ON -> manualOn ? 1 : 0;
+            case DATA_NETWORK_STATE ->
+                    networkConflict ? NET_STATE_CONFLICT : (networkUuid != null ? NET_STATE_LINKED : NET_STATE_NONE);
+            case DATA_PENDING_OPS -> pendingOps();
+            case DATA_RUNNING_OPS -> runningOps();
+            case DATA_COMPLETED_OPS -> (int) Math.min(Integer.MAX_VALUE, completedOps());
+            case DATA_FAILOVER_ENABLED -> failoverEnabled ? 1 : 0;
+            case DATA_FAILOVER_ROLE -> failoverRole.ordinal();
             default -> 0;
         };
     }
@@ -972,6 +1107,7 @@ public class MainframeBlockEntity extends BlockEntity
         }
         manualOn = tag.getBoolean("ManualOn");
         autoStart = tag.getBoolean("AutoStart");
+        failoverEnabled = tag.getBoolean("Failover");
         if (tag.contains("NodeUuid")) {
             nodeUuid = NodeUuid.fromString(tag.getString("NodeUuid"));
         }
@@ -998,6 +1134,7 @@ public class MainframeBlockEntity extends BlockEntity
         tag.put("Inventory", inventory.serializeNBT(registries));
         tag.putBoolean("ManualOn", manualOn);
         tag.putBoolean("AutoStart", autoStart);
+        tag.putBoolean("Failover", failoverEnabled);
         if (nodeUuid != null) {
             tag.putString("NodeUuid", nodeUuid.asString());
         }

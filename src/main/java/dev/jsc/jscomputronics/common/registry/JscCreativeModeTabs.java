@@ -52,6 +52,7 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.PERSONAL_ROUTER_ITEM.get());
                         output.accept(ComputingModule.MAINFRAME_ITEM.get());
                         output.accept(ComputingModule.MONITOR_ITEM.get());
+                        output.accept(ComputingModule.TANK_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
                         output.accept(ComputingModule.SERVER_RACK_ITEM.get());
                         output.accept(ComputingModule.IMPORT_BUS_ITEM.get());

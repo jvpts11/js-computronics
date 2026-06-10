@@ -344,4 +344,44 @@ class ConnectivityIndexTest {
         assertEquals(2, index.size());
         assertEquals(1, index.componentCount());
     }
+
+    @Test
+    void bridge_unionsSeparateRuns_intoOneComponent() {
+        // Two runs separated by a device (no direct cable-to-cable contact) — two components.
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(10, 0, 0), Set.of());
+        assertEquals(2, index.componentCount());
+        assertFalse(index.inSameNetwork(pos(0, 0, 0), pos(10, 0, 0)));
+        index.bridge(Set.of(pos(0, 0, 0), pos(10, 0, 0)));
+        assertEquals(1, index.componentCount());
+        assertTrue(index.inSameNetwork(pos(0, 0, 0), pos(10, 0, 0)),
+                "a device bridges the two runs it touches into one network");
+    }
+
+    @Test
+    void bridge_preservesTheNetworkUuid() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(10, 0, 0), Set.of());
+        var uuid = NetworkUuid.random();
+        index.assignUuid(pos(0, 0, 0), uuid); // one run carries the network; the other is UUID-less
+        index.bridge(Set.of(pos(0, 0, 0), pos(10, 0, 0)));
+        assertEquals(uuid, index.networkOf(pos(0, 0, 0)).orElseThrow());
+        assertEquals(uuid, index.networkOf(pos(10, 0, 0)).orElseThrow(),
+                "the bridged run inherits the merged network's UUID");
+    }
+
+    @Test
+    void bridge_singlePosition_isNoOp() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.bridge(Set.of(pos(0, 0, 0)));
+        assertEquals(1, index.componentCount());
+    }
+
+    @Test
+    void bridge_ignoresUnregisteredPositions() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.bridge(Set.of(pos(0, 0, 0), pos(99, 0, 0))); // the second is not registered
+        assertEquals(1, index.componentCount());
+        assertTrue(index.contains(pos(0, 0, 0)));
+    }
 }

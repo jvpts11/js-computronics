@@ -12,6 +12,7 @@ import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -21,7 +22,6 @@ import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 /**
@@ -165,36 +165,38 @@ public final class ExportBusPart implements CablePart {
         if (filterStack.isEmpty() || network == null) {
             return;
         }
-        final IItemHandler dest = host.neighborHandler(face);
-        if (dest == null) {
+        final ExternalDataPort dest = host.neighborPort(face);
+        if (dest.isEmpty()) {
             return;
         }
-        // Export the exact filtered variant (item + components), so an enchanted filter pulls only
-        // the enchanted item, not every bare copy.
-        final StorageKey key = StorageKey.of(filterStack);
+        // A fluid container in the filter (e.g. a filled bucket) exports its FLUID; any other item
+        final StorageKey key = net.neoforged.neoforge.fluids.FluidUtil.getFluidContained(filterStack)
+                .filter(f -> !f.isEmpty())
+                .map(StorageKey::of)
+                .orElseGet(() -> StorageKey.of(filterStack));
         final MainframeBlockEntity mainframe = host.mainframe();
         if (mainframe == null) {
             return;
         }
-        // Don't spin failed DELETEs forever once the network holds none of the item.
+        // Don't spin failed DELETEs forever once the network holds none of the data.
         if (NetworkStorage.of(level, network).count(key) <= 0L) {
             return;
         }
-        // Throughput follows the network's orchestration capacity (items/tick), not a fixed batch.
-        final int batch = (int) Math.max(BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
+        // Throughput follows the network's orchestration capacity, not a fixed batch.
+        final long batch = Math.max(BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
         final long want = computeWant(dest, key, batch);
         if (want <= 0L) {
             return;
         }
-        // Pull the item out of the network into the faced inventory as a timed DELETE Operation,
+        // Pull the data out of the network into the faced block (item or fluid) as a timed DELETE
         activeOp = mainframe.submitNetworkDelete(key, want, dest, "export");
     }
 
-    private long computeWant(final IItemHandler dest, final StorageKey key, final int batch) {
+    private long computeWant(final ExternalDataPort dest, final StorageKey key, final long batch) {
         if (max <= 0) {
             return batch; // no cap: push up to the network throughput each cycle
         }
-        final int destCount = countOf(dest, key);
+        final long destCount = dest.count(key);
         if (destCount >= max) {
             active = false;
             return 0L;
@@ -205,18 +207,7 @@ public final class ExportBusPart implements CablePart {
             }
             active = true;
         }
-        return Math.min((long) batch, (long) (max - destCount));
-    }
-
-    private static int countOf(final IItemHandler handler, final StorageKey key) {
-        int total = 0;
-        for (int i = 0; i < handler.getSlots(); i++) {
-            final ItemStack inSlot = handler.getStackInSlot(i);
-            if (ItemStack.isSameItemSameComponents(inSlot, key.prototype())) {
-                total += inSlot.getCount();
-            }
-        }
-        return total;
+        return Math.min(batch, (long) max - destCount);
     }
 
     private void markHostChanged() {

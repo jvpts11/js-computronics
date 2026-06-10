@@ -70,10 +70,11 @@ public class DiskItem extends Item {
                 tooltip.add(Component.literal("  ...and more").withStyle(ChatFormatting.DARK_GRAY));
                 break;
             }
-            // Item model name in gray, the stored quantity trailing in a dimmer grey.
+            // Item/fluid name in gray, the stored quantity trailing in a dimmer grey (mB for fluids).
+            final String qty = entry.getKey().isFluid() ? entry.getValue() + " mB" : "x" + entry.getValue();
             tooltip.add(Component.literal("  ")
-                    .append(entry.getKey().stack(1).getHoverName().copy().withStyle(ChatFormatting.GRAY))
-                    .append(Component.literal("  x" + entry.getValue()).withStyle(ChatFormatting.DARK_GRAY)));
+                    .append(entry.getKey().displayName().copy().withStyle(ChatFormatting.GRAY))
+                    .append(Component.literal("  " + qty).withStyle(ChatFormatting.DARK_GRAY)));
             shown++;
         }
     }

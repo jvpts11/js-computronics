@@ -10,8 +10,11 @@ package dev.jsc.jscomputronics.gametest;
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.hardware.DiskSize;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
+import dev.jsc.jscomputronics.common.network.FailoverRole;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
+import dev.jsc.jscomputronics.common.persistence.NetworkRegistrySavedData;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
@@ -152,27 +155,126 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
-    public static void mainframeDestroyed_erasesNetworkFromCables(final GameTestHelper helper) {
+    public static void mainframeDestroyed_orphansNetworkAndReAdopts(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos c1 = new BlockPos(2, 2, 2);
         final BlockPos c2 = new BlockPos(3, 2, 2);
         placeRunningMainframe(helper, m);
         helper.setBlock(c1, ComputingModule.HBW_CABLE.get());
         helper.setBlock(c2, ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] uuid = new NetworkUuid[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    helper.assertTrue(networkOf(helper, c1).isPresent(),
+                    final Optional<NetworkUuid> net = networkOf(helper, c1);
+                    helper.assertTrue(net.isPresent(),
                             "cables should carry the mainframe's network while it runs");
-                    helper.assertTrue(networkOf(helper, c2).isPresent(),
-                            "the whole cable run should be networked");
+                    uuid[0] = net.get();
+                    helper.assertTrue(registryState(helper, uuid[0]) == NetworkUuidState.ACTIVE,
+                            "a running network is ACTIVE");
                 })
                 .thenExecute(() -> helper.setBlock(m, Blocks.AIR)) // destroy the mainframe
                 .thenExecuteAfter(SETTLE, () -> {
-                    helper.assertTrue(networkOf(helper, c1).isEmpty(),
-                            "destroying the mainframe must erase the network from its cables");
-                    helper.assertTrue(networkOf(helper, c2).isEmpty(),
-                            "no cable may keep a network once its only mainframe is gone");
+                    helper.assertTrue(networkOf(helper, c1).equals(Optional.of(uuid[0])),
+                            "an orphaned network keeps its UUID on the cables, not erased");
+                    helper.assertTrue(networkOf(helper, c2).equals(Optional.of(uuid[0])),
+                            "the whole orphaned segment keeps the same UUID");
+                    helper.assertTrue(registryState(helper, uuid[0]) == NetworkUuidState.ORPHANED,
+                            "destroying the only Mainframe marks the network ORPHANED");
                 })
+                .thenExecute(() -> placeRunningMainframe(helper, m)) // a replacement on the same topology
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(networkOf(helper, c1).equals(Optional.of(uuid[0])),
+                            "a new Mainframe re-adopts the orphaned UUID, not a fresh one");
+                    helper.assertTrue(registryState(helper, uuid[0]) == NetworkUuidState.ACTIVE,
+                            "re-adoption brings the network back to ACTIVE");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 220)
+    public static void failover_standbyJoinsPrimaryAndTakesOver(final GameTestHelper helper) {
+        final BlockPos primaryPos = new BlockPos(1, 2, 2);
+        final BlockPos standbyPos = new BlockPos(5, 2, 2);
+        final MainframeBlockEntity primary = placeRunningMainframe(helper, primaryPos); // Failover OFF
+        final MainframeBlockEntity standby = placeRunningMainframe(helper, standbyPos);
+        standby.toggleFailover(); // ON -> a standby that joins the primary's network
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] uuid = new NetworkUuid[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertFalse(primary.hasNetworkConflict(), "primary + standby must not conflict");
+                    helper.assertFalse(standby.hasNetworkConflict(), "primary + standby must not conflict");
+                    uuid[0] = primary.networkUuid();
+                    helper.assertTrue(uuid[0] != null, "the primary owns a network");
+                    helper.assertTrue(uuid[0].equals(standby.networkUuid()),
+                            "the standby joins the primary's network, not its own");
+                    helper.assertTrue(standby.failoverRole() == FailoverRole.PASSIVE,
+                            "the standby stands by while the primary runs; got " + standby.failoverRole());
+                })
+                .thenExecute(() -> helper.setBlock(primaryPos, Blocks.AIR)) // destroy the primary
+                // The standby takes over only after the takeover delay (60 ticks); wait it out.
+                .thenExecuteAfter(70, () -> {
+                    helper.assertTrue(standby.failoverRole() == FailoverRole.ACTIVE,
+                            "the standby promotes to run the orphaned network; got " + standby.failoverRole());
+                    helper.assertTrue(uuid[0].equals(standby.networkUuid()),
+                            "the promoted standby keeps the SAME network UUID, never a fresh one");
+                    helper.assertTrue(registryState(helper, uuid[0]) == NetworkUuidState.ACTIVE,
+                            "the network is ACTIVE again under the promoted standby");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void failover_enablingErasesOwnNetwork(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos c = new BlockPos(2, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m); // Failover OFF, a primary
+        helper.setBlock(c, ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] uuid = new NetworkUuid[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    uuid[0] = networkOf(helper, c).orElse(null);
+                    helper.assertTrue(uuid[0] != null, "the primary owns a network on its cable");
+                    helper.assertTrue(registryState(helper, uuid[0]) == NetworkUuidState.ACTIVE, "and it is ACTIVE");
+                })
+                .thenExecute(mainframe::toggleFailover) // become a standby
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(networkOf(helper, c).isEmpty(),
+                            "enabling Failover erases the owned network from the cable");
+                    helper.assertTrue(mainframe.networkUuid() == null,
+                            "a standby with no primary owns no network");
+                    helper.assertTrue(registryState(helper, uuid[0]) == null,
+                            "the erased network is dropped from the registry");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void failover_lastMemberOutOrphansNotGhostActive(final GameTestHelper helper) {
+        final BlockPos primaryPos = new BlockPos(1, 2, 2);
+        final BlockPos standbyPos = new BlockPos(5, 2, 2);
+        final MainframeBlockEntity primary = placeRunningMainframe(helper, primaryPos);
+        final MainframeBlockEntity standby = placeRunningMainframe(helper, standbyPos);
+        standby.toggleFailover();
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        final NetworkUuid[] uuid = new NetworkUuid[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    uuid[0] = primary.networkUuid();
+                    helper.assertTrue(uuid[0] != null, "the primary forms a network");
+                    helper.assertTrue(registryState(helper, uuid[0]) == NetworkUuidState.ACTIVE, "running network is ACTIVE");
+                })
+                .thenExecute(() -> helper.setBlock(primaryPos, Blocks.AIR)) // destroy the primary first
+                // ...then the standby too, BEFORE it can promote (well under the 60-tick takeover delay)
+                .thenExecuteAfter(2, () -> helper.setBlock(standbyPos, Blocks.AIR))
+                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(
+                        registryState(helper, uuid[0]) == NetworkUuidState.ORPHANED,
+                        "with the last Mainframe gone the network must be ORPHANED, not a ghost ACTIVE; got "
+                                + registryState(helper, uuid[0])))
                 .thenSucceed();
     }
 
@@ -490,7 +592,7 @@ public final class NetworkGameTests {
 
                     // SELECT 30 into a destination handler.
                     final ItemStackHandler dest = new ItemStackHandler(9);
-                    final long moved = ns.select(Items.COBBLESTONE, 30, dest);
+                    final long moved = ns.select(Items.COBBLESTONE, 30, new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null));
                     helper.assertTrue(moved == 30, "SELECT should move 30; got " + moved);
                     helper.assertTrue(ns.count(Items.COBBLESTONE) == 70,
                             "network should have 70 after SELECT");
@@ -613,7 +715,7 @@ public final class NetworkGameTests {
                             "the PC's network should see the server's 200 cobblestone; got "
                                     + ns.count(Items.COBBLESTONE));
                     final ItemStackHandler dest = new ItemStackHandler(9);
-                    final long moved = ns.select(Items.COBBLESTONE, 100, dest);
+                    final long moved = ns.select(Items.COBBLESTONE, 100, new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null));
                     helper.assertTrue(moved == 100, "SELECT should move 100 via the PC's network; got " + moved);
                     helper.assertTrue(ns.count(Items.COBBLESTONE) == 100,
                             "network should have 100 left after SELECT");
@@ -952,7 +1054,7 @@ public final class NetworkGameTests {
                 // Let the in-RAM catalog see the seeded items before the SELECT locks against it.
                 .thenExecuteAfter(2, () -> {
                     final var op = mainframe.submitNetworkSelect(
-                            Items.COBBLESTONE, seeded, dest, "test", null);
+                            Items.COBBLESTONE, seeded, new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null), "test", null);
                     helper.assertTrue(op != null, "the SELECT should dispatch on a running mainframe");
                     op.abortWhen(gone::get);
                     opBox.set(op);
@@ -1077,7 +1179,7 @@ public final class NetworkGameTests {
                             "two swords total across variants; got " + ns.count(Items.DIAMOND_SWORD));
                     // Pull the named one back out and confirm it kept its custom name.
                     final ItemStackHandler dest = new ItemStackHandler(4);
-                    helper.assertTrue(ns.select(StorageKey.of(named), 1, dest) == 1L, "named SELECT moves 1");
+                    helper.assertTrue(ns.select(StorageKey.of(named), 1, new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null)) == 1L, "named SELECT moves 1");
                     final ItemStack out = dest.getStackInSlot(0);
                     helper.assertTrue(ItemStack.isSameItemSameComponents(out, named),
                             "the pulled sword must keep its components; got '" + out.getHoverName().getString() + "'");
@@ -1182,7 +1284,7 @@ public final class NetworkGameTests {
                             net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
                             helper.absolutePos(barrel), null);
                     helper.assertTrue(dest != null, "the barrel must expose an item handler");
-                    op[0] = mainframe.submitNetworkSelect(Items.COBBLESTONE, stored[0], dest, "select");
+                    op[0] = mainframe.submitNetworkSelect(Items.COBBLESTONE, stored[0], new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null), "select");
                     helper.assertTrue(op[0] != null, "the SELECT must be accepted");
                 })
                 .thenExecuteAfter(30, () -> {
@@ -1324,7 +1426,7 @@ public final class NetworkGameTests {
                     final var dest = helper.getLevel().getCapability(
                             net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
                             helper.absolutePos(barrel), null);
-                    op[0] = mainframe.submitNetworkDelete(Items.COBBLESTONE, stored[0], dest, "export");
+                    op[0] = mainframe.submitNetworkDelete(Items.COBBLESTONE, stored[0], new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null), "export");
                     helper.assertTrue(op[0] != null, "the DELETE must be accepted");
                 })
                 .thenExecuteAfter(30, () -> {
@@ -1533,5 +1635,9 @@ public final class NetworkGameTests {
         final ServerLevel level = helper.getLevel();
         return NetworkSystem.get(level).connectivity().inSameNetwork(
                 helper.absolutePos(a).asLong(), helper.absolutePos(b).asLong());
+    }
+
+    private static NetworkUuidState registryState(final GameTestHelper helper, final NetworkUuid uuid) {
+        return NetworkRegistrySavedData.get(helper.getLevel()).networkState(uuid);
     }
 }

@@ -7,20 +7,20 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
 /**
- * Client to server: a Monitor terminal asked to SELECT {@code quantity} of {@code stack}'s type (item AND components, so an enchanted item is pulled as that exact enchanted item) from the chosen source Servers to a chosen destination — the computer's local storage, the player's inventory, or another Server on the network (a MOVE).
+ * Client to server: a Monitor terminal asked to SELECT {@code quantity} of {@code key}'s data type (item OR fluid, with components) from the chosen source Servers to a chosen destination — the computer's local storage, or another computer on the network (a MOVE).
  */
-public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, ItemStack stack, long quantity,
+public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, StorageKey key, long quantity,
                                     List<String> serverKeys, int destKind, String destServer)
         implements CustomPacketPayload {
 
@@ -40,7 +40,7 @@ public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, ItemS
                     (buf, p) -> {
                         BlockPos.STREAM_CODEC.encode(buf, p.monitorPos());
                         BlockPos.STREAM_CODEC.encode(buf, p.hostPos());
-                        ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, p.stack());
+                        StorageKey.STREAM_CODEC.encode(buf, p.key());
                         buf.writeVarLong(p.quantity());
                         ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(MAX_SERVERS))
                                 .encode(buf, p.serverKeys());
@@ -50,7 +50,7 @@ public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, ItemS
                     buf -> new TerminalSelectPayload(
                             BlockPos.STREAM_CODEC.decode(buf),
                             BlockPos.STREAM_CODEC.decode(buf),
-                            ItemStack.OPTIONAL_STREAM_CODEC.decode(buf),
+                            StorageKey.STREAM_CODEC.decode(buf),
                             buf.readVarLong(),
                             ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(MAX_SERVERS)).decode(buf),
                             buf.readVarInt(),

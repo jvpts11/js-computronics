@@ -49,7 +49,7 @@ public interface ComputerTerminalHost {
 
     long localStorageCapacity();
 
-    net.neoforged.neoforge.items.IItemHandler localStorage();
+    dev.jsc.jscomputronics.module.computing.storage.DataSink localStorage();
 
     dev.jsc.jscomputronics.module.computing.storage.LocalStore localStore();
 

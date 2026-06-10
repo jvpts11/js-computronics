@@ -8,16 +8,17 @@
 package dev.jsc.jscomputronics.common.persistence;
 
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -28,6 +29,8 @@ public final class NetworkRegistrySavedData extends JscSavedData{
     public static final String DATA_NAME = "jsc_network_registry";
 
     private static final String KEY_NETWORKS = "networks";
+    private static final String KEY_UUID = "uuid";
+    private static final String KEY_STATE = "state";
 
     private NetworkRegistryState state;
 
@@ -42,17 +45,38 @@ public final class NetworkRegistrySavedData extends JscSavedData{
     public static NetworkRegistrySavedData load(
             final CompoundTag tag,
             final HolderLookup.Provider registries) {
-        final Set<NetworkUuid> networks = new LinkedHashSet<>();
-        final ListTag list = tag.getList(KEY_NETWORKS, 8); // 8 = string tag id
+        final Map<NetworkUuid, NetworkUuidState> networks = new LinkedHashMap<>();
+        final ListTag list = tag.getList(KEY_NETWORKS, Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
-            final String raw = list.getString(i);
+            final CompoundTag entry = list.getCompound(i);
             try {
-                networks.add(new NetworkUuid(UUID.fromString(raw)));
+                final NetworkUuid uuid = new NetworkUuid(UUID.fromString(entry.getString(KEY_UUID)));
+                networks.put(uuid, parseState(entry.getString(KEY_STATE)));
             } catch (final IllegalArgumentException ignored) {
                 // Corrupt UUID string — skip it rather than crash the load.
             }
         }
-        return new NetworkRegistrySavedData(NetworkRegistryState.of(networks));
+        // Backward compatibility: an older save stored a plain string list (every network ACTIVE).
+        if (networks.isEmpty()) {
+            final ListTag legacy = tag.getList(KEY_NETWORKS, Tag.TAG_STRING);
+            for (int i = 0; i < legacy.size(); i++) {
+                try {
+                    networks.put(new NetworkUuid(UUID.fromString(legacy.getString(i))),
+                            NetworkUuidState.ACTIVE);
+                } catch (final IllegalArgumentException ignored) {
+                    // Skip a corrupt entry.
+                }
+            }
+        }
+        return new NetworkRegistrySavedData(NetworkRegistryState.ofStates(networks));
+    }
+
+    private static NetworkUuidState parseState(final String raw) {
+        try {
+            return NetworkUuidState.valueOf(raw);
+        } catch (final IllegalArgumentException ignored) {
+            return NetworkUuidState.ACTIVE;
+        }
     }
 
     public static SavedData.Factory<NetworkRegistrySavedData> factory() {
@@ -68,9 +92,12 @@ public final class NetworkRegistrySavedData extends JscSavedData{
     @Override
     public CompoundTag save(final CompoundTag tag, final HolderLookup.Provider registries) {
         final ListTag list = new ListTag();
-        for (final NetworkUuid uuid : state.networks()) {
-            list.add(StringTag.valueOf(uuid.value().toString()));
-        }
+        state.states().forEach((uuid, networkState) -> {
+            final CompoundTag entry = new CompoundTag();
+            entry.putString(KEY_UUID, uuid.value().toString());
+            entry.putString(KEY_STATE, networkState.name());
+            list.add(entry);
+        });
         tag.put(KEY_NETWORKS, list);
         return tag;
     }
@@ -79,8 +106,20 @@ public final class NetworkRegistrySavedData extends JscSavedData{
         return state;
     }
 
+    public NetworkUuidState networkState(final NetworkUuid uuid) {
+        return state.stateOf(uuid);
+    }
+
     public void addNetwork(final NetworkUuid uuid) {
         final NetworkRegistryState next = state.withNetwork(uuid);
+        if (next != state) {
+            state = next;
+            setDirty();
+        }
+    }
+
+    public void setNetworkState(final NetworkUuid uuid, final NetworkUuidState networkState) {
+        final NetworkRegistryState next = state.withState(uuid, networkState);
         if (next != state) {
             state = next;
             setDirty();

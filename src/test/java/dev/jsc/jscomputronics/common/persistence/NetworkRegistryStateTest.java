@@ -8,14 +8,18 @@
 package dev.jsc.jscomputronics.common.persistence;
 
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -140,5 +144,83 @@ class NetworkRegistryStateTest {
         assertEquals(a, iterator.next());
         assertEquals(b, iterator.next());
         assertEquals(c, iterator.next());
+    }
+
+    @Test
+    void withNetwork_defaultsToActive() {
+        NetworkUuid uuid = net();
+        NetworkRegistryState state = NetworkRegistryState.empty().withNetwork(uuid);
+        assertEquals(NetworkUuidState.ACTIVE, state.stateOf(uuid));
+    }
+
+    @Test
+    void stateOf_unregistered_returnsNull() {
+        assertNull(NetworkRegistryState.empty().stateOf(net()));
+    }
+
+    @Test
+    void withState_setsState() {
+        NetworkUuid uuid = net();
+        NetworkRegistryState state = NetworkRegistryState.empty()
+                .withNetwork(uuid)
+                .withState(uuid, NetworkUuidState.CONFLICTED);
+        assertEquals(NetworkUuidState.CONFLICTED, state.stateOf(uuid));
+    }
+
+    @Test
+    void withState_addsNetworkIfAbsent() {
+        NetworkUuid uuid = net();
+        NetworkRegistryState state = NetworkRegistryState.empty()
+                .withState(uuid, NetworkUuidState.ORPHANED);
+        assertTrue(state.contains(uuid));
+        assertEquals(NetworkUuidState.ORPHANED, state.stateOf(uuid));
+    }
+
+    @Test
+    void withState_idempotent_returnsSameInstance() {
+        NetworkUuid uuid = net();
+        NetworkRegistryState state = NetworkRegistryState.empty()
+                .withState(uuid, NetworkUuidState.ORPHANED);
+        NetworkRegistryState again = state.withState(uuid, NetworkUuidState.ORPHANED);
+        assertSame(state, again);
+    }
+
+    @Test
+    void withState_isImmutable_originalUnchanged() {
+        NetworkUuid uuid = net();
+        NetworkRegistryState active = NetworkRegistryState.empty().withNetwork(uuid);
+        NetworkRegistryState orphaned = active.withState(uuid, NetworkUuidState.ORPHANED);
+        assertEquals(NetworkUuidState.ACTIVE, active.stateOf(uuid));
+        assertEquals(NetworkUuidState.ORPHANED, orphaned.stateOf(uuid));
+    }
+
+    @Test
+    void equals_sameNetworkDifferentState_notEqual() {
+        NetworkUuid uuid = net();
+        NetworkRegistryState active = NetworkRegistryState.empty().withNetwork(uuid);
+        NetworkRegistryState conflicted = active.withState(uuid, NetworkUuidState.CONFLICTED);
+        assertFalse(active.equals(conflicted));
+    }
+
+    @Test
+    void ofStates_buildsFromMap() {
+        NetworkUuid a = net();
+        NetworkUuid b = net();
+        Map<NetworkUuid, NetworkUuidState> map = new LinkedHashMap<>();
+        map.put(a, NetworkUuidState.ACTIVE);
+        map.put(b, NetworkUuidState.ORPHANED);
+        NetworkRegistryState state = NetworkRegistryState.ofStates(map);
+        assertEquals(NetworkUuidState.ACTIVE, state.stateOf(a));
+        assertEquals(NetworkUuidState.ORPHANED, state.stateOf(b));
+    }
+
+    @Test
+    void ofStates_defensiveCopy_externalMutationDoesNotAffectState() {
+        NetworkUuid a = net();
+        Map<NetworkUuid, NetworkUuidState> map = new LinkedHashMap<>();
+        map.put(a, NetworkUuidState.ACTIVE);
+        NetworkRegistryState state = NetworkRegistryState.ofStates(map);
+        map.put(net(), NetworkUuidState.ORPHANED);
+        assertEquals(1, state.size(), "state must not reflect external mutation");
     }
 }

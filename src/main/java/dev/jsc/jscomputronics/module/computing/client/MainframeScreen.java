@@ -7,6 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.network.FailoverRole;
+import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -22,14 +24,13 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
     private static final int COL_R_W = 110;
     private static final int BTN_H = 14;
 
-    // Control row (relative to the GUI top-left).
+    // Control row (relative to the GUI top-left): four 54px buttons, 4px gaps, 8px margins.
     private static final int BTN_Y = 162;
+    private static final int BTN_W = 54;
     private static final int POWER_X = 8;
-    private static final int POWER_W = 72;
-    private static final int AUTO_X = 84;
-    private static final int AUTO_W = 72;
-    private static final int NODES_X = 160;
-    private static final int NODES_W = 76;
+    private static final int AUTO_X = 66;
+    private static final int FAILOVER_X = 124;
+    private static final int NODES_X = 182;
 
     public MainframeScreen(final MainframeMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
@@ -50,10 +51,12 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         // Hardware cells, only up to the count the installed board exposes.
         JscOsTheme.slot(g, x + 8, y + 40);   // motherboard
         JscOsTheme.slot(g, x + 8, y + 73);   // psu
-        final int cpu = Math.min(menu.boardCpuSlots(), 4);
-        final int ram = Math.min(menu.boardRamSlots(), 8);
-        final int gpu = Math.min(menu.boardPcieSlots(), 6);
-        final int disk = Math.min(menu.boardDiskSlots(), 4);
+        // The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
+        // screen draws exactly what the menu exposes — one source of truth, no duplicated cap literal.
+        final int cpu = menu.boardCpuSlots();
+        final int ram = menu.boardRamSlots();
+        final int gpu = menu.boardPcieSlots();
+        final int disk = menu.boardDiskSlots();
         for (int i = 0; i < cpu; i++) {
             JscOsTheme.slot(g, x + 44 + i * 18, y + 40);
         }
@@ -74,10 +77,11 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         JscOsTheme.panel(g, x + COL_R, y + 108, COL_R_W, 42);  // OPERATIONS
 
         final boolean auto = menu.isAutoStart();
-        JscOsTheme.button(g, x + POWER_X, y + BTN_Y, POWER_W, BTN_H,
-                !auto && hover(mouseX, mouseY, POWER_X, BTN_Y, POWER_W, BTN_H));
-        JscOsTheme.button(g, x + AUTO_X, y + BTN_Y, AUTO_W, BTN_H, hover(mouseX, mouseY, AUTO_X, BTN_Y, AUTO_W, BTN_H));
-        JscOsTheme.button(g, x + NODES_X, y + BTN_Y, NODES_W, BTN_H, hover(mouseX, mouseY, NODES_X, BTN_Y, NODES_W, BTN_H));
+        JscOsTheme.button(g, x + POWER_X, y + BTN_Y, BTN_W, BTN_H,
+                !auto && hover(mouseX, mouseY, POWER_X, BTN_Y, BTN_W, BTN_H));
+        JscOsTheme.button(g, x + AUTO_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, AUTO_X, BTN_Y, BTN_W, BTN_H));
+        JscOsTheme.button(g, x + FAILOVER_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, FAILOVER_X, BTN_Y, BTN_W, BTN_H));
+        JscOsTheme.button(g, x + NODES_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, NODES_X, BTN_Y, BTN_W, BTN_H));
 
         // Player inventory.
         for (int row = 0; row < 3; row++) {
@@ -95,12 +99,15 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         JscOsTheme.text(g, font, "MAINFRAME", 12, 11, JscOsTheme.TEXT);
         final String status;
         final int statusColor;
-        if (menu.networkState() == 2) {
+        if (menu.networkState() == MainframeBlockEntity.NET_STATE_CONFLICT) {
             status = "CONFLICT";
             statusColor = JscOsTheme.RED;
         } else if (!menu.buildValid()) {
             status = "OFFLINE";
             statusColor = JscOsTheme.RED;
+        } else if (menu.isRunning() && menu.failoverRole() == FailoverRole.PASSIVE.ordinal()) {
+            status = "STANDBY"; // a Passive Failover member: powered and synced, not orchestrating
+            statusColor = JscOsTheme.AMBER;
         } else if (menu.isRunning()) {
             status = "ONLINE";
             statusColor = JscOsTheme.GREEN;
@@ -128,8 +135,10 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
 
         JscOsTheme.text(g, font, "NETWORK", COL_R, 96, JscOsTheme.DIM);
         final int net = menu.networkState();
-        final String netStr = net == 2 ? "CONFLICT" : net == 1 ? "LINKED" : "--";
-        final int netColor = net == 2 ? JscOsTheme.RED : net == 1 ? JscOsTheme.GREEN : JscOsTheme.DIM;
+        final String netStr = net == MainframeBlockEntity.NET_STATE_CONFLICT ? "CONFLICT"
+                : net == MainframeBlockEntity.NET_STATE_LINKED ? "LINKED" : "--";
+        final int netColor = net == MainframeBlockEntity.NET_STATE_CONFLICT ? JscOsTheme.RED
+                : net == MainframeBlockEntity.NET_STATE_LINKED ? JscOsTheme.GREEN : JscOsTheme.DIM;
         JscOsTheme.textRight(g, font, netStr, COL_R + COL_R_W, 96, netColor);
 
         // Operations dispatch — one row per metric (label left, value right).
@@ -141,10 +150,13 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         // Control row captions.
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isManualOn() ? "TURN OFF" : "TURN ON");
-        JscOsTheme.textCenter(g, font, powerCap, POWER_X + POWER_W / 2, BTN_Y + 4, auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
-        JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + AUTO_W / 2, BTN_Y + 4,
+        JscOsTheme.textCenter(g, font, powerCap, POWER_X + BTN_W / 2, BTN_Y + 4, auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+        JscOsTheme.textCenter(g, font, "AUTO " + (auto ? "ON" : "OFF"), AUTO_X + BTN_W / 2, BTN_Y + 4,
                 auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.textCenter(g, font, "NODES", NODES_X + NODES_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
+        final boolean failover = menu.failoverEnabled();
+        JscOsTheme.textCenter(g, font, "FAIL " + (failover ? "ON" : "OFF"), FAILOVER_X + BTN_W / 2, BTN_Y + 4,
+                failover ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+        JscOsTheme.textCenter(g, font, "NODES", NODES_X + BTN_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
     }
 
     private void opRow(final GuiGraphics g, final String key, final String value, final int y, final int valueColor) {
@@ -168,15 +180,19 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         if (button == 0) {
-            if (!menu.isAutoStart() && hover((int) mouseX, (int) mouseY, POWER_X, BTN_Y, POWER_W, BTN_H)) {
+            if (!menu.isAutoStart() && hover((int) mouseX, (int) mouseY, POWER_X, BTN_Y, BTN_W, BTN_H)) {
                 sendButton(MainframeMenu.BUTTON_POWER);
                 return true;
             }
-            if (hover((int) mouseX, (int) mouseY, AUTO_X, BTN_Y, AUTO_W, BTN_H)) {
+            if (hover((int) mouseX, (int) mouseY, AUTO_X, BTN_Y, BTN_W, BTN_H)) {
                 sendButton(MainframeMenu.BUTTON_AUTOSTART);
                 return true;
             }
-            if (hover((int) mouseX, (int) mouseY, NODES_X, BTN_Y, NODES_W, BTN_H)) {
+            if (hover((int) mouseX, (int) mouseY, FAILOVER_X, BTN_Y, BTN_W, BTN_H)) {
+                sendButton(MainframeMenu.BUTTON_FAILOVER);
+                return true;
+            }
+            if (hover((int) mouseX, (int) mouseY, NODES_X, BTN_Y, BTN_W, BTN_H)) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new dev.jsc.jscomputronics.module.computing.operation.payload.RequestNetworkNodesPayload(
                                 menu.blockPos()));

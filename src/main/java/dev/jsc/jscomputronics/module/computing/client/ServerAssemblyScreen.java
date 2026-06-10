@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.client;
 import dev.jsc.jscomputronics.common.format.Unit;
 import dev.jsc.jscomputronics.common.format.UnitFormatter;
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
+import dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler;
 import dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenameServerPayload;
 import net.minecraft.ChatFormatting;
@@ -123,20 +124,12 @@ public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssembly
         // Problems strip.
         JscOsTheme.panel(g, x + 8, y + 68, 228, 12);
 
-        // Hardware bay cells.
-        JscOsTheme.slot(g, x + 8, y + 96);    // motherboard
-        JscOsTheme.slot(g, x + 26, y + 96);   // psu
-        for (int i = 0; i < 6; i++) {
-            JscOsTheme.slot(g, x + 8 + (i % 2) * 18, y + 126 + (i / 2) * 18);
-        }
-        for (int i = 0; i < 4; i++) {
-            JscOsTheme.slot(g, x + 52 + i * 18, y + 96);
-        }
-        for (int i = 0; i < 8; i++) {
-            JscOsTheme.slot(g, x + 52 + (i % 4) * 18, y + 126 + (i / 4) * 18);
-        }
-        for (int i = 0; i < 6; i++) {
-            JscOsTheme.slot(g, x + 52 + (i % 3) * 18, y + 174 + (i / 3) * 18);
+        // Draw a cell behind every ACTIVE hardware slot, reading the menu's own slot positions. The
+        for (int i = 0; i < ServerHardwareHandler.SLOTS; i++) {
+            final var slot = menu.getSlot(i);
+            if (slot.isActive()) {
+                JscOsTheme.slot(g, x + slot.x, y + slot.y);
+            }
         }
 
         // Player inventory.
