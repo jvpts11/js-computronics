@@ -60,6 +60,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final int TEXT = JscOsTheme.TEXT;
     private static final int DIM = JscOsTheme.DIM;
     private static final int TAB_ON = JscOsTheme.TAB_ON;
+    private static final int HOVER = JscOsTheme.HOVER;
 
     private static final int RAIL_X = 4;
     private static final int RAIL_W = 56;
@@ -87,7 +88,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final int DEPOSIT_W = NET_COLS * 18 - 2;
     private static final int DEPOSIT_H = 14;
 
-    private static final String[] TAB_NAMES = {"Local", "Storage", "Network", "Operations", "Tasks", "Maint"};
+    private static final String[] TAB_NAMES = {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft"};
 
     private int netScrollRow;
     private int selectedOp;
@@ -112,6 +113,12 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private boolean syncingQty;
     @org.jetbrains.annotations.Nullable
     private NetworkItemEntry popupEntry;
+
+    // Craft popup state (open only while craftPopup != null) + catalog scroll.
+    @org.jetbrains.annotations.Nullable
+    private dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry craftPopup;
+    private long craftQty = 1;
+    private int craftScroll;
     private int popupQty = 1;
     private boolean popupFromStorage;
     private final Set<String> deselectedServers = new HashSet<>();
@@ -189,14 +196,14 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         if (searchBox == null) {
             return;
         }
-        final boolean show = isGridTab() && popupEntry == null && popupOp == null;
+        final boolean show = isGridTab() && popupEntry == null && popupOp == null && craftPopup == null;
         searchBox.visible = show;
         searchBox.active = show;
         if (!show) {
             searchBox.setFocused(false);
         }
         if (qtyBox != null) {
-            final boolean p = popupEntry != null;
+            final boolean p = popupEntry != null || craftPopup != null;
             qtyBox.visible = p;
             qtyBox.active = p;
             if (!p) {
@@ -206,7 +213,20 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private void onQtyTyped(final String s) {
-        if (popupEntry == null || syncingQty) {
+        if (syncingQty) {
+            return;
+        }
+        if (craftPopup != null) {
+            try {
+                final long v = s.isEmpty() ? 1L : Long.parseLong(s);
+                craftQty = Math.max(1, Math.min(99_999, v));
+                requestCraftPlan();
+            } catch (final NumberFormatException ignored) {
+                // Over-long input: leave the last valid quantity in place.
+            }
+            return;
+        }
+        if (popupEntry == null) {
             return;
         }
         try {
@@ -232,6 +252,31 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         return menu.mainframeHost() ? 6 : 4;
     }
 
+    private int[] railTabs() {
+        final boolean craft = menu.craftAvailable();
+        if (menu.mainframeHost()) {
+            return craft
+                    ? new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
+                            ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_CRAFT,
+                            ComputerTerminalMenu.TAB_OPS, ComputerTerminalMenu.TAB_TASKS,
+                            ComputerTerminalMenu.TAB_MAINTENANCE}
+                    : new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
+                            ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS,
+                            ComputerTerminalMenu.TAB_TASKS, ComputerTerminalMenu.TAB_MAINTENANCE};
+        }
+        return craft
+                ? new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
+                        ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_CRAFT,
+                        ComputerTerminalMenu.TAB_OPS}
+                : new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
+                        ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS};
+    }
+
+    private int tabH() {
+        final int railH = menu.invY() - TAB_Y0 - 2;
+        return Math.min(TAB_H, railH / railTabs().length);
+    }
+
     private int contentW() {
         return imageWidth - CONTENT_X - 6;
     }
@@ -250,15 +295,20 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final int railH = menu.invY() - TAB_Y0 - 2;
         g.fill(x + RAIL_X, y + TAB_Y0, x + RAIL_X + RAIL_W, y + TAB_Y0 + railH, RAIL);
         g.fill(x + RAIL_X + RAIL_W, y + TAB_Y0, x + RAIL_X + RAIL_W + 1, y + TAB_Y0 + railH, LINE);
-        for (int i = 0; i < tabCount(); i++) {
+        final int[] rail = railTabs();
+        final int tabH = tabH();
+        for (int i = 0; i < rail.length; i++) {
+            final int tab = rail[i];
             final int tx = x + RAIL_X;
-            final int ty = y + TAB_Y0 + i * TAB_H;
-            final boolean on = i == menu.activeTab();
+            final int ty = y + TAB_Y0 + i * tabH;
+            final boolean on = tab == menu.activeTab();
             if (on) {
-                g.fill(tx, ty, tx + RAIL_W, ty + TAB_H, TAB_ON);
-                g.fill(tx, ty, tx + 2, ty + TAB_H, ACCENT);
+                g.fill(tx, ty, tx + RAIL_W, ty + tabH, TAB_ON);
+                g.fill(tx, ty, tx + 2, ty + tabH, ACCENT);
             }
-            icon(g, i, tx + (RAIL_W - 16) / 2, ty + 3, on ? ACCENT : DIM);
+            // On the compressed 7-tab rail the icon centers alone; the name moves to its tooltip.
+            final int iconY = tabH >= TAB_H ? ty + 3 : ty + (tabH - 16) / 2 + 1;
+            icon(g, tab, tx + (RAIL_W - 16) / 2, iconY, on ? ACCENT : DIM);
         }
 
         // Content header bar.
@@ -275,6 +325,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case ComputerTerminalMenu.TAB_OPS -> opsBg(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_TASKS -> tasksBg(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_MAINTENANCE -> maintenanceBg(g, cx, cy, cw, mouseX, mouseY);
+            case ComputerTerminalMenu.TAB_CRAFT -> craftBg(g, x, y);
             default -> { /* nothing */ }
         }
 
@@ -352,11 +403,15 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final int cy = 6;
         final int cw = contentW();
 
-        // Tab names.
-        for (int i = 0; i < tabCount(); i++) {
-            final int ty = TAB_Y0 + i * TAB_H;
-            g.drawCenteredString(font, TAB_NAMES[i], RAIL_X + RAIL_W / 2, ty + 19,
-                    i == menu.activeTab() ? ACCENT : DIM);
+        // Tab names (omitted on the compressed 7-tab rail, where the icon stands alone).
+        final int[] rail = railTabs();
+        final int tabH = tabH();
+        if (tabH >= TAB_H) {
+            for (int i = 0; i < rail.length; i++) {
+                final int ty = TAB_Y0 + i * tabH;
+                g.drawCenteredString(font, TAB_NAMES[rail[i]], RAIL_X + RAIL_W / 2, ty + 19,
+                        rail[i] == menu.activeTab() ? ACCENT : DIM);
+            }
         }
 
         // Header: computer name + status pill.
@@ -386,8 +441,338 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case ComputerTerminalMenu.TAB_OPS -> opsLabels(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_TASKS -> tasksLabels(g, cx, cy, cw);
             case ComputerTerminalMenu.TAB_MAINTENANCE -> maintenanceLabels(g, cx, cy, cw);
+            case ComputerTerminalMenu.TAB_CRAFT -> craftLabels(g, cx, cy, cw);
             default -> placeholder(g, cx, cy, "Not available yet");
         }
+    }
+
+    // Craft tab — catalog grid + running/recent panels + request popup
+
+    private static final int CRAFT_COLS = 9;
+    private static final int CRAFT_ROWS = 2;
+    private static final int CRAFT_GRID_Y = 40;
+    private static final int CRAFT_RUNNING_Y = 82;
+    private static final int CRAFT_RECENT_Y = 116;
+
+    private int craftGridX() {
+        // Aligned with the Network tab's item grid, safely right of the 56px tab rail.
+        return NET_X;
+    }
+
+    private java.util.List<OperationRecord> runningCrafts() {
+        final java.util.List<OperationRecord> out = new java.util.ArrayList<>();
+        for (final OperationRecord op : menu.activeOps()) {
+            if (op.type() == OperationRecord.TYPE_CRAFT) {
+                out.add(op);
+            }
+        }
+        return out;
+    }
+
+    private java.util.List<OperationRecord> recentCrafts() {
+        final java.util.List<OperationRecord> out = new java.util.ArrayList<>();
+        for (final OperationRecord op : menu.operationsLog()) {
+            if (op.type() == OperationRecord.TYPE_CRAFT) {
+                out.add(op);
+            }
+        }
+        return out;
+    }
+
+    private int recentRows() {
+        return menu.mainframeHost() ? 3 : 2;
+    }
+
+    private void craftBg(final GuiGraphics g, final int x, final int y) {
+        // Catalog cells with the availability dot in the corner.
+        final var catalog = menu.craftCatalog();
+        final int maxScroll = Math.max(0, (catalog.size() + CRAFT_COLS - 1) / CRAFT_COLS - CRAFT_ROWS);
+        craftScroll = Math.max(0, Math.min(craftScroll, maxScroll));
+        for (int row = 0; row < CRAFT_ROWS; row++) {
+            for (int col = 0; col < CRAFT_COLS; col++) {
+                final int sx = x + craftGridX() + col * 18;
+                final int sy = y + CRAFT_GRID_Y + row * 18;
+                slotBg(g, sx, sy);
+                final int index = (row + craftScroll) * CRAFT_COLS + col;
+                if (index < catalog.size()) {
+                    final var entry = catalog.get(index);
+                    drawDataIcon(g, dev.jsc.jscomputronics.module.computing.storage.StorageKey
+                            .of(entry.result()), -1L, sx, sy);
+                    final int dot = switch (entry.availability()) {
+                        case dev.jsc.jscomputronics.module.computing.operation.payload
+                                .CraftCatalogPayload.DOT_GREEN -> GREEN;
+                        case dev.jsc.jscomputronics.module.computing.operation.payload
+                                .CraftCatalogPayload.DOT_AMBER -> AMBER;
+                        default -> RED;
+                    };
+                    g.fill(sx + 13, sy + 1, sx + 17, sy + 5, dot);
+                }
+            }
+        }
+        // RUNNING rows: panel strip + progress bar.
+        final var running = runningCrafts();
+        for (int i = 0; i < Math.min(2, running.size()); i++) {
+            final OperationRecord op = running.get(i);
+            final int ry = y + CRAFT_RUNNING_Y + 9 + i * 12;
+            g.fill(x + craftGridX(), ry, x + craftGridX() + CRAFT_COLS * 18, ry + 10, PANEL);
+            final int barX = x + craftGridX() + 92;
+            final int barW = 56;
+            g.fill(barX, ry + 3, barX + barW, ry + 7, TRACK);
+            final int pct = op.requested() <= 0 ? 0
+                    : (int) Math.min(100, op.moved() * 100 / Math.max(1, op.requested()));
+            g.fill(barX, ry + 3, barX + barW * pct / 100, ry + 7, ACCENT);
+        }
+        // RECENT rows: plain strips (status text in labels).
+        final var recent = recentCrafts();
+        for (int i = 0; i < Math.min(recentRows(), recent.size()); i++) {
+            final int ry = y + CRAFT_RECENT_Y + 9 + i * 10;
+            g.fill(x + craftGridX(), ry, x + craftGridX() + CRAFT_COLS * 18, ry + 9, PANEL);
+        }
+    }
+
+    private void craftLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
+        final var catalog = menu.craftCatalog();
+        g.drawString(font, "CRAFTABLE", craftGridX(), 30, DIM, false);
+        g.drawString(font, catalog.size() + (catalog.size() == 1 ? " pattern" : " patterns"),
+                craftGridX() + 64, 30, TEXT, false);
+        if (catalog.isEmpty()) {
+            g.drawString(font, "no patterns loaded - use a Pattern Reader", craftGridX(), CRAFT_GRID_Y + 6, DIM, false);
+        }
+        final int totalRows = (catalog.size() + CRAFT_COLS - 1) / CRAFT_COLS;
+        if (totalRows > CRAFT_ROWS) {
+            g.drawString(font, (craftScroll + 1) + "/" + (totalRows - CRAFT_ROWS + 1),
+                    craftGridX() + CRAFT_COLS * 18 - 24, 30, DIM, false);
+        }
+
+        g.drawString(font, "RUNNING", craftGridX(), CRAFT_RUNNING_Y, DIM, false);
+        final var running = runningCrafts();
+        if (running.isEmpty()) {
+            g.drawString(font, "-", craftGridX() + 48, CRAFT_RUNNING_Y, DIM, false);
+        }
+        for (int i = 0; i < Math.min(2, running.size()); i++) {
+            final OperationRecord op = running.get(i);
+            final int ry = CRAFT_RUNNING_Y + 10 + i * 12;
+            g.drawString(font, trim(op.name().getString(), 9), craftGridX() + 3, ry, TEXT, false);
+            g.drawString(font, fmt(op.moved()) + "/" + fmt(op.requested()), craftGridX() + 56, ry, DIM, false);
+        }
+
+        g.drawString(font, "RECENT", craftGridX(), CRAFT_RECENT_Y, DIM, false);
+        final var recent = recentCrafts();
+        if (recent.isEmpty()) {
+            g.drawString(font, "-", craftGridX() + 44, CRAFT_RECENT_Y, DIM, false);
+        }
+        for (int i = 0; i < Math.min(recentRows(), recent.size()); i++) {
+            final OperationRecord op = recent.get(i);
+            final int ry = CRAFT_RECENT_Y + 10 + i * 10;
+            g.drawString(font, trim(op.name().getString(), 11) + " x" + fmt(op.moved()),
+                    craftGridX() + 3, ry, TEXT, false);
+            final String st = switch (op.status()) {
+                case OperationRecord.STATUS_COMPLETED -> "COMPLETED";
+                case OperationRecord.STATUS_PARTIAL -> "PARTIAL";
+                case OperationRecord.STATUS_RESOURCE_LOCKED -> "LOCKED";
+                default -> "FAILED";
+            };
+            final int color = switch (op.status()) {
+                case OperationRecord.STATUS_COMPLETED -> GREEN;
+                case OperationRecord.STATUS_PARTIAL -> AMBER;
+                default -> RED;
+            };
+            g.drawString(font, st, craftGridX() + CRAFT_COLS * 18 - font.width(st) - 3, ry, color, false);
+        }
+    }
+
+    private static String trim(final String s, final int max) {
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry
+            craftEntryAt(final int mouseX, final int mouseY) {
+        final var catalog = menu.craftCatalog();
+        final int gx = leftPos + craftGridX();
+        final int gy = topPos + CRAFT_GRID_Y;
+        if (mouseX < gx || mouseX >= gx + CRAFT_COLS * 18 || mouseY < gy || mouseY >= gy + CRAFT_ROWS * 18) {
+            return null;
+        }
+        final int col = (mouseX - gx) / 18;
+        final int row = (mouseY - gy) / 18;
+        final int index = (row + craftScroll) * CRAFT_COLS + col;
+        return index < catalog.size() ? catalog.get(index) : null;
+    }
+
+    private void openCraftPopup(
+            final dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry entry) {
+        craftPopup = entry;
+        craftQty = 1;
+        menu.setCraftPlan(null);
+        if (qtyBox != null) {
+            syncingQty = true;
+            qtyBox.setValue("1");
+            syncingQty = false;
+        }
+        requestCraftPlan();
+        syncSearchBoxVisibility();
+    }
+
+    private void closeCraftPopup() {
+        craftPopup = null;
+        menu.setCraftPlan(null);
+        syncSearchBoxVisibility();
+    }
+
+    private void requestCraftPlan() {
+        if (craftPopup != null) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new dev.jsc.jscomputronics.module.computing.operation.payload.CraftPlanRequestPayload(
+                            menu.monitorPos(), menu.hostPos(), craftPopup.result(), craftQty));
+        }
+    }
+
+    private void setCraftQty(final long value) {
+        craftQty = Math.max(1, Math.min(99_999, value));
+        if (qtyBox != null) {
+            syncingQty = true;
+            qtyBox.setValue(String.valueOf(craftQty));
+            syncingQty = false;
+        }
+        requestCraftPlan();
+    }
+
+    private void submitCraft(final boolean partial) {
+        if (craftPopup == null) {
+            return;
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.jsc.jscomputronics.module.computing.operation.payload.CraftSubmitPayload(
+                        menu.monitorPos(), menu.hostPos(), craftPopup.result(), craftQty, partial));
+        closeCraftPopup();
+    }
+
+    private void renderCraftPopup(final GuiGraphics g, final int mouseX, final int mouseY) {
+        if (craftPopup == null) {
+            return;
+        }
+        final var plan = menu.craftPlan();
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 350);
+        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xE0070A0F);
+        final int px = popupX();
+        final int py = popupY();
+        g.fill(px - 2, py - 2, px + POPUP_W + 2, py + POPUP_H + 2, 0xFF0A1A1F);
+        g.fill(px, py, px + POPUP_W, py + POPUP_H, PANEL);
+        g.fill(px, py, px + POPUP_W, py + 1, ACCENT);
+
+        drawDataIcon(g, dev.jsc.jscomputronics.module.computing.storage.StorageKey
+                .of(craftPopup.result()), -1L, px + 6, py + 5);
+        g.drawString(font, "CRAFT  " + trim(craftPopup.result().getHoverName().getString(), 18),
+                px + 28, py + 8, TEXT, false);
+
+        // Quantity row: the shared editable field plus steppers.
+        g.fill(px + 6, py + 28, px + 130, py + 46, TRACK);
+        final String[] steps = {"-64", "-1", "+1", "+64"};
+        for (int i = 0; i < steps.length; i++) {
+            final int bx = px + 134 + i * 16;
+            g.fill(bx, py + 30, bx + 15, py + 44, btnHover(mouseX, mouseY, bx, py + 30, 15, 14) ? HOVER : SCREEN);
+            g.drawCenteredString(font, steps[i], bx + 8, py + 33, ACCENT);
+        }
+
+        // Plan rows (need vs have).
+        g.drawString(font, "PLAN - raw ingredients", px + 6, py + 52, DIM, false);
+        int rowY = py + 63;
+        if (plan == null) {
+            g.drawString(font, "planning...", px + 6, rowY, DIM, false);
+        } else {
+            for (int i = 0; i < Math.min(5, plan.rows().size()); i++) {
+                final var row = plan.rows().get(i);
+                drawDataIcon(g, dev.jsc.jscomputronics.module.computing.storage.StorageKey
+                        .of(row.item()), -1L, px + 6, rowY - 2);
+                g.drawString(font, trim(row.item().getHoverName().getString(), 14), px + 26, rowY + 2, TEXT, false);
+                final String counts = fmt(row.have()) + " / " + fmt(row.need());
+                g.drawString(font, counts, px + POPUP_W - font.width(counts) - 8, rowY + 2,
+                        row.satisfied() ? GREEN : RED, false);
+                rowY += 14;
+            }
+            if (plan.rows().size() > 5) {
+                g.drawString(font, "+" + (plan.rows().size() - 5) + " more", px + 26, rowY, DIM, false);
+            }
+            final String est = plan.estimateTicks() > 0
+                    ? "EST ~" + Math.max(1, plan.estimateTicks() / 20) + "s" : "EST --";
+            g.drawString(font, est, px + 6, py + 144, DIM, false);
+            if (!plan.feasible()) {
+                g.drawString(font, "max now: " + fmt(plan.maxFeasible()),
+                        px + 70, py + 144, AMBER, false);
+            }
+        }
+
+        // Buttons: CRAFT (grey while infeasible) / PARTIAL / CANCEL.
+        final boolean feasible = plan != null && plan.feasible();
+        final boolean partialUseful = plan != null && !plan.feasible() && plan.maxFeasible() > 0;
+        drawPopupButton(g, px + 6, py + 156, 56, "CRAFT", feasible ? GREEN : DIM,
+                feasible && btnHover(mouseX, mouseY, px + 6, py + 156, 56, 14));
+        drawPopupButton(g, px + 66, py + 156, 84, "PARTIAL",
+                partialUseful ? AMBER : DIM, partialUseful && btnHover(mouseX, mouseY, px + 66, py + 156, 84, 14));
+        drawPopupButton(g, px + 154, py + 156, 44, "CLOSE", DIM,
+                btnHover(mouseX, mouseY, px + 154, py + 156, 44, 14));
+        g.pose().popPose();
+    }
+
+    private void drawPopupButton(final GuiGraphics g, final int x, final int y, final int w,
+                                 final String label, final int color, final boolean hovered) {
+        g.fill(x, y, x + w, y + 14, hovered ? HOVER : SCREEN);
+        g.fill(x, y, x + w, y + 1, LINE);
+        g.drawCenteredString(font, label, x + w / 2, y + 3, color);
+    }
+
+    private boolean btnHover(final int mouseX, final int mouseY, final int x, final int y,
+                             final int w, final int h) {
+        return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+    }
+
+    private boolean handleCraftPopupClick(final double mouseX, final double mouseY, final int button) {
+        if (button == 1) {
+            closeCraftPopup();
+            return true;
+        }
+        if (button != 0) {
+            return true;
+        }
+        final int px = popupX();
+        final int py = popupY();
+        final int mx = (int) mouseX;
+        final int my = (int) mouseY;
+        if (mx < px || mx >= px + POPUP_W || my < py || my >= py + POPUP_H) {
+            closeCraftPopup();
+            return true;
+        }
+        if (qtyBox != null && qtyBox.isMouseOver(mouseX, mouseY)) {
+            setFocused(qtyBox);
+            qtyBox.setFocused(true);
+            return qtyBox.mouseClicked(mouseX, mouseY, button);
+        }
+        final long[] stepAmounts = {-64, -1, 1, 64};
+        for (int i = 0; i < stepAmounts.length; i++) {
+            final int bx = px + 134 + i * 16;
+            if (btnHover(mx, my, bx, py + 30, 15, 14)) {
+                setCraftQty(craftQty + stepAmounts[i]);
+                return true;
+            }
+        }
+        final var plan = menu.craftPlan();
+        final boolean feasible = plan != null && plan.feasible();
+        final boolean partialUseful = plan != null && !plan.feasible() && plan.maxFeasible() > 0;
+        if (feasible && btnHover(mx, my, px + 6, py + 156, 56, 14)) {
+            submitCraft(false);
+            return true;
+        }
+        if (partialUseful && btnHover(mx, my, px + 66, py + 156, 84, 14)) {
+            submitCraft(true);
+            return true;
+        }
+        if (btnHover(mx, my, px + 154, py + 156, 44, 14)) {
+            closeCraftPopup();
+            return true;
+        }
+        return true; // swallow clicks while the popup is up
     }
 
     private void placeholder(final GuiGraphics g, final int cx, final int cy, final String text) {
@@ -633,13 +1018,14 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             case OperationRecord.TYPE_REINDEX -> "REINDEX";
             case OperationRecord.TYPE_VACUUM -> "VACUUM";
             case OperationRecord.TYPE_DROP -> "DROP";
+            case OperationRecord.TYPE_CRAFT -> "CRAFT";
             default -> "SELECT";
         };
     }
 
     private static int opTypeColor(final byte type) {
         return switch (type) {
-            case OperationRecord.TYPE_INSERT -> AMBER;
+            case OperationRecord.TYPE_INSERT, OperationRecord.TYPE_CRAFT -> AMBER;
             case OperationRecord.TYPE_DELETE, OperationRecord.TYPE_DROP -> RED;
             case OperationRecord.TYPE_MOVE -> GREEN;
             case OperationRecord.TYPE_ANALYZE, OperationRecord.TYPE_REINDEX, OperationRecord.TYPE_VACUUM -> DIM;
@@ -1152,6 +1538,13 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 g.fill(x + 12, y + 6, x + 14, y + 7, c);
                 g.fill(x + 12, y + 9, x + 14, y + 10, c);
             }
+            case 6 -> { // Craft — a 3x3 crafting grid
+                for (int r = 0; r < 3; r++) {
+                    for (int col = 0; col < 3; col++) {
+                        g.fill(x + 2 + col * 4, y + 3 + r * 4, x + 5 + col * 4, y + 6 + r * 4, c);
+                    }
+                }
+            }
             default -> { // Maintenance — a wrench laid diagonally (C-shaped open jaw, diagonal shaft)
                 g.fill(x + 2, y + 2, x + 7, y + 4, c); // jaw: top lip
                 g.fill(x + 2, y + 2, x + 4, y + 7, c); // jaw: left side
@@ -1171,6 +1564,25 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         if (dropOpen) {
             if (key == 256) {
                 closeDrop();
+            }
+            return true;
+        }
+        // The craft popup is modal: ESC closes it, Enter submits a feasible craft, typing goes to
+        // the quantity field, anything else is swallowed.
+        if (craftPopup != null) {
+            if (key == 256) {
+                closeCraftPopup();
+                return true;
+            }
+            if (key == 257 || key == 335) {
+                final var plan = menu.craftPlan();
+                if (plan != null && plan.feasible()) {
+                    submitCraft(false);
+                }
+                return true;
+            }
+            if (qtyBox != null && qtyBox.isFocused()) {
+                qtyBox.keyPressed(key, scan, mods);
             }
             return true;
         }
@@ -1211,7 +1623,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     public boolean charTyped(final char c, final int mods) {
-        if (popupEntry != null && qtyBox != null && qtyBox.isFocused()) {
+        if ((popupEntry != null || craftPopup != null) && qtyBox != null && qtyBox.isFocused()) {
             return qtyBox.charTyped(c, mods);
         }
         if (searchBox != null && searchBox.isFocused()) {
@@ -1224,6 +1636,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         if (dropOpen) {
             return handleDropClick(mouseX, mouseY, button);
+        }
+        if (craftPopup != null) {
+            return handleCraftPopupClick(mouseX, mouseY, button);
         }
         if (popupEntry != null) {
             return handlePopupClick(mouseX, mouseY, button);
@@ -1266,17 +1681,28 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             }
         }
         if (button == 0) {
-            for (int i = 0; i < tabCount(); i++) {
+            final int[] rail = railTabs();
+            final int tabH = tabH();
+            for (int i = 0; i < rail.length; i++) {
+                final int tab = rail[i];
                 final int tx = leftPos + RAIL_X;
-                final int ty = topPos + TAB_Y0 + i * TAB_H;
-                if (mouseX >= tx && mouseX < tx + RAIL_W && mouseY >= ty && mouseY < ty + TAB_H) {
-                    if (i != menu.activeTab()) {
-                        menu.setActiveTab(i);
+                final int ty = topPos + TAB_Y0 + i * tabH;
+                if (mouseX >= tx && mouseX < tx + RAIL_W && mouseY >= ty && mouseY < ty + tabH) {
+                    if (tab != menu.activeTab()) {
+                        menu.setActiveTab(tab);
                         if (minecraft != null && minecraft.gameMode != null) {
-                            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, i);
+                            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, tab);
                         }
                         syncSearchBoxVisibility();
                     }
+                    return true;
+                }
+            }
+            // The Craft tab: clicking a catalog entry opens the request popup.
+            if (menu.activeTab() == ComputerTerminalMenu.TAB_CRAFT && menu.getCarried().isEmpty()) {
+                final var entry = craftEntryAt((int) mouseX, (int) mouseY);
+                if (entry != null) {
+                    openCraftPopup(entry);
                     return true;
                 }
             }
@@ -1859,6 +2285,10 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             opPopupScroll = Math.max(0, opPopupScroll - (int) Math.signum(dy));
             return true;
         }
+        if (craftPopup == null && menu.activeTab() == ComputerTerminalMenu.TAB_CRAFT && dy != 0) {
+            craftScroll = Math.max(0, craftScroll - (int) Math.signum(dy));
+            return true;
+        }
         if (isGridTab() && dy != 0) {
             final int rows = (visibleItems().size() + NET_COLS - 1) / NET_COLS;
             final int max = Math.max(0, rows - NET_ROWS);
@@ -1880,6 +2310,8 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         renderTooltip(g, mouseX, mouseY);
         if (dropOpen) {
             renderDropPopup(g, mouseX, mouseY);
+        } else if (craftPopup != null) {
+            renderCraftPopup(g, mouseX, mouseY);
         } else if (popupEntry != null) {
             renderPopup(g, mouseX, mouseY, partialTick);
         } else if (popupOp != null) {

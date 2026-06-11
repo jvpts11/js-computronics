@@ -813,6 +813,82 @@ public class MainframeBlockEntity extends BlockEntity
                 demand, sourceLabel);
     }
 
+    // CRAFT — recursive autocrafting over the network's Crafting Computers
+
+    public java.util.List<net.minecraft.core.BlockPos> craftingComputerPositions() {
+        if (networkUuid() == null || !(level instanceof ServerLevel serverLevel)) {
+            return java.util.List.of();
+        }
+        final java.util.List<net.minecraft.core.BlockPos> positions = new java.util.ArrayList<>();
+        for (final var node : dev.jsc.jscomputronics.common.network.NetworkSystem.get(serverLevel)
+                .craftingComputersOf(networkUuid())) {
+            positions.add(net.minecraft.core.BlockPos.of(node.pos()));
+        }
+        return positions;
+    }
+
+    public java.util.List<net.minecraft.core.BlockPos> supercomputerPositions() {
+        if (networkUuid() == null || !(level instanceof ServerLevel serverLevel)) {
+            return java.util.List.of();
+        }
+        final java.util.List<net.minecraft.core.BlockPos> positions = new java.util.ArrayList<>();
+        for (final var node : dev.jsc.jscomputronics.common.network.NetworkSystem.get(serverLevel)
+                .supercomputersOf(networkUuid())) {
+            positions.add(net.minecraft.core.BlockPos.of(node.pos()));
+        }
+        return positions;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> networkPatterns() {
+        final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> patterns =
+                new java.util.ArrayList<>();
+        for (final net.minecraft.core.BlockPos pos : craftingComputerPositions()) {
+            if (level != null && level.getBlockEntity(pos)
+                    instanceof CraftingComputerBlockEntity cc && cc.isRunning()) {
+                patterns.addAll(cc.romPatterns());
+            }
+        }
+        return patterns;
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation submitNetworkCraft(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final boolean partial, final String requesterLabel) {
+        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
+                || demand <= 0) {
+            return null;
+        }
+        final var patterns = networkPatterns();
+        final var stock = networkIndex.snapshot();
+        long target = demand;
+        var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
+                key, target, patterns, stock);
+        if (plan.steps().isEmpty()) {
+            return null; // no pattern on the network produces this item
+        }
+        if (!plan.feasible()) {
+            if (!partial) {
+                return null;
+            }
+            target = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.maxFeasible(
+                    key, demand, patterns, stock);
+            if (target <= 0) {
+                return null;
+            }
+            plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
+                    key, target, patterns, stock);
+        }
+        // The record keeps the ORIGINAL request: a scaled-down partial run settles as
+        // COMPLETED_PARTIAL showing produced vs requested, exactly what the player asked to see.
+        final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation(
+                serverLevel, networkUuid(), key, demand, plan, networkIndex,
+                java.util.UUID.randomUUID(), craftingComputerPositions(), supercomputerPositions(),
+                requesterLabel);
+        activeOperations.add(operation);
+        return operation;
+    }
+
     private void tickOperations() {
         if (activeOperations.isEmpty()) {
             return;

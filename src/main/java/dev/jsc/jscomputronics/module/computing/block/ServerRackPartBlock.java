@@ -42,9 +42,18 @@ public class ServerRackPartBlock extends Block implements EntityBlock, DataNetwo
 
     public static final BooleanProperty TOP = BooleanProperty.create("top");
 
+    public static final BooleanProperty FRONT = BooleanProperty.create("front");
+
+    public static final net.minecraft.world.level.block.state.properties.DirectionProperty FACING =
+            net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
+
     public ServerRackPartBlock(final Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(TOP, false));
+        registerDefaultState(stateDefinition.any()
+                .setValue(TOP, false)
+                .setValue(FRONT, false)
+                .setValue(FACING, net.minecraft.core.Direction.NORTH)
+                .setValue(ServerRackBlock.BAYS, 0));
     }
 
     @Override
@@ -60,7 +69,7 @@ public class ServerRackPartBlock extends Block implements EntityBlock, DataNetwo
 
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(TOP);
+        builder.add(TOP, FRONT, FACING, ServerRackBlock.BAYS);
     }
 
     @Nullable

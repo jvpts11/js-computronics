@@ -30,6 +30,13 @@ repositories {
     // Maven Central — used for test dependencies (JUnit) and any
     // non-Minecraft library that lives there.
     mavenCentral()
+
+    // ModMaven mirror — dev-runtime mods used for integration testing.
+    maven {
+        name = 'ModMaven'
+        url = 'https://modmaven.dev/'
+        content { includeGroup 'mekanism' }
+    }
 }
 
 base {
@@ -124,6 +131,12 @@ dependencies {
     // Mod-loaded dependencies — included in the released JAR
     // ============================================================
     // (none yet — added per-feature as modules are implemented)
+
+    // ============================================================
+    // Dev-runtime mods — present in runClient/runServer for
+    // integration testing only; never a published dependency.
+    // ============================================================
+    localRuntime "mekanism:Mekanism:${mekanism_version}"
 
     // Example optional mod dependency with JEI:
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"

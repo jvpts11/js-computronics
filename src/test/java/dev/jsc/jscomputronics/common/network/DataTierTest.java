@@ -46,12 +46,19 @@ class DataTierTest {
 
     @Test
     void noT5Tier_existsInDataCables() {
-        // There are exactly 5 data tiers, with no T5.
+        // Six data tiers (the numbered ladder plus the HPC cluster fabric), with no T5.
         DataTier[] tiers = DataTier.values();
-        assertEquals(5, tiers.length);
+        assertEquals(6, tiers.length);
         for (DataTier tier : tiers) {
             assertEquals(false, tier.name().contains("T5"));
         }
+    }
+
+    @Test
+    void hpc_hasThroughput20000AndLength32() {
+        assertEquals(20_000L, DataTier.HPC.maxThroughput());
+        assertEquals(32, DataTier.HPC.maxLength());
+        assertEquals("hpc_cable", DataTier.HPC.translationKey());
     }
 
     @Test

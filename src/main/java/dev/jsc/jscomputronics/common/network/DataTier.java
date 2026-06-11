@@ -15,7 +15,8 @@ public enum DataTier {
     T2_HBW(5_000L, 256, "hbw_cable"),
     T3_FIBER(7_000L, 1_024, "fiber_optic_cable"),
     T4_VLDC(5_000L, 10_000, "vldc_cable"),
-    T6_QUANTUM(50_000L, 64, "quantum_interconnect_cable");
+    T6_QUANTUM(50_000L, 64, "quantum_interconnect_cable"),
+    HPC(20_000L, 32, "hpc_cable");
 
     private final long maxThroughput;
     private final int maxLength;

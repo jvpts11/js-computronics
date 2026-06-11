@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=east": {
+      "model": "jsc:block/personal_router",
+      "y": 90
+    },
+    "facing=north": {
       "model": "jsc:block/personal_router"
+    },
+    "facing=south": {
+      "model": "jsc:block/personal_router",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "jsc:block/personal_router",
+      "y": 270
     }
   }
 }

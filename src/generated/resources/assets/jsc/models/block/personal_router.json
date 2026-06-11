@@ -1,6 +1,8 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/orientable",
   "textures": {
-    "all": "jsc:block/personal_router"
+    "front": "jsc:block/personal_router_front",
+    "side": "jsc:block/personal_router_side",
+    "top": "jsc:block/personal_router_top"
   }
 }

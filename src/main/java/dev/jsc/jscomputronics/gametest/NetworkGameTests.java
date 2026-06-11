@@ -22,6 +22,7 @@ import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
+import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
@@ -415,6 +416,80 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void craftingComputer_assemblesAndCanCraft(final GameTestHelper helper) {
+        final BlockPos cc = new BlockPos(2, 2, 2);
+        final CraftingComputerBlockEntity computer = placeRunningCraftingComputer(helper, cc);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(computer.buildValid(), "ATX build with a Crafting Card should be valid");
+                    helper.assertTrue(computer.isRunning(), "Crafting Computer should be running after power-on");
+                    helper.assertTrue(computer.craftingCardFactor() > 0.0,
+                            "an installed Crafting Card gives a non-zero factor");
+                    helper.assertTrue(computer.craftingThroughput() > 0,
+                            "a running Crafting Computer reports crafting throughput");
+                    helper.assertTrue(computer.canCraft(), "a powered Crafting Computer with a card can craft");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void craftingComputer_withoutCardCannotCraft(final GameTestHelper helper) {
+        final BlockPos cc = new BlockPos(2, 2, 2);
+        helper.setBlock(cc, ComputingModule.CRAFTING_COMPUTER.get());
+        if (!(helper.getBlockEntity(cc) instanceof CraftingComputerBlockEntity computer)) {
+            throw new IllegalStateException("no crafting computer at " + cc);
+        }
+        final ItemStackHandler hw = computer.getHardware();
+        hw.setStackInSlot(CraftingComputerBlockEntity.MOTHERBOARD_SLOT,
+                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.CPU_SLOT,
+                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.RAM_SLOTS_START,
+                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.PSU_SLOT,
+                new ItemStack(ComputingModule.PSU_650G.get()));
+        computer.togglePower();
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(computer.isRunning(), "the computer still powers on without a card");
+                    helper.assertTrue(computer.craftingCardFactor() == 0.0,
+                            "no Crafting Card means a zero crafting factor");
+                    helper.assertFalse(computer.canCraft(), "without a card the computer cannot craft");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void craftingComputer_joinsMainframeNetworkAsNode(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos cc = new BlockPos(5, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final CraftingComputerBlockEntity computer = placeRunningCraftingComputer(helper, cc);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(computer.networkUuid() != null, "Crafting Computer should be on a network");
+                    helper.assertTrue(mainframe.networkUuid() != null, "mainframe should own a network");
+                    helper.assertTrue(computer.networkUuid().equals(mainframe.networkUuid()),
+                            "Crafting Computer must share the mainframe's network through the router");
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel())
+                                    .craftingComputersOf(mainframe.networkUuid()).size() == 1,
+                            "the Crafting Computer registers as a network node");
+                })
+                .thenExecute(() -> helper.destroyBlock(cc))
+                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(
+                        NetworkSystem.get(helper.getLevel())
+                                .craftingComputersOf(mainframe.networkUuid()).isEmpty(),
+                        "breaking the Crafting Computer unregisters its node"))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void mainframe_ignoresEthernetCable(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(2, 2, 2);
         final BlockPos eth = new BlockPos(3, 2, 2); // Mainframe directly against an Ethernet cable
@@ -543,7 +618,9 @@ public final class NetworkGameTests {
         final BlockPos rack = new BlockPos(3, 2, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         if (helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe) {
             rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
         } else {
@@ -575,8 +652,7 @@ public final class NetworkGameTests {
         final BlockPos part = new BlockPos(4, 3, 2);     // a front part, one up from the controller
         // A cable run from the part's outward face to the mainframe — it touches the
         final BlockPos[] cables = {
-            new BlockPos(3, 3, 2), // against the part's west face
-            new BlockPos(2, 3, 2),
+            new BlockPos(2, 3, 2), // against the REAR face of part (3,3,2) — parts only
             new BlockPos(2, 2, 2), // claimed by the mainframe
         };
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
@@ -584,7 +660,9 @@ public final class NetworkGameTests {
             helper.setBlock(c, ComputingModule.HBW_CABLE.get());
         }
         // Place the controller and drive its self-assembly so all 11 parts exist.
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         ((ServerRackBlock) ComputingModule.SERVER_RACK.get()).setPlacedBy(
                 helper.getLevel(), helper.absolutePos(rack), helper.getBlockState(rack), null, ItemStack.EMPTY);
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
@@ -621,7 +699,9 @@ public final class NetworkGameTests {
         final BlockPos rack = new BlockPos(3, 2, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -664,7 +744,9 @@ public final class NetworkGameTests {
         final BlockPos rack = new BlockPos(3, 2, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -710,7 +792,9 @@ public final class NetworkGameTests {
         final BlockPos rack = new BlockPos(3, 2, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -740,13 +824,15 @@ public final class NetworkGameTests {
         final BlockPos router = new BlockPos(3, 2, 2);
         final BlockPos eth = new BlockPos(4, 2, 2);
         final BlockPos pc = new BlockPos(5, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
         helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
         final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -781,7 +867,7 @@ public final class NetworkGameTests {
         final BlockPos router = new BlockPos(3, 2, 2);
         final BlockPos eth = new BlockPos(4, 2, 2);
         final BlockPos pc = new BlockPos(5, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
@@ -790,7 +876,9 @@ public final class NetworkGameTests {
         // A disk gives the PC local storage, so a SELECT lands there.
         computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -832,7 +920,7 @@ public final class NetworkGameTests {
         final BlockPos router = new BlockPos(3, 2, 2);
         final BlockPos eth = new BlockPos(4, 2, 2);
         final BlockPos pc = new BlockPos(5, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
@@ -841,7 +929,9 @@ public final class NetworkGameTests {
         // A 200 MB disk holds only 50 items — far less than the slot grid (18 x 64) could.
         computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.MB_200)));
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -874,10 +964,12 @@ public final class NetworkGameTests {
     public static void terminalInsert_movesIntoNetwork(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -939,12 +1031,14 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void importBus_movesChestItemsIntoNetwork(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -980,12 +1074,14 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void exportBus_movesNetworkItemsIntoChest(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1031,12 +1127,14 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void insert_abandonsCleanlyOnPowerOff(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1080,12 +1178,14 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void select_abortsWhenDestinationGone(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1136,12 +1236,14 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void activeOperations_reportLiveProgress(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1197,12 +1299,14 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void networkStorage_preservesComponents(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
         helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1273,10 +1377,12 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void networkIndex_catalogsServersAndLocks(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1311,10 +1417,12 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void networkSelect_movesItemsOverTimeAndUnlocks(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1366,10 +1474,12 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void networkInsert_writesItemsIntoServersOverTime(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1399,10 +1509,12 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void networkInsert_failsAndReportsLeftoverWhenNetworkFull(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1430,10 +1542,12 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void server_withoutCpu_servesNoNetworkStorage(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1455,10 +1569,12 @@ public final class NetworkGameTests {
     @GameTest(template = ARENA)
     public static void networkDelete_pullsItemsOutAndLogsDelete(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos rack = new BlockPos(2, 3, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the cable to the north
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             helper.fail("no server rack");
             return;
@@ -1653,7 +1769,9 @@ public final class NetworkGameTests {
         helper.setBlock(hbwA, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
         helper.setBlock(hbwB, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         seedServer(helper, rack);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> {
@@ -1684,9 +1802,13 @@ public final class NetworkGameTests {
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // rear faces the section cable to the west
         helper.setBlock(hbwSouth, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the section cable to the north
         seedServer(helper, rackEast);
         seedServer(helper, rackSouth);
         if (!(helper.getBlockEntity(router) instanceof ServerRouterBlockEntity routerBe)) {
@@ -1789,7 +1911,9 @@ public final class NetworkGameTests {
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         seedServer(helper, rack);
         helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
         if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)) {
@@ -1821,9 +1945,13 @@ public final class NetworkGameTests {
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // rear faces the section cable to the west
         helper.setBlock(hbwSouth, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the section cable to the north
         seedServer(helper, rackEast);
         seedServer(helper, rackSouth);
         helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
@@ -1854,7 +1982,9 @@ public final class NetworkGameTests {
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
         helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         seedServer(helper, rack);
         helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
         if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)
@@ -2095,7 +2225,9 @@ public final class NetworkGameTests {
     private static MainframeBlockEntity storageNetwork(final GameTestHelper helper) {
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, new BlockPos(1, 2, 2));
         helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
-        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.SERVER_RACK.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
         seedServer(helper, new BlockPos(3, 2, 2));
         return mainframe;
     }
@@ -2139,6 +2271,27 @@ public final class NetworkGameTests {
         hw.setStackInSlot(PersonalComputerBlockEntity.RAM_SLOTS_START,
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,
+                new ItemStack(ComputingModule.PSU_650G.get()));
+        be.togglePower();
+        return be;
+    }
+
+    private static CraftingComputerBlockEntity placeRunningCraftingComputer(
+            final GameTestHelper helper, final BlockPos relative) {
+        helper.setBlock(relative, ComputingModule.CRAFTING_COMPUTER.get());
+        if (!(helper.getBlockEntity(relative) instanceof CraftingComputerBlockEntity be)) {
+            throw new IllegalStateException("no crafting computer at " + relative);
+        }
+        final ItemStackHandler hw = be.getHardware();
+        hw.setStackInSlot(CraftingComputerBlockEntity.MOTHERBOARD_SLOT,
+                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.CPU_SLOT,
+                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.RAM_SLOTS_START,
+                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START,
+                new ItemStack(ComputingModule.CRAFTING_CARD_T2.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
         be.togglePower();
         return be;

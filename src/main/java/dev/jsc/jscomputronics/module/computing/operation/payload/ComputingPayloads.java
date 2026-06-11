@@ -110,6 +110,162 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleTerminalMaintenance);
         registrar.playToServer(TerminalDropPayload.TYPE, TerminalDropPayload.STREAM_CODEC,
                 ComputingPayloads::handleTerminalDrop);
+        registrar.playToClient(CraftCatalogPayload.TYPE, CraftCatalogPayload.STREAM_CODEC,
+                ComputingPayloads::handleCraftCatalog);
+        registrar.playToServer(CraftPlanRequestPayload.TYPE, CraftPlanRequestPayload.STREAM_CODEC,
+                ComputingPayloads::handleCraftPlanRequest);
+        registrar.playToClient(CraftPlanPayload.TYPE, CraftPlanPayload.STREAM_CODEC,
+                ComputingPayloads::handleCraftPlan);
+        registrar.playToServer(CraftSubmitPayload.TYPE, CraftSubmitPayload.STREAM_CODEC,
+                ComputingPayloads::handleCraftSubmit);
+    }
+
+    private static void handleCraftCatalog(final CraftCatalogPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof ComputerTerminalMenu menu) {
+                menu.setCraftCatalog(payload.entries());
+            }
+        });
+    }
+
+    private static void handleCraftPlan(final CraftPlanPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof ComputerTerminalMenu menu) {
+                menu.setCraftPlan(payload);
+            }
+        });
+    }
+
+    public static void dispatchCraftCatalog(final ServerPlayer player, final NetworkUuid net,
+                                            final ServerLevel level) {
+        final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+        if (mainframe == null) {
+            PacketDistributor.sendToPlayer(player, new CraftCatalogPayload(java.util.List.of()));
+            return;
+        }
+        final var patterns = mainframe.networkPatterns();
+        final var stock = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
+                .of(level, net).query();
+        final java.util.Map<StorageKey, CraftCatalogPayload.Entry> entries = new java.util.LinkedHashMap<>();
+        for (final var pattern : patterns) {
+            final StorageKey key = StorageKey.of(pattern.result());
+            if (entries.containsKey(key)) {
+                continue;
+            }
+            final byte dot;
+            if (dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner
+                    .plan(key, 1, patterns, stock).feasible()) {
+                dot = CraftCatalogPayload.DOT_GREEN;
+            } else {
+                boolean any = false;
+                for (final StorageKey ingredient : pattern.ingredientTotals().keySet()) {
+                    if (stock.getOrDefault(ingredient, 0L) > 0L) {
+                        any = true;
+                        break;
+                    }
+                }
+                dot = any ? CraftCatalogPayload.DOT_AMBER : CraftCatalogPayload.DOT_RED;
+            }
+            entries.put(key, new CraftCatalogPayload.Entry(pattern.result().copy(), dot));
+            if (entries.size() >= CraftCatalogPayload.MAX_ENTRIES) {
+                break;
+            }
+        }
+        PacketDistributor.sendToPlayer(player,
+                new CraftCatalogPayload(java.util.List.copyOf(entries.values())));
+    }
+
+    private static void handleCraftPlanRequest(final CraftPlanRequestPayload payload,
+                                               final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host == null || host.networkUuid() == null
+                    || !(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || payload.quantity() <= 0L) {
+                return;
+            }
+            final MainframeBlockEntity mainframe = resolveMainframe(level, host.networkUuid());
+            if (mainframe == null) {
+                return;
+            }
+            final var patterns = mainframe.networkPatterns();
+            final var stock = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
+                    .of(level, host.networkUuid()).query();
+            final StorageKey key = StorageKey.of(payload.result());
+            final var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner
+                    .plan(key, payload.quantity(), patterns, stock);
+
+            // Raw-ingredient rows: total needed (consumed + still missing) vs what the network has.
+            final java.util.Map<StorageKey, Long> need = new java.util.LinkedHashMap<>(plan.rawConsumption());
+            plan.missing().forEach((k, v) -> need.merge(k, v, Long::sum));
+            final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
+            for (final var entry : need.entrySet()) {
+                if (rows.size() >= CraftPlanPayload.MAX_ROWS) {
+                    break;
+                }
+                final ItemStack icon = entry.getKey().stack(1);
+                if (!icon.isEmpty()) {
+                    rows.add(new CraftPlanPayload.Row(icon, entry.getValue(),
+                            Math.min(stock.getOrDefault(entry.getKey(), 0L), entry.getValue())));
+                }
+            }
+            final boolean feasible = plan.feasible();
+            final long maxFeasible = feasible ? payload.quantity()
+                    : dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner
+                            .maxFeasible(key, payload.quantity(), patterns, stock);
+            PacketDistributor.sendToPlayer(player, new CraftPlanPayload(
+                    payload.result(), payload.quantity(), java.util.List.copyOf(rows),
+                    feasible, maxFeasible, estimateTicks(level, mainframe, plan)));
+        });
+    }
+
+    private static int estimateTicks(final ServerLevel level, final MainframeBlockEntity mainframe,
+                                     final dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.Plan plan) {
+        long units = 0;
+        for (final var step : plan.steps()) {
+            units += step.runs() * Math.max(1, step.pattern().filledCells());
+        }
+        long rate = 0;
+        for (final net.minecraft.core.BlockPos pos : mainframe.craftingComputerPositions()) {
+            if (level.getBlockEntity(pos)
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity cc
+                    && cc.canCraft()) {
+                rate = Math.max(rate, cc.craftingThroughput());
+            }
+        }
+        if (rate <= 0) {
+            return 0;
+        }
+        return (int) Math.max(1, (units + rate - 1) / rate);
+    }
+
+    private static void handleCraftSubmit(final CraftSubmitPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host == null || host.networkUuid() == null
+                    || !(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || payload.quantity() <= 0L) {
+                return;
+            }
+            final NetworkUuid net = host.networkUuid();
+            final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+            if (mainframe == null) {
+                return;
+            }
+            final var operation = mainframe.submitNetworkCraft(
+                    StorageKey.of(payload.result()), payload.quantity(), payload.partial(), "terminal");
+            if (operation != null) {
+                operation.onSettle(() -> {
+                    dispatchTerminalOpsLog(player, net, level);
+                    dispatchActiveOperations(player, net, level);
+                    dispatchCraftCatalog(player, net, level);
+                });
+            }
+            dispatchActiveOperations(player, net, level);
+            dispatchCraftCatalog(player, net, level);
+        });
     }
 
     private static void handleRenameServerRouter(final RenameServerRouterPayload payload,
@@ -316,12 +472,22 @@ public final class ComputingPayloads {
     private static void handleRenamePc(final RenamePcPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player
-                    && player.containerMenu instanceof PersonalComputerMenu menu
-                    && menu.pcPos().equals(payload.pcPos())
-                    && player.level().getBlockEntity(payload.pcPos()) instanceof PersonalComputerBlockEntity pc) {
-                pc.setCustomName(payload.name());
+                    && hasOpenAssemblyFor(player, payload.pcPos())
+                    && player.level().getBlockEntity(payload.pcPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer) {
+                computer.setCustomName(payload.name());
             }
         });
+    }
+
+    private static boolean hasOpenAssemblyFor(final ServerPlayer player, final net.minecraft.core.BlockPos pos) {
+        if (player.containerMenu instanceof PersonalComputerMenu menu) {
+            return menu.pcPos().equals(pos);
+        }
+        if (player.containerMenu instanceof dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu menu) {
+            return menu.computerPos().equals(pos);
+        }
+        return false;
     }
 
     private static void handleLocalUpload(final TerminalLocalUploadPayload payload, final IPayloadContext context) {

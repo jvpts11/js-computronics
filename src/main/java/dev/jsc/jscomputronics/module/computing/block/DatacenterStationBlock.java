@@ -27,17 +27,31 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The Datacenter Station: a T3 kiosk that opens an interactive terminal over ONE datacenter section (one Server Router output face), aggregating that section's Servers as a single unit.
  */
-public class DatacenterStationBlock extends Block implements EntityBlock, DataNetworkConnectable {
+public class DatacenterStationBlock extends net.minecraft.world.level.block.HorizontalDirectionalBlock
+        implements EntityBlock, DataNetworkConnectable {
 
     public static final MapCodec<DatacenterStationBlock> CODEC = simpleCodec(DatacenterStationBlock::new);
 
     public DatacenterStationBlock(final Properties properties) {
         super(properties);
+        // The kiosk's tilted screen faces the player who placed it.
+        registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH));
     }
 
     @Override
     protected MapCodec<DatacenterStationBlock> codec() {
         return CODEC;
+    }
+
+    @Override
+    protected void createBlockStateDefinition(
+            final net.minecraft.world.level.block.state.StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(final net.minecraft.world.item.context.BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
     // acceptedCableTiers() defaults to every tier: the Station reads whatever cable it sits on.

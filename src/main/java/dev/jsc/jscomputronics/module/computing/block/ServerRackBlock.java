@@ -47,9 +47,12 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
 
     public static final MapCodec<ServerRackBlock> CODEC = simpleCodec(ServerRackBlock::new);
 
+    public static final net.minecraft.world.level.block.state.properties.IntegerProperty BAYS =
+            net.minecraft.world.level.block.state.properties.IntegerProperty.create("bays", 0, 3);
+
     public ServerRackBlock(final Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(BAYS, 0));
     }
 
     @Override
@@ -65,7 +68,7 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
 
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, BAYS);
     }
 
     @Override
@@ -91,7 +94,11 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
         for (final BlockPos part : ServerRackStructure.partPositions(pos, facing)) {
             final boolean top = ServerRackStructure.isTopLayer(pos, part);
             level.setBlock(part, ComputingModule.SERVER_RACK_PART.get().defaultBlockState()
-                    .setValue(ServerRackPartBlock.TOP, top), Block.UPDATE_ALL);
+                    .setValue(ServerRackPartBlock.TOP, top)
+                    .setValue(ServerRackPartBlock.FACING, facing)
+                    .setValue(ServerRackPartBlock.FRONT,
+                            ServerRackStructure.isFrontBayBlock(pos, facing, part)),
+                    Block.UPDATE_ALL);
             if (server && level.getBlockEntity(part) instanceof ServerRackPartBlockEntity partBe) {
                 partBe.setController(pos);
             }

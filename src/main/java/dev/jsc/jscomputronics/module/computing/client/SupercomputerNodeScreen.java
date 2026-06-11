@@ -1,0 +1,202 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jsc.jscomputronics.module.computing.client;
+
+import dev.jsc.jscomputronics.module.computing.menu.SupercomputerNodeMenu;
+import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+/**
+ * Screen for a Supercomputer Node's assembly — the shared "computer OS" skin.
+ */
+public class SupercomputerNodeScreen extends AbstractContainerScreen<SupercomputerNodeMenu> {
+
+    private static final int COL_R = 126;
+    private static final int COL_R_W = 110;
+    private static final int BTN_H = 14;
+    private static final int POWER_Y = 105;
+    private static final int AUTO_Y = 121;
+
+    private EditBox nameBox;
+
+    public SupercomputerNodeScreen(final SupercomputerNodeMenu menu, final Inventory inventory,
+                                   final Component title) {
+        super(menu, inventory, title);
+        this.imageWidth = 244;
+        this.imageHeight = 218;
+        this.titleLabelX = -10000;
+        this.inventoryLabelY = -10000;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        nameBox = new EditBox(font, leftPos + 28, topPos + 8, 126, 11, Component.literal("Name"));
+        nameBox.setBordered(false);
+        nameBox.setMaxLength(RenamePcPayload.MAX_LEN);
+        nameBox.setTextColor(JscOsTheme.TEXT);
+        nameBox.setHint(Component.literal("Name this node...").withStyle(ChatFormatting.DARK_GRAY));
+        nameBox.setValue(menu.customName());
+        nameBox.setResponder(s -> PacketDistributor.sendToServer(new RenamePcPayload(menu.computerPos(), s)));
+        addRenderableWidget(nameBox);
+    }
+
+    @Override
+    public boolean keyPressed(final int key, final int scan, final int mods) {
+        if (nameBox != null && nameBox.isFocused()) {
+            if (key == 256) {
+                nameBox.setFocused(false);
+                setFocused(null);
+                return true;
+            }
+            nameBox.keyPressed(key, scan, mods);
+            return true;
+        }
+        return super.keyPressed(key, scan, mods);
+    }
+
+    @Override
+    public boolean charTyped(final char c, final int mods) {
+        if (nameBox != null && nameBox.isFocused()) {
+            return nameBox.charTyped(c, mods);
+        }
+        return super.charTyped(c, mods);
+    }
+
+    @Override
+    protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
+        final int x = leftPos;
+        final int y = topPos;
+        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
+        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
+        g.fill(x + 26, y + 7, x + 158, y + 19, 0xFF11161D);
+        g.fill(x + 26, y + 18, x + 158, y + 19, 0xFF24323C);
+        JscOsTheme.vLine(g, x + COL_R - 5, y + 24, 108);
+
+        JscOsTheme.slot(g, x + 8, y + 40);
+        if (menu.boardCpuSlots() > 0) {
+            JscOsTheme.slot(g, x + 44, y + 40);
+        }
+        final int ram = Math.min(menu.boardRamSlots(), 2);
+        for (int i = 0; i < ram; i++) {
+            JscOsTheme.slot(g, x + 80 + i * 18, y + 40);
+        }
+        if (menu.boardPcieSlots() > 0) {
+            JscOsTheme.slot(g, x + 8, y + 73);
+        }
+        JscOsTheme.slot(g, x + 44, y + 73);
+        final int disk = Math.min(menu.boardDiskSlots(), 2);
+        for (int i = 0; i < disk; i++) {
+            JscOsTheme.slot(g, x + 80 + i * 18, y + 73);
+        }
+
+        JscOsTheme.panel(g, x + COL_R, y + 27, COL_R_W, 20);  // CO-PROCESSOR
+        JscOsTheme.panel(g, x + COL_R, y + 49, COL_R_W, 20);  // CLUSTER hint
+
+        final boolean auto = menu.isAutoStart();
+        JscOsTheme.button(g, x + COL_R, y + POWER_Y, COL_R_W, BTN_H,
+                !auto && hover(mouseX, mouseY, COL_R, POWER_Y, COL_R_W, BTN_H));
+        JscOsTheme.button(g, x + COL_R, y + AUTO_Y, COL_R_W, BTN_H,
+                hover(mouseX, mouseY, COL_R, AUTO_Y, COL_R_W, BTN_H));
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                JscOsTheme.slot(g, x + 8 + col * 18, y + 138 + row * 18);
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            JscOsTheme.slot(g, x + 8 + col * 18, y + 196);
+        }
+    }
+
+    @Override
+    protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
+        JscOsTheme.text(g, font, "NODE", 12, 11, JscOsTheme.TEXT);
+        final String status;
+        final int statusColor;
+        if (!menu.buildValid()) {
+            status = "OFFLINE";
+            statusColor = JscOsTheme.RED;
+        } else if (menu.isRunning()) {
+            status = "ONLINE";
+            statusColor = JscOsTheme.GREEN;
+        } else {
+            status = "READY";
+            statusColor = JscOsTheme.AMBER;
+        }
+        final int pillX = 232 - font.width(status);
+        JscOsTheme.text(g, font, status, pillX, 11, statusColor);
+        g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
+
+        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "RAM", 80, 27, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "CO-PROC", 8, 60, menu.hasPhi() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "PSU", 44, 60, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "DISK", 80, 60, JscOsTheme.DIM);
+
+        JscOsTheme.tileText(g, font, COL_R, 27, "CO-PROCESSOR",
+                menu.hasPhi() ? "SEATED" : "EMPTY", "", menu.hasPhi() ? JscOsTheme.GREEN : JscOsTheme.DIM);
+        JscOsTheme.tileText(g, font, COL_R, 49, "CLUSTER",
+                "SEE CONSOLE", "", JscOsTheme.DIM);
+
+        final boolean auto = menu.isAutoStart();
+        final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
+        JscOsTheme.textCenter(g, font, powerCap, COL_R + COL_R_W / 2, POWER_Y + 4,
+                auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+        JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), COL_R + COL_R_W / 2, AUTO_Y + 4,
+                auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+    }
+
+    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
+        final int mx = mouseX - leftPos;
+        final int my = mouseY - topPos;
+        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
+    }
+
+    @Override
+    public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
+        if (nameBox != null) {
+            if (nameBox.isMouseOver(mouseX, mouseY)) {
+                setFocused(nameBox);
+                nameBox.setFocused(true);
+                return nameBox.mouseClicked(mouseX, mouseY, button);
+            }
+            nameBox.setFocused(false);
+        }
+        if (button == 0) {
+            if (!menu.isAutoStart() && hover((int) mouseX, (int) mouseY, COL_R, POWER_Y, COL_R_W, BTN_H)) {
+                sendButton(SupercomputerNodeMenu.BUTTON_POWER);
+                return true;
+            }
+            if (hover((int) mouseX, (int) mouseY, COL_R, AUTO_Y, COL_R_W, BTN_H)) {
+                sendButton(SupercomputerNodeMenu.BUTTON_AUTOSTART);
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private void sendButton(final int id) {
+        if (minecraft != null && minecraft.gameMode != null) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
+        }
+    }
+
+    @Override
+    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
+        super.render(g, mouseX, mouseY, partialTick);
+        renderTooltip(g, mouseX, mouseY);
+    }
+}

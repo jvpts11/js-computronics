@@ -2,6 +2,6 @@
   "parent": "minecraft:block/cube_column",
   "textures": {
     "end": "jsc:block/mainframe_top",
-    "side": "jsc:block/mainframe_front"
+    "side": "jsc:block/mainframe_core"
   }
 }

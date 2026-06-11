@@ -36,6 +36,7 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     public static final int TAB_OPS = 3;
     public static final int TAB_TASKS = 4;
     public static final int TAB_MAINTENANCE = 5;
+    public static final int TAB_CRAFT = 6;
 
     // Slot layout (relative to the screen's top-left). The screen draws the slot
     // backgrounds and the inventory at these exact positions.
@@ -49,8 +50,9 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     private static final double MONITOR_REACH = 16.0;
 
-    private static final int DATA_COUNT = 29;
+    private static final int DATA_COUNT = 30;
     private static final int DATA_USABLE_SLOTS = 18;
+    private static final int DATA_CRAFT_COMPUTERS = 29;
 
     private final Level level;
     @Nullable
@@ -118,9 +120,12 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
         this.monitorPos = monitorPos.immutable();
         // Open on the player's last-used tab; fall back to Network, and never land on the
         // Mainframe-only Task Manager when the host is a plain computer.
-        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_MAINTENANCE ? initialTab : TAB_NETWORK;
+        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_CRAFT ? initialTab : TAB_NETWORK;
         if ((tab == TAB_TASKS || tab == TAB_MAINTENANCE) && (host == null || !host.isMainframeHost())) {
             tab = TAB_NETWORK;
+        }
+        if (tab == TAB_CRAFT && craftComputerCount() <= 0 && !level.isClientSide) {
+            tab = TAB_NETWORK; // the Craft tab vanished since last session (computer removed)
         }
         this.activeTab = tab;
         this.invDrop = host != null && host.isMainframeHost() ? MAINFRAME_INV_DROP : 0;
@@ -202,8 +207,21 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
             case 26 -> host.activeLocks();
             case 27 -> clampInt(host.networkStorageUsed());
             case 28 -> clampInt(host.networkStorageTotal());
+            case DATA_CRAFT_COMPUTERS -> craftComputerCount();
             default -> 0;
         };
+    }
+
+    private int craftComputerCount() {
+        if (host == null || host.networkUuid() == null || !(level instanceof ServerLevel serverLevel)) {
+            return 0;
+        }
+        return dev.jsc.jscomputronics.common.network.NetworkSystem.get(serverLevel)
+                .craftingComputersOf(host.networkUuid()).size();
+    }
+
+    public boolean craftAvailable() {
+        return data.get(DATA_CRAFT_COMPUTERS) > 0;
     }
 
     private static int clampInt(final long value) {
@@ -222,7 +240,7 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
 
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
-        if (id >= TAB_LOCAL && id <= TAB_MAINTENANCE) {
+        if (id >= TAB_LOCAL && id <= TAB_CRAFT) {
             this.activeTab = id;
             // Remember the tab on the Monitor so reopening this terminal lands here again.
             if (level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor) {
@@ -253,8 +271,40 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
                 // Servers it can wipe (the SERVER picker); the index stats arrive via ContainerData.
                 ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchNetworkServers(serverPlayer, host.networkUuid(), serverLevel);
+            } else if (id == TAB_CRAFT) {
+                // The Craft tab needs the catalog plus the live/logged Operations for its
+                // RUNNING and RECENT panels.
+                ComputingPayloads.dispatchCraftCatalog(serverPlayer, host.networkUuid(), serverLevel);
+                ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
+                ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
             }
         }
+    }
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .CraftCatalogPayload.Entry> craftCatalog = java.util.List.of();
+
+    @Nullable
+    private dev.jsc.jscomputronics.module.computing.operation.payload.CraftPlanPayload craftPlan;
+
+    public void setCraftCatalog(final java.util.List<
+            dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry> entries) {
+        this.craftCatalog = entries;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .CraftCatalogPayload.Entry> craftCatalog() {
+        return craftCatalog;
+    }
+
+    public void setCraftPlan(
+            @Nullable final dev.jsc.jscomputronics.module.computing.operation.payload.CraftPlanPayload plan) {
+        this.craftPlan = plan;
+    }
+
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.payload.CraftPlanPayload craftPlan() {
+        return craftPlan;
     }
 
     public void setNetworkItems(final java.util.List<NetworkItemEntry> items) {
@@ -331,6 +381,12 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
         // only while something is in flight (its snapshot is already pushed on deposit/withdraw/settle).
         if (activeTab == TAB_TASKS || activeTab == TAB_OPS) {
             ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
+        }
+        if (activeTab == TAB_CRAFT
+                && ComputingPayloads.networkHasActiveOps(serverLevel, host.networkUuid())) {
+            // Keep the RUNNING bars moving and settle finished crafts into RECENT.
+            ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
+            ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
         }
         if (activeTab == TAB_NETWORK
                 && ComputingPayloads.networkHasActiveOps(serverLevel, host.networkUuid())) {

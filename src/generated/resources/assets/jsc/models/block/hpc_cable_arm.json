@@ -1,0 +1,6 @@
+{
+  "parent": "jsc:block/cable_arm",
+  "textures": {
+    "cable": "jsc:block/hpc_cable"
+  }
+}

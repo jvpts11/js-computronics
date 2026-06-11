@@ -37,6 +37,7 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
     public static final byte TYPE_REINDEX = 5;
     public static final byte TYPE_VACUUM = 6;
     public static final byte TYPE_DROP = 7;
+    public static final byte TYPE_CRAFT = 8;
 
     public static final byte STATUS_COMPLETED = 0;
     public static final byte STATUS_PARTIAL = 1;

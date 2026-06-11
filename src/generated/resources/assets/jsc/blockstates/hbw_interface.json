@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "jsc:block/hbw_interface"
+    }
+  }
+}

@@ -23,11 +23,13 @@ import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.common.tier.IndustrialTier;
+import dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
 import dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.PersonalRouterBlock;
+import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
@@ -120,6 +122,21 @@ public final class ComputingModule {
                     .persistent(com.mojang.serialization.Codec.STRING)
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8));
 
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<java.util.List<
+                    dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern>>>
+            DISC_PATTERNS = COMPONENTS.registerComponentType("disc_patterns", b -> b
+                    .persistent(dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern.CODEC.listOf())
+                    .networkSynchronized(
+                            dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern.STREAM_CODEC
+                                    .apply(net.minecraft.network.codec.ByteBufCodecs.list())));
+
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<Integer>>
+            DISC_CYCLES = COMPONENTS.registerComponentType("disc_cycles", b -> b
+                    .persistent(com.mojang.serialization.Codec.intRange(0, Integer.MAX_VALUE))
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
+
     private static BlockBehaviour.Properties cableProperties() {
         return BlockBehaviour.Properties.of()
                 .mapColor(MapColor.COLOR_GRAY)
@@ -141,6 +158,12 @@ public final class ComputingModule {
 
     public static final DeferredItem<BlockItem> HBW_CABLE_ITEM = ITEMS.register(
             "hbw_cable", () -> new BlockItem(HBW_CABLE.get(), new Item.Properties()));
+
+    public static final DeferredBlock<DataCableBlock> HPC_CABLE = BLOCKS.register(
+            "hpc_cable", () -> new DataCableBlock(cableProperties(), DataTier.HPC));
+
+    public static final DeferredItem<BlockItem> HPC_CABLE_ITEM = ITEMS.register(
+            "hpc_cable", () -> new BlockItem(HPC_CABLE.get(), new Item.Properties()));
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PeripheralCableBlock> PERIPHERAL_CABLE =
             BLOCKS.register("peripheral_cable",
@@ -165,7 +188,7 @@ public final class ComputingModule {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DataCableBlockEntity>> DATA_CABLE_BE =
             BLOCK_ENTITIES.register("data_cable",
                     () -> BlockEntityType.Builder.of(DataCableBlockEntity::new,
-                            ETHERNET_CABLE.get(), HBW_CABLE.get()).build(null));
+                            ETHERNET_CABLE.get(), HBW_CABLE.get(), HPC_CABLE.get()).build(null));
 
     // Routers
 
@@ -348,6 +371,62 @@ public final class ComputingModule {
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
 
+    // Pattern system — media, encoder and reader
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PatternDiscItem> PATTERN_DISC =
+            ITEMS.register("pattern_disc", () -> new dev.jsc.jscomputronics.module.computing.item.PatternDiscItem(
+                    new Item.Properties(), false));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PatternDiscItem> PATTERN_DISC_RW =
+            ITEMS.register("pattern_disc_rw", () -> new dev.jsc.jscomputronics.module.computing.item.PatternDiscItem(
+                    new Item.Properties(), true));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock> PATTERN_ENCODER =
+            BLOCKS.register("pattern_encoder",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(1.5F)
+                                    .sound(SoundType.METAL)));
+
+    public static final DeferredItem<BlockItem> PATTERN_ENCODER_ITEM = ITEMS.register(
+            "pattern_encoder", () -> new BlockItem(PATTERN_ENCODER.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity>> PATTERN_ENCODER_BE =
+            BLOCK_ENTITIES.register("pattern_encoder",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity::new,
+                            PATTERN_ENCODER.get()).build(null));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu>> PATTERN_ENCODER_MENU =
+            MENUS.register("pattern_encoder", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu::fromNetwork));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternReaderBlock> PATTERN_READER =
+            BLOCKS.register("pattern_reader",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.PatternReaderBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(1.5F)
+                                    .sound(SoundType.METAL)));
+
+    public static final DeferredItem<BlockItem> PATTERN_READER_ITEM = ITEMS.register(
+            "pattern_reader", () -> new BlockItem(PATTERN_READER.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.PatternReaderBlockEntity>> PATTERN_READER_BE =
+            BLOCK_ENTITIES.register("pattern_reader",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.PatternReaderBlockEntity::new,
+                            PATTERN_READER.get()).build(null));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu>> PATTERN_READER_MENU =
+            MENUS.register("pattern_reader", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu::fromNetwork));
+
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_EEB_P = ITEMS.register(
             "motherboard_eeb_p", () -> new MotherboardItem(new Item.Properties(),
                     new MotherboardSpec(dev.jsc.jscomputronics.common.hardware.FormFactor.EEB,
@@ -497,6 +576,121 @@ public final class ComputingModule {
 
     public static final DeferredHolder<MenuType<?>, MenuType<PersonalComputerMenu>> PERSONAL_COMPUTER_MENU =
             MENUS.register("personal_computer", () -> IMenuTypeExtension.create(PersonalComputerMenu::fromNetwork));
+
+    // Crafting Computer — an ATX computer that executes recipes once a Crafting Card is installed
+
+    public static final DeferredBlock<CraftingComputerBlock> CRAFTING_COMPUTER = BLOCKS.register(
+            "crafting_computer", () -> new CraftingComputerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY)
+                    .strength(2.0F)));
+
+    public static final DeferredItem<BlockItem> CRAFTING_COMPUTER_ITEM = ITEMS.register(
+            "crafting_computer", () -> new BlockItem(CRAFTING_COMPUTER.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CraftingComputerBlockEntity>> CRAFTING_COMPUTER_BE =
+            BLOCK_ENTITIES.register("crafting_computer",
+                    () -> BlockEntityType.Builder.of(CraftingComputerBlockEntity::new,
+                            CRAFTING_COMPUTER.get()).build(null));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu>> CRAFTING_COMPUTER_MENU =
+            MENUS.register("crafting_computer", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu::fromNetwork));
+
+    // Supercomputer — a cluster of interconnected nodes uplinked by an HBW Interface
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock>
+            SUPERCOMPUTER_NODE = BLOCKS.register("supercomputer_node",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(3.0F)));
+
+    public static final DeferredItem<BlockItem> SUPERCOMPUTER_NODE_ITEM = ITEMS.register(
+            "supercomputer_node", () -> new BlockItem(SUPERCOMPUTER_NODE.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity>>
+            SUPERCOMPUTER_NODE_BE = BLOCK_ENTITIES.register("supercomputer_node",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity::new,
+                            SUPERCOMPUTER_NODE.get()).build(null));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock>
+            SUPERCOMPUTER_NODE_PART = BLOCKS.register("supercomputer_node_part",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(3.0F)));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.SupercomputerNodeMenu>>
+            SUPERCOMPUTER_NODE_MENU = MENUS.register("supercomputer_node",
+                    () -> IMenuTypeExtension.create(
+                            dev.jsc.jscomputronics.module.computing.menu.SupercomputerNodeMenu::fromNetwork));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.HbwInterfaceBlock>
+            HBW_INTERFACE = BLOCKS.register("hbw_interface",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.HbwInterfaceBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(2.0F)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> HBW_INTERFACE_ITEM = ITEMS.register(
+            "hbw_interface", () -> new BlockItem(HBW_INTERFACE.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity>>
+            HBW_INTERFACE_BE = BLOCK_ENTITIES.register("hbw_interface",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity::new,
+                            HBW_INTERFACE.get()).build(null));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.SupercomputerConsoleBlock>
+            SUPERCOMPUTER_CONSOLE = BLOCKS.register("supercomputer_console",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.SupercomputerConsoleBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(0.6F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> SUPERCOMPUTER_CONSOLE_ITEM = ITEMS.register(
+            "supercomputer_console", () -> new BlockItem(SUPERCOMPUTER_CONSOLE.get(), new Item.Properties()));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerConsoleBlockEntity>>
+            SUPERCOMPUTER_CONSOLE_BE = BLOCK_ENTITIES.register("supercomputer_console",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerConsoleBlockEntity::new,
+                            SUPERCOMPUTER_CONSOLE.get()).build(null));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.SupercomputerConsoleMenu>>
+            SUPERCOMPUTER_CONSOLE_MENU = MENUS.register("supercomputer_console",
+                    () -> IMenuTypeExtension.create(
+                            dev.jsc.jscomputronics.module.computing.menu.SupercomputerConsoleMenu::fromNetwork));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem> PHI_5100 =
+            ITEMS.register("phi_5100", () -> new dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem(
+                    new Item.Properties(), new dev.jsc.jscomputronics.common.hardware.PhiCoprocessorSpec(
+                            IndustrialTier.T3, 2, 60, 1050, 225)));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem> PHI_7120 =
+            ITEMS.register("phi_7120", () -> new dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem(
+                    new Item.Properties(), new dev.jsc.jscomputronics.common.hardware.PhiCoprocessorSpec(
+                            IndustrialTier.T4, 3, 61, 1240, 250)));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem> PHI_7290 =
+            ITEMS.register("phi_7290", () -> new dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem(
+                    new Item.Properties(), new dev.jsc.jscomputronics.common.hardware.PhiCoprocessorSpec(
+                            IndustrialTier.T4, 4, 72, 1500, 270)));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem> PHI_9000 =
+            ITEMS.register("phi_9000", () -> new dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem(
+                    new Item.Properties(), new dev.jsc.jscomputronics.common.hardware.PhiCoprocessorSpec(
+                            IndustrialTier.T5, 6, 96, 1800, 300)));
 
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu>> SERVER_ROUTER_MENU =

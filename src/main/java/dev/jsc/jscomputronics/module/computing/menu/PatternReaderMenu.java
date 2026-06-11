@@ -1,0 +1,181 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jsc.jscomputronics.module.computing.menu;
+
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.PatternReaderBlockEntity;
+import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
+import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.SimpleContainerData;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.items.SlotItemHandler;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Menu for the Pattern Reader: a media slot plus the pattern list read straight from the synced disc stack.
+ */
+public class PatternReaderMenu extends AbstractContainerMenu {
+
+    public static final int BUTTON_LOAD_SELECTED = 0;
+    public static final int BUTTON_LOAD_ALL = 1;
+    public static final int BUTTON_TOGGLE_BASE = 100;
+
+    public static final int MEDIA_SLOT = 0;
+    private static final int PLAYER_START = 1;
+
+    // ContainerData wire layout.
+    public static final int DATA_ROM_USED = 0;
+    public static final int DATA_HAS_COMPUTER = 1;
+    public static final int DATA_LAST_LOADED = 2;
+    private static final int DATA_COUNT = 3;
+
+    private final PatternReaderBlockEntity blockEntity;
+    private final ContainerLevelAccess access;
+    private final ContainerData data;
+
+    private final Set<Integer> selection = new LinkedHashSet<>();
+
+    public PatternReaderMenu(final int containerId, final Inventory playerInventory,
+                             final PatternReaderBlockEntity be) {
+        super(ComputingModule.PATTERN_READER_MENU.get(), containerId);
+        this.blockEntity = be;
+        this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
+        this.data = new SimpleContainerData(DATA_COUNT);
+
+        addSlot(new SlotItemHandler(be.media(), 0, 12, 30));
+        addPlayerInventory(playerInventory);
+        addDataSlots(data);
+    }
+
+    @org.jetbrains.annotations.Nullable
+    public static PatternReaderMenu fromNetwork(final int containerId, final Inventory playerInventory,
+                                                final RegistryFriendlyByteBuf buf) {
+        if (playerInventory.player.level().getBlockEntity(buf.readBlockPos())
+                instanceof PatternReaderBlockEntity be) {
+            return new PatternReaderMenu(containerId, playerInventory, be);
+        }
+        return null;
+    }
+
+    private void addPlayerInventory(final Inventory inventory) {
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 138 + row * 18));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            addSlot(new Slot(inventory, col, 8 + col * 18, 196));
+        }
+    }
+
+    @Override
+    public void broadcastChanges() {
+        if (blockEntity.getLevel() != null && !blockEntity.getLevel().isClientSide()) {
+            final CraftingComputerBlockEntity cc = blockEntity.adjacentComputer();
+            data.set(DATA_ROM_USED, cc == null ? 0 : cc.romUsed());
+            data.set(DATA_HAS_COMPUTER, cc == null ? 0 : 1);
+        }
+        super.broadcastChanges();
+    }
+
+    public List<CraftingPattern> discPatterns() {
+        return PatternDiscItem.patterns(slots.get(MEDIA_SLOT).getItem());
+    }
+
+    public boolean hasComputer() {
+        return data.get(DATA_HAS_COMPUTER) != 0;
+    }
+
+    public int romUsed() {
+        return data.get(DATA_ROM_USED);
+    }
+
+    public int romLimit() {
+        return CraftingComputerBlockEntity.RECIPE_ROM_LIMIT;
+    }
+
+    public int lastLoaded() {
+        return data.get(DATA_LAST_LOADED);
+    }
+
+    public Set<Integer> selection() {
+        return selection;
+    }
+
+    @Override
+    public boolean clickMenuButton(final Player player, final int id) {
+        if (id >= BUTTON_TOGGLE_BASE) {
+            final int index = id - BUTTON_TOGGLE_BASE;
+            if (index < discPatterns().size() && !selection.remove(index)) {
+                selection.add(index);
+            }
+            return true;
+        }
+        if (id == BUTTON_LOAD_SELECTED) {
+            data.set(DATA_LAST_LOADED, blockEntity.loadSelected(new ArrayList<>(selection)));
+            selection.clear();
+            return true;
+        }
+        if (id == BUTTON_LOAD_ALL) {
+            data.set(DATA_LAST_LOADED, blockEntity.loadAll());
+            selection.clear();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean stillValid(final Player player) {
+        return stillValid(access, player, ComputingModule.PATTERN_READER.get());
+    }
+
+    @Override
+    public ItemStack quickMoveStack(final Player player, final int index) {
+        final Slot slot = slots.get(index);
+        if (slot == null || !slot.hasItem()) {
+            return ItemStack.EMPTY;
+        }
+        final ItemStack stack = slot.getItem();
+        final ItemStack original = stack.copy();
+
+        if (index == MEDIA_SLOT) {
+            if (!moveItemStackTo(stack, PLAYER_START, slots.size(), true)) {
+                return ItemStack.EMPTY;
+            }
+        } else if (stack.getItem() instanceof PatternDiscItem) {
+            if (!moveItemStackTo(stack, MEDIA_SLOT, MEDIA_SLOT + 1, false)) {
+                return ItemStack.EMPTY;
+            }
+        } else {
+            return ItemStack.EMPTY;
+        }
+
+        if (stack.isEmpty()) {
+            slot.setByPlayer(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+        if (stack.getCount() == original.getCount()) {
+            return ItemStack.EMPTY;
+        }
+        slot.onTake(player, stack);
+        return original;
+    }
+}

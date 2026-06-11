@@ -14,5 +14,7 @@ public enum ExpansionCardKind {
 
     GPU,
 
-    CRAFTING
+    CRAFTING,
+
+    PHI
 }

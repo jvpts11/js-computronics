@@ -1,7 +1,0 @@
-{
-  "parent": "minecraft:block/cube_column",
-  "textures": {
-    "end": "jsc:block/mainframe_top",
-    "side": "jsc:block/server_rack_front"
-  }
-}

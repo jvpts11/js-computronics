@@ -1,0 +1,121 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jsc.jscomputronics.module.computing.block;
+
+import com.mojang.serialization.MapCodec;
+import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * The Crafting Computer block: an ATX-class computer that executes recipes for the network.
+ */
+public class CraftingComputerBlock extends HorizontalDirectionalBlock
+        implements EntityBlock, DataNetworkConnectable, PeripheralConnectable {
+
+    public static final MapCodec<CraftingComputerBlock> CODEC = simpleCodec(CraftingComputerBlock::new);
+
+    public CraftingComputerBlock(final Properties properties) {
+        super(properties);
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+    }
+
+    @Override
+    protected MapCodec<CraftingComputerBlock> codec() {
+        return CODEC;
+    }
+
+    @Override
+    public PeripheralCableType peripheralType() {
+        return PeripheralCableType.COMPUTING;
+    }
+
+    @Override
+    public java.util.Set<DataTier> acceptedCableTiers() {
+        return java.util.Set.of(DataTier.T1_ETHERNET); // reach the HBW backbone through a Personal Router
+    }
+
+    @Override
+    protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(final BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    protected net.minecraft.world.InteractionResult useWithoutItem(
+            final BlockState state, final Level level, final BlockPos pos,
+            final net.minecraft.world.entity.player.Player player,
+            final net.minecraft.world.phys.BlockHitResult hit) {
+        if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                && level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity computer) {
+            serverPlayer.openMenu(
+                    new net.minecraft.world.SimpleMenuProvider(
+                            (id, inventory, p) -> new dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu(
+                                    id, inventory, computer),
+                            net.minecraft.network.chat.Component.translatable("block.jsc.crafting_computer")),
+                    buf -> buf.writeBlockPos(pos));
+        }
+        return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    @Override
+    protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
+                            final BlockState newState, final boolean movedByPiston) {
+        if (!state.is(newState.getBlock())
+                && level instanceof net.minecraft.server.level.ServerLevel serverLevel
+                && level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity computer) {
+            computer.onBroken(serverLevel); // drop this computer's network-node registration
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    @Override
+    @Nullable
+    public BlockEntity newBlockEntity(final BlockPos pos, final BlockState state) {
+        return new CraftingComputerBlockEntity(pos, state);
+    }
+
+    @Override
+    @Nullable
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(
+            final Level level, final BlockState state, final BlockEntityType<T> type) {
+        if (level.isClientSide()) {
+            return null;
+        }
+        return createTickerHelper(type, ComputingModule.CRAFTING_COMPUTER_BE.get(),
+                CraftingComputerBlockEntity::serverTick);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
+            final BlockEntityType<A> given, final BlockEntityType<E> expected,
+            final BlockEntityTicker<? super E> ticker) {
+        return expected == given ? (BlockEntityTicker<A>) ticker : null;
+    }
+}

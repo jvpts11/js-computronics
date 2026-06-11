@@ -32,18 +32,31 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The Server Router: a network topology element that switches the network and groups Server Racks into datacenter sections, one per output face.
  */
-public class ServerRouterBlock extends Block
+public class ServerRouterBlock extends net.minecraft.world.level.block.HorizontalDirectionalBlock
         implements EntityBlock, DataNetworkConnectable, NetworkBridge {
 
     public static final MapCodec<ServerRouterBlock> CODEC = simpleCodec(ServerRouterBlock::new);
 
     public ServerRouterBlock(final Properties properties) {
         super(properties);
+        // Facing is purely cosmetic (the port banks) — sections still bind per face regardless.
+        registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH));
     }
 
     @Override
     protected MapCodec<ServerRouterBlock> codec() {
         return CODEC;
+    }
+
+    @Override
+    protected void createBlockStateDefinition(
+            final net.minecraft.world.level.block.state.StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(final net.minecraft.world.item.context.BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
     // acceptedCableTiers() defaults to every tier: the router input takes any cable family.

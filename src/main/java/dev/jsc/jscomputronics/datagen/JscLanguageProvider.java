@@ -31,6 +31,7 @@ public class JscLanguageProvider extends LanguageProvider {
         add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
+        addBlock(ComputingModule.HPC_CABLE, "High Compute Cable");
         addBlock(ComputingModule.PERIPHERAL_CABLE, "Peripheral Cable");
         addBlock(ComputingModule.PERSONAL_ROUTER, "Personal Router");
         addBlock(ComputingModule.SERVER_ROUTER, "Server Router");
@@ -44,6 +45,20 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");
+        addBlock(ComputingModule.CRAFTING_COMPUTER, "Crafting Computer");
+        addBlock(ComputingModule.PATTERN_ENCODER, "Pattern Encoder");
+        addBlock(ComputingModule.PATTERN_READER, "Pattern Reader");
+        addBlock(ComputingModule.SUPERCOMPUTER_NODE, "Supercomputer Node");
+        add("item.jsc.supercomputer_node.tooltip", "A full computer: assemble it, seat a Phi, wire it with High Compute Cable");
+        addBlock(ComputingModule.HBW_INTERFACE, "HBW Interface");
+        add("item.jsc.hbw_interface.tooltip", "Uplinks a node cluster to the HBW backbone");
+        addBlock(ComputingModule.SUPERCOMPUTER_CONSOLE, "Supercomputer Console");
+        add(ComputingModule.PHI_5100.get(), "Integra Phi 5100 Co-processor");
+        add(ComputingModule.PHI_7120.get(), "Integra Phi 7120 Co-processor");
+        add(ComputingModule.PHI_7290.get(), "Integra Phi 7290 Co-processor");
+        add(ComputingModule.PHI_9000.get(), "Integra Phi 9000 Co-processor");
+        add(ComputingModule.PATTERN_DISC.get(), "Pattern Disc");
+        add(ComputingModule.PATTERN_DISC_RW.get(), "Rewritable Pattern Disc");
         addBlock(ComputingModule.SERVER_RACK, "Server Rack");
         add(ComputingModule.IMPORT_BUS_ITEM.get(), "Import Bus");
         add("item.jsc.import_bus.tooltip", "Right-click a data cable to attach; pulls items into the network");

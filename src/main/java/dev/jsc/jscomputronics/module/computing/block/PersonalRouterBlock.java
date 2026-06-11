@@ -24,18 +24,31 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The Personal Router: a simple, tier-less block that converts between Ethernet and HBW so a Personal Computer (Ethernet) can reach the HBW backbone.
  */
-public class PersonalRouterBlock extends Block
+public class PersonalRouterBlock extends net.minecraft.world.level.block.HorizontalDirectionalBlock
         implements EntityBlock, DataNetworkConnectable, NetworkBridge {
 
     public static final MapCodec<PersonalRouterBlock> CODEC = simpleCodec(PersonalRouterBlock::new);
 
     public PersonalRouterBlock(final Properties properties) {
         super(properties);
+        // Facing is purely cosmetic (the status panel) — cables still connect on every side.
+        registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH));
     }
 
     @Override
     protected MapCodec<PersonalRouterBlock> codec() {
         return CODEC;
+    }
+
+    @Override
+    protected void createBlockStateDefinition(
+            final net.minecraft.world.level.block.state.StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+    }
+
+    @Override
+    public BlockState getStateForPlacement(final net.minecraft.world.item.context.BlockPlaceContext context) {
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
 
     @Override

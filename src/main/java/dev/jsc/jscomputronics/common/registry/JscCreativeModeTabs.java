@@ -56,6 +56,13 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.MONITOR_ITEM.get());
                         output.accept(ComputingModule.TANK_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
+                        output.accept(ComputingModule.CRAFTING_COMPUTER_ITEM.get());
+                        output.accept(ComputingModule.SUPERCOMPUTER_NODE_ITEM.get());
+                        output.accept(ComputingModule.HPC_CABLE_ITEM.get());
+                        output.accept(ComputingModule.HBW_INTERFACE_ITEM.get());
+                        output.accept(ComputingModule.SUPERCOMPUTER_CONSOLE_ITEM.get());
+                        output.accept(ComputingModule.PATTERN_ENCODER_ITEM.get());
+                        output.accept(ComputingModule.PATTERN_READER_ITEM.get());
                         output.accept(ComputingModule.SERVER_RACK_ITEM.get());
                         output.accept(ComputingModule.IMPORT_BUS_ITEM.get());
                         output.accept(ComputingModule.EXPORT_BUS_ITEM.get());
@@ -74,6 +81,12 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.RAM_DDR3_8192.get());
                         output.accept(ComputingModule.GPU_HD_7970.get());
                         output.accept(ComputingModule.CRAFTING_CARD_T2.get());
+                        output.accept(ComputingModule.PHI_5100.get());
+                        output.accept(ComputingModule.PHI_7120.get());
+                        output.accept(ComputingModule.PHI_7290.get());
+                        output.accept(ComputingModule.PHI_9000.get());
+                        output.accept(ComputingModule.PATTERN_DISC.get());
+                        output.accept(ComputingModule.PATTERN_DISC_RW.get());
                         output.accept(ComputingModule.PSU_650G.get());
                         // Disks (every tier × size).
                         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {

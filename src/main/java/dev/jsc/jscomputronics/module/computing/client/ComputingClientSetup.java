@@ -29,6 +29,11 @@ public final class ComputingClientSetup {
     public static void registerScreens(final RegisterMenuScreensEvent event) {
         event.register(ComputingModule.MAINFRAME_MENU.get(), MainframeScreen::new);
         event.register(ComputingModule.PERSONAL_COMPUTER_MENU.get(), PersonalComputerScreen::new);
+        event.register(ComputingModule.CRAFTING_COMPUTER_MENU.get(), CraftingComputerScreen::new);
+        event.register(ComputingModule.PATTERN_ENCODER_MENU.get(), PatternEncoderScreen::new);
+        event.register(ComputingModule.PATTERN_READER_MENU.get(), PatternReaderScreen::new);
+        event.register(ComputingModule.SUPERCOMPUTER_CONSOLE_MENU.get(), SupercomputerConsoleScreen::new);
+        event.register(ComputingModule.SUPERCOMPUTER_NODE_MENU.get(), SupercomputerNodeScreen::new);
         event.register(ComputingModule.SERVER_RACK_MENU.get(), ServerRackScreen::new);
         event.register(ComputingModule.SERVER_ROUTER_MENU.get(), ServerRouterScreen::new);
         event.register(ComputingModule.DATACENTER_STATION_MENU.get(), DatacenterStationScreen::new);

@@ -48,6 +48,7 @@ public class JscBlockStateProvider extends BlockStateProvider {
 
         pipeCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
         pipeCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
+        pipeCable(ComputingModule.HPC_CABLE.get(), "hpc_cable");
         pipeCable(ComputingModule.PERIPHERAL_CABLE.get(), "peripheral_cable");
 
         // The Mainframe is a 3x2x2 server rack. The controller carries the control
@@ -59,11 +60,11 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/mainframe_top"));
         horizontalBlock(ComputingModule.MAINFRAME.get(), mainframeModel);
 
-        // Parts: the central column wears the control-panel face, the side columns
+        // Parts: the central column wears a lit data-spine face, the side columns wear
         final ModelFile partCasing = models().cubeColumn(
-                "mainframe_part", modLoc("block/mainframe_side"), modLoc("block/mainframe_top"));
+                "mainframe_part", modLoc("block/mainframe_panel"), modLoc("block/mainframe_top"));
         final ModelFile partCore = models().cubeColumn(
-                "mainframe_part_core", modLoc("block/mainframe_front"), modLoc("block/mainframe_top"));
+                "mainframe_part_core", modLoc("block/mainframe_core"), modLoc("block/mainframe_top"));
         getVariantBuilder(ComputingModule.MAINFRAME_PART.get()).forAllStates(state ->
                 net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
                         .modelFile(state.getValue(
@@ -71,14 +72,25 @@ public class JscBlockStateProvider extends BlockStateProvider {
                                 ? partCore : partCasing)
                         .build());
 
-        simpleBlock(ComputingModule.PERSONAL_ROUTER.get(),
-                models().cubeAll("personal_router", modLoc("block/personal_router")));
+        // Routers: the facing carries the status/port panel; the other faces are casing.
+        final ModelFile personalRouterModel = models().orientable(
+                "personal_router",
+                modLoc("block/personal_router_side"),
+                modLoc("block/personal_router_front"),
+                modLoc("block/personal_router_top"));
+        horizontalBlock(ComputingModule.PERSONAL_ROUTER.get(), personalRouterModel);
 
-        simpleBlock(ComputingModule.SERVER_ROUTER.get(),
-                models().cubeAll("server_router", modLoc("block/server_router")));
+        final ModelFile serverRouterModel = models().orientable(
+                "server_router",
+                modLoc("block/server_router_side"),
+                modLoc("block/server_router_front"),
+                modLoc("block/server_router_top"));
+        horizontalBlock(ComputingModule.SERVER_ROUTER.get(), serverRouterModel);
 
-        simpleBlock(ComputingModule.DATACENTER_STATION.get(),
-                models().cubeAll("datacenter_station", modLoc("block/datacenter_station")));
+        // Datacenter Station: a hand-written element model (pedestal + tilted console
+        // screen) shipped in main resources; the blockstate only rotates it.
+        horizontalBlock(ComputingModule.DATACENTER_STATION.get(),
+                models().getExistingFile(modLoc("block/datacenter_station")));
 
         // Tank: glass walls in a metal casing frame, so it reads as a containment vessel rather than a
         simpleBlock(ComputingModule.TANK.get(), models()
@@ -86,20 +98,41 @@ public class JscBlockStateProvider extends BlockStateProvider {
                         modLoc("block/mainframe_side"), modLoc("block/mainframe_side"))
                 .renderType("cutout"));
 
-        // Server Rack: a 2x3x2 multiblock cabinet that reads as one tall rack. Every
-        final ModelFile rackBay = models().cubeColumn(
-                "server_rack", modLoc("block/server_rack_front"), modLoc("block/mainframe_top"));
+        // Server Rack: a 2x3x2 multiblock cabinet. The four front bay blocks each show
+        final ModelFile[] rackBays = new ModelFile[4];
+        for (int bays = 0; bays < 4; bays++) {
+            rackBays[bays] = models().getExistingFile(modLoc("block/server_rack_bays_" + bays));
+        }
         final ModelFile rackHeader = models().cubeColumn(
-                "server_rack_part", modLoc("block/server_rack_upper"), modLoc("block/mainframe_top"));
+                "server_rack_part", modLoc("block/server_rack_upper"), modLoc("block/server_rack_top"));
+        final ModelFile rackCasing = models().cubeColumn(
+                "server_rack_casing", modLoc("block/server_rack_side"), modLoc("block/server_rack_top"));
+
         getVariantBuilder(ComputingModule.SERVER_RACK.get()).forAllStates(state ->
                 net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(rackBay).build());
-        getVariantBuilder(ComputingModule.SERVER_RACK_PART.get()).forAllStates(state ->
-                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(state.getValue(
-                                dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.TOP)
-                                ? rackHeader : rackBay)
+                        .modelFile(rackBays[state.getValue(
+                                dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS)])
+                        .rotationY(((int) state.getValue(
+                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)
+                                .toYRot() + 180) % 360)
                         .build());
+        getVariantBuilder(ComputingModule.SERVER_RACK_PART.get()).forAllStates(state -> {
+            if (state.getValue(dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.TOP)) {
+                return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(rackHeader).build();
+            }
+            if (!state.getValue(dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.FRONT)) {
+                return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(rackCasing).build();
+            }
+            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                    .modelFile(rackBays[state.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS)])
+                    .rotationY(((int) state.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.FACING)
+                            .toYRot() + 180) % 360)
+                    .build();
+        });
 
         final ModelFile personalComputerModel = models().orientable(
                 "personal_computer",
@@ -107,6 +140,61 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/personal_computer_front"),
                 modLoc("block/personal_computer_top"));
         horizontalBlock(ComputingModule.PERSONAL_COMPUTER.get(), personalComputerModel);
+
+        final ModelFile craftingComputerModel = models().orientable(
+                "crafting_computer",
+                modLoc("block/crafting_computer_side"),
+                modLoc("block/crafting_computer_front"),
+                modLoc("block/crafting_computer_top"));
+        horizontalBlock(ComputingModule.CRAFTING_COMPUTER.get(), craftingComputerModel);
+
+        // Supercomputer cluster: nodes light up when a co-processor is seated; the
+        // HBW Interface is the uplink; the console is a hand-written kiosk model.
+        final ModelFile nodeEmpty = models().cubeColumn(
+                "supercomputer_node", modLoc("block/supercomputer_node_side"),
+                modLoc("block/supercomputer_node_top"));
+        final ModelFile nodeFilled = models().cubeColumn(
+                "supercomputer_node_filled", modLoc("block/supercomputer_node_side_filled"),
+                modLoc("block/supercomputer_node_top"));
+        getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE.get()).forAllStates(state ->
+                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(state.getValue(
+                                dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED)
+                                ? nodeFilled : nodeEmpty)
+                        .build());
+        final ModelFile nodeMid = models().cubeColumn(
+                "supercomputer_node_mid", modLoc("block/supercomputer_node_mid"),
+                modLoc("block/supercomputer_node_top"));
+        final ModelFile nodeCap = models().cubeColumn(
+                "supercomputer_node_cap", modLoc("block/supercomputer_node_cap"),
+                modLoc("block/supercomputer_node_top"));
+        getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE_PART.get()).forAllStates(state ->
+                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                        .modelFile(state.getValue(
+                                dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.TOP)
+                                ? nodeCap : nodeMid)
+                        .build());
+
+        simpleBlock(ComputingModule.HBW_INTERFACE.get(), models().cubeColumn(
+                "hbw_interface", modLoc("block/hbw_interface_side"), modLoc("block/hbw_interface_top")));
+
+        horizontalBlock(ComputingModule.SUPERCOMPUTER_CONSOLE.get(),
+                models().getExistingFile(modLoc("block/supercomputer_console")));
+
+        // Pattern Encoder and Reader share the workstation casing; the front face tells them apart.
+        final ModelFile patternEncoderModel = models().orientable(
+                "pattern_encoder",
+                modLoc("block/pattern_station_side"),
+                modLoc("block/pattern_encoder_front"),
+                modLoc("block/pattern_station_top"));
+        horizontalBlock(ComputingModule.PATTERN_ENCODER.get(), patternEncoderModel);
+
+        final ModelFile patternReaderModel = models().orientable(
+                "pattern_reader",
+                modLoc("block/pattern_station_side"),
+                modLoc("block/pattern_reader_front"),
+                modLoc("block/pattern_station_top"));
+        horizontalBlock(ComputingModule.PATTERN_READER.get(), patternReaderModel);
 
         // Monitor: a screen on the front, casing on the other faces. The screen has
         final ModelFile monitorOff = models().orientable(

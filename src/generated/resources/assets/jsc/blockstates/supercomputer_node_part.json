@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "facing=east,top=false": {
+      "model": "jsc:block/supercomputer_node_mid"
+    },
+    "facing=east,top=true": {
+      "model": "jsc:block/supercomputer_node_cap"
+    },
+    "facing=north,top=false": {
+      "model": "jsc:block/supercomputer_node_mid"
+    },
+    "facing=north,top=true": {
+      "model": "jsc:block/supercomputer_node_cap"
+    },
+    "facing=south,top=false": {
+      "model": "jsc:block/supercomputer_node_mid"
+    },
+    "facing=south,top=true": {
+      "model": "jsc:block/supercomputer_node_cap"
+    },
+    "facing=west,top=false": {
+      "model": "jsc:block/supercomputer_node_mid"
+    },
+    "facing=west,top=true": {
+      "model": "jsc:block/supercomputer_node_cap"
+    }
+  }
+}

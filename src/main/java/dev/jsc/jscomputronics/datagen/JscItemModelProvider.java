@@ -40,6 +40,8 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/ethernet_cable_core")));
         getBuilder("hbw_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/hbw_cable_core")));
+        getBuilder("hpc_cable")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/hpc_cable_core")));
         getBuilder("peripheral_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/peripheral_cable_core")));
 
@@ -57,6 +59,24 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/tank")));
         getBuilder("personal_computer")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_computer")));
+        getBuilder("crafting_computer")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/crafting_computer")));
+        getBuilder("supercomputer_node")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/supercomputer_node")));
+        getBuilder("hbw_interface")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/hbw_interface")));
+        getBuilder("supercomputer_console")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/supercomputer_console")));
+        basicItem(ComputingModule.PHI_5100.get());
+        basicItem(ComputingModule.PHI_7120.get());
+        basicItem(ComputingModule.PHI_7290.get());
+        basicItem(ComputingModule.PHI_9000.get());
+        getBuilder("pattern_encoder")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/pattern_encoder")));
+        getBuilder("pattern_reader")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/pattern_reader")));
+        basicItem(ComputingModule.PATTERN_DISC.get());
+        basicItem(ComputingModule.PATTERN_DISC_RW.get());
         basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());
         basicItem(ComputingModule.MOTHERBOARD_ATX_P.get());
         basicItem(ComputingModule.CPU_SERVO_2620.get());
@@ -71,7 +91,7 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.SERVER_CASE.get());
         basicItem(ComputingModule.SERVER.get());
         getBuilder("server_rack")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack")));
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack_bays_0")));
         getBuilder("import_bus")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/import_bus_part")));
         getBuilder("export_bus")

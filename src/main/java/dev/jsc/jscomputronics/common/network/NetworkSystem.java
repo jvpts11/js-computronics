@@ -37,6 +37,12 @@ public final class NetworkSystem {
     private final java.util.Map<NetworkUuid, java.util.List<PersonalComputerNode>> pcsByNetwork =
             new java.util.HashMap<>();
 
+    private final java.util.Map<NetworkUuid, java.util.List<CraftingComputerNode>> craftingComputersByNetwork =
+            new java.util.HashMap<>();
+
+    private final java.util.Map<NetworkUuid, java.util.List<SupercomputerNode>> supercomputersByNetwork =
+            new java.util.HashMap<>();
+
     private final java.util.Map<NetworkUuid, java.util.List<ServerRouterElement>> routersByNetwork =
             new java.util.HashMap<>();
 
@@ -44,6 +50,18 @@ public final class NetworkSystem {
      * A Personal Computer attached to a network: a Category-C node that issues, but never orchestrates, Operations.
      */
     public record PersonalComputerNode(NodeUuid nodeUuid, NetworkUuid networkUuid, long capacity, long pos) {
+    }
+
+    /**
+     * A Crafting Computer attached to a network: a Category-C node that executes recipes.
+     */
+    public record CraftingComputerNode(NodeUuid nodeUuid, NetworkUuid networkUuid, long capacity, long pos) {
+    }
+
+    /**
+     * A Supercomputer attached to a network: the orchestration upgrade that runs the network's CRAFT Operations in parallel.
+     */
+    public record SupercomputerNode(NodeUuid nodeUuid, NetworkUuid networkUuid, long parallelCrafts, long pos) {
     }
 
     /**
@@ -153,6 +171,52 @@ public final class NetworkSystem {
 
     public java.util.List<PersonalComputerNode> personalComputersOf(NetworkUuid networkUuid) {
         final var list = pcsByNetwork.get(networkUuid);
+        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+    }
+
+    public void registerCraftingComputer(CraftingComputerNode computer) {
+        java.util.Objects.requireNonNull(computer, "computer must not be null");
+        final java.util.List<CraftingComputerNode> list =
+                craftingComputersByNetwork.computeIfAbsent(computer.networkUuid(), k -> new java.util.ArrayList<>());
+        list.removeIf(c -> c.nodeUuid().equals(computer.nodeUuid()));
+        list.add(computer);
+    }
+
+    public void unregisterCraftingComputer(NetworkUuid network, NodeUuid node) {
+        final java.util.List<CraftingComputerNode> list = craftingComputersByNetwork.get(network);
+        if (list != null) {
+            list.removeIf(c -> c.nodeUuid().equals(node));
+            if (list.isEmpty()) {
+                craftingComputersByNetwork.remove(network);
+            }
+        }
+    }
+
+    public java.util.List<CraftingComputerNode> craftingComputersOf(NetworkUuid networkUuid) {
+        final var list = craftingComputersByNetwork.get(networkUuid);
+        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+    }
+
+    public void registerSupercomputer(SupercomputerNode supercomputer) {
+        java.util.Objects.requireNonNull(supercomputer, "supercomputer must not be null");
+        final java.util.List<SupercomputerNode> list = supercomputersByNetwork
+                .computeIfAbsent(supercomputer.networkUuid(), k -> new java.util.ArrayList<>());
+        list.removeIf(s -> s.nodeUuid().equals(supercomputer.nodeUuid()));
+        list.add(supercomputer);
+    }
+
+    public void unregisterSupercomputer(NetworkUuid network, NodeUuid node) {
+        final java.util.List<SupercomputerNode> list = supercomputersByNetwork.get(network);
+        if (list != null) {
+            list.removeIf(s -> s.nodeUuid().equals(node));
+            if (list.isEmpty()) {
+                supercomputersByNetwork.remove(network);
+            }
+        }
+    }
+
+    public java.util.List<SupercomputerNode> supercomputersOf(NetworkUuid networkUuid) {
+        final var list = supercomputersByNetwork.get(networkUuid);
         return list == null ? java.util.List.of() : java.util.List.copyOf(list);
     }
 

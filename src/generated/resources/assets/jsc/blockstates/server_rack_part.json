@@ -1,9 +1,207 @@
 {
   "variants": {
-    "top=false": {
-      "model": "jsc:block/server_rack"
+    "bays=0,facing=east,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
     },
-    "top=true": {
+    "bays=0,facing=east,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=east,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_0",
+      "y": 90
+    },
+    "bays=0,facing=east,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=north,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=0,facing=north,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=north,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_0"
+    },
+    "bays=0,facing=north,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=south,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=0,facing=south,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=south,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_0",
+      "y": 180
+    },
+    "bays=0,facing=south,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=west,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=0,facing=west,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=0,facing=west,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_0",
+      "y": 270
+    },
+    "bays=0,facing=west,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=east,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=1,facing=east,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=east,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_1",
+      "y": 90
+    },
+    "bays=1,facing=east,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=north,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=1,facing=north,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=north,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_1"
+    },
+    "bays=1,facing=north,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=south,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=1,facing=south,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=south,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_1",
+      "y": 180
+    },
+    "bays=1,facing=south,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=west,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=1,facing=west,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=1,facing=west,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_1",
+      "y": 270
+    },
+    "bays=1,facing=west,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=east,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=2,facing=east,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=east,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_2",
+      "y": 90
+    },
+    "bays=2,facing=east,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=north,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=2,facing=north,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=north,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_2"
+    },
+    "bays=2,facing=north,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=south,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=2,facing=south,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=south,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_2",
+      "y": 180
+    },
+    "bays=2,facing=south,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=west,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=2,facing=west,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=2,facing=west,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_2",
+      "y": 270
+    },
+    "bays=2,facing=west,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=east,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=3,facing=east,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=east,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_3",
+      "y": 90
+    },
+    "bays=3,facing=east,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=north,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=3,facing=north,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=north,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_3"
+    },
+    "bays=3,facing=north,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=south,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=3,facing=south,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=south,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_3",
+      "y": 180
+    },
+    "bays=3,facing=south,front=true,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=west,front=false,top=false": {
+      "model": "jsc:block/server_rack_casing"
+    },
+    "bays=3,facing=west,front=false,top=true": {
+      "model": "jsc:block/server_rack_part"
+    },
+    "bays=3,facing=west,front=true,top=false": {
+      "model": "jsc:block/server_rack_bays_3",
+      "y": 270
+    },
+    "bays=3,facing=west,front=true,top=true": {
       "model": "jsc:block/server_rack_part"
     }
   }

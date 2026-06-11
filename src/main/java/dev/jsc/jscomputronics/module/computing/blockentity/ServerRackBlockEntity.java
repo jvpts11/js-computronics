@@ -53,8 +53,41 @@ public class ServerRackBlockEntity extends BlockEntity {
         protected void onContentsChanged(final int slot) {
             markStorageChanged(slot);
             setChanged();
+            updateBayVisuals();
         }
     };
+
+    private void updateBayVisuals() {
+        if (!(level instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+            return;
+        }
+        final BlockState self = getBlockState();
+        if (!(self.getBlock() instanceof dev.jsc.jscomputronics.module.computing.block.ServerRackBlock)) {
+            return;
+        }
+        final net.minecraft.core.Direction facing = self.getValue(
+                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+        for (int h = 0; h < 2; h++) {
+            for (int w = 0; w < 2; w++) {
+                final int base = h * 4 + w * 2;
+                final int bits = (servers.getStackInSlot(base).isEmpty() ? 0 : 1)
+                        | (servers.getStackInSlot(base + 1).isEmpty() ? 0 : 2);
+                final BlockPos bayPos = dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                        .bayBlockPos(worldPosition, facing, w, h);
+                final BlockState bayState = serverLevel.getBlockState(bayPos);
+                final boolean isRackBlock = bayState.getBlock()
+                        instanceof dev.jsc.jscomputronics.module.computing.block.ServerRackBlock
+                        || bayState.getBlock()
+                        instanceof dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
+                if (isRackBlock && bayState.getValue(
+                        dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS) != bits) {
+                    serverLevel.setBlock(bayPos, bayState.setValue(
+                            dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS, bits),
+                            net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+                }
+            }
+        }
+    }
 
     private final long[] storageModCounts = new long[CAPACITY];
 
@@ -165,18 +198,17 @@ public class ServerRackBlockEntity extends BlockEntity {
                 inside.add(p.asLong());
             }
         }
-        // Collect EVERY cable touching any external face — the whole cabinet is one connection surface.
+        // Cables attach ONLY through the cabinet's rear: the open front is the bay
+        final Direction back = facing.getOpposite();
         final Set<Long> cables = new HashSet<>();
         for (final long posLong : inside) {
             final BlockPos p = BlockPos.of(posLong);
-            for (final Direction direction : Direction.values()) {
-                final BlockPos neighbor = p.relative(direction);
-                if (inside.contains(neighbor.asLong())) {
-                    continue; // a face internal to the cabinet
-                }
-                if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock) {
-                    cables.add(neighbor.asLong());
-                }
+            final BlockPos neighbor = p.relative(back);
+            if (inside.contains(neighbor.asLong())) {
+                continue; // a face internal to the cabinet (the front layer's rear)
+            }
+            if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock) {
+                cables.add(neighbor.asLong());
             }
         }
         // Bridge the cable runs this rack touches into one segment, so a Mainframe on one side and a

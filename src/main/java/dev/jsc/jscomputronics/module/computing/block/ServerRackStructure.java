@@ -49,4 +49,21 @@ public final class ServerRackStructure {
     public static boolean isTopLayer(final BlockPos controller, final BlockPos part) {
         return part.getY() - controller.getY() == HEIGHT - 1;
     }
+
+    public static boolean isFrontBayBlock(final BlockPos controller, final Direction facing,
+                                          final BlockPos part) {
+        final int h = part.getY() - controller.getY();
+        if (h < 0 || h >= HEIGHT - 1) {
+            return false;
+        }
+        // The front layer is the controller's own layer along the facing axis: the
+        // controller column and the column one step clockwise of it.
+        final BlockPos flat = part.below(h);
+        return flat.equals(controller) || flat.equals(controller.relative(facing.getClockWise()));
+    }
+
+    public static BlockPos bayBlockPos(final BlockPos controller, final Direction facing,
+                                       final int w, final int h) {
+        return controller.relative(facing.getClockWise(), w).above(h);
+    }
 }
