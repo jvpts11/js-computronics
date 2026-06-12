@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.operation;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
+import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
 import dev.jsc.jscomputronics.common.operation.index.Allocation;
 import dev.jsc.jscomputronics.common.operation.index.ItemLocation;
 import dev.jsc.jscomputronics.common.operation.exec.EqualShare;
@@ -46,6 +47,8 @@ public final class NetworkSelectOperation implements NetworkOperation {
     private final byte recordType;
     private final UUID operationId;
     private final NetworkIndex index;
+    @org.jetbrains.annotations.Nullable
+    private final LatencyScheduler scheduler;
     private final java.util.Set<NodeUuid> sourceFilter;
     private final int waitTimeoutTicks;
 
@@ -64,24 +67,40 @@ public final class NetworkSelectOperation implements NetworkOperation {
     private java.util.function.BooleanSupplier abortWhen;
 
     /**
-     * One SubOperation: a source server's timed transfer, with its own identity and the per-tick cap the server's hardware imposes.
+     * One SubOperation: a source server's timed transfer, with its own identity, the per-tick cap the
+     * server's hardware imposes, and a {@code ready} gate that a virtual thread flips once the disk's
+     * read latency has elapsed (so several disks read in parallel, each parked on its own thread).
      */
-    private record Source(UUID subId, NodeUuid server, TransferState state, long hardwareCap) {
+    private static final class Source {
+        private final NodeUuid server;
+        private final TransferState state;
+        private final long hardwareCap;
+        private volatile boolean ready;
+
+        private Source(final NodeUuid server, final TransferState state,
+                       final long hardwareCap, final boolean ready) {
+            this.server = server;
+            this.state = state;
+            this.hardwareCap = hardwareCap;
+            this.ready = ready;
+        }
     }
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final DataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
+                                  @org.jetbrains.annotations.Nullable final LatencyScheduler scheduler,
                                   final java.util.Set<NodeUuid> sourceFilter) {
         this(level, network, key, demand, destination, destinationLabel, recordType, operationId, index,
-                sourceFilter, DEFAULT_WAIT_TIMEOUT_TICKS);
+                scheduler, sourceFilter, DEFAULT_WAIT_TIMEOUT_TICKS);
     }
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final DataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
+                                  @org.jetbrains.annotations.Nullable final LatencyScheduler scheduler,
                                   final java.util.Set<NodeUuid> sourceFilter, final int waitTimeoutTicks) {
         this.level = level;
         this.network = network;
@@ -92,6 +111,7 @@ public final class NetworkSelectOperation implements NetworkOperation {
         this.recordType = recordType;
         this.operationId = operationId;
         this.index = index;
+        this.scheduler = scheduler;
         this.sourceFilter = sourceFilter;
         this.waitTimeoutTicks = waitTimeoutTicks;
 
@@ -124,11 +144,23 @@ public final class NetworkSelectOperation implements NetworkOperation {
     private void buildSources(final Allocation plan, final Map<NodeUuid, StorageTier> tiers) {
         plan.perServer().forEach((server, quantity) -> {
             final StorageTier tier = tiers.getOrDefault(server, StorageTier.HDD);
-            sources.add(new Source(UUID.randomUUID(), server,
-                    new TransferState(quantity, tier.latencyTicks()),
-                    NetworkIndex.serverThroughputCap(level, server)));
+            final int latency = tier.latencyTicks();
+            final long cap = NetworkIndex.serverThroughputCap(level, server);
+            final Source source;
+            if (scheduler != null) {
+                // Model the disk's read latency as a parked virtual thread: the transfer state carries
+                // no latency of its own, and the scheduler flips the source ready once the read time has
+                // elapsed. Every source schedules independently, so the disks read in parallel.
+                source = new Source(server, new TransferState(quantity, 0), cap, false);
+                scheduler.afterTicks(latency, () -> source.ready = true);
+            } else {
+                // No dispatcher to park on (a directly driven operation): count the latency in the
+                // transfer state on the main thread, the original behavior.
+                source = new Source(server, new TransferState(quantity, latency), cap, true);
+            }
+            sources.add(source);
         });
-        this.progress = new OperationProgress(sources.stream().map(Source::state).toList());
+        this.progress = new OperationProgress(sources.stream().map(s -> s.state).toList());
     }
 
     public void tick(final long throughputBudget) {
@@ -153,24 +185,28 @@ public final class NetworkSelectOperation implements NetworkOperation {
 
         for (int i = 0; i < sources.size(); i++) {
             final Source source = sources.get(i);
-            final boolean wasWaiting = source.state().waitingOnLatency();
+            if (!source.ready) {
+                waiting = true; // the disk is still reading, parked on its own virtual thread
+                continue;
+            }
+            final boolean wasWaiting = source.state.waitingOnLatency();
             // The server streams at the slower of its orchestration share and its own hardware.
-            final long planned = source.state().planTick(Math.min(shares[i], source.hardwareCap()));
+            final long planned = source.state.planTick(Math.min(shares[i], source.hardwareCap));
             if (wasWaiting && planned == 0L) {
                 waiting = true; // no progress this tick only because of read latency
             }
             if (planned <= 0L) {
                 continue;
             }
-            final long moved = storage.selectBreakdown(key, planned, destination, Set.of(source.server()))
-                    .getOrDefault(source.server(), 0L);
-            source.state().commit(moved);
+            final long moved = storage.selectBreakdown(key, planned, destination, Set.of(source.server))
+                    .getOrDefault(source.server, 0L);
+            source.state.commit(moved);
             if (moved > 0L) {
                 movedTotal += moved;
-                movedPerServer.merge(source.server(), moved, Long::sum);
+                movedPerServer.merge(source.server, moved, Long::sum);
                 // The moved items have left the server, so drop them from the lock: this keeps the
                 // catalog from reading as over-locked to other concurrent Operations.
-                index.release(operationId, key, source.server(), moved);
+                index.release(operationId, key, source.server, moved);
                 movedAny = true;
             }
         }
@@ -290,11 +326,11 @@ public final class NetworkSelectOperation implements NetworkOperation {
             if (subs.size() >= OperationRecord.MAX_SUBS) {
                 break;
             }
-            final byte state = source.state().isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
-                    : source.state().waitingOnLatency() ? OperationRecord.SubRow.SUB_READING
+            final byte state = source.state.isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
+                    : (!source.ready || source.state.waitingOnLatency()) ? OperationRecord.SubRow.SUB_READING
                     : OperationRecord.SubRow.SUB_STREAMING;
-            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server().asString()),
-                    source.state().total(), source.state().moved(), state));
+            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server.asString()),
+                    source.state.total(), source.state.moved(), state));
         }
         return subs;
     }

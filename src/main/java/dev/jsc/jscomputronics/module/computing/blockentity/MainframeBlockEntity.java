@@ -622,6 +622,20 @@ public class MainframeBlockEntity extends BlockEntity
         dispatch.tick();
     }
 
+    /**
+     * The virtual-thread dispatcher, created on demand. A timed Operation submitted between ticks (from
+     * a terminal, the CLI or a bus) parks each disk's read latency on it; the per-tick reconciliation in
+     * {@link #runDispatch()} still owns recreating it when the parallel-queue count changes.
+     */
+    private OperationDispatch ensureDispatch() {
+        if (dispatch == null) {
+            final int queues = Math.max(1, parallelQueues());
+            dispatch = new OperationDispatch(queues);
+            dispatchQueues = queues;
+        }
+        return dispatch;
+    }
+
     private void closeDispatch() {
         if (dispatch != null) {
             // Fold the dying dispatcher's tally into the persisted lifetime total so the
@@ -774,7 +788,7 @@ public class MainframeBlockEntity extends BlockEntity
         }
         final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation(
                 serverLevel, networkUuid(), key, demand, destination, destinationLabel, recordType,
-                java.util.UUID.randomUUID(), networkIndex, sources);
+                java.util.UUID.randomUUID(), networkIndex, ensureDispatch(), sources);
         activeOperations.add(operation);
         return operation;
     }
@@ -787,7 +801,7 @@ public class MainframeBlockEntity extends BlockEntity
             return null;
         }
         final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation(
-                serverLevel, networkUuid(), key, demand, sourceLabel, networkIndex);
+                serverLevel, networkUuid(), key, demand, sourceLabel, networkIndex, ensureDispatch());
         activeOperations.add(operation);
         return operation;
     }

@@ -24,7 +24,7 @@ import java.util.function.Supplier;
 /**
  * The Operation dispatcher: runs CPU-bound Operation work on virtual threads while keeping every world mutation on the main (server) thread. A task does its computation on a virtual thread and uses its {@link OperationContext} to bounce world reads/writes back to the main thread and to wait on whole game ticks — so disk latency and throughput are paced deterministically by ticks, never by a wall clock. Multiple disks (one task per server) therefore process in parallel without ever touching the world off-thread.
  */
-public final class OperationDispatch implements AutoCloseable {
+public final class OperationDispatch implements AutoCloseable, LatencyScheduler {
 
     private record PendingOp(UUID id, OperationTask task, OperationPriority priority, long sequence) {
     }
@@ -90,6 +90,46 @@ public final class OperationDispatch implements AutoCloseable {
         synchronized (tickMonitor) {
             tickCount++;
             tickMonitor.notifyAll();
+        }
+    }
+
+    @Override
+    public void afterTicks(final int ticks, final Runnable callback) {
+        Objects.requireNonNull(callback, "callback must not be null");
+        // Park a virtual thread for the disk's read time, then resume the transfer on the main thread.
+        // Many disks call this at once, so their reads genuinely overlap, capped only by the latency.
+        workers.execute(() -> {
+            try {
+                awaitTicks(ticks);
+            } catch (final OperationCancelledException cancelled) {
+                return; // dispatcher shut down — the Operation is being abandoned, drop the read
+            }
+            mainThreadActions.add(callback);
+        });
+    }
+
+    /**
+     * Blocks the calling virtual thread until {@code ticks} server ticks have elapsed, or throws
+     * {@link OperationCancelledException} if the dispatcher shuts down while waiting. Shared by the
+     * per-task context and {@link #afterTicks}.
+     */
+    private void awaitTicks(final int ticks) {
+        if (ticks <= 0) {
+            return;
+        }
+        final long target = tickCount + ticks;
+        synchronized (tickMonitor) {
+            while (tickCount < target) {
+                if (closed) {
+                    throw new OperationCancelledException();
+                }
+                try {
+                    tickMonitor.wait();
+                } catch (final InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new OperationCancelledException();
+                }
+            }
         }
     }
 
@@ -212,23 +252,7 @@ public final class OperationDispatch implements AutoCloseable {
 
         @Override
         public void awaitTicks(final int ticks) {
-            if (ticks <= 0) {
-                return;
-            }
-            final long target = tickCount + ticks;
-            synchronized (tickMonitor) {
-                while (tickCount < target) {
-                    if (closed) {
-                        throw new OperationCancelledException();
-                    }
-                    try {
-                        tickMonitor.wait();
-                    } catch (final InterruptedException interrupted) {
-                        Thread.currentThread().interrupt();
-                        throw new OperationCancelledException();
-                    }
-                }
-            }
+            OperationDispatch.this.awaitTicks(ticks);
         }
 
         @Override

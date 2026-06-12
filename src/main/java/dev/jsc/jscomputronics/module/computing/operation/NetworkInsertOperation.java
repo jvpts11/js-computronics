@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.operation;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
+import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
 import dev.jsc.jscomputronics.common.operation.exec.EqualShare;
 import dev.jsc.jscomputronics.common.operation.exec.OperationProgress;
 import dev.jsc.jscomputronics.common.operation.exec.TransferState;
@@ -54,13 +55,27 @@ public final class NetworkInsertOperation implements NetworkOperation {
     private Runnable onSettle;
 
     /**
-     * One SubOperation: a destination server's timed write, with its own identity and hardware cap.
+     * One SubOperation: a destination server's timed write, with its own hardware cap and a {@code ready}
+     * gate a virtual thread flips once the disk's write latency has elapsed (disks write in parallel).
      */
-    private record Source(java.util.UUID subId, NodeUuid server, TransferState state, long hardwareCap) {
+    private static final class Source {
+        private final NodeUuid server;
+        private final TransferState state;
+        private final long hardwareCap;
+        private volatile boolean ready;
+
+        private Source(final NodeUuid server, final TransferState state,
+                       final long hardwareCap, final boolean ready) {
+            this.server = server;
+            this.state = state;
+            this.hardwareCap = hardwareCap;
+            this.ready = ready;
+        }
     }
 
     public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
-                                  final long demand, final String sourceLabel, final NetworkIndex index) {
+                                  final long demand, final String sourceLabel, final NetworkIndex index,
+                                  @org.jetbrains.annotations.Nullable final LatencyScheduler scheduler) {
         this.level = level;
         this.network = network;
         this.key = key;
@@ -81,11 +96,20 @@ public final class NetworkInsertOperation implements NetworkOperation {
         final Allocation plan = StorageAllocator.allocate(free, demand);
         plan.perServer().forEach((server, quantity) -> {
             final StorageTier tier = tiers.getOrDefault(server, StorageTier.HDD);
-            sources.add(new Source(java.util.UUID.randomUUID(), server,
-                    new TransferState(quantity, tier.latencyTicks()),
-                    NetworkIndex.serverThroughputCap(level, server)));
+            final int latency = tier.latencyTicks();
+            final long cap = NetworkIndex.serverThroughputCap(level, server);
+            final Source source;
+            if (scheduler != null) {
+                // The disk's write latency is a parked virtual thread; the scheduler flips the source
+                // ready once it elapses, so the disks accept writes in parallel.
+                source = new Source(server, new TransferState(quantity, 0), cap, false);
+                scheduler.afterTicks(latency, () -> source.ready = true);
+            } else {
+                source = new Source(server, new TransferState(quantity, latency), cap, true);
+            }
+            sources.add(source);
         });
-        this.progress = new OperationProgress(sources.stream().map(Source::state).toList());
+        this.progress = new OperationProgress(sources.stream().map(s -> s.state).toList());
         if (sources.isEmpty()) {
             finish(); // the network is full — nothing written
         }
@@ -102,21 +126,25 @@ public final class NetworkInsertOperation implements NetworkOperation {
 
         for (int i = 0; i < sources.size(); i++) {
             final Source source = sources.get(i);
-            final boolean wasWaiting = source.state().waitingOnLatency();
+            if (!source.ready) {
+                waiting = true; // the disk is still in its write latency, parked on its own virtual thread
+                continue;
+            }
+            final boolean wasWaiting = source.state.waitingOnLatency();
             // The server absorbs writes at the slower of its orchestration share and its hardware.
-            final long planned = source.state().planTick(Math.min(shares[i], source.hardwareCap()));
+            final long planned = source.state.planTick(Math.min(shares[i], source.hardwareCap));
             if (wasWaiting && planned == 0L) {
                 waiting = true;
             }
             if (planned <= 0L) {
                 continue;
             }
-            final ServerStore store = storeOf(source.server());
+            final ServerStore store = storeOf(source.server);
             final long written = store == null ? 0L : store.insert(key, planned);
-            source.state().commit(written);
+            source.state.commit(written);
             if (written > 0L) {
                 writtenTotal += written;
-                writtenPerServer.merge(source.server(), written, Long::sum);
+                writtenPerServer.merge(source.server, written, Long::sum);
                 movedAny = true;
             }
         }
@@ -207,11 +235,11 @@ public final class NetworkInsertOperation implements NetworkOperation {
             if (subs.size() >= OperationRecord.MAX_SUBS) {
                 break;
             }
-            final byte state = source.state().isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
-                    : source.state().waitingOnLatency() ? OperationRecord.SubRow.SUB_READING
+            final byte state = source.state.isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
+                    : (!source.ready || source.state.waitingOnLatency()) ? OperationRecord.SubRow.SUB_READING
                     : OperationRecord.SubRow.SUB_STREAMING;
-            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server().asString()),
-                    source.state().total(), source.state().moved(), state));
+            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server.asString()),
+                    source.state.total(), source.state.moved(), state));
         }
         return subs;
     }

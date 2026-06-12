@@ -2284,7 +2284,7 @@ public final class NetworkGameTests {
                             .NetworkSelectOperation(helper.getLevel(), mainframe.networkUuid(),
                             StorageKey.of(Items.COBBLESTONE), 50, port(new ItemStackHandler(9)), "test",
                             OperationRecord.TYPE_SELECT, java.util.UUID.randomUUID(),
-                            mainframe.networkIndex(), null, 3);
+                            mainframe.networkIndex(), null, null, 3);
                     helper.assertTrue(contender.isWaiting(), "the contender starts WAITING");
                     for (int i = 0; i < 5; i++) {
                         contender.tick(1_000L); // retries past its 3-tick timeout
