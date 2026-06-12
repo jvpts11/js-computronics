@@ -11,14 +11,18 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 
 /**
- * The Operation dispatcher: runs CPU-bound Operation work on virtual threads while keeping every world mutation on the main (server) thread.
+ * The Operation dispatcher: runs CPU-bound Operation work on virtual threads while keeping every world mutation on the main (server) thread. A task does its computation on a virtual thread and uses its {@link OperationContext} to bounce world reads/writes back to the main thread and to wait on whole game ticks — so disk latency and throughput are paced deterministically by ticks, never by a wall clock. Multiple disks (one task per server) therefore process in parallel without ever touching the world off-thread.
  */
 public final class OperationDispatch implements AutoCloseable {
 
@@ -34,7 +38,11 @@ public final class OperationDispatch implements AutoCloseable {
     private final PriorityQueue<PendingOp> pending = new PriorityQueue<>(ORDER);
     private final ConcurrentLinkedQueue<Runnable> mainThreadActions = new ConcurrentLinkedQueue<>();
     private final Map<UUID, OperationStatus> statuses = new ConcurrentHashMap<>();
+    private final Set<CompletableFuture<?>> inFlight = ConcurrentHashMap.newKeySet();
+    private final Object tickMonitor = new Object();
 
+    private volatile long tickCount;
+    private volatile boolean closed;
     private long sequenceCounter;
     private int running;
     private long completed;
@@ -57,11 +65,18 @@ public final class OperationDispatch implements AutoCloseable {
         return id;
     }
 
+    /** The current server-tick count; advanced once per {@link #tick()}. */
+    public long tickCount() {
+        return tickCount;
+    }
+
     public void tick() {
+        // 1. Apply everything the virtual threads asked the main thread to do since the last tick.
         Runnable action;
         while ((action = mainThreadActions.poll()) != null) {
             action.run();
         }
+        // 2. Promote pending Operations onto virtual threads, up to the parallel-queue capacity.
         while (running < parallelQueues) {
             final PendingOp op = pending.poll();
             if (op == null) {
@@ -71,10 +86,15 @@ public final class OperationDispatch implements AutoCloseable {
             running++;
             dispatch(op);
         }
+        // 3. Advance the tick clock and wake any task waiting on ticks (disk latency / pacing).
+        synchronized (tickMonitor) {
+            tickCount++;
+            tickMonitor.notifyAll();
+        }
     }
 
     private void dispatch(final PendingOp op) {
-        final OperationContext context = mainThreadActions::add;
+        final OperationContext context = new DispatchContext();
         workers.execute(() -> {
             OperationResult result;
             try {
@@ -82,6 +102,8 @@ public final class OperationDispatch implements AutoCloseable {
                 if (result == null) {
                     result = OperationResult.failure("task returned a null result");
                 }
+            } catch (final OperationCancelledException cancelled) {
+                result = OperationResult.failure("cancelled");
             } catch (final Throwable throwable) {
                 result = OperationResult.failure(throwable.toString());
             }
@@ -91,7 +113,6 @@ public final class OperationDispatch implements AutoCloseable {
     }
 
     private void complete(final UUID id, final OperationResult result) {
-        // Only Success and Failure exist today; revisit when InProgress (SubOperations) is added.
         if (result instanceof OperationResult.Success) {
             statuses.put(id, OperationStatus.COMPLETED);
             completed++;
@@ -136,6 +157,88 @@ public final class OperationDispatch implements AutoCloseable {
 
     @Override
     public void close() {
-        workers.shutdown();
+        closed = true;
+        // Unblock every task waiting on the main thread or on a tick so no virtual thread hangs.
+        for (final CompletableFuture<?> future : inFlight) {
+            future.completeExceptionally(new OperationCancelledException());
+        }
+        synchronized (tickMonitor) {
+            tickMonitor.notifyAll();
+        }
+        workers.shutdownNow();
+    }
+
+    /** The per-task handle: marshals work to the main thread and waits on ticks, all virtual-thread-safe. */
+    private final class DispatchContext implements OperationContext {
+
+        @Override
+        public void onMainThread(final Runnable mainThreadAction) {
+            mainThreadActions.add(mainThreadAction);
+        }
+
+        @Override
+        public <T> T runOnMain(final Supplier<T> work) {
+            if (closed) {
+                throw new OperationCancelledException();
+            }
+            final CompletableFuture<T> future = new CompletableFuture<>();
+            inFlight.add(future);
+            // Close the race with close(): if a shutdown set closed after our first check but before
+            // this add became visible, close()'s drain may have missed this future — re-check now so
+            // we never join() on a future nobody will ever complete.
+            if (closed) {
+                inFlight.remove(future);
+                throw new OperationCancelledException();
+            }
+            mainThreadActions.add(() -> {
+                inFlight.remove(future);
+                try {
+                    future.complete(work.get());
+                } catch (final Throwable error) {
+                    future.completeExceptionally(error);
+                }
+            });
+            try {
+                return future.join();
+            } catch (final CompletionException joinError) {
+                if (joinError.getCause() instanceof OperationCancelledException cancelled) {
+                    throw cancelled;
+                }
+                throw new OperationCancelledException();
+            } finally {
+                inFlight.remove(future);
+            }
+        }
+
+        @Override
+        public void awaitTicks(final int ticks) {
+            if (ticks <= 0) {
+                return;
+            }
+            final long target = tickCount + ticks;
+            synchronized (tickMonitor) {
+                while (tickCount < target) {
+                    if (closed) {
+                        throw new OperationCancelledException();
+                    }
+                    try {
+                        tickMonitor.wait();
+                    } catch (final InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new OperationCancelledException();
+                    }
+                }
+            }
+        }
+
+        @Override
+        public long currentTick() {
+            return tickCount;
+        }
+
+        @Override
+        public boolean isActive() {
+            return !closed;
+        }
     }
 }

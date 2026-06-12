@@ -9,13 +9,41 @@ package dev.jsc.jscomputronics.common.operation;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.function.Supplier;
+
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SelfTestOperationTaskTest {
 
-    private static final OperationContext NO_OP = action -> {
-    };
+    /** Runs every marshaled action inline on the calling thread; for testing pure-CPU tasks without a dispatcher. */
+    private static final class ImmediateContext implements OperationContext {
+        @Override
+        public void onMainThread(final Runnable action) {
+            action.run();
+        }
+
+        @Override
+        public <T> T runOnMain(final Supplier<T> work) {
+            return work.get();
+        }
+
+        @Override
+        public void awaitTicks(final int ticks) {
+        }
+
+        @Override
+        public long currentTick() {
+            return 0L;
+        }
+
+        @Override
+        public boolean isActive() {
+            return true;
+        }
+    }
+
+    private static final OperationContext NO_OP = new ImmediateContext();
 
     @Test
     void run_succeeds() {

@@ -206,4 +206,82 @@ class OperationDispatchTest {
         dispatch = new OperationDispatch(3);
         assertEquals(3, dispatch.parallelQueues());
     }
+
+    @Test
+    void runOnMain_returnsValueComputedOnTickThread() {
+        dispatch = new OperationDispatch(1);
+        final Thread tickThread = Thread.currentThread();
+        final AtomicReference<Thread> computeThread = new AtomicReference<>();
+        final AtomicReference<Thread> taskThread = new AtomicReference<>();
+        final AtomicInteger value = new AtomicInteger(-1);
+
+        final UUID id = dispatch.submit(context -> {
+            taskThread.set(Thread.currentThread());
+            final int result = context.runOnMain(() -> {
+                computeThread.set(Thread.currentThread());
+                return 7 * 6;
+            });
+            value.set(result);
+            return OperationResult.success();
+        }, OperationPriority.MEDIUM);
+
+        tickUntilTerminal(id);
+
+        assertEquals(42, value.get(), "runOnMain must return the value computed on the tick thread");
+        assertEquals(tickThread, computeThread.get(), "the supplier must run on the tick (main) thread");
+        assertTrue(taskThread.get().isVirtual(), "the task itself must run on a virtual thread");
+    }
+
+    @Test
+    void awaitTicks_completesOnlyAfterEnoughTicksElapse() {
+        dispatch = new OperationDispatch(1);
+        final UUID id = dispatch.submit(context -> {
+            context.awaitTicks(3);
+            return OperationResult.success();
+        }, OperationPriority.MEDIUM);
+
+        // Tick 1 promotes the task; it then blocks until three ticks have elapsed from that point.
+        for (int i = 0; i < 3; i++) {
+            dispatch.tick();
+            sleep(5);
+            assertFalse(dispatch.statusOf(id).isTerminal(),
+                    "task must not finish before the awaited ticks elapse (tick " + i + ")");
+        }
+        tickUntilTerminal(id);
+        assertEquals(OperationStatus.COMPLETED, dispatch.statusOf(id));
+    }
+
+    @Test
+    void close_unblocksTaskWaitingOnTicks() {
+        dispatch = new OperationDispatch(1);
+        final CountDownLatch started = new CountDownLatch(1);
+        final AtomicReference<Boolean> cancelled = new AtomicReference<>(Boolean.FALSE);
+
+        dispatch.submit(context -> {
+            started.countDown();
+            try {
+                context.awaitTicks(1_000_000);
+            } catch (final OperationCancelledException expected) {
+                cancelled.set(Boolean.TRUE);
+                throw expected;
+            }
+            return OperationResult.success();
+        }, OperationPriority.MEDIUM);
+
+        dispatch.tick(); // promote and let it enter the long wait
+        try {
+            started.await();
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        sleep(20);
+
+        dispatch.close();
+        dispatch = null; // tearDown must not double-close
+
+        for (int i = 0; i < 200 && !cancelled.get(); i++) {
+            sleep(5);
+        }
+        assertTrue(cancelled.get(), "closing the dispatcher must unblock a task waiting on ticks");
+    }
 }
