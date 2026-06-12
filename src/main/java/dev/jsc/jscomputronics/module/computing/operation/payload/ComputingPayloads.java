@@ -124,6 +124,41 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRequestRomSnapshot);
         registrar.playToClient(RomSnapshotPayload.TYPE, RomSnapshotPayload.STREAM_CODEC,
                 ComputingPayloads::handleRomSnapshot);
+        registrar.playToServer(RunCommandPayload.TYPE, RunCommandPayload.STREAM_CODEC,
+                ComputingPayloads::handleRunCommand);
+        registrar.playToClient(CommandOutputPayload.TYPE, CommandOutputPayload.STREAM_CODEC,
+                ComputingPayloads::handleCommandOutput);
+    }
+
+    // Command Prompt — a typed line runs through the shell against the open host and the styled
+    // output is streamed back. The CLI is an alternative interface over the same network operations.
+
+    private static final int CLI_WIDTH = 50;
+
+    private static void handleRunCommand(final RunCommandPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu menu)
+                    || !menu.hostPos().equals(payload.hostPos())
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host)) {
+                return;
+            }
+            final var computer = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
+            final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(CLI_WIDTH);
+            final var response = shell.run(payload.line(), computer);
+            final List<CommandOutputPayload.WireLine> wire = new ArrayList<>(response.lines().size());
+            for (final var cliLine : response.lines()) {
+                wire.add(new CommandOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
+            }
+            PacketDistributor.sendToPlayer(player, new CommandOutputPayload(response.clearScreen(), wire));
+        });
+    }
+
+    private static void handleCommandOutput(final CommandOutputPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.CommandPromptScreen.accept(payload));
     }
 
     // Recipe ROM tab on the Pattern Reader — the client lists the adjacent Crafting Computer's ROM

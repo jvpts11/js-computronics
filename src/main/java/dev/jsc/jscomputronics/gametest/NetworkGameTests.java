@@ -882,6 +882,58 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void commandPrompt_runsAgainstTheNetwork(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
+        placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer,
+                            helper.getLevel());
+                    final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(50);
+
+                    helper.assertTrue(cliContains(shell.run("whoami", cli), "Personal Computer"),
+                            "whoami should report the computer kind");
+                    helper.assertTrue(cliContains(shell.run("status", cli), "ONLINE"),
+                            "status should report the running computer as online");
+                    helper.assertTrue(cliContains(shell.run("query", cli), "cobblestone"),
+                            "query should list the network's cobblestone");
+                    helper.assertTrue(cliContains(shell.run("query diamond", cli), "nothing matches"),
+                            "query with a non-matching filter should say so");
+                    helper.assertTrue(cliContains(shell.run("select 50 cobblestone", cli), "SELECT queued"),
+                            "select should queue an operation through the network");
+                    helper.assertTrue(cliContains(shell.run("select 50 not_a_real_item", cli), "unknown item"),
+                            "select of an unknown item should be reported, not crash");
+                })
+                .thenSucceed();
+    }
+
+    private static boolean cliContains(
+            final dev.jsc.jscomputronics.module.computing.program.cli.CliShell.Response response,
+            final String needle) {
+        final String lower = needle.toLowerCase(java.util.Locale.ROOT);
+        return response.lines().stream()
+                .anyMatch(line -> line.text().toLowerCase(java.util.Locale.ROOT).contains(lower));
+    }
+
+    @GameTest(template = ARENA)
     public static void terminalSelect_landsInPcLocalStorage(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);

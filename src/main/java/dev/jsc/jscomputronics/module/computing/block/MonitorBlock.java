@@ -86,6 +86,10 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                 // Explain WHY the screen is dark instead of a generic "not linked", so a missing GPU
                 // (the most common cause) or a full host is obvious rather than silent.
                 serverPlayer.displayClientMessage(diagnoseUnlinked(level, pos), true);
+            } else if (serverPlayer.isShiftKeyDown()) {
+                // Sneak-use opens the Command Prompt: a full CLI over this same computer, for players
+                // who would rather drive it like a real terminal than through the graphical tabs.
+                openCommandPrompt(serverPlayer, level, pos, owner);
             } else {
                 openTerminal(serverPlayer, level, pos, owner);
             }
@@ -107,6 +111,20 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                         buf.writeBlockPos(monitorPos);
                         buf.writeBlockPos(owner);
                         buf.writeVarInt(initialTab);
+                    });
+        }
+    }
+
+    private static void openCommandPrompt(final ServerPlayer player, final Level level,
+                                          final BlockPos monitorPos, final BlockPos owner) {
+        if (level.getBlockEntity(owner) instanceof ComputerTerminalHost) {
+            final Component title = level.getBlockState(owner).getBlock().getName();
+            player.openMenu(new SimpleMenuProvider(
+                    (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu(
+                            id, inv, monitorPos, owner), title),
+                    buf -> {
+                        buf.writeBlockPos(monitorPos);
+                        buf.writeBlockPos(owner);
                     });
         }
     }

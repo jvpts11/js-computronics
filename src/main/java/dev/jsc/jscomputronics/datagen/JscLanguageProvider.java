@@ -42,6 +42,8 @@ public class JscLanguageProvider extends LanguageProvider {
         add("block.jsc.monitor.no_computer", "No computer found in range over a Peripheral Cable");
         add("block.jsc.monitor.no_gpu", "The computer has no GPU - install a GPU to host monitors (4 per GPU)");
         add("block.jsc.monitor.at_capacity", "The computer's monitor outputs are all in use");
+        add("block.jsc.monitor.hint_command_prompt", "Sneak-use to open the Command Prompt");
+        add("program.jsc.command_prompt", "Command Prompt");
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");

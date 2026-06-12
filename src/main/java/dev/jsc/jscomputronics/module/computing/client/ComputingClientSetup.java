@@ -32,6 +32,7 @@ public final class ComputingClientSetup {
         event.register(ComputingModule.CRAFTING_COMPUTER_MENU.get(), CraftingComputerScreen::new);
         event.register(ComputingModule.PATTERN_ENCODER_MENU.get(), PatternEncoderScreen::new);
         event.register(ComputingModule.PATTERN_READER_MENU.get(), PatternReaderScreen::new);
+        event.register(ComputingModule.COMMAND_PROMPT_MENU.get(), CommandPromptScreen::new);
         event.register(ComputingModule.SUPERCOMPUTER_CONSOLE_MENU.get(), SupercomputerConsoleScreen::new);
         event.register(ComputingModule.SUPERCOMPUTER_NODE_MENU.get(), SupercomputerNodeScreen::new);
         event.register(ComputingModule.SERVER_RACK_MENU.get(), ServerRackScreen::new);

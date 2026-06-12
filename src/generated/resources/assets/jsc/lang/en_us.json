@@ -10,6 +10,7 @@
   "block.jsc.mainframe": "Mainframe",
   "block.jsc.monitor": "Monitor",
   "block.jsc.monitor.at_capacity": "The computer's monitor outputs are all in use",
+  "block.jsc.monitor.hint_command_prompt": "Sneak-use to open the Command Prompt",
   "block.jsc.monitor.no_computer": "No computer found in range over a Peripheral Cable",
   "block.jsc.monitor.no_gpu": "The computer has no GPU - install a GPU to host monitors (4 per GPU)",
   "block.jsc.monitor.unlinked": "No computer linked",
@@ -70,5 +71,6 @@
   "itemGroup.jsc.computing": "J's Computronics: Computing",
   "itemGroup.jsc.industrial": "J's Computronics: Industrial",
   "menu.jsc.network_overview": "Network Overview",
-  "menu.jsc.server_assembly": "Server Assembly"
+  "menu.jsc.server_assembly": "Server Assembly",
+  "program.jsc.command_prompt": "Command Prompt"
 }
