@@ -14,7 +14,7 @@ import java.util.Objects;
  */
 public record DiskSpec(StorageTier tier, long capacityItems, int tdpWatts) {
 
-    public static final long MB_PER_ITEM = 4L;
+    public static final long MB_PER_ITEM = 256L;
 
     public DiskSpec {
         Objects.requireNonNull(tier, "tier must not be null");

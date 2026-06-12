@@ -14,15 +14,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DiskSizeTest {
 
     @Test
-    void capacityItems_oneTerabyteIs262144Items() {
-        // 1 TB = 1,048,576 MB / 4 MB per item = 262,144 items.
-        assertEquals(262_144L, DiskSize.TB_1.capacityItems());
+    void capacityItems_oneTerabyteIs4096Items() {
+        // 1 TB = 1,048,576 MB / 256 MB per item = 4,096 items.
+        assertEquals(4_096L, DiskSize.TB_1.capacityItems());
     }
 
     @Test
-    void capacityItems_smallestIs50Items() {
-        // 200 MB / 4 MB = 50 items.
-        assertEquals(50L, DiskSize.MB_200.capacityItems());
+    void capacityItems_smallestIs2000Items() {
+        // 500 GB = 512,000 MB / 256 MB = 2,000 items.
+        assertEquals(2_000L, DiskSize.GB_500.capacityItems());
     }
 
     @Test
@@ -34,7 +34,7 @@ class DiskSizeTest {
 
     @Test
     void capacityMb_matchesDiskSpec() {
-        // A disk built from a size yields capacityMb = items × 4, regardless of tier.
+        // A disk built from a size yields capacityMb = items × 256, regardless of tier.
         final DiskSpec hdd = new DiskSpec(StorageTier.HDD, DiskSize.TB_1.capacityItems(), 6);
         final DiskSpec nvme = new DiskSpec(StorageTier.NVME, DiskSize.TB_1.capacityItems(), 5);
         assertEquals(hdd.capacityMb(), nvme.capacityMb());

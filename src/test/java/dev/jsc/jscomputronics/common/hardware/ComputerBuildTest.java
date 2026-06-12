@@ -173,11 +173,11 @@ class ComputerBuildTest {
     }
 
     @Test
-    void storageMb_isItemsTimesFour() {
+    void storageMb_isItemsTimes256() {
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650),
                 List.of(disk(StorageTier.NVME, 1_000, 4)));
-        assertEquals(4_000L, build.storageMb());
+        assertEquals(256_000L, build.storageMb());
     }
 
     @Test

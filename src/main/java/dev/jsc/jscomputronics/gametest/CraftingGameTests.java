@@ -352,19 +352,19 @@ public final class CraftingGameTests {
                 dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    net.seed(helper, Items.OAK_LOG, 80000);
+                    net.seed(helper, Items.OAK_LOG, 8000);
                     net.cc.loadPattern(planksPattern(4));
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // No cluster yet: two long crafts — the second must wait its turn.
                     first.set(net.mainframe.submitNetworkCraft(
-                            storageKey(Items.OAK_PLANKS), 160000, false, "test"));
+                            storageKey(Items.OAK_PLANKS), 12000, false, "test"));
                     second.set(net.mainframe.submitNetworkCraft(
-                            storageKey(Items.OAK_PLANKS), 160000, false, "test"));
+                            storageKey(Items.OAK_PLANKS), 12000, false, "test"));
                     helper.assertTrue(first.get() != null && second.get() != null,
                             "both CRAFTs must be accepted");
                 })
-                .thenExecuteAfter(6, () -> {
+                .thenExecuteAfter(2, () -> {
                     helper.assertFalse(first.get().isWaiting(),
                             "the first craft claims the computer");
                     helper.assertTrue(second.get().isWaiting(),
@@ -381,9 +381,9 @@ public final class CraftingGameTests {
                     // Smaller than phase one: the first run consumed some logs before being
                     // abandoned, and BOTH locks must still be fully coverable at once.
                     first.set(net.mainframe.submitNetworkCraft(
-                            storageKey(Items.OAK_PLANKS), 100000, false, "test"));
+                            storageKey(Items.OAK_PLANKS), 8000, false, "test"));
                     second.set(net.mainframe.submitNetworkCraft(
-                            storageKey(Items.OAK_PLANKS), 100000, false, "test"));
+                            storageKey(Items.OAK_PLANKS), 8000, false, "test"));
                     helper.assertTrue(first.get() != null && second.get() != null,
                             "both CRAFTs must be accepted with the Supercomputer");
                 })

@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class DiskSpecTest {
 
     @Test
-    void capacityMb_isItemsTimesFour() {
-        assertEquals(4_000L, new DiskSpec(StorageTier.SSD, 1_000, 3).capacityMb());
+    void capacityMb_isItemsTimes256() {
+        assertEquals(256_000L, new DiskSpec(StorageTier.SSD, 1_000, 3).capacityMb());
     }
 
     @Test

@@ -757,13 +757,34 @@ public final class NetworkGameTests {
                     final NetworkUuid net = mainframe.networkUuid();
                     helper.assertTrue(net != null, "mainframe owns a network");
                     final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), net);
-                    final int stored = ns.insert(new ItemStack(Items.COBBLESTONE, 572));
-                    helper.assertTrue(stored == 50,
-                            "INSERT must cap at the 50-item disk capacity; stored " + stored);
-                    helper.assertTrue(ns.count(Items.COBBLESTONE) == 50,
-                            "network should hold exactly 50; got " + ns.count(Items.COBBLESTONE));
+                    final int stored = ns.insert(new ItemStack(Items.COBBLESTONE, 2_500));
+                    helper.assertTrue(stored == 2_000,
+                            "INSERT must cap at the 2,000-item disk capacity; stored " + stored);
+                    helper.assertTrue(ns.count(Items.COBBLESTONE) == 2_000,
+                            "network should hold exactly 2,000; got " + ns.count(Items.COBBLESTONE));
                 })
                 .thenSucceed();
+    }
+
+    private static ItemStack bigDiskServer() {
+        final net.minecraft.core.NonNullList<ItemStack> hw = net.minecraft.core.NonNullList.withSize(
+                dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.SLOTS, ItemStack.EMPTY);
+        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.MOBO,
+                new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
+        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.CPU_START,
+                new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
+        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.RAM_START,
+                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
+        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.PSU,
+                new ItemStack(ComputingModule.PSU_650G.get()));
+        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
+        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START + 1,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
+        final ItemStack server = new ItemStack(ComputingModule.SERVER.get());
+        server.set(ComputingModule.SERVER_HARDWARE.get(),
+                net.minecraft.world.item.component.ItemContainerContents.fromItems(hw));
+        return server;
     }
 
     private static ItemStack smallDiskServer() {
@@ -778,7 +799,7 @@ public final class NetworkGameTests {
         hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.PSU,
                 new ItemStack(ComputingModule.PSU_650G.get()));
         hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
-                new ItemStack(ComputingModule.disk(StorageTier.SSD, DiskSize.MB_200)));
+                new ItemStack(ComputingModule.disk(StorageTier.SSD, DiskSize.GB_500)));
         final ItemStack server = new ItemStack(ComputingModule.SERVER.get());
         server.set(ComputingModule.SERVER_HARDWARE.get(),
                 net.minecraft.world.item.component.ItemContainerContents.fromItems(hw));
@@ -926,9 +947,9 @@ public final class NetworkGameTests {
         helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
         helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
         final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
-        // A 200 MB disk holds only 50 items — far less than the slot grid (18 x 64) could.
+        // A 500 GB disk holds 2,000 items — the SELECT below asks for more than that.
         computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
-                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.MB_200)));
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.GB_500)));
         helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                         Direction.SOUTH)); // rear faces the cable to the north
@@ -939,12 +960,12 @@ public final class NetworkGameTests {
         rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
-                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 2_500);
                     helper.assertTrue(computer.networkUuid() != null, "PC must be on the network");
                 })
                 .thenExecuteAfter(2, () -> {
-                    // Ask for far more than the 50-item disk can hold.
-                    final var op = mainframe.submitNetworkSelect(Items.COBBLESTONE, 200,
+                    // Ask for more than the 2,000-item disk can hold.
+                    final var op = mainframe.submitNetworkSelect(Items.COBBLESTONE, 2_500,
                             computer.localStorage(), "storage", null);
                     helper.assertTrue(op != null, "Mainframe should dispatch the SELECT");
                 })
@@ -952,9 +973,9 @@ public final class NetworkGameTests {
                     final long inStorage = computer.localStore().count(StorageKey.of(Items.COBBLESTONE));
                     final long inNet = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
                             .count(Items.COBBLESTONE);
-                    helper.assertTrue(inStorage == 50,
-                            "local storage must cap at the 50-item disk capacity; got " + inStorage);
-                    helper.assertTrue(inStorage + inNet == 200,
+                    helper.assertTrue(inStorage == 2_000,
+                            "local storage must cap at the 2,000-item disk capacity; got " + inStorage);
+                    helper.assertTrue(inStorage + inNet == 2_500,
                             "the rest must stay in the network, nothing lost; storage=" + inStorage + " net=" + inNet);
                 })
                 .thenSucceed();
@@ -1139,11 +1160,11 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        rackBe.getServers().setStackInSlot(0, bigDiskServer());
 
         // A large INSERT: far beyond one tick of the server's RAM-bounded write rate, so it is
         // certainly still in flight when power is cut a few ticks in.
-        final long demand = 200_000L;
+        final long demand = 30_000L;
         final java.util.concurrent.atomic.AtomicReference<
                 dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation> opBox =
                 new java.util.concurrent.atomic.AtomicReference<>();
@@ -1193,7 +1214,7 @@ public final class NetworkGameTests {
         rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
 
         // A large pull into a roomy sink, so it spans many ticks (it cannot finish before we cut it).
-        final long seeded = 60_000L;
+        final long seeded = 8_000L;
         final ItemStackHandler dest = new ItemStackHandler(1000);
         final java.util.concurrent.atomic.AtomicBoolean gone = new java.util.concurrent.atomic.AtomicBoolean(false);
         final java.util.concurrent.atomic.AtomicReference<
