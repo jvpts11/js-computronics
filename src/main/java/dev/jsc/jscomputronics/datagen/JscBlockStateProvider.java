@@ -80,11 +80,16 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/personal_router_top"));
         horizontalBlock(ComputingModule.PERSONAL_ROUTER.get(), personalRouterModel);
 
-        final ModelFile serverRouterModel = models().orientable(
+        // The back face is the dedicated Mainframe uplink, so it gets its own port texture.
+        final ModelFile serverRouterModel = models().cube(
                 "server_router",
-                modLoc("block/server_router_side"),
+                modLoc("block/server_router_top"),
+                modLoc("block/server_router_top"),
                 modLoc("block/server_router_front"),
-                modLoc("block/server_router_top"));
+                modLoc("block/server_router_back"),
+                modLoc("block/server_router_side"),
+                modLoc("block/server_router_side"))
+                .texture("particle", modLoc("block/server_router_side"));
         horizontalBlock(ComputingModule.SERVER_ROUTER.get(), serverRouterModel);
 
         // Datacenter Station: a hand-written element model (pedestal + tilted console

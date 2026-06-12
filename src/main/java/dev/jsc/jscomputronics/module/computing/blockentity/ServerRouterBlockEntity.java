@@ -158,9 +158,18 @@ public class ServerRouterBlockEntity extends BlockEntity {
         final Set<Long> blocked = Set.of(worldPosition.asLong());
         final List<DatacenterSection> found = new ArrayList<>();
         final Set<Set<Long>> seenRackSets = new HashSet<>();
-        Direction detectedInput = null;
+        // The back face is the dedicated uplink to the Mainframe; every other face is a
+        // potential datacenter section.
+        final Direction uplink = getBlockState().getBlock()
+                instanceof dev.jsc.jscomputronics.module.computing.block.ServerRouterBlock
+                ? getBlockState().getValue(
+                        net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING).getOpposite()
+                : null;
 
         for (final Direction face : Direction.values()) {
+            if (face == uplink) {
+                continue; // the uplink side is never a datacenter section
+            }
             final long neighbor = worldPosition.relative(face).asLong();
             if (!index.contains(neighbor)) {
                 continue; // no cable on this face
@@ -171,10 +180,7 @@ public class ServerRouterBlockEntity extends BlockEntity {
             }
             final BranchScan scan = scanBranch(level, branchCables);
             if (scan.hasMainframe) {
-                if (detectedInput == null) {
-                    detectedInput = face; // first branch reaching the Mainframe is the input
-                }
-                continue; // the input side is not a datacenter section
+                continue; // a section branch must not loop back to the Mainframe — miswired, ignore
             }
             if (scan.rackControllers.isEmpty()) {
                 continue; // an empty branch carries no datacenter
@@ -210,7 +216,7 @@ public class ServerRouterBlockEntity extends BlockEntity {
 
         this.sections = List.copyOf(found);
         this.unmanagedRacks = Set.copyOf(unmanaged);
-        this.inputFace = detectedInput;
+        this.inputFace = uplink;
         this.overCapacity = !unmanaged.isEmpty();
         for (final DatacenterSection section : found) {
             loadBalanceModes.putIfAbsent(section.face(), LoadBalanceMode.ROUND_ROBIN);

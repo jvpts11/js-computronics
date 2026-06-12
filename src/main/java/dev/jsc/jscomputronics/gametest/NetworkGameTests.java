@@ -1788,7 +1788,9 @@ public final class NetworkGameTests {
         final BlockPos rack = new BlockPos(5, 2, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbwA, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
         helper.setBlock(hbwB, ComputingModule.HBW_CABLE.get());
         helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
@@ -1811,7 +1813,7 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
-    public static void serverRouter_groupsRacksIntoSectionsAndDetectsInput(final GameTestHelper helper) {
+    public static void serverRouter_groupsRacksIntoSections(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbwIn = new BlockPos(2, 2, 2);
         final BlockPos router = new BlockPos(3, 2, 2);
@@ -1821,7 +1823,9 @@ public final class NetworkGameTests {
         final BlockPos rackSouth = new BlockPos(3, 2, 4);
         placeRunningMainframe(helper, m);
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
         helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
@@ -1841,7 +1845,7 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE + 4, routerBe::recomputeNow)
                 .thenExecute(() -> {
                     helper.assertTrue(routerBe.inputFace() == Direction.WEST,
-                            "the face toward the Mainframe is the input; got " + routerBe.inputFace());
+                            "the back face is the dedicated uplink; got " + routerBe.inputFace());
                     final java.util.List<DatacenterSection> sections = routerBe.sections();
                     helper.assertTrue(sections.size() == 2,
                             "two output faces with racks form two sections; got " + sections.size());
@@ -1869,7 +1873,9 @@ public final class NetworkGameTests {
         final BlockPos hbwB = new BlockPos(4, 2, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbwA, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
         helper.setBlock(hbwB, ComputingModule.HBW_CABLE.get());
         final NetworkUuid[] net = new NetworkUuid[1];
         helper.startSequence()
@@ -1930,7 +1936,9 @@ public final class NetworkGameTests {
         final BlockPos station = new BlockPos(2, 3, 2); // on top of the input cable, on the network
         placeRunningMainframe(helper, m);
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
         helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
@@ -1964,7 +1972,9 @@ public final class NetworkGameTests {
         final BlockPos station = new BlockPos(4, 3, 2); // touching the EAST branch cable
         placeRunningMainframe(helper, m);
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
         helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
@@ -2001,7 +2011,9 @@ public final class NetworkGameTests {
         final BlockPos station = new BlockPos(2, 3, 2);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
         helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
         helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
         helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,

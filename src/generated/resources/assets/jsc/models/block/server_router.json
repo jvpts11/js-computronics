@@ -1,8 +1,12 @@
 {
-  "parent": "minecraft:block/orientable",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "front": "jsc:block/server_router_front",
-    "side": "jsc:block/server_router_side",
-    "top": "jsc:block/server_router_top"
+    "down": "jsc:block/server_router_top",
+    "east": "jsc:block/server_router_side",
+    "north": "jsc:block/server_router_front",
+    "particle": "jsc:block/server_router_side",
+    "south": "jsc:block/server_router_back",
+    "up": "jsc:block/server_router_top",
+    "west": "jsc:block/server_router_side"
   }
 }
