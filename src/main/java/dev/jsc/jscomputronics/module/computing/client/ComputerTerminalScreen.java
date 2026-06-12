@@ -281,9 +281,20 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                         ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS};
     }
 
+    // The rail now scrolls instead of shrinking, so every entry keeps its full height and its name.
+    private int railScroll;
+
     private int tabH() {
+        return TAB_H;
+    }
+
+    private int railVisible() {
         final int railH = menu.invY() - TAB_Y0 - 2;
-        return Math.min(TAB_H, railH / railTabs().length);
+        return Math.max(1, railH / TAB_H);
+    }
+
+    private int maxRailScroll() {
+        return Math.max(0, railTabs().length - railVisible());
     }
 
     private int contentW() {
@@ -300,24 +311,33 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.fill(x - 1, y - 1, x + imageWidth + 1, y + imageHeight + 1, OUTER);
         g.fill(x, y, x + imageWidth, y + imageHeight, SCREEN);
 
-        // Tab rail — its height tracks the inventory (taller on the Mainframe's 6-tab terminal).
+        // Tab rail — a fixed-height, scrolling list so every entry keeps its name even when there are
+        // more tabs (plus the Command Prompt) than fit at once.
         final int railH = menu.invY() - TAB_Y0 - 2;
         g.fill(x + RAIL_X, y + TAB_Y0, x + RAIL_X + RAIL_W, y + TAB_Y0 + railH, RAIL);
         g.fill(x + RAIL_X + RAIL_W, y + TAB_Y0, x + RAIL_X + RAIL_W + 1, y + TAB_Y0 + railH, LINE);
         final int[] rail = railTabs();
-        final int tabH = tabH();
-        for (int i = 0; i < rail.length; i++) {
+        railScroll = Math.max(0, Math.min(railScroll, maxRailScroll()));
+        final int visible = railVisible();
+        for (int row = 0; row < visible && railScroll + row < rail.length; row++) {
+            final int i = railScroll + row;
             final int tab = rail[i];
             final int tx = x + RAIL_X;
-            final int ty = y + TAB_Y0 + i * tabH;
+            final int ty = y + TAB_Y0 + row * TAB_H;
             final boolean on = tab == menu.activeTab();
             if (on) {
-                g.fill(tx, ty, tx + RAIL_W, ty + tabH, TAB_ON);
-                g.fill(tx, ty, tx + 2, ty + tabH, ACCENT);
+                g.fill(tx, ty, tx + RAIL_W, ty + TAB_H, TAB_ON);
+                g.fill(tx, ty, tx + 2, ty + TAB_H, ACCENT);
             }
-            // On the compressed 7-tab rail the icon centers alone; the name moves to its tooltip.
-            final int iconY = tabH >= TAB_H ? ty + 3 : ty + (tabH - 16) / 2 + 1;
-            icon(g, tab, tx + (RAIL_W - 16) / 2, iconY, on ? ACCENT : DIM);
+            icon(g, tab, tx + (RAIL_W - 16) / 2, ty + 3, on ? ACCENT : DIM);
+        }
+        // Scroll hints: a small up/down chevron when there is more rail above or below.
+        if (railScroll > 0) {
+            g.fill(x + RAIL_X + RAIL_W / 2 - 2, y + TAB_Y0 + 1, x + RAIL_X + RAIL_W / 2 + 2, y + TAB_Y0 + 2, ACCENT);
+        }
+        if (railScroll < maxRailScroll()) {
+            final int by = y + TAB_Y0 + railH - 2;
+            g.fill(x + RAIL_X + RAIL_W / 2 - 2, by, x + RAIL_X + RAIL_W / 2 + 2, by + 1, ACCENT);
         }
 
         // Content header bar.
@@ -412,15 +432,14 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final int cy = 6;
         final int cw = contentW();
 
-        // Tab names (omitted on the compressed 7-tab rail, where the icon stands alone).
+        // Tab names under each icon, for the scrolling window of rail entries.
         final int[] rail = railTabs();
-        final int tabH = tabH();
-        if (tabH >= TAB_H) {
-            for (int i = 0; i < rail.length; i++) {
-                final int ty = TAB_Y0 + i * tabH;
-                g.drawCenteredString(font, TAB_NAMES[rail[i]], RAIL_X + RAIL_W / 2, ty + 19,
-                        rail[i] == menu.activeTab() ? ACCENT : DIM);
-            }
+        final int visible = railVisible();
+        for (int row = 0; row < visible && railScroll + row < rail.length; row++) {
+            final int i = railScroll + row;
+            final int ty = TAB_Y0 + row * TAB_H;
+            g.drawCenteredString(font, TAB_NAMES[rail[i]], RAIL_X + RAIL_W / 2, ty + 19,
+                    rail[i] == menu.activeTab() ? ACCENT : DIM);
         }
 
         // Header: computer name + status pill.
@@ -1697,12 +1716,12 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         }
         if (button == 0) {
             final int[] rail = railTabs();
-            final int tabH = tabH();
-            for (int i = 0; i < rail.length; i++) {
-                final int tab = rail[i];
-                final int tx = leftPos + RAIL_X;
-                final int ty = topPos + TAB_Y0 + i * tabH;
-                if (mouseX >= tx && mouseX < tx + RAIL_W && mouseY >= ty && mouseY < ty + tabH) {
+            final int tx = leftPos + RAIL_X;
+            final int visible = railVisible();
+            for (int row = 0; row < visible && railScroll + row < rail.length; row++) {
+                final int tab = rail[railScroll + row];
+                final int ty = topPos + TAB_Y0 + row * TAB_H;
+                if (mouseX >= tx && mouseX < tx + RAIL_W && mouseY >= ty && mouseY < ty + TAB_H) {
                     if (tab == ComputerTerminalMenu.TAB_CONSOLE) {
                         // Launch the Command Prompt for this computer instead of switching content.
                         PacketDistributor.sendToServer(new dev.jsc.jscomputronics.module.computing.operation.payload
@@ -2297,6 +2316,11 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     public boolean mouseScrolled(final double mx, final double my, final double dx, final double dy) {
+        // Scrolling over the tab rail moves the rail when it holds more entries than fit.
+        if (dy != 0 && mx >= leftPos + RAIL_X && mx < leftPos + RAIL_X + RAIL_W && maxRailScroll() > 0) {
+            railScroll = Math.max(0, Math.min(maxRailScroll(), railScroll - (int) Math.signum(dy)));
+            return true;
+        }
         if (dropOpen && dy != 0) {
             if (dropScope == TerminalDropPayload.SCOPE_TYPES) {
                 dropTypeScrollRow = Math.max(0, dropTypeScrollRow - (int) Math.signum(dy));

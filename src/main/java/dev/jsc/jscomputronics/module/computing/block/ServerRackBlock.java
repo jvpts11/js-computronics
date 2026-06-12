@@ -72,6 +72,13 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    public boolean connectsOnFace(final BlockState state, final Direction face) {
+        // A Server Rack takes its data cable on the rear only, matching where the rack actually reads
+        // the network (the back of its lower-rear block), so the cable never appears to attach elsewhere.
+        return face == state.getValue(FACING).getOpposite();
+    }
+
+    @Override
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();

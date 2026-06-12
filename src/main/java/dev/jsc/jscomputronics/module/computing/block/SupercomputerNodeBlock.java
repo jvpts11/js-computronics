@@ -71,6 +71,12 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    public boolean connectsOnFace(final BlockState state, final Direction face) {
+        // A Supercomputer node takes its HPC cable on the rear only, like the other computers.
+        return face == state.getValue(FACING).getOpposite();
+    }
+
+    @Override
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
