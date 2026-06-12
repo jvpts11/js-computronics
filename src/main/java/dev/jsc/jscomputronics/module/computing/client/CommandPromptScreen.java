@@ -9,6 +9,8 @@ package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.CommandOutputPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.ConsoleInitPayload;
+import dev.jsc.jscomputronics.module.computing.operation.payload.RequestConsoleInitPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RunCommandPayload;
 import dev.jsc.jscomputronics.module.computing.program.cli.CliStyle;
 import net.minecraft.client.Minecraft;
@@ -22,7 +24,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * The Command Prompt: a full CLI over the computer the Monitor is bound to. A typed line is echoed, sent to the server to run through the shell, and the styled result is appended to the scrollback. Up/Down walk the input history; the mouse wheel scrolls back through output. The same OS skin as the rest of the computing GUIs, square corners and all.
@@ -36,8 +41,12 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
 
     private final Deque<Line> scrollback = new ArrayDeque<>();
     private final List<String> history = new ArrayList<>();
+    private final List<String> commandNames = new ArrayList<>();
+    private final Map<String, String> commandUsage = new LinkedHashMap<>();
     private int historyIndex = -1;
     private int scrollOffset;
+    private int completionCycle;
+    private boolean programmaticEdit;
 
     private EditBox input;
 
@@ -58,13 +67,21 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
         input.setMaxLength(RunCommandPayload.MAX_LEN);
         input.setTextColor(JscOsTheme.TEXT);
         input.setFocused(true);
+        // A real edit (typing/backspace) restarts Tab cycling; our own programmatic setValue does not.
+        input.setResponder(s -> {
+            if (!programmaticEdit) {
+                completionCycle = 0;
+            }
+        });
         setInitialFocus(input);
         addRenderableWidget(input);
         if (scrollback.isEmpty()) {
             push("J's Computronics Shell v1.0", CliStyle.ACCENT);
-            push("type 'help' for commands", CliStyle.DIM);
+            push("type 'help' for commands, TAB to complete", CliStyle.DIM);
             push("", CliStyle.PLAIN);
         }
+        // Ask the server for this computer's saved history and the command list (for completion).
+        PacketDistributor.sendToServer(new RequestConsoleInitPayload(menu.hostPos()));
     }
 
     // --- output ----------------------------------------------------------------------------------
@@ -73,6 +90,25 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
     public static void accept(final CommandOutputPayload payload) {
         if (Minecraft.getInstance().screen instanceof CommandPromptScreen screen) {
             screen.apply(payload);
+        }
+    }
+
+    /** Seeds the open Command Prompt with the computer's saved history and the command list. */
+    public static void acceptInit(final ConsoleInitPayload payload) {
+        if (Minecraft.getInstance().screen instanceof CommandPromptScreen screen) {
+            screen.applyInit(payload);
+        }
+    }
+
+    private void applyInit(final ConsoleInitPayload payload) {
+        history.clear();
+        history.addAll(payload.history());
+        historyIndex = -1;
+        commandNames.clear();
+        commandUsage.clear();
+        for (final ConsoleInitPayload.WireCommand command : payload.commands()) {
+            commandNames.add(command.name());
+            commandUsage.put(command.name(), command.usage());
         }
     }
 
@@ -153,6 +189,15 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
         // Prompt glyph before the input box.
         JscOsTheme.text(g, font, "jsc>", 10, imageHeight - 18, JscOsTheme.ACCENT);
 
+        // Usage hint: once the verb is recognised, show how it is used, dimmed on the right.
+        final String typed = input == null ? "" : input.getValue().trim();
+        final int space = typed.indexOf(' ');
+        final String verb = (space < 0 ? typed : typed.substring(0, space)).toLowerCase(Locale.ROOT);
+        final String usage = commandUsage.get(verb);
+        if (usage != null && !usage.isEmpty()) {
+            JscOsTheme.textSRight(g, font, verb + " " + usage, imageWidth - 10, imageHeight - 17, JscOsTheme.DIM);
+        }
+
         JscOsTheme.textS(g, font, "ENTER run    UP/DOWN history    wheel scroll    ESC close",
                 10, imageHeight - 7, JscOsTheme.DIM);
     }
@@ -193,6 +238,10 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
             submit();
             return true;
         }
+        if (key == 258) { // Tab — complete the command word
+            complete();
+            return true;
+        }
         if (key == 265) { // Up — older history
             recallHistory(-1);
             return true;
@@ -217,6 +266,33 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
     @Override
     public boolean charTyped(final char c, final int mods) {
         return input != null && input.charTyped(c, mods);
+    }
+
+    /**
+     * Completes the command word the player is typing against the known command names, cycling
+     * through the matches on repeated Tab. Only the first word (the verb) is completed for now.
+     */
+    private void complete() {
+        final String text = input.getValue();
+        if (text.contains(" ") || text.isEmpty()) {
+            return; // arguments are not completed yet; only the leading command word
+        }
+        final String prefix = text.toLowerCase(Locale.ROOT);
+        final List<String> matches = new ArrayList<>();
+        for (final String name : commandNames) {
+            if (name.startsWith(prefix)) {
+                matches.add(name);
+            }
+        }
+        if (matches.isEmpty()) {
+            return;
+        }
+        final String pick = matches.get(completionCycle % matches.size());
+        completionCycle++;
+        programmaticEdit = true;
+        input.setValue(matches.size() == 1 ? pick + " " : pick);
+        input.moveCursorToEnd(false);
+        programmaticEdit = false;
     }
 
     private void recallHistory(final int direction) {

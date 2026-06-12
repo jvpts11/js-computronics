@@ -76,6 +76,15 @@ public interface CliComputer {
     /** The programs installed on this computer (kept here, not in the CLI layer, so the engine stays Minecraft-free). */
     List<ProgramInfo> programs();
 
+    /** Installs a program on this computer by id. */
+    OpResult install(String programId);
+
+    /** The SQL dialect the {@code operation} verb should parse, from the server config. */
+    dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect dialect();
+
+    /** Runs a parsed effecting operation (SELECT/INSERT/MOVE/CRAFT/DELETE) against the network. */
+    OpResult execute(dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation operation);
+
     /** Counts that describe the network at a glance. */
     record NetSummary(boolean linked, int servers, int personalComputers, int subframes,
                       int indexedTypes, boolean mainframePresent) {

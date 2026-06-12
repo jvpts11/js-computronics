@@ -7,6 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.program.cli;
 
+import dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation;
+import dev.jsc.jscomputronics.module.computing.program.sql.SqlParseResult;
+import dev.jsc.jscomputronics.module.computing.program.sql.SqlParser;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -34,8 +38,10 @@ public final class BuiltinCommands {
                 new Insert(),
                 new Craft(),
                 new Ops(),
+                new Operation(),
                 new Devices(),
                 new ProgramsList(),
+                new Install(),
                 new Maint("analyze", "analyze"),
                 new Maint("reindex", "reindex"),
                 new Maint("vacuum", "vacuum"));
@@ -433,6 +439,80 @@ public final class BuiltinCommands {
                 final String tail = op.status() + " " + group(op.progress()) + "/" + group(op.total());
                 ctx.out().row(head, tail);
             }
+        }
+    }
+
+    static final class Operation implements CliCommand {
+        private static final int QUERY_LIMIT = 64;
+
+        @Override public String name() {
+            return "operation";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("op", "sql");
+        }
+
+        @Override public String summary() {
+            return "run an SQL-style operation on the network";
+        }
+
+        @Override public String usage() {
+            return "<statement>";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: operation <statement>   e.g. operation SELECT 64 Cobblestone");
+                return;
+            }
+            final SqlParseResult parsed = SqlParser.parse(ctx.rest(0), ctx.computer().dialect());
+            if (!parsed.ok()) {
+                ctx.out().error("syntax: " + parsed.error());
+                return;
+            }
+            final SqlOperation op = parsed.operation();
+            if (op.verb() == SqlOperation.Verb.QUERY) {
+                if (!ctx.computer().onNetwork()) {
+                    ctx.out().error("not on a network");
+                    return;
+                }
+                final int limit = op.limit() > 0 ? op.limit() : QUERY_LIMIT;
+                final List<CliComputer.StoredItem> items = ctx.computer().query(op.item(), limit);
+                if (items.isEmpty()) {
+                    ctx.out().dim("no rows");
+                    return;
+                }
+                for (final CliComputer.StoredItem item : items) {
+                    ctx.out().row(item.name(), group(item.quantity()));
+                }
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().execute(op);
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    static final class Install implements CliCommand {
+        @Override public String name() {
+            return "install";
+        }
+
+        @Override public String summary() {
+            return "install a program on this computer";
+        }
+
+        @Override public String usage() {
+            return "<program-id>";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: install <program-id>   (see 'programs')");
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().install(ctx.arg(0));
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 

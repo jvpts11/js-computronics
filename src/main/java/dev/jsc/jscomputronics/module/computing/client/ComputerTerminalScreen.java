@@ -88,7 +88,8 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     private static final int DEPOSIT_W = NET_COLS * 18 - 2;
     private static final int DEPOSIT_H = 14;
 
-    private static final String[] TAB_NAMES = {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft"};
+    private static final String[] TAB_NAMES =
+            {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Console"};
 
     private int netScrollRow;
     private int selectedOp;
@@ -253,6 +254,14 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private int[] railTabs() {
+        // The Command Prompt launcher sits at the bottom of every computer's rail.
+        final int[] base = baseRailTabs();
+        final int[] full = java.util.Arrays.copyOf(base, base.length + 1);
+        full[base.length] = ComputerTerminalMenu.TAB_CONSOLE;
+        return full;
+    }
+
+    private int[] baseRailTabs() {
         final boolean craft = menu.craftAvailable();
         if (menu.mainframeHost()) {
             return craft
@@ -1545,6 +1554,12 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                     }
                 }
             }
+            case 7 -> { // Console — a ">" prompt and a blinking cursor underscore
+                g.fill(x + 3, y + 4, x + 5, y + 6, c);
+                g.fill(x + 5, y + 6, x + 7, y + 8, c);
+                g.fill(x + 3, y + 8, x + 5, y + 10, c);
+                g.fill(x + 8, y + 11, x + 13, y + 13, c);
+            }
             default -> { // Maintenance — a wrench laid diagonally (C-shaped open jaw, diagonal shaft)
                 g.fill(x + 2, y + 2, x + 7, y + 4, c); // jaw: top lip
                 g.fill(x + 2, y + 2, x + 4, y + 7, c); // jaw: left side
@@ -1688,6 +1703,13 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 final int tx = leftPos + RAIL_X;
                 final int ty = topPos + TAB_Y0 + i * tabH;
                 if (mouseX >= tx && mouseX < tx + RAIL_W && mouseY >= ty && mouseY < ty + tabH) {
+                    if (tab == ComputerTerminalMenu.TAB_CONSOLE) {
+                        // Launch the Command Prompt for this computer instead of switching content.
+                        PacketDistributor.sendToServer(new dev.jsc.jscomputronics.module.computing.operation.payload
+                                .OpenProgramPayload(menu.monitorPos(), menu.hostPos(),
+                                dev.jsc.jscomputronics.module.computing.program.Programs.COMMAND_PROMPT.toString()));
+                        return true;
+                    }
                     if (tab != menu.activeTab()) {
                         menu.setActiveTab(tab);
                         if (minecraft != null && minecraft.gameMode != null) {

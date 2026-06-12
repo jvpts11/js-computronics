@@ -128,6 +128,12 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRunCommand);
         registrar.playToClient(CommandOutputPayload.TYPE, CommandOutputPayload.STREAM_CODEC,
                 ComputingPayloads::handleCommandOutput);
+        registrar.playToServer(RequestConsoleInitPayload.TYPE, RequestConsoleInitPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestConsoleInit);
+        registrar.playToClient(ConsoleInitPayload.TYPE, ConsoleInitPayload.STREAM_CODEC,
+                ComputingPayloads::handleConsoleInit);
+        registrar.playToServer(OpenProgramPayload.TYPE, OpenProgramPayload.STREAM_CODEC,
+                ComputingPayloads::handleOpenProgram);
     }
 
     // Command Prompt — a typed line runs through the shell against the open host and the styled
@@ -153,6 +159,69 @@ public final class ComputingPayloads {
                 wire.add(new CommandOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
             }
             PacketDistributor.sendToPlayer(player, new CommandOutputPayload(response.clearScreen(), wire));
+            // Persist the typed line on the computer so the history survives closing the prompt or Monitor.
+            if (host.console() != null && !payload.line().isBlank()) {
+                host.console().pushHistory(payload.line().trim());
+                ((net.minecraft.world.level.block.entity.BlockEntity) host).setChanged();
+            }
+        });
+    }
+
+    private static void handleRequestConsoleInit(final RequestConsoleInitPayload payload,
+                                                 final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.containerMenu instanceof dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu menu
+                    && menu.hostPos().equals(payload.hostPos())
+                    && player.level().getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host) {
+                sendConsoleInit(player, host);
+            }
+        });
+    }
+
+    private static void sendConsoleInit(final ServerPlayer player,
+            final dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host) {
+        final var console = host.console();
+        final List<String> history = console == null ? List.of() : console.history();
+        final List<ConsoleInitPayload.WireCommand> commands = new ArrayList<>();
+        for (final var command : dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.all()) {
+            if (commands.size() >= ConsoleInitPayload.MAX_COMMANDS) {
+                break;
+            }
+            commands.add(new ConsoleInitPayload.WireCommand(command.name(), command.usage()));
+        }
+        PacketDistributor.sendToPlayer(player, new ConsoleInitPayload(List.copyOf(history), commands));
+    }
+
+    private static void handleConsoleInit(final ConsoleInitPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.CommandPromptScreen.acceptInit(payload));
+    }
+
+    private static void handleOpenProgram(final OpenProgramPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof ComputerTerminalMenu terminal)
+                    || !terminal.hostPos().equals(payload.hostPos())
+                    || !(player.level().getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost)) {
+                return;
+            }
+            // Only the Command Prompt is launchable this way for now; future programs slot in here.
+            final String id = payload.programId();
+            if (id.equals(dev.jsc.jscomputronics.module.computing.program.Programs.COMMAND_PROMPT.toString())
+                    || id.equals("command_prompt")) {
+                final net.minecraft.network.chat.Component title =
+                        player.level().getBlockState(payload.hostPos()).getBlock().getName();
+                player.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                        (windowId, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu(
+                                windowId, inv, payload.monitorPos(), payload.hostPos()), title),
+                        buf -> {
+                            buf.writeBlockPos(payload.monitorPos());
+                            buf.writeBlockPos(payload.hostPos());
+                        });
+            }
         });
     }
 

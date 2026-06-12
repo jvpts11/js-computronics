@@ -406,6 +406,17 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
                 && device.acceptedCableTiers().contains(tier);
     }
 
+    // Console state — the Command Prompt's per-computer history and installed programs.
+
+    private final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState console =
+            new dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState();
+
+    // Provided here (no @Override: this base does not itself declare ComputerTerminalHost) so the
+    // computer subclasses that ARE hosts inherit it and satisfy the interface's console() method.
+    public dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState console() {
+        return console;
+    }
+
     // Persistence (common fields; subclasses add their own via the hooks)
 
     protected void saveExtra(final CompoundTag tag, final HolderLookup.Provider registries) {
@@ -430,6 +441,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
         for (final long monitor : tag.getLongArray("LinkedMonitors")) {
             linkedMonitors.add(monitor);
         }
+        if (tag.contains("Console")) {
+            console.load(tag.getCompound("Console"));
+        }
         loadExtra(tag, registries);
         buildDirty = true;
     }
@@ -449,6 +463,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
         if (!linkedMonitors.isEmpty()) {
             tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }
+        final CompoundTag consoleTag = new CompoundTag();
+        console.save(consoleTag);
+        tag.put("Console", consoleTag);
         saveExtra(tag, registries);
     }
 

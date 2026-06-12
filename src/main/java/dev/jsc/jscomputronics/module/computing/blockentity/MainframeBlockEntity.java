@@ -1131,6 +1131,14 @@ public class MainframeBlockEntity extends BlockEntity
         return true;
     }
 
+    private final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState console =
+            new dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState();
+
+    @Override
+    public dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState console() {
+        return console;
+    }
+
     @Override
     public int indexedTypes() {
         return networkIndex.catalogSize();
@@ -1258,6 +1266,9 @@ public class MainframeBlockEntity extends BlockEntity
         for (final long monitor : tag.getLongArray("LinkedMonitors")) {
             linkedMonitors.add(monitor);
         }
+        if (tag.contains("Console")) {
+            console.load(tag.getCompound("Console"));
+        }
         completedTotal = tag.getLong("CompletedTotal");
         operationLog.clear();
         final net.minecraft.nbt.ListTag ops = tag.getList("OperationLog", net.minecraft.nbt.Tag.TAG_COMPOUND);
@@ -1284,6 +1295,9 @@ public class MainframeBlockEntity extends BlockEntity
         if (!linkedMonitors.isEmpty()) {
             tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }
+        final CompoundTag consoleTag = new CompoundTag();
+        console.save(consoleTag);
+        tag.put("Console", consoleTag);
         // Save the full lifetime total (persisted base plus the live dispatcher's tally);
         // the live dispatcher itself is transient, so the snapshot reloads as the new base.
         tag.putLong("CompletedTotal", completedOps());

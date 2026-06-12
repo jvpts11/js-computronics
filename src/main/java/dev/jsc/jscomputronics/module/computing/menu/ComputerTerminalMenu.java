@@ -37,6 +37,9 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
     public static final int TAB_TASKS = 4;
     public static final int TAB_MAINTENANCE = 5;
     public static final int TAB_CRAFT = 6;
+    // A launch-only rail entry: clicking it opens the Command Prompt rather than switching content,
+    // so it is never the active tab (the menu's initial-tab clamp stops at TAB_CRAFT).
+    public static final int TAB_CONSOLE = 7;
 
     // Slot layout (relative to the screen's top-left). The screen draws the slot
     // backgrounds and the inventory at these exact positions.

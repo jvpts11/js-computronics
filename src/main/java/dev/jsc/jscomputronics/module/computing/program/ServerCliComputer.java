@@ -290,7 +290,127 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public List<ProgramInfo> programs() {
-        return Programs.installedInfo();
+        final List<ProgramInfo> out = new ArrayList<>(Programs.installedInfo()); // the pre-installed set
+        final ComputerConsoleState console = host.console();
+        if (console != null) {
+            for (final String id : console.installed()) {
+                final Program program = Programs.get(ResourceLocation.tryParse(id));
+                if (program != null && !program.preinstalled()) {
+                    out.add(new ProgramInfo(program.commandName(), program.id().toString()));
+                }
+            }
+        }
+        return out;
+    }
+
+    @Override
+    public OpResult install(final String programId) {
+        final ResourceLocation location = ResourceLocation.tryParse(
+                programId.contains(":") ? programId.toLowerCase(java.util.Locale.ROOT)
+                        : "jsc:" + programId.toLowerCase(java.util.Locale.ROOT));
+        final Program program = location == null ? null : Programs.get(location);
+        if (program == null) {
+            return OpResult.fail("no such program: " + programId);
+        }
+        if (program.preinstalled()) {
+            return OpResult.fail(program.commandName() + " is pre-installed on every computer");
+        }
+        final ComputerConsoleState console = host.console();
+        if (console == null) {
+            return OpResult.fail("this computer cannot store installed programs");
+        }
+        if (!console.install(program.id().toString())) {
+            return OpResult.fail(program.commandName() + " is already installed");
+        }
+        hostBlock.setChanged();
+        return OpResult.ok("installed " + program.commandName());
+    }
+
+    @Override
+    public dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect dialect() {
+        return ProgramSettings.sqlDialect();
+    }
+
+    @Override
+    public OpResult execute(final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation op) {
+        return switch (op.verb()) {
+            case SELECT -> select(op.item(), op.quantity());
+            case INSERT -> insert(op.item(), op.quantity());
+            case CRAFT -> craft(op.item(), op.quantity());
+            case DELETE -> executeDelete(op);
+            case MOVE -> executeMove(op);
+            case QUERY -> OpResult.fail("a query reads the network; it does not run as an operation");
+        };
+    }
+
+    private OpResult executeDelete(final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation op) {
+        final StorageKey key = resolveKey(op.item());
+        if (key == null) {
+            return OpResult.fail("unknown item: " + op.item());
+        }
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        // DELETE extracts and discards: a sink that accepts everything and keeps nothing.
+        final dev.jsc.jscomputronics.module.computing.storage.DataSink voidSink =
+                (k, amount, simulate) -> amount;
+        final var operation = mainframe.submitNetworkDelete(key, op.quantity(), voidSink, "cli");
+        return operation == null ? OpResult.fail("could not start the DELETE")
+                : OpResult.ok("DELETE queued: " + op.quantity() + " " + key.displayName().getString());
+    }
+
+    private OpResult executeMove(final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation op) {
+        final StorageKey key = resolveKey(op.item());
+        if (key == null) {
+            return OpResult.fail("unknown item: " + op.item());
+        }
+        final NetworkUuid net = host.networkUuid();
+        final MainframeBlockEntity mainframe = mainframe(net);
+        if (mainframe == null || net == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        final NodeUuid source = resolveServer(net, op.source());
+        final NodeUuid dest = resolveServer(net, op.dest());
+        if (source == null) {
+            return OpResult.fail("no server named '" + op.source() + "'");
+        }
+        if (dest == null) {
+            return OpResult.fail("no server named '" + op.dest() + "'");
+        }
+        final dev.jsc.jscomputronics.module.computing.storage.DataSink destSink = serverSink(dest);
+        if (destSink == null) {
+            return OpResult.fail("the destination server is unavailable");
+        }
+        final var operation = mainframe.submitNetworkMove(key, op.quantity(), destSink, "cli",
+                java.util.Set.of(source));
+        return operation == null ? OpResult.fail("could not start the MOVE")
+                : OpResult.ok("MOVE queued: " + op.quantity() + " " + key.displayName().getString()
+                        + " -> " + ComputingPayloads.serverLabel(level, dest));
+    }
+
+    private NodeUuid resolveServer(final NetworkUuid net, final String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        for (final dev.jsc.jscomputronics.common.network.ServerNode server
+                : NetworkSystem.get(level).serversOf(net)) {
+            if (ComputingPayloads.serverLabel(level, server.nodeUuid()).equalsIgnoreCase(name)) {
+                return server.nodeUuid();
+            }
+        }
+        return null;
+    }
+
+    private dev.jsc.jscomputronics.module.computing.storage.DataSink serverSink(final NodeUuid node) {
+        return NetworkSystem.get(level).locationOf(node)
+                .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
+                        instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
+                        ? (dev.jsc.jscomputronics.module.computing.storage.DataSink)
+                                new dev.jsc.jscomputronics.module.computing.storage.ServerStoreSink(
+                                        rack.getServerStorage(loc.slot()))
+                        : null)
+                .orElse(null);
     }
 
     // --- helpers ----------------------------------------------------------------------------------

@@ -140,6 +140,32 @@ class CliShellTest {
     }
 
     @Test
+    void run_operationParsesAndExecutesEffectingVerb() {
+        computer.onNetwork = true;
+        joined("operation select 64 cobblestone");
+        assertEquals("execute(SELECT,cobblestone,64)", computer.lastCall);
+    }
+
+    @Test
+    void run_operationQueryReadsStorageInsteadOfExecuting() {
+        computer.onNetwork = true;
+        computer.stock.add(new CliComputer.StoredItem("cobblestone", 100));
+        final String out = joined("operation query");
+        assertTrue(out.contains("cobblestone"));
+    }
+
+    @Test
+    void run_operationReportsSyntaxErrors() {
+        assertTrue(anyStyle("operation frobnicate 1 thing", CliStyle.ERROR));
+    }
+
+    @Test
+    void run_installDelegatesToTheComputer() {
+        joined("install nms");
+        assertEquals("install(nms)", computer.lastCall);
+    }
+
+    @Test
     void run_maintenanceDelegatesToTheComputer() {
         joined("vacuum");
         assertEquals("maintenance(vacuum)", computer.lastCall);
@@ -247,6 +273,21 @@ class CliShellTest {
 
         @Override public List<ProgramInfo> programs() {
             return List.of(new ProgramInfo("cmd", "jsc:command_prompt"));
+        }
+
+        @Override public OpResult install(final String programId) {
+            lastCall = "install(" + programId + ")";
+            return OpResult.ok("installed " + programId);
+        }
+
+        @Override public dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect dialect() {
+            return dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect.SIMPLE;
+        }
+
+        @Override public OpResult execute(
+                final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation operation) {
+            lastCall = "execute(" + operation.verb() + "," + operation.item() + "," + operation.quantity() + ")";
+            return OpResult.ok("queued " + operation.verb());
         }
     }
 }

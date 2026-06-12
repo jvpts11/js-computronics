@@ -96,4 +96,13 @@ public interface ComputerTerminalHost {
     }
 
     boolean isMainframeHost();
+
+    /**
+     * This computer's persistent console state — the Command Prompt history and installed programs.
+     * A host that cannot store it (none today) returns {@code null} and the console degrades to a
+     * fresh, non-persistent session.
+     */
+    default dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState console() {
+        return null;
+    }
 }
