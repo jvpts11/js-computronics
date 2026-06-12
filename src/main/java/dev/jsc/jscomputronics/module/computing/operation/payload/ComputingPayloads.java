@@ -134,6 +134,10 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleConsoleInit);
         registrar.playToServer(OpenProgramPayload.TYPE, OpenProgramPayload.STREAM_CODEC,
                 ComputingPayloads::handleOpenProgram);
+        registrar.playToServer(RunSqlPayload.TYPE, RunSqlPayload.STREAM_CODEC,
+                ComputingPayloads::handleRunSql);
+        registrar.playToClient(SqlResultPayload.TYPE, SqlResultPayload.STREAM_CODEC,
+                ComputingPayloads::handleSqlResult);
     }
 
     // Command Prompt — a typed line runs through the shell against the open host and the styled
@@ -151,6 +155,15 @@ public final class ComputingPayloads {
                             instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host)) {
                 return;
             }
+            // "run/open <program>" launches another installed program from the prompt.
+            final String[] parts = payload.line().trim().split("\\s+", 2);
+            if (parts.length == 2 && (parts[0].equalsIgnoreCase("run") || parts[0].equalsIgnoreCase("open"))) {
+                if (host.console() != null && !payload.line().isBlank()) {
+                    host.console().pushHistory(payload.line().trim());
+                }
+                launchProgram(player, host, menu.monitorPos(), payload.hostPos(), parts[1].trim());
+                return;
+            }
             final var computer = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
             final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(CLI_WIDTH);
             final var response = shell.run(payload.line(), computer);
@@ -165,6 +178,95 @@ public final class ComputingPayloads {
                 ((net.minecraft.world.level.block.entity.BlockEntity) host).setChanged();
             }
         });
+    }
+
+    private static void launchProgram(final ServerPlayer player,
+            final dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host,
+            final BlockPos monitorPos, final BlockPos hostPos, final String name) {
+        dev.jsc.jscomputronics.module.computing.program.Program program = null;
+        for (final var candidate : dev.jsc.jscomputronics.module.computing.program.Programs.all()) {
+            if (candidate.commandName().equalsIgnoreCase(name)
+                    || candidate.id().getPath().equalsIgnoreCase(name)
+                    || candidate.id().toString().equalsIgnoreCase(name)) {
+                program = candidate;
+                break;
+            }
+        }
+        if (program == null) {
+            sendConsoleLine(player, "no such program: " + name, OperationRecord.STATUS_FAILED);
+            return;
+        }
+        final boolean installed = program.preinstalled()
+                || (host.console() != null && host.console().isInstalled(program.id().toString()));
+        if (!installed) {
+            sendConsoleLine(player, program.commandName() + " is not installed - try: install "
+                    + program.commandName(), OperationRecord.STATUS_FAILED);
+            return;
+        }
+        if (program.id().equals(dev.jsc.jscomputronics.module.computing.program.Programs.NMS)) {
+            final net.minecraft.network.chat.Component title =
+                    player.level().getBlockState(hostPos).getBlock().getName();
+            player.openMenu(new net.minecraft.world.SimpleMenuProvider(
+                    (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.NmsMenu(
+                            id, inv, monitorPos, hostPos), title),
+                    buf -> {
+                        buf.writeBlockPos(monitorPos);
+                        buf.writeBlockPos(hostPos);
+                    });
+        } else {
+            sendConsoleLine(player, "the " + program.commandName() + " is already open", -1);
+        }
+    }
+
+    /** One styled line back to the open Command Prompt (status -1 = dim, FAILED = red, else green). */
+    private static void sendConsoleLine(final ServerPlayer player, final String text, final int status) {
+        final dev.jsc.jscomputronics.module.computing.program.cli.CliStyle style = status == OperationRecord.STATUS_FAILED
+                ? dev.jsc.jscomputronics.module.computing.program.cli.CliStyle.ERROR
+                : status < 0 ? dev.jsc.jscomputronics.module.computing.program.cli.CliStyle.DIM
+                : dev.jsc.jscomputronics.module.computing.program.cli.CliStyle.OK;
+        PacketDistributor.sendToPlayer(player, new CommandOutputPayload(false,
+                List.of(new CommandOutputPayload.WireLine(text, style.ordinal()))));
+    }
+
+    private static void handleRunSql(final RunSqlPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.containerMenu instanceof dev.jsc.jscomputronics.module.computing.menu.NmsMenu menu)
+                    || !menu.hostPos().equals(payload.hostPos())
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host)) {
+                return;
+            }
+            final var parsed = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
+                    payload.sql(), dev.jsc.jscomputronics.module.computing.program.ProgramSettings.sqlDialect());
+            if (!parsed.ok()) {
+                PacketDistributor.sendToPlayer(player, new SqlResultPayload(false, "syntax: " + parsed.error(),
+                        List.of()));
+                return;
+            }
+            final var op = parsed.operation();
+            final var computer = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
+            if (op.verb() == dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation.Verb.QUERY) {
+                final int limit = op.limit() > 0 ? op.limit() : SqlResultPayload.MAX_ROWS;
+                final var items = computer.query(op.item(), limit);
+                final List<SqlResultPayload.Row> rows = new ArrayList<>(items.size());
+                for (final var item : items) {
+                    rows.add(new SqlResultPayload.Row(item.name(), item.quantity()));
+                }
+                PacketDistributor.sendToPlayer(player, new SqlResultPayload(true,
+                        rows.size() + (rows.size() == 1 ? " row" : " rows"), rows));
+            } else {
+                final var result = computer.execute(op);
+                PacketDistributor.sendToPlayer(player,
+                        new SqlResultPayload(result.ok(), result.message(), List.of()));
+            }
+        });
+    }
+
+    private static void handleSqlResult(final SqlResultPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.NmsScreen.accept(payload));
     }
 
     private static void handleRequestConsoleInit(final RequestConsoleInitPayload payload,

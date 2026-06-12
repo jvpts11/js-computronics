@@ -25,10 +25,15 @@ public final class Programs {
     public static final ResourceLocation COMMAND_PROMPT =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "command_prompt");
 
+    /** Network Management Studio: an SSMS-style operations console, installed by the player. */
+    public static final ResourceLocation NMS =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");
+
     private static final Map<ResourceLocation, Program> REGISTERED = new LinkedHashMap<>();
 
     static {
         register(new Program(COMMAND_PROMPT, "cmd", "program.jsc.command_prompt", true));
+        register(new Program(NMS, "nms", "program.jsc.nms", false));
     }
 
     private Programs() {

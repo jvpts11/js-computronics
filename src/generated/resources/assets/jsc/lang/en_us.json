@@ -72,5 +72,6 @@
   "itemGroup.jsc.industrial": "J's Computronics: Industrial",
   "menu.jsc.network_overview": "Network Overview",
   "menu.jsc.server_assembly": "Server Assembly",
-  "program.jsc.command_prompt": "Command Prompt"
+  "program.jsc.command_prompt": "Command Prompt",
+  "program.jsc.nms": "Network Management Studio"
 }

@@ -341,6 +341,11 @@ public final class ComputingModule {
             MENUS.register("command_prompt", () -> IMenuTypeExtension.create(
                     dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu::fromNetwork));
 
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.NmsMenu>> NMS_MENU =
+            MENUS.register("nms", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.NmsMenu::fromNetwork));
+
     // Hardware components (Standard era — minimal set to build a Mainframe)
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(

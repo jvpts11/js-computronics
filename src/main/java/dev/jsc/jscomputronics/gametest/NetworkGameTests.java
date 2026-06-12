@@ -925,6 +925,49 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA)
+    public static void nms_runsParsedSqlAgainstTheNetwork(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer,
+                            helper.getLevel());
+                    final var dialect = dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect.STANDARD;
+
+                    final var read = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
+                            "SELECT * FROM network", dialect);
+                    helper.assertTrue(read.ok(), "the read statement must parse");
+                    helper.assertFalse(cli.query(read.operation().item(), 64).isEmpty(),
+                            "SELECT * must return the network's rows");
+
+                    final var pull = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
+                            "SELECT 50 FROM network WHERE item = 'cobblestone'", dialect);
+                    helper.assertTrue(pull.ok(), "the pull statement must parse");
+                    helper.assertTrue(cli.execute(pull.operation()).ok(),
+                            "executing the pull must queue an operation");
+                })
+                .thenSucceed();
+    }
+
     private static boolean cliContains(
             final dev.jsc.jscomputronics.module.computing.program.cli.CliShell.Response response,
             final String needle) {
