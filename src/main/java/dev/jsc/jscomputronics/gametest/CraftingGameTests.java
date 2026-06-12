@@ -125,6 +125,51 @@ public final class CraftingGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void patternReader_exportsRomOntoRewritableDisc(final GameTestHelper helper) {
+        final BlockPos cc = new BlockPos(2, 2, 2);
+        final BlockPos reader = new BlockPos(3, 2, 2);
+        helper.setBlock(cc, ComputingModule.CRAFTING_COMPUTER.get());
+        helper.setBlock(reader, ComputingModule.PATTERN_READER.get());
+        if (!(helper.getBlockEntity(cc) instanceof CraftingComputerBlockEntity computer)
+                || !(helper.getBlockEntity(reader) instanceof PatternReaderBlockEntity readerBe)) {
+            throw new IllegalStateException("missing crafting computer or pattern reader");
+        }
+        computer.loadPattern(planksPattern(1));
+        computer.loadPattern(sticksPattern());
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    // A write-once disc can never receive an export.
+                    final ItemStack writeOnce = new ItemStack(ComputingModule.PATTERN_DISC.get());
+                    readerBe.media().setStackInSlot(0, writeOnce);
+                    helper.assertTrue(readerBe.exportAll() == 0, "a write-once disc must reject an export");
+
+                    // A rewritable disc takes both patterns and spends exactly one cycle for the burn.
+                    final ItemStack rw = new ItemStack(ComputingModule.PATTERN_DISC_RW.get());
+                    readerBe.media().setStackInSlot(0, rw);
+                    final int before = PatternDiscItem.cyclesLeft(readerBe.media().getStackInSlot(0));
+                    helper.assertTrue(readerBe.exportAll() == 2, "both ROM patterns export onto the disc");
+                    final ItemStack written = readerBe.media().getStackInSlot(0);
+                    helper.assertTrue(PatternDiscItem.patterns(written).size() == 2, "the disc now holds two patterns");
+                    helper.assertTrue(PatternDiscItem.cyclesLeft(written) == before - 1,
+                            "a whole export burn spends exactly one cycle");
+                    helper.assertTrue(computer.romUsed() == 2, "exporting copies - the ROM is never emptied");
+
+                    // Re-exporting writes nothing new and therefore costs no further cycle.
+                    helper.assertTrue(readerBe.exportAll() == 0, "a re-export of the same patterns writes nothing");
+                    helper.assertTrue(PatternDiscItem.cyclesLeft(readerBe.media().getStackInSlot(0)) == before - 1,
+                            "a no-op export must not spend a cycle");
+
+                    // Deleting from the ROM frees a slot without touching the disc.
+                    readerBe.removeFromRom(0);
+                    helper.assertTrue(computer.romUsed() == 1, "removing a pattern frees one ROM slot");
+                    helper.assertTrue(PatternDiscItem.patterns(readerBe.media().getStackInSlot(0)).size() == 2,
+                            "removing from the ROM never alters the disc");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void recipeRom_capsAtFiftyPatterns(final GameTestHelper helper) {
         final BlockPos cc = new BlockPos(2, 2, 2);
         helper.setBlock(cc, ComputingModule.CRAFTING_COMPUTER.get());

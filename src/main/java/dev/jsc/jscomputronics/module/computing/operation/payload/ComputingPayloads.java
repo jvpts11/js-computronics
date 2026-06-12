@@ -16,6 +16,7 @@ import dev.jsc.jscomputronics.common.network.SubframeNode;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.PatternReaderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
@@ -24,6 +25,7 @@ import dev.jsc.jscomputronics.module.computing.datacenter.LoadBalancer;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
+import dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu;
 import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
 import dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu;
 import dev.jsc.jscomputronics.module.computing.menu.DatacenterStationMenu;
@@ -118,6 +120,43 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleCraftPlan);
         registrar.playToServer(CraftSubmitPayload.TYPE, CraftSubmitPayload.STREAM_CODEC,
                 ComputingPayloads::handleCraftSubmit);
+        registrar.playToServer(RequestRomSnapshotPayload.TYPE, RequestRomSnapshotPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestRomSnapshot);
+        registrar.playToClient(RomSnapshotPayload.TYPE, RomSnapshotPayload.STREAM_CODEC,
+                ComputingPayloads::handleRomSnapshot);
+    }
+
+    // Recipe ROM tab on the Pattern Reader — the client lists the adjacent Crafting Computer's ROM
+    // and exports patterns to a rewritable disc.
+
+    private static void handleRequestRomSnapshot(final RequestRomSnapshotPayload payload,
+                                                 final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.containerMenu instanceof PatternReaderMenu menu
+                    && menu.readerPos().equals(payload.readerPos())
+                    && player.level().getBlockEntity(payload.readerPos())
+                            instanceof PatternReaderBlockEntity reader) {
+                sendRomSnapshot(player, reader);
+            }
+        });
+    }
+
+    private static void handleRomSnapshot(final RomSnapshotPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player().containerMenu instanceof PatternReaderMenu menu) {
+                menu.setRomPatterns(payload.patterns());
+            }
+        });
+    }
+
+    public static void sendRomSnapshot(final ServerPlayer player, final PatternReaderBlockEntity reader) {
+        if (player == null || player.isRemoved()) {
+            return;
+        }
+        final List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> rom = reader.romPatterns();
+        final var bounded = rom.size() > RomSnapshotPayload.MAX ? rom.subList(0, RomSnapshotPayload.MAX) : rom;
+        PacketDistributor.sendToPlayer(player, new RomSnapshotPayload(List.copyOf(bounded)));
     }
 
     private static void handleCraftCatalog(final CraftCatalogPayload payload, final IPayloadContext context) {

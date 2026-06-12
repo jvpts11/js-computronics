@@ -10,33 +10,49 @@ package dev.jsc.jscomputronics.module.computing.client;
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
 import dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu;
+import dev.jsc.jscomputronics.module.computing.operation.payload.RequestRomSnapshotPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * Screen for the Pattern Reader: the disc readout, the selectable pattern list (click a row to toggle it), and LOAD SELECTED / LOAD ALL into the adjacent Crafting Computer's Recipe ROM with its usage shown live.
+ * Screen for the Pattern Reader, a two-tab disc/ROM station. The READ tab copies a disc's patterns into the adjacent Crafting Computer's Recipe ROM; the ROM tab lists that ROM and exports selected patterns back onto a rewritable disc (a copy that spends one rewrite cycle), with a right-click deleting a pattern from the ROM.
  */
 public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMenu> {
+
+    private static final int TAB_READ = 0;
+    private static final int TAB_ROM = 1;
+
+    private static final int TAB_W = 30;
+    private static final int TAB_H = 12;
+    private static final int TAB_Y = 8;
+    private static final int READ_TAB_X = 130;
+    private static final int ROM_TAB_X = 162;
 
     private static final int LIST_X = 8;
     private static final int LIST_Y = 60;
     private static final int ROW_H = 12;
     private static final int VISIBLE_ROWS = 4;
-    private static final int LOAD_SEL_X = 8;
-    private static final int LOAD_ALL_X = 122;
+    private static final int SEL_X = 8;
+    private static final int SEL_W = 106;
+    private static final int ALL_X = 122;
+    private static final int ALL_W = 70;
     private static final int BTN_Y = 112;
     private static final int BTN_H = 14;
 
     private final Set<Integer> selection = new LinkedHashSet<>();
+    private final Set<Integer> romSelection = new LinkedHashSet<>();
 
+    private int activeTab = TAB_READ;
     private int scroll;
+    private int romScroll;
 
     public PatternReaderScreen(final PatternReaderMenu menu, final Inventory inventory,
                                final Component title) {
@@ -48,31 +64,52 @@ public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMe
     }
 
     @Override
+    protected void init() {
+        super.init();
+        requestRom();
+    }
+
+    private void requestRom() {
+        PacketDistributor.sendToServer(new RequestRomSnapshotPayload(menu.readerPos()));
+    }
+
+    // Backgrounds
+
+    @Override
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
         JscOsTheme.window(g, x, y, imageWidth, imageHeight);
         JscOsTheme.headerBar(g, x + 6, y + 6, imageWidth - 12);
+        tab(g, x, y, READ_TAB_X, activeTab == TAB_READ, mouseX, mouseY);
+        tab(g, x, y, ROM_TAB_X, activeTab == TAB_ROM, mouseX, mouseY);
         JscOsTheme.slot(g, x + 12, y + 30);
 
-        // Pattern rows (panel strips; the selected ones carry an accent edge).
-        final List<CraftingPattern> patterns = menu.discPatterns();
-        clampScroll(patterns.size());
-        for (int row = 0; row < Math.min(VISIBLE_ROWS, patterns.size()); row++) {
-            final int index = row + scroll;
+        final List<CraftingPattern> rows = activeTab == TAB_READ ? menu.discPatterns() : menu.romPatterns();
+        final int scrollPos = activeTab == TAB_READ ? clampScroll(scroll, rows.size()) : clampScroll(romScroll, rows.size());
+        final Set<Integer> sel = activeTab == TAB_READ ? selection : romSelection;
+        for (int row = 0; row < Math.min(VISIBLE_ROWS, rows.size()); row++) {
+            final int index = row + scrollPos;
             final int rowY = y + LIST_Y + row * ROW_H;
             g.fill(x + LIST_X, rowY, x + imageWidth - 8, rowY + ROW_H - 2, JscOsTheme.PANEL);
-            if (selection.contains(index)) {
+            if (sel.contains(index)) {
                 g.fill(x + LIST_X, rowY, x + LIST_X + 2, rowY + ROW_H - 2, JscOsTheme.AMBER);
             }
         }
 
-        final boolean usable = menu.hasComputer() && !patterns.isEmpty();
-        if (usable) {
-            JscOsTheme.button(g, x + LOAD_SEL_X, y + BTN_Y, 106, BTN_H,
-                    !selection.isEmpty() && hover(mouseX, mouseY, LOAD_SEL_X, BTN_Y, 106, BTN_H));
-            JscOsTheme.button(g, x + LOAD_ALL_X, y + BTN_Y, 70, BTN_H,
-                    hover(mouseX, mouseY, LOAD_ALL_X, BTN_Y, 70, BTN_H));
+        if (activeTab == TAB_READ) {
+            final boolean usable = menu.hasComputer() && !menu.discPatterns().isEmpty();
+            if (usable) {
+                JscOsTheme.button(g, x + SEL_X, y + BTN_Y, SEL_W, BTN_H,
+                        !selection.isEmpty() && hover(mouseX, mouseY, SEL_X, BTN_Y, SEL_W, BTN_H));
+                JscOsTheme.button(g, x + ALL_X, y + BTN_Y, ALL_W, BTN_H,
+                        hover(mouseX, mouseY, ALL_X, BTN_Y, ALL_W, BTN_H));
+            }
+        } else if (canExport()) {
+            JscOsTheme.button(g, x + SEL_X, y + BTN_Y, SEL_W, BTN_H,
+                    !romSelection.isEmpty() && hover(mouseX, mouseY, SEL_X, BTN_Y, SEL_W, BTN_H));
+            JscOsTheme.button(g, x + ALL_X, y + BTN_Y, ALL_W, BTN_H,
+                    hover(mouseX, mouseY, ALL_X, BTN_Y, ALL_W, BTN_H));
         }
 
         for (int row = 0; row < 3; row++) {
@@ -85,50 +122,69 @@ public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMe
         }
     }
 
+    private void tab(final GuiGraphics g, final int x, final int y, final int tx, final boolean on,
+                     final int mouseX, final int mouseY) {
+        final int bg = on ? JscOsTheme.TAB_ON
+                : (hover(mouseX, mouseY, tx, TAB_Y, TAB_W, TAB_H) ? JscOsTheme.HOVER : JscOsTheme.PANEL);
+        g.fill(x + tx, y + TAB_Y, x + tx + TAB_W, y + TAB_Y + TAB_H, bg);
+        if (on) {
+            g.fill(x + tx, y + TAB_Y + TAB_H - 1, x + tx + TAB_W, y + TAB_Y + TAB_H, JscOsTheme.ACCENT);
+        }
+    }
+
+    // Labels
+
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         JscOsTheme.text(g, font, "PATTERN READER", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.textSCenter(g, font, "READ", READ_TAB_X + TAB_W / 2, TAB_Y + 3,
+                activeTab == TAB_READ ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+        JscOsTheme.textSCenter(g, font, "ROM", ROM_TAB_X + TAB_W / 2, TAB_Y + 3,
+                activeTab == TAB_ROM ? JscOsTheme.ACCENT : JscOsTheme.DIM);
 
-        final ItemStack disc = menu.slots.get(PatternReaderMenu.MEDIA_SLOT).getItem();
-        final List<CraftingPattern> patterns = menu.discPatterns();
-        if (disc.isEmpty()) {
-            JscOsTheme.textS(g, font, "insert pattern media", 34, 36, JscOsTheme.DIM);
+        discReadout(g);
+
+        if (activeTab == TAB_READ) {
+            readLabels(g);
         } else {
-            JscOsTheme.textS(g, font, patterns.size() + (patterns.size() == 1 ? " pattern" : " patterns"),
-                    34, 32, JscOsTheme.TEXT);
-            if (disc.getItem() instanceof PatternDiscItem item && item.isRewritable()) {
-                final int cycles = PatternDiscItem.cyclesLeft(disc);
-                JscOsTheme.textS(g, font, cycles > 0 ? cycles + " cycles left" : "read-only",
-                        34, 41, cycles > 0 ? JscOsTheme.AMBER : JscOsTheme.DIM);
-            } else {
-                JscOsTheme.textS(g, font, "write-once", 34, 41, JscOsTheme.DIM);
-            }
+            romLabels(g);
         }
+    }
 
-        JscOsTheme.textS(g, font, "PATTERNS ON MEDIA", LIST_X, 53, JscOsTheme.DIM);
-        for (int row = 0; row < Math.min(VISIBLE_ROWS, patterns.size()); row++) {
-            final int index = row + scroll;
-            final CraftingPattern p = patterns.get(index);
-            final int rowY = LIST_Y + row * ROW_H + 2;
-            JscOsTheme.textS(g, font, "CRAFT", LIST_X + 5, rowY, JscOsTheme.ACCENT);
-            JscOsTheme.textS(g, font, p.result().getHoverName().getString() + " x" + p.result().getCount(),
-                    LIST_X + 36, rowY, JscOsTheme.TEXT);
-            JscOsTheme.textSRight(g, font, selection.contains(index) ? "selected" : "",
-                    imageWidth - 12, rowY, JscOsTheme.AMBER);
+    private void discReadout(final GuiGraphics g) {
+        final ItemStack disc = menu.slots.get(PatternReaderMenu.MEDIA_SLOT).getItem();
+        if (disc.isEmpty()) {
+            JscOsTheme.textS(g, font, activeTab == TAB_ROM ? "insert a rewritable disc" : "insert pattern media",
+                    34, 36, JscOsTheme.DIM);
+            return;
         }
+        final List<CraftingPattern> onDisc = menu.discPatterns();
+        JscOsTheme.textS(g, font, onDisc.size() + (onDisc.size() == 1 ? " pattern" : " patterns"),
+                34, 32, JscOsTheme.TEXT);
+        if (disc.getItem() instanceof PatternDiscItem item && item.isRewritable()) {
+            final int cycles = PatternDiscItem.cyclesLeft(disc);
+            JscOsTheme.textS(g, font, cycles > 0 ? cycles + " cycles left" : "read-only",
+                    34, 41, cycles > 0 ? JscOsTheme.AMBER : JscOsTheme.DIM);
+        } else {
+            JscOsTheme.textS(g, font, "write-once", 34, 41, JscOsTheme.DIM);
+        }
+    }
+
+    private void readLabels(final GuiGraphics g) {
+        final List<CraftingPattern> patterns = menu.discPatterns();
+        JscOsTheme.textS(g, font, "PATTERNS ON MEDIA", LIST_X, 53, JscOsTheme.DIM);
+        listRows(g, patterns, clampScroll(scroll, patterns.size()), selection);
         if (patterns.size() > VISIBLE_ROWS) {
-            JscOsTheme.textSRight(g, font, (scroll + 1) + "-" + Math.min(scroll + VISIBLE_ROWS, patterns.size())
-                    + " / " + patterns.size(), imageWidth - 8, 53, JscOsTheme.DIM);
+            JscOsTheme.textSRight(g, font, rangeLabel(scroll, patterns.size()), imageWidth - 8, 53, JscOsTheme.DIM);
         }
 
         final boolean usable = menu.hasComputer() && !patterns.isEmpty();
         if (usable) {
             JscOsTheme.textCenter(g, font, "LOAD SELECTED (" + selection.size() + ")",
-                    LOAD_SEL_X + 53, BTN_Y + 4, selection.isEmpty() ? JscOsTheme.DIM : JscOsTheme.GREEN);
-            JscOsTheme.textCenter(g, font, "LOAD ALL", LOAD_ALL_X + 35, BTN_Y + 4, JscOsTheme.ACCENT);
+                    SEL_X + SEL_W / 2, BTN_Y + 4, selection.isEmpty() ? JscOsTheme.DIM : JscOsTheme.GREEN);
+            JscOsTheme.textCenter(g, font, "LOAD ALL", ALL_X + ALL_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
         }
 
-        // Target line: the adjacent computer and its ROM budget — or why nothing can load.
         if (menu.hasComputer()) {
             JscOsTheme.textS(g, font, "> Crafting Computer", LIST_X, 130, JscOsTheme.ACCENT);
             JscOsTheme.textSRight(g, font, "ROM " + menu.romUsed() + " / " + menu.romLimit(),
@@ -138,16 +194,90 @@ public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMe
         }
     }
 
-    private void clampScroll(final int count) {
-        scroll = Math.max(0, Math.min(scroll, Math.max(0, count - VISIBLE_ROWS)));
+    private void romLabels(final GuiGraphics g) {
+        final List<CraftingPattern> patterns = menu.romPatterns();
+        JscOsTheme.textS(g, font, "PATTERNS IN ROM", LIST_X, 53, JscOsTheme.DIM);
+        if (!menu.hasComputer()) {
+            JscOsTheme.textS(g, font, "no Crafting Computer adjacent", LIST_X, 62, JscOsTheme.RED);
+            return;
+        }
+        if (patterns.isEmpty()) {
+            JscOsTheme.textS(g, font, "ROM is empty", LIST_X, 62, JscOsTheme.DIM);
+        }
+        listRows(g, patterns, clampScroll(romScroll, patterns.size()), romSelection);
+        if (patterns.size() > VISIBLE_ROWS) {
+            JscOsTheme.textSRight(g, font, rangeLabel(romScroll, patterns.size()), imageWidth - 8, 53, JscOsTheme.DIM);
+        }
+
+        if (canExport()) {
+            JscOsTheme.textCenter(g, font, "EXPORT (" + romSelection.size() + ")",
+                    SEL_X + SEL_W / 2, BTN_Y + 4, romSelection.isEmpty() ? JscOsTheme.DIM : JscOsTheme.GREEN);
+            JscOsTheme.textCenter(g, font, "EXPORT ALL", ALL_X + ALL_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
+        } else {
+            JscOsTheme.textSCenter(g, font, exportBlockReason(), imageWidth / 2, BTN_Y + 4, JscOsTheme.DIM);
+        }
+
+        JscOsTheme.textS(g, font, "right-click a row to delete it", LIST_X, 130, JscOsTheme.DIM);
+        JscOsTheme.textSRight(g, font, menu.romUsed() + " / " + menu.romLimit(),
+                imageWidth - 8, 130, menu.romUsed() >= menu.romLimit() ? JscOsTheme.RED : JscOsTheme.TEXT);
     }
+
+    private void listRows(final GuiGraphics g, final List<CraftingPattern> patterns, final int scrollPos,
+                          final Set<Integer> sel) {
+        for (int row = 0; row < Math.min(VISIBLE_ROWS, patterns.size()); row++) {
+            final int index = row + scrollPos;
+            final CraftingPattern p = patterns.get(index);
+            final int rowY = LIST_Y + row * ROW_H + 2;
+            JscOsTheme.textS(g, font, "CRAFT", LIST_X + 5, rowY, JscOsTheme.ACCENT);
+            JscOsTheme.textS(g, font, p.result().getHoverName().getString() + " x" + p.result().getCount(),
+                    LIST_X + 36, rowY, JscOsTheme.TEXT);
+            JscOsTheme.textSRight(g, font, sel.contains(index) ? "selected" : "",
+                    imageWidth - 12, rowY, JscOsTheme.AMBER);
+        }
+    }
+
+    private String rangeLabel(final int scrollPos, final int count) {
+        final int clamped = clampScroll(scrollPos, count);
+        return (clamped + 1) + "-" + Math.min(clamped + VISIBLE_ROWS, count) + " / " + count;
+    }
+
+    /** True when the media slot holds a rewritable disc with cycles left and there is something to export. */
+    private boolean canExport() {
+        final ItemStack disc = menu.slots.get(PatternReaderMenu.MEDIA_SLOT).getItem();
+        return menu.hasComputer() && !menu.romPatterns().isEmpty()
+                && disc.getItem() instanceof PatternDiscItem item && item.isRewritable()
+                && PatternDiscItem.cyclesLeft(disc) > 0;
+    }
+
+    private String exportBlockReason() {
+        if (!menu.hasComputer() || menu.romPatterns().isEmpty()) {
+            return "";
+        }
+        final ItemStack disc = menu.slots.get(PatternReaderMenu.MEDIA_SLOT).getItem();
+        if (disc.isEmpty()) {
+            return "insert a rewritable disc to export";
+        }
+        if (!(disc.getItem() instanceof PatternDiscItem item) || !item.isRewritable()) {
+            return "disc is write-once - cannot export";
+        }
+        return "disc has no rewrite cycles left";
+    }
+
+    private int clampScroll(final int value, final int count) {
+        return Math.max(0, Math.min(value, Math.max(0, count - VISIBLE_ROWS)));
+    }
+
+    // Input
 
     @Override
     public boolean mouseScrolled(final double mouseX, final double mouseY, final double dx, final double dy) {
-        final int count = menu.discPatterns().size();
-        if (count > VISIBLE_ROWS) {
-            scroll -= (int) Math.signum(dy);
-            clampScroll(count);
+        final List<CraftingPattern> rows = activeTab == TAB_READ ? menu.discPatterns() : menu.romPatterns();
+        if (rows.size() > VISIBLE_ROWS) {
+            if (activeTab == TAB_READ) {
+                scroll = clampScroll(scroll - (int) Math.signum(dy), rows.size());
+            } else {
+                romScroll = clampScroll(romScroll - (int) Math.signum(dy), rows.size());
+            }
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, dx, dy);
@@ -161,33 +291,87 @@ public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMe
 
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
-        if (button == 0) {
-            final List<CraftingPattern> patterns = menu.discPatterns();
-            // Row click toggles that pattern's selection (mirrored server-side by button id).
-            for (int row = 0; row < Math.min(VISIBLE_ROWS, patterns.size()); row++) {
-                final int index = row + scroll;
-                if (hover((int) mouseX, (int) mouseY, LIST_X, LIST_Y + row * ROW_H, imageWidth - 16, ROW_H - 2)) {
-                    if (!selection.remove(index)) {
-                        selection.add(index);
-                    }
-                    sendButton(PatternReaderMenu.BUTTON_TOGGLE_BASE + index);
-                    return true;
+        final int mx = (int) mouseX;
+        final int my = (int) mouseY;
+        // Tabs (either mouse button).
+        if (hover(mx, my, READ_TAB_X, TAB_Y, TAB_W, TAB_H)) {
+            activeTab = TAB_READ;
+            return true;
+        }
+        if (hover(mx, my, ROM_TAB_X, TAB_Y, TAB_W, TAB_H)) {
+            activeTab = TAB_ROM;
+            requestRom();
+            return true;
+        }
+        if (activeTab == TAB_READ) {
+            return readClick(mx, my, button) || super.mouseClicked(mouseX, mouseY, button);
+        }
+        return romClick(mx, my, button) || super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean readClick(final int mx, final int my, final int button) {
+        if (button != 0) {
+            return false;
+        }
+        final List<CraftingPattern> patterns = menu.discPatterns();
+        final int scrollPos = clampScroll(scroll, patterns.size());
+        for (int row = 0; row < Math.min(VISIBLE_ROWS, patterns.size()); row++) {
+            final int index = row + scrollPos;
+            if (hover(mx, my, LIST_X, LIST_Y + row * ROW_H, imageWidth - 16, ROW_H - 2)) {
+                if (!selection.remove(index)) {
+                    selection.add(index);
                 }
-            }
-            final boolean usable = menu.hasComputer() && !patterns.isEmpty();
-            if (usable && !selection.isEmpty()
-                    && hover((int) mouseX, (int) mouseY, LOAD_SEL_X, BTN_Y, 106, BTN_H)) {
-                sendButton(PatternReaderMenu.BUTTON_LOAD_SELECTED);
-                selection.clear();
-                return true;
-            }
-            if (usable && hover((int) mouseX, (int) mouseY, LOAD_ALL_X, BTN_Y, 70, BTN_H)) {
-                sendButton(PatternReaderMenu.BUTTON_LOAD_ALL);
-                selection.clear();
+                sendButton(PatternReaderMenu.BUTTON_TOGGLE_BASE + index);
                 return true;
             }
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        final boolean usable = menu.hasComputer() && !patterns.isEmpty();
+        if (usable && !selection.isEmpty() && hover(mx, my, SEL_X, BTN_Y, SEL_W, BTN_H)) {
+            sendButton(PatternReaderMenu.BUTTON_LOAD_SELECTED);
+            selection.clear();
+            return true;
+        }
+        if (usable && hover(mx, my, ALL_X, BTN_Y, ALL_W, BTN_H)) {
+            sendButton(PatternReaderMenu.BUTTON_LOAD_ALL);
+            selection.clear();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean romClick(final int mx, final int my, final int button) {
+        final List<CraftingPattern> patterns = menu.romPatterns();
+        final int scrollPos = clampScroll(romScroll, patterns.size());
+        for (int row = 0; row < Math.min(VISIBLE_ROWS, patterns.size()); row++) {
+            final int index = row + scrollPos;
+            if (hover(mx, my, LIST_X, LIST_Y + row * ROW_H, imageWidth - 16, ROW_H - 2)) {
+                if (button == 1) {
+                    // Right-click deletes the pattern from the ROM; deletion reindexes the list, so
+                    // drop any selection and let the server push a fresh snapshot.
+                    romSelection.clear();
+                    sendButton(PatternReaderMenu.BUTTON_ROM_REMOVE_BASE + index);
+                } else if (button == 0) {
+                    if (!romSelection.remove(index)) {
+                        romSelection.add(index);
+                    }
+                    sendButton(PatternReaderMenu.BUTTON_ROM_TOGGLE_BASE + index);
+                }
+                return true;
+            }
+        }
+        if (button == 0 && canExport()) {
+            if (!romSelection.isEmpty() && hover(mx, my, SEL_X, BTN_Y, SEL_W, BTN_H)) {
+                sendButton(PatternReaderMenu.BUTTON_EXPORT_SELECTED);
+                romSelection.clear();
+                return true;
+            }
+            if (hover(mx, my, ALL_X, BTN_Y, ALL_W, BTN_H)) {
+                sendButton(PatternReaderMenu.BUTTON_EXPORT_ALL);
+                romSelection.clear();
+                return true;
+            }
+        }
+        return false;
     }
 
     private void sendButton(final int id) {

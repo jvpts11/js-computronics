@@ -35,7 +35,11 @@ public class PatternReaderMenu extends AbstractContainerMenu {
 
     public static final int BUTTON_LOAD_SELECTED = 0;
     public static final int BUTTON_LOAD_ALL = 1;
+    public static final int BUTTON_EXPORT_SELECTED = 2;
+    public static final int BUTTON_EXPORT_ALL = 3;
     public static final int BUTTON_TOGGLE_BASE = 100;
+    public static final int BUTTON_ROM_TOGGLE_BASE = 300;
+    public static final int BUTTON_ROM_REMOVE_BASE = 500;
 
     public static final int MEDIA_SLOT = 0;
     private static final int PLAYER_START = 1;
@@ -51,6 +55,10 @@ public class PatternReaderMenu extends AbstractContainerMenu {
     private final ContainerData data;
 
     private final Set<Integer> selection = new LinkedHashSet<>();
+    private final Set<Integer> romSelection = new LinkedHashSet<>();
+
+    // Client-side cache of the adjacent computer's Recipe ROM, pushed by the server (RomSnapshotPayload).
+    private List<CraftingPattern> romPatterns = List.of();
 
     public PatternReaderMenu(final int containerId, final Inventory playerInventory,
                              final PatternReaderBlockEntity be) {
@@ -119,8 +127,41 @@ public class PatternReaderMenu extends AbstractContainerMenu {
         return selection;
     }
 
+    public Set<Integer> romSelection() {
+        return romSelection;
+    }
+
+    public net.minecraft.core.BlockPos readerPos() {
+        return blockEntity.getBlockPos();
+    }
+
+    public List<CraftingPattern> romPatterns() {
+        return romPatterns;
+    }
+
+    public void setRomPatterns(final List<CraftingPattern> patterns) {
+        this.romPatterns = List.copyOf(patterns);
+    }
+
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
+        // Remove a single pattern from the adjacent computer's ROM (ROM tab, right-click a row).
+        if (id >= BUTTON_ROM_REMOVE_BASE) {
+            final int index = id - BUTTON_ROM_REMOVE_BASE;
+            blockEntity.removeFromRom(index);
+            romSelection.clear();
+            syncRom(player);
+            return true;
+        }
+        // Toggle a ROM row's selection (ROM tab, left-click a row).
+        if (id >= BUTTON_ROM_TOGGLE_BASE) {
+            final int index = id - BUTTON_ROM_TOGGLE_BASE;
+            if (index < blockEntity.romUsed() && !romSelection.remove(index)) {
+                romSelection.add(index);
+            }
+            return true;
+        }
+        // Toggle a disc row's selection (Read tab).
         if (id >= BUTTON_TOGGLE_BASE) {
             final int index = id - BUTTON_TOGGLE_BASE;
             if (index < discPatterns().size() && !selection.remove(index)) {
@@ -131,14 +172,37 @@ public class PatternReaderMenu extends AbstractContainerMenu {
         if (id == BUTTON_LOAD_SELECTED) {
             data.set(DATA_LAST_LOADED, blockEntity.loadSelected(new ArrayList<>(selection)));
             selection.clear();
+            syncRom(player);
             return true;
         }
         if (id == BUTTON_LOAD_ALL) {
             data.set(DATA_LAST_LOADED, blockEntity.loadAll());
             selection.clear();
+            syncRom(player);
+            return true;
+        }
+        if (id == BUTTON_EXPORT_SELECTED) {
+            data.set(DATA_LAST_LOADED, blockEntity.exportToDisc(new ArrayList<>(romSelection)));
+            romSelection.clear();
+            return true;
+        }
+        if (id == BUTTON_EXPORT_ALL) {
+            data.set(DATA_LAST_LOADED, blockEntity.exportAll());
+            romSelection.clear();
             return true;
         }
         return false;
+    }
+
+    /**
+     * Pushes a fresh copy of the adjacent computer's Recipe ROM to the viewing player after an action
+     * that may have changed it, so the ROM tab stays in sync without polling every tick.
+     */
+    private void syncRom(final Player player) {
+        if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                    .sendRomSnapshot(serverPlayer, blockEntity);
+        }
     }
 
     @Override

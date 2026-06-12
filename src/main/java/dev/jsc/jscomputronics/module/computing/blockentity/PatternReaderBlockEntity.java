@@ -91,6 +91,72 @@ public class PatternReaderBlockEntity extends BlockEntity {
         return loadSelected(all);
     }
 
+    /**
+     * The Recipe ROM of the adjacent Crafting Computer, or an empty list when none is touching.
+     */
+    public List<CraftingPattern> romPatterns() {
+        final CraftingComputerBlockEntity cc = adjacentComputer();
+        return cc == null ? List.of() : cc.romPatterns();
+    }
+
+    public int romUsed() {
+        final CraftingComputerBlockEntity cc = adjacentComputer();
+        return cc == null ? 0 : cc.romUsed();
+    }
+
+    public int romLimit() {
+        return CraftingComputerBlockEntity.RECIPE_ROM_LIMIT;
+    }
+
+    /**
+     * Copies the chosen Recipe ROM patterns of the adjacent Crafting Computer onto the rewritable
+     * disc in the media slot. The ROM keeps its patterns (an export is a copy, never a move) and the
+     * whole burn spends one rewrite cycle. Returns how many patterns were written to the disc.
+     */
+    public int exportToDisc(final List<Integer> romIndices) {
+        final CraftingComputerBlockEntity cc = adjacentComputer();
+        final ItemStack disc = media.getStackInSlot(0);
+        if (cc == null || disc.isEmpty() || !(disc.getItem() instanceof PatternDiscItem item)) {
+            return 0;
+        }
+        final List<CraftingPattern> rom = cc.romPatterns();
+        final List<CraftingPattern> picked = new java.util.ArrayList<>();
+        for (final int index : romIndices) {
+            if (index >= 0 && index < rom.size()) {
+                picked.add(rom.get(index));
+            }
+        }
+        final int written = item.writePatterns(disc, picked);
+        if (written > 0) {
+            setChanged();
+        }
+        return written;
+    }
+
+    public int exportAll() {
+        final CraftingComputerBlockEntity cc = adjacentComputer();
+        if (cc == null) {
+            return 0;
+        }
+        final int count = cc.romUsed();
+        final List<Integer> all = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            all.add(i);
+        }
+        return exportToDisc(all);
+    }
+
+    /**
+     * Deletes the pattern at the given Recipe ROM index from the adjacent Crafting Computer, freeing
+     * a ROM slot. The disc is not touched.
+     */
+    public void removeFromRom(final int index) {
+        final CraftingComputerBlockEntity cc = adjacentComputer();
+        if (cc != null) {
+            cc.removePattern(index);
+        }
+    }
+
     public void dropContents(final Level level, final BlockPos pos) {
         final ItemStack disc = media.getStackInSlot(0);
         if (!disc.isEmpty()) {

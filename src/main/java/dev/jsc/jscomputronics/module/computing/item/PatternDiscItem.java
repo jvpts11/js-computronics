@@ -64,6 +64,38 @@ public class PatternDiscItem extends Item {
         stack.set(ComputingModule.DISC_CYCLES.get(), cyclesLeft(stack) - 1);
     }
 
+    /**
+     * Burns the given patterns onto a rewritable disc, skipping any the disc already carries, and
+     * spends exactly one rewrite cycle for the whole write. Returns how many patterns were actually
+     * added. A write-once disc, a spent rewritable disc, or a write that adds nothing new leaves the
+     * disc untouched and costs no cycle.
+     */
+    public int writePatterns(final ItemStack stack, final List<CraftingPattern> toWrite) {
+        if (!rewritable || cyclesLeft(stack) <= 0) {
+            return 0;
+        }
+        final List<CraftingPattern> current = new ArrayList<>(patterns(stack));
+        int written = 0;
+        for (final CraftingPattern pattern : toWrite) {
+            boolean duplicate = false;
+            for (final CraftingPattern existing : current) {
+                if (existing.sameRecipe(pattern)) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate) {
+                current.add(pattern);
+                written++;
+            }
+        }
+        if (written > 0) {
+            stack.set(ComputingModule.DISC_PATTERNS.get(), List.copyOf(current));
+            stack.set(ComputingModule.DISC_CYCLES.get(), cyclesLeft(stack) - 1);
+        }
+        return written;
+    }
+
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
