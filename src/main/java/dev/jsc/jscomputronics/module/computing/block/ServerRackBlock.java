@@ -43,7 +43,8 @@ import org.jetbrains.annotations.Nullable;
  * The Server Rack: a 2-wide, 3-tall, 2-deep multiblock cabinet that is logically a single rack.
  */
 public class ServerRackBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable {
+        implements EntityBlock, DataNetworkConnectable,
+        dev.jsc.jscomputronics.common.multiblock.MultiblockBlock {
 
     public static final MapCodec<ServerRackBlock> CODEC = simpleCodec(ServerRackBlock::new);
 
@@ -79,14 +80,16 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    public java.util.List<BlockPos> footprint(final BlockPos origin, final Direction facing) {
+        return ServerRackStructure.allPositions(origin, facing);
+    }
+
+    @Override
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
-        final Level level = context.getLevel();
-        for (final BlockPos part : ServerRackStructure.partPositions(context.getClickedPos(), facing)) {
-            if (!level.getBlockState(part).canBeReplaced()) {
-                return null; // no room for the 2x3x2 cabinet — cancel placement, item not consumed
-            }
+        if (!canPlaceAt(context.getLevel(), context.getClickedPos(), facing)) {
+            return null; // no room for the 2x3x2 cabinet — cancel placement, item not consumed
         }
         return defaultBlockState().setValue(FACING, facing);
     }

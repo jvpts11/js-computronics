@@ -39,7 +39,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public class MainframeBlock extends HorizontalDirectionalBlock
         implements EntityBlock, dev.jsc.jscomputronics.common.network.DataNetworkConnectable,
-        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
+        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable,
+        dev.jsc.jscomputronics.common.multiblock.MultiblockBlock {
 
     public static final MapCodec<MainframeBlock> CODEC = simpleCodec(MainframeBlock::new);
 
@@ -71,14 +72,16 @@ public class MainframeBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    public java.util.List<BlockPos> footprint(final BlockPos origin, final Direction facing) {
+        return MainframeStructure.allPositions(origin, facing);
+    }
+
+    @Override
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
-        final Level level = context.getLevel();
-        for (final BlockPos part : MainframeStructure.partPositions(context.getClickedPos(), facing)) {
-            if (!level.getBlockState(part).canBeReplaced()) {
-                return null; // no room for the 3x2x2 structure — cancel placement, item not consumed
-            }
+        if (!canPlaceAt(context.getLevel(), context.getClickedPos(), facing)) {
+            return null; // no room for the 3x2x2 structure — cancel placement, item not consumed
         }
         return defaultBlockState().setValue(FACING, facing);
     }
