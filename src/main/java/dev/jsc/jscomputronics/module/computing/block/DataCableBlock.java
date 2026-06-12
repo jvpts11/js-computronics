@@ -109,12 +109,16 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
     }
 
     private boolean connectsTo(final LevelAccessor level, final BlockPos pos, final Direction direction) {
-        final var neighbor = level.getBlockState(pos.relative(direction)).getBlock();
+        final BlockState neighborState = level.getBlockState(pos.relative(direction));
+        final var neighbor = neighborState.getBlock();
         if (neighbor instanceof DataCableBlock other) {
             return other.tier == this.tier;
         }
+        // The cable only shows a connection where the device actually accepts a cable on that face
+        // (a computer accepts one on its rear only), so the rendered nub never lies about connectivity.
         return neighbor instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable device
-                && device.acceptedCableTiers().contains(this.tier);
+                && device.acceptedCableTiers().contains(this.tier)
+                && device.connectsOnFace(neighborState, direction.getOpposite());
     }
 
     // Shape: the cable pipe plus a box for each mounted part

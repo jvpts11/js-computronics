@@ -2291,8 +2291,60 @@ public final class NetworkGameTests {
         }
     }
 
+    @GameTest(template = ARENA)
+    public static void computer_acceptsCableOnRearFaceOnly(final GameTestHelper helper) {
+        final BlockPos pc = new BlockPos(2, 2, 2);
+        helper.setBlock(pc, ComputingModule.PERSONAL_COMPUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        net.minecraft.core.Direction.NORTH));
+        final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pc);
+        final dev.jsc.jscomputronics.common.network.DataNetworkConnectable block =
+                (dev.jsc.jscomputronics.common.network.DataNetworkConnectable) state.getBlock();
+        // A north-facing computer's rear is south: only that face takes a cable.
+        helper.assertTrue(block.connectsOnFace(state, net.minecraft.core.Direction.SOUTH),
+                "the rear (south) face must accept a cable");
+        helper.assertFalse(block.connectsOnFace(state, net.minecraft.core.Direction.NORTH),
+                "the front must reject a cable");
+        helper.assertFalse(block.connectsOnFace(state, net.minecraft.core.Direction.EAST),
+                "a side must reject a cable");
+        helper.assertFalse(block.connectsOnFace(state, net.minecraft.core.Direction.UP),
+                "the top must reject a cable");
+        // The Mainframe is the exception: it still takes a cable on any face.
+        final BlockPos mf = new BlockPos(4, 2, 2);
+        helper.setBlock(mf, ComputingModule.MAINFRAME.get());
+        final net.minecraft.world.level.block.state.BlockState mfState = helper.getBlockState(mf);
+        if (mfState.getBlock() instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable mainframe) {
+            helper.assertTrue(mainframe.connectsOnFace(mfState, net.minecraft.core.Direction.EAST),
+                    "the Mainframe accepts a cable on any face");
+            helper.assertTrue(mainframe.connectsOnFace(mfState, net.minecraft.core.Direction.UP),
+                    "the Mainframe accepts a cable on any face");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * Turns a just-placed computer so its rear (its only data port) meets an adjacent horizontal
+     * cable. Computers now connect through the back face alone, so a test that drops one beside a
+     * cable must orient it; this keeps the fixtures declaring "computer next to cable" working.
+     */
+    private static void faceRearTowardCable(final GameTestHelper helper, final BlockPos pos) {
+        final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pos);
+        if (!state.hasProperty(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)) {
+            return;
+        }
+        for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            if (helper.getBlockState(pos.relative(d)).getBlock()
+                    instanceof dev.jsc.jscomputronics.module.computing.block.DataCableBlock) {
+                helper.setBlock(pos, state.setValue(
+                        net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, d.getOpposite()));
+                return;
+            }
+        }
+    }
+
     private static PersonalComputerBlockEntity placeRunningPC(final GameTestHelper helper, final BlockPos relative) {
         helper.setBlock(relative, ComputingModule.PERSONAL_COMPUTER.get());
+        faceRearTowardCable(helper, relative);
         if (!(helper.getBlockEntity(relative) instanceof PersonalComputerBlockEntity be)) {
             throw new IllegalStateException("no personal computer at " + relative);
         }
@@ -2312,6 +2364,7 @@ public final class NetworkGameTests {
     private static CraftingComputerBlockEntity placeRunningCraftingComputer(
             final GameTestHelper helper, final BlockPos relative) {
         helper.setBlock(relative, ComputingModule.CRAFTING_COMPUTER.get());
+        faceRearTowardCable(helper, relative);
         if (!(helper.getBlockEntity(relative) instanceof CraftingComputerBlockEntity be)) {
             throw new IllegalStateException("no crafting computer at " + relative);
         }

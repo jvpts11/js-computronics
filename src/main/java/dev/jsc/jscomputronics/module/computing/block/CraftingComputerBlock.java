@@ -57,6 +57,12 @@ public class CraftingComputerBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    public boolean connectsOnFace(final BlockState state, final Direction face) {
+        // A Crafting Computer plugs into the network through its rear only.
+        return face == state.getValue(FACING).getOpposite();
+    }
+
+    @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING);
     }

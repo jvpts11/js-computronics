@@ -537,6 +537,7 @@ public final class CraftingGameTests {
         helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
 
         helper.setBlock(cc, ComputingModule.CRAFTING_COMPUTER.get());
+        faceRearTowardCable(helper, cc);
         if (!(helper.getBlockEntity(cc) instanceof CraftingComputerBlockEntity ccBe)) {
             throw new IllegalStateException("no crafting computer");
         }
@@ -562,6 +563,25 @@ public final class CraftingGameTests {
     }
 
     // Pattern fixtures
+
+    /**
+     * Turns a just-placed computer so its rear (its only data port) meets an adjacent horizontal
+     * cable, since computers now connect through the back face alone.
+     */
+    private static void faceRearTowardCable(final GameTestHelper helper, final BlockPos pos) {
+        final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pos);
+        if (!state.hasProperty(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)) {
+            return;
+        }
+        for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            if (helper.getBlockState(pos.relative(d)).getBlock()
+                    instanceof dev.jsc.jscomputronics.module.computing.block.DataCableBlock) {
+                helper.setBlock(pos, state.setValue(
+                        net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, d.getOpposite()));
+                return;
+            }
+        }
+    }
 
     private static CraftingPattern planksPattern(final int count) {
         final List<ItemStack> grid = emptyGrid();

@@ -370,7 +370,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
     }
 
     protected long adjacentCable(final ServerLevel level) {
-        for (final Direction direction : Direction.values()) {
+        for (final Direction direction : cableSearchFaces()) {
             final BlockPos neighbor = worldPosition.relative(direction);
             if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock cable
                     && acceptsTier(cable.tier())) {
@@ -378,6 +378,27 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
             }
         }
         return NO_CABLE;
+    }
+
+    /**
+     * The faces on which this computer will accept a data cable, derived from the block's
+     * {@link dev.jsc.jscomputronics.common.network.DataNetworkConnectable#connectsOnFace} so the
+     * device's attachment and the cable's rendered connection always agree. A standalone computer
+     * reports only its rear; the Mainframe (a separate block entity) and the cluster nodes keep every
+     * face.
+     */
+    protected java.util.List<Direction> cableSearchFaces() {
+        final BlockState state = getBlockState();
+        if (state.getBlock() instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable device) {
+            final java.util.List<Direction> faces = new java.util.ArrayList<>(Direction.values().length);
+            for (final Direction direction : Direction.values()) {
+                if (device.connectsOnFace(state, direction)) {
+                    faces.add(direction);
+                }
+            }
+            return faces;
+        }
+        return java.util.Arrays.asList(Direction.values());
     }
 
     protected boolean acceptsTier(final DataTier tier) {
