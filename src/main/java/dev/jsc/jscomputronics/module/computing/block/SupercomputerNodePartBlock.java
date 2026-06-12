@@ -10,28 +10,36 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.phys.BlockHitResult;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * A structural section of the Supercomputer Node tower — the mid compute section or the vented cap.
+ * A structural part of the Supercomputer Node cabinet.
  */
-public class SupercomputerNodePartBlock extends Block implements DataNetworkConnectable {
+public class SupercomputerNodePartBlock extends Block implements EntityBlock, DataNetworkConnectable {
 
     public static final MapCodec<SupercomputerNodePartBlock> CODEC =
             simpleCodec(SupercomputerNodePartBlock::new);
 
     public static final BooleanProperty TOP = BooleanProperty.create("top");
+
+    public static final BooleanProperty FRONT = BooleanProperty.create("front");
+
+    public static final BooleanProperty FILLED = SupercomputerNodeBlock.FILLED;
 
     public static final DirectionProperty FACING =
             net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
@@ -40,6 +48,8 @@ public class SupercomputerNodePartBlock extends Block implements DataNetworkConn
         super(properties);
         registerDefaultState(stateDefinition.any()
                 .setValue(TOP, false)
+                .setValue(FRONT, false)
+                .setValue(FILLED, false)
                 .setValue(FACING, Direction.NORTH));
     }
 
@@ -55,25 +65,26 @@ public class SupercomputerNodePartBlock extends Block implements DataNetworkConn
 
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(TOP, FACING);
+        builder.add(TOP, FRONT, FILLED, FACING);
     }
 
-    @org.jetbrains.annotations.Nullable
-    public static BlockPos controllerBelow(final Level level, final BlockPos part) {
-        for (int down = 1; down < SupercomputerNodeBlock.HEIGHT; down++) {
-            final BlockPos candidate = part.below(down);
-            if (level.getBlockState(candidate).getBlock() instanceof SupercomputerNodeBlock) {
-                return candidate;
-            }
-        }
-        return null;
+    @Override
+    @Nullable
+    public BlockEntity newBlockEntity(final BlockPos pos, final BlockState state) {
+        return new SupercomputerNodePartBlockEntity(pos, state);
+    }
+
+    @Nullable
+    public static BlockPos controllerOf(final Level level, final BlockPos part) {
+        return level.getBlockEntity(part) instanceof SupercomputerNodePartBlockEntity partBe
+                ? partBe.controllerPos() : null;
     }
 
     @Override
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
-        final BlockPos controller = controllerBelow(level, pos);
-        if (controller != null) {
+        final BlockPos controller = controllerOf(level, pos);
+        if (controller != null && level.getBlockState(controller).getBlock() instanceof SupercomputerNodeBlock) {
             return level.getBlockState(controller).useWithoutItem(level, player,
                     new BlockHitResult(hit.getLocation(), hit.getDirection(), controller, false));
         }
@@ -83,11 +94,12 @@ public class SupercomputerNodePartBlock extends Block implements DataNetworkConn
     @Override
     protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
                             final BlockState newState, final boolean movedByPiston) {
-        if (!state.is(newState.getBlock())) {
-            final BlockPos controller = controllerBelow(level, pos);
+        if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
+            final BlockPos controller = controllerOf(level, pos);
             if (controller != null
-                    && level.getBlockEntity(controller) instanceof SupercomputerNodeBlockEntity) {
-                level.destroyBlock(controller, true); // the controller drops its hardware
+                    && level.getBlockState(controller).getBlock() instanceof SupercomputerNodeBlock) {
+                // The controller drops its hardware and its own onRemove dissolves the cabinet.
+                serverLevel.destroyBlock(controller, true);
             }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);

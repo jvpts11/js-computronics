@@ -12,9 +12,11 @@ import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
@@ -36,14 +38,13 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The Supercomputer Node tower controller.
+ * The Supercomputer Node cabinet controller. The cabinet shares the Server Rack footprint
+ * (2 wide, 3 tall, 2 deep) so the two stand side by side in a datacenter aisle.
  */
 public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
         implements EntityBlock, DataNetworkConnectable {
 
     public static final MapCodec<SupercomputerNodeBlock> CODEC = simpleCodec(SupercomputerNodeBlock::new);
-
-    public static final int HEIGHT = 3;
 
     public static final BooleanProperty FILLED = BooleanProperty.create("filled");
 
@@ -72,24 +73,32 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
     @Override
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
+        final Direction facing = context.getHorizontalDirection().getOpposite();
         final Level level = context.getLevel();
-        for (int h = 1; h < HEIGHT; h++) {
-            if (!level.getBlockState(context.getClickedPos().above(h)).canBeReplaced()) {
-                return null; // no room for the tower — cancel, the item is not consumed
+        for (final BlockPos part : ServerRackStructure.partPositions(context.getClickedPos(), facing)) {
+            if (!level.getBlockState(part).canBeReplaced()) {
+                return null; // no room for the cabinet — cancel placement, item not consumed
             }
         }
-        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+        return defaultBlockState().setValue(FACING, facing);
     }
 
     @Override
     public void setPlacedBy(final Level level, final BlockPos pos, final BlockState state,
                             @Nullable final LivingEntity placer, final ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        for (int h = 1; h < HEIGHT; h++) {
-            level.setBlock(pos.above(h), ComputingModule.SUPERCOMPUTER_NODE_PART.get().defaultBlockState()
-                    .setValue(SupercomputerNodePartBlock.TOP, h == HEIGHT - 1)
-                    .setValue(SupercomputerNodePartBlock.FACING, state.getValue(FACING)),
+        final Direction facing = state.getValue(FACING);
+        final boolean server = !level.isClientSide();
+        for (final BlockPos part : ServerRackStructure.partPositions(pos, facing)) {
+            level.setBlock(part, ComputingModule.SUPERCOMPUTER_NODE_PART.get().defaultBlockState()
+                    .setValue(SupercomputerNodePartBlock.TOP, ServerRackStructure.isTopLayer(pos, part))
+                    .setValue(SupercomputerNodePartBlock.FRONT,
+                            ServerRackStructure.isFrontBayBlock(pos, facing, part))
+                    .setValue(SupercomputerNodePartBlock.FACING, facing),
                     Block.UPDATE_ALL);
+            if (server && level.getBlockEntity(part) instanceof SupercomputerNodePartBlockEntity partBe) {
+                partBe.setController(pos);
+            }
         }
     }
 
@@ -111,19 +120,34 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
     @Override
     protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
                             final BlockState newState, final boolean movedByPiston) {
-        if (!state.is(newState.getBlock())) {
-            if (level instanceof net.minecraft.server.level.ServerLevel serverLevel
-                    && level.getBlockEntity(pos) instanceof SupercomputerNodeBlockEntity node) {
+        if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
+            if (level.getBlockEntity(pos) instanceof SupercomputerNodeBlockEntity node) {
                 node.onBroken(serverLevel);
             }
-            for (int h = 1; h < HEIGHT; h++) {
-                if (level.getBlockState(pos.above(h)).getBlock() instanceof SupercomputerNodePartBlock) {
-                    level.setBlock(pos.above(h), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(),
-                            Block.UPDATE_ALL);
-                }
-            }
+            dissolve(serverLevel, pos, state.getValue(FACING));
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    private static final java.util.Set<BlockPos> DISSOLVING =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    static void dissolve(final ServerLevel level, final BlockPos controllerPos, final Direction facing) {
+        if (!DISSOLVING.add(controllerPos.immutable())) {
+            return;
+        }
+        try {
+            for (final BlockPos part : ServerRackStructure.partPositions(controllerPos, facing)) {
+                if (level.getBlockState(part).getBlock() instanceof SupercomputerNodePartBlock) {
+                    level.removeBlock(part, false);
+                }
+            }
+            if (level.getBlockState(controllerPos).getBlock() instanceof SupercomputerNodeBlock) {
+                level.removeBlock(controllerPos, false);
+            }
+        } finally {
+            DISSOLVING.remove(controllerPos);
+        }
     }
 
     @Override

@@ -64,13 +64,31 @@ public class SupercomputerNodeBlockEntity extends AbstractComputerBlockEntity {
     }
 
     private void syncRunningVisual(final ServerLevel serverLevel) {
-        if (getBlockState().getBlock()
-                instanceof dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock) {
-            final boolean running = isRunning();
-            if (getBlockState().getValue(
-                    dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED) != running) {
-                serverLevel.setBlock(worldPosition, getBlockState().setValue(
-                        dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED, running),
+        if (!(getBlockState().getBlock()
+                instanceof dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock)) {
+            return;
+        }
+        final boolean running = isRunning();
+        if (getBlockState().getValue(
+                dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED) != running) {
+            serverLevel.setBlock(worldPosition, getBlockState().setValue(
+                    dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED, running),
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
+        // The whole cabinet lights up with the controller.
+        final net.minecraft.core.Direction facing = getBlockState().getValue(
+                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+        for (final net.minecraft.core.BlockPos part
+                : dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                        .partPositions(worldPosition, facing)) {
+            final net.minecraft.world.level.block.state.BlockState partState = serverLevel.getBlockState(part);
+            if (partState.getBlock()
+                    instanceof dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock
+                    && partState.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FILLED)
+                            != running) {
+                serverLevel.setBlock(part, partState.setValue(
+                        dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FILLED, running),
                         net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
             }
         }

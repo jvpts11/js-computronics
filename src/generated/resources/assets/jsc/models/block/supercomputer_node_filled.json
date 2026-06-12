@@ -1,7 +1,8 @@
 {
-  "parent": "minecraft:block/cube_column",
+  "parent": "minecraft:block/orientable",
   "textures": {
-    "end": "jsc:block/supercomputer_node_top",
-    "side": "jsc:block/supercomputer_node_side_filled"
+    "front": "jsc:block/supercomputer_node_front_filled",
+    "side": "jsc:block/supercomputer_node_side",
+    "top": "jsc:block/supercomputer_node_top"
   }
 }

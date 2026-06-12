@@ -623,6 +623,13 @@ public final class ComputingModule {
                                     .mapColor(MapColor.COLOR_GRAY)
                                     .strength(3.0F)));
 
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity>>
+            SUPERCOMPUTER_NODE_PART_BE = BLOCK_ENTITIES.register("supercomputer_node_part",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity::new,
+                            SUPERCOMPUTER_NODE_PART.get()).build(null));
+
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jsc.jscomputronics.module.computing.menu.SupercomputerNodeMenu>>
             SUPERCOMPUTER_NODE_MENU = MENUS.register("supercomputer_node",

@@ -120,7 +120,7 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
                 } else if (state.getBlock()
                         instanceof dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock) {
                     controller = dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock
-                            .controllerBelow(serverLevel, neighbor);
+                            .controllerOf(serverLevel, neighbor);
                 }
                 if (controller != null) {
                     queue.add(neighbor);

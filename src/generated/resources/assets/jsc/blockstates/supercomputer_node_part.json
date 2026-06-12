@@ -1,28 +1,124 @@
 {
   "variants": {
-    "facing=east,top=false": {
-      "model": "jsc:block/supercomputer_node_mid"
+    "facing=east,filled=false,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 90
     },
-    "facing=east,top=true": {
-      "model": "jsc:block/supercomputer_node_cap"
+    "facing=east,filled=false,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 90
     },
-    "facing=north,top=false": {
-      "model": "jsc:block/supercomputer_node_mid"
+    "facing=east,filled=false,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node",
+      "y": 90
     },
-    "facing=north,top=true": {
-      "model": "jsc:block/supercomputer_node_cap"
+    "facing=east,filled=false,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node",
+      "y": 90
     },
-    "facing=south,top=false": {
-      "model": "jsc:block/supercomputer_node_mid"
+    "facing=east,filled=true,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 90
     },
-    "facing=south,top=true": {
-      "model": "jsc:block/supercomputer_node_cap"
+    "facing=east,filled=true,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 90
     },
-    "facing=west,top=false": {
-      "model": "jsc:block/supercomputer_node_mid"
+    "facing=east,filled=true,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node_filled",
+      "y": 90
     },
-    "facing=west,top=true": {
-      "model": "jsc:block/supercomputer_node_cap"
+    "facing=east,filled=true,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node_filled",
+      "y": 90
+    },
+    "facing=north,filled=false,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain"
+    },
+    "facing=north,filled=false,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain"
+    },
+    "facing=north,filled=false,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node"
+    },
+    "facing=north,filled=false,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node"
+    },
+    "facing=north,filled=true,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain"
+    },
+    "facing=north,filled=true,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain"
+    },
+    "facing=north,filled=true,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node_filled"
+    },
+    "facing=north,filled=true,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node_filled"
+    },
+    "facing=south,filled=false,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 180
+    },
+    "facing=south,filled=false,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 180
+    },
+    "facing=south,filled=false,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node",
+      "y": 180
+    },
+    "facing=south,filled=false,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node",
+      "y": 180
+    },
+    "facing=south,filled=true,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 180
+    },
+    "facing=south,filled=true,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 180
+    },
+    "facing=south,filled=true,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node_filled",
+      "y": 180
+    },
+    "facing=south,filled=true,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node_filled",
+      "y": 180
+    },
+    "facing=west,filled=false,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 270
+    },
+    "facing=west,filled=false,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 270
+    },
+    "facing=west,filled=false,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node",
+      "y": 270
+    },
+    "facing=west,filled=false,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node",
+      "y": 270
+    },
+    "facing=west,filled=true,front=false,top=false": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 270
+    },
+    "facing=west,filled=true,front=false,top=true": {
+      "model": "jsc:block/supercomputer_node_plain",
+      "y": 270
+    },
+    "facing=west,filled=true,front=true,top=false": {
+      "model": "jsc:block/supercomputer_node_filled",
+      "y": 270
+    },
+    "facing=west,filled=true,front=true,top=true": {
+      "model": "jsc:block/supercomputer_node_filled",
+      "y": 270
     }
   }
 }

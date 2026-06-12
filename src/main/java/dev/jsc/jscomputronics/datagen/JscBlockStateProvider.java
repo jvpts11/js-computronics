@@ -153,32 +153,43 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/crafting_computer_top"));
         horizontalBlock(ComputingModule.CRAFTING_COMPUTER.get(), craftingComputerModel);
 
-        // Supercomputer cluster: nodes light up when a co-processor is seated; the
-        // HBW Interface is the uplink; the console is a hand-written kiosk model.
-        final ModelFile nodeEmpty = models().cubeColumn(
-                "supercomputer_node", modLoc("block/supercomputer_node_side"),
+        // Supercomputer cluster: the node is a rack-sized cabinet whose front lights up while it
+        // runs; the HBW Interface is the uplink; the console is a hand-written kiosk model.
+        final ModelFile nodeFront = models().orientable(
+                "supercomputer_node",
+                modLoc("block/supercomputer_node_side"),
+                modLoc("block/supercomputer_node_front"),
                 modLoc("block/supercomputer_node_top"));
-        final ModelFile nodeFilled = models().cubeColumn(
-                "supercomputer_node_filled", modLoc("block/supercomputer_node_side_filled"),
+        final ModelFile nodeFrontFilled = models().orientable(
+                "supercomputer_node_filled",
+                modLoc("block/supercomputer_node_side"),
+                modLoc("block/supercomputer_node_front_filled"),
+                modLoc("block/supercomputer_node_top"));
+        final ModelFile nodePlain = models().cubeColumn(
+                "supercomputer_node_plain",
+                modLoc("block/supercomputer_node_side"),
                 modLoc("block/supercomputer_node_top"));
         getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE.get()).forAllStates(state ->
                 net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
                         .modelFile(state.getValue(
                                 dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED)
-                                ? nodeFilled : nodeEmpty)
+                                ? nodeFrontFilled : nodeFront)
+                        .rotationY(((int) state.getValue(
+                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)
+                                .toYRot() + 180) % 360)
                         .build());
-        final ModelFile nodeMid = models().cubeColumn(
-                "supercomputer_node_mid", modLoc("block/supercomputer_node_mid"),
-                modLoc("block/supercomputer_node_top"));
-        final ModelFile nodeCap = models().cubeColumn(
-                "supercomputer_node_cap", modLoc("block/supercomputer_node_cap"),
-                modLoc("block/supercomputer_node_top"));
-        getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE_PART.get()).forAllStates(state ->
-                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(state.getValue(
-                                dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.TOP)
-                                ? nodeCap : nodeMid)
-                        .build());
+        getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE_PART.get()).forAllStates(state -> {
+            final boolean front = state.getValue(
+                    dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FRONT);
+            final boolean filled = state.getValue(
+                    dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FILLED);
+            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                    .modelFile(front ? (filled ? nodeFrontFilled : nodeFront) : nodePlain)
+                    .rotationY(((int) state.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FACING)
+                            .toYRot() + 180) % 360)
+                    .build();
+        });
 
         simpleBlock(ComputingModule.HBW_INTERFACE.get(), models().cubeColumn(
                 "hbw_interface", modLoc("block/hbw_interface_side"), modLoc("block/hbw_interface_top")));

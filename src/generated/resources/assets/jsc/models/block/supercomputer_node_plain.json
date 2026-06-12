@@ -2,6 +2,6 @@
   "parent": "minecraft:block/cube_column",
   "textures": {
     "end": "jsc:block/supercomputer_node_top",
-    "side": "jsc:block/supercomputer_node_cap"
+    "side": "jsc:block/supercomputer_node_side"
   }
 }
