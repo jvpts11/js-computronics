@@ -258,6 +258,20 @@ class CliShellTest {
             return OpResult.ok("ok");
         }
 
+        @Override public OpResult lock(final String item, final long quantity) {
+            lastCall = "lock(" + item + ", " + quantity + ")";
+            return OpResult.ok("ok");
+        }
+
+        @Override public OpResult unlock(final String item) {
+            lastCall = "unlock(" + item + ")";
+            return OpResult.ok("ok");
+        }
+
+        @Override public List<StoredItem> locks() {
+            return List.of();
+        }
+
         @Override public List<ActiveOp> activeOps() {
             return List.of();
         }

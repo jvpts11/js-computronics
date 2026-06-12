@@ -738,6 +738,55 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void manualLock_makesConcurrentSelectWaitUntilUnlocked(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(3, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
+        final dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[] op =
+                new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[1];
+        final ItemStackHandler dest = new ItemStackHandler(9);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(mainframe.networkUuid() != null, "mainframe owns a network");
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 100);
+                })
+                // Let the Mainframe's incremental ANALYZE index the freshly seeded items.
+                .thenExecuteAfter(3, () -> {
+                    final long held = mainframe.lockType(cobble, Long.MAX_VALUE, null);
+                    helper.assertTrue(held == 100, "LOCK must hold all 100 cobblestone; got " + held);
+                    op[0] = mainframe.submitNetworkSelect(Items.COBBLESTONE, 50,
+                            new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null), "test");
+                    helper.assertTrue(op[0] != null, "Mainframe should dispatch the SELECT");
+                })
+                .thenExecuteAfter(5, () -> {
+                    helper.assertTrue(op[0].isWaiting(), "the SELECT must WAIT while the type is locked");
+                    helper.assertFalse(op[0].isDone(), "a waiting SELECT is not done");
+                    final long released = mainframe.unlockType(cobble);
+                    helper.assertTrue(released == 100, "UNLOCK must release the 100 held; got " + released);
+                })
+                .thenExecuteAfter(12, () -> {
+                    helper.assertTrue(op[0].isDone(), "the SELECT must finish once the lock is released");
+                    helper.assertTrue(op[0].status() == OperationRecord.STATUS_COMPLETED,
+                            "the SELECT must complete fully after unlock; status " + op[0].status());
+                    final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid());
+                    helper.assertTrue(ns.count(Items.COBBLESTONE) == 50,
+                            "the network must hold 50 after the SELECT; got " + ns.count(Items.COBBLESTONE));
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void networkStorage_capsAtDiskCapacity(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);

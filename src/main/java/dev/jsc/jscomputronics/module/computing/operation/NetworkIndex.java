@@ -40,6 +40,13 @@ public final class NetworkIndex {
     private final Map<StorageKey, List<ItemLocation>> catalog = new LinkedHashMap<>();
     private final StorageLockTable<StorageKey> locks = new StorageLockTable<>();
     private final Map<NodeUuid, Long> indexedModCounts = new LinkedHashMap<>();
+    // Player-issued holds: one reservation per item type, kept alive until an explicit unlock so that
+    // every other Operation contending for that type WAITs. Distinct from the per-Operation locks above
+    // (those are keyed by the Operation's id and freed when it settles).
+    private final Map<StorageKey, ManualLock> manualLocks = new LinkedHashMap<>();
+
+    private record ManualLock(UUID id, long amount) {
+    }
 
     public void rebuild(final ServerLevel level, final NetworkUuid network) {
         catalog.clear();
@@ -286,10 +293,67 @@ public final class NetworkIndex {
         return locks.holdsLocks(operation);
     }
 
+    // Manual locking (player-issued holds that make concurrent Operations WAIT)
+
+    /**
+     * Reserves up to {@code demand} of {@code key} across the network under a standing hold, so that
+     * every Operation that later contends for it WAITs. A second lock on a type already held is a no-op.
+     *
+     * @param allowed the servers the hold may draw from, or {@code null} for the whole network
+     * @return the amount actually held (0 if the type was already locked or nothing was free to hold)
+     */
+    public long manualLock(final StorageKey key, final long demand, final java.util.Set<NodeUuid> allowed) {
+        if (demand <= 0L || manualLocks.containsKey(key)) {
+            return 0L;
+        }
+        final UUID id = UUID.randomUUID();
+        final Allocation plan = lock(id, key, demand, allowed);
+        if (plan.allocated() <= 0L) {
+            locks.unlock(id); // reserved nothing — leave no empty holder behind
+            return 0L;
+        }
+        manualLocks.put(key, new ManualLock(id, plan.allocated()));
+        return plan.allocated();
+    }
+
+    /**
+     * Releases the standing hold on {@code key}.
+     *
+     * @return the amount that was held (0 if the type was not manually locked)
+     */
+    public long manualUnlock(final StorageKey key) {
+        final ManualLock held = manualLocks.remove(key);
+        if (held == null) {
+            return 0L;
+        }
+        locks.unlock(held.id());
+        return held.amount();
+    }
+
+    public int manualUnlockAll() {
+        final int count = manualLocks.size();
+        for (final ManualLock held : manualLocks.values()) {
+            locks.unlock(held.id());
+        }
+        manualLocks.clear();
+        return count;
+    }
+
+    public boolean isManuallyLocked(final StorageKey key) {
+        return manualLocks.containsKey(key);
+    }
+
+    public Map<StorageKey, Long> manualLockView() {
+        final Map<StorageKey, Long> out = new LinkedHashMap<>();
+        manualLocks.forEach((key, held) -> out.put(key, held.amount()));
+        return out;
+    }
+
     public void clear() {
         catalog.clear();
         locks.clear();
         indexedModCounts.clear();
+        manualLocks.clear();
     }
 
     // Readout (for the Mainframe terminal's Maintenance tab)

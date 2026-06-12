@@ -233,6 +233,56 @@ public final class ServerCliComputer implements CliComputer {
     }
 
     @Override
+    public OpResult lock(final String item, final long quantity) {
+        final StorageKey key = resolveKey(item);
+        if (key == null) {
+            return OpResult.fail("unknown item: " + item);
+        }
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        final long demand = quantity > 0L ? quantity : Long.MAX_VALUE; // 0 locks everything available
+        final long held = mainframe.lockType(key, demand, null);
+        if (held <= 0L) {
+            return OpResult.fail(mainframe.networkIndex().isManuallyLocked(key)
+                    ? key.displayName().getString() + " is already locked"
+                    : "nothing to lock: the network holds no free " + key.displayName().getString());
+        }
+        return OpResult.ok("LOCK held " + held + " " + key.displayName().getString()
+                + " (concurrent operations will wait)");
+    }
+
+    @Override
+    public OpResult unlock(final String item) {
+        final StorageKey key = resolveKey(item);
+        if (key == null) {
+            return OpResult.fail("unknown item: " + item);
+        }
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        final long released = mainframe.unlockType(key);
+        if (released <= 0L) {
+            return OpResult.fail(key.displayName().getString() + " is not locked");
+        }
+        return OpResult.ok("UNLOCK released " + released + " " + key.displayName().getString());
+    }
+
+    @Override
+    public List<StoredItem> locks() {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return List.of();
+        }
+        final List<StoredItem> rows = new ArrayList<>();
+        mainframe.lockedTypes().forEach((key, amount) ->
+                rows.add(new StoredItem(key.displayName().getString(), amount)));
+        return rows;
+    }
+
+    @Override
     public List<ActiveOp> activeOps() {
         final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
         if (mainframe == null) {

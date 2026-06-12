@@ -60,6 +60,15 @@ public interface CliComputer {
     /** Ask the network to craft the named item. */
     OpResult craft(String item, long quantity);
 
+    /** Place a standing hold on the named item so concurrent operations WAIT on it. */
+    OpResult lock(String item, long quantity);
+
+    /** Release the standing hold on the named item. */
+    OpResult unlock(String item);
+
+    /** The item types currently held by a manual lock, and how much each holds. */
+    List<StoredItem> locks();
+
     /** The operations currently in flight on the network. */
     List<ActiveOp> activeOps();
 

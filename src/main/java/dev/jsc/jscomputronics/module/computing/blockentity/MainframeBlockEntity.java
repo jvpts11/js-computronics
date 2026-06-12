@@ -875,6 +875,26 @@ public class MainframeBlockEntity extends BlockEntity
         return operation;
     }
 
+    // Manual LOCK / UNLOCK — player-issued holds on a network item type that make concurrent
+    // Operations WAIT, the explicit handle on storage concurrency.
+
+    public long lockType(final dev.jsc.jscomputronics.module.computing.storage.StorageKey key,
+                         final long demand,
+                         @Nullable final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+        if (!isRunning() || networkUuid() == null) {
+            return 0L;
+        }
+        return networkIndex.manualLock(key, demand, sources);
+    }
+
+    public long unlockType(final dev.jsc.jscomputronics.module.computing.storage.StorageKey key) {
+        return networkIndex.manualUnlock(key);
+    }
+
+    public java.util.Map<dev.jsc.jscomputronics.module.computing.storage.StorageKey, Long> lockedTypes() {
+        return networkIndex.manualLockView();
+    }
+
     private void tickOperations() {
         if (activeOperations.isEmpty()) {
             return;

@@ -37,6 +37,9 @@ public final class BuiltinCommands {
                 new Select(),
                 new Insert(),
                 new Craft(),
+                new Lock(),
+                new Unlock(),
+                new Locks(),
                 new Ops(),
                 new Operation(),
                 new Devices(),
@@ -412,6 +415,92 @@ public final class BuiltinCommands {
 
         @Override CliComputer.OpResult act(final CliComputer c, final String item, final long qty) {
             return c.craft(item, qty);
+        }
+    }
+
+    static final class Lock implements CliCommand {
+        @Override public String name() {
+            return "lock";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("hold");
+        }
+
+        @Override public String summary() {
+            return "hold an item so concurrent operations wait";
+        }
+
+        @Override public String usage() {
+            return "<item> | <quantity> <item>";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: lock " + usage());
+                return;
+            }
+            if (!ctx.computer().onNetwork()) {
+                ctx.out().error("not on a network");
+                return;
+            }
+            // "lock <quantity> <item>" reserves an amount; "lock <item>" holds everything available.
+            final long qty = ctx.longArg(0);
+            final String item = qty > 0L && ctx.argCount() >= 2 ? ctx.rest(1) : ctx.rest(0);
+            final CliComputer.OpResult result = ctx.computer().lock(item, qty > 0L ? qty : 0L);
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    static final class Unlock implements CliCommand {
+        @Override public String name() {
+            return "unlock";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("release");
+        }
+
+        @Override public String summary() {
+            return "release a held item";
+        }
+
+        @Override public String usage() {
+            return "<item>";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: unlock <item>");
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().unlock(ctx.rest(0));
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    static final class Locks implements CliCommand {
+        @Override public String name() {
+            return "locks";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("holds");
+        }
+
+        @Override public String summary() {
+            return "list held item types";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            final List<CliComputer.StoredItem> held = ctx.computer().locks();
+            if (held.isEmpty()) {
+                ctx.out().dim("no items are locked");
+                return;
+            }
+            for (final CliComputer.StoredItem row : held) {
+                ctx.out().row(row.name(), group(row.quantity()));
+            }
         }
     }
 
