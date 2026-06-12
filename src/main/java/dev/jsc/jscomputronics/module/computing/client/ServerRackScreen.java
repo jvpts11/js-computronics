@@ -42,7 +42,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     public ServerRackScreen(final ServerRackMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
         this.imageWidth = 244;
-        this.imageHeight = 300;
+        this.imageHeight = 228;
         this.titleLabelX = -10000;
         this.inventoryLabelY = -10000;
     }
@@ -84,11 +84,11 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
         // Player inventory.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + 8 + col * 18, y + 220 + row * 18);
+                JscOsTheme.slot(g, x + 8 + col * 18, y + 148 + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + 8 + col * 18, y + 278);
+            JscOsTheme.slot(g, x + 8 + col * 18, y + 206);
         }
     }
 

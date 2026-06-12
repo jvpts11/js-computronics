@@ -284,7 +284,8 @@ public final class CraftingGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    // Slots 0+1 live on the controller block; slot 2 on the next column's block.
+                    // One server per bay block now: slot 0 = controller, slot 1 = second column,
+                    // slot 2 = the block above the controller.
                     rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
                     rackBe.getServers().setStackInSlot(1, ComputingModule.defaultServer());
                     rackBe.getServers().setStackInSlot(2, ComputingModule.defaultServer());
@@ -292,18 +293,29 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     final var bays = dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS;
                     helper.assertTrue(helper.getBlockState(rack).getValue(bays) == 3,
-                            "controller face shows both bays occupied");
+                            "the controller bay lights up for its server");
                     final BlockPos second = new BlockPos(
                             dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
                                     .bayBlockPos(rack, facing, 1, 0));
-                    helper.assertTrue(helper.getBlockState(second).getValue(bays) == 1,
-                            "second column shows its lower bay occupied");
+                    helper.assertTrue(helper.getBlockState(second).getValue(bays) == 3,
+                            "the second column lights up for its server");
+                    final BlockPos upper = new BlockPos(
+                            dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                                    .bayBlockPos(rack, facing, 0, 1));
+                    helper.assertTrue(helper.getBlockState(upper).getValue(bays) == 3,
+                            "the upper bay lights up for its server");
                     rackBe.getServers().setStackInSlot(1, ItemStack.EMPTY);
                 })
-                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(
-                        helper.getBlockState(rack).getValue(
-                                dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS) == 1,
-                        "pulling a Server empties its bay on the face"))
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var bays = dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS;
+                    final BlockPos second = new BlockPos(
+                            dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                                    .bayBlockPos(rack, facing, 1, 0));
+                    helper.assertTrue(helper.getBlockState(second).getValue(bays) == 0,
+                            "pulling a Server empties its bay on the face");
+                    helper.assertTrue(helper.getBlockState(rack).getValue(bays) == 3,
+                            "the controller bay keeps its own server");
+                })
                 .thenSucceed();
     }
 

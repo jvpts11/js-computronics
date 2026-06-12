@@ -36,7 +36,7 @@ import java.util.UUID;
  */
 public class ServerRackBlockEntity extends BlockEntity {
 
-    public static final int CAPACITY = 8;
+    public static final int CAPACITY = 4;
 
     private final ItemStackHandler servers = new ItemStackHandler(CAPACITY) {
         @Override
@@ -69,9 +69,8 @@ public class ServerRackBlockEntity extends BlockEntity {
                 net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
         for (int h = 0; h < 2; h++) {
             for (int w = 0; w < 2; w++) {
-                final int base = h * 4 + w * 2;
-                final int bits = (servers.getStackInSlot(base).isEmpty() ? 0 : 1)
-                        | (servers.getStackInSlot(base + 1).isEmpty() ? 0 : 2);
+                final int slot = h * 2 + w;
+                final int bits = servers.getStackInSlot(slot).isEmpty() ? 0 : 3;
                 final BlockPos bayPos = dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
                         .bayBlockPos(worldPosition, facing, w, h);
                 final BlockState bayState = serverLevel.getBlockState(bayPos);
