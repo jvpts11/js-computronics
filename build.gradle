@@ -37,6 +37,13 @@ repositories {
         url = 'https://modmaven.dev/'
         content { includeGroup 'mekanism' }
     }
+
+    // BlameJared — JEI, present in the dev client for recipe lookups while testing autocrafting.
+    maven {
+        name = 'BlameJared'
+        url = 'https://maven.blamejared.com'
+        content { includeGroup 'mezz.jei' }
+    }
 }
 
 base {
@@ -137,11 +144,8 @@ dependencies {
     // integration testing only; never a published dependency.
     // ============================================================
     localRuntime "mekanism:Mekanism:${mekanism_version}"
-
-    // Example optional mod dependency with JEI:
-    // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
-    // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
-    // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
+    // JEI in the dev client only — recipe lookups while testing autocrafting; never published.
+    localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 
     // Example mod dependency from a flat libs directory:
     // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
