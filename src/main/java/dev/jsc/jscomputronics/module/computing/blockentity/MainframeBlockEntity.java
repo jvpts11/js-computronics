@@ -57,39 +57,25 @@ import java.util.Optional;
  * The Mainframe BlockEntity: the binding that turns installed hardware item stacks into a {@link ComputerBuild} and exposes the powered state, capacity and parallel-queue count.
  */
 public class MainframeBlockEntity extends BlockEntity
-        implements dev.jsc.jscomputronics.common.peripheral.PeripheralOwner,
+        implements dev.jsc.jscomputronics.common.peripheral.PeripheralOwnerSupport,
         dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost {
 
     private final java.util.Set<Long> linkedMonitors = new java.util.LinkedHashSet<>();
 
     @Override
-    public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType cableType() {
-        return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    public java.util.Set<Long> peripheralEndpoints() {
+        return linkedMonitors;
     }
 
     @Override
-    public java.util.List<Long> linkedEndpoints() {
-        return java.util.List.copyOf(linkedMonitors);
+    public void markPeripheralChange() {
+        setChanged();
     }
 
     @Override
     public int maxEndpoints() {
         final ComputerBuild build = currentBuild();
         return build == null ? 0 : build.gpus().size() * 4;
-    }
-
-    @Override
-    public void onEndpointLinked(final long endpointPos) {
-        if (linkedMonitors.add(endpointPos)) {
-            setChanged();
-        }
-    }
-
-    @Override
-    public void onEndpointUnlinked(final long endpointPos) {
-        if (linkedMonitors.remove(endpointPos)) {
-            setChanged();
-        }
     }
 
     @Override

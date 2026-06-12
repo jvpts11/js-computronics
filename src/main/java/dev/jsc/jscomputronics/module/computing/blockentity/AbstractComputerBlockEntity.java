@@ -16,8 +16,7 @@ import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralOwnerSupport;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
@@ -48,7 +47,7 @@ import java.util.Set;
 /**
  * Shared base for every computer that is a BLOCK (Personal Computer, Mainframe, Crafting Computer, and future ones such as Subframe / Supercomputer / AI Server).
  */
-public abstract class AbstractComputerBlockEntity extends BlockEntity implements PeripheralOwner {
+public abstract class AbstractComputerBlockEntity extends BlockEntity implements PeripheralOwnerSupport {
 
     protected static final long NO_CABLE = Long.MIN_VALUE;
 
@@ -319,36 +318,23 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
         }
     }
 
-    // Peripheral ownership — Monitors (and later Drives/Printers). 4 monitors per installed GPU.
+    // Peripheral ownership — the endpoint set + standard owner methods come from
+    // PeripheralOwnerSupport; only the capacity is hardware-dependent (4 monitors per GPU).
 
     @Override
-    public PeripheralCableType cableType() {
-        return PeripheralCableType.COMPUTING;
+    public Set<Long> peripheralEndpoints() {
+        return linkedMonitors;
     }
 
     @Override
-    public List<Long> linkedEndpoints() {
-        return List.copyOf(linkedMonitors);
+    public void markPeripheralChange() {
+        setChanged();
     }
 
     @Override
     public int maxEndpoints() {
         final ComputerBuild build = currentBuild();
         return build == null ? 0 : build.gpus().size() * 4;
-    }
-
-    @Override
-    public void onEndpointLinked(final long endpointPos) {
-        if (linkedMonitors.add(endpointPos)) {
-            setChanged();
-        }
-    }
-
-    @Override
-    public void onEndpointUnlinked(final long endpointPos) {
-        if (linkedMonitors.remove(endpointPos)) {
-            setChanged();
-        }
     }
 
     // Network participation (default: a passive client that reads its network from a cable).
