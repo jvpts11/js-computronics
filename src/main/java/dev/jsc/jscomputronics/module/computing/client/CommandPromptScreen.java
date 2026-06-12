@@ -61,8 +61,10 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
     @Override
     protected void init() {
         super.init();
-        input = new EditBox(font, leftPos + 28, topPos + imageHeight - 18, imageWidth - 36, 11,
-                Component.literal("command"));
+        // Start the input box just past the "jsc> " prompt so the caret never sits on top of it.
+        final int promptW = font.width("jsc> ");
+        input = new EditBox(font, leftPos + 10 + promptW, topPos + imageHeight - 18,
+                imageWidth - 18 - promptW, 11, Component.literal("command"));
         input.setBordered(false);
         input.setMaxLength(RunCommandPayload.MAX_LEN);
         input.setTextColor(JscOsTheme.TEXT);

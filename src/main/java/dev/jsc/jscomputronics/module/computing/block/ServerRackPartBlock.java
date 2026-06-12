@@ -63,8 +63,15 @@ public class ServerRackPartBlock extends Block implements EntityBlock, DataNetwo
 
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
-        // The whole cabinet takes any data tier — a cable may attach to any face.
         return java.util.EnumSet.allOf(DataTier.class);
+    }
+
+    @Override
+    public boolean connectsOnFace(final BlockState state, final net.minecraft.core.Direction face) {
+        // The cabinet is a multiblock made of these parts; every part takes a cable on the structure's
+        // rear face only (the parts share the controller's facing), so the rack connects through the
+        // back of the whole structure, never its sides or front.
+        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override

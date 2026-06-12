@@ -64,6 +64,12 @@ public class SupercomputerNodePartBlock extends Block implements EntityBlock, Da
     }
 
     @Override
+    public boolean connectsOnFace(final BlockState state, final Direction face) {
+        // Every part of the node tower takes its HPC cable on the structure's rear face only.
+        return face == state.getValue(FACING).getOpposite();
+    }
+
+    @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(TOP, FRONT, FILLED, FACING);
     }
