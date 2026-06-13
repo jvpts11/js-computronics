@@ -108,6 +108,16 @@ public interface ComputerTerminalHost {
     }
 
     /**
+     * The hardware era whose skin the terminal GUI should wear: the chassis era for a per-era computer, or the
+     * installed board's era otherwise. Defaults to {@link #installedEra()}; a block entity whose chassis fixes a
+     * fixed era overrides this to report that chassis era even when no board is installed.
+     */
+    @org.jetbrains.annotations.Nullable
+    default dev.jsc.jscomputronics.common.tier.HardwareEra displayEra() {
+        return installedEra();
+    }
+
+    /**
      * Whether this computer exposes the per-disk public/private storage slider. A Server's and a Mainframe's own storage is always fully public, so they return {@code false} and the terminal shows a static "always public" badge instead of a dead control.
      */
     default boolean storageHasSlider() {
