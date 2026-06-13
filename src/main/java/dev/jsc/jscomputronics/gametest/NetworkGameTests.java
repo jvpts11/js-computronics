@@ -1176,14 +1176,14 @@ public final class NetworkGameTests {
                             "whoami should report the computer kind");
                     helper.assertTrue(cliContains(shell.run("status", cli), "ONLINE"),
                             "status should report the running computer as online");
-                    helper.assertTrue(cliContains(shell.run("query", cli), "cobblestone"),
-                            "query should list the network's cobblestone");
-                    helper.assertTrue(cliContains(shell.run("query diamond", cli), "nothing matches"),
-                            "query with a non-matching filter should say so");
-                    helper.assertTrue(cliContains(shell.run("select 50 cobblestone", cli), "SELECT queued"),
-                            "select should queue an operation through the network");
-                    helper.assertTrue(cliContains(shell.run("select 50 not_a_real_item", cli), "unknown item"),
-                            "select of an unknown item should be reported, not crash");
+                    helper.assertTrue(cliContains(shell.run("operation query", cli), "cobblestone"),
+                            "operation query should list the network's cobblestone");
+                    helper.assertTrue(cliContains(shell.run("operation query diamond", cli), "no rows"),
+                            "operation query with a non-matching filter should say so");
+                    helper.assertTrue(cliContains(shell.run("operation select 50 cobblestone", cli), "SELECT queued"),
+                            "operation select should queue an operation through the network");
+                    helper.assertTrue(cliContains(shell.run("operation select 50 not_a_real_item", cli), "unknown item"),
+                            "operation select of an unknown item should be reported, not crash");
                 })
                 .thenSucceed();
     }
