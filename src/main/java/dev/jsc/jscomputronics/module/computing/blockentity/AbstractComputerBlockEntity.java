@@ -430,6 +430,15 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
 
     // Persistence (common fields; subclasses add their own via the hooks)
 
+    /**
+     * The NBT key the hardware {@link ItemStackHandler} is stored under. Overridable so a subclass with
+     * pre-existing saved worlds (the Mainframe, which historically persisted under {@code "Inventory"})
+     * can keep its key and load every existing component without data migration.
+     */
+    protected String hardwareNbtKey() {
+        return "Hardware";
+    }
+
     protected void saveExtra(final CompoundTag tag, final HolderLookup.Provider registries) {
     }
 
@@ -439,8 +448,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
     @Override
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        if (tag.contains("Hardware")) {
-            hardware.deserializeNBT(registries, tag.getCompound("Hardware"));
+        final String hardwareKey = hardwareNbtKey();
+        if (tag.contains(hardwareKey)) {
+            hardware.deserializeNBT(registries, tag.getCompound(hardwareKey));
         }
         manualOn = tag.getBoolean("ManualOn");
         autoStart = tag.getBoolean("AutoStart");
@@ -462,7 +472,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
     @Override
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Hardware", hardware.serializeNBT(registries));
+        tag.put(hardwareNbtKey(), hardware.serializeNBT(registries));
         tag.putBoolean("ManualOn", manualOn);
         tag.putBoolean("AutoStart", autoStart);
         if (!computerName.isEmpty()) {

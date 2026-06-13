@@ -1328,6 +1328,49 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void installedHardware_persistsAcrossReload(final GameTestHelper helper) {
+        final BlockPos a = new BlockPos(2, 2, 2);
+        final MainframeBlockEntity be = placeRunningMainframe(helper, a);
+        // Add an extra CPU and a disk on top of the valid build, so a wrong/changed hardware NBT key
+        // (the Mainframe persists under "Inventory", not the base's "Hardware") would be caught here:
+        // the reloaded build would silently lose these components.
+        be.getInventory().setStackInSlot(MainframeBlockEntity.CPU_SLOTS_START + 1,
+                new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
+        be.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final long capacityBefore = be.capacity();
+                    final long storageBefore = be.storageItems();
+                    helper.assertTrue(storageBefore == DiskSize.TB_1.capacityItems(),
+                            "build should report the installed disk's capacity before reload; got " + storageBefore);
+
+                    final var registries = helper.getLevel().registryAccess();
+                    final net.minecraft.nbt.CompoundTag saved = be.saveWithFullMetadata(registries);
+                    final var reloaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                            helper.absolutePos(a), be.getBlockState(), saved, registries);
+                    helper.assertTrue(reloaded instanceof MainframeBlockEntity, "reloaded BE should be a Mainframe");
+                    final MainframeBlockEntity loaded = (MainframeBlockEntity) reloaded;
+
+                    helper.assertTrue(loaded.getInventory()
+                                    .getStackInSlot(MainframeBlockEntity.DISK_SLOTS_START).getItem()
+                                    instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem,
+                            "the installed disk must survive reload under the preserved NBT key");
+                    helper.assertTrue(loaded.getInventory()
+                                    .getStackInSlot(MainframeBlockEntity.CPU_SLOTS_START + 1).getItem()
+                                    instanceof dev.jsc.jscomputronics.module.computing.item.CpuItem,
+                            "the second CPU must survive reload under the preserved NBT key");
+                    helper.assertTrue(loaded.storageItems() == storageBefore,
+                            "reloaded build must report the same storage capacity; got " + loaded.storageItems()
+                                    + " expected " + storageBefore);
+                    helper.assertTrue(loaded.capacity() == capacityBefore,
+                            "reloaded build must report the same orchestration capacity; got " + loaded.capacity()
+                                    + " expected " + capacityBefore);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void importBus_movesChestItemsIntoNetwork(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
