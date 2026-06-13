@@ -219,4 +219,33 @@ class JscEventDispatcherTest {
         assertThrows(NullPointerException.class, () ->
                 new OperationLifecycleEvent.Failed(net(), 1L, null));
     }
+
+    @Test
+    void post_deliversToAncestorInterfaceSubscriber() {
+        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        AtomicInteger count = new AtomicInteger();
+        // JscEvent is a SUPERinterface of the event's direct interface (OperationLifecycleEvent), so it
+        // is only reached once the whole interface graph is walked, not just the direct interfaces.
+        dispatcher.subscribe(JscEvent.class, e -> count.incrementAndGet());
+
+        dispatcher.post(new OperationLifecycleEvent.Created(net(), 1L));
+
+        assertEquals(1, count.get());
+    }
+
+    @Test
+    void post_allowsAListenerToMutateSubscriptionsMidDispatch() {
+        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        AtomicInteger count = new AtomicInteger();
+        dispatcher.subscribe(OperationLifecycleEvent.Created.class, e -> {
+            count.incrementAndGet();
+            // Subscribing and clearing during dispatch must not throw ConcurrentModificationException.
+            dispatcher.subscribe(OperationLifecycleEvent.Started.class, x -> { });
+            dispatcher.clear();
+        });
+
+        dispatcher.post(new OperationLifecycleEvent.Created(net(), 1L));
+
+        assertEquals(1, count.get());
+    }
 }

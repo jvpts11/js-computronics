@@ -36,42 +36,37 @@ public class JscEventDispatcher {
     public <E extends JscEvent> E post(final E event) {
         Objects.requireNonNull(event, "event must not be null");
 
-        // Walk up the class hierarchy collecting listeners. This covers
-        // listeners subscribed to a parent class or implemented interface.
-        Class<?> current = event.getClass();
-        while (current != null && JscEvent.class.isAssignableFrom(current)) {
-            final List<Consumer<? extends JscEvent>> listeners =
-                    listenersByClass.get(current);
-            if (listeners != null) {
-                for (final Consumer listener : listeners) {
-                    if (event instanceof JscEvent.Cancellable cancellable
-                            && cancellable.isCancelled()) {
-                        return event;
-                    }
-                    listener.accept(event);
-                }
-            }
-            current = current.getSuperclass();
-        }
+        // Every JscEvent type this event is assignable to: its whole class chain AND its whole interface
+        // graph (superinterfaces included), de-duplicated and most-specific first. Collecting the full
+        // graph — not just the direct interfaces — is what lets a listener on an ancestor interface
+        // (e.g. JscEvent itself) be reached.
+        final java.util.Set<Class<?>> types = new java.util.LinkedHashSet<>();
+        collectEventTypes(event.getClass(), types);
 
-        // Also walk implemented interfaces for sealed hierarchies.
-        for (final Class<?> iface : event.getClass().getInterfaces()) {
-            if (JscEvent.class.isAssignableFrom(iface)) {
-                final List<Consumer<? extends JscEvent>> listeners =
-                        listenersByClass.get(iface);
-                if (listeners != null) {
-                    for (final Consumer listener : listeners) {
-                        if (event instanceof JscEvent.Cancellable cancellable
-                                && cancellable.isCancelled()) {
-                            return event;
-                        }
-                        listener.accept(event);
-                    }
+        for (final Class<?> type : types) {
+            final List<Consumer<? extends JscEvent>> listeners = listenersByClass.get(type);
+            if (listeners == null) {
+                continue;
+            }
+            // Iterate a snapshot so a listener may subscribe or clear during dispatch without a CME.
+            for (final Consumer listener : new ArrayList<>(listeners)) {
+                if (event instanceof JscEvent.Cancellable cancellable && cancellable.isCancelled()) {
+                    return event;
                 }
+                listener.accept(event);
             }
         }
-
         return event;
+    }
+
+    private static void collectEventTypes(final Class<?> type, final java.util.Set<Class<?>> out) {
+        if (type == null || !JscEvent.class.isAssignableFrom(type) || !out.add(type)) {
+            return;
+        }
+        collectEventTypes(type.getSuperclass(), out);
+        for (final Class<?> iface : type.getInterfaces()) {
+            collectEventTypes(iface, out);
+        }
     }
 
     public void clear() {
