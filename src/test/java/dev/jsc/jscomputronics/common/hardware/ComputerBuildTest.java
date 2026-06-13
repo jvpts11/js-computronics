@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.common.hardware;
 
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jsc.jscomputronics.common.tier.IndustrialTier;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -36,6 +37,10 @@ class ComputerBuildTest {
 
     private static GpuSpec standardGpu() {
         return new GpuSpec(HardwareEra.STANDARD, PcieGeneration.PCIE_3_0, 2048, 3072, 250);
+    }
+
+    private static CraftingCardSpec craftingCard() {
+        return new CraftingCardSpec(IndustrialTier.T3, PcieGeneration.PCIE_3_0, 1.5, 40);
     }
 
     private static PsuSpec psu(final int watts) {
@@ -138,6 +143,19 @@ class ComputerBuildTest {
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(), List.of(ddr3()), psu(650));
         assertEquals(1, build.parallelQueues());
+    }
+
+    @Test
+    void parallelQueues_countsOnlyGpus_andMatchesGpusAccessor() {
+        // Two GPUs plus a non-GPU card (a Crafting Card): only the GPUs add parallel queues,
+        // and the count must agree with the typed gpus() accessor — a single GPU-detection path.
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()),
+                List.of(standardGpu(), craftingCard(), standardGpu()),
+                List.of(ddr3()), psu(1000));
+        assertEquals(2, build.gpus().size());
+        assertEquals(1 + build.gpus().size(), build.parallelQueues());
+        assertEquals(3, build.parallelQueues(), "a non-GPU card must not add a parallel queue");
     }
 
     @Test

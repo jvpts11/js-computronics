@@ -65,13 +65,9 @@ public record ComputerBuild(MotherboardSpec motherboard,
     }
 
     public int parallelQueues() {
-        int gpuCount = 0;
-        for (final ExpansionCardSpec card : pcieCards) {
-            if (card.kind() == ExpansionCardKind.GPU) {
-                gpuCount++;
-            }
-        }
-        return 1 + gpuCount;
+        // One base CPU queue plus one extra parallel queue per installed GPU. GPUs are detected
+        // the single canonical way, through gpus(), so this never drifts from the GPU accessor.
+        return 1 + gpus().size();
     }
 
     public long ramBuffer() {
