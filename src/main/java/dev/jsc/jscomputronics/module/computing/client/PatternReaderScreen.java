@@ -137,9 +137,9 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         JscOsTheme.text(g, font, "PATTERN READER", 12, 11, JscOsTheme.text());
         JscOsTheme.textSCenter(g, font, "READ", READ_TAB_X + TAB_W / 2, TAB_Y + 3,
-                activeTab == TAB_READ ? JscOsTheme.accent() : JscOsTheme.dim());
+                activeTab == TAB_READ ? JscOsTheme.tabLabelOn() : JscOsTheme.dim());
         JscOsTheme.textSCenter(g, font, "ROM", ROM_TAB_X + TAB_W / 2, TAB_Y + 3,
-                activeTab == TAB_ROM ? JscOsTheme.accent() : JscOsTheme.dim());
+                activeTab == TAB_ROM ? JscOsTheme.tabLabelOn() : JscOsTheme.dim());
 
         discReadout(g);
 

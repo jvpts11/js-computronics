@@ -66,6 +66,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private int TEXT;
     private int DIM;
     private int TAB_ON;
+    private int TAB_LABEL_ON;
     private int HOVER;
 
     /** Refreshes the palette fields from the bound era theme. Called at the top of every draw pass. */
@@ -86,6 +87,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         TEXT = JscOsTheme.text();
         DIM = JscOsTheme.dim();
         TAB_ON = JscOsTheme.tabOn();
+        TAB_LABEL_ON = JscOsTheme.tabLabelOn();
         HOVER = JscOsTheme.hover();
     }
 
@@ -402,7 +404,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 g.fill(tx, ty, tx + RAIL_W, ty + TAB_H, TAB_ON);
                 g.fill(tx, ty, tx + 2, ty + TAB_H, ACCENT);
             }
-            icon(g, tab, tx + (RAIL_W - 16) / 2, ty + 3, on ? ACCENT : DIM);
+            icon(g, tab, tx + (RAIL_W - 16) / 2, ty + 3, on ? TAB_LABEL_ON : DIM);
         }
         // Scroll hints: a small up/down chevron when there is more rail above or below.
         if (railScroll > 0) {
@@ -579,7 +581,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             final int i = railScroll + row;
             final int ty = TAB_Y0 + row * TAB_H;
             g.drawCenteredString(font, TAB_NAMES[rail[i]], RAIL_X + RAIL_W / 2, ty + 19,
-                    rail[i] == menu.activeTab() ? ACCENT : DIM);
+                    rail[i] == menu.activeTab() ? TAB_LABEL_ON : DIM);
         }
 
         // Header: computer name + status pill.

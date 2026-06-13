@@ -34,7 +34,7 @@ public final class EraThemes {
                     0xFF39D6C4, 0xFF2AA7E0,
                     0xFF5FE07A, 0xFFF0B23A, 0xFFEF6A5A,
                     0xFFCDD6E2, 0xFF7D8A9C,
-                    0xFF15212A, 0xFF1A2937),
+                    0xFF15212A, 0xFF39D6C4, 0xFF1A2937),
             EraStyle.flat(SMALL));
 
     /** Green-phosphor CRT: near-black screen, phosphor green text/accents, amber cautions, a square scanline finish. */
@@ -45,7 +45,7 @@ public final class EraThemes {
                     0xFF33FF66, 0xFF66FF99,
                     0xFF33FF66, 0xFFFFB000, 0xFFFF6655,
                     0xFF66FF66, 0xFF2E8B2E,
-                    0xFF0A2A0A, 0xFF103810),
+                    0xFF0A2A0A, 0xFF33FF66, 0xFF103810),
             new EraStyle(true, false, false, 0, 0, 0x2200FF00, 0, SMALL));
 
     /**
@@ -60,7 +60,7 @@ public final class EraThemes {
                     0xFF1A3C8C, 0xFF2E5AB8,
                     0xFF1E7A2E, 0xFFB8860B, 0xFFA01818,
                     0xFF1A1A14, 0xFF5A5648,
-                    0xFF1A3C8C, 0xFFD4D0C0),
+                    0xFF1A3C8C, 0xFFFFFFF0, 0xFFD4D0C0),
             new EraStyle(false, true, false, 0xFFFFFFF0, 0xFF6E6A58, 0, 0, SMALL));
 
     /**

@@ -67,7 +67,10 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
                 imageWidth - 18 - promptW, 11, Component.literal("command"));
         input.setBordered(false);
         input.setMaxLength(RunCommandPayload.MAX_LEN);
-        input.setTextColor(JscOsTheme.text());
+        // Use the era's primary text color: dark for light-panel eras (Legacy), light for dark-panel
+        // eras (Standard, Vintage). The input strip adopts the era's panel background, so the text
+        // must track the era — a fixed light color disappears on Legacy's cream panel.
+        input.setTextColor(theme.text());
         input.setFocused(true);
         // A real edit (typing/backspace) restarts Tab cycling; our own programmatic setValue does not.
         input.setResponder(s -> {
@@ -221,14 +224,17 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
     }
 
     private static int colorOf(final CliStyle style) {
+        // The console panel is always near-black (CONSOLE constant). Use fixed terminal colors so text
+        // stays readable regardless of which hardware-era skin the surrounding screen is wearing.
         return switch (style) {
-            case PROMPT, ACCENT, HEADER -> JscOsTheme.accent();
-            case OK -> JscOsTheme.green();
-            case ERROR -> JscOsTheme.red();
-            case WARN -> JscOsTheme.amber();
-            case INFO -> JscOsTheme.accent2();
-            case DIM -> JscOsTheme.dim();
-            default -> JscOsTheme.text();
+            case PROMPT -> 0xFFCDD6E2;        // light gray-white for the echoed user command line
+            case ACCENT, HEADER -> 0xFF39D6C4; // cyan for system messages
+            case OK -> 0xFF5FE07A;             // green for success
+            case ERROR -> 0xFFEF6A5A;          // red for errors
+            case WARN -> 0xFFF0B23A;           // amber for warnings
+            case INFO -> 0xFF2AA7E0;            // blue for informational output
+            case DIM -> 0xFF7D8A9C;            // dim gray for hints and secondary output
+            default -> 0xFFCDD6E2;             // plain = light gray
         };
     }
 
@@ -321,6 +327,15 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
         final int maxScroll = Math.max(0, scrollback.size() - visible);
         scrollOffset = Math.max(0, Math.min(maxScroll, scrollOffset + (int) Math.signum(dy)));
         return true;
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        // Keep the input color in sync if a board swap changes the era while the screen is open.
+        if (input != null) {
+            input.setTextColor(theme.text());
+        }
     }
 
     @Override

@@ -28,8 +28,9 @@ package dev.jsc.jscomputronics.module.computing.client.theme;
  * @param red      a negative/error status color
  * @param text     the primary foreground text color
  * @param dim      the muted/label text color
- * @param tabOn    the background of a selected tab
- * @param hover    the background of a hovered button
+ * @param tabOn       the background of a selected tab
+ * @param tabLabelOn  the text and icon color drawn on top of a selected tab (must contrast with tabOn)
+ * @param hover       the background of a hovered button
  */
 public record EraPalette(
         int outer, int screen, int rail, int panel, int line, int track,
@@ -37,5 +38,5 @@ public record EraPalette(
         int accent, int accent2,
         int green, int amber, int red,
         int text, int dim,
-        int tabOn, int hover) {
+        int tabOn, int tabLabelOn, int hover) {
 }

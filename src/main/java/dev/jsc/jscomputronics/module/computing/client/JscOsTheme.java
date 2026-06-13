@@ -110,6 +110,10 @@ public final class JscOsTheme {
         return active.tabOn();
     }
 
+    public static int tabLabelOn() {
+        return active.tabLabelOn();
+    }
+
     public static int hover() {
         return active.hover();
     }

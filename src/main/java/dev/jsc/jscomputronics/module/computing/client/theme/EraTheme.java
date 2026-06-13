@@ -102,6 +102,10 @@ public final class EraTheme {
         return p.tabOn();
     }
 
+    public int tabLabelOn() {
+        return p.tabLabelOn();
+    }
+
     public int hover() {
         return p.hover();
     }

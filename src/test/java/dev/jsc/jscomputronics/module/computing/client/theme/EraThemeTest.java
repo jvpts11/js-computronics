@@ -95,6 +95,17 @@ class EraThemeTest {
     }
 
     @Test
+    void everyEra_tabLabelOnDiffersFromTabOn() {
+        // tabLabelOn must contrast with tabOn: if they were the same, labels drawn on a selected tab
+        // would be invisible. Verified as a structural invariant: tabLabelOn != tabOn for every era.
+        for (final HardwareEra era : HardwareEra.values()) {
+            final EraTheme t = EraThemes.of(era);
+            assertNotEquals(t.tabOn(), t.tabLabelOn(),
+                    "Era " + era + ": tabLabelOn must differ from tabOn");
+        }
+    }
+
+    @Test
     void everyEra_resolvesToANonNullTheme() {
         for (final HardwareEra era : HardwareEra.values()) {
             assertNotEquals(null, EraThemes.of(era));
