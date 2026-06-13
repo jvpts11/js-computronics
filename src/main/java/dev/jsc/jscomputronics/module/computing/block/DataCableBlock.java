@@ -12,6 +12,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.part.CablePart;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
@@ -302,16 +303,9 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, ComputingModule.DATA_CABLE_BE.get(), DataCableBlockEntity::serverTick);
+        return BlockEntityTickers.create(type, ComputingModule.DATA_CABLE_BE.get(), DataCableBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 
     private static Map<Direction, AABB> buildPartBoxes() {
         final Map<Direction, AABB> boxes = new EnumMap<>(Direction.class);

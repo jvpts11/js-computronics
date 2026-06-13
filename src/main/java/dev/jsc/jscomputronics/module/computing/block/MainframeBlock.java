@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
@@ -188,15 +189,8 @@ public class MainframeBlock extends HorizontalDirectionalBlock
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, ComputingModule.MAINFRAME_BE.get(),
+        return BlockEntityTickers.create(type, ComputingModule.MAINFRAME_BE.get(),
                 MainframeBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }

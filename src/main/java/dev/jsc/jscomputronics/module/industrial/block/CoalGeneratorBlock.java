@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.industrial.block;
 
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.blockentity.CoalGeneratorBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.menu.CoalGeneratorMenu;
@@ -97,15 +98,8 @@ public class CoalGeneratorBlock extends HorizontalDirectionalBlock implements En
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, IndustrialModule.COAL_GENERATOR_BE.get(),
+        return BlockEntityTickers.create(type, IndustrialModule.COAL_GENERATOR_BE.get(),
                 CoalGeneratorBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }

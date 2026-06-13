@@ -11,6 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity;
@@ -181,15 +182,8 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, ComputingModule.SUPERCOMPUTER_NODE_BE.get(),
+        return BlockEntityTickers.create(type, ComputingModule.SUPERCOMPUTER_NODE_BE.get(),
                 SupercomputerNodeBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }

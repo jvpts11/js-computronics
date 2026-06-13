@@ -11,6 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
@@ -155,14 +156,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, ComputingModule.MONITOR_BE.get(), MonitorBlockEntity::serverTick);
+        return BlockEntityTickers.create(type, ComputingModule.MONITOR_BE.get(), MonitorBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }

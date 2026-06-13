@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -68,15 +69,8 @@ public class HbwInterfaceBlock extends Block implements EntityBlock, DataNetwork
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, ComputingModule.HBW_INTERFACE_BE.get(),
+        return BlockEntityTickers.create(type, ComputingModule.HBW_INTERFACE_BE.get(),
                 HbwInterfaceBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }

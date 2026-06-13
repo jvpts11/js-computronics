@@ -11,6 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -123,15 +124,8 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, ComputingModule.PERSONAL_COMPUTER_BE.get(),
+        return BlockEntityTickers.create(type, ComputingModule.PERSONAL_COMPUTER_BE.get(),
                 PersonalComputerBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }

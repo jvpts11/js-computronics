@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.industrial.block;
 
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
+import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.menu.MaceratorMenu;
@@ -97,15 +98,8 @@ public class MaceratorBlock extends HorizontalDirectionalBlock implements Entity
         if (level.isClientSide()) {
             return null;
         }
-        return createTickerHelper(type, IndustrialModule.MACERATOR_BE.get(),
+        return BlockEntityTickers.create(type, IndustrialModule.MACERATOR_BE.get(),
                 MaceratorBlockEntity::serverTick);
     }
 
-    @SuppressWarnings("unchecked")
-    @Nullable
-    private static <A extends BlockEntity, E extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
-            final BlockEntityType<A> given, final BlockEntityType<E> expected,
-            final BlockEntityTicker<? super E> ticker) {
-        return expected == given ? (BlockEntityTicker<A>) ticker : null;
-    }
 }
