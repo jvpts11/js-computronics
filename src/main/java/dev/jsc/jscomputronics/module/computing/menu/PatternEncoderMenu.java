@@ -13,7 +13,6 @@ import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.Slot;
@@ -24,7 +23,7 @@ import net.neoforged.neoforge.items.SlotItemHandler;
 /**
  * Menu for the Pattern Encoder: a ghost 3x3 recipe grid (clicks set count-1 copies, the player's items are never consumed), a live result preview resolved server-side from the recipe book, a real media slot, and the player inventory.
  */
-public class PatternEncoderMenu extends AbstractContainerMenu {
+public class PatternEncoderMenu extends AbstractComputerMenu {
 
     public static final int BUTTON_WRITE = 0;
     public static final int BUTTON_ERASE = 1;
@@ -66,7 +65,7 @@ public class PatternEncoderMenu extends AbstractContainerMenu {
         // Media bay — a real slot restricted to pattern discs.
         addSlot(new SlotItemHandler(be.media(), 0, 138, 32));
 
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, 8, 138);
     }
 
     @org.jetbrains.annotations.Nullable
@@ -79,16 +78,6 @@ public class PatternEncoderMenu extends AbstractContainerMenu {
         return null;
     }
 
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 138 + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 196));
-        }
-    }
 
     /**
      * A ghost cell: never holds a real item — a click records a copy of the carried stack.

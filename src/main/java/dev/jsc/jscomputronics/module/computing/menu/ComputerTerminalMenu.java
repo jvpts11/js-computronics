@@ -18,7 +18,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -28,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Menu for the Monitor terminal — the tabbed interface a Monitor opens onto the computer it is linked to.
  */
-public class ComputerTerminalMenu extends AbstractContainerMenu {
+public class ComputerTerminalMenu extends AbstractComputerMenu {
 
     public static final int TAB_LOCAL = 0;
     public static final int TAB_STORAGE = 1;
@@ -136,19 +135,8 @@ public class ComputerTerminalMenu extends AbstractContainerMenu {
         // The Storage tab is now a disk-backed quantity view (like the Network tab), not vanilla
         // slots, so the menu holds only the player inventory; local items are synced via snapshot.
         this.storageCount = 0;
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, INV_X, INV_Y + invDrop);
         addDataSlots(data);
-    }
-
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, INV_X + col * 18, INV_Y + invDrop + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, INV_X + col * 18, HOTBAR_Y + invDrop));
-        }
     }
 
     public int invY() {

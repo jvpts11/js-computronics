@@ -15,7 +15,6 @@ import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.SimpleContainerData;
@@ -31,7 +30,7 @@ import java.util.Set;
 /**
  * Menu for the Pattern Reader: a media slot plus the pattern list read straight from the synced disc stack.
  */
-public class PatternReaderMenu extends AbstractContainerMenu {
+public class PatternReaderMenu extends AbstractComputerMenu {
 
     public static final int BUTTON_LOAD_SELECTED = 0;
     public static final int BUTTON_LOAD_ALL = 1;
@@ -68,7 +67,7 @@ public class PatternReaderMenu extends AbstractContainerMenu {
         this.data = new SimpleContainerData(DATA_COUNT);
 
         addSlot(new SlotItemHandler(be.media(), 0, 12, 30));
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, 8, 138);
         addDataSlots(data);
     }
 
@@ -82,16 +81,6 @@ public class PatternReaderMenu extends AbstractContainerMenu {
         return null;
     }
 
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 138 + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 196));
-        }
-    }
 
     @Override
     public void broadcastChanges() {

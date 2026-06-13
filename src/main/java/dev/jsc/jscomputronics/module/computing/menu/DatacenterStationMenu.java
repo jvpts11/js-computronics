@@ -16,9 +16,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
@@ -26,7 +24,7 @@ import java.util.List;
 /**
  * Menu for the Datacenter Station terminal: it carries the player inventory (so items can be deposited into the section from the cursor) and caches the section snapshot the server pushes — the unified item index, the aggregate header and the per-Server breakdown.
  */
-public class DatacenterStationMenu extends AbstractContainerMenu {
+public class DatacenterStationMenu extends AbstractComputerMenu {
 
     public static final int INV_X = 34;
     public static final int INV_Y = 170;
@@ -43,7 +41,7 @@ public class DatacenterStationMenu extends AbstractContainerMenu {
         super(ComputingModule.DATACENTER_STATION_MENU.get(), containerId);
         this.stationPos = be.getBlockPos();
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, INV_X, INV_Y);
     }
 
     @org.jetbrains.annotations.Nullable
@@ -54,17 +52,6 @@ public class DatacenterStationMenu extends AbstractContainerMenu {
             return new DatacenterStationMenu(containerId, playerInventory, be);
         }
         return null;
-    }
-
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, INV_X + col * 18, INV_Y + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, INV_X + col * 18, HOTBAR_Y));
-        }
     }
 
     public BlockPos stationPos() {

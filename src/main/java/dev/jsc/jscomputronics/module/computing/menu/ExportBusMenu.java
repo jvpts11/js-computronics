@@ -16,7 +16,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
@@ -28,7 +27,7 @@ import net.neoforged.neoforge.items.SlotItemHandler;
 /**
  * Menu for configuring an Export Bus part mounted on a data cable: a single ghost filter slot (the item to export), the destination min/max stock window, and the continuous/redstone mode, plus the player inventory.
  */
-public class ExportBusMenu extends AbstractContainerMenu {
+public class ExportBusMenu extends AbstractComputerMenu {
 
     public static final int FILTER_SLOT = 0;
 
@@ -65,7 +64,7 @@ public class ExportBusMenu extends AbstractContainerMenu {
                 return false;
             }
         });
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, 8, 89);
         addDataSlots(this.data);
     }
 
@@ -84,17 +83,6 @@ public class ExportBusMenu extends AbstractContainerMenu {
         final ExportBusPart part = level.getBlockEntity(pos) instanceof DataCableBlockEntity cable
                 && cable.getPart(face) instanceof ExportBusPart real ? real : new ExportBusPart();
         return new ExportBusMenu(containerId, playerInventory, part, level, pos);
-    }
-
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 89 + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 147));
-        }
     }
 
     public int min() {
