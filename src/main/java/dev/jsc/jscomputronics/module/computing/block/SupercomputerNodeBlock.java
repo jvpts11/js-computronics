@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockBlock;
 import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
@@ -44,7 +45,7 @@ import org.jetbrains.annotations.Nullable;
  * (2 wide, 3 tall, 2 deep) so the two stand side by side in a datacenter aisle.
  */
 public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort {
+        implements EntityBlock, RearFacingDataPort, MultiblockBlock {
 
     public static final MapCodec<SupercomputerNodeBlock> CODEC = simpleCodec(SupercomputerNodeBlock::new);
 
@@ -76,13 +77,15 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
-        final Level level = context.getLevel();
-        for (final BlockPos part : ServerRackStructure.partPositions(context.getClickedPos(), facing)) {
-            if (!level.getBlockState(part).canBeReplaced()) {
-                return null; // no room for the cabinet — cancel placement, item not consumed
-            }
+        if (!canPlaceAt(context.getLevel(), context.getClickedPos(), facing)) {
+            return null; // no room for the cabinet — cancel placement, item not consumed
         }
         return defaultBlockState().setValue(FACING, facing);
+    }
+
+    @Override
+    public java.util.List<BlockPos> footprint(final BlockPos origin, final Direction facing) {
+        return ServerRackStructure.allPositions(origin, facing);
     }
 
     @Override
