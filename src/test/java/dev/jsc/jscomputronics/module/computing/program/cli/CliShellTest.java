@@ -55,20 +55,20 @@ class CliShellTest {
     @Test
     void run_helpListsEveryRegisteredCommand() {
         final String out = joined("help");
-        assertTrue(out.contains("select"));
-        assertTrue(out.contains("craft"));
-        assertTrue(out.contains("query"));
+        assertTrue(out.contains("operation"));
+        assertTrue(out.contains("find"));
+        assertTrue(out.contains("lock"));
     }
 
     @Test
     void run_helpForOneCommandShowsItsUsage() {
-        assertTrue(joined("help select").contains("<quantity> <item>"));
+        assertTrue(joined("help operation").contains("<statement>"));
     }
 
     @Test
     void run_aliasResolvesToTheSameCommand() {
-        // 'q' is an alias of query; on an empty network both print the same "not on a network" error.
-        assertEquals(joined("query"), joined("q"));
+        // 'op' is an alias of operation; with no statement both print the same usage error.
+        assertEquals(joined("operation"), joined("op"));
     }
 
     @Test
@@ -91,52 +91,9 @@ class CliShellTest {
     }
 
     @Test
-    void run_queryOffNetworkErrors() {
+    void run_operationQueryOffNetworkErrors() {
         computer.onNetwork = false;
-        assertTrue(anyStyle("query", CliStyle.ERROR));
-    }
-
-    @Test
-    void run_queryListsHeldItemsAndHonorsFilter() {
-        computer.onNetwork = true;
-        computer.stock.add(new CliComputer.StoredItem("cobblestone", 2304));
-        computer.stock.add(new CliComputer.StoredItem("oak_planks", 64));
-        assertTrue(joined("query").contains("cobblestone"));
-        assertTrue(joined("query").contains("oak_planks"));
-        // The fake honors the filter itself, mimicking the real server.
-        final String filtered = joined("query cobble");
-        assertTrue(filtered.contains("cobblestone"));
-        assertFalse(filtered.contains("oak_planks"));
-    }
-
-    @Test
-    void run_selectRequiresAPositiveQuantityAndItem() {
-        computer.onNetwork = true;
-        assertTrue(anyStyle("select", CliStyle.ERROR));
-        assertTrue(anyStyle("select abc cobblestone", CliStyle.ERROR));
-        assertTrue(anyStyle("select 0 cobblestone", CliStyle.ERROR));
-        assertTrue(anyStyle("select 64", CliStyle.ERROR));
-    }
-
-    @Test
-    void run_selectPassesQuantityAndItemThrough() {
-        computer.onNetwork = true;
-        final String out = joined("select 64 iron_ingot");
-        assertEquals("select(iron_ingot, 64)", computer.lastCall);
-        assertTrue(out.contains("ok"));
-    }
-
-    @Test
-    void run_selectAcceptsAQuotedMultiWordItem() {
-        computer.onNetwork = true;
-        joined("select 4 \"oak planks\"");
-        assertEquals("select(oak planks, 4)", computer.lastCall);
-    }
-
-    @Test
-    void run_craftOffNetworkErrors() {
-        computer.onNetwork = false;
-        assertTrue(anyStyle("craft 8 hopper", CliStyle.ERROR));
+        assertTrue(anyStyle("operation query", CliStyle.ERROR));
     }
 
     @Test

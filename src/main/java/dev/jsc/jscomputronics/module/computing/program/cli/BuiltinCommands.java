@@ -32,11 +32,7 @@ public final class BuiltinCommands {
                 new Whoami(),
                 new Status(),
                 new Net(),
-                new Query(),
                 new Find(),
-                new Select(),
-                new Insert(),
-                new Craft(),
                 new Lock(),
                 new Unlock(),
                 new Locks(),
@@ -271,41 +267,6 @@ public final class BuiltinCommands {
 
     // --- storage ----------------------------------------------------------------------------------
 
-    static final class Query implements CliCommand {
-        private static final int LIMIT = 64;
-
-        @Override public String name() {
-            return "query";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("ls", "q");
-        }
-
-        @Override public String summary() {
-            return "list what the network holds";
-        }
-
-        @Override public String usage() {
-            return "[name filter]";
-        }
-
-        @Override public void run(final CliContext ctx) {
-            if (!ctx.computer().onNetwork()) {
-                ctx.out().error("not on a network");
-                return;
-            }
-            final List<CliComputer.StoredItem> items = ctx.computer().query(ctx.rest(0), "", LIMIT);
-            if (items.isEmpty()) {
-                ctx.out().dim(ctx.hasArgs() ? "nothing matches '" + ctx.rest(0) + "'" : "the network is empty");
-                return;
-            }
-            for (final CliComputer.StoredItem item : items) {
-                ctx.out().row(item.name(), group(item.quantity()));
-            }
-        }
-    }
-
     static final class Find implements CliCommand {
         @Override public String name() {
             return "find";
@@ -340,83 +301,6 @@ public final class BuiltinCommands {
     }
 
     // --- operations -------------------------------------------------------------------------------
-
-    /** Shared body for the quantity-then-item verbs (select / insert / craft). */
-    private abstract static class QuantityItem implements CliCommand {
-        @Override public String usage() {
-            return "<quantity> <item>";
-        }
-
-        @Override public void run(final CliContext ctx) {
-            final long qty = ctx.longArg(0);
-            if (qty < 0L || ctx.argCount() < 2) {
-                ctx.out().error("usage: " + name() + " " + usage());
-                return;
-            }
-            if (!ctx.computer().onNetwork()) {
-                ctx.out().error("not on a network");
-                return;
-            }
-            final CliComputer.OpResult result = act(ctx.computer(), ctx.rest(1), qty);
-            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
-        }
-
-        abstract CliComputer.OpResult act(CliComputer computer, String item, long quantity);
-    }
-
-    static final class Select extends QuantityItem {
-        @Override public String name() {
-            return "select";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("get", "pull");
-        }
-
-        @Override public String summary() {
-            return "pull items from the network to this computer";
-        }
-
-        @Override CliComputer.OpResult act(final CliComputer c, final String item, final long qty) {
-            return c.select(item, qty);
-        }
-    }
-
-    static final class Insert extends QuantityItem {
-        @Override public String name() {
-            return "insert";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("push", "put");
-        }
-
-        @Override public String summary() {
-            return "push items from this computer into the network";
-        }
-
-        @Override CliComputer.OpResult act(final CliComputer c, final String item, final long qty) {
-            return c.insert(item, qty);
-        }
-    }
-
-    static final class Craft extends QuantityItem {
-        @Override public String name() {
-            return "craft";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("make");
-        }
-
-        @Override public String summary() {
-            return "ask the network to craft an item";
-        }
-
-        @Override CliComputer.OpResult act(final CliComputer c, final String item, final long qty) {
-            return c.craft(item, qty);
-        }
-    }
 
     static final class Lock implements CliCommand {
         @Override public String name() {
