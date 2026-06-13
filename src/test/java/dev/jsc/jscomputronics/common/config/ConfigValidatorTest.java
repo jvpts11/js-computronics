@@ -198,6 +198,90 @@ class ConfigValidatorTest {
     }
 
     @Test
+    void sqlDialectKey_declaresWhitelistAndDefault() {
+        ConfigKey<String> key = JscConfigKeys.SQL_DIALECT;
+        assertEquals("computing.sql_dialect", key.dottedPath());
+        assertEquals("SIMPLE", key.defaultValue());
+        assertEquals(List.of("SIMPLE", "STANDARD"), key.whitelist().orElseThrow());
+        assertTrue(JscConfigKeys.registry().isWhitelisted("computing.sql_dialect"));
+    }
+
+    @Test
+    void validate_sqlDialectKey_garbageClampsToSimple() {
+        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+
+        ConfigValidationResult<String> result =
+                validator.validate(JscConfigKeys.SQL_DIALECT, "garbage");
+
+        assertEquals("SIMPLE", result.value());
+    }
+
+    @Test
+    void whitelisted_validValue_returnsValid() {
+        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigKey<String> key = ConfigKey.whitelisted(
+                List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
+
+        ConfigValidationResult<String> result = validator.validate(key, "STANDARD");
+
+        assertInstanceOf(ConfigValidationResult.Valid.class, result);
+        assertEquals("STANDARD", result.value());
+    }
+
+    @Test
+    void whitelisted_unknownValue_clampsToDefaultAndLogs() {
+        RecordingLogger log = new RecordingLogger();
+        ConfigValidator validator = new ConfigValidator(log);
+        ConfigKey<String> key = ConfigKey.whitelisted(
+                List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
+
+        ConfigValidationResult<String> result = validator.validate(key, "ORACLE");
+
+        ConfigValidationResult.Rejected<String> rejected = assertInstanceOf(
+                ConfigValidationResult.Rejected.class, result);
+        assertEquals("SIMPLE", rejected.value());
+        assertEquals(1, log.messages.size());
+        assertTrue(log.messages.get(0).contains("computing.sql_dialect"));
+    }
+
+    @Test
+    void whitelisted_isCaseSensitive_lowercaseRejected() {
+        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigKey<String> key = ConfigKey.whitelisted(
+                List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
+
+        ConfigValidationResult<String> result = validator.validate(key, "standard");
+
+        assertInstanceOf(ConfigValidationResult.Rejected.class, result);
+        assertEquals("SIMPLE", result.value());
+    }
+
+    @Test
+    void whitelisted_nullValue_rejectedWithDefault() {
+        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigKey<String> key = ConfigKey.whitelisted(
+                List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
+
+        ConfigValidationResult<String> result = validator.validate(key, null);
+
+        assertInstanceOf(ConfigValidationResult.Rejected.class, result);
+        assertEquals("SIMPLE", result.value());
+    }
+
+    @Test
+    void whitelisted_defaultNotInList_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ConfigKey.whitelisted(
+                        List.of("k"), "MYSQL", List.of("SIMPLE", "STANDARD")));
+    }
+
+    @Test
+    void whitelisted_emptyList_throws() {
+        assertThrows(IllegalArgumentException.class,
+                () -> ConfigKey.whitelisted(List.of("k"), "SIMPLE", List.of()));
+    }
+
+    @Test
     void registry_registerAndLookup_returnsKey() {
         JscConfigRegistry registry = new JscConfigRegistry();
         ConfigKey<Long> key = ConfigKey.of(

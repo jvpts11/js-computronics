@@ -98,6 +98,15 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
         JscOsTheme.button(g, x + imageWidth - 60, y + 28, 52, 12, hover);
         // Column header under the editor.
         g.fill(x + EXPLORER_W + 6, y + 44, x + imageWidth - 6, y + 53, JscOsTheme.panel());
+        // Active-dialect badge chip (sharp corners) at the far right of the status bar; the word is drawn in
+        // renderLabels. It is the only header-strip widget free of the title and column-header text.
+        final int badgeW = badgeWidth();
+        final int badgeX = imageWidth - 12 - badgeW;
+        g.fill(x + badgeX, y + imageHeight - 16, x + badgeX + badgeW, y + imageHeight - 7, JscOsTheme.rail());
+    }
+
+    private int badgeWidth() {
+        return JscOsTheme.widthS(font, menu.dialect().name()) + 8;
     }
 
     @Override
@@ -139,7 +148,12 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
         // Status bar.
         JscOsTheme.textS(g, font, status, EXPLORER_W + 10, imageHeight - 14,
                 statusOk ? JscOsTheme.green() : JscOsTheme.red());
-        JscOsTheme.textSRight(g, font, "F5 / ENTER to run", imageWidth - 10, imageHeight - 14, JscOsTheme.dim());
+        // Active SQL dialect badge: a one-word chip telling the player which grammar the server parses. The chip
+        // background is drawn in renderBg; the word sits inside it, at the far right of the status bar.
+        final int badgeW = badgeWidth();
+        final int badgeX = imageWidth - 12 - badgeW;
+        JscOsTheme.textS(g, font, menu.dialect().name(), badgeX + 4, imageHeight - 14, JscOsTheme.accent2());
+        JscOsTheme.textSRight(g, font, "F5 / ENTER to run", badgeX - 6, imageHeight - 14, JscOsTheme.dim());
     }
 
     private void small(final GuiGraphics g, final String text, final int x, final int y, final int color) {

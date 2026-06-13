@@ -208,12 +208,16 @@ public final class ComputingPayloads {
         if (program.id().equals(dev.jsc.jscomputronics.module.computing.program.Programs.NMS)) {
             final net.minecraft.network.chat.Component title =
                     player.level().getBlockState(hostPos).getBlock().getName();
+            // The server picks the dialect; capture it now so the client can show which grammar is live.
+            final dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect dialect =
+                    dev.jsc.jscomputronics.module.computing.menu.NmsMenu.activeDialect();
             player.openMenu(new net.minecraft.world.SimpleMenuProvider(
                     (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.NmsMenu(
-                            id, inv, monitorPos, hostPos), title),
+                            id, inv, monitorPos, hostPos, dialect), title),
                     buf -> {
                         buf.writeBlockPos(monitorPos);
                         buf.writeBlockPos(hostPos);
+                        buf.writeEnum(dialect);
                     });
         } else {
             sendConsoleLine(player, "the " + program.commandName() + " is already open", -1);

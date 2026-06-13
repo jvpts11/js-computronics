@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics;
 
 import com.mojang.logging.LogUtils;
+import dev.jsc.jscomputronics.common.config.JscConfigBridge;
 import dev.jsc.jscomputronics.common.registry.JscAttachments;
 import dev.jsc.jscomputronics.common.registry.JscCreativeModeTabs;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
@@ -29,6 +30,10 @@ public class JsComputronics {
 
     public JsComputronics(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("J's Computronics {} loaded.", modContainer.getModInfo().getVersion());
+
+        // Server config: registers the TOML spec on the mod container and pushes loaded values into the runtime
+        // settings the Operation console reads (e.g. the SQL dialect).
+        JscConfigBridge.register(modEventBus, modContainer);
 
         // Module registration. When the module config system exists, each of
         IndustrialModule.register(modEventBus);

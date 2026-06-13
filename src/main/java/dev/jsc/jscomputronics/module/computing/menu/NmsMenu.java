@@ -8,6 +8,8 @@
 package dev.jsc.jscomputronics.module.computing.menu;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.program.ProgramSettings;
+import dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -24,13 +26,15 @@ public class NmsMenu extends AbstractContainerMenu {
 
     private final BlockPos monitorPos;
     private final BlockPos hostPos;
+    private final SqlDialect dialect;
     private final ContainerLevelAccess access;
 
     public NmsMenu(final int containerId, final Inventory playerInventory,
-                   final BlockPos monitorPos, final BlockPos hostPos) {
+                   final BlockPos monitorPos, final BlockPos hostPos, final SqlDialect dialect) {
         super(ComputingModule.NMS_MENU.get(), containerId);
         this.monitorPos = monitorPos;
         this.hostPos = hostPos;
+        this.dialect = dialect;
         this.access = ContainerLevelAccess.create(playerInventory.player.level(), hostPos);
     }
 
@@ -38,7 +42,8 @@ public class NmsMenu extends AbstractContainerMenu {
                                       final RegistryFriendlyByteBuf buf) {
         final BlockPos monitor = buf.readBlockPos();
         final BlockPos host = buf.readBlockPos();
-        return new NmsMenu(containerId, playerInventory, monitor, host);
+        final SqlDialect dialect = buf.readEnum(SqlDialect.class);
+        return new NmsMenu(containerId, playerInventory, monitor, host, dialect);
     }
 
     public BlockPos monitorPos() {
@@ -47,6 +52,16 @@ public class NmsMenu extends AbstractContainerMenu {
 
     public BlockPos hostPos() {
         return hostPos;
+    }
+
+    /** The server's active SQL dialect, captured when the Studio was opened, for the client-side badge. */
+    public SqlDialect dialect() {
+        return dialect;
+    }
+
+    /** The dialect the server is parsing right now; used both to fill the menu and to write the open buffer. */
+    public static SqlDialect activeDialect() {
+        return ProgramSettings.sqlDialect();
     }
 
     @Override

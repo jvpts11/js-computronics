@@ -49,7 +49,18 @@ public final class ConfigValidator {
 
         final T typedValue = (T) rawValue;
 
-        // Rule 3: numeric out of range -> Clamped.
+        // Rule 3: value not in the string whitelist -> Rejected (default substituted).
+        // There is no "nearest valid" string to clamp to, so the safe house rule is to fall back to the
+        // default, which the key guarantees is itself whitelisted.
+        if (key.whitelist().isPresent() && !key.whitelist().get().contains(typedValue)) {
+            final String reason = "value '" + typedValue + "' for key '"
+                    + key.dottedPath() + "' is not one of " + key.whitelist().get()
+                    + "; using default '" + key.defaultValue() + "'";
+            logger.warn(reason);
+            return new ConfigValidationResult.Rejected<>(key.defaultValue(), reason);
+        }
+
+        // Rule 4: numeric out of range -> Clamped.
         if (key.range().isPresent()) {
             @SuppressWarnings("rawtypes")
             final ConfigKeyRange range = key.range().get();
