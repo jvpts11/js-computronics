@@ -284,4 +284,23 @@ class OperationDispatchTest {
         }
         assertTrue(cancelled.get(), "closing the dispatcher must unblock a task waiting on ticks");
     }
+
+    @Test
+    void terminalStatuses_areBoundedAndEvictTheOldest() {
+        dispatch = new OperationDispatch(4);
+        final List<UUID> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < 300; i++) {
+            ids.add(dispatch.submit(context -> OperationResult.success(), OperationPriority.MEDIUM));
+        }
+        for (final UUID id : ids) {
+            tickUntilTerminal(id);
+        }
+        // The most recently settled Operation keeps its terminal status...
+        assertTrue(dispatch.statusOf(ids.get(299)).isTerminal(),
+                "a recent terminal status is retained");
+        // ...but an old one is evicted once the bounded history fills, falling back to the unknown-id
+        // default, so the status map can never grow without bound on a long-lived dispatcher.
+        assertEquals(OperationStatus.PENDING, dispatch.statusOf(ids.get(0)),
+                "an old terminal status is evicted");
+    }
 }

@@ -33,11 +33,16 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
             Comparator.comparing(PendingOp::priority).reversed()
                     .thenComparingLong(PendingOp::sequence);
 
+    private static final int MAX_TERMINAL_HISTORY = 256;
+
     private final int parallelQueues;
     private final ExecutorService workers;
     private final PriorityQueue<PendingOp> pending = new PriorityQueue<>(ORDER);
     private final ConcurrentLinkedQueue<Runnable> mainThreadActions = new ConcurrentLinkedQueue<>();
     private final Map<UUID, OperationStatus> statuses = new ConcurrentHashMap<>();
+    // Settle order, so the status map keeps only the most recent terminal entries: without this it would
+    // grow one entry per Operation forever on a long-lived dispatcher. Touched on the main thread only.
+    private final java.util.ArrayDeque<UUID> terminalOrder = new java.util.ArrayDeque<>();
     private final Set<CompletableFuture<?>> inFlight = ConcurrentHashMap.newKeySet();
     private final Object tickMonitor = new Object();
 
@@ -160,6 +165,7 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
             statuses.put(id, OperationStatus.FAILED);
             failed++;
         }
+        rememberTerminal(id);
         running--;
     }
 
@@ -170,9 +176,22 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
     public boolean cancel(final UUID id) {
         if (pending.removeIf(op -> op.id().equals(id))) {
             statuses.put(id, OperationStatus.DISCARDED);
+            rememberTerminal(id);
             return true;
         }
         return false;
+    }
+
+    /**
+     * Records a settled Operation and evicts the oldest once more than {@value #MAX_TERMINAL_HISTORY}
+     * have settled, so the status map stays bounded. A caller that polls a just-settled status (the
+     * usual pattern) still sees it; only long-stale terminal entries fall back to {@code PENDING}.
+     */
+    private void rememberTerminal(final UUID id) {
+        terminalOrder.addLast(id);
+        while (terminalOrder.size() > MAX_TERMINAL_HISTORY) {
+            statuses.remove(terminalOrder.pollFirst());
+        }
     }
 
     public int runningCount() {
