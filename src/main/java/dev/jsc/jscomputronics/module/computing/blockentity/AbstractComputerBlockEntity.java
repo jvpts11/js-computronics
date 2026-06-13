@@ -288,6 +288,18 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
                 ? m.spec().era() : null;
     }
 
+    /**
+     * The hardware era the GUI should wear. A per-era chassis (a Vintage or Legacy computer block) fixes its era
+     * regardless of what is installed, so its assembly GUI shows the right era skin even when empty; every other
+     * computer takes its look from the installed board, falling back to {@code null} (the STANDARD skin) when bare.
+     */
+    @Nullable
+    public HardwareEra displayEra() {
+        return getBlockState().getBlock() instanceof dev.jsc.jscomputronics.module.computing.block.EraChassisBlock chassis
+                ? chassis.chassisEra()
+                : installedEra();
+    }
+
     public int installedCpus() {
         final ComputerBuild build = currentBuild();
         return build == null ? 0 : build.cpus().size();

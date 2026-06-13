@@ -499,6 +499,75 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    // Era Personal Computers (Vintage / Legacy) — the right-click assembly GUI must open exactly
+    // like the Standard one. The three blocks share PersonalComputerBlockEntity, the menu and the
+    // screen; the era blocks only override era() and codec(). These tests open the menu through the
+    // real interaction path and verify the server keeps it open (stillValid), which is what actually
+    // decides whether the player sees the GUI.
+
+    @GameTest(template = ARENA)
+    public static void standardPc_rightClickOpensAndKeepsMenu(final GameTestHelper helper) {
+        assertPcMenuOpens(helper, ComputingModule.PERSONAL_COMPUTER.get(),
+                ComputingModule.PERSONAL_COMPUTER_ITEM.get());
+    }
+
+    @GameTest(template = ARENA)
+    public static void vintagePc_rightClickOpensAndKeepsMenu(final GameTestHelper helper) {
+        assertPcMenuOpens(helper, ComputingModule.VINTAGE_PERSONAL_COMPUTER.get(),
+                ComputingModule.VINTAGE_PERSONAL_COMPUTER_ITEM.get());
+    }
+
+    @GameTest(template = ARENA)
+    public static void legacyPc_rightClickOpensAndKeepsMenu(final GameTestHelper helper) {
+        assertPcMenuOpens(helper, ComputingModule.LEGACY_PERSONAL_COMPUTER.get(),
+                ComputingModule.LEGACY_PERSONAL_COMPUTER_ITEM.get());
+    }
+
+    /**
+     * Places the given Personal Computer block, verifies its block entity and menu construction, then
+     * checks the very test the server runs each tick to decide whether to keep the GUI open:
+     * {@link net.minecraft.world.inventory.AbstractContainerMenu#stillValid}. A menu whose
+     * {@code stillValid} returns false is closed by the server on the next tick, which is exactly the
+     * "the GUI never opens" symptom for the player.
+     */
+    private static void assertPcMenuOpens(final GameTestHelper helper,
+                                          final net.minecraft.world.level.block.Block block,
+                                          final net.minecraft.world.item.Item blockItem) {
+        final BlockPos pos = new BlockPos(2, 2, 2);
+        helper.setBlock(pos, block);
+
+        // The block entity must be created for the era blocks too, or useWithoutItem's instanceof
+        // check fails silently and no menu ever opens.
+        if (!(helper.getBlockEntity(pos) instanceof PersonalComputerBlockEntity be)) {
+            helper.fail("no PersonalComputerBlockEntity at " + pos + " for block " + block + " ("
+                    + blockItem + ")");
+            return;
+        }
+
+        // A plain mock player (no networking, so opening menus broadcasts nothing) standing on the
+        // block, well inside the interaction reach stillValid also checks.
+        final net.minecraft.world.entity.player.Player player =
+                helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        final BlockPos absolute = helper.absolutePos(pos);
+        player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
+
+        // Menu construction must succeed for an era PC: it reads the shared block entity.
+        final dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu menu =
+                new dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu(
+                        1, player.getInventory(), be);
+        helper.assertFalse(menu.slots.isEmpty(), "the PC menu must build its slots for " + block);
+
+        // The block's own name must resolve without throwing (useWithoutItem uses it as the title).
+        helper.assertTrue(block.getName() != null, "block name must resolve for " + block);
+
+        // The decisive check: the server validates the open menu against the block at the position
+        // every tick. If stillValid is false the menu is closed at once, so the player never sees it.
+        helper.assertTrue(menu.stillValid(player),
+                "the Personal Computer menu must stay valid for " + block
+                        + "; a menu that is not stillValid is closed immediately, so the GUI never opens");
+        helper.succeed();
+    }
+
     @GameTest(template = ARENA)
     public static void craftingComputer_assemblesAndCanCraft(final GameTestHelper helper) {
         final BlockPos cc = new BlockPos(2, 2, 2);

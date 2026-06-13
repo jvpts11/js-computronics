@@ -329,7 +329,7 @@ public final class ComputingPayloads {
                 final dev.jsc.jscomputronics.common.tier.HardwareEra hostEra =
                         player.level().getBlockEntity(payload.hostPos())
                                 instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                        .AbstractComputerBlockEntity host ? host.installedEra() : null;
+                                        .AbstractComputerBlockEntity host ? host.displayEra() : null;
                 player.openMenu(new net.minecraft.world.SimpleMenuProvider(
                         (windowId, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu(
                                 windowId, inv, payload.monitorPos(), payload.hostPos(), hostEra), title),

@@ -101,7 +101,7 @@ public class SupercomputerNodeMenu extends AbstractComputerMenu {
 
     @org.jetbrains.annotations.Nullable
     public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
-        return blockEntity.installedEra();
+        return blockEntity.displayEra();
     }
 
     public boolean isRunning() {

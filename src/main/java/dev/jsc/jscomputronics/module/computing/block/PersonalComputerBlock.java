@@ -37,12 +37,17 @@ import org.jetbrains.annotations.Nullable;
  * The Personal Computer: the player's hands-on access point to the network, assembled on a consumer ATX board.
  */
 public class PersonalComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort,
+        implements EntityBlock, RearFacingDataPort, EraChassisBlock,
         dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
 
     @Override
     public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType peripheralType() {
         return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    }
+
+    @Override
+    public dev.jsc.jscomputronics.common.tier.HardwareEra chassisEra() {
+        return era();
     }
 
     public static final MapCodec<PersonalComputerBlock> CODEC = simpleCodec(PersonalComputerBlock::new);

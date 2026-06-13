@@ -96,7 +96,7 @@ public class PersonalComputerMenu extends AbstractComputerMenu {
 
     @org.jetbrains.annotations.Nullable
     public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
-        return blockEntity.installedEra();
+        return blockEntity.displayEra();
     }
 
     public boolean hasBoard() {
@@ -150,7 +150,14 @@ public class PersonalComputerMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        return stillValid(access, player, ComputingModule.PERSONAL_COMPUTER.get());
+        // Validate against the block family, not a single block: the Standard, Vintage and Legacy
+        // Personal Computers are three distinct blocks that share this menu. Checking only the
+        // Standard block would make the server reject a Vintage/Legacy PC's menu as invalid and close
+        // it the instant it opens, so its GUI would never appear.
+        return access.evaluate((level, pos) ->
+                level.getBlockState(pos).getBlock()
+                        instanceof dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock
+                        && player.canInteractWithBlock(pos, 4.0), true);
     }
 
     @Override

@@ -2719,7 +2719,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         final net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(menu.hostPos())
                 instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity host) {
-            return host.installedEra();
+            return host.displayEra();
         }
         return menu.hardwareEra();
     }

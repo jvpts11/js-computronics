@@ -203,7 +203,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
             case 28 -> clampInt(host.networkStorageTotal());
             case DATA_CRAFT_COMPUTERS -> craftComputerCount();
             case DATA_ERA -> {
-                final dev.jsc.jscomputronics.common.tier.HardwareEra era = host.installedEra();
+                final dev.jsc.jscomputronics.common.tier.HardwareEra era = host.displayEra();
                 yield era == null ? -1 : era.ordinal();
             }
             default -> 0;

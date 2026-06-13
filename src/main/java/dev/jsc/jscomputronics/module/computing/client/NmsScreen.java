@@ -214,7 +214,7 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
         final Minecraft mc = Minecraft.getInstance();
         if (mc.level != null
                 && mc.level.getBlockEntity(menu.hostPos()) instanceof AbstractComputerBlockEntity host) {
-            return host.installedEra();
+            return host.displayEra();
         }
         return null;
     }
