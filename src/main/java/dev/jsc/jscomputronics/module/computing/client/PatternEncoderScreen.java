@@ -11,7 +11,6 @@ import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
 import dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
@@ -21,7 +20,7 @@ import java.util.List;
 /**
  * Screen for the Pattern Encoder: the ghost 3x3 recipe grid with a live result preview on the left, the media bay with its disc readout and the WRITE / ERASE controls on the right, and the pattern list already on the disc along the bottom.
  */
-public class PatternEncoderScreen extends AbstractContainerScreen<PatternEncoderMenu> {
+public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderMenu> {
 
     private static final int WRITE_X = 100;
     private static final int WRITE_Y = 86;
@@ -131,12 +130,6 @@ public class PatternEncoderScreen extends AbstractContainerScreen<PatternEncoder
         }
     }
 
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
-    }
-
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         if (button == 0) {
@@ -150,12 +143,6 @@ public class PatternEncoderScreen extends AbstractContainerScreen<PatternEncoder
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    private void sendButton(final int id) {
-        if (minecraft != null && minecraft.gameMode != null) {
-            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
-        }
     }
 
     @Override

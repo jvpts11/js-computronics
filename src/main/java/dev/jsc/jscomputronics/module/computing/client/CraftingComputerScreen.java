@@ -12,7 +12,6 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -22,7 +21,7 @@ import java.util.Locale;
 /**
  * Screen for the Crafting Computer's assembly surface — the same flat-dark "computer OS" skin as the Personal Computer.
  */
-public class CraftingComputerScreen extends AbstractContainerScreen<CraftingComputerMenu> {
+public class CraftingComputerScreen extends AbstractComputerScreen<CraftingComputerMenu> {
 
     private static final int COL_R = 126;
     private static final int COL_R_W = 110;
@@ -207,12 +206,6 @@ public class CraftingComputerScreen extends AbstractContainerScreen<CraftingComp
         return menu.buildValid() ? JscOsTheme.GREEN : JscOsTheme.AMBER;
     }
 
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
-    }
-
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         // Clicking the name field selects it for typing; clicking anywhere else deselects it.
@@ -235,12 +228,6 @@ public class CraftingComputerScreen extends AbstractContainerScreen<CraftingComp
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    private void sendButton(final int id) {
-        if (minecraft != null && minecraft.gameMode != null) {
-            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
-        }
     }
 
     @Override

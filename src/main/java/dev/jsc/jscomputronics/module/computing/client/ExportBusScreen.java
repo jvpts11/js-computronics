@@ -10,14 +10,13 @@ package dev.jsc.jscomputronics.module.computing.client;
 import dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart;
 import dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
  * Configuration screen for the Export Bus, in the shared flat-dark "computer OS" theme: the ghost filter slot, the destination min/max stock steppers (shift for ×16), and the continuous/redstone mode toggle, over the player inventory.
  */
-public class ExportBusScreen extends AbstractContainerScreen<ExportBusMenu> {
+public class ExportBusScreen extends AbstractComputerScreen<ExportBusMenu> {
 
     private static final int STEP = 12;
     private static final int MIN_Y = 26;
@@ -96,12 +95,6 @@ public class ExportBusScreen extends AbstractContainerScreen<ExportBusMenu> {
         JscOsTheme.textCenter(g, font, modeText, MODE_X + MODE_W / 2, MODE_Y + 4, JscOsTheme.ACCENT);
 
         JscOsTheme.text(g, font, "INVENTORY", 8, 80, JscOsTheme.DIM);
-    }
-
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
     }
 
     @Override

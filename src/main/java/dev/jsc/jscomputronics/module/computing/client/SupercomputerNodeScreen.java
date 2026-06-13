@@ -12,7 +12,6 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -20,7 +19,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * Screen for a Supercomputer Node's assembly — the shared "computer OS" skin.
  */
-public class SupercomputerNodeScreen extends AbstractContainerScreen<SupercomputerNodeMenu> {
+public class SupercomputerNodeScreen extends AbstractComputerScreen<SupercomputerNodeMenu> {
 
     private static final int COL_R = 126;
     private static final int COL_R_W = 110;
@@ -159,12 +158,6 @@ public class SupercomputerNodeScreen extends AbstractContainerScreen<Supercomput
                 auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
     }
 
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
-    }
-
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         if (nameBox != null) {
@@ -186,12 +179,6 @@ public class SupercomputerNodeScreen extends AbstractContainerScreen<Supercomput
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    private void sendButton(final int id) {
-        if (minecraft != null && minecraft.gameMode != null) {
-            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
-        }
     }
 
     @Override

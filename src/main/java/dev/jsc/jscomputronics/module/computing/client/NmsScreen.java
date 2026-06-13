@@ -13,7 +13,6 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.SqlResultPayloa
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -24,7 +23,7 @@ import java.util.List;
 /**
  * The Network Management Studio: an SSMS-style operations console. A left object-explorer shows the network schema; the query editor at the top runs an SQL statement (the server's dialect) against the network; the results grid below lists a read's rows, and the status bar reports the outcome. The player installs it from the Command Prompt and opens it with {@code run nms}.
  */
-public class NmsScreen extends AbstractContainerScreen<NmsMenu> {
+public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
 
     private static final int EXPLORER_W = 66;
     private static final int ROW_H = 9;
@@ -149,12 +148,6 @@ public class NmsScreen extends AbstractContainerScreen<NmsMenu> {
         g.pose().scale(SMALL, SMALL, 1.0f);
         g.drawString(font, text, 0, 0, color, false);
         g.pose().popPose();
-    }
-
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
     }
 
     @Override

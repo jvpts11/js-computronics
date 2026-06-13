@@ -12,7 +12,6 @@ import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
 import dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RequestRomSnapshotPayload;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
@@ -25,7 +24,7 @@ import java.util.Set;
 /**
  * Screen for the Pattern Reader, a two-tab disc/ROM station. The READ tab copies a disc's patterns into the adjacent Crafting Computer's Recipe ROM; the ROM tab lists that ROM and exports selected patterns back onto a rewritable disc (a copy that spends one rewrite cycle), with a right-click deleting a pattern from the ROM.
  */
-public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMenu> {
+public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMenu> {
 
     private static final int TAB_READ = 0;
     private static final int TAB_ROM = 1;
@@ -283,12 +282,6 @@ public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMe
         return super.mouseScrolled(mouseX, mouseY, dx, dy);
     }
 
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
-    }
-
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         final int mx = (int) mouseX;
@@ -372,12 +365,6 @@ public class PatternReaderScreen extends AbstractContainerScreen<PatternReaderMe
             }
         }
         return false;
-    }
-
-    private void sendButton(final int id) {
-        if (minecraft != null && minecraft.gameMode != null) {
-            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
-        }
     }
 
     @Override

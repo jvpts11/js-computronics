@@ -11,14 +11,13 @@ import dev.jsc.jscomputronics.common.network.FailoverRole;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
  * Screen for the Mainframe: a flat-dark "computer OS" hardware-assembly surface.
  */
-public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
+public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
 
     private static final int COL_R = 126;
     private static final int COL_R_W = 110;
@@ -171,12 +170,6 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
         return menu.buildValid() ? JscOsTheme.GREEN : JscOsTheme.AMBER;
     }
 
-    private boolean hover(final int mouseX, final int mouseY, final int rx, final int ry, final int w, final int h) {
-        final int mx = mouseX - leftPos;
-        final int my = mouseY - topPos;
-        return mx >= rx && mx < rx + w && my >= ry && my < ry + h;
-    }
-
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
         if (button == 0) {
@@ -200,12 +193,6 @@ public class MainframeScreen extends AbstractContainerScreen<MainframeMenu> {
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    private void sendButton(final int id) {
-        if (minecraft != null && minecraft.gameMode != null) {
-            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
-        }
     }
 
     @Override
