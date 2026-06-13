@@ -13,7 +13,6 @@ import dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
@@ -23,17 +22,10 @@ import java.util.Map;
 /**
  * A storage-disk component item.
  */
-public class DiskItem extends Item {
-
-    private final DiskSpec spec;
+public class DiskItem extends SpecItem<DiskSpec> {
 
     public DiskItem(final Properties properties, final DiskSpec spec) {
-        super(properties);
-        this.spec = spec;
-    }
-
-    public DiskSpec spec() {
-        return spec;
+        super(properties, spec);
     }
 
     // A fresh disk exposes nothing to the network until the owner publishes part of it; this keeps a
@@ -65,6 +57,7 @@ public class DiskItem extends Item {
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
+        final DiskSpec spec = spec();
         tooltip.add(Component.literal(
                 spec.capacityItems() + " items  (" + spec.capacityMb() + " MB)")
                 .withStyle(ChatFormatting.GRAY));

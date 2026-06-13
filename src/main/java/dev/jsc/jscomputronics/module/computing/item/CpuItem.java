@@ -10,7 +10,6 @@ package dev.jsc.jscomputronics.module.computing.item;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
@@ -19,22 +18,16 @@ import java.util.List;
 /**
  * A CPU component item.
  */
-public class CpuItem extends Item {
-
-    private final CpuSpec spec;
+public class CpuItem extends SpecItem<CpuSpec> {
 
     public CpuItem(final Properties properties, final CpuSpec spec) {
-        super(properties);
-        this.spec = spec;
-    }
-
-    public CpuSpec spec() {
-        return spec;
+        super(properties, spec);
     }
 
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
+        final CpuSpec spec = spec();
         tooltip.add(Component.literal(
                 spec.cores() + " cores @ " + String.format("%.2f GHz", spec.freqMhz() / 1000.0))
                 .withStyle(ChatFormatting.GRAY));

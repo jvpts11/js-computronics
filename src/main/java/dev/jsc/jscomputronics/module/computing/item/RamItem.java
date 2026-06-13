@@ -10,7 +10,6 @@ package dev.jsc.jscomputronics.module.computing.item;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
@@ -19,22 +18,16 @@ import java.util.List;
 /**
  * A RAM module item.
  */
-public class RamItem extends Item {
-
-    private final RamSpec spec;
+public class RamItem extends SpecItem<RamSpec> {
 
     public RamItem(final Properties properties, final RamSpec spec) {
-        super(properties);
-        this.spec = spec;
-    }
-
-    public RamSpec spec() {
-        return spec;
+        super(properties, spec);
     }
 
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
+        final RamSpec spec = spec();
         tooltip.add(Component.literal(
                 spec.bufferItems() + " items buffer  -  " + spec.generation())
                 .withStyle(ChatFormatting.GRAY));

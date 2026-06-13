@@ -11,7 +11,6 @@ import dev.jsc.jscomputronics.common.hardware.CraftingCardSpec;
 import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
@@ -20,27 +19,21 @@ import java.util.List;
 /**
  * A Crafting Card component item: the PCIe card a Crafting Computer needs to execute recipes.
  */
-public class CraftingCardItem extends Item implements ExpansionCardItem {
-
-    private final CraftingCardSpec spec;
+public class CraftingCardItem extends SpecItem<CraftingCardSpec> implements ExpansionCardItem {
 
     public CraftingCardItem(final Properties properties, final CraftingCardSpec spec) {
-        super(properties);
-        this.spec = spec;
-    }
-
-    public CraftingCardSpec spec() {
-        return spec;
+        super(properties, spec);
     }
 
     @Override
     public ExpansionCardSpec cardSpec() {
-        return spec;
+        return spec();
     }
 
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
+        final CraftingCardSpec spec = spec();
         tooltip.add(Component.literal("Executes recipes  -  " + spec.cpuFactor() + "x CPU")
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal(spec.tier() + "  -  " + spec.tdpWatts() + " W")
