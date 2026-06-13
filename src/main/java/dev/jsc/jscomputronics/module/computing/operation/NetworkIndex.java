@@ -17,6 +17,7 @@ import dev.jsc.jscomputronics.common.operation.index.StorageAllocator;
 import dev.jsc.jscomputronics.common.operation.index.StorageLockTable;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.ServerItem;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
@@ -63,6 +64,14 @@ public final class NetworkIndex {
                 }
             });
         }
+        // A Personal Computer contributes only its published share. With the default-private permille
+        // this adds nothing until the owner moves a slider, so a fresh PC stays invisible to SELECT.
+        for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
+            if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
+                indexPc(pcBe, pc.nodeUuid());
+                indexedModCounts.put(pc.nodeUuid(), pcBe.storageModCount());
+            }
+        }
     }
 
     public void analyzeIncremental(final ServerLevel level, final NetworkUuid network) {
@@ -86,10 +95,22 @@ public final class NetworkIndex {
                 }
             });
         }
-        // Servers no longer on the network (or unresolvable) leave the catalog entirely.
+        // The same changes-only pass for Personal Computers, keyed on the PC's storage counter (bumped
+        // both by a disk-content change and by a slider write, so re-publishing re-reads the view).
+        final Map<NodeUuid, PersonalComputerBlockEntity> livePcs = new LinkedHashMap<>();
+        for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
+            if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
+                livePcs.put(pc.nodeUuid(), pcBe);
+                final Long seen = indexedModCounts.get(pc.nodeUuid());
+                if (seen == null || seen != pcBe.storageModCount()) {
+                    dirty.add(pc.nodeUuid());
+                }
+            }
+        }
+        // Nodes no longer on the network (or unresolvable) leave the catalog entirely.
         final List<NodeUuid> gone = new ArrayList<>();
         for (final NodeUuid indexed : indexedModCounts.keySet()) {
-            if (!live.containsKey(indexed)) {
+            if (!live.containsKey(indexed) && !livePcs.containsKey(indexed)) {
                 gone.add(indexed);
             }
         }
@@ -104,9 +125,16 @@ public final class NetworkIndex {
         }
         for (final NodeUuid node : dirty) {
             final NetworkSystem.ServerLocation loc = live.get(node);
-            if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+            if (loc != null
+                    && level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
                 indexServer(rack, loc.slot(), node);
                 indexedModCounts.put(node, rack.storageModCount(loc.slot()));
+            } else {
+                final PersonalComputerBlockEntity pcBe = livePcs.get(node);
+                if (pcBe != null) {
+                    indexPc(pcBe, node);
+                    indexedModCounts.put(node, pcBe.storageModCount());
+                }
             }
         }
     }
@@ -114,8 +142,13 @@ public final class NetworkIndex {
     public int vacuum(final ServerLevel level, final NetworkUuid network) {
         final java.util.Set<NodeUuid> registered = new java.util.HashSet<>();
         if (network != null) {
-            for (final ServerNode server : NetworkSystem.get(level).serversOf(network)) {
+            final NetworkSystem system = NetworkSystem.get(level);
+            for (final ServerNode server : system.serversOf(network)) {
                 registered.add(server.nodeUuid());
+            }
+            // PCs are indexed too; keeping their nodes registered stops vacuum treating them as ghosts.
+            for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
+                registered.add(pc.nodeUuid());
             }
         }
         int freed = 0;
@@ -155,6 +188,18 @@ public final class NetworkIndex {
             if (quantity > 0L) {
                 catalog.computeIfAbsent(key, k -> new ArrayList<>())
                         .add(new ItemLocation(server, tier, quantity));
+            }
+        });
+    }
+
+    private void indexPc(final PersonalComputerBlockEntity pc, final NodeUuid node) {
+        // A PC contributes only its published share, indexed at the slowest tier so it always sorts
+        // last among SELECT sources — Servers are served first, a PC's published storage only as a
+        // fallback. The private remainder is absent from publicView(), so SELECT can never reach it.
+        pc.localStore().publicView().forEach((key, quantity) -> {
+            if (quantity > 0L) {
+                catalog.computeIfAbsent(key, k -> new ArrayList<>())
+                        .add(new ItemLocation(node, StorageTier.HDD, quantity));
             }
         });
     }

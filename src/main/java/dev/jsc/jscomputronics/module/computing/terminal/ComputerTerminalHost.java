@@ -98,6 +98,33 @@ public interface ComputerTerminalHost {
     boolean isMainframeHost();
 
     /**
+     * Whether this computer exposes the per-disk public/private storage slider. A Server's and a Mainframe's own storage is always fully public, so they return {@code false} and the terminal shows a static "always public" badge instead of a dead control.
+     */
+    default boolean storageHasSlider() {
+        return false;
+    }
+
+    /** The number of disk slots whose privacy this computer's slider controls (0 when it has no slider). */
+    default int diskPrivacyDiskCount() {
+        return 0;
+    }
+
+    /** The public-share permille (0..1000) of one disk; the private default when out of range. */
+    default int diskPrivacyPermille(final int diskIndex) {
+        return 0;
+    }
+
+    /** The used data weight stored on one disk, for the slider's per-disk readout. */
+    default long diskUsedWeight(final int diskIndex) {
+        return 0L;
+    }
+
+    /** The capacity data weight of one disk, for the slider's per-disk readout. */
+    default long diskCapacityWeight(final int diskIndex) {
+        return 0L;
+    }
+
+    /**
      * This computer's persistent console state — the Command Prompt history and installed programs.
      * A host that cannot store it (none today) returns {@code null} and the console degrades to a
      * fresh, non-persistent session.

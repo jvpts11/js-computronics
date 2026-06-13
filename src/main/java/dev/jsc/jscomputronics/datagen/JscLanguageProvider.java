@@ -87,6 +87,13 @@ public class JscLanguageProvider extends LanguageProvider {
         add("menu.jsc.network_overview", "Network Overview");
         add("gui.jsc.confirm", "Confirm");
         add("gui.jsc.cancel", "Cancel");
+        // Storage tab — the per-disk public/private slider and its readouts.
+        add("jsc.gui.storage.public_private", "Public / Private");
+        add("jsc.gui.storage.public", "%s%% public");
+        add("jsc.gui.storage.private", "%s%% private");
+        add("jsc.gui.storage.always_public", "Public - network storage");
+        add("jsc.gui.storage.no_disk", "no disk");
+        add("jsc.gui.storage.disk", "Disk %s");
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             add(disk.item().get(), disk.displayName());
         }

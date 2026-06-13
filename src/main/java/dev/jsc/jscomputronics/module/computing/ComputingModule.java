@@ -137,6 +137,15 @@ public final class ComputingModule {
                     .persistent(com.mojang.serialization.Codec.intRange(0, Integer.MAX_VALUE))
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
 
+    // How much of a (non-Server) computer disk's storage is public, as a per-mille 0..1000. The
+    // component rides on the disk ItemStack so the split travels with the disk when it is pulled
+    // and reinserted. An absent component reads as fully private (see DiskItem.publicPermille).
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<Integer>>
+            DISK_PUBLIC_PERMILLE = COMPONENTS.registerComponentType("disk_public_permille", b -> b
+                    .persistent(com.mojang.serialization.Codec.intRange(0, 1000))
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
+
     private static BlockBehaviour.Properties cableProperties() {
         return BlockBehaviour.Properties.of()
                 .mapColor(MapColor.COLOR_GRAY)

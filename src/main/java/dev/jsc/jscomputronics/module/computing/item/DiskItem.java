@@ -36,6 +36,30 @@ public class DiskItem extends Item {
         return spec;
     }
 
+    // A fresh disk exposes nothing to the network until the owner publishes part of it; this keeps a
+    // newly placed computer's storage private by default. Tunable.
+    public static final int DEFAULT_PUBLIC_PERMILLE = 0;
+
+    /**
+     * The public-share permille stored on a disk stack, or the private default if the component is absent or the stack is not a disk.
+     */
+    public static int publicPermille(final ItemStack stack) {
+        if (!(stack.getItem() instanceof DiskItem)) {
+            return DEFAULT_PUBLIC_PERMILLE;
+        }
+        final Integer stored = stack.get(ComputingModule.DISK_PUBLIC_PERMILLE.get());
+        return stored == null ? DEFAULT_PUBLIC_PERMILLE
+                : dev.jsc.jscomputronics.module.computing.storage.DiskPrivacy.clampPermille(stored);
+    }
+
+    /** Writes a clamped public-share permille onto a disk stack (a no-op for a non-disk stack). */
+    public static void setPublicPermille(final ItemStack stack, final int permille) {
+        if (stack.getItem() instanceof DiskItem) {
+            stack.set(ComputingModule.DISK_PUBLIC_PERMILLE.get(),
+                    dev.jsc.jscomputronics.module.computing.storage.DiskPrivacy.clampPermille(permille));
+        }
+    }
+
     private static final int MAX_CONTENT_ROWS = 12;
 
     @Override

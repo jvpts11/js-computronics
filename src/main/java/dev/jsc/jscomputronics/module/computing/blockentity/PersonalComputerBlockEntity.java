@@ -12,6 +12,7 @@ import dev.jsc.jscomputronics.common.hardware.FormFactor;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.LocalStore;
 import dev.jsc.jscomputronics.module.computing.storage.StoreSink;
@@ -53,8 +54,31 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
             MOTHERBOARD_SLOT, CPU_SLOT, 1, RAM_SLOTS_START, RAM_SLOTS,
             GPU_SLOTS_START, GPU_SLOTS, PSU_SLOT, DISK_SLOTS_START, DISK_SLOTS, HARDWARE_SLOTS);
 
+    // Bumped on any change to the disk contents (insert/extract/disk swap) AND on a privacy-slider
+    // write, so the Mainframe's incremental ANALYZE re-reads this PC's public view exactly when it
+    // could have changed — moving a slider changes the public view with no item movement at all.
+    private long storageModCount;
+
     public PersonalComputerBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.PERSONAL_COMPUTER_BE.get(), pos, state, LAYOUT);
+    }
+
+    public long storageModCount() {
+        return storageModCount;
+    }
+
+    /** Marks the PC's storage as changed so the network index re-reads it; used by the slider write. */
+    public void bumpStorageModCount() {
+        storageModCount++;
+        setChanged();
+    }
+
+    @Override
+    public void setChanged() {
+        // Any reason the BE is marked dirty (a disk swap, a content write) could have changed the
+        // public view, so advance the counter the index keys its re-reads on.
+        storageModCount++;
+        super.setChanged();
     }
 
     @Override
@@ -171,6 +195,51 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
     @Override
     public boolean isMainframeHost() {
         return false;
+    }
+
+    // Public/private storage slider — a PC publishes part of each disk to the network per disk.
+
+    @Override
+    public boolean storageHasSlider() {
+        return true;
+    }
+
+    @Override
+    public int diskPrivacyDiskCount() {
+        return DISK_SLOTS;
+    }
+
+    @Override
+    public int diskPrivacyPermille(final int diskIndex) {
+        if (diskIndex < 0 || diskIndex >= DISK_SLOTS) {
+            return 0;
+        }
+        return DiskItem.publicPermille(getHardware().getStackInSlot(DISK_SLOTS_START + diskIndex));
+    }
+
+    @Override
+    public long diskUsedWeight(final int diskIndex) {
+        return localStore().diskUsedWeight(diskIndex);
+    }
+
+    @Override
+    public long diskCapacityWeight(final int diskIndex) {
+        return localStore().diskCapacityWeight(diskIndex);
+    }
+
+    /**
+     * Writes a clamped public-share permille onto the disk in {@code diskIndex} and marks storage changed so the network re-reads this PC's public view. A no-op for an out-of-range index or an empty slot.
+     */
+    public void setDiskPrivacy(final int diskIndex, final int permille) {
+        if (diskIndex < 0 || diskIndex >= DISK_SLOTS) {
+            return;
+        }
+        final ItemStack disk = getHardware().getStackInSlot(DISK_SLOTS_START + diskIndex);
+        if (!(disk.getItem() instanceof DiskItem)) {
+            return;
+        }
+        DiskItem.setPublicPermille(disk, permille);
+        bumpStorageModCount();
     }
 
     // Screen sync (ContainerData wire layout — single source of truth shared with the Menu)

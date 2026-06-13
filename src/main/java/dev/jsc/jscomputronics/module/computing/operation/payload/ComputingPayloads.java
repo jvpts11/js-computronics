@@ -88,6 +88,8 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleLocalSnapshot);
         registrar.playToServer(TerminalLocalWithdrawPayload.TYPE, TerminalLocalWithdrawPayload.STREAM_CODEC,
                 ComputingPayloads::handleLocalWithdraw);
+        registrar.playToServer(TerminalDiskPrivacyPayload.TYPE, TerminalDiskPrivacyPayload.STREAM_CODEC,
+                ComputingPayloads::handleDiskPrivacy);
         registrar.playToServer(TerminalLocalDepositPayload.TYPE, TerminalLocalDepositPayload.STREAM_CODEC,
                 ComputingPayloads::handleLocalDeposit);
         registrar.playToClient(ActiveOperationsPayload.TYPE, ActiveOperationsPayload.STREAM_CODEC,
@@ -1460,6 +1462,7 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof ComputerTerminalMenu menu) {
                 menu.setLocalItems(payload.items());
+                menu.setDiskPrivacy(payload.disks());
             }
         });
     }
@@ -1470,7 +1473,17 @@ public final class ComputingPayloads {
                 Math.min(view.size(), LocalStorageSnapshotPayload.MAX_ENTRIES));
         view.entrySet().stream().limit(LocalStorageSnapshotPayload.MAX_ENTRIES)
                 .forEach(e -> entries.add(new NetworkItemEntry(e.getKey(), e.getValue())));
-        PacketDistributor.sendToPlayer(player, new LocalStorageSnapshotPayload(entries));
+        // Per-disk privacy state for the Storage tab's slider; empty for a host with no slider, which
+        // makes the Storage tab show the static "always public" badge instead of a control.
+        final List<LocalStorageSnapshotPayload.DiskInfo> disks = new ArrayList<>();
+        if (host.storageHasSlider()) {
+            final int count = Math.min(host.diskPrivacyDiskCount(), LocalStorageSnapshotPayload.MAX_DISKS);
+            for (int i = 0; i < count; i++) {
+                disks.add(new LocalStorageSnapshotPayload.DiskInfo(
+                        host.diskPrivacyPermille(i), host.diskUsedWeight(i), host.diskCapacityWeight(i)));
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new LocalStorageSnapshotPayload(entries, disks));
     }
 
     private static void handleLocalWithdraw(final TerminalLocalWithdrawPayload payload, final IPayloadContext context) {
@@ -1506,6 +1519,32 @@ public final class ComputingPayloads {
             if (remaining > 0L) {
                 host.localStore().insert(key, remaining); // belt-and-braces: never lose the remainder
             }
+            dispatchLocalSnapshot(player, host);
+        });
+    }
+
+    private static void handleDiskPrivacy(final TerminalDiskPrivacyPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final ComputerTerminalHost host = openTerminal(context, payload.monitorPos(), payload.hostPos());
+            if (host == null || !(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            // A Server or the Mainframe is always fully public — it carries no slider, so a privacy
+            // write to one is a stale or spoofed packet. Warn lightly and ignore it.
+            if (!host.storageHasSlider()
+                    || !(host instanceof PersonalComputerBlockEntity pc)) {
+                JsComputronics.LOGGER.warn("Ignoring disk-privacy write to a host without a storage slider at {}",
+                        payload.hostPos());
+                return;
+            }
+            if (payload.diskIndex() < 0 || payload.diskIndex() >= pc.diskPrivacyDiskCount()) {
+                return;
+            }
+            // Whitelist + clamp: only a value inside the valid per-mille range is ever applied.
+            final int permille = dev.jsc.jscomputronics.module.computing.storage.DiskPrivacy
+                    .clampPermille(payload.permille());
+            pc.setDiskPrivacy(payload.diskIndex(), permille); // a no-op + no counter bump if the slot has no disk
+            // Refresh the owner's Storage tab so the readout reflects the authoritative value.
             dispatchLocalSnapshot(player, host);
         });
     }

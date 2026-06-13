@@ -314,6 +314,42 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         return localItems;
     }
 
+    // Per-disk privacy state for the Storage tab's slider, synced with the local snapshot. Empty for a
+    // host with no slider (a Server/Mainframe), which the screen reads as "always public".
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .LocalStorageSnapshotPayload.DiskInfo> diskPrivacy = java.util.List.of();
+
+    public void setDiskPrivacy(final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .LocalStorageSnapshotPayload.DiskInfo> disks) {
+        this.diskPrivacy = disks;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .LocalStorageSnapshotPayload.DiskInfo> diskPrivacy() {
+        return diskPrivacy;
+    }
+
+    /** Whether the open host has a per-disk privacy slider (true once the snapshot carried disk rows). */
+    public boolean storageHasSlider() {
+        return host != null && host.storageHasSlider();
+    }
+
+    public int diskCount() {
+        return diskPrivacy.size();
+    }
+
+    public int diskPermille(final int index) {
+        return index >= 0 && index < diskPrivacy.size() ? diskPrivacy.get(index).permille() : 0;
+    }
+
+    public long diskUsedWeight(final int index) {
+        return index >= 0 && index < diskPrivacy.size() ? diskPrivacy.get(index).usedWeight() : 0L;
+    }
+
+    public long diskCapacityWeight(final int index) {
+        return index >= 0 && index < diskPrivacy.size() ? diskPrivacy.get(index).capacityWeight() : 0L;
+    }
+
     public void setServerBreakdown(
             final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload.ServerHolding> rows) {
         this.serverBreakdown = rows;

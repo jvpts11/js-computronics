@@ -402,6 +402,86 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void pcPrivateStorage_isInvisibleUntilPublished(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pcPos = new BlockPos(5, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity pc = placeRunningPC(helper, pcPos);
+        // Install the smallest disk (2000-item capacity) and seed it with 100 cobblestone, all private
+        // by default (0 permille). Public storage is a capacity-fraction budget: a permille of 15 on a
+        // 2000-item disk publishes a 30-item budget, so 30 of the 100 become public, 70 stay private.
+        pc.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.GB_500)));
+        final java.util.function.IntConsumer publish = permille ->
+                pc.setDiskPrivacy(0, permille);
+        final ItemStackHandler dest = new ItemStackHandler(9);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(pc.networkUuid() != null, "the PC should be on the network");
+                    helper.assertTrue(pc.networkUuid().equals(mainframe.networkUuid()),
+                            "the PC shares the mainframe network");
+                    pc.localStore().insert(StorageKey.of(Items.COBBLESTONE), 100);
+                })
+                // Default-private: the network must not see any of the PC's storage.
+                .thenExecuteAfter(4, () -> {
+                    helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 0,
+                            "a default-private PC disk must be invisible to the index; got "
+                                    + mainframe.networkIndex().available(Items.COBBLESTONE));
+                    final var op = mainframe.submitNetworkSelect(Items.COBBLESTONE, 100, port(dest), "test");
+                    helper.assertTrue(op == null || op.isDone(),
+                            "a SELECT against an all-private PC finds nothing to pull");
+                })
+                .thenExecuteAfter(4, () -> helper.assertTrue(countIn(dest, Items.COBBLESTONE) == 0,
+                        "nothing should have moved while the PC is fully private"))
+                // Publish a 30-item budget (15 permille of the 2000-item disk): 30 of the 100 become
+                // public; the other 70 stay private.
+                .thenExecute(() -> publish.accept(15))
+                .thenExecuteAfter(4, () -> {
+                    helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 30,
+                            "publishing a 30-item budget exposes 30 of the 100 to the index; got "
+                                    + mainframe.networkIndex().available(Items.COBBLESTONE));
+                    mainframe.submitNetworkSelect(Items.COBBLESTONE, 100, port(dest), "test");
+                })
+                // A SELECT for 100 pulls only the 30 public; the 70 private remain on the PC's disk.
+                .thenExecuteAfter(30, () -> {
+                    helper.assertTrue(countIn(dest, Items.COBBLESTONE) == 30,
+                            "only the published 30 are SELECT-able; got " + countIn(dest, Items.COBBLESTONE));
+                    helper.assertTrue(pc.localStore().count(StorageKey.of(Items.COBBLESTONE)) == 70,
+                            "the private remainder stays on the PC; got "
+                                    + pc.localStore().count(StorageKey.of(Items.COBBLESTONE)));
+                })
+                // The public budget is a standing ceiling: 30 of the remaining 70 are public again, so
+                // a repeat pull yields another 30 and never reaches the private floor.
+                .thenExecuteAfter(4, () -> helper.assertTrue(
+                        mainframe.networkIndex().available(Items.COBBLESTONE) == 30,
+                        "the budget re-exposes 30 of the remaining 70; got "
+                                + mainframe.networkIndex().available(Items.COBBLESTONE)))
+                // Fully private again: no part of the PC is visible, the whole 70 is protected.
+                .thenExecute(() -> publish.accept(0))
+                .thenExecuteAfter(4, () -> helper.assertTrue(
+                        mainframe.networkIndex().available(Items.COBBLESTONE) == 0,
+                        "setting the disk back to private hides all of it again; got "
+                                + mainframe.networkIndex().available(Items.COBBLESTONE)))
+                .thenSucceed();
+    }
+
+    private static int countIn(final ItemStackHandler handler, final net.minecraft.world.item.Item item) {
+        int total = 0;
+        for (int i = 0; i < handler.getSlots(); i++) {
+            if (handler.getStackInSlot(i).getItem() == item) {
+                total += handler.getStackInSlot(i).getCount();
+            }
+        }
+        return total;
+    }
+
     @GameTest(template = ARENA)
     public static void personalComputer_ignoresHbwCable(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);

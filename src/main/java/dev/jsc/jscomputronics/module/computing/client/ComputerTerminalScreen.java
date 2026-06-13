@@ -8,8 +8,10 @@
 package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
+import dev.jsc.jscomputronics.module.computing.operation.payload.LocalStorageSnapshotPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
+import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalDiskPrivacyPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RequestServerBreakdownPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ServerBreakdownPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalDropPayload;
@@ -99,6 +101,30 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     @org.jetbrains.annotations.Nullable
     private EditBox searchBox;
     private boolean sortByQuantity = true;
+
+    // Storage tab — public/private slider band. The Storage tab inserts a band between the header bar
+    // and the item toolbar, then shifts its toolbar/grid/deposit down by STORAGE_SHIFT so nothing
+    // overlaps. The band holds one compact track per disk (a PC has 2). For a host without a slider
+    // (a Server/Mainframe) the band shows a static "always public" badge instead of a dead control.
+    private static final int SLIDER_TRACK0_DY = 1;        // first track top, relative to the band top
+    private static final int SLIDER_ROW_PITCH = 9;        // vertical distance between the two tracks
+    private static final int SLIDER_TRACK_H = 7;
+    private static final int SLIDER_TRACK_LX = 24;        // track left inset from the content left edge
+    private static final int SLIDER_HANDLE_W = 3;
+    // Snap step while dragging (50 per-mille = 5%); holding Shift drags at fine 1 per-mille. Tunable.
+    private static final int SLIDER_STEP = 50;
+    // Storage-tab vertical shift applied to the shared toolbar/grid/deposit so the band fits above. The
+    // shift is bounded by the inventory: DEPOSIT_Y(126) + STORAGE_SHIFT + DEPOSIT_H(14) must stay <=
+    // INV_Y(148), so 8 is the maximum and the deposit bar abuts the inventory exactly with no overlap.
+    private static final int STORAGE_SHIFT = 8;
+    // The Storage grid loses one row to the band; the Network grid keeps all four.
+    private static final int STORAGE_NET_ROWS = 3;
+
+    private int draggingSliderDisk = -1;   // which disk's slider is being dragged, or -1 for none
+    private int focusedSliderDisk = -1;    // which disk's slider has keyboard focus, or -1 for none
+    // Optimistic per-disk values shown while dragging; overwritten by the authoritative sync each frame.
+    private final int[] sliderPreview = new int[LocalStorageSnapshotPayload.MAX_DISKS];
+    private final boolean[] sliderPreviewActive = new boolean[LocalStorageSnapshotPayload.MAX_DISKS];
 
     // Operations tab layout (content-relative).
     private static final int OPS_ROWS = 4;
@@ -200,6 +226,8 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final boolean show = isGridTab() && popupEntry == null && popupOp == null && craftPopup == null;
         searchBox.visible = show;
         searchBox.active = show;
+        // The Storage tab's toolbar sits below the slider band, so move the search field to match.
+        searchBox.setY(topPos + TOOLBAR_Y + 2 + gridShift());
         if (!show) {
             searchBox.setFocused(false);
         }
@@ -400,9 +428,153 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private void storageBg(final GuiGraphics g, final int x, final int y,
                            final int cx, final int cy, final int cw) {
-        // The Storage tab is a disk-backed quantity view: the same item grid + deposit bar as the
-        // Network tab, drawn from the local-storage snapshot (visibleItems() sources it by tab).
-        networkBg(g, x, y);
+        // The Storage tab inserts the privacy-slider band just under the header, then draws the same
+        // disk-backed quantity grid as the Network tab shifted down by the band so nothing overlaps.
+        sliderBandBg(g, cx, cy, cw);
+        gridBg(g, x, y, STORAGE_SHIFT, STORAGE_NET_ROWS);
+    }
+
+    // The two-tone privacy slider band (Storage tab only). Tracks are drawn here (backgrounds), the
+    // text labels in storageLabels. For a host with no slider the band is a single static badge.
+    private void sliderBandBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
+        final int bandTop = cy + 18; // just below the header bar's LINE at cy+17
+        if (!menu.storageHasSlider()) {
+            // Server/Mainframe: a flat badge strip, no control.
+            g.fill(cx, bandTop, cx + cw, bandTop + 11, PANEL);
+            g.fill(cx, bandTop, cx + 2, bandTop + 11, GREEN);
+            return;
+        }
+        final int disks = menu.diskCount();
+        final int trackX = cx + SLIDER_TRACK_LX;
+        final int trackW = cw - SLIDER_TRACK_LX - 2;
+        for (int d = 0; d < disks; d++) {
+            final int ty = bandTop + SLIDER_TRACK0_DY + d * SLIDER_ROW_PITCH;
+            sliderTrackBg(g, trackX, ty, trackW, d);
+        }
+    }
+
+    private void sliderTrackBg(final GuiGraphics g, final int tx, final int ty, final int tw, final int disk) {
+        final int permille = sliderValue(disk);
+        final boolean empty = menu.diskCapacityWeight(disk) <= 0L;
+        // Track base + top edge line.
+        g.fill(tx, ty, tx + tw, ty + SLIDER_TRACK_H, TRACK);
+        g.fill(tx, ty, tx + tw, ty + 1, LINE);
+        if (empty) {
+            return; // no disk in this slot: a greyed, handle-less track (the "no disk" caption is the label)
+        }
+        final int span = tw - SLIDER_HANDLE_W;
+        final int handleX = tx + Math.round(span * (permille / 1000.0f));
+        // Public fill (left of the handle) in GREEN; private fill (right) in the dim panel tone.
+        if (handleX > tx + 1) {
+            g.fill(tx + 1, ty + 1, handleX, ty + SLIDER_TRACK_H - 1, GREEN);
+        }
+        if (handleX + SLIDER_HANDLE_W < tx + tw - 1) {
+            g.fill(handleX + SLIDER_HANDLE_W, ty + 1, tx + tw - 1, ty + SLIDER_TRACK_H - 1, PANEL);
+        }
+        // Snap ticks at 0/25/50/75/100% under the track, faint.
+        for (int i = 0; i <= 4; i++) {
+            final int tickX = tx + Math.round(span * (i / 4.0f)) + SLIDER_HANDLE_W / 2;
+            g.fill(tickX, ty + SLIDER_TRACK_H, tickX + 1, ty + SLIDER_TRACK_H + 1, LINE);
+        }
+        // Handle: a 3px ACCENT bar slightly taller than the track; brightens while dragging this disk.
+        final int handleColor = draggingSliderDisk == disk ? 0xFFFFFFFF : ACCENT;
+        g.fill(handleX, ty - 2, handleX + SLIDER_HANDLE_W, ty + SLIDER_TRACK_H + 2, handleColor);
+    }
+
+    // The value shown for a disk's slider: the optimistic preview while dragging, else the synced value.
+    private int sliderValue(final int disk) {
+        if (disk >= 0 && disk < sliderPreviewActive.length && sliderPreviewActive[disk]) {
+            return sliderPreview[disk];
+        }
+        return menu.diskPermille(disk);
+    }
+
+    // Track geometry, content-relative-to-absolute (matches sliderBandBg).
+    private int sliderTrackX() {
+        return leftPos + CONTENT_X + SLIDER_TRACK_LX;
+    }
+
+    private int sliderTrackW() {
+        return contentW() - SLIDER_TRACK_LX - 2;
+    }
+
+    private int sliderTrackY(final int disk) {
+        // cy = topPos + 6; band top = cy + 18; first track at band top + SLIDER_TRACK0_DY.
+        return topPos + 6 + 18 + SLIDER_TRACK0_DY + disk * SLIDER_ROW_PITCH;
+    }
+
+    /** The disk whose slider track the cursor is over (within a small vertical tolerance), or -1. */
+    private int sliderDiskAt(final double mx, final double my) {
+        if (menu.activeTab() != ComputerTerminalMenu.TAB_STORAGE || !menu.storageHasSlider()) {
+            return -1;
+        }
+        final int tx = sliderTrackX();
+        final int tw = sliderTrackW();
+        if (mx < tx - 1 || mx > tx + tw + 1) {
+            return -1;
+        }
+        for (int d = 0; d < menu.diskCount(); d++) {
+            if (menu.diskCapacityWeight(d) <= 0L) {
+                continue; // an empty disk slot has no draggable handle
+            }
+            final int ty = sliderTrackY(d);
+            if (my >= ty - 3 && my <= ty + SLIDER_TRACK_H + 3) {
+                return d;
+            }
+        }
+        return -1;
+    }
+
+    /** Maps a cursor X to a per-mille for the given disk, snapped to the step grid unless Shift is held. */
+    private int sliderPermilleAt(final int disk, final double mx, final boolean fine) {
+        final int tx = sliderTrackX();
+        final int span = Math.max(1, sliderTrackW() - SLIDER_HANDLE_W);
+        final double frac = Math.max(0.0, Math.min(1.0, (mx - tx) / span));
+        int permille = (int) Math.round(frac * 1000.0);
+        if (!fine) {
+            permille = Math.round(permille / (float) SLIDER_STEP) * SLIDER_STEP;
+        }
+        return Math.max(0, Math.min(1000, permille));
+    }
+
+    private void setSliderPreview(final int disk, final int permille) {
+        if (disk >= 0 && disk < sliderPreview.length) {
+            sliderPreview[disk] = permille;
+            sliderPreviewActive[disk] = true;
+        }
+    }
+
+    private void sendSliderValue(final int disk, final int permille) {
+        PacketDistributor.sendToServer(new TerminalDiskPrivacyPayload(
+                menu.monitorPos(), menu.hostPos(), disk, permille));
+    }
+
+    // A parameterized item grid + deposit bar shared by the Network tab (offset 0, 4 rows) and the
+    // Storage tab (offset STORAGE_SHIFT, 3 rows), so both stay pixel-identical apart from the offset.
+    private void gridBg(final GuiGraphics g, final int x, final int y, final int dy, final int rows) {
+        final int tbx = x + NET_X;
+        final int tby = y + TOOLBAR_Y + dy;
+        g.fill(tbx, tby, tbx + SEARCH_W, tby + TOOLBAR_H, TRACK);
+        g.fill(tbx, tby, tbx + SEARCH_W, tby + 1, LINE);
+        final int sbx = x + SORT_X;
+        g.fill(sbx, tby, sbx + SORT_W, tby + TOOLBAR_H, PANEL);
+        g.fill(sbx, tby, sbx + SORT_W, tby + 1, LINE);
+
+        final List<NetworkItemEntry> items = visibleItems();
+        final int start = clampScroll(items.size(), rows) * NET_COLS;
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < NET_COLS; col++) {
+                final int sx = x + NET_X + col * 18;
+                final int sy = y + NET_Y + dy + row * 18;
+                slotBg(g, sx, sy);
+                final int idx = start + row * NET_COLS + col;
+                if (idx < items.size()) {
+                    final NetworkItemEntry e = items.get(idx);
+                    drawDataIcon(g, e.key(), e.total(), sx, sy);
+                }
+            }
+        }
+        depositBar(g, x, y, dy);
     }
 
     private static void slotBg(final GuiGraphics g, final int x, final int y) {
@@ -832,46 +1004,54 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private void storageLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final String cap = menu.storageCapacity() <= 0 ? "no disk"
-                : fmt(menu.storageUsed()) + "/" + fmt(menu.storageCapacity());
-        g.drawString(font, "LOCAL STORAGE  " + cap, cx, cy + 20, DIM, false);
+        sliderBandLabels(g, cx, cy, cw);
         final int shown = visibleItems().size();
         final String t = shown + (shown == 1 ? " type" : " types");
-        g.drawString(font, t, cx + cw - font.width(t), cy + 20, DIM, false);
+        g.drawString(font, t, cx + cw - font.width(t), TOOLBAR_Y + STORAGE_SHIFT + 3, DIM, false);
         g.drawCenteredString(font, sortByQuantity ? "Qty" : "Name", SORT_X + SORT_W / 2,
-                TOOLBAR_Y + 3, ACCENT);
+                TOOLBAR_Y + STORAGE_SHIFT + 3, ACCENT);
         final boolean holding = !menu.getCarried().isEmpty();
-        g.drawCenteredString(font, "DEPOSIT TO STORAGE", NET_X + DEPOSIT_W / 2, DEPOSIT_Y + 3,
-                holding ? ACCENT : DIM);
+        g.drawCenteredString(font, "DEPOSIT TO STORAGE", NET_X + DEPOSIT_W / 2,
+                DEPOSIT_Y + STORAGE_SHIFT + 3, holding ? ACCENT : DIM);
+    }
+
+    private void sliderBandLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
+        final int bandTop = cy + 18;
+        if (!menu.storageHasSlider()) {
+            // Server/Mainframe: storage is always public — a static badge, never a control.
+            g.drawString(font, "PUBLIC · NETWORK STORAGE", cx + 4, bandTop + 2, GREEN, false);
+            return;
+        }
+        final int disks = menu.diskCount();
+        final int trackX = cx + SLIDER_TRACK_LX;
+        for (int d = 0; d < disks; d++) {
+            final int ty = bandTop + SLIDER_TRACK0_DY + d * SLIDER_ROW_PITCH;
+            // Disk letter to the left of the track; the per-disk public/private readout to the right.
+            g.drawString(font, String.valueOf((char) ('A' + d)), cx + 2, ty, DIM, false);
+            if (menu.diskCapacityWeight(d) <= 0L) {
+                g.drawString(font, "no disk", trackX + 4, ty, DIM, false);
+                continue;
+            }
+            final int permille = sliderValue(d);
+            final String readout = (permille / 10) + "% pub";
+            g.drawString(font, readout, cx + cw - font.width(readout), ty, GREEN, false);
+        }
     }
 
     // Network tab — a virtual item grid drawn from the snapshot
 
     private void networkBg(final GuiGraphics g, final int x, final int y) {
-        // Toolbar: search field box + sort toggle.
-        final int tbx = x + NET_X;
-        final int tby = y + TOOLBAR_Y;
-        g.fill(tbx, tby, tbx + SEARCH_W, tby + TOOLBAR_H, TRACK);
-        g.fill(tbx, tby, tbx + SEARCH_W, tby + 1, LINE);
-        final int sbx = x + SORT_X;
-        g.fill(sbx, tby, sbx + SORT_W, tby + TOOLBAR_H, PANEL);
-        g.fill(sbx, tby, sbx + SORT_W, tby + 1, LINE);
+        gridBg(g, x, y, 0, NET_ROWS);
+    }
 
-        final List<NetworkItemEntry> items = visibleItems();
-        final int start = clampScroll(items.size()) * NET_COLS;
-        for (int row = 0; row < NET_ROWS; row++) {
-            for (int col = 0; col < NET_COLS; col++) {
-                final int sx = x + NET_X + col * 18;
-                final int sy = y + NET_Y + row * 18;
-                slotBg(g, sx, sy);
-                final int idx = start + row * NET_COLS + col;
-                if (idx < items.size()) {
-                    final NetworkItemEntry e = items.get(idx);
-                    drawDataIcon(g, e.key(), e.total(), sx, sy);
-                }
-            }
-        }
-        depositBar(g, x, y);
+    /** The vertical shift applied to the shared grid on the Storage tab (the slider band lives above). */
+    private int gridShift() {
+        return menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE ? STORAGE_SHIFT : 0;
+    }
+
+    /** The number of grid rows for the active tab (the Storage tab gives one row to the slider band). */
+    private int gridRows() {
+        return menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE ? STORAGE_NET_ROWS : NET_ROWS;
     }
 
     private List<NetworkItemEntry> visibleItems() {
@@ -894,9 +1074,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         return out;
     }
 
-    private void depositBar(final GuiGraphics g, final int x, final int y) {
+    private void depositBar(final GuiGraphics g, final int x, final int y, final int yShift) {
         final int dx = x + NET_X;
-        final int dy = y + DEPOSIT_Y;
+        final int dy = y + DEPOSIT_Y + yShift;
         final boolean holding = !menu.getCarried().isEmpty();
         g.fill(dx - 1, dy - 1, dx + DEPOSIT_W + 1, dy + DEPOSIT_H + 1, holding ? ACCENT : SLOT_EDGE);
         g.fill(dx, dy, dx + DEPOSIT_W, dy + DEPOSIT_H, holding ? 0xFF123038 : TRACK);
@@ -924,9 +1104,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 holding ? ACCENT : DIM);
     }
 
-    private int clampScroll(final int count) {
+    private int clampScroll(final int count, final int visibleRows) {
         final int rows = (count + NET_COLS - 1) / NET_COLS;
-        final int max = Math.max(0, rows - NET_ROWS);
+        final int max = Math.max(0, rows - visibleRows);
         netScrollRow = Math.max(0, Math.min(max, netScrollRow));
         return netScrollRow;
     }
@@ -934,13 +1114,13 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     @org.jetbrains.annotations.Nullable
     private NetworkItemEntry networkItemAt(final int mx, final int my) {
         final int relX = mx - (leftPos + NET_X);
-        final int relY = my - (topPos + NET_Y);
+        final int relY = my - (topPos + NET_Y + gridShift());
         if (relX < 0 || relY < 0 || relX % 18 > 16 || relY % 18 > 16) {
             return null;
         }
         final int col = relX / 18;
         final int row = relY / 18;
-        if (col >= NET_COLS || row >= NET_ROWS) {
+        if (col >= NET_COLS || row >= gridRows()) {
             return null;
         }
         final List<NetworkItemEntry> items = visibleItems();
@@ -1643,6 +1823,28 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
             }
             return true;
         }
+        // A focused privacy slider takes the arrow / Home / End keys: arrows nudge by the snap step
+        // (Shift = fine 1 per-mille), Home/End jump to fully private / fully public. Each key commits.
+        if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE && menu.storageHasSlider()
+                && focusedSliderDisk >= 0 && focusedSliderDisk < menu.diskCount()
+                && (searchBox == null || !searchBox.isFocused())) {
+            final int disk = focusedSliderDisk;
+            final int stepKey = (mods & 0x0001) != 0 ? 1 : SLIDER_STEP; // GLFW_MOD_SHIFT = 1
+            Integer next = null;
+            switch (key) {
+                case 263 -> next = sliderValue(disk) - stepKey; // left arrow
+                case 262 -> next = sliderValue(disk) + stepKey; // right arrow
+                case 268 -> next = 0;                           // Home
+                case 269 -> next = 1000;                        // End
+                default -> { /* not a slider key */ }
+            }
+            if (next != null) {
+                final int permille = Math.max(0, Math.min(1000, next));
+                setSliderPreview(disk, permille);
+                sendSliderValue(disk, permille);
+                return true;
+            }
+        }
         // While the search field has focus, route typing to it; ESC unfocuses it; never let a letter
         // key fall through and close the GUI.
         if (searchBox != null && searchBox.isFocused()) {
@@ -1681,6 +1883,17 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         }
         if (popupOp != null) {
             return handleOpPopupClick(mouseX, mouseY, button);
+        }
+        // Privacy slider (Storage tab): a press on a disk's track starts a drag and jumps the value to
+        // the cursor. Handled before the deposit/grid handlers so a slider drag never deposits a stack.
+        if (button == 0) {
+            final int disk = sliderDiskAt(mouseX, mouseY);
+            if (disk >= 0) {
+                draggingSliderDisk = disk;
+                focusedSliderDisk = disk;
+                setSliderPreview(disk, sliderPermilleAt(disk, mouseX, hasShiftDown()));
+                return true;
+            }
         }
         // Clicking the search field selects it for typing; clicking elsewhere deselects it. Container
         // screens don't reliably route focus to widgets, so do it explicitly.
@@ -1750,7 +1963,8 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 }
             }
             if (isGridTab()) {
-                if (inRect(mouseX, mouseY, leftPos + SORT_X, topPos + TOOLBAR_Y, SORT_W, TOOLBAR_H)) {
+                if (inRect(mouseX, mouseY, leftPos + SORT_X, topPos + TOOLBAR_Y + gridShift(),
+                        SORT_W, TOOLBAR_H)) {
                     sortByQuantity = !sortByQuantity;
                     netScrollRow = 0;
                     return true;
@@ -1813,6 +2027,45 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     @Override
+    public boolean mouseDragged(final double mouseX, final double mouseY, final int button,
+                                final double dragX, final double dragY) {
+        // A live slider drag updates the optimistic preview every frame; nothing is sent until release.
+        if (draggingSliderDisk >= 0 && button == 0) {
+            setSliderPreview(draggingSliderDisk, sliderPermilleAt(draggingSliderDisk, mouseX, hasShiftDown()));
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(final double mouseX, final double mouseY, final int button) {
+        // Releasing a slider drag commits the value once (one packet per drag, not per pixel).
+        if (draggingSliderDisk >= 0 && button == 0) {
+            final int disk = draggingSliderDisk;
+            final int permille = sliderPermilleAt(disk, mouseX, hasShiftDown());
+            setSliderPreview(disk, permille);
+            sendSliderValue(disk, permille);
+            draggingSliderDisk = -1;
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        // Drop a slider's optimistic preview once the authoritative sync has caught up to it (or while
+        // it is not being dragged and the server reports a different, clamped value), so a rejected
+        // value visibly corrects and later syncs drive the display.
+        for (int d = 0; d < sliderPreviewActive.length; d++) {
+            if (sliderPreviewActive[d] && draggingSliderDisk != d
+                    && d < menu.diskCount() && menu.diskPermille(d) == sliderPreview[d]) {
+                sliderPreviewActive[d] = false;
+            }
+        }
+    }
+
+    @Override
     protected void slotClicked(final Slot slot, final int slotId, final int button, final ClickType type) {
         // On the Network/Storage tabs, shift-clicking an inventory stack deposits it into the network
         // or local storage respectively, instead of a (no-op) quick-move.
@@ -1831,8 +2084,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     }
 
     private boolean overNetworkGrid(final double mx, final double my) {
+        final int gy = topPos + NET_Y + gridShift();
         return mx >= leftPos + NET_X && mx < leftPos + NET_X + NET_COLS * 18
-                && my >= topPos + NET_Y && my < topPos + NET_Y + NET_ROWS * 18;
+                && my >= gy && my < gy + gridRows() * 18;
     }
 
     private boolean isGridTab() {
@@ -1842,7 +2096,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     private boolean overDepositBar(final double mx, final double my) {
         final int dx = leftPos + NET_X;
-        final int dy = topPos + DEPOSIT_Y;
+        final int dy = topPos + DEPOSIT_Y + gridShift();
         return mx >= dx && mx < dx + DEPOSIT_W && my >= dy && my < dy + DEPOSIT_H;
     }
 

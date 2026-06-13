@@ -11,9 +11,9 @@ import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.network.ServerNode;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -34,9 +34,9 @@ import java.util.Set;
 public final class NetworkStorage {
 
     /**
-     * One Server's store paired with the node identity that selects it for filtering.
+     * One node's store paired with the node identity that selects it for filtering, and whether it accepts inserts (a PC's public area is a read-only SELECT-source).
      */
-    private record Entry(NodeUuid node, ServerStore store) {
+    private record Entry(NodeUuid node, NodeStore store, boolean acceptsInsert) {
     }
 
     private final List<Entry> entries;
@@ -51,9 +51,17 @@ public final class NetworkStorage {
         for (final ServerNode server : system.serversOf(network)) {
             system.locationOf(server.nodeUuid()).ifPresent(loc -> {
                 if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
-                    entries.add(new Entry(server.nodeUuid(), rack.getServerStorage(loc.slot())));
+                    entries.add(new Entry(server.nodeUuid(),
+                            new ServerNodeStore(rack.getServerStorage(loc.slot())), true));
                 }
             });
+        }
+        // A Personal Computer contributes only the published share of its disks, as a SELECT-source.
+        // With the default-private permille this list is empty until the owner publishes some storage.
+        for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
+            if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
+                entries.add(new Entry(pc.nodeUuid(), new PcPublicNodeStore(pcBe.localStore()), false));
+            }
         }
         return new NetworkStorage(entries);
     }
@@ -64,7 +72,7 @@ public final class NetworkStorage {
         for (final NodeUuid node : nodes) {
             system.locationOf(node).ifPresent(loc -> {
                 if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
-                    entries.add(new Entry(node, rack.getServerStorage(loc.slot())));
+                    entries.add(new Entry(node, new ServerNodeStore(rack.getServerStorage(loc.slot())), true));
                 }
             });
         }
@@ -133,7 +141,7 @@ public final class NetworkStorage {
             if (allowed != null && !allowed.contains(entry.node())) {
                 continue;
             }
-            final ServerStore store = entry.store();
+            final NodeStore store = entry.store();
             long available = store.count(key);
             while (moved < amount && available > 0L) {
                 final long batch = Math.min(Math.min(amount - moved, available), batchSize);
@@ -163,6 +171,9 @@ public final class NetworkStorage {
             if (remaining <= 0L) {
                 break;
             }
+            if (!entry.acceptsInsert()) {
+                continue; // never write into a PC's public area
+            }
             remaining -= entry.store().insert(key, remaining);
         }
         return (int) (stack.getCount() - remaining);
@@ -179,6 +190,9 @@ public final class NetworkStorage {
             if (remaining <= 0L) {
                 break;
             }
+            if (!entry.acceptsInsert()) {
+                continue; // never write into a PC's public area
+            }
             final long accepted = entry.store().insert(key, remaining);
             if (accepted > 0L) {
                 stored.merge(entry.node(), accepted, Long::sum);
@@ -189,12 +203,13 @@ public final class NetworkStorage {
     }
 
     public long drop(final Item item, final long amount) {
+        final StorageKey key = StorageKey.of(item);
         long destroyed = 0L;
         for (final Entry entry : entries) {
             if (destroyed >= amount) {
                 break;
             }
-            destroyed += entry.store().extract(item, amount - destroyed);
+            destroyed += entry.store().extract(key, amount - destroyed);
         }
         return destroyed;
     }
