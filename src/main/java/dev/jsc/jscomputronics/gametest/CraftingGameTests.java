@@ -96,6 +96,34 @@ public final class CraftingGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void patternEncoder_rewritableWriteSpendsACycleAndStopsWhenSpent(final GameTestHelper helper) {
+        final BlockPos pos = new BlockPos(2, 2, 2);
+        helper.setBlock(pos, ComputingModule.PATTERN_ENCODER.get());
+        if (!(helper.getBlockEntity(pos) instanceof PatternEncoderBlockEntity encoder)) {
+            throw new IllegalStateException("no pattern encoder at " + pos);
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.PATTERN_DISC_RW.get()));
+                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
+                    final int before = PatternDiscItem.cyclesLeft(encoder.media().getStackInSlot(0));
+
+                    helper.assertTrue(encoder.writePattern(), "the first write to a fresh rewritable disc succeeds");
+                    helper.assertTrue(PatternDiscItem.cyclesLeft(encoder.media().getStackInSlot(0)) == before - 1,
+                            "a write spends exactly one rewrite cycle");
+
+                    helper.assertFalse(encoder.writePattern(), "re-writing the same pattern is a no-op");
+                    helper.assertTrue(PatternDiscItem.cyclesLeft(encoder.media().getStackInSlot(0)) == before - 1,
+                            "a duplicate write spends no cycle");
+
+                    encoder.media().getStackInSlot(0).set(ComputingModule.DISC_CYCLES.get(), 0);
+                    helper.assertFalse(encoder.canWrite(), "a spent rewritable disc is read-only");
+                    helper.assertFalse(encoder.writePattern(), "a spent rewritable disc refuses the write");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void patternReader_copiesIntoAdjacentRomWithDedupe(final GameTestHelper helper) {
         final BlockPos cc = new BlockPos(2, 2, 2);
         final BlockPos reader = new BlockPos(3, 2, 2);

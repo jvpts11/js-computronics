@@ -104,7 +104,13 @@ public class PatternEncoderBlockEntity extends BlockEntity {
     }
 
     public boolean canWrite() {
-        return !preview.isEmpty() && !media.getStackInSlot(0).isEmpty();
+        if (preview.isEmpty() || media.getStackInSlot(0).isEmpty()) {
+            return false;
+        }
+        final ItemStack disc = media.getStackInSlot(0);
+        // A spent rewritable disc is read-only; a write-once disc is always writable (append-only).
+        return disc.getItem() instanceof PatternDiscItem item
+                && (!item.isRewritable() || PatternDiscItem.cyclesLeft(disc) > 0);
     }
 
     public boolean writePattern() {
@@ -113,10 +119,15 @@ public class PatternEncoderBlockEntity extends BlockEntity {
             return false;
         }
         final ItemStack disc = media.getStackInSlot(0);
-        PatternDiscItem.append(disc, new CraftingPattern(gridCells(), preview.copy()));
-        media.setStackInSlot(0, disc); // re-set so the slot syncs the new component to the client
-        setChanged();
-        return true;
+        if (!(disc.getItem() instanceof PatternDiscItem item)) {
+            return false;
+        }
+        final boolean written = item.write(disc, new CraftingPattern(gridCells(), preview.copy()));
+        if (written) {
+            media.setStackInSlot(0, disc); // re-set so the slot syncs the new component to the client
+            setChanged();
+        }
+        return written;
     }
 
     public boolean eraseMedia() {

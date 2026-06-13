@@ -41,10 +41,34 @@ public class PatternDiscItem extends Item {
         return list == null ? List.of() : list;
     }
 
+    /** Low-level append with no economy check — for data setup and tests; the Encoder uses {@link #write}. */
     public static void append(final ItemStack stack, final CraftingPattern pattern) {
         final List<CraftingPattern> list = new ArrayList<>(patterns(stack));
         list.add(pattern);
         stack.set(ComputingModule.DISC_PATTERNS.get(), List.copyOf(list));
+    }
+
+    /**
+     * Writes one pattern onto a disc honoring the disc economy: a rewritable disc spends one cycle and
+     * refuses once it is spent, a write-once disc accepts the write (it is append-only and never erasable),
+     * and a pattern already on the disc is a no-op. Returns whether the pattern was written.
+     */
+    public boolean write(final ItemStack stack, final CraftingPattern pattern) {
+        if (rewritable && cyclesLeft(stack) <= 0) {
+            return false; // a spent rewritable disc is read-only
+        }
+        for (final CraftingPattern existing : patterns(stack)) {
+            if (existing.sameRecipe(pattern)) {
+                return false; // already carried — no write, no cycle spent
+            }
+        }
+        final List<CraftingPattern> list = new ArrayList<>(patterns(stack));
+        list.add(pattern);
+        stack.set(ComputingModule.DISC_PATTERNS.get(), List.copyOf(list));
+        if (rewritable) {
+            stack.set(ComputingModule.DISC_CYCLES.get(), cyclesLeft(stack) - 1);
+        }
+        return true;
     }
 
     public static int cyclesLeft(final ItemStack stack) {
