@@ -83,6 +83,7 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.RAM_DDR3_8192.get());
                         output.accept(ComputingModule.GPU_HD_7970.get());
                         output.accept(ComputingModule.CRAFTING_CARD_T2.get());
+                        output.accept(ComputingModule.CRAFTING_CARD_T3.get());
                         output.accept(ComputingModule.PHI_5100.get());
                         output.accept(ComputingModule.PHI_7120.get());
                         output.accept(ComputingModule.PHI_7290.get());

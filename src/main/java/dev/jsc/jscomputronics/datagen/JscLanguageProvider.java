@@ -79,6 +79,7 @@ public class JscLanguageProvider extends LanguageProvider {
         add(ComputingModule.RAM_DDR3_8192.get(), "Stratix DDR3-8192");
         add(ComputingModule.GPU_HD_7970.get(), "Pyrix Radiance HD 7970");
         add(ComputingModule.CRAFTING_CARD_T2.get(), "Forge Logic Crafting Card");
+        add(ComputingModule.CRAFTING_CARD_T3.get(), "Forge Logic Crafting Card T3");
         add(ComputingModule.PSU_650G.get(), "MF PowerGold 650G");
         add(ComputingModule.MOTHERBOARD_EEB_P.get(), "EEB-P Server Board");
         add(ComputingModule.SERVER_CASE.get(), "Server Case");

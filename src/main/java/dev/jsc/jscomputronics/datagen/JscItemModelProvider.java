@@ -90,6 +90,7 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.RAM_DDR3_8192.get());
         basicItem(ComputingModule.GPU_HD_7970.get());
         basicItem(ComputingModule.CRAFTING_CARD_T2.get());
+        basicItem(ComputingModule.CRAFTING_CARD_T3.get());
         basicItem(ComputingModule.PSU_650G.get());
         basicItem(ComputingModule.MOTHERBOARD_EEB_P.get());
         basicItem(ComputingModule.SERVER_CASE.get());
