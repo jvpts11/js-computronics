@@ -312,6 +312,35 @@ public final class CraftingGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void craft_drawsIngredientsAcrossTwoServersAndReleasesLocks(final GameTestHelper helper) {
+        final Network net = buildCraftingNetwork(helper);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    net.rack.getServers().setStackInSlot(1, ComputingModule.defaultServer());
+                    net.cc.loadPattern(planksPattern(4));
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    // One log on each server, so an 8-plank craft (2 logs) must draw from both — the case
+                    // where the lock-order server and the drained server once diverged and left reservations.
+                    net.rack.getServerStorage(0).insert(Items.OAK_LOG, 1);
+                    net.rack.getServerStorage(1).insert(Items.OAK_LOG, 1);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> helper.assertTrue(
+                        net.mainframe.submitNetworkCraft(storageKey(Items.OAK_PLANKS), 8, false, "test") != null,
+                        "the two-server craft must be accepted"))
+                .thenExecuteAfter(40, () -> {
+                    final var storage = net.storage(helper);
+                    helper.assertTrue(storage.count(Items.OAK_PLANKS) == 8,
+                            "8 planks crafted from logs on two servers; got " + storage.count(Items.OAK_PLANKS));
+                    helper.assertTrue(storage.count(Items.OAK_LOG) == 0,
+                            "both logs are consumed; got " + storage.count(Items.OAK_LOG));
+                    helper.assertTrue(net.mainframe.networkIndex().activeLockCount() == 0,
+                            "the craft releases every ingredient reservation");
+                })
+                .thenSucceed();
+    }
+
     @GameTest(template = ARENA)
     public static void craft_withoutPatternIsRejected(final GameTestHelper helper) {
         final Network net = buildCraftingNetwork(helper);

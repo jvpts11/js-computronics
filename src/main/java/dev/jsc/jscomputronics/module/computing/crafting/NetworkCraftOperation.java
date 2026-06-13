@@ -48,6 +48,9 @@ public final class NetworkCraftOperation implements NetworkOperation {
     private final String requesterLabel;
 
     private final Map<StorageKey, Long> pool = new HashMap<>();
+    // The servers each ingredient's reservation was placed on, so the per-tick drain targets the same
+    // servers and every release frees the matching reservation instead of silently missing.
+    private final Map<StorageKey, java.util.Set<NodeUuid>> lockedServers = new HashMap<>();
     private final long[] runsDone;
 
     private CraftingComputerBlockEntity executor;
@@ -159,9 +162,11 @@ public final class NetworkCraftOperation implements NetworkOperation {
     }
 
     private boolean tryLockIngredients() {
+        lockedServers.clear();
         boolean covered = true;
         for (final Map.Entry<StorageKey, Long> entry : plan.rawConsumption().entrySet()) {
             final Allocation allocation = index.lock(operationId, entry.getKey(), entry.getValue());
+            lockedServers.put(entry.getKey(), new java.util.HashSet<>(allocation.perServer().keySet()));
             if (!allocation.covers(entry.getValue())) {
                 covered = false;
                 break;
@@ -250,10 +255,11 @@ public final class NetworkCraftOperation implements NetworkOperation {
                 need -= fromPool;
             }
             if (need > 0) {
-                // Crafting consumes the items: extract from the servers into the craft (sink
-                // swallows), releasing the reservation server by server as the items leave.
+                // Crafting consumes the items: extract from the SAME servers the lock holds (not just any
+                // server in discovery order) so each release frees its matching reservation as the items
+                // leave, instead of missing and leaving them reserved until the craft finishes.
                 final Map<NodeUuid, Long> moved = storage.selectBreakdown(
-                        key, need, (k, amount, simulate) -> amount, null);
+                        key, need, (k, amount, simulate) -> amount, lockedServers.get(key));
                 moved.forEach((server, amount) -> index.release(operationId, key, server, amount));
             }
         }
