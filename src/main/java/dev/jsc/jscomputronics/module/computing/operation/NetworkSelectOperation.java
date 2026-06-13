@@ -78,9 +78,10 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         this.sourceFilter = sourceFilter;
         this.waitTimeoutTicks = waitTimeoutTicks;
 
-        // The tier of each server holding the item (for read latency), captured BEFORE locking —
-        // after the lock, the net-of-locks location view no longer shows what we reserved.
+        // Capture disk tiers and RAM latencies BEFORE locking — after the lock the net-of-locks
+        // location view no longer shows the full picture of what we reserved.
         final Map<NodeUuid, StorageTier> tiers = captureTiers();
+        final Map<NodeUuid, Integer> ramLatencies = captureRamLatencies();
         // Reserve the items and split the reservation into one SubOperation per server. A non-null
         // sourceFilter restricts the pull to the picked servers (the terminal's source picker).
         final Allocation plan = index.lock(operationId, key, demand, sourceFilter);
@@ -90,7 +91,7 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
             index.unlock(operationId);
             waiting = true;
         } else {
-            buildSources(plan, tiers);
+            buildSources(plan, tiers, ramLatencies);
             if (sourcesEmpty()) {
                 finish(); // nothing to serve — settles immediately as FAILED
             }
@@ -105,9 +106,20 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         return tiers;
     }
 
-    private void buildSources(final Allocation plan, final Map<NodeUuid, StorageTier> tiers) {
+    private Map<NodeUuid, Integer> captureRamLatencies() {
+        final Map<NodeUuid, Integer> ramLatencies = new HashMap<>();
+        for (final ItemLocation location : index.locations(key)) {
+            ramLatencies.put(location.server(),
+                    NetworkIndex.serverRamLatencyTicks(level, location.server()));
+        }
+        return ramLatencies;
+    }
+
+    private void buildSources(final Allocation plan, final Map<NodeUuid, StorageTier> tiers,
+                              final Map<NodeUuid, Integer> ramLatencies) {
         plan.perServer().forEach((server, quantity) ->
-                addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD), scheduler));
+                addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD),
+                        ramLatencies.getOrDefault(server, 0), scheduler));
         buildProgress();
     }
 
@@ -154,13 +166,14 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
             return;
         }
         final Map<NodeUuid, StorageTier> tiers = captureTiers();
+        final Map<NodeUuid, Integer> ramLatencies = captureRamLatencies();
         final long gross = index.grossAvailable(key, sourceFilter);
         final Allocation plan = index.lock(operationId, key, demand, sourceFilter);
         if (plan.covers(demand) || gross < demand) {
             // Fully covered — or the contended items have left the network entirely, so full
             // coverage is no longer possible and the pull proceeds with what physically remains.
             waiting = false;
-            buildSources(plan, tiers);
+            buildSources(plan, tiers, ramLatencies);
             if (sourcesEmpty()) {
                 finish();
             }

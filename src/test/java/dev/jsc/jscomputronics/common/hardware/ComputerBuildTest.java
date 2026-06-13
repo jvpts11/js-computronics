@@ -187,6 +187,31 @@ class ComputerBuildTest {
     }
 
     @Test
+    void bestRamLatencyTicks_returnsMinAcrossModules() {
+        // DDR3 = 1 tick; mixing a slower EDO (4) and a faster DDR3 (1) yields 1.
+        final RamSpec edo = new RamSpec(HardwareEra.VINTAGE, RamGeneration.EDO, 4, 2);
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(edo, ddr3()), psu(650));
+        assertEquals(1, build.bestRamLatencyTicks());
+    }
+
+    @Test
+    void bestRamLatencyTicks_singleSlowModule() {
+        final RamSpec simm = new RamSpec(HardwareEra.VINTAGE, RamGeneration.SIMM, 1, 1);
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(simm), psu(650));
+        assertEquals(5, build.bestRamLatencyTicks());
+    }
+
+    @Test
+    void bestRamLatencyTicks_noRam_returnsZero() {
+        // An empty RAM list is an invalid build, but bestRamLatencyTicks must not throw.
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(), List.of(), psu(650));
+        assertEquals(0, build.bestRamLatencyTicks());
+    }
+
+    @Test
     void powerDraw_sumsAllComponents() {
         // 130W CPU + 250W GPU + 15W RAM = 395W.
         final ComputerBuild build = new ComputerBuild(mtxStandard(),

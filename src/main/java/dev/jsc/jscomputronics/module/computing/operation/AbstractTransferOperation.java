@@ -51,20 +51,26 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
     private Runnable onSettle;
 
     /**
-     * One SubOperation: a server's timed transfer, with its own per-tick hardware cap and a {@code ready} gate a virtual thread flips once the disk's read/write latency has elapsed, so several disks transfer in parallel, each parked on its own thread.
+     * One SubOperation: a server's timed transfer. Two virtual-thread gates guard the start of
+     * the stream: {@code diskReady} flips when the disk seek latency elapses, and {@code ramReady}
+     * flips when the RAM staging latency elapses. Both must be true before any data moves —
+     * mirroring real hardware where a seek completes and then data is buffered through RAM.
+     * The two VTs run in parallel, so each latency is paid concurrently.
      */
     protected static final class Source {
         final NodeUuid server;
         final TransferState state;
         final long hardwareCap;
-        volatile boolean ready;
+        volatile boolean diskReady;
+        volatile boolean ramReady;
 
         Source(final NodeUuid server, final TransferState state, final long hardwareCap,
-               final boolean ready) {
+               final boolean diskReady, final boolean ramReady) {
             this.server = server;
             this.state = state;
             this.hardwareCap = hardwareCap;
-            this.ready = ready;
+            this.diskReady = diskReady;
+            this.ramReady = ramReady;
         }
     }
 
@@ -77,18 +83,27 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
     }
 
     /**
-     * Adds one SubOperation for a server. With a scheduler the disk's latency is parked on a virtual thread that flips the source ready once it elapses (disks transfer in parallel); without one the latency is counted on the main thread, the directly-driven behavior.
+     * Adds one SubOperation for a server. With a scheduler, each latency (disk seek and RAM
+     * staging) parks its own virtual thread that flips the corresponding gate once it elapses —
+     * both gates must open before data moves, and the two VTs run concurrently so neither adds
+     * to the other's wall-clock cost. Without a scheduler both latencies are counted on the main
+     * thread through {@link TransferState} (the directly-driven fallback path used in tests).
      */
     protected final void addSource(final NodeUuid server, final long quantity, final StorageTier tier,
+                                   final int ramLatencyTicks,
                                    @Nullable final LatencyScheduler scheduler) {
-        final int latency = tier.latencyTicks();
+        final int diskLatency = tier.latencyTicks();
         final long cap = NetworkIndex.serverThroughputCap(level, server);
         final Source source;
         if (scheduler != null) {
-            source = new Source(server, new TransferState(quantity, 0), cap, false);
-            scheduler.afterTicks(latency, () -> source.ready = true);
+            source = new Source(server, new TransferState(quantity, 0), cap, false, ramLatencyTicks <= 0);
+            scheduler.afterTicks(diskLatency, () -> source.diskReady = true);
+            if (ramLatencyTicks > 0) {
+                scheduler.afterTicks(ramLatencyTicks, () -> source.ramReady = true);
+            }
         } else {
-            source = new Source(server, new TransferState(quantity, latency), cap, true);
+            // No VT scheduler: absorb the disk latency through TransferState; RAM gate opens immediately.
+            source = new Source(server, new TransferState(quantity, diskLatency), cap, true, true);
         }
         sources.add(source);
     }
@@ -117,8 +132,8 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
 
         for (int i = 0; i < sources.size(); i++) {
             final Source source = sources.get(i);
-            if (!source.ready) {
-                waitingOnLatency = true; // the disk is still in its latency, parked on its own thread
+            if (!source.diskReady || !source.ramReady) {
+                waitingOnLatency = true; // waiting for disk seek or RAM staging, parked on VTs
                 continue;
             }
             final boolean wasWaiting = source.state.waitingOnLatency();
@@ -204,7 +219,8 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
                 break;
             }
             final byte state = source.state.isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
-                    : (!source.ready || source.state.waitingOnLatency()) ? OperationRecord.SubRow.SUB_READING
+                    : (!source.diskReady || !source.ramReady || source.state.waitingOnLatency())
+                            ? OperationRecord.SubRow.SUB_READING
                     : OperationRecord.SubRow.SUB_STREAMING;
             subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server.asString()),
                     source.state.total(), source.state.moved(), state));

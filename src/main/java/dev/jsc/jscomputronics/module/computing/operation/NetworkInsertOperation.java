@@ -45,16 +45,19 @@ public final class NetworkInsertOperation extends AbstractTransferOperation {
         final long unitWeight = key.weight(1L);
         final List<ItemLocation> free = new ArrayList<>();
         final Map<NodeUuid, StorageTier> tiers = new HashMap<>();
+        final Map<NodeUuid, Integer> ramLatencies = new HashMap<>();
         for (final ItemLocation room : index.freeSpace(level, network)) {
             final long roomNative = room.quantity() / unitWeight;
             if (roomNative > 0L) {
                 free.add(room.withQuantity(roomNative));
                 tiers.put(room.server(), room.tier());
+                ramLatencies.put(room.server(), NetworkIndex.serverRamLatencyTicks(level, room.server()));
             }
         }
         final Allocation plan = StorageAllocator.allocate(free, demand);
         plan.perServer().forEach((server, quantity) ->
-                addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD), scheduler));
+                addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD),
+                        ramLatencies.getOrDefault(server, 0), scheduler));
         buildProgress();
         if (sourcesEmpty()) {
             finish(); // the network is full — nothing written

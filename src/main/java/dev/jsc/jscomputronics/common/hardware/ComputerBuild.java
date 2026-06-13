@@ -86,6 +86,19 @@ public record ComputerBuild(MotherboardSpec motherboard,
         return best;
     }
 
+    /**
+     * The lowest staging latency across all installed RAM modules, in ticks. When no RAM is
+     * installed this returns zero — the caller already guards against an empty RAM list through
+     * {@link #validate()}, so an empty list here means the build is invalid anyway.
+     */
+    public int bestRamLatencyTicks() {
+        int best = Integer.MAX_VALUE;
+        for (final RamSpec ram : rams) {
+            best = Math.min(best, ram.latencyTicks());
+        }
+        return best == Integer.MAX_VALUE ? 0 : best;
+    }
+
     public long totalStorageItems() {
         long sum = 0L;
         for (final DiskSpec disk : disks) {

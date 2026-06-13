@@ -233,6 +233,25 @@ public final class NetworkIndex {
         return StorageTier.HDD;
     }
 
+    /** Returns the best (lowest) RAM staging latency in ticks for the server. Zero if unresolvable. */
+    public static int serverRamLatencyTicks(final ServerLevel level, final NodeUuid server) {
+        return NetworkSystem.get(level).locationOf(server)
+                .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack
+                        ? ramLatencyOf(rack, loc.slot()) : 0)
+                .orElse(0);
+    }
+
+    private static int ramLatencyOf(final ServerRackBlockEntity rack, final int slot) {
+        final ItemStack stack = rack.getServers().getStackInSlot(slot);
+        if (stack.getItem() instanceof ServerItem) {
+            final ComputerBuild build = ServerItem.build(stack);
+            if (build != null) {
+                return build.bestRamLatencyTicks();
+            }
+        }
+        return 0;
+    }
+
     // Query (reads the in-RAM catalog, net of locks — never touches disks)
 
     public long available(final Item item) {

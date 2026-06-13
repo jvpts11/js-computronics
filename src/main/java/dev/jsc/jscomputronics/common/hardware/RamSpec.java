@@ -29,4 +29,9 @@ public record RamSpec(HardwareEra era,
             throw new IllegalArgumentException("tdpWatts must be >= 0; got " + tdpWatts);
         }
     }
+
+    /** Ticks a virtual thread parks for this module's staging latency. Delegates to {@link RamGeneration#latencyTicks()}. */
+    public int latencyTicks() {
+        return generation.latencyTicks();
+    }
 }
