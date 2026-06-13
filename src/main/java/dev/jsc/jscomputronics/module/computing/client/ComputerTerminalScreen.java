@@ -598,11 +598,13 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 case OperationRecord.STATUS_COMPLETED -> "COMPLETED";
                 case OperationRecord.STATUS_PARTIAL -> "PARTIAL";
                 case OperationRecord.STATUS_RESOURCE_LOCKED -> "LOCKED";
+                case OperationRecord.STATUS_DISCARDED -> "DISCARDED";
                 default -> "FAILED";
             };
             final int color = switch (op.status()) {
                 case OperationRecord.STATUS_COMPLETED -> GREEN;
                 case OperationRecord.STATUS_PARTIAL -> AMBER;
+                case OperationRecord.STATUS_DISCARDED -> DIM;
                 default -> RED;
             };
             g.drawString(font, st, craftGridX() + CRAFT_COLS * 18 - font.width(st) - 3, ry, color, false);

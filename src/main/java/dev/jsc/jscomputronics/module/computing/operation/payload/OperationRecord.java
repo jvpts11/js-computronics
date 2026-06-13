@@ -39,6 +39,8 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
     public static final byte TYPE_DROP = 7;
     public static final byte TYPE_CRAFT = 8;
 
+    // Mirrors the 8-state OperationStatus: COMPLETED, COMPLETED_PARTIAL, FAILED, PROCESSING, WAITING,
+    // RESOURCE_LOCKED, PENDING, DISCARDED.
     public static final byte STATUS_COMPLETED = 0;
     public static final byte STATUS_PARTIAL = 1;
     public static final byte STATUS_FAILED = 2;
@@ -46,6 +48,7 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
     public static final byte STATUS_WAITING = 4;
     public static final byte STATUS_RESOURCE_LOCKED = 5;
     public static final byte STATUS_PENDING = 6;
+    public static final byte STATUS_DISCARDED = 7;
 
     public static final int MAX_MOVES = 32;
     public static final int MAX_SUBS = 32;

@@ -787,6 +787,55 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void poweringOffMidOperation_recordsDiscardedInTheLog(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(3, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // cables attach through the rear (west side here)
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
+        final dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[] op =
+                new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[1];
+        final ItemStackHandler dest = new ItemStackHandler(9);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(mainframe.networkUuid() != null, "mainframe owns a network");
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 100);
+                })
+                // Let the incremental ANALYZE index the seeded items, then hold the type so the
+                // SELECT can never finish: it stays in-flight (WAITING) until we power off.
+                .thenExecuteAfter(3, () -> {
+                    final long held = mainframe.lockType(cobble, Long.MAX_VALUE, null);
+                    helper.assertTrue(held == 100, "LOCK must hold all 100 cobblestone; got " + held);
+                    op[0] = mainframe.submitNetworkSelect(Items.COBBLESTONE, 50,
+                            new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null), "test");
+                    helper.assertTrue(op[0] != null, "Mainframe should dispatch the SELECT");
+                })
+                .thenExecuteAfter(5, () -> {
+                    helper.assertTrue(op[0].isWaiting(), "the SELECT must be in-flight (WAITING) before power-off");
+                    mainframe.togglePower(); // power off with an Operation still in flight
+                })
+                // Powering off makes the next tick run closeDispatch(), which abandons every
+                // in-flight Operation and records it so the log keeps a trace instead of losing it.
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertFalse(mainframe.isRunning(), "the mainframe is powered off");
+                    final boolean discarded = mainframe.recentOperations().stream()
+                            .anyMatch(r -> r.status() == OperationRecord.STATUS_DISCARDED);
+                    helper.assertTrue(discarded,
+                            "an Operation abandoned by power-off must be logged as DISCARDED, not vanish");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void chunkUnload_unregistersHousedServers(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);

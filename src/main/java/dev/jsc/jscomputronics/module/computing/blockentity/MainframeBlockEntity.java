@@ -645,8 +645,13 @@ public class MainframeBlockEntity extends BlockEntity
             dispatch = null;
             dispatchQueues = 0;
             // Settle every in-flight multi-tick Operation first, so a holder polling isDone() (an
+            // INSERT returning leftover, a SELECT freeing its lock) recovers; then record each as
+            // DISCARDED so a conflict or power-off leaves a trace in the log instead of vanishing.
             for (final var operation : activeOperations) {
                 operation.abandon();
+                recordOperation(operation.toRecord().withStatus(
+                        dev.jsc.jscomputronics.module.computing.operation.payload
+                                .OperationRecord.STATUS_DISCARDED));
             }
             activeOperations.clear();
             // The index lives in RAM: powering off clears the catalog, rebuilt on the next start.

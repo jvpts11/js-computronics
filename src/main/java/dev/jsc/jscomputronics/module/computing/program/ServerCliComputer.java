@@ -519,6 +519,7 @@ public final class ServerCliComputer implements CliComputer {
             case OperationRecord.STATUS_WAITING -> "waiting";
             case OperationRecord.STATUS_RESOURCE_LOCKED -> "locked";
             case OperationRecord.STATUS_PENDING -> "pending";
+            case OperationRecord.STATUS_DISCARDED -> "discarded";
             default -> "?";
         };
     }
