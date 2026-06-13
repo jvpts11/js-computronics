@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -98,14 +99,30 @@ public class SupercomputerNodePartBlock extends Block implements EntityBlock, Da
     }
 
     @Override
+    public BlockState playerWillDestroy(final Level level, final BlockPos pos, final BlockState state,
+                                        final Player player) {
+        // Drops happen here (not in dissolve) so creative mode never spills the node or its hardware.
+        if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild) {
+            final BlockPos controller = controllerOf(level, pos);
+            if (controller != null
+                    && level.getBlockState(controller).getBlock() instanceof SupercomputerNodeBlock) {
+                SupercomputerNodeBlock.dropContents(serverLevel, controller);
+            }
+        }
+        return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
     protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
                             final BlockState newState, final boolean movedByPiston) {
         if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
             final BlockPos controller = controllerOf(level, pos);
             if (controller != null
                     && level.getBlockState(controller).getBlock() instanceof SupercomputerNodeBlock) {
-                // The controller drops its hardware and its own onRemove dissolves the cabinet.
-                serverLevel.destroyBlock(controller, true);
+                // Take the whole cabinet down with non-dropping removals; the player-break path above
+                // already spilled the node and its hardware.
+                SupercomputerNodeBlock.dissolve(serverLevel, controller,
+                        level.getBlockState(controller).getValue(HorizontalDirectionalBlock.FACING));
             }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);

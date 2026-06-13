@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -101,6 +102,18 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
             computer.onBroken(serverLevel); // drop this PC's network-node registration
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    @Override
+    public BlockState playerWillDestroy(final Level level, final BlockPos pos, final BlockState state,
+                                        final Player player) {
+        // Spill the installed hardware so a broken PC never destroys its components.
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel
+                && !player.getAbilities().instabuild
+                && level.getBlockEntity(pos) instanceof PersonalComputerBlockEntity computer) {
+            BlockDrops.spill(serverLevel, pos, computer.getHardware());
+        }
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override

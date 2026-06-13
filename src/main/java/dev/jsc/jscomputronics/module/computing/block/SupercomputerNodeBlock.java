@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity;
@@ -124,6 +125,16 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
     }
 
     @Override
+    public BlockState playerWillDestroy(final Level level, final BlockPos pos, final BlockState state,
+                                        final Player player) {
+        // Drops happen here (not in dissolve) so creative mode never spills the node or its hardware.
+        if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild) {
+            dropContents(serverLevel, pos);
+        }
+        return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
     protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
                             final BlockState newState, final boolean movedByPiston) {
         if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
@@ -133,6 +144,13 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
             dissolve(serverLevel, pos, state.getValue(FACING));
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    static void dropContents(final ServerLevel level, final BlockPos controllerPos) {
+        Block.popResource(level, controllerPos, new ItemStack(ComputingModule.SUPERCOMPUTER_NODE_ITEM.get()));
+        if (level.getBlockEntity(controllerPos) instanceof SupercomputerNodeBlockEntity node) {
+            BlockDrops.spill(level, controllerPos, node.getHardware());
+        }
     }
 
     private static final java.util.Set<BlockPos> DISSOLVING =

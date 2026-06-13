@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "jsc:supercomputer_console"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "jsc:blocks/supercomputer_console"
+}

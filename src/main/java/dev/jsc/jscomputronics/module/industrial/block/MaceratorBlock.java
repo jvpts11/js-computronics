@@ -8,12 +8,14 @@
 package dev.jsc.jscomputronics.module.industrial.block;
 
 import com.mojang.serialization.MapCodec;
+import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.menu.MaceratorMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
@@ -70,6 +72,17 @@ public class MaceratorBlock extends HorizontalDirectionalBlock implements Entity
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    @Override
+    public BlockState playerWillDestroy(final Level level, final BlockPos pos, final BlockState state,
+                                        final Player player) {
+        // Spill the ground items here (not in onRemove) so creative mode never drops them.
+        if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild
+                && level.getBlockEntity(pos) instanceof MaceratorBlockEntity machine) {
+            BlockDrops.spill(serverLevel, pos, machine.getInventory());
+        }
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override
