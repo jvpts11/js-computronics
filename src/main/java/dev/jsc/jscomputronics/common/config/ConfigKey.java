@@ -40,6 +40,18 @@ public record ConfigKey<T>(
                     "defaultValue type mismatch: expected " + valueClass.getSimpleName()
                             + ", got " + defaultValue.getClass().getSimpleName());
         }
+        if (range.isPresent()) {
+            // A range's bounds must be the key's own value type, or the validator would later cast the
+            // value to the bound type and throw instead of clamping (a Boolean key with a numeric range,
+            // or an Integer value with a Long range, must be rejected here, not crash at use).
+            final Object min = range.get().min();
+            final Object max = range.get().max();
+            if (!valueClass.isInstance(min) || !valueClass.isInstance(max)) {
+                throw new IllegalArgumentException(
+                        "range bounds must match the key's value type " + valueClass.getSimpleName()
+                                + ", got " + min.getClass().getSimpleName());
+            }
+        }
     }
 
     public static <T> ConfigKey<T> of(
