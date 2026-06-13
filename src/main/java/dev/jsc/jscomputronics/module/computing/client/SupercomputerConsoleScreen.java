@@ -85,9 +85,14 @@ public class SupercomputerConsoleScreen extends AbstractContainerScreen<Supercom
             } else if (code == HbwInterfaceBlockEntity.SLOT_UNDER_RATED) {
                 label = "rating too low for this slot";
                 labelColor = JscOsTheme.RED;
+            } else if (code == HbwInterfaceBlockEntity.SLOT_OFFLINE) {
+                label = "node offline";
+                labelColor = JscOsTheme.AMBER;
             } else {
-                label = MODELS[Math.min(MODELS.length - 1,
-                        code - HbwInterfaceBlockEntity.SLOT_OK_BASE)];
+                // An OK slot encodes its Phi model as SLOT_OK_BASE + modelIndex; clamp BOTH ends so any
+                // unexpected code can never index past the model list (a -1 here once crashed the screen).
+                label = MODELS[Math.max(0, Math.min(MODELS.length - 1,
+                        code - HbwInterfaceBlockEntity.SLOT_OK_BASE))];
                 labelColor = JscOsTheme.GREEN;
             }
             JscOsTheme.textS(g, font, label, 56, rowY, labelColor);
