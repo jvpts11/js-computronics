@@ -106,14 +106,14 @@ class JscEventDispatcherTest {
         JscEventDispatcher dispatcher = new JscEventDispatcher();
         List<Integer> order = new ArrayList<>();
 
-        dispatcher.subscribe(NetworkPropagatedEvent.class, e -> {
+        dispatcher.subscribe(NetworkPropagatingEvent.class, e -> {
             order.add(1);
             e.cancel();
         });
-        dispatcher.subscribe(NetworkPropagatedEvent.class, e -> order.add(2));
-        dispatcher.subscribe(NetworkPropagatedEvent.class, e -> order.add(3));
+        dispatcher.subscribe(NetworkPropagatingEvent.class, e -> order.add(2));
+        dispatcher.subscribe(NetworkPropagatingEvent.class, e -> order.add(3));
 
-        NetworkPropagatedEvent event = new NetworkPropagatedEvent(net(), 100L, 200L);
+        NetworkPropagatingEvent event = new NetworkPropagatingEvent(net(), 100L, 200L);
         dispatcher.post(event);
 
         assertEquals(List.of(1), order);
@@ -124,14 +124,14 @@ class JscEventDispatcherTest {
     void uncancelledEvent_runsAllListeners() {
         JscEventDispatcher dispatcher = new JscEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        dispatcher.subscribe(NetworkPropagatedEvent.class,
+        dispatcher.subscribe(NetworkPropagatingEvent.class,
                 e -> count.incrementAndGet());
-        dispatcher.subscribe(NetworkPropagatedEvent.class,
+        dispatcher.subscribe(NetworkPropagatingEvent.class,
                 e -> count.incrementAndGet());
-        dispatcher.subscribe(NetworkPropagatedEvent.class,
+        dispatcher.subscribe(NetworkPropagatingEvent.class,
                 e -> count.incrementAndGet());
 
-        NetworkPropagatedEvent event = new NetworkPropagatedEvent(net(), 100L, 200L);
+        NetworkPropagatingEvent event = new NetworkPropagatingEvent(net(), 100L, 200L);
         dispatcher.post(event);
 
         assertEquals(3, count.get());
@@ -140,7 +140,7 @@ class JscEventDispatcherTest {
 
     @Test
     void cancel_isIdempotent() {
-        NetworkPropagatedEvent event = new NetworkPropagatedEvent(net(), 100L, 200L);
+        NetworkPropagatingEvent event = new NetworkPropagatingEvent(net(), 100L, 200L);
         event.cancel();
         event.cancel();
         event.cancel();
@@ -203,9 +203,9 @@ class JscEventDispatcherTest {
     }
 
     @Test
-    void networkPropagatedEvent_hasCanonicalEventId() {
+    void networkPropagatingEvent_hasCanonicalEventId() {
         assertEquals("network.propagated",
-                new NetworkPropagatedEvent(net(), 100L, 200L).eventId());
+                new NetworkPropagatingEvent(net(), 100L, 200L).eventId());
     }
 
     @Test

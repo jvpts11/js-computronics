@@ -14,14 +14,14 @@ import java.util.Objects;
 /**
  * Cancellable event fired when a network UUID is about to propagate through a newly-placed cable into adjacent components.
  */
-public final class NetworkPropagatedEvent implements JscEvent.Cancellable{
+public final class NetworkPropagatingEvent implements JscEvent.Cancellable{
 
     private final NetworkUuid networkUuid;
     private final long fromPos;
     private final long toPos;
     private boolean cancelled;
 
-    public NetworkPropagatedEvent(
+    public NetworkPropagatingEvent(
             final NetworkUuid networkUuid,
             final long fromPos,
             final long toPos) {
