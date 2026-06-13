@@ -369,6 +369,17 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
         }
     }
 
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        // The block's onRemove only fires on destruction; a plain chunk unload removes the block entity
+        // without it, so without this the node would stay registered in the still-loaded per-level
+        // network as a phantom. onBroken is idempotent, so the destruction path running both is safe.
+        if (level instanceof ServerLevel serverLevel) {
+            onBroken(serverLevel);
+        }
+    }
+
     protected long adjacentCable(final ServerLevel level) {
         for (final Direction direction : cableSearchFaces()) {
             final BlockPos neighbor = worldPosition.relative(direction);

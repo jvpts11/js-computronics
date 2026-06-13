@@ -229,6 +229,16 @@ public class ServerRackBlockEntity extends BlockEntity {
     }
 
     @Override
+    public void setRemoved() {
+        super.setRemoved();
+        // Unregister the housed Servers on chunk unload too, not just on destruction (the block's
+        // onRemove), so they never linger in the still-loaded per-level network. onBroken is idempotent.
+        if (level instanceof ServerLevel serverLevel) {
+            onBroken(serverLevel);
+        }
+    }
+
+    @Override
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         servers.deserializeNBT(registries, tag.getCompound("Servers"));

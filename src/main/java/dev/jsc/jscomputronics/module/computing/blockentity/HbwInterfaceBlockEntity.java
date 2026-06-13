@@ -236,6 +236,16 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     }
 
     @Override
+    public void setRemoved() {
+        super.setRemoved();
+        // Unregister the cluster on chunk unload too, not just on destruction (the block's onRemove),
+        // so the Supercomputer never lingers in the still-loaded per-level network. onBroken is idempotent.
+        if (level instanceof ServerLevel serverLevel) {
+            onBroken(serverLevel);
+        }
+    }
+
+    @Override
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         if (tag.hasUUID("NodeUuid")) {

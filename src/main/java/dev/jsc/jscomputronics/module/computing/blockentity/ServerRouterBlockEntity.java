@@ -263,6 +263,16 @@ public class ServerRouterBlockEntity extends BlockEntity {
         }
     }
 
+    @Override
+    public void setRemoved() {
+        super.setRemoved();
+        // Also unregister on chunk unload, not just on destruction (the block's onRemove), so the router
+        // never lingers in the still-loaded per-level network. onBroken is idempotent.
+        if (level instanceof ServerLevel serverLevel) {
+            onBroken(serverLevel);
+        }
+    }
+
     // Accessors for the config GUI and the Datacenter Station
 
     public ContainerData getDataAccess() {

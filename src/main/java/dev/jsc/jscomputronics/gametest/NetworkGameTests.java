@@ -787,6 +787,34 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void chunkUnload_unregistersHousedServers(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(3, 2, 2);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkUuid net = mainframe.networkUuid();
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).serversOf(net).size() == 1,
+                            "the rack's server is registered before the unload");
+                    // A chunk unload removes the block entity without firing the block's onRemove.
+                    rackBe.setRemoved();
+                    helper.assertTrue(NetworkSystem.get(helper.getLevel()).serversOf(net).isEmpty(),
+                            "setRemoved (the chunk-unload path) must unregister the housed servers");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void networkStorage_capsAtDiskCapacity(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);
