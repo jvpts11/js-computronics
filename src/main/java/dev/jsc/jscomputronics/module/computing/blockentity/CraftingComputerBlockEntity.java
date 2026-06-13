@@ -53,7 +53,9 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
 
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        return Set.of(FormFactor.ATX);
+        // A Crafting Computer is a PC-class machine: it takes the consumer ATX board of every era and the
+        // Singularity Socket Q board.
+        return Set.of(FormFactor.ATX, FormFactor.SOCKET_Q);
     }
 
     public static void serverTick(final Level level, final BlockPos pos,

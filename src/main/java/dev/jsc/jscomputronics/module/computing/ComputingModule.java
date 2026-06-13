@@ -720,6 +720,9 @@ public final class ComputingModule {
                     dev.jsc.jscomputronics.module.computing.menu.DatacenterStationMenu::fromNetwork));
 
     public static void register(final IEventBus modEventBus) {
+        // Force the per-era hardware catalog to load so its items register onto ITEMS before the
+        // DeferredRegister is handed to the mod event bus below.
+        HardwareItems.init();
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);

@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.HardwareItems;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.common.data.LanguageProvider;
 import net.minecraft.data.PackOutput;
@@ -89,5 +90,131 @@ public class JscLanguageProvider extends LanguageProvider {
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             add(disk.item().get(), disk.displayName());
         }
+        addHardwareCatalog();
+    }
+
+    /**
+     * Display names for the per-era hardware catalog. Names follow the spec product lines (Integra,
+     * Velocion, Stratix, Visara, Pyrix, MF). The Standard era's first items already have names in
+     * {@link #addTranslations()}; this method covers the items added across all six eras.
+     */
+    private void addHardwareCatalog() {
+        // Vintage
+        add(HardwareItems.CPU_INTEGRA_486SX.get(), "Integra 486SX");
+        add(HardwareItems.CPU_INTEGRA_486DX2.get(), "Integra 486DX2");
+        add(HardwareItems.CPU_INTEGRA_486DX4.get(), "Integra 486DX4");
+        add(HardwareItems.CPU_VELOCION_K6_II.get(), "Velocion K6-II");
+        add(HardwareItems.CPU_VELOCION_K6_III.get(), "Velocion K6-III");
+        add(HardwareItems.CPU_VELOCION_K6_III_PLUS.get(), "Velocion K6-III+");
+        add(HardwareItems.RAM_SIMM_4.get(), "Stratix Layer SIMM-4");
+        add(HardwareItems.RAM_EDO_16.get(), "Stratix Layer EDO-16");
+        add(HardwareItems.GPU_VGA_256.get(), "Visara VGA-256");
+        add(HardwareItems.GPU_3D_BLASTER.get(), "Pyrix 3D Blaster");
+        add(HardwareItems.PSU_300B.get(), "MF PowerBasic 300B");
+        add(HardwareItems.MOTHERBOARD_BABYAT_VINTAGE.get(), "MF Baby-AT I Motherboard");
+        add(HardwareItems.MOTHERBOARD_AT_VINTAGE.get(), "MF AT Standard Motherboard");
+        add(HardwareItems.MOTHERBOARD_MTX_VINTAGE.get(), "MF MTX-V Motherboard");
+
+        // Legacy
+        add(HardwareItems.CPU_INTEGRA_VERTEX_700.get(), "Integra Vertex 700");
+        add(HardwareItems.CPU_INTEGRA_VERTEX_III_S_1000.get(), "Integra Vertex III-S 1000");
+        add(HardwareItems.CPU_INTEGRA_VERTEX_III_S_1400.get(), "Integra Vertex III-S 1400");
+        add(HardwareItems.CPU_VELOCION_SPRINT_XP_2400.get(), "Velocion Sprint XP 2400+");
+        add(HardwareItems.CPU_VELOCION_SPRINT_XP_3200.get(), "Velocion Sprint XP 3200+");
+        add(HardwareItems.CPU_VELOCION_SPRINT_XP_3800.get(), "Velocion Sprint XP 3800+");
+        add(HardwareItems.CPU_INTEGRA_DUO_E4300.get(), "Integra Duo E4300");
+        add(HardwareItems.CPU_INTEGRA_DUO_E6600.get(), "Integra Duo E6600");
+        add(HardwareItems.CPU_INTEGRA_DUO_E8500.get(), "Integra Duo E8500");
+        add(HardwareItems.CPU_VELOCION_DUAL_240.get(), "Velocion Dual 240");
+        add(HardwareItems.CPU_VELOCION_DUAL_280.get(), "Velocion Dual 280");
+        add(HardwareItems.CPU_VELOCION_DUAL_285.get(), "Velocion Dual 285");
+        add(HardwareItems.CPU_INTEGRA_SERVO_5100.get(), "Integra Servo 5100");
+        add(HardwareItems.CPU_INTEGRA_SERVO_5160.get(), "Integra Servo 5160");
+        add(HardwareItems.CPU_INTEGRA_SERVO_5365.get(), "Integra Servo 5365");
+        add(HardwareItems.RAM_SDRAM_128.get(), "Stratix Layer SDRAM-128");
+        add(HardwareItems.RAM_DDR_512.get(), "Stratix Layer DDR-512");
+        add(HardwareItems.RAM_DDR2_2048.get(), "Stratix Layer DDR2-2048");
+        add(HardwareItems.GPU_VERTEX_256.get(), "Visara Vertex 256");
+        add(HardwareItems.GPU_RADIANCE_9800_PRO.get(), "Pyrix Radiance 9800 Pro");
+        add(HardwareItems.GPU_VERTEX_8800_GT.get(), "Visara Vertex 8800 GT");
+        add(HardwareItems.PSU_500B.get(), "MF PowerBasic 500B");
+        add(HardwareItems.MOTHERBOARD_ATX_LEGACY_SKA.get(), "MF ATX Legacy Motherboard (Socket A)");
+        add(HardwareItems.MOTHERBOARD_ATX_LEGACY_S370.get(), "MF ATX Legacy Motherboard (Socket 370)");
+        add(HardwareItems.MOTHERBOARD_ATX_LEGACY_LGA775.get(), "MF ATX Legacy Motherboard (LGA 775)");
+        add(HardwareItems.MOTHERBOARD_EATX_LEGACY_LGA775.get(), "MF EATX Legacy Motherboard (LGA 775)");
+        add(HardwareItems.MOTHERBOARD_EATX_LEGACY_S940.get(), "MF EATX Legacy Motherboard (Socket 940)");
+        add(HardwareItems.MOTHERBOARD_MTX_LEGACY.get(), "MF MTX-L Motherboard");
+
+        // Standard (completion)
+        add(HardwareItems.CPU_ASCENT_X4_955.get(), "Velocion Ascent X4 955");
+        add(HardwareItems.CPU_ASCENT_X6_1090T.get(), "Velocion Ascent X6 1090T");
+        add(HardwareItems.CPU_APEX_5_4590.get(), "Integra Apex 5 4590");
+        add(HardwareItems.CPU_APEX_5_4690K.get(), "Integra Apex 5 4690K");
+        add(HardwareItems.CPU_APEX_7_4790K.get(), "Integra Apex 7 4790K");
+        add(HardwareItems.PSU_850G.get(), "MF PowerGold 850G");
+        add(HardwareItems.MOTHERBOARD_ATX_STANDARD_LGA1150.get(), "MF ATX Standard Motherboard (LGA 1150)");
+        add(HardwareItems.MOTHERBOARD_EATX_STANDARD_WS.get(), "MF EATX Standard Workstation Board");
+
+        // Advanced
+        add(HardwareItems.CPU_ASCENT_9_3900X.get(), "Velocion Ascent 9 3900X");
+        add(HardwareItems.CPU_ASCENT_9_5900X.get(), "Velocion Ascent 9 5900X");
+        add(HardwareItems.CPU_ASCENT_9_5950X.get(), "Velocion Ascent 9 5950X");
+        add(HardwareItems.CPU_APEX_9_12900K.get(), "Integra Apex 9 12900K");
+        add(HardwareItems.CPU_SERVO_PLATA_8352Y.get(), "Integra Servo Plata 8352Y");
+        add(HardwareItems.CPU_SERVO_PLATA_8380.get(), "Integra Servo Plata 8380");
+        add(HardwareItems.CPU_SERVO_PLATA_8380H.get(), "Integra Servo Plata 8380H");
+        add(HardwareItems.CPU_EPIC_7302.get(), "Velocion Epic 7302");
+        add(HardwareItems.CPU_EPIC_7452.get(), "Velocion Epic 7452");
+        add(HardwareItems.CPU_EPIC_7763.get(), "Velocion Epic 7763");
+        add(HardwareItems.RAM_DDR4_16384.get(), "Stratix Layer DDR4-16384");
+        add(HardwareItems.GPU_RTX_4090.get(), "Visara Vertex RTX 4090");
+        add(HardwareItems.PSU_1000G.get(), "MF PowerGold 1000G");
+        add(HardwareItems.PSU_1200P.get(), "MF PowerPlat 1200P");
+        add(HardwareItems.PSU_1600P.get(), "MF PowerPlat 1600P");
+        add(HardwareItems.MOTHERBOARD_ATX_ADVANCED.get(), "MF ATX Advanced Motherboard");
+        add(HardwareItems.MOTHERBOARD_EATX_ADVANCED_WS_LGA4189.get(), "MF EATX Advanced Workstation Board (LGA 4189)");
+        add(HardwareItems.MOTHERBOARD_EATX_ADVANCED_WS_SP3.get(), "MF EATX Advanced Workstation Board (SP3)");
+        add(HardwareItems.MOTHERBOARD_EEB_ADVANCED_SP3.get(), "MF EEB Advanced Server Board (SP3)");
+        add(HardwareItems.MOTHERBOARD_EEB_ADVANCED_LGA4189.get(), "MF EEB Advanced Server Board (LGA 4189)");
+        add(HardwareItems.MOTHERBOARD_MTX_ADVANCED.get(), "MF MTX-A Motherboard");
+
+        // Exa
+        add(HardwareItems.CPU_APEX_9_13900K.get(), "Integra Apex 9 13900K");
+        add(HardwareItems.CPU_APEX_9_13900KS.get(), "Integra Apex 9 13900KS");
+        add(HardwareItems.CPU_THREADKILLER_7960X.get(), "Velocion Threadkiller 7960X");
+        add(HardwareItems.CPU_THREADKILLER_7980X.get(), "Velocion Threadkiller 7980X");
+        add(HardwareItems.CPU_THREADKILLER_7995WX.get(), "Velocion Threadkiller 7995WX");
+        add(HardwareItems.CPU_SERVO_SAPPHIRE_4410Y.get(), "Integra Servo Sapphire 4410Y");
+        add(HardwareItems.CPU_SERVO_SAPPHIRE_6442Y.get(), "Integra Servo Sapphire 6442Y");
+        add(HardwareItems.CPU_SERVO_SAPPHIRE_6960P.get(), "Integra Servo Sapphire 6960P");
+        add(HardwareItems.CPU_EPIC_9124.get(), "Velocion Epic 9124");
+        add(HardwareItems.CPU_EPIC_9374F.get(), "Velocion Epic 9374F");
+        add(HardwareItems.CPU_EPIC_9654.get(), "Velocion Epic 9654");
+        add(HardwareItems.RAM_DDR5_32768.get(), "Stratix Layer DDR5-32768");
+        add(HardwareItems.GPU_MI300X.get(), "Pyrix Insight MI300X");
+        add(HardwareItems.PSU_2000P.get(), "MF ServerPSU 2000P");
+        add(HardwareItems.PSU_3000P.get(), "MF ServerPSU 3000P (Redundant)");
+        add(HardwareItems.MOTHERBOARD_ATX_EXA.get(), "MF ATX Exa Motherboard");
+        add(HardwareItems.MOTHERBOARD_EATX_EXA_WS.get(), "MF EATX Exa Workstation Board");
+        add(HardwareItems.MOTHERBOARD_EEB_EXA_PRO_SP5.get(), "MF EEB Exa Pro Board (SP5)");
+        add(HardwareItems.MOTHERBOARD_EEB_EXA_PRO_LGA4677.get(), "MF EEB Exa Pro Board (LGA 4677)");
+        add(HardwareItems.MOTHERBOARD_EEB_EXA_RACK_SP5.get(), "MF EEB Exa Rack Board (SP5)");
+        add(HardwareItems.MOTHERBOARD_EEB_EXA_RACK_LGA4677.get(), "MF EEB Exa Rack Board (LGA 4677)");
+        add(HardwareItems.MOTHERBOARD_MTX_EXA.get(), "MF MTX Exa Motherboard");
+
+        // Singularity
+        add(HardwareItems.CPU_QUANTUM_CORE_MK_I.get(), "MF Quantum Core Mk.I");
+        add(HardwareItems.CPU_QUANTUM_CORE_MK_II.get(), "MF Quantum Core Mk.II");
+        add(HardwareItems.CPU_QUANTUM_CORE_MK_III.get(), "MF Quantum Core Mk.III \"Omega\"");
+        add(HardwareItems.CPU_EM_CORE.get(), "MF EM Core");
+        add(HardwareItems.RAM_DDR6_65536.get(), "Stratix Layer DDR6-65536");
+        add(HardwareItems.RAM_HBM_131072.get(), "Stratix HBM-131072");
+        add(HardwareItems.GPU_VERTEX_Q_9000.get(), "Visara Vertex Q-9000");
+        add(HardwareItems.PSU_4000Q.get(), "MF QuantumPSU 4000Q");
+        add(HardwareItems.PSU_8000S.get(), "MF SingularityPSU 8000S");
+        add(HardwareItems.PSU_ALIEN_EM.get(), "MF AlienPSU EM");
+        add(HardwareItems.MOTHERBOARD_SKTQ_STD.get(), "MF Skt Q Std Motherboard");
+        add(HardwareItems.MOTHERBOARD_SKTQ_PRIME.get(), "MF Skt Q Prime Motherboard");
+        add(HardwareItems.MOTHERBOARD_MTX_EM.get(), "MF MTX-EM Motherboard");
     }
 }

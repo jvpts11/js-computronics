@@ -46,7 +46,9 @@ public class SupercomputerNodeBlockEntity extends AbstractComputerBlockEntity {
 
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        return Set.of(FormFactor.EEB);
+        // A Supercomputer node takes a server-class board: EEB across the eras, or the EATX workstation
+        // board where the era offers one.
+        return Set.of(FormFactor.EEB, FormFactor.EATX);
     }
 
     @Override

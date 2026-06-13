@@ -99,5 +99,12 @@ public class JscItemModelProvider extends ItemModelProvider {
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             basicItem(disk.item().get());
         }
+
+        // Per-era hardware catalog — a generated (layer0 = item texture) model for every component.
+        dev.jsc.jscomputronics.module.computing.HardwareItems.CPUS.forEach(h -> basicItem(h.get()));
+        dev.jsc.jscomputronics.module.computing.HardwareItems.RAMS.forEach(h -> basicItem(h.get()));
+        dev.jsc.jscomputronics.module.computing.HardwareItems.GPUS.forEach(h -> basicItem(h.get()));
+        dev.jsc.jscomputronics.module.computing.HardwareItems.PSUS.forEach(h -> basicItem(h.get()));
+        dev.jsc.jscomputronics.module.computing.HardwareItems.MOTHERBOARDS.forEach(h -> basicItem(h.get()));
     }
 }

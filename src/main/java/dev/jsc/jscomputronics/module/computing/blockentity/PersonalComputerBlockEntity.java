@@ -59,7 +59,8 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        return Set.of(FormFactor.ATX); // a PC accepts only a consumer ATX board
+        // A PC takes the consumer ATX board of every era, plus the Singularity Socket Q board.
+        return Set.of(FormFactor.ATX, FormFactor.SOCKET_Q);
     }
 
     // Network node — a passive Category-C node read from the adjacent cable

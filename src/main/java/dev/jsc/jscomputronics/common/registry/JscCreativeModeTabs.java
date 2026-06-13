@@ -92,6 +92,12 @@ public final class JscCreativeModeTabs {
                         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
                             output.accept(disk.item().get());
                         }
+                        // Per-era hardware catalog, ordered Vintage to Singularity so the progression
+                        // reads cleanly in the tab.
+                        for (final net.minecraft.world.item.Item hardware
+                                : dev.jsc.jscomputronics.module.computing.HardwareItems.creativeOrder()) {
+                            output.accept(hardware);
+                        }
                     })
                     .build());
 

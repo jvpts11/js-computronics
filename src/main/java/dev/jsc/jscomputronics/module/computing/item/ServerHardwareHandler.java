@@ -100,9 +100,11 @@ public final class ServerHardwareHandler implements IItemHandlerModifiable {
     @Override
     public boolean isItemValid(final int slot, final ItemStack stack) {
         if (slot == MOBO) {
-            // A Server accepts only an EEB-form-factor board, not any motherboard.
+            // A Server takes a server-class board: EEB across the eras, or the EATX workstation board
+            // where the era offers one. It does not accept consumer or Mainframe-only boards.
             return MotherboardItem.fits(stack,
-                    java.util.Set.of(dev.jsc.jscomputronics.common.hardware.FormFactor.EEB));
+                    java.util.Set.of(dev.jsc.jscomputronics.common.hardware.FormFactor.EEB,
+                            dev.jsc.jscomputronics.common.hardware.FormFactor.EATX));
         }
         if (slot == PSU) {
             return stack.getItem() instanceof PsuItem;
