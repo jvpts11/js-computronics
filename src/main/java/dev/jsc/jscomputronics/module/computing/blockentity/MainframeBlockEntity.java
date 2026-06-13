@@ -1117,7 +1117,7 @@ public class MainframeBlockEntity extends BlockEntity
 
     @Override
     public dev.jsc.jscomputronics.module.computing.storage.DataSink localStorage() {
-        return new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(localStore());
+        return new dev.jsc.jscomputronics.module.computing.storage.StoreSink(localStore());
     }
 
     public java.util.Map<dev.jsc.jscomputronics.module.computing.storage.StorageKey, Long> localSnapshot() {

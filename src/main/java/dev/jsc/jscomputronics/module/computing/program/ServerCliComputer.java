@@ -457,7 +457,7 @@ public final class ServerCliComputer implements CliComputer {
                 .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
                         instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
                         ? (dev.jsc.jscomputronics.module.computing.storage.DataSink)
-                                new dev.jsc.jscomputronics.module.computing.storage.ServerStoreSink(
+                                new dev.jsc.jscomputronics.module.computing.storage.StoreSink(
                                         rack.getServerStorage(loc.slot()))
                         : null)
                 .orElse(null);

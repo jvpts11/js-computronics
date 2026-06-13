@@ -19,7 +19,7 @@ import java.util.Map;
 /**
  * A computer's local storage as a capacity-bounded, component-preserving type → quantity store that lives on its installed disks — the data is held in each disk item's {@link ComputingModule#DISK_STORAGE} component, so a computer's local storage is literally the union of its disks.
  */
-public final class LocalStore {
+public final class LocalStore implements WeightedStore {
 
     private final List<ItemStack> disks;
     private final Runnable onChanged;

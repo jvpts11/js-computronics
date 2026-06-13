@@ -20,7 +20,7 @@ import java.util.Map;
 /**
  * A live, capacity-bounded view of one Server's storage, housed in a Server Rack.
  */
-public final class ServerStore {
+public final class ServerStore implements WeightedStore {
 
     private final ServerRackBlockEntity rack;
     private final int serverSlot;

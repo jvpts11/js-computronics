@@ -14,7 +14,7 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.LocalStore;
-import dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink;
+import dev.jsc.jscomputronics.module.computing.storage.StoreSink;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;
@@ -132,7 +132,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     public DataSink localStorage() {
-        return new LocalStoreSink(localStore());
+        return new StoreSink(localStore());
     }
 
     // ComputerTerminalHost — read-only monitoring (the rest is inherited from the base)

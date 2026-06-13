@@ -1030,14 +1030,14 @@ public final class ComputingPayloads {
         }
         final MainframeBlockEntity mf = resolveMainframe(level, net);
         if (mf != null && mf.nodeUuid() != null && mf.nodeUuid().equals(target)) {
-            return new Dest(new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(mf.localStore()),
+            return new Dest(new dev.jsc.jscomputronics.module.computing.storage.StoreSink(mf.localStore()),
                     "Mainframe", false, null);
         }
         // A Personal Computer on the network: a SELECT into its own local storage (leaves the network).
         for (final NetworkSystem.PersonalComputerNode pc : NetworkSystem.get(level).personalComputersOf(net)) {
             if (pc.nodeUuid().equals(target)
                     && level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
-                return new Dest(new dev.jsc.jscomputronics.module.computing.storage.LocalStoreSink(pcBe.localStore()),
+                return new Dest(new dev.jsc.jscomputronics.module.computing.storage.StoreSink(pcBe.localStore()),
                         pcLabel(pcBe, target), false, null);
             }
         }
@@ -1071,7 +1071,7 @@ public final class ComputingPayloads {
         return system.locationOf(target)
                 .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
                         instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
-                        ? new Dest(new dev.jsc.jscomputronics.module.computing.storage.ServerStoreSink(
+                        ? new Dest(new dev.jsc.jscomputronics.module.computing.storage.StoreSink(
                                 rack.getServerStorage(loc.slot())),
                                 serverLabel(level, target), true, target)
                         : null)
