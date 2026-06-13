@@ -59,6 +59,10 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/tank")));
         getBuilder("personal_computer")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_computer")));
+        getBuilder("vintage_personal_computer")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/vintage_personal_computer")));
+        getBuilder("legacy_personal_computer")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/legacy_personal_computer")));
         getBuilder("crafting_computer")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/crafting_computer")));
         getBuilder("supercomputer_node")

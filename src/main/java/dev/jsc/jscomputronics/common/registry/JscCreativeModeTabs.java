@@ -56,6 +56,8 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.MONITOR_ITEM.get());
                         output.accept(ComputingModule.TANK_ITEM.get());
                         output.accept(ComputingModule.PERSONAL_COMPUTER_ITEM.get());
+                        output.accept(ComputingModule.VINTAGE_PERSONAL_COMPUTER_ITEM.get());
+                        output.accept(ComputingModule.LEGACY_PERSONAL_COMPUTER_ITEM.get());
                         output.accept(ComputingModule.CRAFTING_COMPUTER_ITEM.get());
                         output.accept(ComputingModule.SUPERCOMPUTER_NODE_ITEM.get());
                         output.accept(ComputingModule.HPC_CABLE_ITEM.get());

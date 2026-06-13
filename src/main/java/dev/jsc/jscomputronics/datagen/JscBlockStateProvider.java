@@ -146,6 +146,21 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/personal_computer_top"));
         horizontalBlock(ComputingModule.PERSONAL_COMPUTER.get(), personalComputerModel);
 
+        // Earlier-era Personal Computers: same orientable model, era-specific faces.
+        final ModelFile vintagePersonalComputerModel = models().orientable(
+                "vintage_personal_computer",
+                modLoc("block/vintage_personal_computer_side"),
+                modLoc("block/vintage_personal_computer_front"),
+                modLoc("block/vintage_personal_computer_top"));
+        horizontalBlock(ComputingModule.VINTAGE_PERSONAL_COMPUTER.get(), vintagePersonalComputerModel);
+
+        final ModelFile legacyPersonalComputerModel = models().orientable(
+                "legacy_personal_computer",
+                modLoc("block/legacy_personal_computer_side"),
+                modLoc("block/legacy_personal_computer_front"),
+                modLoc("block/legacy_personal_computer_top"));
+        horizontalBlock(ComputingModule.LEGACY_PERSONAL_COMPUTER.get(), legacyPersonalComputerModel);
+
         final ModelFile craftingComputerModel = models().orientable(
                 "crafting_computer",
                 modLoc("block/crafting_computer_side"),

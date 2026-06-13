@@ -16,7 +16,6 @@ import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
@@ -53,8 +52,17 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
+    /**
+     * The hardware era this Personal Computer belongs to. It selects the block's skin and gates which
+     * consumer board the machine accepts: only a board of this era (and of the era's form factor) installs.
+     * The base block is the Standard era; the Vintage and Legacy variants override this.
+     */
+    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
+        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    }
+
     @Override
-    protected MapCodec<PersonalComputerBlock> codec() {
+    protected MapCodec<? extends PersonalComputerBlock> codec() {
         return CODEC;
     }
 
@@ -82,7 +90,7 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
                     new SimpleMenuProvider(
                             (id, inventory, p) -> new dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu(
                                     id, inventory, computer),
-                            Component.translatable("block.jsc.personal_computer")),
+                            getName()),
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());

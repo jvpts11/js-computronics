@@ -105,13 +105,38 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
 
     protected abstract Set<FormFactor> acceptedFormFactors();
 
+    /**
+     * The hardware era a board must belong to for this computer to accept it, or {@code null} when the
+     * computer takes a board of any era (the default). A non-null value gates both slot insertion and the
+     * computed build: a board whose era differs is neither installable nor counted. Used by the era-specific
+     * Personal Computers to keep, for example, a Legacy board out of a Standard machine even though both are
+     * ATX.
+     */
+    @Nullable
+    protected HardwareEra requiredBoardEra() {
+        return null;
+    }
+
+    /**
+     * Whether {@code stack} is a motherboard this computer accepts: it must match an accepted form factor
+     * and, when {@link #requiredBoardEra()} is set, also match that era.
+     */
+    protected boolean isAcceptedBoard(final ItemStack stack) {
+        if (!MotherboardItem.fits(stack, acceptedFormFactors())) {
+            return false;
+        }
+        final HardwareEra required = requiredBoardEra();
+        return required == null
+                || (stack.getItem() instanceof MotherboardItem board && board.spec().era() == required);
+    }
+
     protected boolean isValidPcieCard(final ItemStack stack) {
         return stack.getItem() instanceof ExpansionCardItem;
     }
 
     public boolean isValidForSlot(final int slot, final ItemStack stack) {
         if (slot == layout.motherboardSlot()) {
-            return MotherboardItem.fits(stack, acceptedFormFactors());
+            return isAcceptedBoard(stack);
         }
         if (slot == layout.psuSlot()) {
             return stack.getItem() instanceof PsuItem;
@@ -150,7 +175,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
 
     @Nullable
     private ComputerBuild computeBuild() {
-        if (!(hardware.getStackInSlot(layout.motherboardSlot()).getItem() instanceof MotherboardItem motherboard)) {
+        final ItemStack boardStack = hardware.getStackInSlot(layout.motherboardSlot());
+        if (!(boardStack.getItem() instanceof MotherboardItem motherboard) || !isAcceptedBoard(boardStack)) {
+            // A board this computer does not accept (wrong form factor or wrong era) yields no build, so a
+            // direct setStackInSlot or a board installed before an era gate existed can never run the machine.
             return null;
         }
         if (!(hardware.getStackInSlot(layout.psuSlot()).getItem() instanceof PsuItem psu)) {

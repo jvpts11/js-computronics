@@ -49,6 +49,8 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");
+        addBlock(ComputingModule.VINTAGE_PERSONAL_COMPUTER, "Vintage Personal Computer");
+        addBlock(ComputingModule.LEGACY_PERSONAL_COMPUTER, "Legacy Personal Computer");
         addBlock(ComputingModule.CRAFTING_COMPUTER, "Crafting Computer");
         addBlock(ComputingModule.PATTERN_ENCODER, "Pattern Encoder");
         addBlock(ComputingModule.PATTERN_READER, "Pattern Reader");

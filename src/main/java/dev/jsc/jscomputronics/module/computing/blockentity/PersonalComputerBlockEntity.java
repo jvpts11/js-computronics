@@ -12,6 +12,7 @@ import dev.jsc.jscomputronics.common.hardware.FormFactor;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.LocalStore;
@@ -84,10 +85,30 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         super.setChanged();
     }
 
+    /**
+     * The era this PC belongs to, read from its block. Defaults to Standard for any block that is not a
+     * {@link PersonalComputerBlock} (which never happens in practice, but keeps the read total).
+     */
+    private dev.jsc.jscomputronics.common.tier.HardwareEra blockEra() {
+        return getBlockState().getBlock() instanceof PersonalComputerBlock pc
+                ? pc.era()
+                : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    }
+
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        // A PC takes the consumer ATX board of every shipped era.
-        return Set.of(FormFactor.ATX);
+        // Each era takes its own consumer form factor: Vintage on Baby-AT/AT, Legacy and Standard on ATX.
+        return switch (blockEra()) {
+            case VINTAGE -> Set.of(FormFactor.BABY_AT, FormFactor.AT);
+            default -> Set.of(FormFactor.ATX);
+        };
+    }
+
+    @Override
+    protected dev.jsc.jscomputronics.common.tier.HardwareEra requiredBoardEra() {
+        // A PC accepts only a board of its own era, so a Legacy and a Standard ATX board are not
+        // interchangeable: each installs in its matching machine alone.
+        return blockEra();
     }
 
     // Network node — a passive Category-C node read from the adjacent cable

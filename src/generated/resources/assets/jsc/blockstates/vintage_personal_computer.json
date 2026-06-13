@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "jsc:block/vintage_personal_computer",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "jsc:block/vintage_personal_computer"
+    },
+    "facing=south": {
+      "model": "jsc:block/vintage_personal_computer",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "jsc:block/vintage_personal_computer",
+      "y": 270
+    }
+  }
+}

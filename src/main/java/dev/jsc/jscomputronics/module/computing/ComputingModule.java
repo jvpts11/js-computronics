@@ -588,10 +588,35 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> PERSONAL_COMPUTER_ITEM = ITEMS.register(
             "personal_computer", () -> new BlockItem(PERSONAL_COMPUTER.get(), new Item.Properties()));
 
+    // Earlier-era Personal Computers — the same machine and block entity, differing only by era, accepted
+    // board and skin.
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.VintagePersonalComputerBlock>
+            VINTAGE_PERSONAL_COMPUTER = BLOCKS.register("vintage_personal_computer",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.VintagePersonalComputerBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(2.0F)));
+
+    public static final DeferredItem<BlockItem> VINTAGE_PERSONAL_COMPUTER_ITEM = ITEMS.register(
+            "vintage_personal_computer",
+            () -> new BlockItem(VINTAGE_PERSONAL_COMPUTER.get(), new Item.Properties()));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.LegacyPersonalComputerBlock>
+            LEGACY_PERSONAL_COMPUTER = BLOCKS.register("legacy_personal_computer",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.LegacyPersonalComputerBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(2.0F)));
+
+    public static final DeferredItem<BlockItem> LEGACY_PERSONAL_COMPUTER_ITEM = ITEMS.register(
+            "legacy_personal_computer",
+            () -> new BlockItem(LEGACY_PERSONAL_COMPUTER.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PersonalComputerBlockEntity>> PERSONAL_COMPUTER_BE =
             BLOCK_ENTITIES.register("personal_computer",
                     () -> BlockEntityType.Builder.of(PersonalComputerBlockEntity::new,
-                            PERSONAL_COMPUTER.get()).build(null));
+                            PERSONAL_COMPUTER.get(), VINTAGE_PERSONAL_COMPUTER.get(),
+                            LEGACY_PERSONAL_COMPUTER.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<PersonalComputerMenu>> PERSONAL_COMPUTER_MENU =
             MENUS.register("personal_computer", () -> IMenuTypeExtension.create(PersonalComputerMenu::fromNetwork));
