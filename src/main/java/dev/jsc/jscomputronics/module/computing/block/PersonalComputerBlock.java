@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
@@ -37,7 +37,7 @@ import org.jetbrains.annotations.Nullable;
  * The Personal Computer: the player's hands-on access point to the network, assembled on a consumer ATX board.
  */
 public class PersonalComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable,
+        implements EntityBlock, RearFacingDataPort,
         dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
 
     @Override
@@ -60,12 +60,6 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
         return java.util.Set.of(DataTier.T1_ETHERNET); // PCs are Ethernet-only; reach HBW via a Personal Router
-    }
-
-    @Override
-    public boolean connectsOnFace(final BlockState state, final Direction face) {
-        // A Personal Computer plugs into the network through its rear only.
-        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override

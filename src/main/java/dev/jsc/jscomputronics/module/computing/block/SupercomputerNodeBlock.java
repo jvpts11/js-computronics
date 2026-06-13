@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
@@ -43,7 +43,7 @@ import org.jetbrains.annotations.Nullable;
  * (2 wide, 3 tall, 2 deep) so the two stand side by side in a datacenter aisle.
  */
 public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable {
+        implements EntityBlock, RearFacingDataPort {
 
     public static final MapCodec<SupercomputerNodeBlock> CODEC = simpleCodec(SupercomputerNodeBlock::new);
 
@@ -69,12 +69,6 @@ public class SupercomputerNodeBlock extends HorizontalDirectionalBlock
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING, FILLED);
-    }
-
-    @Override
-    public boolean connectsOnFace(final BlockState state, final Direction face) {
-        // A Supercomputer node takes its HPC cable on the rear only, like the other computers.
-        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override

@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodePartBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A structural part of the Supercomputer Node cabinet.
  */
-public class SupercomputerNodePartBlock extends Block implements EntityBlock, DataNetworkConnectable {
+public class SupercomputerNodePartBlock extends Block implements EntityBlock, RearFacingDataPort {
 
     public static final MapCodec<SupercomputerNodePartBlock> CODEC =
             simpleCodec(SupercomputerNodePartBlock::new);
@@ -62,12 +62,6 @@ public class SupercomputerNodePartBlock extends Block implements EntityBlock, Da
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
         return java.util.Set.of(DataTier.HPC);
-    }
-
-    @Override
-    public boolean connectsOnFace(final BlockState state, final Direction face) {
-        // Every part of the node tower takes its HPC cable on the structure's rear face only.
-        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override

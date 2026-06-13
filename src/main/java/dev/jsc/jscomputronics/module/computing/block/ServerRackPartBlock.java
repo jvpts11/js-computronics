@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity;
@@ -36,7 +36,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A structural part of the Server Rack — one of the 11 non-controller blocks of the 2x3x2 cabinet.
  */
-public class ServerRackPartBlock extends Block implements EntityBlock, DataNetworkConnectable {
+public class ServerRackPartBlock extends Block implements EntityBlock, RearFacingDataPort {
 
     public static final MapCodec<ServerRackPartBlock> CODEC = simpleCodec(ServerRackPartBlock::new);
 
@@ -64,14 +64,6 @@ public class ServerRackPartBlock extends Block implements EntityBlock, DataNetwo
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
         return java.util.EnumSet.allOf(DataTier.class);
-    }
-
-    @Override
-    public boolean connectsOnFace(final BlockState state, final net.minecraft.core.Direction face) {
-        // The cabinet is a multiblock made of these parts; every part takes a cable on the structure's
-        // rear face only (the parts share the controller's facing), so the rack connects through the
-        // back of the whole structure, never its sides or front.
-        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override

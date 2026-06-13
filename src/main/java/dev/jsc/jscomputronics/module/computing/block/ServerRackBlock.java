@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
@@ -43,7 +43,7 @@ import org.jetbrains.annotations.Nullable;
  * The Server Rack: a 2-wide, 3-tall, 2-deep multiblock cabinet that is logically a single rack.
  */
 public class ServerRackBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable,
+        implements EntityBlock, RearFacingDataPort,
         dev.jsc.jscomputronics.common.multiblock.MultiblockBlock {
 
     public static final MapCodec<ServerRackBlock> CODEC = simpleCodec(ServerRackBlock::new);
@@ -70,13 +70,6 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(FACING, BAYS);
-    }
-
-    @Override
-    public boolean connectsOnFace(final BlockState state, final Direction face) {
-        // A Server Rack takes its data cable on the rear only, matching where the rack actually reads
-        // the network (the back of its lower-rear block), so the cable never appears to attach elsewhere.
-        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override

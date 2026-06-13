@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
+import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
  * The Crafting Computer block: an ATX-class computer that executes recipes for the network.
  */
 public class CraftingComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable, PeripheralConnectable {
+        implements EntityBlock, RearFacingDataPort, PeripheralConnectable {
 
     public static final MapCodec<CraftingComputerBlock> CODEC = simpleCodec(CraftingComputerBlock::new);
 
@@ -55,12 +55,6 @@ public class CraftingComputerBlock extends HorizontalDirectionalBlock
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
         return java.util.Set.of(DataTier.T1_ETHERNET); // reach the HBW backbone through a Personal Router
-    }
-
-    @Override
-    public boolean connectsOnFace(final BlockState state, final Direction face) {
-        // A Crafting Computer plugs into the network through its rear only.
-        return face == state.getValue(FACING).getOpposite();
     }
 
     @Override
