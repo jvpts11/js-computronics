@@ -39,6 +39,8 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * The Server Rack: a 2-wide, 3-tall, 2-deep multiblock cabinet that is logically a single rack.
  */
@@ -115,8 +117,13 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
-        if (!canPlaceAt(context.getLevel(), context.getClickedPos(), facing)) {
-            return null; // no room for the 2x3x2 cabinet — cancel placement, item not consumed
+        final Level level = context.getLevel();
+        final List<BlockPos> obstructedBlocks = getObstructedBlocks(level, context.getClickedPos(), facing);
+        if (!obstructedBlocks.isEmpty()) {
+            // No room for the 2x3x2 cabinet — cancel placement, item not consumed, and outline the
+            // obstructing cells with particles so the player can see what is in the way.
+            spawnMisplaceParticles(level, obstructedBlocks);
+            return null;
         }
         return defaultBlockState().setValue(FACING, facing);
     }

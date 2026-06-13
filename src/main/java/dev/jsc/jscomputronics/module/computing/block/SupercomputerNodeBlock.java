@@ -37,6 +37,8 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * The Supercomputer Node cabinet controller. The cabinet shares the Server Rack footprint
  * (2 wide, 3 tall, 2 deep) so the two stand side by side in a datacenter aisle.
@@ -74,8 +76,13 @@ public class SupercomputerNodeBlock extends AbstractMultiblockControllerBlock
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
-        if (!canPlaceAt(context.getLevel(), context.getClickedPos(), facing)) {
-            return null; // no room for the cabinet — cancel placement, item not consumed
+        final Level level = context.getLevel();
+        final List<BlockPos> obstructedBlocks = getObstructedBlocks(level, context.getClickedPos(), facing);
+        if (!obstructedBlocks.isEmpty()) {
+            // No room for the cabinet — cancel placement, item not consumed, and outline the obstructing
+            // cells with particles so the player can see what is in the way.
+            spawnMisplaceParticles(level, obstructedBlocks);
+            return null;
         }
         return defaultBlockState().setValue(FACING, facing);
     }
