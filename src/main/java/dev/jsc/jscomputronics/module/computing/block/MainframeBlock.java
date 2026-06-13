@@ -14,6 +14,7 @@ import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +35,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * The Mainframe — the network's orchestrator.
@@ -81,9 +84,14 @@ public class MainframeBlock extends HorizontalDirectionalBlock
     @Nullable
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
         final Direction facing = context.getHorizontalDirection().getOpposite();
-        if (!canPlaceAt(context.getLevel(), context.getClickedPos(), facing)) {
+        final Level level = context.getLevel();
+        final List<BlockPos> obstructedBlocks = getObstructedBlocks(level, context.getClickedPos(), facing);
+
+        if (!obstructedBlocks.isEmpty()) {
+            spawnMisplaceParticles(level, obstructedBlocks);
             return null; // no room for the 3x2x2 structure — cancel placement, item not consumed
         }
+
         return defaultBlockState().setValue(FACING, facing);
     }
 
