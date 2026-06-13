@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.industrial.blockentity;
 
+import dev.jsc.jscomputronics.common.util.FieldContainerData;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -18,6 +19,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
+
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 
 /**
  * The Coal Generator — the first FE source: burns furnace fuel (coal, charcoal, etc.) to produce {@value #FE_PER_TICK} FE per tick while it has burn time left, and pushes stored FE into adjacent energy consumers each tick.
@@ -117,32 +121,17 @@ public class CoalGeneratorBlockEntity extends AbstractMachineBlockEntity {
         return burnTime > 0;
     }
 
-    private final ContainerData dataAccess = new ContainerData() {
-        @Override
-        public int get(final int index) {
-            return switch (index) {
-                case 0 -> burnTime;
-                case 1 -> maxBurnTime;
-                case 2 -> energy.getEnergyStored();
-                default -> 0;
-            };
-        }
-
-        @Override
-        public void set(final int index, final int value) {
-            switch (index) {
-                case 0 -> burnTime = value;
-                case 1 -> maxBurnTime = value;
-                case 2 -> energy.setEnergyStored(value);
-                default -> { }
-            }
-        }
-
-        @Override
-        public int getCount() {
-            return 3;
-        }
-    };
+    private final ContainerData dataAccess = new FieldContainerData(
+            new IntSupplier[] {
+                () -> burnTime,
+                () -> maxBurnTime,
+                () -> energy.getEnergyStored(),
+            },
+            new IntConsumer[] {
+                value -> burnTime = value,
+                value -> maxBurnTime = value,
+                value -> energy.setEnergyStored(value),
+            });
 
     public ContainerData getDataAccess() {
         return dataAccess;

@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.industrial.blockentity;
 
+import dev.jsc.jscomputronics.common.util.FieldContainerData;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.recipe.MaceratingRecipe;
 import net.minecraft.core.BlockPos;
@@ -20,6 +21,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Optional;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 
 /**
  * The Macerator's processing logic: grinds the input item into the recipe result, spending {@value #FE_PER_TICK} FE per tick over the recipe's processing time (Tier-1: 200 ticks, ore → 2 dust).
@@ -109,32 +112,17 @@ public class MaceratorBlockEntity extends AbstractMachineBlockEntity {
         return maxProgress;
     }
 
-    private final ContainerData dataAccess = new ContainerData() {
-        @Override
-        public int get(final int index) {
-            return switch (index) {
-                case 0 -> progress;
-                case 1 -> maxProgress;
-                case 2 -> energy.getEnergyStored();
-                default -> 0;
-            };
-        }
-
-        @Override
-        public void set(final int index, final int value) {
-            switch (index) {
-                case 0 -> progress = value;
-                case 1 -> maxProgress = value;
-                case 2 -> energy.setEnergyStored(value);
-                default -> { }
-            }
-        }
-
-        @Override
-        public int getCount() {
-            return 3;
-        }
-    };
+    private final ContainerData dataAccess = new FieldContainerData(
+            new IntSupplier[] {
+                () -> progress,
+                () -> maxProgress,
+                () -> energy.getEnergyStored(),
+            },
+            new IntConsumer[] {
+                value -> progress = value,
+                value -> maxProgress = value,
+                value -> energy.setEnergyStored(value),
+            });
 
     public ContainerData getDataAccess() {
         return dataAccess;
