@@ -27,14 +27,7 @@ public class JscItemModelProvider extends ItemModelProvider {
      * textures are marked as generated so a basic generated model can still be produced for them during
      * datagen. Drop an id from this list once its real texture is added under resources.
      */
-    private static final List<String> PREVIEW_ONLY_GPU_TEXTURES = List.of(
-            "gpu_prism_4",
-            "gpu_voodoo_gfx",
-            "gpu_radiance_9200_se",
-            "gpu_vertex_gtx_280",
-            "gpu_vertex_gtx_550_ti",
-            "gpu_radiance_hd_6850",
-            "gpu_vertex_gtx_780_ti");
+    private static final List<String> PREVIEW_ONLY_GPU_TEXTURES = List.of();
 
     public JscItemModelProvider(final PackOutput output, final ExistingFileHelper existingFiles) {
         super(output, JsComputronics.MODID, existingFiles);
