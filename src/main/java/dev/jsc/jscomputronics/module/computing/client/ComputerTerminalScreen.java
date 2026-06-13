@@ -33,6 +33,8 @@ import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import net.minecraft.client.gui.Font;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -117,13 +119,13 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Console"};
 
     private int netScrollRow;
-    private int selectedOp;
+    int selectedOp;
     private int opScroll;
-    private int taskSubTab;
+    int taskSubTab;
 
     @org.jetbrains.annotations.Nullable
     private EditBox searchBox;
-    private boolean sortByQuantity = true;
+    boolean sortByQuantity = true;
 
     // Storage tab — public/private slider band. The Storage tab inserts a band between the header bar
     // and the item toolbar, then shifts its toolbar/grid/deposit down by STORAGE_SHIFT so nothing
@@ -143,7 +145,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     // The Storage grid loses one row to the band; the Network grid keeps all four.
     private static final int STORAGE_NET_ROWS = 3;
 
-    private int draggingSliderDisk = -1;   // which disk's slider is being dragged, or -1 for none
+    int draggingSliderDisk = -1;            // which disk's slider is being dragged, or -1 for none
     private int focusedSliderDisk = -1;    // which disk's slider has keyboard focus, or -1 for none
     // Optimistic per-disk values shown while dragging; overwritten by the authoritative sync each frame.
     private final int[] sliderPreview = new int[LocalStorageSnapshotPayload.MAX_DISKS];
@@ -168,7 +170,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     @org.jetbrains.annotations.Nullable
     private dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry craftPopup;
     private long craftQty = 1;
-    private int craftScroll;
+    int craftScroll;
     private int popupQty = 1;
     private boolean popupFromStorage;
     private final Set<String> deselectedServers = new HashSet<>();
@@ -198,7 +200,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private final Set<StorageKey> dropTypes = new java.util.LinkedHashSet<>();
     private int dropServerIndex;
     private int dropTypeScrollRow;
-    private String maintHint = "";
+    String maintHint = "";
     private static final int DROP_W = 206;
     private static final int DROP_H = 146;
     private static final int DROP_GRID_COLS = 9;
@@ -242,6 +244,16 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         qtyBox = qty;
 
         syncSearchBoxVisibility();
+
+        tabs = new TerminalTab[]{
+            new LocalTerminalTab(this, menu),
+            new StorageTerminalTab(this, menu),
+            new NetworkTerminalTab(this, menu),
+            new OpsTerminalTab(this, menu),
+            new TasksTerminalTab(this, menu),
+            new MaintenanceTerminalTab(this, menu),
+            new CraftTerminalTab(this, menu),
+        };
     }
 
     private void syncSearchBoxVisibility() {
@@ -334,6 +346,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                         ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS};
     }
 
+    // Per-tab rendering delegates; instantiated in init() once menu and screen geometry are ready.
+    private TerminalTab[] tabs;
+
     // The rail now scrolls instead of shrinking, so every entry keeps its full height and its name.
     private int railScroll;
 
@@ -352,6 +367,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     private int contentW() {
         return imageWidth - CONTENT_X - 6;
+    }
+
+    Font tabFont() {
+        return font;
     }
 
     // Background
@@ -401,15 +420,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.fill(cx, cy, cx + cw, cy + 16, PANEL);
         g.fill(cx, cy + 16, cx + cw, cy + 17, LINE);
 
-        switch (menu.activeTab()) {
-            case ComputerTerminalMenu.TAB_LOCAL -> localBg(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_STORAGE -> storageBg(g, x, y, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_NETWORK -> networkBg(g, x, y);
-            case ComputerTerminalMenu.TAB_OPS -> opsBg(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_TASKS -> tasksBg(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_MAINTENANCE -> maintenanceBg(g, cx, cy, cw, mouseX, mouseY);
-            case ComputerTerminalMenu.TAB_CRAFT -> craftBg(g, x, y);
-            default -> { /* nothing */ }
+        final int activeTab = menu.activeTab();
+        if (activeTab >= 0 && activeTab < tabs.length) {
+            tabs[activeTab].renderTabBg(g, x, y, cx, cy, cw, mouseX, mouseY);
         }
 
         // Player inventory backgrounds (always visible; the Mainframe's sit lower).
@@ -423,24 +436,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
     }
 
-    private void localBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int tileW = (cw - 8) / 3;
-        for (int i = 0; i < 3; i++) {
-            final int tx = cx + i * (tileW + 4);
-            g.fill(tx, cy + 26, tx + tileW, cy + 52, PANEL);
-            g.fill(tx, cy + 26, tx + tileW, cy + 27, LINE);
-        }
-        // Hardware-population bars — inline (label · track · value on one row).
-        inlineTrack(g, cx, cy + 70, cw, frac(menu.installedCpus(), menu.cpuSlots()), ACCENT2);
-        inlineTrack(g, cx, cy + 82, cw, frac(menu.installedRam(), menu.ramSlots()), ACCENT2);
-        inlineTrack(g, cx, cy + 94, cw, frac(menu.installedGpus(), menu.gpuSlots()), ACCENT);
-        inlineTrack(g, cx, cy + 106, cw, frac(menu.installedDisks(), menu.diskSlots()), ACCENT);
-        final long cap = menu.storageCapacity();
-        final double sf = cap <= 0 ? 0 : Math.min(1.0, (double) menu.storageUsed() / cap);
-        inlineTrack(g, cx, cy + 122, cw, sf, cap <= 0 ? DIM : (sf > 0.9 ? RED : GREEN));
-    }
-
-    private void inlineTrack(final GuiGraphics g, final int x, final int y, final int w,
+    void inlineTrack(final GuiGraphics g, final int x, final int y, final int w,
                              final double f, final int color) {
         final int tx = x + 36;
         final int tw = w - 36 - 44;
@@ -452,63 +448,8 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
     }
 
-    private void storageBg(final GuiGraphics g, final int x, final int y,
-                           final int cx, final int cy, final int cw) {
-        // The Storage tab inserts the privacy-slider band just under the header, then draws the same
-        // disk-backed quantity grid as the Network tab shifted down by the band so nothing overlaps.
-        sliderBandBg(g, cx, cy, cw);
-        gridBg(g, x, y, STORAGE_SHIFT, STORAGE_NET_ROWS);
-    }
-
-    // The two-tone privacy slider band (Storage tab only). Tracks are drawn here (backgrounds), the
-    // text labels in storageLabels. For a host with no slider the band is a single static badge.
-    private void sliderBandBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int bandTop = cy + 18; // just below the header bar's LINE at cy+17
-        if (!menu.storageHasSlider()) {
-            // Server/Mainframe: a flat badge strip, no control.
-            g.fill(cx, bandTop, cx + cw, bandTop + 11, PANEL);
-            g.fill(cx, bandTop, cx + 2, bandTop + 11, GREEN);
-            return;
-        }
-        final int disks = menu.diskCount();
-        final int trackX = cx + SLIDER_TRACK_LX;
-        final int trackW = cw - SLIDER_TRACK_LX - 2;
-        for (int d = 0; d < disks; d++) {
-            final int ty = bandTop + SLIDER_TRACK0_DY + d * SLIDER_ROW_PITCH;
-            sliderTrackBg(g, trackX, ty, trackW, d);
-        }
-    }
-
-    private void sliderTrackBg(final GuiGraphics g, final int tx, final int ty, final int tw, final int disk) {
-        final int permille = sliderValue(disk);
-        final boolean empty = menu.diskCapacityWeight(disk) <= 0L;
-        // Track base + top edge line.
-        g.fill(tx, ty, tx + tw, ty + SLIDER_TRACK_H, TRACK);
-        g.fill(tx, ty, tx + tw, ty + 1, LINE);
-        if (empty) {
-            return; // no disk in this slot: a greyed, handle-less track (the "no disk" caption is the label)
-        }
-        final int span = tw - SLIDER_HANDLE_W;
-        final int handleX = tx + Math.round(span * (permille / 1000.0f));
-        // Public fill (left of the handle) in GREEN; private fill (right) in the dim panel tone.
-        if (handleX > tx + 1) {
-            g.fill(tx + 1, ty + 1, handleX, ty + SLIDER_TRACK_H - 1, GREEN);
-        }
-        if (handleX + SLIDER_HANDLE_W < tx + tw - 1) {
-            g.fill(handleX + SLIDER_HANDLE_W, ty + 1, tx + tw - 1, ty + SLIDER_TRACK_H - 1, PANEL);
-        }
-        // Snap ticks at 0/25/50/75/100% under the track, faint.
-        for (int i = 0; i <= 4; i++) {
-            final int tickX = tx + Math.round(span * (i / 4.0f)) + SLIDER_HANDLE_W / 2;
-            g.fill(tickX, ty + SLIDER_TRACK_H, tickX + 1, ty + SLIDER_TRACK_H + 1, LINE);
-        }
-        // Handle: a 3px ACCENT bar slightly taller than the track; brightens while dragging this disk.
-        final int handleColor = draggingSliderDisk == disk ? 0xFFFFFFFF : ACCENT;
-        g.fill(handleX, ty - 2, handleX + SLIDER_HANDLE_W, ty + SLIDER_TRACK_H + 2, handleColor);
-    }
-
     // The value shown for a disk's slider: the optimistic preview while dragging, else the synced value.
-    private int sliderValue(final int disk) {
+    int sliderValue(final int disk) {
         if (disk >= 0 && disk < sliderPreviewActive.length && sliderPreviewActive[disk]) {
             return sliderPreview[disk];
         }
@@ -577,7 +518,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     // A parameterized item grid + deposit bar shared by the Network tab (offset 0, 4 rows) and the
     // Storage tab (offset STORAGE_SHIFT, 3 rows), so both stay pixel-identical apart from the offset.
-    private void gridBg(final GuiGraphics g, final int x, final int y, final int dy, final int rows) {
+    void gridBg(final GuiGraphics g, final int x, final int y, final int dy, final int rows) {
         final int tbx = x + NET_X;
         final int tby = y + TOOLBAR_Y + dy;
         g.fill(tbx, tby, tbx + SEARCH_W, tby + TOOLBAR_H, TRACK);
@@ -603,16 +544,16 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         depositBar(g, x, y, dy);
     }
 
-    private void slotBg(final GuiGraphics g, final int x, final int y) {
+    void slotBg(final GuiGraphics g, final int x, final int y) {
         g.fill(x - 1, y - 1, x + 17, y + 17, SLOT_EDGE);
         g.fill(x, y, x + 16, y + 16, SLOT_BG);
     }
 
-    private static double frac(final int a, final int b) {
+    static double frac(final int a, final int b) {
         return b <= 0 ? 0 : Math.min(1.0, (double) a / b);
     }
 
-    private void track(final GuiGraphics g, final int x, final int y, final int w,
+    void track(final GuiGraphics g, final int x, final int y, final int w,
                        final double f, final int color) {
         g.fill(x, y, x + w, y + 8, TRACK);
         g.fill(x, y, x + w, y + 1, LINE);
@@ -661,15 +602,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
         g.drawString(font, status, cx + cw - font.width(status) - 6, cy + 5, statusColor, false);
 
-        switch (menu.activeTab()) {
-            case ComputerTerminalMenu.TAB_LOCAL -> localLabels(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_STORAGE -> storageLabels(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_NETWORK -> networkLabels(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_OPS -> opsLabels(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_TASKS -> tasksLabels(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_MAINTENANCE -> maintenanceLabels(g, cx, cy, cw);
-            case ComputerTerminalMenu.TAB_CRAFT -> craftLabels(g, cx, cy, cw);
-            default -> placeholder(g, cx, cy, "Not available yet");
+        final int activeTab = menu.activeTab();
+        if (activeTab >= 0 && activeTab < tabs.length) {
+            tabs[activeTab].renderTabLabels(g, cx, cy, cw);
+        } else {
+            placeholder(g, cx, cy, "Not available yet");
         }
     }
 
@@ -681,135 +618,6 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private static final int CRAFT_RUNNING_Y = 82;
     private static final int CRAFT_RECENT_Y = 116;
 
-    private int craftGridX() {
-        // Aligned with the Network tab's item grid, safely right of the 56px tab rail.
-        return NET_X;
-    }
-
-    private java.util.List<OperationRecord> runningCrafts() {
-        final java.util.List<OperationRecord> out = new java.util.ArrayList<>();
-        for (final OperationRecord op : menu.activeOps()) {
-            if (op.type() == OperationRecord.TYPE_CRAFT) {
-                out.add(op);
-            }
-        }
-        return out;
-    }
-
-    private java.util.List<OperationRecord> recentCrafts() {
-        final java.util.List<OperationRecord> out = new java.util.ArrayList<>();
-        for (final OperationRecord op : menu.operationsLog()) {
-            if (op.type() == OperationRecord.TYPE_CRAFT) {
-                out.add(op);
-            }
-        }
-        return out;
-    }
-
-    private int recentRows() {
-        return menu.mainframeHost() ? 3 : 2;
-    }
-
-    private void craftBg(final GuiGraphics g, final int x, final int y) {
-        // Catalog cells with the availability dot in the corner.
-        final var catalog = menu.craftCatalog();
-        final int maxScroll = Math.max(0, (catalog.size() + CRAFT_COLS - 1) / CRAFT_COLS - CRAFT_ROWS);
-        craftScroll = Math.max(0, Math.min(craftScroll, maxScroll));
-        for (int row = 0; row < CRAFT_ROWS; row++) {
-            for (int col = 0; col < CRAFT_COLS; col++) {
-                final int sx = x + craftGridX() + col * 18;
-                final int sy = y + CRAFT_GRID_Y + row * 18;
-                slotBg(g, sx, sy);
-                final int index = (row + craftScroll) * CRAFT_COLS + col;
-                if (index < catalog.size()) {
-                    final var entry = catalog.get(index);
-                    drawDataIcon(g, dev.jsc.jscomputronics.module.computing.storage.StorageKey
-                            .of(entry.result()), -1L, sx, sy);
-                    final int dot = switch (entry.availability()) {
-                        case dev.jsc.jscomputronics.module.computing.operation.payload
-                                .CraftCatalogPayload.DOT_GREEN -> GREEN;
-                        case dev.jsc.jscomputronics.module.computing.operation.payload
-                                .CraftCatalogPayload.DOT_AMBER -> AMBER;
-                        default -> RED;
-                    };
-                    g.fill(sx + 13, sy + 1, sx + 17, sy + 5, dot);
-                }
-            }
-        }
-        // RUNNING rows: panel strip + progress bar.
-        final var running = runningCrafts();
-        for (int i = 0; i < Math.min(2, running.size()); i++) {
-            final OperationRecord op = running.get(i);
-            final int ry = y + CRAFT_RUNNING_Y + 9 + i * 12;
-            g.fill(x + craftGridX(), ry, x + craftGridX() + CRAFT_COLS * 18, ry + 10, PANEL);
-            final int barX = x + craftGridX() + 92;
-            final int barW = 56;
-            g.fill(barX, ry + 3, barX + barW, ry + 7, TRACK);
-            final int pct = op.requested() <= 0 ? 0
-                    : (int) Math.min(100, op.moved() * 100 / Math.max(1, op.requested()));
-            g.fill(barX, ry + 3, barX + barW * pct / 100, ry + 7, ACCENT);
-        }
-        // RECENT rows: plain strips (status text in labels).
-        final var recent = recentCrafts();
-        for (int i = 0; i < Math.min(recentRows(), recent.size()); i++) {
-            final int ry = y + CRAFT_RECENT_Y + 9 + i * 10;
-            g.fill(x + craftGridX(), ry, x + craftGridX() + CRAFT_COLS * 18, ry + 9, PANEL);
-        }
-    }
-
-    private void craftLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final var catalog = menu.craftCatalog();
-        g.drawString(font, "CRAFTABLE", craftGridX(), 30, DIM, false);
-        g.drawString(font, catalog.size() + (catalog.size() == 1 ? " pattern" : " patterns"),
-                craftGridX() + 64, 30, TEXT, false);
-        if (catalog.isEmpty()) {
-            g.drawString(font, "no patterns loaded - use a Pattern Reader", craftGridX(), CRAFT_GRID_Y + 6, DIM, false);
-        }
-        final int totalRows = (catalog.size() + CRAFT_COLS - 1) / CRAFT_COLS;
-        if (totalRows > CRAFT_ROWS) {
-            g.drawString(font, (craftScroll + 1) + "/" + (totalRows - CRAFT_ROWS + 1),
-                    craftGridX() + CRAFT_COLS * 18 - 24, 30, DIM, false);
-        }
-
-        g.drawString(font, "RUNNING", craftGridX(), CRAFT_RUNNING_Y, DIM, false);
-        final var running = runningCrafts();
-        if (running.isEmpty()) {
-            g.drawString(font, "-", craftGridX() + 48, CRAFT_RUNNING_Y, DIM, false);
-        }
-        for (int i = 0; i < Math.min(2, running.size()); i++) {
-            final OperationRecord op = running.get(i);
-            final int ry = CRAFT_RUNNING_Y + 10 + i * 12;
-            g.drawString(font, trim(op.name().getString(), 9), craftGridX() + 3, ry, TEXT, false);
-            g.drawString(font, fmt(op.moved()) + "/" + fmt(op.requested()), craftGridX() + 56, ry, DIM, false);
-        }
-
-        g.drawString(font, "RECENT", craftGridX(), CRAFT_RECENT_Y, DIM, false);
-        final var recent = recentCrafts();
-        if (recent.isEmpty()) {
-            g.drawString(font, "-", craftGridX() + 44, CRAFT_RECENT_Y, DIM, false);
-        }
-        for (int i = 0; i < Math.min(recentRows(), recent.size()); i++) {
-            final OperationRecord op = recent.get(i);
-            final int ry = CRAFT_RECENT_Y + 10 + i * 10;
-            g.drawString(font, trim(op.name().getString(), 11) + " x" + fmt(op.moved()),
-                    craftGridX() + 3, ry, TEXT, false);
-            final String st = switch (op.status()) {
-                case OperationRecord.STATUS_COMPLETED -> "COMPLETED";
-                case OperationRecord.STATUS_PARTIAL -> "PARTIAL";
-                case OperationRecord.STATUS_RESOURCE_LOCKED -> "LOCKED";
-                case OperationRecord.STATUS_DISCARDED -> "DISCARDED";
-                default -> "FAILED";
-            };
-            final int color = switch (op.status()) {
-                case OperationRecord.STATUS_COMPLETED -> GREEN;
-                case OperationRecord.STATUS_PARTIAL -> AMBER;
-                case OperationRecord.STATUS_DISCARDED -> DIM;
-                default -> RED;
-            };
-            g.drawString(font, st, craftGridX() + CRAFT_COLS * 18 - font.width(st) - 3, ry, color, false);
-        }
-    }
-
     private static String trim(final String s, final int max) {
         return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
@@ -818,7 +626,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry
             craftEntryAt(final int mouseX, final int mouseY) {
         final var catalog = menu.craftCatalog();
-        final int gx = leftPos + craftGridX();
+        final int gx = leftPos + NET_X;
         final int gy = topPos + CRAFT_GRID_Y;
         if (mouseX < gx || mouseX >= gx + CRAFT_COLS * 18 || mouseY < gy || mouseY >= gy + CRAFT_ROWS * 18) {
             return null;
@@ -1013,68 +821,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.drawString(font, text, cx + 6, cy + 28, DIM, false);
     }
 
-    private void localLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int tileW = (cw - 8) / 3;
-        tile(g, cx + 0 * (tileW + 4), cy + 26, "CAPACITY", fmt(menu.capacity()), "it/t");
-        tile(g, cx + 1 * (tileW + 4), cy + 26, "QUEUES", String.valueOf(menu.queues()), "");
-        tile(g, cx + 2 * (tileW + 4), cy + 26, "RAM BUF", fmt(menu.ramBuffer()), "it");
-
-        g.drawString(font, "HARDWARE", cx, cy + 56, DIM, false);
-        final int net = menu.networkLinkState();
-        final String netStr = net == 2 ? "conflict"
-                : net == 1 ? menu.serverCount() + " servers" : "offline";
-        g.drawString(font, netStr, cx + cw - font.width(netStr), cy + 56, net == 2 ? RED : DIM, false);
-
-        barLabel(g, cx, cy + 70, cw, "CPU", menu.installedCpus() + "/" + menu.cpuSlots());
-        barLabel(g, cx, cy + 82, cw, "RAM", menu.installedRam() + "/" + menu.ramSlots());
-        barLabel(g, cx, cy + 94, cw, "GPU", menu.installedGpus() + "/" + menu.gpuSlots());
-        barLabel(g, cx, cy + 106, cw, "Disk", menu.installedDisks() + "/" + menu.diskSlots());
-
-        final String store = menu.storageCapacity() <= 0 ? "no disk"
-                : fmt(menu.storageUsed()) + "/" + fmt(menu.storageCapacity());
-        barLabel(g, cx, cy + 122, cw, "Storage", store);
-    }
-
-    private void storageLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        sliderBandLabels(g, cx, cy, cw);
-        final int shown = visibleItems().size();
-        final String t = shown + (shown == 1 ? " type" : " types");
-        g.drawString(font, t, cx + cw - font.width(t), TOOLBAR_Y + STORAGE_SHIFT + 3, DIM, false);
-        g.drawCenteredString(font, sortByQuantity ? "Qty" : "Name", SORT_X + SORT_W / 2,
-                TOOLBAR_Y + STORAGE_SHIFT + 3, ACCENT);
-        final boolean holding = !menu.getCarried().isEmpty();
-        g.drawCenteredString(font, "DEPOSIT TO STORAGE", NET_X + DEPOSIT_W / 2,
-                DEPOSIT_Y + STORAGE_SHIFT + 3, holding ? ACCENT : DIM);
-    }
-
-    private void sliderBandLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int bandTop = cy + 18;
-        if (!menu.storageHasSlider()) {
-            // Server/Mainframe: storage is always public — a static badge, never a control.
-            g.drawString(font, "PUBLIC · NETWORK STORAGE", cx + 4, bandTop + 2, GREEN, false);
-            return;
-        }
-        final int disks = menu.diskCount();
-        final int trackX = cx + SLIDER_TRACK_LX;
-        for (int d = 0; d < disks; d++) {
-            final int ty = bandTop + SLIDER_TRACK0_DY + d * SLIDER_ROW_PITCH;
-            // Disk letter to the left of the track; the per-disk public/private readout to the right.
-            g.drawString(font, String.valueOf((char) ('A' + d)), cx + 2, ty, DIM, false);
-            if (menu.diskCapacityWeight(d) <= 0L) {
-                g.drawString(font, "no disk", trackX + 4, ty, DIM, false);
-                continue;
-            }
-            final int permille = sliderValue(d);
-            final String readout = (permille / 10) + "% pub";
-            g.drawString(font, readout, cx + cw - font.width(readout), ty, GREEN, false);
-        }
-    }
-
     // Network tab — a virtual item grid drawn from the snapshot
-
-    private void networkBg(final GuiGraphics g, final int x, final int y) {
-        gridBg(g, x, y, 0, NET_ROWS);
-    }
 
     /** The vertical shift applied to the shared grid on the Storage tab (the slider band lives above). */
     private int gridShift() {
@@ -1086,7 +833,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         return menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE ? STORAGE_NET_ROWS : NET_ROWS;
     }
 
-    private List<NetworkItemEntry> visibleItems() {
+    List<NetworkItemEntry> visibleItems() {
         final String q = searchBox == null ? "" : searchBox.getValue().trim().toLowerCase(Locale.ROOT);
         final List<NetworkItemEntry> out = new ArrayList<>();
         final List<NetworkItemEntry> source = menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE
@@ -1122,20 +869,6 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.fill(gx + 2, gy + 6, gx + 4, gy + 7, gc);
     }
 
-    private void networkLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        g.drawString(font, "NETWORK", cx, cy + 20, DIM, false);
-        final int shown = visibleItems().size();
-        final String t = shown + (shown == 1 ? " item" : " items");
-        g.drawString(font, t, cx + cw - font.width(t), cy + 20, DIM, false);
-        // Sort toggle caption.
-        g.drawCenteredString(font, sortByQuantity ? "Qty" : "Name", SORT_X + SORT_W / 2,
-                TOOLBAR_Y + 3, ACCENT);
-        // Deposit-bar caption (centred in the strip; brightens while holding an item).
-        final boolean holding = !menu.getCarried().isEmpty();
-        g.drawCenteredString(font, "DEPOSIT TO NETWORK", NET_X + DEPOSIT_W / 2, DEPOSIT_Y + 3,
-                holding ? ACCENT : DIM);
-    }
-
     private int clampScroll(final int count, final int visibleRows) {
         final int rows = (count + NET_COLS - 1) / NET_COLS;
         final int max = Math.max(0, rows - visibleRows);
@@ -1162,74 +895,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     // Operations tab — recent network Operations + provenance detail
 
-    private void opsBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final List<OperationRecord> ops = menu.operationsLog();
-        final int start = clampOpScroll(ops.size());
-        for (int i = 0; i < OPS_ROWS && start + i < ops.size(); i++) {
-            final int ry = cy + 32 + i * 12;
-            final boolean sel = (start + i) == selectedOp;
-            g.fill(cx, ry, cx + cw, ry + 11, sel ? TAB_ON : PANEL);
-            if (sel) {
-                g.fill(cx, ry, cx + 2, ry + 11, ACCENT);
-            }
-        }
-        // Scrollbar on the list's right edge whenever the history overflows the visible rows.
-        if (ops.size() > OPS_ROWS) {
-            final int trackTop = cy + 32;
-            final int trackH = OPS_ROWS * 12 - 1;
-            final int maxOff = ops.size() - OPS_ROWS;
-            final int thumbH = Math.max(8, trackH * OPS_ROWS / ops.size());
-            final int thumbY = trackTop + (trackH - thumbH) * start / maxOff;
-            g.fill(cx + cw - 2, trackTop, cx + cw, trackTop + trackH, LINE);
-            g.fill(cx + cw - 2, thumbY, cx + cw, thumbY + thumbH, ACCENT);
-        }
-        g.fill(cx, cy + 90, cx + cw, cy + 140, PANEL);
-        g.fill(cx, cy + 90, cx + cw, cy + 91, LINE);
-        if (selectedOp >= 0 && selectedOp < ops.size()) {
-            drawDataIcon(g, ops.get(selectedOp).key(), -1L, cx + 5, cy + 96);
-        }
-    }
-
-    private void opsLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        g.drawString(font, "OPERATIONS", cx, cy + 20, DIM, false);
-        final List<OperationRecord> ops = menu.operationsLog();
-        final String n = ops.size() + (ops.size() == 1 ? " op" : " ops");
-        g.drawString(font, n, cx + cw - font.width(n), cy + 20, DIM, false);
-        if (ops.isEmpty()) {
-            g.drawString(font, "No operations yet.", cx, cy + 40, DIM, false);
-            return;
-        }
-        final int start = clampOpScroll(ops.size());
-        for (int i = 0; i < OPS_ROWS && start + i < ops.size(); i++) {
-            opListRow(g, cx, cy + 34 + i * 12, cw, ops.get(start + i));
-        }
-        if (selectedOp >= 0 && selectedOp < ops.size()) {
-            final OperationRecord op = ops.get(selectedOp);
-            g.drawString(font, op.name().getString(), cx + 24, cy + 96, TEXT, false);
-            final String sub = fmt(op.moved()) + " of " + fmt(op.requested()) + "  " + statusLabel(op.status());
-            g.drawString(font, sub, cx + 24, cy + 106, statusColor(op.status()), false);
-            // At most two provenance rows fit in the box; if there are more sources,
-            // the second row is replaced by a one-line summary so nothing overflows.
-            final List<OperationRecord.MoveRow> mv = op.moves();
-            if (!mv.isEmpty()) {
-                moveRow(g, cx, cy + 118, mv.get(0));
-                if (mv.size() == 2) {
-                    moveRow(g, cx, cy + 128, mv.get(1));
-                } else if (mv.size() > 2) {
-                    g.drawString(font, "+" + (mv.size() - 1) + " more sources", cx + 6, cy + 128, DIM, false);
-                }
-            }
-        }
-    }
-
-    private void moveRow(final GuiGraphics g, final int cx, final int my, final OperationRecord.MoveRow mv) {
+    void moveRow(final GuiGraphics g, final int cx, final int my, final OperationRecord.MoveRow mv) {
         g.drawString(font, font.plainSubstrByWidth(mv.from(), 62), cx + 6, my, DIM, false);
         g.drawString(font, ">", cx + 72, my, ACCENT, false);
         g.drawString(font, font.plainSubstrByWidth(fmt(mv.qty()) + " " + mv.to(), POPUP_W - 88),
                 cx + 82, my, TEXT, false);
     }
 
-    private int statusColor(final byte status) {
+    int statusColor(final byte status) {
         return switch (status) {
             case OperationRecord.STATUS_COMPLETED -> GREEN;
             case OperationRecord.STATUS_PARTIAL, OperationRecord.STATUS_WAITING -> AMBER;
@@ -1239,7 +912,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         };
     }
 
-    private static String statusLabel(final byte status) {
+    static String statusLabel(final byte status) {
         return switch (status) {
             case OperationRecord.STATUS_COMPLETED -> "COMPLETED";
             case OperationRecord.STATUS_PARTIAL -> "PARTIAL";
@@ -1265,178 +938,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         };
     }
 
-    private int opTypeColor(final byte type) {
-        return switch (type) {
-            case OperationRecord.TYPE_INSERT, OperationRecord.TYPE_CRAFT -> AMBER;
-            case OperationRecord.TYPE_DELETE, OperationRecord.TYPE_DROP -> RED;
-            case OperationRecord.TYPE_MOVE -> GREEN;
-            case OperationRecord.TYPE_ANALYZE, OperationRecord.TYPE_REINDEX, OperationRecord.TYPE_VACUUM -> DIM;
-            default -> ACCENT2;
-        };
-    }
-
     // Task Manager tab (Mainframe only): Processes / Hardware / Devices
 
-    private void tasksBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int sw = cw / 3;
-        g.fill(cx + taskSubTab * sw + 4, cy + 36, cx + (taskSubTab + 1) * sw - 4, cy + 37, ACCENT);
-        g.fill(cx, cy + 38, cx + cw, cy + 39, LINE);
-        if (taskSubTab == 0 || taskSubTab == 1) {
-            tilesBg(g, cx, cy + 44, cw);
-        }
-        if (taskSubTab == 1) {
-            inlineTrack(g, cx, cy + 90, cw, frac(menu.installedCpus(), menu.cpuSlots()), ACCENT2);
-            inlineTrack(g, cx, cy + 102, cw, frac(menu.installedRam(), menu.ramSlots()), ACCENT2);
-            inlineTrack(g, cx, cy + 114, cw, frac(menu.installedGpus(), menu.gpuSlots()), ACCENT);
-            inlineTrack(g, cx, cy + 126, cw, frac(menu.installedDisks(), menu.diskSlots()), ACCENT);
-        }
-    }
-
-    private void tilesBg(final GuiGraphics g, final int x, final int y, final int cw) {
-        final int tileW = (cw - 8) / 3;
-        for (int i = 0; i < 3; i++) {
-            final int tx = x + i * (tileW + 4);
-            g.fill(tx, y, tx + tileW, y + 28, PANEL);
-            g.fill(tx, y, tx + tileW, y + 1, LINE);
-        }
-    }
-
-    private void tasksLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int sw = cw / 3;
-        for (int i = 0; i < 3; i++) {
-            g.drawCenteredString(font, TASK_SUBTABS[i], cx + i * sw + sw / 2, cy + 28,
-                    i == taskSubTab ? ACCENT : DIM);
-        }
-        switch (taskSubTab) {
-            case 0 -> tasksProcesses(g, cx, cy, cw);
-            case 1 -> tasksHardware(g, cx, cy, cw);
-            default -> tasksDevices(g, cx, cy, cw);
-        }
-    }
-
-    private void tasksProcesses(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int tileW = (cw - 8) / 3;
-        final List<OperationRecord> active = menu.activeOps();
-        tile(g, cx, cy + 44, "IN FLIGHT", String.valueOf(active.size()), "");
-        tile(g, cx + tileW + 4, cy + 44, "PENDING", String.valueOf(menu.pendingOps()), "");
-        tile(g, cx + 2 * (tileW + 4), cy + 44, "DONE", fmt(menu.completedOps()), "");
-        g.drawString(font, "IN PROGRESS", cx, cy + 78, DIM, false);
-        if (active.isEmpty()) {
-            g.drawString(font, "Idle - no Operations running.", cx, cy + 90, DIM, false);
-            return;
-        }
-        for (int i = 0; i < TASK_OP_ROWS && i < active.size(); i++) {
-            taskOpRow(g, cx, cy + 90 + i * 14, cw, active.get(i));
-        }
-        if (active.size() > TASK_OP_ROWS) {
-            g.drawString(font, "+" + (active.size() - TASK_OP_ROWS) + " more",
-                    cx, cy + 90 + TASK_OP_ROWS * 14, DIM, false);
-        }
-    }
-
-    private void taskOpRow(final GuiGraphics g, final int cx, final int ry, final int cw,
-                           final OperationRecord op) {
-        final byte type = op.type();
-        g.drawString(font, opTypeLabel(type), cx + 4, ry, opTypeColor(type), false);
-        final double f = op.requested() <= 0 ? 0 : Math.min(1.0, (double) op.moved() / op.requested());
-        final String pct = (int) Math.round(f * 100) + "%";
-        final int nameW = Math.max(0, cw - 44 - font.width(pct) - 8);
-        g.drawString(font, font.plainSubstrByWidth(op.name().getString(), nameW),
-                cx + 44, ry, TEXT, false);
-        g.drawString(font, pct, cx + cw - font.width(pct) - 4, ry, ACCENT, false);
-        track(g, cx + 4, ry + 9, cw - 8, f, ACCENT2);
-    }
-
-    private void opListRow(final GuiGraphics g, final int cx, final int ry, final int cw,
-                           final OperationRecord op) {
-        final byte type = op.type();
-        g.drawString(font, opTypeLabel(type), cx + 4, ry, opTypeColor(type), false);
-        final String q = fmt(op.moved());
-        final int nameW = Math.max(0, cw - 44 - font.width(q) - 8);
-        final String name = font.plainSubstrByWidth(op.name().getString(), nameW);
-        g.drawString(font, name, cx + 44, ry, TEXT, false);
-        g.drawString(font, q, cx + cw - font.width(q) - 4, ry, statusColor(op.status()), false);
-    }
-
-    private void tasksHardware(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        final int tileW = (cw - 8) / 3;
-        tile(g, cx, cy + 44, "CAPACITY", fmt(menu.capacity()), "it/t");
-        tile(g, cx + tileW + 4, cy + 44, "QUEUES", String.valueOf(menu.queues()), "");
-        tile(g, cx + 2 * (tileW + 4), cy + 44, "RAM BUF", fmt(menu.ramBuffer()), "it");
-        g.drawString(font, "HARDWARE", cx, cy + 78, DIM, false);
-        barLabel(g, cx, cy + 90, cw, "CPU", menu.installedCpus() + "/" + menu.cpuSlots());
-        barLabel(g, cx, cy + 102, cw, "RAM", menu.installedRam() + "/" + menu.ramSlots());
-        barLabel(g, cx, cy + 114, cw, "GPU", menu.installedGpus() + "/" + menu.gpuSlots());
-        barLabel(g, cx, cy + 126, cw, "Disk", menu.installedDisks() + "/" + menu.diskSlots());
-    }
-
-    private void tasksDevices(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        deviceRow(g, cx, cy + 48, cw, "Mainframe", 1);
-        deviceRow(g, cx, cy + 62, cw, "Servers", menu.serverCount());
-        deviceRow(g, cx, cy + 76, cw, "Personal Computers", menu.pcCount());
-        deviceRow(g, cx, cy + 90, cw, "Subframes", menu.subframeCount());
-        g.drawString(font, "Network storage", cx, cy + 110, DIM, false);
-        final String st = fmt(menu.storageUsed()) + " / " + fmt(menu.storageCapacity());
-        g.drawString(font, st, cx + cw - font.width(st), cy + 110, TEXT, false);
-    }
-
-    private void deviceRow(final GuiGraphics g, final int cx, final int y, final int cw,
-                           final String name, final int count) {
-        g.drawString(font, name, cx + 4, y, TEXT, false);
-        final String c = String.valueOf(count);
-        g.drawString(font, c, cx + cw - font.width(c) - 4, y, count > 0 ? GREEN : DIM, false);
-    }
-
     // Maintenance tab (Mainframe-only): index stats + ANALYZE / VACUUM / REINDEX / DROP
-
-    private void maintenanceBg(final GuiGraphics g, final int cx, final int cy, final int cw,
-                               final int mouseX, final int mouseY) {
-        // Four index stat tiles (2x2).
-        final int tileW = (cw - 4) / 2;
-        for (int r = 0; r < 2; r++) {
-            final int ty = cy + (r == 0 ? MNT_TILE_ROW1_Y : MNT_TILE_ROW2_Y);
-            for (int col = 0; col < 2; col++) {
-                final int tx = cx + col * (tileW + 4);
-                g.fill(tx, ty, tx + tileW, ty + MNT_TILE_H, PANEL);
-                g.fill(tx, ty, tx + tileW, ty + 1, LINE);
-            }
-        }
-        // Action-button backgrounds (labels are drawn over them in maintenanceLabels).
-        final int halfW = (cw - 4) / 2;
-        maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_ROW1_Y, halfW, 0xFF1C6F86, 0xFF2A93AE);
-        maintBtnBg(g, mouseX, mouseY, cx + halfW + 4, cy + MNT_BTN_ROW1_Y, halfW, 0xFF1C6F86, 0xFF2A93AE);
-        maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_REINDEX_Y, cw, 0xFF7A5A1E, 0xFFA8801F);
-        maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_DROP_Y, cw, 0xFF7A241C, 0xFFB23228);
-    }
-
-    private void maintBtnBg(final GuiGraphics g, final int mx, final int my, final int x, final int y,
-                            final int w, final int base, final int hover) {
-        final boolean hov = inRect(mx, my, x, y, w, MNT_BTN_H);
-        g.fill(x, y, x + w, y + MNT_BTN_H, hov ? hover : base);
-        g.fill(x, y, x + w, y + 1, 0x33FFFFFF);
-    }
-
-    private void maintenanceLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        g.drawString(font, "STORAGE INDEX", cx, cy + 20, DIM, false);
-        final int tileW = (cw - 4) / 2;
-        tile(g, cx, cy + MNT_TILE_ROW1_Y, "TYPES", fmt(menu.indexedTypes()), "");
-        tile(g, cx + tileW + 4, cy + MNT_TILE_ROW1_Y, "SERVERS", String.valueOf(menu.indexedServers()), "");
-        tile(g, cx, cy + MNT_TILE_ROW2_Y, "LOCKS", String.valueOf(menu.activeLocks()), "");
-        final long used = menu.networkStorageUsed();
-        final long total = menu.networkStorageTotal();
-        tile(g, cx + tileW + 4, cy + MNT_TILE_ROW2_Y, "STORAGE",
-                total <= 0 ? "0" : fmt(used) + "/" + fmt(total), "");
-
-        g.drawString(font, "ACTIONS", cx, cy + MNT_ACTIONS_Y, DIM, false);
-        final int halfW = (cw - 4) / 2;
-        g.drawCenteredString(font, "ANALYZE", cx + halfW / 2, cy + MNT_BTN_ROW1_Y + 4, 0xFFFFFFFF);
-        g.drawCenteredString(font, "VACUUM", cx + halfW + 4 + halfW / 2, cy + MNT_BTN_ROW1_Y + 4, 0xFFFFFFFF);
-        g.drawCenteredString(font, "REINDEX", cx + cw / 2, cy + MNT_BTN_REINDEX_Y + 4, 0xFFFFFFFF);
-        g.drawCenteredString(font, "DROP DATA...", cx + cw / 2, cy + MNT_BTN_DROP_Y + 4, 0xFFFFFFFF);
-        if (!maintHint.isEmpty()) {
-            g.drawString(font, maintHint, cx, cy + MNT_BTN_DROP_Y + MNT_BTN_H + 2, ACCENT, false);
-        }
-    }
 
     private int maintButtonAt(final int mx, final int my) {
         final int cx = leftPos + CONTENT_X;
@@ -1698,7 +1202,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         return sub >= 0 && sub < 3 ? sub : -1;
     }
 
-    private int clampOpScroll(final int size) {
+    int clampOpScroll(final int size) {
         final int max = Math.max(0, size - OPS_ROWS);
         opScroll = Math.max(0, Math.min(max, opScroll));
         return opScroll;
@@ -1720,7 +1224,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         return idx < menu.operationsLog().size() ? idx : -1;
     }
 
-    private void tile(final GuiGraphics g, final int x, final int y, final String key,
+    void tile(final GuiGraphics g, final int x, final int y, final String key,
                       final String value, final String unit) {
         g.drawString(font, key, x + 4, y + 4, DIM, false);
         g.drawString(font, value, x + 4, y + 14, TEXT, false);
@@ -1729,7 +1233,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
     }
 
-    private void barLabel(final GuiGraphics g, final int x, final int y, final int w,
+    void barLabel(final GuiGraphics g, final int x, final int y, final int w,
                           final String label, final String value) {
         g.drawString(font, label, x, y, TEXT, false);
         g.drawString(font, value, x + w - font.width(value), y, DIM, false);
@@ -2580,7 +2084,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.drawCenteredString(font, label, x + w / 2, y + 4, 0xFFFFFFFF);
     }
 
-    private void drawDataIcon(final GuiGraphics g, final StorageKey key, final long count,
+    void drawDataIcon(final GuiGraphics g, final StorageKey key, final long count,
                               final int x, final int y) {
         if (key.isFluid()) {
             FluidSprite.draw(g, key.fluidPrototype(), x, y);
@@ -2599,7 +2103,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
     }
 
-    private static String fmt(final long n) {
+    static String fmt(final long n) {
         if (n < 10_000) {
             return String.format("%,d", n);
         }
