@@ -77,4 +77,43 @@ public record CraftingPattern(List<ItemStack> grid, ItemStack result) {
         }
         return true;
     }
+
+    // ItemStack has no value-based equals/hashCode in 1.21.1, so the record-generated ones compared by
+    // identity — making two patterns that hold the same recipe unequal and breaking this type's use as a
+    // data-component value (dedupe, stack comparison). Compare and hash the stacks by value instead.
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof CraftingPattern other) || !ItemStack.matches(result, other.result)
+                || grid.size() != other.grid.size()) {
+            return false;
+        }
+        for (int i = 0; i < grid.size(); i++) {
+            if (!ItemStack.matches(grid.get(i), other.grid.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int h = hashStack(result);
+        for (final ItemStack stack : grid) {
+            h = 31 * h + hashStack(stack);
+        }
+        return h;
+    }
+
+    private static int hashStack(final ItemStack stack) {
+        if (stack.isEmpty()) {
+            return 0;
+        }
+        int h = stack.getItem().hashCode();
+        h = 31 * h + stack.getComponents().hashCode();
+        return 31 * h + stack.getCount();
+    }
 }

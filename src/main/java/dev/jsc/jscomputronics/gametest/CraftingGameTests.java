@@ -213,6 +213,17 @@ public final class CraftingGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA)
+    public static void craftingPattern_comparesByValueNotIdentity(final GameTestHelper helper) {
+        final CraftingPattern a = planksPattern(4);
+        final CraftingPattern b = planksPattern(4);
+        helper.assertTrue(a.equals(b), "two patterns holding the same recipe must be equal");
+        helper.assertTrue(a.hashCode() == b.hashCode(), "equal patterns must share a hash code");
+        helper.assertFalse(a.equals(planksPattern(8)), "a different result count is a different pattern");
+        helper.assertFalse(a.equals(sticksPattern()), "a different recipe is not equal");
+        helper.succeed();
+    }
+
     // CRAFT engine — end to end over a real network
 
     @GameTest(template = ARENA, timeoutTicks = 200)
