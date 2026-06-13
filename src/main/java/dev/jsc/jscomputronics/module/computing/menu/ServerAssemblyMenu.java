@@ -16,15 +16,13 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
  * Menu for assembling a Server: hardware slots (board, CPU, RAM, GPU, PSU, disks) over the held Server item's hardware, plus the player inventory.
  */
-public class ServerAssemblyMenu extends AbstractContainerMenu {
+public class ServerAssemblyMenu extends AbstractComputerMenu {
 
     private static final int HARDWARE_SLOTS = ServerHardwareHandler.SLOTS;
 
@@ -60,7 +58,7 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
                     52 + (i % 3) * 18, 174 + (i / 3) * 18, i, this::boardGpuSlots));
         }
 
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, 8, 214);
     }
 
     private MotherboardSpec boardSpec() {
@@ -125,17 +123,6 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
         broadcastChanges();
     }
 
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 214 + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 272));
-        }
-    }
-
     @Override
     public boolean stillValid(final Player player) {
         // Valid only while the player is still holding a Server in that hand.
@@ -144,31 +131,6 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(final Player player, final int index) {
-        final Slot slot = slots.get(index);
-        if (slot == null || !slot.hasItem()) {
-            return ItemStack.EMPTY;
-        }
-        final ItemStack stack = slot.getItem();
-        final ItemStack original = stack.copy();
-        final int total = slots.size();
-
-        if (index < HARDWARE_SLOTS) {
-            if (!moveItemStackTo(stack, HARDWARE_SLOTS, total, true)) {
-                return ItemStack.EMPTY;
-            }
-        } else if (!moveItemStackTo(stack, 0, HARDWARE_SLOTS, false)) {
-            return ItemStack.EMPTY;
-        }
-
-        if (stack.isEmpty()) {
-            slot.setByPlayer(ItemStack.EMPTY);
-        } else {
-            slot.setChanged();
-        }
-        if (stack.getCount() == original.getCount()) {
-            return ItemStack.EMPTY;
-        }
-        slot.onTake(player, stack);
-        return original;
+        return quickMoveBetweenContainerAndPlayer(player, index, HARDWARE_SLOTS);
     }
 }

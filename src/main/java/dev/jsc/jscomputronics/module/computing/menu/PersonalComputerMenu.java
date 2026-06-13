@@ -12,10 +12,8 @@ import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlock
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
@@ -23,7 +21,7 @@ import net.neoforged.neoforge.items.SlotItemHandler;
 /**
  * Menu for the Personal Computer: a single hardware-assembly surface (motherboard, PSU, CPU, RAM, GPU, disks — each restricted to its component category and clamped to the count the installed motherboard offers) plus the player inventory.
  */
-public class PersonalComputerMenu extends AbstractContainerMenu {
+public class PersonalComputerMenu extends AbstractComputerMenu {
 
     public static final int BUTTON_POWER = 0;
     public static final int BUTTON_AUTOSTART = 1;
@@ -58,7 +56,7 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
                     8 + i * 18, 106, i, be::boardDiskSlots));
         }
 
-        addPlayerInventory(playerInventory);
+        addPlayerInventory(playerInventory, 8, 138);
         addDataSlots(this.data);
     }
 
@@ -70,17 +68,6 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
             return new PersonalComputerMenu(containerId, playerInventory, be);
         }
         return null;
-    }
-
-    private void addPlayerInventory(final Inventory inventory) {
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 138 + row * 18));
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(inventory, col, 8 + col * 18, 196));
-        }
     }
 
     public net.minecraft.core.BlockPos pcPos() {
@@ -163,33 +150,6 @@ public class PersonalComputerMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(final Player player, final int index) {
-        final Slot slot = slots.get(index);
-        if (slot == null || !slot.hasItem()) {
-            return ItemStack.EMPTY;
-        }
-        final ItemStack stack = slot.getItem();
-        final ItemStack original = stack.copy();
-        final int total = slots.size();
-
-        if (index < HARDWARE_SLOTS) {
-            if (!moveItemStackTo(stack, HARDWARE_SLOTS, total, true)) {
-                return ItemStack.EMPTY;
-            }
-        } else if (!moveItemStackTo(stack, 0, HARDWARE_SLOTS, false)) {
-            // Components land in their category-restricted hardware slot; anything
-            // else has nowhere to go and stays in the inventory.
-            return ItemStack.EMPTY;
-        }
-
-        if (stack.isEmpty()) {
-            slot.setByPlayer(ItemStack.EMPTY);
-        } else {
-            slot.setChanged();
-        }
-        if (stack.getCount() == original.getCount()) {
-            return ItemStack.EMPTY;
-        }
-        slot.onTake(player, stack);
-        return original;
+        return quickMoveBetweenContainerAndPlayer(player, index, HARDWARE_SLOTS);
     }
 }
