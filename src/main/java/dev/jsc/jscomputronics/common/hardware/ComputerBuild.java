@@ -163,9 +163,13 @@ public record ComputerBuild(MotherboardSpec motherboard,
                     + motherboard.diskSlots() + " disk slots");
         }
 
-        final int draw = powerDraw();
-        if (draw > psu.wattage()) {
-            problems.add("PSU insufficient: draw " + draw + "W exceeds " + psu.wattage() + "W");
+        // An auto-scaling PSU dimensions its output to the build's draw, so it always satisfies the
+        // power requirement; only a fixed-wattage PSU can come up short.
+        if (!psu.autoScaling()) {
+            final int draw = powerDraw();
+            if (draw > psu.wattage()) {
+                problems.add("PSU insufficient: draw " + draw + "W exceeds " + psu.wattage() + "W");
+            }
         }
 
         return new BuildValidation(problems.isEmpty(), problems);

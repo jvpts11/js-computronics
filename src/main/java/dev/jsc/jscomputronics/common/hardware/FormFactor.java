@@ -12,11 +12,31 @@ package dev.jsc.jscomputronics.common.hardware;
  */
 public enum FormFactor {
 
+    BABY_AT("Baby-AT"),
+
+    AT("AT"),
+
     ATX("ATX"),
+
+    EATX("EATX"),
 
     EEB("EEB"),
 
-    MTX("MTX");
+    MTX("MTX"),
+
+    SOCKET_Q("Socket Q"),
+
+    /**
+     * Mining motherboard: a specialized board with one consumer socket and many expansion slots,
+     * built for mining computers rather than general computing.
+     */
+    MNG("MNG"),
+
+    /**
+     * Simulation motherboard: a specialized board for simulation-cluster nodes, with no conventional
+     * CPU or RAM slots of its own.
+     */
+    SIM("SIM");
 
     private final String label;
 

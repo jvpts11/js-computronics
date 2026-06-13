@@ -124,6 +124,27 @@ class ComputerBuildTest {
     }
 
     @Test
+    void autoScalingPsuBelowDraw_isPowered() {
+        // 4 x 130W CPU + 250W GPU + 15W RAM = 785W draw, far above the nominal 1W wattage, but an
+        // auto-scaling PSU dimensions itself to the draw and always satisfies it.
+        final PsuSpec alienPsu = new PsuSpec(1, 100, true);
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu(), standardCpu(), standardCpu(), standardCpu()),
+                List.of(standardGpu()), List.of(ddr3()), alienPsu);
+        assertTrue(build.isPowered(), "an auto-scaling PSU always satisfies the power draw");
+        assertTrue(build.validate().problems().isEmpty());
+    }
+
+    @Test
+    void fixedPsuBelowDraw_isNotPowered() {
+        // Same heavy build on a conventional fixed-wattage PSU below the draw must still fail.
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu(), standardCpu(), standardCpu(), standardCpu()),
+                List.of(standardGpu()), List.of(ddr3()), psu(300));
+        assertFalse(build.isPowered());
+    }
+
+    @Test
     void totalCapacity_sumsCpus() {
         // Two CPUs at 4480 each = 8960.
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
