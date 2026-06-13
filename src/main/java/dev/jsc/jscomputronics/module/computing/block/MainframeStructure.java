@@ -7,7 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
-import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
+import dev.jsc.jscomputronics.common.multiblock.BlockMatcher;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockPattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -16,6 +17,15 @@ import java.util.List;
 
 /**
  * Geometry of the Mainframe multiblock: a 3-wide, 2-tall, 2-deep box (12 blocks).
+ *
+ * <p>The canonical NORTH-facing layout (x = clockwise from controller, z = depth):
+ * <pre>
+ *   y=0  z=0 (front): P # P
+ *        z=1 (back):  P P P
+ *   y=1  z=0 (front): P P P
+ *        z=1 (back):  P P P
+ * </pre>
+ * The controller is at the middle column (x=1), ground floor (y=0), front row (z=0).
  */
 public final class MainframeStructure {
 
@@ -24,23 +34,16 @@ public final class MainframeStructure {
     public static final int DEPTH = 2;
     public static final int BLOCK_COUNT = WIDTH * HEIGHT * DEPTH; // 12
 
-    /** This structure's footprint as a value, so a controller can hand it to the shared multiblock lifecycle. */
-    public static final MultiblockGeometry GEOMETRY = new MultiblockGeometry() {
-        @Override
-        public List<BlockPos> allPositions(final BlockPos controller, final Direction facing) {
-            return MainframeStructure.allPositions(controller, facing);
-        }
-
-        @Override
-        public List<BlockPos> partPositions(final BlockPos controller, final Direction facing) {
-            return MainframeStructure.partPositions(controller, facing);
-        }
-
-        @Override
-        public int blockCount() {
-            return BLOCK_COUNT;
-        }
-    };
+    /**
+     * Declarative description of the Mainframe footprint, used by
+     * {@link dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry} to compute
+     * world positions for any of the four horizontal orientations.
+     */
+    public static final MultiblockPattern PATTERN = MultiblockPattern.builder("mainframe")
+            .layer("P#P", "PPP")
+            .layer("PPP", "PPP")
+            .where('P', BlockMatcher.any())
+            .build();
 
     private MainframeStructure() {
     }

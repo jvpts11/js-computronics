@@ -115,6 +115,9 @@ public final class EraTheme {
     public void window(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, p.outer());
         g.fill(x, y, x + w, y + h, p.screen());
+        // Double-bevel themes (e.g., Legacy) draw a raised 3D frame just inside the outer border,
+        // giving the window the "dialog box" look authentic to the era.
+        bevel(g, x, y, w, h, true);
         if (s.scanlines() && s.scanlineColor() != 0) {
             // Square, low-alpha 1px lines every 2px across the screen rect — a CRT scanline finish.
             for (int ly = y + 1; ly < y + h; ly += 2) {
@@ -132,7 +135,8 @@ public final class EraTheme {
     public void panel(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         g.fill(x, y, x + w, y + h, p.panel());
         g.fill(x, y, x + w, y + 1, p.line());
-        bevel(g, x, y, w, h, false);
+        // Panels use a sunken bevel (inverted edges) on double-bevel themes to convey a recessed display area.
+        bevelSunken(g, x, y, w, h);
     }
 
     public void hLine(final GuiGraphics g, final int x, final int y, final int w) {
@@ -170,11 +174,9 @@ public final class EraTheme {
     }
 
     /**
-     * Draws the optional raised double bevel on a rectangle (a 1px light top-left edge and a 1px dark bottom-right
-     * edge). A no-op unless the style enables it and supplies edge colors, so STANDARD never bevels.
-     *
-     * @param raised {@code true} for a raised look (light top-left), {@code false} keeps the same orientation here;
-     *               only the presence of the bevel is era-driven, the orientation is fixed raised
+     * Draws the optional raised double bevel on a rectangle: a 1px light top-left edge and a 1px dark
+     * bottom-right edge. A no-op unless the style enables it and supplies edge colors, so STANDARD never
+     * bevels and output is byte-identical to before.
      */
     private void bevel(final GuiGraphics g, final int x, final int y, final int w, final int h,
                        final boolean raised) {
@@ -188,6 +190,24 @@ public final class EraTheme {
         if (s.bevelDark() != 0) {
             g.fill(x, y + h - 1, x + w, y + h, s.bevelDark());
             g.fill(x + w - 1, y, x + w, y + h, s.bevelDark());
+        }
+    }
+
+    /**
+     * Draws the optional sunken double bevel: dark top-left and light bottom-right, giving a recessed
+     * appearance suitable for panels and display areas. A no-op on flat-style themes.
+     */
+    private void bevelSunken(final GuiGraphics g, final int x, final int y, final int w, final int h) {
+        if (!s.doubleBevel()) {
+            return;
+        }
+        if (s.bevelDark() != 0) {
+            g.fill(x, y, x + w, y + 1, s.bevelDark());
+            g.fill(x, y, x + 1, y + h, s.bevelDark());
+        }
+        if (s.bevelLight() != 0) {
+            g.fill(x, y + h - 1, x + w, y + h, s.bevelLight());
+            g.fill(x + w - 1, y, x + w, y + h, s.bevelLight());
         }
     }
 }

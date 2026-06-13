@@ -48,15 +48,19 @@ public final class EraThemes {
                     0xFF0A2A0A, 0xFF103810),
             new EraStyle(true, false, false, 0, 0, 0x2200FF00, 0, SMALL));
 
-    /** Early-PC beige/blue chrome: light bevelled surfaces, classic system-blue accents, dark text on light. */
+    /**
+     * Early-PC beige/blue chrome: bevelled surfaces, classic system-blue accents, dark text on warm-cream
+     * backgrounds. The palette targets Windows 3.1 / early-90s PC BIOS aesthetics: raised buttons, sunken
+     * display panels, and cream-white bevel highlights.
+     */
     public static final EraTheme LEGACY = new EraTheme(
             new EraPalette(
-                    0xFF3A3A30, 0xFFC8C4B0, 0xFFB8B4A0, 0xFFD6D2C0, 0xFF6E6A58, 0xFFA8A494,
+                    0xFF808070, 0xFFC8C4B0, 0xFFB8B4A0, 0xFFD6D2C0, 0xFF6E6A58, 0xFF969280,
                     0xFFE4E0D0, 0xFF8A8676,
                     0xFF1A3C8C, 0xFF2E5AB8,
                     0xFF1E7A2E, 0xFFB8860B, 0xFFA01818,
                     0xFF1A1A14, 0xFF5A5648,
-                    0xFF1A3C8C, 0xFFE8E4D4),
+                    0xFF1A3C8C, 0xFFD4D0C0),
             new EraStyle(false, true, false, 0xFFFFFFF0, 0xFF6E6A58, 0, 0, SMALL));
 
     /**

@@ -7,7 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
-import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
+import dev.jsc.jscomputronics.common.multiblock.BlockMatcher;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockPattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -15,7 +16,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Geometry of the Server Rack multiblock: a 2-wide, 3-tall, 2-deep cabinet (12 blocks) that is logically a single rack.
+ * Geometry of the Server Rack multiblock: a 2-wide, 3-tall, 2-deep cabinet (12 blocks), shared with the
+ * Supercomputer Node cabinet which uses the same physical footprint.
+ *
+ * <p>The canonical NORTH-facing layout (x = clockwise from controller, z = depth):
+ * <pre>
+ *   y=0  z=0 (front): # P
+ *        z=1 (back):  P P
+ *   y=1  z=0 (front): P P   (and the same for y=2)
+ *        z=1 (back):  P P
+ * </pre>
+ * The controller is at the left column (x=0), ground floor (y=0), front row (z=0).
  */
 public final class ServerRackStructure {
 
@@ -24,23 +35,17 @@ public final class ServerRackStructure {
     public static final int DEPTH = 2;
     public static final int BLOCK_COUNT = WIDTH * HEIGHT * DEPTH; // 12
 
-    /** This footprint as a value, shared by the Server Rack and the Supercomputer Node, for the multiblock lifecycle. */
-    public static final MultiblockGeometry GEOMETRY = new MultiblockGeometry() {
-        @Override
-        public List<BlockPos> allPositions(final BlockPos controller, final Direction facing) {
-            return ServerRackStructure.allPositions(controller, facing);
-        }
-
-        @Override
-        public List<BlockPos> partPositions(final BlockPos controller, final Direction facing) {
-            return ServerRackStructure.partPositions(controller, facing);
-        }
-
-        @Override
-        public int blockCount() {
-            return BLOCK_COUNT;
-        }
-    };
+    /**
+     * Declarative description of the Server Rack / Supercomputer Node footprint, used by
+     * {@link dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry} to compute
+     * world positions for any of the four horizontal orientations.
+     */
+    public static final MultiblockPattern PATTERN = MultiblockPattern.builder("server_rack")
+            .layer("#P", "PP")
+            .layer("PP", "PP")
+            .layer("PP", "PP")
+            .where('P', BlockMatcher.any())
+            .build();
 
     private ServerRackStructure() {
     }

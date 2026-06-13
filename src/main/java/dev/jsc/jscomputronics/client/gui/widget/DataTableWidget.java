@@ -10,22 +10,17 @@ package dev.jsc.jscomputronics.client.gui.widget;
 import dev.jsc.jscomputronics.client.gui.logic.PaginationState;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * A paginated table of rows of type {@code T} with fixed columns.
  */
-public abstract class DataTableWidget<T> extends AbstractWidget {
+public abstract class DataTableWidget<T> extends RowListWidget<T> {
 
-    private final List<T> rows = new ArrayList<>();
     private final List<Component> columnHeaders;
     private final int headerHeight;
-    private final int rowHeight;
     private PaginationState pagination;
 
     protected DataTableWidget(
@@ -37,25 +32,24 @@ public abstract class DataTableWidget<T> extends AbstractWidget {
             final int headerHeight,
             final int rowHeight,
             final Component message) {
-        super(x, y, width, height, message);
+        super(x, y, width, height, rowHeight, message);
         if (columnHeaders.isEmpty()) {
             throw new IllegalArgumentException("columnHeaders must not be empty");
         }
-        if (rowHeight < 1 || headerHeight < 1) {
-            throw new IllegalArgumentException("row/header height must be >= 1");
+        if (headerHeight < 1) {
+            throw new IllegalArgumentException("headerHeight must be >= 1");
         }
         this.columnHeaders = List.copyOf(columnHeaders);
         this.headerHeight = headerHeight;
-        this.rowHeight = rowHeight;
         final int bodyHeight = Math.max(0, height - headerHeight);
         final int rowsPerPage = Math.max(1, bodyHeight / rowHeight);
         this.pagination = PaginationState.of(0, rowsPerPage);
     }
 
     public void setRows(final List<T> newRows) {
-        rows.clear();
-        rows.addAll(newRows);
-        pagination = pagination.withTotalItems(rows.size()).toPage(0);
+        itemList.clear();
+        itemList.addAll(newRows);
+        pagination = pagination.withTotalItems(itemList.size()).toPage(0);
     }
 
     public PaginationState pagination() {
@@ -110,7 +104,7 @@ public abstract class DataTableWidget<T> extends AbstractWidget {
             final int bg = ((i - first) % 2 == 0) ? 0xFF1A1A1A : 0xFF222222;
             graphics.fill(getX(), rowY, getX() + width, rowY + rowHeight, bg);
             for (int col = 0; col < columnHeaders.size(); col++) {
-                renderCell(graphics, rows.get(i), col,
+                renderCell(graphics, itemList.get(i), col,
                         columnX(col) + 2, rowY + (rowHeight - 8) / 2);
             }
         }
@@ -118,8 +112,4 @@ public abstract class DataTableWidget<T> extends AbstractWidget {
         graphics.disableScissor();
     }
 
-    @Override
-    protected void updateWidgetNarration(final NarrationElementOutput output) {
-        this.defaultButtonNarrationText(output);
-    }
 }

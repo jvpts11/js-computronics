@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
 import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry;
 import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
@@ -75,7 +76,7 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
 
     @Override
     protected MultiblockGeometry geometry() {
-        return ServerRackStructure.GEOMETRY;
+        return new MultiblockPatternGeometry(ServerRackStructure.PATTERN);
     }
 
     @Override

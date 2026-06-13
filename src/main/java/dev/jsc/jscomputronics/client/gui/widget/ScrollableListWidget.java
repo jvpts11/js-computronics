@@ -10,20 +10,15 @@ package dev.jsc.jscomputronics.client.gui.widget;
 import dev.jsc.jscomputronics.client.gui.logic.ScrollState;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * A generic scrollable list of rows of type {@code T}.
  */
-public abstract class ScrollableListWidget<T> extends AbstractWidget {
+public abstract class ScrollableListWidget<T> extends RowListWidget<T> {
 
-    private final List<T> items = new ArrayList<>();
-    private final int rowHeight;
     private ScrollState scroll;
 
     protected ScrollableListWidget(
@@ -33,20 +28,15 @@ public abstract class ScrollableListWidget<T> extends AbstractWidget {
             final int height,
             final int rowHeight,
             final Component message) {
-        super(x, y, width, height, message);
-        if (rowHeight < 1) {
-            throw new IllegalArgumentException(
-                    "rowHeight must be >= 1; got " + rowHeight);
-        }
-        this.rowHeight = rowHeight;
+        super(x, y, width, height, rowHeight, message);
         final int visibleRows = Math.max(1, height / rowHeight);
         this.scroll = ScrollState.of(0, visibleRows);
     }
 
     public void setItems(final List<T> newItems) {
-        items.clear();
-        items.addAll(newItems);
-        scroll = scroll.withTotalItems(items.size());
+        itemList.clear();
+        itemList.addAll(newItems);
+        scroll = scroll.withTotalItems(itemList.size());
     }
 
     public ScrollState scrollState() {
@@ -72,7 +62,7 @@ public abstract class ScrollableListWidget<T> extends AbstractWidget {
             final int rowY = getY() + (i - first) * rowHeight;
             final boolean hovered = mouseX >= getX() && mouseX < getX() + width
                     && mouseY >= rowY && mouseY < rowY + rowHeight;
-            renderRow(graphics, items.get(i),
+            renderRow(graphics, itemList.get(i),
                     getX(), rowY, width, rowHeight, hovered, mouseX, mouseY);
         }
         graphics.disableScissor();
@@ -95,9 +85,4 @@ public abstract class ScrollableListWidget<T> extends AbstractWidget {
         return true;
     }
 
-    @Override
-    protected void updateWidgetNarration(final NarrationElementOutput output) {
-        // Minimal narration; refined per concrete list in Phase 1+.
-        this.defaultButtonNarrationText(output);
-    }
 }

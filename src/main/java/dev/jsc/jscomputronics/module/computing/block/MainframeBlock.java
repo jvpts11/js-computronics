@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
 import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry;
 import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
@@ -74,7 +75,7 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
 
     @Override
     protected MultiblockGeometry geometry() {
-        return MainframeStructure.GEOMETRY;
+        return new MultiblockPatternGeometry(MainframeStructure.PATTERN);
     }
 
     @Override
