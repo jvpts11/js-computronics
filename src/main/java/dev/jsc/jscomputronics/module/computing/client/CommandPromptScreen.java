@@ -330,6 +330,14 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
 
     @Override
     protected HardwareEra screenEra() {
+        // Resolve the host computer's era from its block entity on the client so the first frame already wears
+        // the right era skin; the synced era slot lagged a tick and flashed the default era on open. Fall back
+        // to the synced value when the host isn't client-loaded.
+        final net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level != null && mc.level.getBlockEntity(menu.hostPos())
+                instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity host) {
+            return host.installedEra();
+        }
         return menu.hardwareEra();
     }
 

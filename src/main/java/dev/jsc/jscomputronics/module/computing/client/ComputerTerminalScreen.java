@@ -2713,6 +2713,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     @Override
     protected HardwareEra screenEra() {
+        // Read the host computer's era straight from its block entity on the client, so the very first frame
+        // already wears the right era skin. Relying only on the synced era slot lagged one tick and flashed
+        // the default era when the GUI opened. Fall back to the synced value if the host isn't client-loaded.
+        final net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level != null && mc.level.getBlockEntity(menu.hostPos())
+                instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity host) {
+            return host.installedEra();
+        }
         return menu.hardwareEra();
     }
 }
