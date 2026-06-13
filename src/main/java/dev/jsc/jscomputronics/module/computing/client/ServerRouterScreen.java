@@ -49,7 +49,7 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
         nameBox = new EditBox(font, leftPos + 10, topPos + 39, 170, 10, Component.literal("Name"));
         nameBox.setBordered(false);
         nameBox.setMaxLength(RenameServerRouterPayload.MAX_LEN);
-        nameBox.setTextColor(JscOsTheme.TEXT);
+        nameBox.setTextColor(JscOsTheme.text());
         nameBox.setValue(menu.initialName());
         nameBox.setResponder(s ->
                 PacketDistributor.sendToServer(new RenameServerRouterPayload(menu.routerPos(), s)));
@@ -64,8 +64,8 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
         JscOsTheme.headerBar(g, x + 6, y + 6, W - 12);
 
         // Name field background (the EditBox is drawn over this).
-        g.fill(x + 8, y + 36, x + W - 8, y + 50, JscOsTheme.SLOT_BG);
-        g.fill(x + 8, y + 36, x + W - 8, y + 37, JscOsTheme.LINE);
+        g.fill(x + 8, y + 36, x + W - 8, y + 50, JscOsTheme.slotBg());
+        g.fill(x + 8, y + 36, x + W - 8, y + 37, JscOsTheme.line());
 
         // Two status tiles.
         JscOsTheme.panel(g, x + 8, y + 56, 84, 22);
@@ -86,33 +86,33 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         // Header.
-        JscOsTheme.text(g, font, "SERVER ROUTER", 12, 10, JscOsTheme.TEXT);
-        JscOsTheme.textRight(g, font, "T3", W - 12, 10, JscOsTheme.ACCENT);
+        JscOsTheme.text(g, font, "SERVER ROUTER", 12, 10, JscOsTheme.text());
+        JscOsTheme.textRight(g, font, "T3", W - 12, 10, JscOsTheme.accent());
 
-        JscOsTheme.textS(g, font, "NAME", 10, 28, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "NAME", 10, 28, JscOsTheme.dim());
 
         // Input + rack-budget tiles.
         final Direction in = menu.inputFace();
-        JscOsTheme.tileTextS(g, font, 8, 56, "INPUT", in == null ? "—" : title(in.getName()), JscOsTheme.ACCENT2);
+        JscOsTheme.tileTextS(g, font, 8, 56, "INPUT", in == null ? "—" : title(in.getName()), JscOsTheme.accent2());
         final int max = menu.maxRacks();
         final String racks = menu.managedRacks() + " / " + max;
         JscOsTheme.tileTextS(g, font, 98, 56, "RACKS",
-                racks, menu.overCapacity() ? JscOsTheme.RED : JscOsTheme.GREEN);
+                racks, menu.overCapacity() ? JscOsTheme.red() : JscOsTheme.green());
 
-        JscOsTheme.textS(g, font, "SECTIONS", 10, 84, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "SECTIONS", 10, 84, JscOsTheme.dim());
 
         final int count = menu.sectionCount();
         if (count == 0) {
-            JscOsTheme.textS(g, font, "No datacenter sections", 12, ROW_Y0 + 3, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, "No datacenter sections", 12, ROW_Y0 + 3, JscOsTheme.dim());
             return;
         }
         for (int i = 0; i < count; i++) {
             final int ry = ROW_Y0 + i * ROW_PITCH;
             final Direction face = menu.sectionFace(i);
             JscOsTheme.textS(g, font, face == null ? "?" : face.getName().toUpperCase(java.util.Locale.ROOT),
-                    10, ry + 3, JscOsTheme.TEXT);
+                    10, ry + 3, JscOsTheme.text());
             JscOsTheme.textS(g, font, menu.sectionRacks(i) + "R · " + menu.sectionServers(i) + "S",
-                    40, ry + 3, JscOsTheme.DIM);
+                    40, ry + 3, JscOsTheme.dim());
             final LoadBalanceMode mode = menu.sectionMode(i);
             JscOsTheme.textSCenter(g, font, modeLabel(mode), MODE_X + MODE_W / 2, ry + 3, modeColor(mode));
         }
@@ -153,9 +153,9 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
 
     private static int modeColor(final LoadBalanceMode mode) {
         return switch (mode) {
-            case ROUND_ROBIN -> JscOsTheme.ACCENT2;
-            case LEAST_LOADED -> JscOsTheme.AMBER;
-            case MANUAL -> JscOsTheme.DIM;
+            case ROUND_ROBIN -> JscOsTheme.accent2();
+            case LEAST_LOADED -> JscOsTheme.amber();
+            case MANUAL -> JscOsTheme.dim();
         };
     }
 

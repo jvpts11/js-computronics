@@ -101,6 +101,12 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
     }
 
     @org.jetbrains.annotations.Nullable
+    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+        final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = currentBuild();
+        return build == null ? null : build.motherboard().era();
+    }
+
+    @org.jetbrains.annotations.Nullable
     public java.util.UUID nodeUuid() {
         return ServerItem.nodeUuid(owner.getItemInHand(hand));
     }

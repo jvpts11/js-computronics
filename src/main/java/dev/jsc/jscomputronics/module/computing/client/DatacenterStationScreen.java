@@ -141,35 +141,35 @@ public final class DatacenterStationScreen extends AbstractContainerScreen<Datac
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "DATACENTER STATION", 12, 10, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "DATACENTER STATION", 12, 10, JscOsTheme.text());
 
         // SECTION tile: picker counter on the label line, the bound section's name below.
-        JscOsTheme.textS(g, font, "SECTION", SECTION_X + 4, TILE_Y + 3, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "SECTION", SECTION_X + 4, TILE_Y + 3, JscOsTheme.dim());
         final int avail = menu.availableSectionCount();
         if (avail > 1) {
-            JscOsTheme.textSRight(g, font, avail + " ▸", SECTION_X + SECTION_W - 4, TILE_Y + 3, JscOsTheme.DIM);
+            JscOsTheme.textSRight(g, font, avail + " ▸", SECTION_X + SECTION_W - 4, TILE_Y + 3, JscOsTheme.dim());
         }
-        JscOsTheme.textS(g, font, trim(menu.sectionLabel(), 20), SECTION_X + 4, TILE_Y + 11, JscOsTheme.ACCENT);
+        JscOsTheme.textS(g, font, trim(menu.sectionLabel(), 20), SECTION_X + 4, TILE_Y + 11, JscOsTheme.accent());
 
         JscOsTheme.tileTextS(g, font, SERVERS_X, TILE_Y, "SERVERS", String.valueOf(menu.serverCount()),
-                JscOsTheme.TEXT);
+                JscOsTheme.text());
         JscOsTheme.tileTextS(g, font, OPS_X, TILE_Y, "OPS", String.valueOf(menu.activeOps()),
-                menu.activeOps() > 0 ? JscOsTheme.GREEN : JscOsTheme.DIM);
+                menu.activeOps() > 0 ? JscOsTheme.green() : JscOsTheme.dim());
 
         // Row 2 — the section as ONE machine: summed CPU, RAM and storage.
         JscOsTheme.tileTextS(g, font, CPU_X, ROW2_Y, "CPU", JscOsTheme.fmt(menu.cpuCapacity()) + " it/t",
-                JscOsTheme.TEXT);
+                JscOsTheme.text());
         JscOsTheme.tileTextS(g, font, RAM_X, ROW2_Y, "RAM", JscOsTheme.fmt(menu.ramBuffer()) + " it",
-                JscOsTheme.TEXT);
+                JscOsTheme.text());
         JscOsTheme.tileTextS(g, font, STORAGE_X, ROW2_Y, "STORAGE",
-                itemsTight(menu.storageUsed()) + " / " + itemsTight(menu.storageTotal()), JscOsTheme.ACCENT);
+                itemsTight(menu.storageUsed()) + " / " + itemsTight(menu.storageTotal()), JscOsTheme.accent());
 
         final LoadBalanceMode mode = menu.loadBalanceMode();
-        JscOsTheme.textS(g, font, "BALANCE", BAL_X + 4, BAL_Y + 2, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "BALANCE", BAL_X + 4, BAL_Y + 2, JscOsTheme.dim());
         JscOsTheme.textSRight(g, font, modeLabel(mode) + " ⟳", BAL_X + BAL_W - 4, BAL_Y + 2, modeColor(mode));
 
         JscOsTheme.textSCenter(g, font, "click item: move out · with items: deposit", W / 2, HINT_Y,
-                JscOsTheme.DIM);
+                JscOsTheme.dim());
     }
 
     @Override
@@ -332,36 +332,36 @@ public final class DatacenterStationScreen extends AbstractContainerScreen<Datac
                 g.renderItem(popupKey.stack(1), px + 6, py + 4);
             }
         }
-        g.drawString(font, "MOVE OUT", px + 26, py + 7, JscOsTheme.TEXT, false);
+        g.drawString(font, "MOVE OUT", px + 26, py + 7, JscOsTheme.text(), false);
         JscOsTheme.textS(g, font, "of " + JscOsTheme.fmt(popupTotal) + " in section", px + 6, py + 23,
-                JscOsTheme.DIM);
-        JscOsTheme.textS(g, font, "QUANTITY  " + JscOsTheme.fmt(popupQty), px + 6, py + 31, JscOsTheme.TEXT);
+                JscOsTheme.dim());
+        JscOsTheme.textS(g, font, "QUANTITY  " + JscOsTheme.fmt(popupQty), px + 6, py + 31, JscOsTheme.text());
 
         final String[] labels = {"1", "16", "64", "256", "MAX"};
         for (int i = 0; i < labels.length; i++) {
             final int bx = px + 6 + i * 29;
             JscOsTheme.button(g, bx, py + 40, 27, 12, inRect(mx, my, bx, py + 40, 27, 12));
-            JscOsTheme.textSCenter(g, font, labels[i], bx + 13, py + 42, JscOsTheme.ACCENT2);
+            JscOsTheme.textSCenter(g, font, labels[i], bx + 13, py + 42, JscOsTheme.accent2());
         }
 
         final List<DatacenterSnapshotPayload.DestEntry> dests = menu.destinations();
-        JscOsTheme.textS(g, font, "TO", px + 6, py + 57, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "TO", px + 6, py + 57, JscOsTheme.dim());
         if (dests.isEmpty()) {
-            JscOsTheme.textSCenter(g, font, "no destination computer", px + POP_W / 2, py + 57, JscOsTheme.RED);
+            JscOsTheme.textSCenter(g, font, "no destination computer", px + POP_W / 2, py + 57, JscOsTheme.red());
         } else {
             JscOsTheme.button(g, px + 18, py + 55, 12, 12, inRect(mx, my, px + 18, py + 55, 12, 12));
             JscOsTheme.button(g, px + POP_W - 18, py + 55, 12, 12, inRect(mx, my, px + POP_W - 18, py + 55, 12, 12));
-            JscOsTheme.textSCenter(g, font, "<", px + 24, py + 57, JscOsTheme.TEXT);
-            JscOsTheme.textSCenter(g, font, ">", px + POP_W - 12, py + 57, JscOsTheme.TEXT);
+            JscOsTheme.textSCenter(g, font, "<", px + 24, py + 57, JscOsTheme.text());
+            JscOsTheme.textSCenter(g, font, ">", px + POP_W - 12, py + 57, JscOsTheme.text());
             final DatacenterSnapshotPayload.DestEntry d = dests.get(Math.min(destIndex, dests.size() - 1));
-            JscOsTheme.textSCenter(g, font, trim(d.name(), 16), px + (POP_W + 18) / 2, py + 57, JscOsTheme.ACCENT);
+            JscOsTheme.textSCenter(g, font, trim(d.name(), 16), px + (POP_W + 18) / 2, py + 57, JscOsTheme.accent());
         }
 
         final boolean canMove = !dests.isEmpty();
         final boolean hovMove = inRect(mx, my, px + 6, py + 74, POP_W - 12, 14);
         g.fill(px + 6, py + 74, px + POP_W - 6, py + 88,
                 canMove ? (hovMove ? 0xFF2BB3A4 : 0xFF1F9488) : 0xFF2A2F38);
-        JscOsTheme.textSCenter(g, font, "MOVE", px + POP_W / 2, py + 77, canMove ? 0xFFFFFFFF : JscOsTheme.DIM);
+        JscOsTheme.textSCenter(g, font, "MOVE", px + POP_W / 2, py + 77, canMove ? 0xFFFFFFFF : JscOsTheme.dim());
         g.pose().popPose();
     }
 
@@ -420,9 +420,9 @@ public final class DatacenterStationScreen extends AbstractContainerScreen<Datac
 
     private static int modeColor(final LoadBalanceMode mode) {
         return switch (mode) {
-            case ROUND_ROBIN -> JscOsTheme.ACCENT2;
-            case LEAST_LOADED -> JscOsTheme.AMBER;
-            case MANUAL -> JscOsTheme.DIM;
+            case ROUND_ROBIN -> JscOsTheme.accent2();
+            case LEAST_LOADED -> JscOsTheme.amber();
+            case MANUAL -> JscOsTheme.dim();
         };
     }
 

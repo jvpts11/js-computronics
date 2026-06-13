@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.common.network.FailoverRole;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import net.minecraft.client.gui.GuiGraphics;
@@ -95,79 +96,79 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "MAINFRAME", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "MAINFRAME", 12, 11, JscOsTheme.text());
         final String status;
         final int statusColor;
         if (menu.networkState() == MainframeBlockEntity.NET_STATE_CONFLICT) {
             status = "CONFLICT";
-            statusColor = JscOsTheme.RED;
+            statusColor = JscOsTheme.red();
         } else if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.RED;
+            statusColor = JscOsTheme.red();
         } else if (menu.isRunning() && menu.failoverRole() == FailoverRole.PASSIVE.ordinal()) {
             status = "STANDBY"; // a Passive Failover member: powered and synced, not orchestrating
-            statusColor = JscOsTheme.AMBER;
+            statusColor = JscOsTheme.amber();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.GREEN;
+            statusColor = JscOsTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.AMBER;
+            statusColor = JscOsTheme.amber();
         }
         final int pillX = 232 - font.width(status);
         JscOsTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
         // Hardware group labels (no counters — the drawn cells show installed vs available).
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
+        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.dim());
         g.fill(30, 61, 34, 65, psuColor());
-        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "DISK", 8, 111, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "GPU", 44, 111, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "DISK", 8, 111, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "GPU", 44, 111, JscOsTheme.dim());
 
         // Right column: spec tiles.
-        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.TEXT);
-        JscOsTheme.tileText(g, font, COL_R, 52, "QUEUES", String.valueOf(menu.parallelQueues()), "", JscOsTheme.TEXT);
-        JscOsTheme.tileText(g, font, COL_R, 73, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.TEXT);
+        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.text());
+        JscOsTheme.tileText(g, font, COL_R, 52, "QUEUES", String.valueOf(menu.parallelQueues()), "", JscOsTheme.text());
+        JscOsTheme.tileText(g, font, COL_R, 73, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.text());
 
-        JscOsTheme.text(g, font, "NETWORK", COL_R, 96, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "NETWORK", COL_R, 96, JscOsTheme.dim());
         final int net = menu.networkState();
         final String netStr = net == MainframeBlockEntity.NET_STATE_CONFLICT ? "CONFLICT"
                 : net == MainframeBlockEntity.NET_STATE_LINKED ? "LINKED" : "--";
-        final int netColor = net == MainframeBlockEntity.NET_STATE_CONFLICT ? JscOsTheme.RED
-                : net == MainframeBlockEntity.NET_STATE_LINKED ? JscOsTheme.GREEN : JscOsTheme.DIM;
+        final int netColor = net == MainframeBlockEntity.NET_STATE_CONFLICT ? JscOsTheme.red()
+                : net == MainframeBlockEntity.NET_STATE_LINKED ? JscOsTheme.green() : JscOsTheme.dim();
         JscOsTheme.textRight(g, font, netStr, COL_R + COL_R_W, 96, netColor);
 
         // Operations dispatch — one row per metric (label left, value right).
         final int running = menu.runningOps();
-        opRow(g, "QUEUED", String.valueOf(menu.pendingOps()), 113, JscOsTheme.TEXT);
-        opRow(g, "RUNNING", String.valueOf(running), 124, running > 0 ? JscOsTheme.GREEN : JscOsTheme.TEXT);
-        opRow(g, "DONE", JscOsTheme.fmt(menu.completedOps()), 135, JscOsTheme.TEXT);
+        opRow(g, "QUEUED", String.valueOf(menu.pendingOps()), 113, JscOsTheme.text());
+        opRow(g, "RUNNING", String.valueOf(running), 124, running > 0 ? JscOsTheme.green() : JscOsTheme.text());
+        opRow(g, "DONE", JscOsTheme.fmt(menu.completedOps()), 135, JscOsTheme.text());
 
         // Control row captions.
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isManualOn() ? "TURN OFF" : "TURN ON");
-        JscOsTheme.textCenter(g, font, powerCap, POWER_X + BTN_W / 2, BTN_Y + 4, auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+        JscOsTheme.textCenter(g, font, powerCap, POWER_X + BTN_W / 2, BTN_Y + 4, auto ? JscOsTheme.dim() : JscOsTheme.accent());
         JscOsTheme.textCenter(g, font, "AUTO " + (auto ? "ON" : "OFF"), AUTO_X + BTN_W / 2, BTN_Y + 4,
-                auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+                auto ? JscOsTheme.accent() : JscOsTheme.dim());
         final boolean failover = menu.failoverEnabled();
         JscOsTheme.textCenter(g, font, "FAIL " + (failover ? "ON" : "OFF"), FAILOVER_X + BTN_W / 2, BTN_Y + 4,
-                failover ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.textCenter(g, font, "NODES", NODES_X + BTN_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
+                failover ? JscOsTheme.accent() : JscOsTheme.dim());
+        JscOsTheme.textCenter(g, font, "NODES", NODES_X + BTN_W / 2, BTN_Y + 4, JscOsTheme.accent());
     }
 
     private void opRow(final GuiGraphics g, final String key, final String value, final int y, final int valueColor) {
-        JscOsTheme.text(g, font, key, COL_R + 4, y, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, key, COL_R + 4, y, JscOsTheme.dim());
         JscOsTheme.textRight(g, font, value, COL_R + COL_R_W - 4, y, valueColor);
     }
 
     private int psuColor() {
         if (!menu.hasPsu()) {
-            return JscOsTheme.DIM;
+            return JscOsTheme.dim();
         }
-        return menu.buildValid() ? JscOsTheme.GREEN : JscOsTheme.AMBER;
+        return menu.buildValid() ? JscOsTheme.green() : JscOsTheme.amber();
     }
 
     @Override
@@ -196,8 +197,7 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
     }
 
     @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
     }
 }

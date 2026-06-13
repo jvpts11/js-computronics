@@ -63,38 +63,38 @@ public class ExportBusScreen extends AbstractComputerScreen<ExportBusMenu> {
     private void stepperBg(final GuiGraphics g, final int x, final int y, final int row,
                            final int mouseX, final int mouseY) {
         JscOsTheme.button(g, x + MINUS_X, y + row, STEP, STEP, hover(mouseX, mouseY, MINUS_X, row, STEP, STEP));
-        g.fill(x + MINUS_X + STEP + 2, y + row, x + PLUS_X - 2, y + row + STEP, JscOsTheme.TRACK);
+        g.fill(x + MINUS_X + STEP + 2, y + row, x + PLUS_X - 2, y + row + STEP, JscOsTheme.track());
         JscOsTheme.hLine(g, x + MINUS_X + STEP + 2, y + row, PLUS_X - MINUS_X - STEP - 4);
         JscOsTheme.button(g, x + PLUS_X, y + row, STEP, STEP, hover(mouseX, mouseY, PLUS_X, row, STEP, STEP));
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "EXPORT BUS", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "EXPORT BUS", 12, 11, JscOsTheme.text());
         final boolean linked = menu.linked();
         final String pill = linked ? "LINKED" : "OFFLINE";
-        final int pillColor = linked ? JscOsTheme.GREEN : JscOsTheme.RED;
+        final int pillColor = linked ? JscOsTheme.green() : JscOsTheme.red();
         final int pillX = 164 - font.width(pill);
         JscOsTheme.text(g, font, pill, pillX, 11, pillColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, pillColor);
 
         // Min / max steppers: label + centered value + "-"/"+".
-        JscOsTheme.text(g, font, "MIN", 40, MIN_Y + 3, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "MAX", 40, MAX_Y + 3, JscOsTheme.DIM);
-        JscOsTheme.textCenter(g, font, "-", MINUS_X + STEP / 2, MIN_Y + 3, JscOsTheme.ACCENT);
-        JscOsTheme.textCenter(g, font, "-", MINUS_X + STEP / 2, MAX_Y + 3, JscOsTheme.ACCENT);
-        JscOsTheme.textCenter(g, font, "+", PLUS_X + STEP / 2, MIN_Y + 3, JscOsTheme.ACCENT);
-        JscOsTheme.textCenter(g, font, "+", PLUS_X + STEP / 2, MAX_Y + 3, JscOsTheme.ACCENT);
+        JscOsTheme.text(g, font, "MIN", 40, MIN_Y + 3, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "MAX", 40, MAX_Y + 3, JscOsTheme.dim());
+        JscOsTheme.textCenter(g, font, "-", MINUS_X + STEP / 2, MIN_Y + 3, JscOsTheme.accent());
+        JscOsTheme.textCenter(g, font, "-", MINUS_X + STEP / 2, MAX_Y + 3, JscOsTheme.accent());
+        JscOsTheme.textCenter(g, font, "+", PLUS_X + STEP / 2, MIN_Y + 3, JscOsTheme.accent());
+        JscOsTheme.textCenter(g, font, "+", PLUS_X + STEP / 2, MAX_Y + 3, JscOsTheme.accent());
         final int mid = (MINUS_X + STEP + PLUS_X) / 2;
-        JscOsTheme.textCenter(g, font, String.valueOf(menu.min()), mid, MIN_Y + 3, JscOsTheme.TEXT);
-        JscOsTheme.textCenter(g, font, menu.max() <= 0 ? "any" : String.valueOf(menu.max()), mid, MAX_Y + 3, JscOsTheme.TEXT);
+        JscOsTheme.textCenter(g, font, String.valueOf(menu.min()), mid, MIN_Y + 3, JscOsTheme.text());
+        JscOsTheme.textCenter(g, font, menu.max() <= 0 ? "any" : String.valueOf(menu.max()), mid, MAX_Y + 3, JscOsTheme.text());
 
         // Mode toggle.
-        JscOsTheme.text(g, font, "MODE", 40, MODE_Y + 4, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "MODE", 40, MODE_Y + 4, JscOsTheme.dim());
         final String modeText = menu.mode() == ExportBusPart.MODE_CONTINUOUS ? "CONTINUOUS" : "ON DEMAND";
-        JscOsTheme.textCenter(g, font, modeText, MODE_X + MODE_W / 2, MODE_Y + 4, JscOsTheme.ACCENT);
+        JscOsTheme.textCenter(g, font, modeText, MODE_X + MODE_W / 2, MODE_Y + 4, JscOsTheme.accent());
 
-        JscOsTheme.text(g, font, "INVENTORY", 8, 80, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "INVENTORY", 8, 80, JscOsTheme.dim());
     }
 
     @Override
@@ -133,8 +133,8 @@ public class ExportBusScreen extends AbstractComputerScreen<ExportBusMenu> {
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
+        // super.render binds the era skin, draws the background and widgets, and renders the slot tooltip.
         super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
         // Hint on the empty ghost filter slot (a held item sets the filter, not consumed).
         if (menu.filterStack().isEmpty() && hover(mouseX, mouseY, 12, 30, 16, 16)) {
             g.renderTooltip(font, Component.literal("Click an item to set the export filter"), mouseX, mouseY);

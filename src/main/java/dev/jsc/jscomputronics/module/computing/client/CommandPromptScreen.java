@@ -67,7 +67,7 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
                 imageWidth - 18 - promptW, 11, Component.literal("command"));
         input.setBordered(false);
         input.setMaxLength(RunCommandPayload.MAX_LEN);
-        input.setTextColor(JscOsTheme.TEXT);
+        input.setTextColor(JscOsTheme.text());
         input.setFocused(true);
         // A real edit (typing/backspace) restarts Tab cycling; our own programmatic setValue does not.
         input.setResponder(s -> {
@@ -158,17 +158,17 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
         final int top = y + 26;
         final int bottom = y + imageHeight - 22;
         g.fill(x + 6, top, x + imageWidth - 6, bottom, CONSOLE);
-        g.fill(x + 6, top, x + imageWidth - 6, top + 1, JscOsTheme.LINE);
+        g.fill(x + 6, top, x + imageWidth - 6, top + 1, JscOsTheme.line());
         // Input strip.
-        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 8, JscOsTheme.PANEL);
-        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 19, JscOsTheme.LINE);
+        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 8, JscOsTheme.panel());
+        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 19, JscOsTheme.line());
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "COMMAND PROMPT", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "COMMAND PROMPT", 12, 11, JscOsTheme.text());
         // PROGRAM chip-ish marker + host on the right of the header.
-        JscOsTheme.textRight(g, font, "PROGRAM", imageWidth - 10, 11, JscOsTheme.ACCENT);
+        JscOsTheme.textRight(g, font, "PROGRAM", imageWidth - 10, 11, JscOsTheme.accent());
 
         // Console scrollback, newest at the bottom, honoring the scroll offset.
         final int top = 27;
@@ -185,11 +185,11 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
             row++;
         }
         if (scrollOffset > 0) {
-            JscOsTheme.textSRight(g, font, "scrolled +" + scrollOffset, imageWidth - 10, bottom - 7, JscOsTheme.DIM);
+            JscOsTheme.textSRight(g, font, "scrolled +" + scrollOffset, imageWidth - 10, bottom - 7, JscOsTheme.dim());
         }
 
         // Prompt glyph before the input box.
-        JscOsTheme.text(g, font, "jsc>", 10, imageHeight - 18, JscOsTheme.ACCENT);
+        JscOsTheme.text(g, font, "jsc>", 10, imageHeight - 18, JscOsTheme.accent());
 
         // Usage hint: once the verb is recognised, show how it is used, dimmed on the right.
         final String typed = input == null ? "" : input.getValue().trim();
@@ -197,11 +197,11 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
         final String verb = (space < 0 ? typed : typed.substring(0, space)).toLowerCase(Locale.ROOT);
         final String usage = commandUsage.get(verb);
         if (usage != null && !usage.isEmpty()) {
-            JscOsTheme.textSRight(g, font, verb + " " + usage, imageWidth - 10, imageHeight - 17, JscOsTheme.DIM);
+            JscOsTheme.textSRight(g, font, verb + " " + usage, imageWidth - 10, imageHeight - 17, JscOsTheme.dim());
         }
 
         JscOsTheme.textS(g, font, "ENTER run    UP/DOWN history    wheel scroll    ESC close",
-                10, imageHeight - 7, JscOsTheme.DIM);
+                10, imageHeight - 7, JscOsTheme.dim());
     }
 
     private void drawSmall(final GuiGraphics g, final String text, final int x, final int y, final int color) {
@@ -222,13 +222,13 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
 
     private static int colorOf(final CliStyle style) {
         return switch (style) {
-            case PROMPT, ACCENT, HEADER -> JscOsTheme.ACCENT;
-            case OK -> JscOsTheme.GREEN;
-            case ERROR -> JscOsTheme.RED;
-            case WARN -> JscOsTheme.AMBER;
-            case INFO -> JscOsTheme.ACCENT2;
-            case DIM -> JscOsTheme.DIM;
-            default -> JscOsTheme.TEXT;
+            case PROMPT, ACCENT, HEADER -> JscOsTheme.accent();
+            case OK -> JscOsTheme.green();
+            case ERROR -> JscOsTheme.red();
+            case WARN -> JscOsTheme.amber();
+            case INFO -> JscOsTheme.accent2();
+            case DIM -> JscOsTheme.dim();
+            default -> JscOsTheme.text();
         };
     }
 

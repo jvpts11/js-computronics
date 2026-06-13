@@ -90,9 +90,9 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
         for (int row = 0; row < Math.min(VISIBLE_ROWS, rows.size()); row++) {
             final int index = row + scrollPos;
             final int rowY = y + LIST_Y + row * ROW_H;
-            g.fill(x + LIST_X, rowY, x + imageWidth - 8, rowY + ROW_H - 2, JscOsTheme.PANEL);
+            g.fill(x + LIST_X, rowY, x + imageWidth - 8, rowY + ROW_H - 2, JscOsTheme.panel());
             if (sel.contains(index)) {
-                g.fill(x + LIST_X, rowY, x + LIST_X + 2, rowY + ROW_H - 2, JscOsTheme.AMBER);
+                g.fill(x + LIST_X, rowY, x + LIST_X + 2, rowY + ROW_H - 2, JscOsTheme.amber());
             }
         }
 
@@ -123,11 +123,11 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
 
     private void tab(final GuiGraphics g, final int x, final int y, final int tx, final boolean on,
                      final int mouseX, final int mouseY) {
-        final int bg = on ? JscOsTheme.TAB_ON
-                : (hover(mouseX, mouseY, tx, TAB_Y, TAB_W, TAB_H) ? JscOsTheme.HOVER : JscOsTheme.PANEL);
+        final int bg = on ? JscOsTheme.tabOn()
+                : (hover(mouseX, mouseY, tx, TAB_Y, TAB_W, TAB_H) ? JscOsTheme.hover() : JscOsTheme.panel());
         g.fill(x + tx, y + TAB_Y, x + tx + TAB_W, y + TAB_Y + TAB_H, bg);
         if (on) {
-            g.fill(x + tx, y + TAB_Y + TAB_H - 1, x + tx + TAB_W, y + TAB_Y + TAB_H, JscOsTheme.ACCENT);
+            g.fill(x + tx, y + TAB_Y + TAB_H - 1, x + tx + TAB_W, y + TAB_Y + TAB_H, JscOsTheme.accent());
         }
     }
 
@@ -135,11 +135,11 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "PATTERN READER", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "PATTERN READER", 12, 11, JscOsTheme.text());
         JscOsTheme.textSCenter(g, font, "READ", READ_TAB_X + TAB_W / 2, TAB_Y + 3,
-                activeTab == TAB_READ ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+                activeTab == TAB_READ ? JscOsTheme.accent() : JscOsTheme.dim());
         JscOsTheme.textSCenter(g, font, "ROM", ROM_TAB_X + TAB_W / 2, TAB_Y + 3,
-                activeTab == TAB_ROM ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+                activeTab == TAB_ROM ? JscOsTheme.accent() : JscOsTheme.dim());
 
         discReadout(g);
 
@@ -154,71 +154,71 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
         final ItemStack disc = menu.slots.get(PatternReaderMenu.MEDIA_SLOT).getItem();
         if (disc.isEmpty()) {
             JscOsTheme.textS(g, font, activeTab == TAB_ROM ? "insert a rewritable disc" : "insert pattern media",
-                    34, 36, JscOsTheme.DIM);
+                    34, 36, JscOsTheme.dim());
             return;
         }
         final List<CraftingPattern> onDisc = menu.discPatterns();
         JscOsTheme.textS(g, font, onDisc.size() + (onDisc.size() == 1 ? " pattern" : " patterns"),
-                34, 32, JscOsTheme.TEXT);
+                34, 32, JscOsTheme.text());
         if (disc.getItem() instanceof PatternDiscItem item && item.isRewritable()) {
             final int cycles = PatternDiscItem.cyclesLeft(disc);
             JscOsTheme.textS(g, font, cycles > 0 ? cycles + " cycles left" : "read-only",
-                    34, 41, cycles > 0 ? JscOsTheme.AMBER : JscOsTheme.DIM);
+                    34, 41, cycles > 0 ? JscOsTheme.amber() : JscOsTheme.dim());
         } else {
-            JscOsTheme.textS(g, font, "write-once", 34, 41, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, "write-once", 34, 41, JscOsTheme.dim());
         }
     }
 
     private void readLabels(final GuiGraphics g) {
         final List<CraftingPattern> patterns = menu.discPatterns();
-        JscOsTheme.textS(g, font, "PATTERNS ON MEDIA", LIST_X, 53, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "PATTERNS ON MEDIA", LIST_X, 53, JscOsTheme.dim());
         listRows(g, patterns, clampScroll(scroll, patterns.size()), selection);
         if (patterns.size() > VISIBLE_ROWS) {
-            JscOsTheme.textSRight(g, font, rangeLabel(scroll, patterns.size()), imageWidth - 8, 53, JscOsTheme.DIM);
+            JscOsTheme.textSRight(g, font, rangeLabel(scroll, patterns.size()), imageWidth - 8, 53, JscOsTheme.dim());
         }
 
         final boolean usable = menu.hasComputer() && !patterns.isEmpty();
         if (usable) {
             JscOsTheme.textCenter(g, font, "LOAD SELECTED (" + selection.size() + ")",
-                    SEL_X + SEL_W / 2, BTN_Y + 4, selection.isEmpty() ? JscOsTheme.DIM : JscOsTheme.GREEN);
-            JscOsTheme.textCenter(g, font, "LOAD ALL", ALL_X + ALL_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
+                    SEL_X + SEL_W / 2, BTN_Y + 4, selection.isEmpty() ? JscOsTheme.dim() : JscOsTheme.green());
+            JscOsTheme.textCenter(g, font, "LOAD ALL", ALL_X + ALL_W / 2, BTN_Y + 4, JscOsTheme.accent());
         }
 
         if (menu.hasComputer()) {
-            JscOsTheme.textS(g, font, "> Crafting Computer", LIST_X, 130, JscOsTheme.ACCENT);
+            JscOsTheme.textS(g, font, "> Crafting Computer", LIST_X, 130, JscOsTheme.accent());
             JscOsTheme.textSRight(g, font, "ROM " + menu.romUsed() + " / " + menu.romLimit(),
-                    imageWidth - 8, 130, menu.romUsed() >= menu.romLimit() ? JscOsTheme.RED : JscOsTheme.TEXT);
+                    imageWidth - 8, 130, menu.romUsed() >= menu.romLimit() ? JscOsTheme.red() : JscOsTheme.text());
         } else {
-            JscOsTheme.textS(g, font, "no Crafting Computer adjacent", LIST_X, 130, JscOsTheme.RED);
+            JscOsTheme.textS(g, font, "no Crafting Computer adjacent", LIST_X, 130, JscOsTheme.red());
         }
     }
 
     private void romLabels(final GuiGraphics g) {
         final List<CraftingPattern> patterns = menu.romPatterns();
-        JscOsTheme.textS(g, font, "PATTERNS IN ROM", LIST_X, 53, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "PATTERNS IN ROM", LIST_X, 53, JscOsTheme.dim());
         if (!menu.hasComputer()) {
-            JscOsTheme.textS(g, font, "no Crafting Computer adjacent", LIST_X, 62, JscOsTheme.RED);
+            JscOsTheme.textS(g, font, "no Crafting Computer adjacent", LIST_X, 62, JscOsTheme.red());
             return;
         }
         if (patterns.isEmpty()) {
-            JscOsTheme.textS(g, font, "ROM is empty", LIST_X, 62, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, "ROM is empty", LIST_X, 62, JscOsTheme.dim());
         }
         listRows(g, patterns, clampScroll(romScroll, patterns.size()), romSelection);
         if (patterns.size() > VISIBLE_ROWS) {
-            JscOsTheme.textSRight(g, font, rangeLabel(romScroll, patterns.size()), imageWidth - 8, 53, JscOsTheme.DIM);
+            JscOsTheme.textSRight(g, font, rangeLabel(romScroll, patterns.size()), imageWidth - 8, 53, JscOsTheme.dim());
         }
 
         if (canExport()) {
             JscOsTheme.textCenter(g, font, "EXPORT (" + romSelection.size() + ")",
-                    SEL_X + SEL_W / 2, BTN_Y + 4, romSelection.isEmpty() ? JscOsTheme.DIM : JscOsTheme.GREEN);
-            JscOsTheme.textCenter(g, font, "EXPORT ALL", ALL_X + ALL_W / 2, BTN_Y + 4, JscOsTheme.ACCENT);
+                    SEL_X + SEL_W / 2, BTN_Y + 4, romSelection.isEmpty() ? JscOsTheme.dim() : JscOsTheme.green());
+            JscOsTheme.textCenter(g, font, "EXPORT ALL", ALL_X + ALL_W / 2, BTN_Y + 4, JscOsTheme.accent());
         } else {
-            JscOsTheme.textSCenter(g, font, exportBlockReason(), imageWidth / 2, BTN_Y + 4, JscOsTheme.DIM);
+            JscOsTheme.textSCenter(g, font, exportBlockReason(), imageWidth / 2, BTN_Y + 4, JscOsTheme.dim());
         }
 
-        JscOsTheme.textS(g, font, "right-click a row to delete it", LIST_X, 130, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "right-click a row to delete it", LIST_X, 130, JscOsTheme.dim());
         JscOsTheme.textSRight(g, font, menu.romUsed() + " / " + menu.romLimit(),
-                imageWidth - 8, 130, menu.romUsed() >= menu.romLimit() ? JscOsTheme.RED : JscOsTheme.TEXT);
+                imageWidth - 8, 130, menu.romUsed() >= menu.romLimit() ? JscOsTheme.red() : JscOsTheme.text());
     }
 
     private void listRows(final GuiGraphics g, final List<CraftingPattern> patterns, final int scrollPos,
@@ -227,11 +227,11 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
             final int index = row + scrollPos;
             final CraftingPattern p = patterns.get(index);
             final int rowY = LIST_Y + row * ROW_H + 2;
-            JscOsTheme.textS(g, font, "CRAFT", LIST_X + 5, rowY, JscOsTheme.ACCENT);
+            JscOsTheme.textS(g, font, "CRAFT", LIST_X + 5, rowY, JscOsTheme.accent());
             JscOsTheme.textS(g, font, p.result().getHoverName().getString() + " x" + p.result().getCount(),
-                    LIST_X + 36, rowY, JscOsTheme.TEXT);
+                    LIST_X + 36, rowY, JscOsTheme.text());
             JscOsTheme.textSRight(g, font, sel.contains(index) ? "selected" : "",
-                    imageWidth - 12, rowY, JscOsTheme.AMBER);
+                    imageWidth - 12, rowY, JscOsTheme.amber());
         }
     }
 
@@ -367,9 +367,4 @@ public class PatternReaderScreen extends AbstractComputerScreen<PatternReaderMen
         return false;
     }
 
-    @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
-    }
 }

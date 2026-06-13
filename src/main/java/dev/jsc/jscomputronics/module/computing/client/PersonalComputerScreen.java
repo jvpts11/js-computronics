@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
 import net.minecraft.ChatFormatting;
@@ -99,55 +100,55 @@ public class PersonalComputerScreen extends AbstractAssemblyScreen<PersonalCompu
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "PC", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "PC", 12, 11, JscOsTheme.text());
         final String status;
         final int statusColor;
         if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.RED;
+            statusColor = JscOsTheme.red();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.GREEN;
+            statusColor = JscOsTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.AMBER;
+            statusColor = JscOsTheme.amber();
         }
         final int pillX = 232 - font.width(status);
         JscOsTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
+        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.dim());
         g.fill(30, 61, 34, 65, psuColor());
-        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "DISK", 8, 93, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "GPU", 44, 93, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "DISK", 8, 93, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "GPU", 44, 93, JscOsTheme.dim());
 
-        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.TEXT);
-        JscOsTheme.tileText(g, font, COL_R, 52, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.TEXT);
+        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.text());
+        JscOsTheme.tileText(g, font, COL_R, 52, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.text());
 
-        JscOsTheme.text(g, font, "NETWORK", COL_R, 74, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "NETWORK", COL_R, 74, JscOsTheme.dim());
         if (menu.isOnNetwork()) {
-            JscOsTheme.textRight(g, font, "LINKED", COL_R + COL_R_W, 74, JscOsTheme.GREEN);
+            JscOsTheme.textRight(g, font, "LINKED", COL_R + COL_R_W, 74, JscOsTheme.green());
             final int n = menu.networkServerCount();
-            JscOsTheme.textRight(g, font, n + (n == 1 ? " server" : " servers"), COL_R + COL_R_W, 85, JscOsTheme.DIM);
+            JscOsTheme.textRight(g, font, n + (n == 1 ? " server" : " servers"), COL_R + COL_R_W, 85, JscOsTheme.dim());
         } else {
-            JscOsTheme.textRight(g, font, "--", COL_R + COL_R_W, 74, JscOsTheme.DIM);
+            JscOsTheme.textRight(g, font, "--", COL_R + COL_R_W, 74, JscOsTheme.dim());
         }
 
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
-        JscOsTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4, auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+        JscOsTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4, auto ? JscOsTheme.dim() : JscOsTheme.accent());
         JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
-                auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+                auto ? JscOsTheme.accent() : JscOsTheme.dim());
     }
 
     private int psuColor() {
         if (!menu.hasPsu()) {
-            return JscOsTheme.DIM;
+            return JscOsTheme.dim();
         }
-        return menu.buildValid() ? JscOsTheme.GREEN : JscOsTheme.AMBER;
+        return menu.buildValid() ? JscOsTheme.green() : JscOsTheme.amber();
     }
 
     @Override
@@ -175,8 +176,7 @@ public class PersonalComputerScreen extends AbstractAssemblyScreen<PersonalCompu
     }
 
     @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
     }
 }

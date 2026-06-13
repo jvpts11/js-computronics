@@ -67,7 +67,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
             final ItemStack server = menu.serverInBay(i);
             final boolean populated = server.getItem() instanceof ServerItem;
             if (populated) {
-                g.fill(x + ROW_LEFT + 1, top, x + ROW_LEFT + 3, top + 17, JscOsTheme.ACCENT);
+                g.fill(x + ROW_LEFT + 1, top, x + ROW_LEFT + 3, top + 17, JscOsTheme.accent());
             }
             JscOsTheme.slot(g, x + 12, top + 1);
             if (populated) {
@@ -76,7 +76,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
                     final long cap = build.totalStorageItems();
                     final long used = ServerItem.storage(server).total();
                     final double frac = cap <= 0 ? 0.0 : Math.min(1.0, (double) used / cap);
-                    JscOsTheme.track(g, x + TRACK_X, top + 7, TRACK_W, frac, frac >= 0.9 ? JscOsTheme.RED : JscOsTheme.GREEN);
+                    JscOsTheme.track(g, x + TRACK_X, top + 7, TRACK_W, frac, frac >= 0.9 ? JscOsTheme.red() : JscOsTheme.green());
                 }
             }
         }
@@ -95,9 +95,9 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         final boolean linked = menu.networkLinked();
-        JscOsTheme.text(g, font, "SERVER RACK", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "SERVER RACK", 12, 11, JscOsTheme.text());
         final String pill = linked ? "LINKED" : "OFFLINE";
-        final int pillColor = linked ? JscOsTheme.GREEN : JscOsTheme.RED;
+        final int pillColor = linked ? JscOsTheme.green() : JscOsTheme.red();
         final int pillX = 232 - font.width(pill);
         JscOsTheme.text(g, font, pill, pillX, 11, pillColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, pillColor);
@@ -125,38 +125,38 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
             }
         }
 
-        JscOsTheme.textS(g, font, "RACK SUMMARY", 8, 26, JscOsTheme.DIM);
-        JscOsTheme.textSRight(g, font, used + " / " + CAP + " bays", 236, 26, JscOsTheme.DIM);
-        JscOsTheme.tileTextS(g, font, 8, 34, "BAYS", used + "/" + CAP, JscOsTheme.TEXT);
-        JscOsTheme.tileTextS(g, font, 85, 34, "CAPACITY", fmt.compact(totalMb, Unit.MB), JscOsTheme.TEXT);
-        final int storedColor = totalCapItems > 0 && totalStored >= totalCapItems * 9 / 10 ? JscOsTheme.RED : JscOsTheme.GREEN;
+        JscOsTheme.textS(g, font, "RACK SUMMARY", 8, 26, JscOsTheme.dim());
+        JscOsTheme.textSRight(g, font, used + " / " + CAP + " bays", 236, 26, JscOsTheme.dim());
+        JscOsTheme.tileTextS(g, font, 8, 34, "BAYS", used + "/" + CAP, JscOsTheme.text());
+        JscOsTheme.tileTextS(g, font, 85, 34, "CAPACITY", fmt.compact(totalMb, Unit.MB), JscOsTheme.text());
+        final int storedColor = totalCapItems > 0 && totalStored >= totalCapItems * 9 / 10 ? JscOsTheme.red() : JscOsTheme.green();
         JscOsTheme.tileTextS(g, font, 162, 34, "STORED", JscOsTheme.fmt(totalStored), storedColor);
 
-        JscOsTheme.textS(g, font, "BAYS", 8, 60, JscOsTheme.DIM);
-        JscOsTheme.textSRight(g, font, online + " online", 236, 60, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "BAYS", 8, 60, JscOsTheme.dim());
+        JscOsTheme.textSRight(g, font, online + " online", 236, 60, JscOsTheme.dim());
 
         for (int i = 0; i < CAP; i++) {
             final int top = BAY_Y + i * BAY_PITCH;
             final ItemStack server = menu.serverInBay(i);
             if (!(server.getItem() instanceof ServerItem)) {
-                JscOsTheme.textS(g, font, "— empty —", 34, top + 6, JscOsTheme.DIM);
+                JscOsTheme.textS(g, font, "— empty —", 34, top + 6, JscOsTheme.dim());
                 continue;
             }
             final ComputerBuild build = ServerItem.build(server);
             final UUID uuid = ServerItem.nodeUuid(server);
             final String id = uuid != null ? uuid.toString().substring(0, 6) : "server";
-            JscOsTheme.textS(g, font, id, 34, top + 6, JscOsTheme.TEXT);
+            JscOsTheme.textS(g, font, id, 34, top + 6, JscOsTheme.text());
             final String state;
             final int color;
             if (build == null) {
                 state = "INCOMPLETE";
-                color = JscOsTheme.RED;
+                color = JscOsTheme.red();
             } else if (linked) {
                 state = "ONLINE";
-                color = JscOsTheme.GREEN;
+                color = JscOsTheme.green();
             } else {
                 state = "READY";
-                color = JscOsTheme.AMBER;
+                color = JscOsTheme.amber();
             }
             JscOsTheme.textSRight(g, font, state, 236, top + 6, color);
         }

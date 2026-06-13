@@ -7,18 +7,65 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jsc.jscomputronics.module.computing.client.theme.EraTheme;
+import dev.jsc.jscomputronics.module.computing.client.theme.EraThemes;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Base for the computing container screens, holding the two hand-rolled helpers every one of them repeated: a hit-test against a rectangle in this screen's local space, and a menu-button send to the server.
+ * Base for the computing container screens, holding the two hand-rolled helpers every one of them repeated: a hit-test against a rectangle in this screen's local space, and a menu-button send to the server. It also resolves the screen's per-era skin and binds it for the render pass, so every computing screen paints in the host computer's hardware-era theme. A screen with no host era (a topology element, a board-less assembly, a program with no era source) falls back to the frozen STANDARD skin, which renders exactly as before.
  */
 public abstract class AbstractComputerScreen<T extends AbstractContainerMenu> extends AbstractContainerScreen<T> {
 
+    /** The skin this screen paints with for the current render pass; STANDARD until {@link #init} resolves it. */
+    protected EraTheme theme = EraThemes.STANDARD;
+
     protected AbstractComputerScreen(final T menu, final Inventory playerInventory, final Component title) {
         super(menu, playerInventory, title);
+    }
+
+    /**
+     * The hardware era whose skin this screen should wear, or {@code null} to use the STANDARD default. The base
+     * returns {@code null}; a screen running on a host computer overrides this to report its host's era so the GUI
+     * adopts that era's skin. Resolved fresh every {@link #containerTick}, so inserting or removing a board repaints
+     * the GUI in the new era live.
+     */
+    @Nullable
+    protected HardwareEra screenEra() {
+        return null;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        this.theme = EraThemes.ofNullable(screenEra());
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        // Re-resolve so a board swap (which changes the host era) updates the skin without reopening the GUI.
+        this.theme = EraThemes.ofNullable(screenEra());
+    }
+
+    @Override
+    public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
+        // Bind this screen's era skin for the render pass (background, widgets, labels) and always restore the
+        // default afterwards, so any unthemed draw stays on the frozen STANDARD look. A subclass that overrides
+        // render still routes through here via super.render(), so its background and widgets get the bound skin;
+        // its post-super draws are tooltips (vanilla-styled, palette-agnostic) so they are unaffected by the skin.
+        JscOsTheme.bind(theme);
+        try {
+            super.render(graphics, mouseX, mouseY, partialTick);
+            renderTooltip(graphics, mouseX, mouseY);
+        } finally {
+            JscOsTheme.unbind();
+        }
     }
 
     /**

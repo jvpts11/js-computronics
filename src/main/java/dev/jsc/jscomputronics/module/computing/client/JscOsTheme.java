@@ -7,83 +7,154 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.module.computing.client.theme.EraTheme;
+import dev.jsc.jscomputronics.module.computing.client.theme.EraThemes;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * Shared flat-dark "computer OS" theme for the computing block GUIs (Mainframe, Personal Computer, Server Assembly, Server Rack), matching the Monitor terminal: square corners only, flat fills, a cyan accent, 1px separator lines and slot cells with a 1px lighter edge.
+ * Render-scoped facade over the active {@link EraTheme} for the computing block GUIs (Mainframe, Personal Computer,
+ * Server Assembly, Server Rack, and the program/terminal screens). It keeps the original square-cornered "computer
+ * OS" look as its STANDARD default and lets each screen repaint in the skin of its host computer's hardware era.
+ *
+ * <p>A screen binds its resolved theme once per render pass ({@link #bind}) and unbinds afterwards; every color
+ * accessor and palette-coupled helper below reads the bound theme. With the STANDARD theme bound — the default, and
+ * the fallback for any screen without a valid build — the helpers run the exact fill sequences the flat-dark theme
+ * always did, so the default GUI is byte-identical to before.
  */
 public final class JscOsTheme {
 
     private JscOsTheme() {
     }
 
-    // Flat palette (ARGB). No rounded corners anywhere.
-    public static final int OUTER = 0xFF05070A;
-    public static final int SCREEN = 0xFF0B0E13;
-    public static final int RAIL = 0xFF0E131A;
-    public static final int PANEL = 0xFF11161D;
-    public static final int LINE = 0xFF1D2530;
-    public static final int TRACK = 0xFF0A0E14;
-    public static final int SLOT_BG = 0xFF0A0D12;
-    public static final int SLOT_EDGE = 0xFF1C2531;
-    public static final int ACCENT = 0xFF39D6C4;
-    public static final int ACCENT2 = 0xFF2AA7E0;
-    public static final int GREEN = 0xFF5FE07A;
-    public static final int AMBER = 0xFFF0B23A;
-    public static final int RED = 0xFFEF6A5A;
-    public static final int TEXT = 0xFFCDD6E2;
-    public static final int DIM = 0xFF7D8A9C;
-    public static final int TAB_ON = 0xFF15212A;
-    public static final int HOVER = 0xFF1A2937;
+    private static EraTheme active = EraThemes.STANDARD;
 
-    // Backgrounds (renderBg, absolute coordinates)
+    /** Binds the theme for the current render pass. The screen base calls this at the top of {@code render}. */
+    public static void bind(final EraTheme theme) {
+        active = theme == null ? EraThemes.STANDARD : theme;
+    }
+
+    /** Restores the STANDARD default after a render pass, so any unthemed draw stays on the frozen skin. */
+    public static void unbind() {
+        active = EraThemes.STANDARD;
+    }
+
+    /** The theme currently bound (STANDARD by default). */
+    public static EraTheme active() {
+        return active;
+    }
+
+    // Palette accessors (these read the bound theme; they replaced the former public static final int constants).
+
+    public static int outer() {
+        return active.outer();
+    }
+
+    public static int screen() {
+        return active.screen();
+    }
+
+    public static int rail() {
+        return active.rail();
+    }
+
+    public static int panel() {
+        return active.panel();
+    }
+
+    public static int line() {
+        return active.line();
+    }
+
+    public static int track() {
+        return active.track();
+    }
+
+    public static int slotBg() {
+        return active.slotBg();
+    }
+
+    public static int slotEdge() {
+        return active.slotEdge();
+    }
+
+    public static int accent() {
+        return active.accent();
+    }
+
+    public static int accent2() {
+        return active.accent2();
+    }
+
+    public static int green() {
+        return active.green();
+    }
+
+    public static int amber() {
+        return active.amber();
+    }
+
+    public static int red() {
+        return active.red();
+    }
+
+    public static int text() {
+        return active.text();
+    }
+
+    public static int dim() {
+        return active.dim();
+    }
+
+    public static int tabOn() {
+        return active.tabOn();
+    }
+
+    public static int hover() {
+        return active.hover();
+    }
+
+    public static float small() {
+        return active.small();
+    }
+
+    // Backgrounds (renderBg, absolute coordinates) — delegate to the bound theme's palette-coupled drawing.
 
     public static void window(final GuiGraphics g, final int x, final int y, final int w, final int h) {
-        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, OUTER);
-        g.fill(x, y, x + w, y + h, SCREEN);
+        active.window(g, x, y, w, h);
     }
 
     public static void slot(final GuiGraphics g, final int x, final int y) {
-        g.fill(x - 1, y - 1, x + 17, y + 17, SLOT_EDGE);
-        g.fill(x, y, x + 16, y + 16, SLOT_BG);
+        active.slot(g, x, y);
     }
 
     public static void panel(final GuiGraphics g, final int x, final int y, final int w, final int h) {
-        g.fill(x, y, x + w, y + h, PANEL);
-        g.fill(x, y, x + w, y + 1, LINE);
+        active.panel(g, x, y, w, h);
     }
 
     public static void hLine(final GuiGraphics g, final int x, final int y, final int w) {
-        g.fill(x, y, x + w, y + 1, LINE);
+        active.hLine(g, x, y, w);
     }
 
     public static void vLine(final GuiGraphics g, final int x, final int y, final int h) {
-        g.fill(x, y, x + 1, y + h, LINE);
+        active.vLine(g, x, y, h);
     }
 
     public static void headerBar(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        g.fill(cx, cy, cx + cw, cy + 16, PANEL);
-        g.fill(cx, cy + 16, cx + cw, cy + 17, LINE);
+        active.headerBar(g, cx, cy, cw);
     }
 
     public static void button(final GuiGraphics g, final int x, final int y, final int w, final int h,
                               final boolean hovered) {
-        g.fill(x, y, x + w, y + h, hovered ? HOVER : PANEL);
-        g.fill(x, y, x + w, y + 1, LINE);
+        active.button(g, x, y, w, h, hovered);
     }
 
     public static void track(final GuiGraphics g, final int x, final int y, final int w,
                              final double frac, final int fillColor) {
-        g.fill(x, y, x + w, y + 7, TRACK);
-        g.fill(x, y, x + w, y + 1, LINE);
-        final int fw = (int) Math.round((w - 2) * Math.max(0.0, Math.min(1.0, frac)));
-        if (fw > 0) {
-            g.fill(x + 1, y + 1, x + 1 + fw, y + 6, fillColor);
-        }
+        active.track(g, x, y, w, frac, fillColor);
     }
 
-    // Text (renderLabels, GUI-relative coordinates)
+    // Text (renderLabels, GUI-relative coordinates) — palette-agnostic; the caller passes the color.
 
     public static void text(final GuiGraphics g, final Font f, final String s, final int x, final int y,
                             final int color) {
@@ -100,17 +171,16 @@ public final class JscOsTheme {
         g.drawCenteredString(f, s, cx, y, color);
     }
 
-    public static final float SMALL = 0.75f;
-
     public static int widthS(final Font f, final String s) {
-        return (int) Math.ceil(f.width(s) * SMALL);
+        return (int) Math.ceil(f.width(s) * active.small());
     }
 
     public static void textS(final GuiGraphics g, final Font f, final String s, final int x, final int y,
                              final int color) {
+        final float scale = active.small();
         g.pose().pushPose();
         g.pose().translate(x, y, 0);
-        g.pose().scale(SMALL, SMALL, 1.0f);
+        g.pose().scale(scale, scale, 1.0f);
         g.drawString(f, s, 0, 0, color, false);
         g.pose().popPose();
     }
@@ -127,16 +197,16 @@ public final class JscOsTheme {
 
     public static void tileTextS(final GuiGraphics g, final Font f, final int x, final int y,
                                  final String key, final String value, final int valueColor) {
-        textS(g, f, key, x + 3, y + 3, DIM);
+        textS(g, f, key, x + 3, y + 3, active.dim());
         textS(g, f, value, x + 3, y + 11, valueColor);
     }
 
     public static void tileText(final GuiGraphics g, final Font f, final int x, final int y,
                                 final String key, final String value, final String unit, final int valueColor) {
-        g.drawString(f, key, x + 4, y + 4, DIM, false);
+        g.drawString(f, key, x + 4, y + 4, active.dim(), false);
         g.drawString(f, value, x + 4, y + 13, valueColor, false);
         if (unit != null && !unit.isEmpty()) {
-            g.drawString(f, unit, x + 6 + f.width(value), y + 15, DIM, false);
+            g.drawString(f, unit, x + 6 + f.width(value), y + 15, active.dim(), false);
         }
     }
 

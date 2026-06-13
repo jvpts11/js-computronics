@@ -44,23 +44,23 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     // Flat palette (ARGB), sourced from the shared OS theme so the Monitor terminal never drifts from
     // the other computing GUIs. No rounded corners anywhere.
-    private static final int OUTER = JscOsTheme.OUTER;
-    private static final int SCREEN = JscOsTheme.SCREEN;
-    private static final int RAIL = JscOsTheme.RAIL;
-    private static final int PANEL = JscOsTheme.PANEL;
-    private static final int LINE = JscOsTheme.LINE;
-    private static final int TRACK = JscOsTheme.TRACK;
-    private static final int SLOT_BG = JscOsTheme.SLOT_BG;
-    private static final int SLOT_EDGE = JscOsTheme.SLOT_EDGE;
-    private static final int ACCENT = JscOsTheme.ACCENT;
-    private static final int ACCENT2 = JscOsTheme.ACCENT2;
-    private static final int GREEN = JscOsTheme.GREEN;
-    private static final int AMBER = JscOsTheme.AMBER;
-    private static final int RED = JscOsTheme.RED;
-    private static final int TEXT = JscOsTheme.TEXT;
-    private static final int DIM = JscOsTheme.DIM;
-    private static final int TAB_ON = JscOsTheme.TAB_ON;
-    private static final int HOVER = JscOsTheme.HOVER;
+    private static final int OUTER = JscOsTheme.outer();
+    private static final int SCREEN = JscOsTheme.screen();
+    private static final int RAIL = JscOsTheme.rail();
+    private static final int PANEL = JscOsTheme.panel();
+    private static final int LINE = JscOsTheme.line();
+    private static final int TRACK = JscOsTheme.track();
+    private static final int SLOT_BG = JscOsTheme.slotBg();
+    private static final int SLOT_EDGE = JscOsTheme.slotEdge();
+    private static final int ACCENT = JscOsTheme.accent();
+    private static final int ACCENT2 = JscOsTheme.accent2();
+    private static final int GREEN = JscOsTheme.green();
+    private static final int AMBER = JscOsTheme.amber();
+    private static final int RED = JscOsTheme.red();
+    private static final int TEXT = JscOsTheme.text();
+    private static final int DIM = JscOsTheme.dim();
+    private static final int TAB_ON = JscOsTheme.tabOn();
+    private static final int HOVER = JscOsTheme.hover();
 
     private static final int RAIL_X = 4;
     private static final int RAIL_W = 56;

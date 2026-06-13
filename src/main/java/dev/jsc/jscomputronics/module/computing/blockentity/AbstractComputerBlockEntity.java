@@ -17,6 +17,7 @@ import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralOwnerSupport;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
@@ -247,6 +248,16 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
     public int boardDiskSlots() {
         return hardware.getStackInSlot(layout.motherboardSlot()).getItem() instanceof MotherboardItem m
                 ? Math.min(layout.diskCount(), m.spec().diskSlots()) : 0;
+    }
+
+    /**
+     * The hardware era of the installed motherboard, or {@code null} when no board is present. Read from the board
+     * alone (no PSU needed), so the assembly GUI can adopt the era's skin the moment a board goes in.
+     */
+    @Nullable
+    public HardwareEra installedEra() {
+        return hardware.getStackInSlot(layout.motherboardSlot()).getItem() instanceof MotherboardItem m
+                ? m.spec().era() : null;
     }
 
     public int installedCpus() {

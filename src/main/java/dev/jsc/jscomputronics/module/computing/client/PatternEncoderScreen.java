@@ -75,56 +75,56 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "PATTERN ENCODER", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "PATTERN ENCODER", 12, 11, JscOsTheme.text());
 
-        JscOsTheme.text(g, font, "RECIPE", 26, 23, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, ">", 88, 55, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "MEDIA", 138, 23, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "RECIPE", 26, 23, JscOsTheme.dim());
+        JscOsTheme.text(g, font, ">", 88, 55, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "MEDIA", 138, 23, JscOsTheme.dim());
 
         // Disc readout right of the media slot.
         final ItemStack disc = menu.mediaStack();
         if (disc.isEmpty()) {
-            JscOsTheme.textS(g, font, "no disc", 158, 36, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, "no disc", 158, 36, JscOsTheme.dim());
         } else {
             final List<CraftingPattern> patterns = PatternDiscItem.patterns(disc);
             JscOsTheme.textS(g, font, patterns.size() + (patterns.size() == 1 ? " pattern" : " patterns"),
-                    158, 34, JscOsTheme.TEXT);
+                    158, 34, JscOsTheme.text());
             if (disc.getItem() instanceof PatternDiscItem item && item.isRewritable()) {
                 final int cycles = PatternDiscItem.cyclesLeft(disc);
                 JscOsTheme.textS(g, font, cycles > 0 ? cycles + " cycles" : "read-only",
-                        158, 43, cycles > 0 ? JscOsTheme.AMBER : JscOsTheme.DIM);
+                        158, 43, cycles > 0 ? JscOsTheme.amber() : JscOsTheme.dim());
             } else {
-                JscOsTheme.textS(g, font, "write-once", 158, 43, JscOsTheme.DIM);
+                JscOsTheme.textS(g, font, "write-once", 158, 43, JscOsTheme.dim());
             }
         }
 
         if (menu.canErase()) {
-            JscOsTheme.textCenter(g, font, "ERASE", ERASE_X + ERASE_W / 2, ERASE_Y + 4, JscOsTheme.AMBER);
+            JscOsTheme.textCenter(g, font, "ERASE", ERASE_X + ERASE_W / 2, ERASE_Y + 4, JscOsTheme.amber());
         }
         final boolean writable = menu.canWrite();
         JscOsTheme.textCenter(g, font, "WRITE PATTERN", WRITE_X + WRITE_W / 2, WRITE_Y + 4,
-                writable ? JscOsTheme.GREEN : JscOsTheme.DIM);
+                writable ? JscOsTheme.green() : JscOsTheme.dim());
 
         // Why WRITE is disabled, stated inline rather than a dead button.
         if (!writable) {
             final String reason = menu.preview().isEmpty() ? "lay out a known recipe" : "insert a disc";
-            JscOsTheme.textS(g, font, reason, 26, 92, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, reason, 26, 92, JscOsTheme.dim());
         }
 
         // Patterns already on the disc (last three fit; the tooltip of the disc lists the count).
         final List<CraftingPattern> onDisc = disc.isEmpty() ? List.of() : PatternDiscItem.patterns(disc);
-        JscOsTheme.textS(g, font, "ON THIS MEDIA", 8, 104, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "ON THIS MEDIA", 8, 104, JscOsTheme.dim());
         if (onDisc.isEmpty()) {
-            JscOsTheme.textS(g, font, "-", 8, 114, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, "-", 8, 114, JscOsTheme.dim());
         } else {
             final int first = Math.max(0, onDisc.size() - 3);
             int rowY = 113;
             for (int i = first; i < onDisc.size(); i++) {
                 final CraftingPattern p = onDisc.get(i);
-                JscOsTheme.textS(g, font, "CRAFT", 8, rowY, JscOsTheme.ACCENT);
+                JscOsTheme.textS(g, font, "CRAFT", 8, rowY, JscOsTheme.accent());
                 JscOsTheme.textS(g, font, p.result().getHoverName().getString() + " x" + p.result().getCount(),
-                        40, rowY, JscOsTheme.TEXT);
-                JscOsTheme.textSRight(g, font, p.filledCells() + " ingredients", imageWidth - 8, rowY, JscOsTheme.DIM);
+                        40, rowY, JscOsTheme.text());
+                JscOsTheme.textSRight(g, font, p.filledCells() + " ingredients", imageWidth - 8, rowY, JscOsTheme.dim());
                 rowY += 9;
             }
         }
@@ -145,9 +145,4 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
-    }
 }

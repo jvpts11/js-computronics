@@ -93,41 +93,41 @@ public class SupercomputerNodeScreen extends AbstractAssemblyScreen<Supercompute
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "NODE", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "NODE", 12, 11, JscOsTheme.text());
         final String status;
         final int statusColor;
         if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.RED;
+            statusColor = JscOsTheme.red();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.GREEN;
+            statusColor = JscOsTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.AMBER;
+            statusColor = JscOsTheme.amber();
         }
         final int pillX = 232 - font.width(status);
         JscOsTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "RAM", 80, 27, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "CO-PROC", 8, 60, menu.hasPhi() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "PSU", 44, 60, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "DISK", 80, 60, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
+        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "RAM", 80, 27, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "CO-PROC", 8, 60, menu.hasPhi() ? JscOsTheme.accent() : JscOsTheme.dim());
+        JscOsTheme.text(g, font, "PSU", 44, 60, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "DISK", 80, 60, JscOsTheme.dim());
 
         JscOsTheme.tileText(g, font, COL_R, 27, "CO-PROCESSOR",
-                menu.hasPhi() ? "SEATED" : "EMPTY", "", menu.hasPhi() ? JscOsTheme.GREEN : JscOsTheme.DIM);
+                menu.hasPhi() ? "SEATED" : "EMPTY", "", menu.hasPhi() ? JscOsTheme.green() : JscOsTheme.dim());
         JscOsTheme.tileText(g, font, COL_R, 49, "CLUSTER",
-                "SEE CONSOLE", "", JscOsTheme.DIM);
+                "SEE CONSOLE", "", JscOsTheme.dim());
 
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
         JscOsTheme.textCenter(g, font, powerCap, COL_R + COL_R_W / 2, POWER_Y + 4,
-                auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+                auto ? JscOsTheme.dim() : JscOsTheme.accent());
         JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), COL_R + COL_R_W / 2, AUTO_Y + 4,
-                auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+                auto ? JscOsTheme.accent() : JscOsTheme.dim());
     }
 
     @Override
@@ -153,9 +153,4 @@ public class SupercomputerNodeScreen extends AbstractAssemblyScreen<Supercompute
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
-    }
 }

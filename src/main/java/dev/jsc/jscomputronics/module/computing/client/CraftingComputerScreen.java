@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
 import net.minecraft.ChatFormatting;
@@ -107,58 +108,58 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "CC", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "CC", 12, 11, JscOsTheme.text());
         final String status;
         final int statusColor;
         if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.RED;
+            statusColor = JscOsTheme.red();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.GREEN;
+            statusColor = JscOsTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.AMBER;
+            statusColor = JscOsTheme.amber();
         }
         final int pillX = 232 - font.width(status);
         JscOsTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.ACCENT : JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
+        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.dim());
         g.fill(30, 61, 34, 65, psuColor());
-        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.DIM);
-        JscOsTheme.text(g, font, "DISK", 8, 93, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.dim());
+        JscOsTheme.text(g, font, "DISK", 8, 93, JscOsTheme.dim());
         JscOsTheme.text(g, font, "PCIE", 44, 93,
-                menu.craftFactorX100() > 0 ? JscOsTheme.AMBER : JscOsTheme.DIM);
+                menu.craftFactorX100() > 0 ? JscOsTheme.amber() : JscOsTheme.dim());
 
         JscOsTheme.tileText(g, font, COL_R, TILE_Y0, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t",
-                JscOsTheme.TEXT);
+                JscOsTheme.text());
         final int factor = menu.craftFactorX100();
         if (factor > 0) {
             JscOsTheme.tileText(g, font, COL_R, TILE_Y1, "CRAFT x" + formatFactor(factor),
-                    JscOsTheme.fmt(menu.craftThroughput()), "it/t", JscOsTheme.ACCENT);
+                    JscOsTheme.fmt(menu.craftThroughput()), "it/t", JscOsTheme.accent());
         } else {
             // No Crafting Card installed: the computer runs but cannot craft.
-            JscOsTheme.tileText(g, font, COL_R, TILE_Y1, "CRAFT", "NO CARD", "", JscOsTheme.DIM);
+            JscOsTheme.tileText(g, font, COL_R, TILE_Y1, "CRAFT", "NO CARD", "", JscOsTheme.dim());
         }
         JscOsTheme.tileText(g, font, COL_R, TILE_Y2, "RECIPE ROM",
-                menu.romUsed() + " / " + menu.romLimit(), "", JscOsTheme.TEXT);
+                menu.romUsed() + " / " + menu.romLimit(), "", JscOsTheme.text());
 
-        JscOsTheme.text(g, font, "NETWORK", COL_R, NETWORK_Y, JscOsTheme.DIM);
+        JscOsTheme.text(g, font, "NETWORK", COL_R, NETWORK_Y, JscOsTheme.dim());
         if (menu.isOnNetwork()) {
-            JscOsTheme.textRight(g, font, "LINKED", COL_R + COL_R_W, NETWORK_Y, JscOsTheme.GREEN);
+            JscOsTheme.textRight(g, font, "LINKED", COL_R + COL_R_W, NETWORK_Y, JscOsTheme.green());
         } else {
-            JscOsTheme.textRight(g, font, "--", COL_R + COL_R_W, NETWORK_Y, JscOsTheme.DIM);
+            JscOsTheme.textRight(g, font, "--", COL_R + COL_R_W, NETWORK_Y, JscOsTheme.dim());
         }
 
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
         JscOsTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4,
-                auto ? JscOsTheme.DIM : JscOsTheme.ACCENT);
+                auto ? JscOsTheme.dim() : JscOsTheme.accent());
         JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
-                auto ? JscOsTheme.ACCENT : JscOsTheme.DIM);
+                auto ? JscOsTheme.accent() : JscOsTheme.dim());
     }
 
     private static String formatFactor(final int factorX100) {
@@ -170,9 +171,9 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
 
     private int psuColor() {
         if (!menu.hasPsu()) {
-            return JscOsTheme.DIM;
+            return JscOsTheme.dim();
         }
-        return menu.buildValid() ? JscOsTheme.GREEN : JscOsTheme.AMBER;
+        return menu.buildValid() ? JscOsTheme.green() : JscOsTheme.amber();
     }
 
     @Override
@@ -200,8 +201,7 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
     }
 
     @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
     }
 }

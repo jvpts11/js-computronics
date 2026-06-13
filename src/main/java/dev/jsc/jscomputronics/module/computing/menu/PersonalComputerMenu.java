@@ -94,6 +94,11 @@ public class PersonalComputerMenu extends AbstractComputerMenu {
         return blockEntity.boardDiskSlots();
     }
 
+    @org.jetbrains.annotations.Nullable
+    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+        return blockEntity.installedEra();
+    }
+
     public boolean hasBoard() {
         return slots.get(0).hasItem();
     }

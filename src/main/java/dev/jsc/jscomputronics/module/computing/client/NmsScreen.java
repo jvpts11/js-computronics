@@ -50,7 +50,7 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
                 Component.literal("query"));
         query.setBordered(false);
         query.setMaxLength(RunSqlPayload.MAX_LEN);
-        query.setTextColor(JscOsTheme.TEXT);
+        query.setTextColor(JscOsTheme.text());
         query.setHint(Component.literal("SELECT * FROM network").withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
         query.setFocused(true);
         setInitialFocus(query);
@@ -88,38 +88,38 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
         JscOsTheme.window(g, x, y, imageWidth, imageHeight);
         JscOsTheme.headerBar(g, x + 6, y + 6, imageWidth - 12);
         // Object explorer (left), query editor strip (top), results grid (centre), status bar (bottom).
-        g.fill(x + 6, y + 24, x + EXPLORER_W, y + imageHeight - 6, JscOsTheme.RAIL);
+        g.fill(x + 6, y + 24, x + EXPLORER_W, y + imageHeight - 6, JscOsTheme.rail());
         JscOsTheme.vLine(g, x + EXPLORER_W, y + 24, imageHeight - 30);
-        g.fill(x + EXPLORER_W + 6, y + 27, x + imageWidth - 6, y + 41, JscOsTheme.PANEL);
+        g.fill(x + EXPLORER_W + 6, y + 27, x + imageWidth - 6, y + 41, JscOsTheme.panel());
         g.fill(x + EXPLORER_W + 6, y + 44, x + imageWidth - 6, y + imageHeight - 18, 0xFF070A0E);
-        g.fill(x + EXPLORER_W + 6, y + imageHeight - 16, x + imageWidth - 6, y + imageHeight - 6, JscOsTheme.PANEL);
+        g.fill(x + EXPLORER_W + 6, y + imageHeight - 16, x + imageWidth - 6, y + imageHeight - 6, JscOsTheme.panel());
         // Execute button.
         final boolean hover = hover(mouseX, mouseY, imageWidth - 60, 28, 52, 12);
         JscOsTheme.button(g, x + imageWidth - 60, y + 28, 52, 12, hover);
         // Column header under the editor.
-        g.fill(x + EXPLORER_W + 6, y + 44, x + imageWidth - 6, y + 53, JscOsTheme.PANEL);
+        g.fill(x + EXPLORER_W + 6, y + 44, x + imageWidth - 6, y + 53, JscOsTheme.panel());
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "NETWORK MANAGEMENT STUDIO", 12, 11, JscOsTheme.TEXT);
+        JscOsTheme.text(g, font, "NETWORK MANAGEMENT STUDIO", 12, 11, JscOsTheme.text());
 
         // Object explorer: the schema the statements address.
-        JscOsTheme.textS(g, font, "OBJECT EXPLORER", 10, 28, JscOsTheme.DIM);
-        JscOsTheme.textS(g, font, "v NETWORK", 10, 40, JscOsTheme.ACCENT);
-        JscOsTheme.textS(g, font, "  v tables", 10, 49, JscOsTheme.DIM);
-        JscOsTheme.textS(g, font, "    network", 10, 58, JscOsTheme.TEXT);
-        JscOsTheme.textS(g, font, "  columns:", 10, 70, JscOsTheme.DIM);
-        JscOsTheme.textS(g, font, "    item", 10, 79, JscOsTheme.TEXT);
-        JscOsTheme.textS(g, font, "    quantity", 10, 88, JscOsTheme.TEXT);
-        JscOsTheme.textS(g, font, "    server", 10, 97, JscOsTheme.TEXT);
+        JscOsTheme.textS(g, font, "OBJECT EXPLORER", 10, 28, JscOsTheme.dim());
+        JscOsTheme.textS(g, font, "v NETWORK", 10, 40, JscOsTheme.accent());
+        JscOsTheme.textS(g, font, "  v tables", 10, 49, JscOsTheme.dim());
+        JscOsTheme.textS(g, font, "    network", 10, 58, JscOsTheme.text());
+        JscOsTheme.textS(g, font, "  columns:", 10, 70, JscOsTheme.dim());
+        JscOsTheme.textS(g, font, "    item", 10, 79, JscOsTheme.text());
+        JscOsTheme.textS(g, font, "    quantity", 10, 88, JscOsTheme.text());
+        JscOsTheme.textS(g, font, "    server", 10, 97, JscOsTheme.text());
 
-        JscOsTheme.text(g, font, ">", EXPLORER_W + 4, 30, JscOsTheme.ACCENT);
-        JscOsTheme.textCenter(g, font, "EXECUTE", imageWidth - 34, 30, JscOsTheme.ACCENT);
+        JscOsTheme.text(g, font, ">", EXPLORER_W + 4, 30, JscOsTheme.accent());
+        JscOsTheme.textCenter(g, font, "EXECUTE", imageWidth - 34, 30, JscOsTheme.accent());
 
         // Results column header.
-        JscOsTheme.textS(g, font, "item", EXPLORER_W + 10, 46, JscOsTheme.DIM);
-        JscOsTheme.textSRight(g, font, "quantity", imageWidth - 12, 46, JscOsTheme.DIM);
+        JscOsTheme.textS(g, font, "item", EXPLORER_W + 10, 46, JscOsTheme.dim());
+        JscOsTheme.textSRight(g, font, "quantity", imageWidth - 12, 46, JscOsTheme.dim());
 
         // Results grid.
         final int top = 55;
@@ -129,17 +129,17 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
         for (int i = 0; i < visible && clamped + i < rows.size(); i++) {
             final SqlResultPayload.Row row = rows.get(clamped + i);
             final int ry = top + i * ROW_H;
-            small(g, row.label(), EXPLORER_W + 10, ry, JscOsTheme.TEXT);
-            JscOsTheme.textSRight(g, font, JscOsTheme.fmt(row.quantity()), imageWidth - 12, ry, JscOsTheme.GREEN);
+            small(g, row.label(), EXPLORER_W + 10, ry, JscOsTheme.text());
+            JscOsTheme.textSRight(g, font, JscOsTheme.fmt(row.quantity()), imageWidth - 12, ry, JscOsTheme.green());
         }
         if (rows.isEmpty()) {
-            JscOsTheme.textS(g, font, "no result set", EXPLORER_W + 10, top + 2, JscOsTheme.DIM);
+            JscOsTheme.textS(g, font, "no result set", EXPLORER_W + 10, top + 2, JscOsTheme.dim());
         }
 
         // Status bar.
         JscOsTheme.textS(g, font, status, EXPLORER_W + 10, imageHeight - 14,
-                statusOk ? JscOsTheme.GREEN : JscOsTheme.RED);
-        JscOsTheme.textSRight(g, font, "F5 / ENTER to run", imageWidth - 10, imageHeight - 14, JscOsTheme.DIM);
+                statusOk ? JscOsTheme.green() : JscOsTheme.red());
+        JscOsTheme.textSRight(g, font, "F5 / ENTER to run", imageWidth - 10, imageHeight - 14, JscOsTheme.dim());
     }
 
     private void small(final GuiGraphics g, final String text, final int x, final int y, final int color) {
@@ -190,8 +190,4 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
         return query != null && query.charTyped(c, mods);
     }
 
-    @Override
-    public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        super.render(g, mouseX, mouseY, partialTick);
-    }
 }

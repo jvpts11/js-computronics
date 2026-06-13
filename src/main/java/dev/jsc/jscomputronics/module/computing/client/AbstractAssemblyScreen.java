@@ -36,11 +36,21 @@ public abstract class AbstractAssemblyScreen<T extends AbstractContainerMenu> ex
         nameBox = new EditBox(font, leftPos + x, topPos + y, width, 11, Component.literal("Name"));
         nameBox.setBordered(false);
         nameBox.setMaxLength(maxLength);
-        nameBox.setTextColor(JscOsTheme.TEXT);
+        // The field colors itself with the resolved era skin, not the bound static, since it is built in init()
+        // outside a render pass; containerTick keeps it in step when a board swap changes the era.
+        nameBox.setTextColor(theme.text());
         nameBox.setHint(hint);
         nameBox.setValue(initialValue);
         nameBox.setResponder(responder);
         addRenderableWidget(nameBox);
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        if (nameBox != null) {
+            nameBox.setTextColor(theme.text());
+        }
     }
 
     @Override
