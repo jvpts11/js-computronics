@@ -13,15 +13,14 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * One representative build per hardware era, asserting that the validation rules hold for the whole
- * progression: a coherent era build powers on, a socket mismatch is rejected, a wrong RAM generation is
- * rejected, and the Singularity alien CPU/PSU behave as specified. The specs mirror the registered item
- * catalog; the pure-logic layer cannot touch the Minecraft item wrappers, so it works on the records.
+ * One representative build per shipped hardware era (Vintage, Legacy, Standard), asserting that the
+ * validation rules hold across the progression: a coherent era build powers on, a socket mismatch is
+ * rejected, and a wrong RAM generation is rejected. The specs mirror the registered item catalog; the
+ * pure-logic layer cannot touch the Minecraft item wrappers, so it works on the records.
  */
 class PerEraBuildTest {
 
@@ -126,142 +125,8 @@ class PerEraBuildTest {
 
     @Test
     void standardBuild_wrongRamGeneration_isNotPowered() {
-        final RamSpec ddr4 = new RamSpec(HardwareEra.ADVANCED, RamGeneration.DDR4, 4096, 20);
-        assertFalse(build(standardBoard(), standardCpu(), ddr4, psu(650)).isPowered());
-    }
-
-    // ---- Advanced ----
-
-    private static MotherboardSpec advancedBoard() {
-        return new MotherboardSpec(FormFactor.MTX, HardwareEra.ADVANCED, CpuSocket.SP3, 4,
-                Set.of(RamGeneration.DDR4), 24, PcieGeneration.PCIE_4_0, 12, 6, 8);
-    }
-
-    private static CpuSpec advancedCpu() {
-        return new CpuSpec(HardwareEra.ADVANCED, CpuSocket.SP3, 64, 2450, 280, false);
-    }
-
-    private static RamSpec advancedRam() {
-        return new RamSpec(HardwareEra.ADVANCED, RamGeneration.DDR4, 4096, 20);
-    }
-
-    @Test
-    void advancedBuild_isPowered() {
-        assertTrue(build(advancedBoard(), advancedCpu(), advancedRam(), psu(1600)).isPowered());
-    }
-
-    @Test
-    void advancedBuild_wrongSocket_isNotPowered() {
-        final CpuSpec wrong = new CpuSpec(HardwareEra.ADVANCED, CpuSocket.AM4, 16, 3400, 105, false);
-        assertFalse(build(advancedBoard(), wrong, advancedRam(), psu(1600)).isPowered());
-    }
-
-    @Test
-    void advancedBuild_wrongRamGeneration_isNotPowered() {
-        final RamSpec ddr5 = new RamSpec(HardwareEra.EXA, RamGeneration.DDR5, 8192, 30);
-        assertFalse(build(advancedBoard(), advancedCpu(), ddr5, psu(1600)).isPowered());
-    }
-
-    // ---- Exa ----
-
-    private static MotherboardSpec exaBoard() {
-        return new MotherboardSpec(FormFactor.MTX, HardwareEra.EXA, CpuSocket.SP5, 4,
-                Set.of(RamGeneration.DDR5), 24, PcieGeneration.PCIE_5_0, 16, 6, 8);
-    }
-
-    private static CpuSpec exaCpu() {
-        return new CpuSpec(HardwareEra.EXA, CpuSocket.SP5, 96, 2400, 360, false);
-    }
-
-    private static RamSpec exaRam() {
-        return new RamSpec(HardwareEra.EXA, RamGeneration.DDR5, 8192, 30);
-    }
-
-    @Test
-    void exaBuild_isPowered() {
-        assertTrue(build(exaBoard(), exaCpu(), exaRam(), psu(3000)).isPowered());
-    }
-
-    @Test
-    void exaBuild_wrongSocket_isNotPowered() {
-        final CpuSpec wrong = new CpuSpec(HardwareEra.EXA, CpuSocket.STR5, 64, 3200, 350, false);
-        assertFalse(build(exaBoard(), wrong, exaRam(), psu(3000)).isPowered());
-    }
-
-    @Test
-    void exaBuild_wrongRamGeneration_isNotPowered() {
-        final RamSpec ddr6 = new RamSpec(HardwareEra.SINGULARITY, RamGeneration.DDR6, 16384, 40);
-        assertFalse(build(exaBoard(), exaCpu(), ddr6, psu(3000)).isPowered());
-    }
-
-    // ---- Singularity (conventional Quantum line) ----
-
-    private static MotherboardSpec sktQPrimeBoard() {
-        return new MotherboardSpec(FormFactor.SOCKET_Q, HardwareEra.SINGULARITY, CpuSocket.SOCKET_Q, 4,
-                Set.of(RamGeneration.DDR6, RamGeneration.HBM), 24, PcieGeneration.PCIE_6_0, 12, 6, 8);
-    }
-
-    private static CpuSpec quantumCpu() {
-        return new CpuSpec(HardwareEra.SINGULARITY, CpuSocket.SOCKET_Q, 256, 6000, 500, false);
-    }
-
-    private static RamSpec ddr6() {
-        return new RamSpec(HardwareEra.SINGULARITY, RamGeneration.DDR6, 16384, 40);
-    }
-
-    @Test
-    void singularityBuild_isPowered() {
-        assertTrue(build(sktQPrimeBoard(), quantumCpu(), ddr6(), psu(8000)).isPowered());
-    }
-
-    @Test
-    void singularityBuild_wrongSocket_isNotPowered() {
-        // The alien EM Core uses Socket EM, which does not fit the conventional Socket Q board.
-        final CpuSpec emCpu = new CpuSpec(HardwareEra.SINGULARITY, CpuSocket.SOCKET_EM, 128, 5500, 450, true);
-        assertFalse(build(sktQPrimeBoard(), emCpu, ddr6(), psu(8000)).isPowered());
-    }
-
-    @Test
-    void singularityBuild_wrongRamGeneration_isNotPowered() {
-        final RamSpec ddr5 = new RamSpec(HardwareEra.EXA, RamGeneration.DDR5, 8192, 30);
-        assertFalse(build(sktQPrimeBoard(), quantumCpu(), ddr5, psu(8000)).isPowered());
-    }
-
-    // ---- Singularity (alien EM line) ----
-
-    private static MotherboardSpec mtxEmBoard() {
-        return new MotherboardSpec(FormFactor.MTX, HardwareEra.SINGULARITY, CpuSocket.SOCKET_EM, 1,
-                Set.of(RamGeneration.DDR6, RamGeneration.HBM), 8, PcieGeneration.PCIE_6_0, 6, 6, 8);
-    }
-
-    private static CpuSpec emCore() {
-        return new CpuSpec(HardwareEra.SINGULARITY, CpuSocket.SOCKET_EM, 128, 5500, 450, true);
-    }
-
-    @Test
-    void emCore_orchestrationCapacity_isTripleTheConventionalCpu() {
-        final CpuSpec conventional = new CpuSpec(HardwareEra.SINGULARITY, CpuSocket.SOCKET_Q, 128, 5500, 400, false);
-        assertEquals(3L * conventional.orchestrationCapacity(), emCore().orchestrationCapacity(),
-                "the alien flag multiplies orchestration capacity by three");
-    }
-
-    @Test
-    void alienPsu_autoScaling_bypassesPowerCheck() {
-        // The EM build's draw (450W CPU + 40W RAM = 490W) is far above the AlienPSU's nominal 8000W only
-        // nominally — the point is that an auto-scaling PSU dimensions itself to any draw. Prove it powers a
-        // build whose draw exceeds a deliberately tiny nominal wattage.
-        final PsuSpec alienPsu = new PsuSpec(1, 100, true);
-        final ComputerBuild emBuild = new ComputerBuild(mtxEmBoard(),
-                List.of(emCore()), List.of(), List.of(ddr6()), alienPsu);
-        assertTrue(emBuild.isPowered(), "the AlienPSU auto-scales and always satisfies the power draw");
-        assertTrue(emBuild.validate().problems().isEmpty());
-    }
-
-    @Test
-    void emCore_onFixedPsuBelowDraw_isNotPowered() {
-        // The same EM build on a conventional fixed-wattage PSU below the draw must still fail.
-        final ComputerBuild emBuild = new ComputerBuild(mtxEmBoard(),
-                List.of(emCore()), List.of(), List.of(ddr6()), psu(100));
-        assertFalse(emBuild.isPowered());
+        // A Standard board wants DDR3; an older DDR2 module from the Legacy era must not power it.
+        final RamSpec ddr2 = new RamSpec(HardwareEra.LEGACY, RamGeneration.DDR2, 512, 12);
+        assertFalse(build(standardBoard(), standardCpu(), ddr2, psu(650)).isPowered());
     }
 }

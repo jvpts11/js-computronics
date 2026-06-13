@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "jsc:item/motherboard_eeb_advanced_lga4189"
-  }
-}

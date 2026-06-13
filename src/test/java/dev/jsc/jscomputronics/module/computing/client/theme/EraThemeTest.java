@@ -102,6 +102,14 @@ class EraThemeTest {
     }
 
     @Test
+    void of_futureEras_resolveToStandard() {
+        // The eras beyond Standard ship no content yet, so they have no distinct skin and fall back to STANDARD.
+        assertSame(EraThemes.STANDARD, EraThemes.of(HardwareEra.ADVANCED));
+        assertSame(EraThemes.STANDARD, EraThemes.of(HardwareEra.EXA));
+        assertSame(EraThemes.STANDARD, EraThemes.of(HardwareEra.SINGULARITY));
+    }
+
+    @Test
     void ofNullable_null_fallsBackToStandard() {
         assertSame(EraThemes.STANDARD, EraThemes.ofNullable(null));
     }

@@ -15,9 +15,9 @@ import org.jetbrains.annotations.Nullable;
  * to pick its skin. STANDARD is frozen: its palette is the exact set of values the original flat-dark theme shipped
  * with, and its style is flat, so a STANDARD-era (or no-board / unknown-era) screen renders pixel-for-pixel as before.
  *
- * <p>The other five palettes are starting points (tunable in playtesting / a mockup pass): square corners only, no
- * rounded geometry — the eras differ by color first and by a restrained square overlay (scanlines, bevel, glow) only
- * where it reads as period-correct.
+ * <p>The Vintage and Legacy palettes are starting points (tunable in playtesting / a mockup pass): square corners
+ * only, no rounded geometry — the eras differ by color first and by a restrained square overlay (scanlines, bevel)
+ * only where it reads as period-correct. Eras beyond Standard ship no content yet, so they share the STANDARD skin.
  */
 public final class EraThemes {
 
@@ -59,50 +59,16 @@ public final class EraThemes {
                     0xFF1A3C8C, 0xFFE8E4D4),
             new EraStyle(false, true, false, 0xFFFFFFF0, 0xFF6E6A58, 0, 0, SMALL));
 
-    /** Sleeker dark: deeper graphite, a cool steel-blue accent and a violet secondary — STANDARD, one notch sharper. */
-    public static final EraTheme ADVANCED = new EraTheme(
-            new EraPalette(
-                    0xFF04060A, 0xFF080B11, 0xFF0B0F16, 0xFF0E141C, 0xFF243042, 0xFF070B12,
-                    0xFF070A10, 0xFF26354A,
-                    0xFF4EA8FF, 0xFF8C6CFF,
-                    0xFF5BE38A, 0xFFF2B544, 0xFFF06A6A,
-                    0xFFE2E8F2, 0xFF8290A4,
-                    0xFF14202E, 0xFF1B2A3C),
-            EraStyle.flat(SMALL));
-
-    /** Holographic near-future: deep teal/indigo panels, bright cyan/magenta accents, a faint square accent glow. */
-    public static final EraTheme EXA = new EraTheme(
-            new EraPalette(
-                    0xFF030611, 0xFF060A1A, 0xFF081026, 0xFF0B1430, 0xFF1E60A0, 0xFF060C20,
-                    0xFF05091C, 0xFF1E60A0,
-                    0xFF22E0FF, 0xFFB04CFF,
-                    0xFF3CF0C0, 0xFFFFC24A, 0xFFFF5E8A,
-                    0xFFD6ECFF, 0xFF6E86B0,
-                    0xFF0E2348, 0xFF14305C),
-            new EraStyle(false, false, true, 0, 0, 0, 0x3322E0FF, SMALL));
-
-    /** Exotic far-future glow: void-black with iridescent gold/violet/cyan accents and the strongest square glow. */
-    public static final EraTheme SINGULARITY = new EraTheme(
-            new EraPalette(
-                    0xFF000000, 0xFF050308, 0xFF0A0612, 0xFF0D0818, 0xFF6A3CC0, 0xFF070410,
-                    0xFF050208, 0xFF6A3CC0,
-                    0xFFE0B84A, 0xFF9C5CFF,
-                    0xFF50F0B0, 0xFFFFD25A, 0xFFFF4E7A,
-                    0xFFF0E6FF, 0xFF8A6CC0,
-                    0xFF170A2E, 0xFF22103E),
-            new EraStyle(false, false, true, 0, 0, 0, 0x44E0B84A, SMALL));
-
     /**
-     * The skin for a given hardware era. The enum is closed, so the switch is exhaustive.
+     * The skin for a given hardware era. The enum is closed, so the switch is exhaustive. Only the Vintage, Legacy
+     * and Standard eras ship content; the future eras (Advanced, Exa, Singularity) have no distinct skin and resolve
+     * to STANDARD until their content exists.
      */
     public static EraTheme of(final HardwareEra era) {
         return switch (era) {
             case VINTAGE -> VINTAGE;
             case LEGACY -> LEGACY;
-            case STANDARD -> STANDARD;
-            case ADVANCED -> ADVANCED;
-            case EXA -> EXA;
-            case SINGULARITY -> SINGULARITY;
+            case STANDARD, ADVANCED, EXA, SINGULARITY -> STANDARD;
         };
     }
 

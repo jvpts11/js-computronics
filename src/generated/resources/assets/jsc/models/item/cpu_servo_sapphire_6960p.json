@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "jsc:item/cpu_servo_sapphire_6960p"
-  }
-}

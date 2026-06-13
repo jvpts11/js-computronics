@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "jsc:item/motherboard_eatx_advanced_ws_lga4189"
-  }
-}

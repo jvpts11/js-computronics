@@ -105,9 +105,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        // A Mainframe takes the MTX board of every era (the MTX-EM alien board is MTX-form-factor too),
-        // plus the Singularity Socket Q Prime board.
-        return Set.of(FormFactor.MTX, FormFactor.SOCKET_Q);
+        // A Mainframe takes the MTX board of every shipped era.
+        return Set.of(FormFactor.MTX);
     }
 
     // Slot validity is governed by the inherited instance isValidForSlot, which the acceptedFormFactors
