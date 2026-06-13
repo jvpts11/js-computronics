@@ -13,6 +13,7 @@ import dev.jsc.jscomputronics.common.format.UnitFormatter;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.network.ServerNode;
 import dev.jsc.jscomputronics.common.network.SubframeNode;
+import dev.jsc.jscomputronics.common.util.ShortId;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
@@ -1300,7 +1301,7 @@ public final class ComputingPayloads {
     }
 
     private static String pcLabel(final PersonalComputerBlockEntity pc, final NodeUuid node) {
-        return pc.customName().isEmpty() ? "PC-" + shortId(node.asString()) : pc.customName();
+        return pc.customName().isEmpty() ? "PC-" + ShortId.of(node.asString()) : pc.customName();
     }
 
     public static void dispatchTerminalOpsLog(final ServerPlayer player, final NetworkUuid net,
@@ -1361,7 +1362,7 @@ public final class ComputingPayloads {
     }
 
     public static String serverLabel(final ServerLevel level, final NodeUuid node) {
-        final String fallback = "SRV-" + shortId(node.asString());
+        final String fallback = "SRV-" + ShortId.of(node.asString());
         return dev.jsc.jscomputronics.common.network.NetworkSystem.get(level).locationOf(node)
                 .map(loc -> level.getBlockEntity(net.minecraft.core.BlockPos.of(loc.rackPos()))
                         instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
@@ -1406,7 +1407,7 @@ public final class ComputingPayloads {
         final NetworkUuid net = mf.networkUuid();
 
         nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_MAINFRAME,
-                shortId(mf.nodeUuid().asString()),
+                ShortId.of(mf.nodeUuid().asString()),
                 fmt.compact(mf.capacity(), Unit.IT_PER_TICK),
                 net != null));
 
@@ -1417,7 +1418,7 @@ public final class ComputingPayloads {
                     break;
                 }
                 nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_SERVER,
-                        shortId(server.nodeUuid().asString()),
+                        ShortId.of(server.nodeUuid().asString()),
                         fmt.compact(server.storageMB(), Unit.MB), true));
             }
             for (final SubframeNode subframe : system.subframesOf(net)) {
@@ -1425,7 +1426,7 @@ public final class ComputingPayloads {
                     break;
                 }
                 nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_SUBFRAME,
-                        shortId(subframe.nodeUuid().asString()),
+                        ShortId.of(subframe.nodeUuid().asString()),
                         fmt.compact(subframe.contributedCapacity(), Unit.IT_PER_TICK), true));
             }
             for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(net)) {
@@ -1433,15 +1434,11 @@ public final class ComputingPayloads {
                     break;
                 }
                 nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_PC,
-                        shortId(pc.nodeUuid().asString()),
+                        ShortId.of(pc.nodeUuid().asString()),
                         fmt.compact(pc.capacity(), Unit.IT_PER_TICK), true));
             }
         }
-        return new NetworkNodesPayload(net != null ? shortId(net.asString()) : "", nodes);
-    }
-
-    private static String shortId(final String uuid) {
-        return uuid.length() >= 6 ? uuid.substring(0, 6) : uuid;
+        return new NetworkNodesPayload(net != null ? ShortId.of(net.asString()) : "", nodes);
     }
 
     public static void sendSnapshot(final ServerPlayer player, final ServerLevel level, final NetworkUuid network) {

@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.program;
 
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
+import dev.jsc.jscomputronics.common.util.ShortId;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity;
@@ -79,7 +80,7 @@ public final class ServerCliComputer implements CliComputer {
         } else {
             node = null;
         }
-        return node == null ? "------" : shortId(node.asString());
+        return node == null ? "------" : ShortId.of(node.asString());
     }
 
     @Override
@@ -105,7 +106,7 @@ public final class ServerCliComputer implements CliComputer {
     @Override
     public String networkId() {
         final NetworkUuid net = host.networkUuid();
-        return net == null ? "" : shortId(net.asString());
+        return net == null ? "" : ShortId.of(net.asString());
     }
 
     @Override
@@ -496,10 +497,6 @@ public final class ServerCliComputer implements CliComputer {
             return null;
         }
         return BuiltInRegistries.ITEM.getOptional(location).orElse(null);
-    }
-
-    private static String shortId(final String uuid) {
-        return uuid.length() >= 6 ? uuid.substring(0, 6) : uuid;
     }
 
     private static String opType(final byte type) {

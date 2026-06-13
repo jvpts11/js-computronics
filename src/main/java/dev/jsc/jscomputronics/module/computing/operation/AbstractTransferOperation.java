@@ -12,6 +12,7 @@ import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
 import dev.jsc.jscomputronics.common.operation.exec.EqualShare;
 import dev.jsc.jscomputronics.common.operation.exec.OperationProgress;
 import dev.jsc.jscomputronics.common.operation.exec.TransferState;
+import dev.jsc.jscomputronics.common.util.ShortId;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
@@ -212,6 +213,6 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
     }
 
     protected static String shortId(final String uuid) {
-        return uuid.length() >= 6 ? uuid.substring(0, 6) : uuid;
+        return ShortId.of(uuid);
     }
 }
