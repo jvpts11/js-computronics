@@ -30,6 +30,23 @@ class NetworkSystemTest {
         net = NetworkUuid.random();
     }
 
+    @Test
+    void clear_resetsEveryRegistryIncludingCraftingAndSupercomputers() {
+        system.registerCraftingComputer(
+                new NetworkSystem.CraftingComputerNode(NodeUuid.random(), net, 1L, 0L));
+        system.registerSupercomputer(
+                new NetworkSystem.SupercomputerNode(NodeUuid.random(), net, 4L, 1L));
+        assertFalse(system.craftingComputersOf(net).isEmpty());
+        assertFalse(system.supercomputersOf(net).isEmpty());
+
+        system.clear();
+
+        assertTrue(system.craftingComputersOf(net).isEmpty(),
+                "clear() must reset the crafting-computer registry");
+        assertTrue(system.supercomputersOf(net).isEmpty(),
+                "clear() must reset the supercomputer registry");
+    }
+
     private MainframeNode standaloneMainframe(long capacity) {
         return new MainframeNode(
                 NodeUuid.random(),

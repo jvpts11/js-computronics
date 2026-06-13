@@ -46,6 +46,13 @@ public final class NetworkSystem {
     private final java.util.Map<NetworkUuid, java.util.List<ServerRouterElement>> routersByNetwork =
             new java.util.HashMap<>();
 
+    // Every per-network / per-node registry, collected so clear() resets them all together and a newly
+    // added map can never be left out again (crafting and supercomputer nodes once were).
+    private final List<java.util.Map<?, ?>> registries = List.of(
+            mainframesByNetwork, mainframePosByNetwork, subframesByNetwork, serversByNetwork,
+            serverLocations, pcsByNetwork, craftingComputersByNetwork, supercomputersByNetwork,
+            routersByNetwork);
+
     /**
      * A Personal Computer attached to a network: a Category-C node that issues, but never orchestrates, Operations.
      */
@@ -298,12 +305,6 @@ public final class NetworkSystem {
 
     public void clear() {
         connectivity.clear();
-        mainframesByNetwork.clear();
-        mainframePosByNetwork.clear();
-        subframesByNetwork.clear();
-        serversByNetwork.clear();
-        serverLocations.clear();
-        pcsByNetwork.clear();
-        routersByNetwork.clear();
+        registries.forEach(java.util.Map::clear);
     }
 }
