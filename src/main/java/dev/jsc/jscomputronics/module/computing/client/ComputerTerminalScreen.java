@@ -896,8 +896,13 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.drawString(font, "CRAFT  " + trim(craftPopup.result().getHoverName().getString(), 18),
                 px + 28, py + 8, TEXT, false);
 
-        // Quantity row: the shared editable field plus steppers.
+        // Quantity row: the shared editable field plus steppers. The popup draws over the screen at a
+        // raised z, so the qty field (a widget drawn earlier by super.render) must be re-rendered here or
+        // the selected craft amount stays hidden behind the overlay -- the item popup does the same.
         g.fill(px + 6, py + 28, px + 130, py + 46, TRACK);
+        if (qtyBox != null) {
+            qtyBox.render(g, mouseX, mouseY, 0.0f);
+        }
         final String[] steps = {"-64", "-1", "+1", "+64"};
         for (int i = 0; i < steps.length; i++) {
             final int bx = px + 134 + i * 16;
@@ -2684,7 +2689,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     private void renderNetworkHover(final GuiGraphics g, final int mx, final int my) {
         final int gx = leftPos + NET_X;
-        final int gy = topPos + NET_Y;
+        // Match the grid's per-tab vertical shift and row count so the highlight tracks the cell the
+        // tooltip hit-test (networkItemAt) reports -- on the Storage tab the slider band pushes both down.
+        final int gy = topPos + NET_Y + gridShift();
         final int relX = mx - gx;
         final int relY = my - gy;
         if (relX < 0 || relY < 0 || relX % 18 > 15 || relY % 18 > 15) {
@@ -2692,7 +2699,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
         final int col = relX / 18;
         final int row = relY / 18;
-        if (col >= NET_COLS || row >= NET_ROWS) {
+        if (col >= NET_COLS || row >= gridRows()) {
             return;
         }
         final int sx = gx + col * 18;
