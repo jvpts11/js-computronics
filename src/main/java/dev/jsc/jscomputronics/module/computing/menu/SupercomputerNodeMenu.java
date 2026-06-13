@@ -80,31 +80,6 @@ public class SupercomputerNodeMenu extends AbstractContainerMenu {
         }
     }
 
-    /**
-     * A hardware slot active only while the installed board offers its index (or it holds a part).
-     */
-    private final class BoardSlot extends SlotItemHandler {
-        private final int relativeIndex;
-        private final java.util.function.IntSupplier boardLimit;
-
-        private BoardSlot(final IItemHandler handler, final int index, final int x, final int y,
-                          final int relativeIndex, final java.util.function.IntSupplier boardLimit) {
-            super(handler, index, x, y);
-            this.relativeIndex = relativeIndex;
-            this.boardLimit = boardLimit;
-        }
-
-        @Override
-        public boolean isActive() {
-            return relativeIndex < boardLimit.getAsInt() || hasItem();
-        }
-
-        @Override
-        public boolean mayPlace(final ItemStack stack) {
-            return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
-        }
-    }
-
     public net.minecraft.core.BlockPos computerPos() {
         return blockEntity.getBlockPos();
     }

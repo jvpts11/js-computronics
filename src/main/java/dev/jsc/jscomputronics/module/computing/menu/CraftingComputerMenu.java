@@ -83,33 +83,6 @@ public class CraftingComputerMenu extends AbstractContainerMenu {
         }
     }
 
-    /**
-     * A hardware slot usable only while its {@code relativeIndex} is within the count the installed motherboard offers — so CPU/RAM/PCIe/disk slots appear and accept parts according to the board, not a fixed maximum.
-     */
-    private final class BoardSlot extends SlotItemHandler {
-        private final int relativeIndex;
-        private final java.util.function.IntSupplier boardLimit;
-
-        private BoardSlot(final IItemHandler handler, final int index, final int x, final int y,
-                          final int relativeIndex, final java.util.function.IntSupplier boardLimit) {
-            super(handler, index, x, y);
-            this.relativeIndex = relativeIndex;
-            this.boardLimit = boardLimit;
-        }
-
-        @Override
-        public boolean isActive() {
-            // Within the board's slot count, or already holding a part — so a
-            // component is never trapped behind a smaller board swapped in later.
-            return relativeIndex < boardLimit.getAsInt() || hasItem();
-        }
-
-        @Override
-        public boolean mayPlace(final ItemStack stack) {
-            return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
-        }
-    }
-
     public net.minecraft.core.BlockPos computerPos() {
         return blockEntity.getBlockPos();
     }

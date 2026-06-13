@@ -44,50 +44,23 @@ public class ServerAssemblyMenu extends AbstractContainerMenu {
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.MOBO, 8, 96));
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.PSU, 26, 96));
         for (int i = 0; i < ServerHardwareHandler.DISK; i++) {
-            addSlot(new BoardSlot(ServerHardwareHandler.DISK_START + i,
+            addSlot(new BoardSlot(hw, ServerHardwareHandler.DISK_START + i,
                     8 + (i % 2) * 18, 126 + (i / 2) * 18, i, this::boardDiskSlots));
         }
         // Middle column: CPUs on a row, RAM in 2 rows, GPUs in 2 rows.
         for (int i = 0; i < ServerHardwareHandler.CPU; i++) {
-            addSlot(new BoardSlot(ServerHardwareHandler.CPU_START + i, 52 + i * 18, 96, i, this::boardCpuSlots));
+            addSlot(new BoardSlot(hw, ServerHardwareHandler.CPU_START + i, 52 + i * 18, 96, i, this::boardCpuSlots));
         }
         for (int i = 0; i < ServerHardwareHandler.RAM; i++) {
-            addSlot(new BoardSlot(ServerHardwareHandler.RAM_START + i,
+            addSlot(new BoardSlot(hw, ServerHardwareHandler.RAM_START + i,
                     52 + (i % 4) * 18, 126 + (i / 4) * 18, i, this::boardRamSlots));
         }
         for (int i = 0; i < ServerHardwareHandler.GPU; i++) {
-            addSlot(new BoardSlot(ServerHardwareHandler.GPU_START + i,
+            addSlot(new BoardSlot(hw, ServerHardwareHandler.GPU_START + i,
                     52 + (i % 3) * 18, 174 + (i / 3) * 18, i, this::boardGpuSlots));
         }
 
         addPlayerInventory(playerInventory);
-    }
-
-    /**
-     * A hardware slot usable only while its {@code relativeIndex} is within the count the installed board offers — so the CPU/RAM/GPU/disk bays appear and accept parts according to the board, and none of them do until a board is installed (the limit is then 0).
-     */
-    private final class BoardSlot extends SlotItemHandler {
-        private final int relativeIndex;
-        private final java.util.function.IntSupplier boardLimit;
-
-        private BoardSlot(final int index, final int x, final int y,
-                          final int relativeIndex, final java.util.function.IntSupplier boardLimit) {
-            super(hw, index, x, y);
-            this.relativeIndex = relativeIndex;
-            this.boardLimit = boardLimit;
-        }
-
-        @Override
-        public boolean isActive() {
-            // Within the board's count, or already holding a part — so a part is never trapped behind
-            // a smaller board swapped in later.
-            return relativeIndex < boardLimit.getAsInt() || hasItem();
-        }
-
-        @Override
-        public boolean mayPlace(final ItemStack stack) {
-            return relativeIndex < boardLimit.getAsInt() && super.mayPlace(stack);
-        }
     }
 
     private MotherboardSpec boardSpec() {
