@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.SupercomputerNodeMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
 import net.minecraft.ChatFormatting;
@@ -151,6 +152,11 @@ public class SupercomputerNodeScreen extends AbstractAssemblyScreen<Supercompute
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
     }
 
 }

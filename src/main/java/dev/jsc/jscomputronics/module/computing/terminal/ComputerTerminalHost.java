@@ -98,6 +98,16 @@ public interface ComputerTerminalHost {
     boolean isMainframeHost();
 
     /**
+     * This host's board-derived hardware era, or {@code null} when no motherboard is installed. The terminal uses
+     * it to skin the GUI in the host computer's era; a {@code null} era keeps the default look. A board-backed
+     * computer overrides this with its installed era; a host with no board reports {@code null}.
+     */
+    @org.jetbrains.annotations.Nullable
+    default dev.jsc.jscomputronics.common.tier.HardwareEra installedEra() {
+        return null;
+    }
+
+    /**
      * Whether this computer exposes the per-disk public/private storage slider. A Server's and a Mainframe's own storage is always fully public, so they return {@code false} and the terminal shows a static "always public" badge instead of a dead control.
      */
     default boolean storageHasSlider() {

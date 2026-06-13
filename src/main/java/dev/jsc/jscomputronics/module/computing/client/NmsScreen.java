@@ -7,6 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.NmsMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RunSqlPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.SqlResultPayload;
@@ -202,6 +204,19 @@ public class NmsScreen extends AbstractComputerScreen<NmsMenu> {
     @Override
     public boolean charTyped(final char c, final int mods) {
         return query != null && query.charTyped(c, mods);
+    }
+
+    @Override
+    protected HardwareEra screenEra() {
+        // The Studio runs on one host computer (a PC or Mainframe); read its board-derived era directly from
+        // the host block entity on the client. The board only changes inside the computer's own assembly GUI,
+        // never while the Studio is open, so resolving it here (per init/containerTick) is sufficient.
+        final Minecraft mc = Minecraft.getInstance();
+        if (mc.level != null
+                && mc.level.getBlockEntity(menu.hostPos()) instanceof AbstractComputerBlockEntity host) {
+            return host.installedEra();
+        }
+        return null;
     }
 
 }

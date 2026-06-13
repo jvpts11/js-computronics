@@ -99,6 +99,11 @@ public class SupercomputerNodeMenu extends AbstractComputerMenu {
         return blockEntity.boardDiskSlots();
     }
 
+    @org.jetbrains.annotations.Nullable
+    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+        return blockEntity.installedEra();
+    }
+
     public boolean isRunning() {
         return data.get(SupercomputerNodeBlockEntity.DATA_RUNNING) != 0;
     }

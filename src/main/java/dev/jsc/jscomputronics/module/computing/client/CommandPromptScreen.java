@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.CommandOutputPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ConsoleInitPayload;
@@ -16,7 +17,6 @@ import dev.jsc.jscomputronics.module.computing.program.cli.CliStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -32,7 +32,7 @@ import java.util.Map;
 /**
  * The Command Prompt: a full CLI over the computer the Monitor is bound to. A typed line is echoed, sent to the server to run through the shell, and the styled result is appended to the scrollback. Up/Down walk the input history; the mouse wheel scrolls back through output. The same OS skin as the rest of the computing GUIs, square corners and all.
  */
-public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMenu> {
+public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMenu> {
 
     private static final int CONSOLE = 0xFF070A0E;
     private static final int MAX_SCROLLBACK = 512;
@@ -326,6 +326,11 @@ public class CommandPromptScreen extends AbstractContainerScreen<CommandPromptMe
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+    }
+
+    @Override
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
     }
 
     /** One scrollback line: its text and the style that colours it. */

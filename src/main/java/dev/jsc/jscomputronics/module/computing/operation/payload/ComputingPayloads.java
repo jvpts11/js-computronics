@@ -323,13 +323,18 @@ public final class ComputingPayloads {
                     || id.equals("command_prompt")) {
                 final net.minecraft.network.chat.Component title =
                         player.level().getBlockState(payload.hostPos()).getBlock().getName();
+                // The host's board-derived era drives the prompt's GUI skin; capture it at open time. It is
+                // not re-synced afterwards because the board is only swapped in the computer's own assembly
+                // GUI, never from the running prompt.
+                final dev.jsc.jscomputronics.common.tier.HardwareEra hostEra =
+                        player.level().getBlockEntity(payload.hostPos())
+                                instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                                        .AbstractComputerBlockEntity host ? host.installedEra() : null;
                 player.openMenu(new net.minecraft.world.SimpleMenuProvider(
                         (windowId, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu(
-                                windowId, inv, payload.monitorPos(), payload.hostPos()), title),
-                        buf -> {
-                            buf.writeBlockPos(payload.monitorPos());
-                            buf.writeBlockPos(payload.hostPos());
-                        });
+                                windowId, inv, payload.monitorPos(), payload.hostPos(), hostEra), title),
+                        buf -> dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu.writeOpenBuffer(
+                                buf, payload.monitorPos(), payload.hostPos(), hostEra));
             }
         });
     }

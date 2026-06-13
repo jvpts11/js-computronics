@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.LocalStorageSnapshotPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry;
@@ -26,7 +27,6 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.TerminalSelectP
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.ClickType;
@@ -42,27 +42,50 @@ import java.util.Set;
 /**
  * Screen for the Monitor terminal: a left tab rail (icon over name) and a content area, drawn as a flat dark "computer OS" with square edges and a cyan accent, with the player inventory pinned along the bottom so every tab is usable.
  */
-public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerminalMenu> {
+public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTerminalMenu> {
 
-    // Flat palette (ARGB), sourced from the shared OS theme so the Monitor terminal never drifts from
-    // the other computing GUIs. No rounded corners anywhere.
-    private static final int OUTER = JscOsTheme.outer();
-    private static final int SCREEN = JscOsTheme.screen();
-    private static final int RAIL = JscOsTheme.rail();
-    private static final int PANEL = JscOsTheme.panel();
-    private static final int LINE = JscOsTheme.line();
-    private static final int TRACK = JscOsTheme.track();
-    private static final int SLOT_BG = JscOsTheme.slotBg();
-    private static final int SLOT_EDGE = JscOsTheme.slotEdge();
-    private static final int ACCENT = JscOsTheme.accent();
-    private static final int ACCENT2 = JscOsTheme.accent2();
-    private static final int GREEN = JscOsTheme.green();
-    private static final int AMBER = JscOsTheme.amber();
-    private static final int RED = JscOsTheme.red();
-    private static final int TEXT = JscOsTheme.text();
-    private static final int DIM = JscOsTheme.dim();
-    private static final int TAB_ON = JscOsTheme.tabOn();
-    private static final int HOVER = JscOsTheme.hover();
+    // Flat palette (ARGB), read live from the render-bound OS theme so the Monitor terminal repaints in the host
+    // computer's hardware-era skin. These mirror the former static constants one-for-one; refreshed via
+    // syncPalette() at the top of each draw pass (renderBg/renderLabels) while the era theme is bound, so a
+    // STANDARD-era host renders byte-identically to the old flat-dark constants.
+    private int OUTER;
+    private int SCREEN;
+    private int RAIL;
+    private int PANEL;
+    private int LINE;
+    private int TRACK;
+    private int SLOT_BG;
+    private int SLOT_EDGE;
+    private int ACCENT;
+    private int ACCENT2;
+    private int GREEN;
+    private int AMBER;
+    private int RED;
+    private int TEXT;
+    private int DIM;
+    private int TAB_ON;
+    private int HOVER;
+
+    /** Refreshes the palette fields from the bound era theme. Called at the top of every draw pass. */
+    private void syncPalette() {
+        OUTER = JscOsTheme.outer();
+        SCREEN = JscOsTheme.screen();
+        RAIL = JscOsTheme.rail();
+        PANEL = JscOsTheme.panel();
+        LINE = JscOsTheme.line();
+        TRACK = JscOsTheme.track();
+        SLOT_BG = JscOsTheme.slotBg();
+        SLOT_EDGE = JscOsTheme.slotEdge();
+        ACCENT = JscOsTheme.accent();
+        ACCENT2 = JscOsTheme.accent2();
+        GREEN = JscOsTheme.green();
+        AMBER = JscOsTheme.amber();
+        RED = JscOsTheme.red();
+        TEXT = JscOsTheme.text();
+        DIM = JscOsTheme.dim();
+        TAB_ON = JscOsTheme.tabOn();
+        HOVER = JscOsTheme.hover();
+    }
 
     private static final int RAIL_X = 4;
     private static final int RAIL_W = 56;
@@ -198,7 +221,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         final EditBox box = new EditBox(font, leftPos + NET_X + 4, topPos + TOOLBAR_Y + 2,
                 SEARCH_W - 8, TOOLBAR_H - 3, Component.literal("Search"));
         box.setBordered(false);
-        box.setTextColor(TEXT);
+        // The fields are built outside a render pass, so color them from the resolved era theme (not the bound
+        // static); containerTick keeps them in step when a board swap changes the host era.
+        box.setTextColor(theme.text());
         box.setMaxLength(48);
         box.setHint(Component.literal("Search items...").withStyle(ChatFormatting.DARK_GRAY));
         box.setResponder(s -> netScrollRow = 0);
@@ -207,7 +232,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
         // The request popup's editable quantity field (digits only); visible only while the popup is up.
         final EditBox qty = new EditBox(font, popupX() + 8, popupY() + 30, 118, 14, Component.literal("Qty"));
-        qty.setTextColor(TEXT);
+        qty.setTextColor(theme.text());
         qty.setMaxLength(12);
         qty.setFilter(s -> s.isEmpty() || s.chars().allMatch(Character::isDigit));
         qty.setResponder(this::onQtyTyped);
@@ -333,6 +358,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
+        syncPalette();
         final int x = leftPos;
         final int y = topPos;
 
@@ -577,7 +603,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         depositBar(g, x, y, dy);
     }
 
-    private static void slotBg(final GuiGraphics g, final int x, final int y) {
+    private void slotBg(final GuiGraphics g, final int x, final int y) {
         g.fill(x - 1, y - 1, x + 17, y + 17, SLOT_EDGE);
         g.fill(x, y, x + 16, y + 16, SLOT_BG);
     }
@@ -600,6 +626,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
+        syncPalette();
         final int cx = CONTENT_X;
         final int cy = 6;
         final int cw = contentW();
@@ -1197,7 +1224,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
                 cx + 82, my, TEXT, false);
     }
 
-    private static int statusColor(final byte status) {
+    private int statusColor(final byte status) {
         return switch (status) {
             case OperationRecord.STATUS_COMPLETED -> GREEN;
             case OperationRecord.STATUS_PARTIAL, OperationRecord.STATUS_WAITING -> AMBER;
@@ -1233,7 +1260,7 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         };
     }
 
-    private static int opTypeColor(final byte type) {
+    private int opTypeColor(final byte type) {
         return switch (type) {
             case OperationRecord.TYPE_INSERT, OperationRecord.TYPE_CRAFT -> AMBER;
             case OperationRecord.TYPE_DELETE, OperationRecord.TYPE_DROP -> RED;
@@ -2054,6 +2081,13 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     @Override
     protected void containerTick() {
         super.containerTick();
+        // Keep the text fields in step with the host era resolved by the base, so a board swap recolors them.
+        if (searchBox != null) {
+            searchBox.setTextColor(theme.text());
+        }
+        if (qtyBox != null) {
+            qtyBox.setTextColor(theme.text());
+        }
         // Drop a slider's optimistic preview once the authoritative sync has caught up to it (or while
         // it is not being dragged and the server reports a different, clamped value), so a rejected
         // value visibly corrects and later syncs drive the display.
@@ -2608,8 +2642,9 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         syncSearchBoxVisibility();
+        // The base render() binds the era skin, draws the screen, and renders the slot tooltip; the popups and
+        // custom hover tooltips below draw afterward using the palette fields refreshed during renderBg/Labels.
         super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
         if (dropOpen) {
             renderDropPopup(g, mouseX, mouseY);
         } else if (craftPopup != null) {
@@ -2667,5 +2702,10 @@ public class ComputerTerminalScreen extends AbstractContainerScreen<ComputerTerm
         g.pose().translate(0, 0, 300);
         g.fill(sx, sy, sx + 16, sy + 16, 0x80FFFFFF);
         g.pose().popPose();
+    }
+
+    @Override
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
     }
 }
