@@ -51,8 +51,11 @@ public class DataCableRenderer implements BlockEntityRenderer<DataCableBlockEnti
             if (type == null) {
                 continue;
             }
-            final BakedModel model = mc.getModelManager()
-                    .getModel(type == CablePartType.IMPORT ? IMPORT_MODEL : EXPORT_MODEL);
+            final ModelResourceLocation modelLocation = switch (type) {
+                case IMPORT -> IMPORT_MODEL;
+                case EXPORT -> EXPORT_MODEL;
+            };
+            final BakedModel model = mc.getModelManager().getModel(modelLocation);
             pose.pushPose();
             orient(pose, face);
             renderer.renderModel(pose.last(), consumer, cable.getBlockState(), model,

@@ -98,12 +98,14 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 models().getExistingFile(modLoc("block/datacenter_station")));
 
         // Tank: glass walls in a metal casing frame, so it reads as a containment vessel rather than a
+        // solid block.
         simpleBlock(ComputingModule.TANK.get(), models()
                 .cubeBottomTop("tank", mcLoc("block/glass"),
                         modLoc("block/mainframe_side"), modLoc("block/mainframe_side"))
                 .renderType("cutout"));
 
-        // Server Rack: a 2x3x2 multiblock cabinet. The four front bay blocks each show
+        // Server Rack: a 2x3x2 multiblock cabinet. The four front bay blocks each show their
+        // populated or empty bay model.
         final ModelFile[] rackBays = new ModelFile[4];
         for (int bays = 0; bays < 4; bays++) {
             rackBays[bays] = models().getExistingFile(modLoc("block/server_rack_bays_" + bays));
@@ -117,9 +119,8 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
                         .modelFile(rackBays[state.getValue(
                                 dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS)])
-                        .rotationY(((int) state.getValue(
-                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)
-                                .toYRot() + 180) % 360)
+                        .rotationY(rearYRot(state.getValue(
+                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)))
                         .build());
         getVariantBuilder(ComputingModule.SERVER_RACK_PART.get()).forAllStates(state -> {
             if (state.getValue(dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.TOP)) {
@@ -133,9 +134,8 @@ public class JscBlockStateProvider extends BlockStateProvider {
             return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
                     .modelFile(rackBays[state.getValue(
                             dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS)])
-                    .rotationY(((int) state.getValue(
-                            dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.FACING)
-                            .toYRot() + 180) % 360)
+                    .rotationY(rearYRot(state.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.FACING)))
                     .build();
         });
 
@@ -174,9 +174,8 @@ public class JscBlockStateProvider extends BlockStateProvider {
                         .modelFile(state.getValue(
                                 dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED)
                                 ? nodeFrontFilled : nodeFront)
-                        .rotationY(((int) state.getValue(
-                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)
-                                .toYRot() + 180) % 360)
+                        .rotationY(rearYRot(state.getValue(
+                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)))
                         .build());
         getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE_PART.get()).forAllStates(state -> {
             final boolean front = state.getValue(
@@ -185,9 +184,8 @@ public class JscBlockStateProvider extends BlockStateProvider {
                     dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FILLED);
             return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
                     .modelFile(front ? (filled ? nodeFrontFilled : nodeFront) : nodePlain)
-                    .rotationY(((int) state.getValue(
-                            dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FACING)
-                            .toYRot() + 180) % 360)
+                    .rotationY(rearYRot(state.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FACING)))
                     .build();
         });
 
@@ -235,6 +233,14 @@ public class JscBlockStateProvider extends BlockStateProvider {
         });
 
         // Interaction buses are not blocks: they are parts mounted on a data cable's face,
+    }
+
+    /**
+     * The model rotation for a block whose access port sits on its rear face: spin the front-facing model
+     * a half-turn so its back lines up with the placement direction.
+     */
+    private static int rearYRot(final net.minecraft.core.Direction facing) {
+        return ((int) facing.toYRot() + 180) % 360;
     }
 
     private void pipeCable(final net.minecraft.world.level.block.Block block, final String name) {

@@ -84,6 +84,8 @@ public class JscLanguageProvider extends LanguageProvider {
         add("item.jsc.server_case.tooltip", "Crafting ingredient for a Server");
         add("menu.jsc.server_assembly", "Server Assembly");
         add("menu.jsc.network_overview", "Network Overview");
+        add("gui.jsc.confirm", "Confirm");
+        add("gui.jsc.cancel", "Cancel");
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             add(disk.item().get(), disk.displayName());
         }

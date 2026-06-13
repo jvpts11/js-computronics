@@ -111,7 +111,7 @@ public class ServerRouterMenu extends AbstractContainerMenu {
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
         // The button id is the output face's 3D data value; cycle that section's load-balance mode.
-        if (id >= 0 && id < 6) {
+        if (id >= 0 && id < Direction.values().length) {
             blockEntity.cycleLoadBalanceMode(Direction.from3DDataValue(id));
             return true;
         }

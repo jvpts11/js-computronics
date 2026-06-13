@@ -75,12 +75,18 @@ public final class ServerHardwareHandler implements IItemHandlerModifiable {
 
     @Override
     public ItemStack getStackInSlot(final int slot) {
+        if (slot < 0) {
+            return ItemStack.EMPTY;
+        }
         final ItemContainerContents current = contents();
         return slot < current.getSlots() ? current.getStackInSlot(slot) : ItemStack.EMPTY;
     }
 
     @Override
     public void setStackInSlot(final int slot, final ItemStack stack) {
+        if (slot < 0 || slot >= SLOTS) {
+            return; // out-of-range write; ignore rather than throw on the backing list
+        }
         final NonNullList<ItemStack> items = snapshot();
         items.set(slot, stack.copyWithCount(Math.min(stack.getCount(), 1)));
         write(items);

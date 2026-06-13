@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Custom mod event system: type-safe, testable, delegates to NeoForge.
+ * Custom mod event system: a type-safe, testable, in-house event bus that future NeoForge integration can sit behind.
  */
 package dev.jsc.jscomputronics.common.event;

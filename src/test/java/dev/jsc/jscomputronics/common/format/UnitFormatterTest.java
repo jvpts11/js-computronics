@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -135,12 +136,15 @@ class UnitFormatterTest {
     }
 
     @Test
-    void compact_minLong() {
-        // Math.abs(Long.MIN_VALUE) overflows, but the sign branch should
+    void compact_minLong_singleSignNoDoubleNegative() {
+        // Math.abs(Long.MIN_VALUE) overflows back to a negative value; the magnitude must be clamped so
+        // the output carries exactly one leading sign and never a "--" prefix.
         UnitFormatter formatter = new UnitFormatter(EN);
-        // Accept whatever it produces — the goal is "no crash, sensible string".
         String result = formatter.compact(Long.MIN_VALUE, Unit.FE);
         assertTrue(result.endsWith(" FE"));
+        assertFalse(result.contains("--"), "expected no double-negative, got: " + result);
+        assertTrue(result.startsWith("-"), "expected a single leading sign, got: " + result);
+        assertFalse(result.substring(1).contains("-"), "expected only one sign, got: " + result);
     }
 
     @Test

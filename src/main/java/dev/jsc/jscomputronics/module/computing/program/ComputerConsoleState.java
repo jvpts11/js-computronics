@@ -81,6 +81,10 @@ public final class ComputerConsoleState {
         for (final Tag entry : tag.getList("History", Tag.TAG_STRING)) {
             history.addLast(entry.getAsString());
         }
+        // A tampered or legacy tag may hold more entries than the live cap; keep only the most recent.
+        while (history.size() > MAX_HISTORY) {
+            history.removeFirst();
+        }
         installed.clear();
         for (final Tag entry : tag.getList("Installed", Tag.TAG_STRING)) {
             installed.add(entry.getAsString());
