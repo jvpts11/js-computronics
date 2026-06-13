@@ -249,7 +249,7 @@ public final class ComputingPayloads {
             final var computer = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
             if (op.verb() == dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation.Verb.QUERY) {
                 final int limit = op.limit() > 0 ? op.limit() : SqlResultPayload.MAX_ROWS;
-                final var items = computer.query(op.item(), limit);
+                final var items = computer.query(op.item(), op.source(), limit);
                 final List<SqlResultPayload.Row> rows = new ArrayList<>(items.size());
                 for (final var item : items) {
                     rows.add(new SqlResultPayload.Row(item.name(), item.quantity()));

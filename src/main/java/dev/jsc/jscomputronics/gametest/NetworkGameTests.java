@@ -1139,7 +1139,7 @@ public final class NetworkGameTests {
                     final var read = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
                             "SELECT * FROM network", dialect);
                     helper.assertTrue(read.ok(), "the read statement must parse");
-                    helper.assertFalse(cli.query(read.operation().item(), 64).isEmpty(),
+                    helper.assertFalse(cli.query(read.operation().item(), read.operation().source(), 64).isEmpty(),
                             "SELECT * must return the network's rows");
 
                     final var pull = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(

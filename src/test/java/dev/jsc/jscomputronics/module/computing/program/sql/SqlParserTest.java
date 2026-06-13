@@ -99,6 +99,16 @@ class SqlParserTest {
     }
 
     @Test
+    void standard_selectStarCarriesServerIntoQuery() {
+        final SqlOperation op = standard(
+                "SELECT * FROM network WHERE item = 'cobblestone' AND server = 'ServerA'");
+        assertEquals(SqlOperation.Verb.QUERY, op.verb());
+        assertEquals("cobblestone", op.item());
+        assertEquals("ServerA", op.source());
+        assertTrue(op.hasSource());
+    }
+
+    @Test
     void standard_selectQuantityPulls() {
         final SqlOperation op = standard("SELECT 100 FROM network WHERE item = 'iron_ingot' AND server = 'ServerA'");
         assertEquals(SqlOperation.Verb.SELECT, op.verb());

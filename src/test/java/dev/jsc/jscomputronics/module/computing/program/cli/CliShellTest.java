@@ -229,7 +229,7 @@ class CliShellTest {
             return new NetSummary(onNetwork, 2, 1, 0, stock.size(), true);
         }
 
-        @Override public List<StoredItem> query(final String filter, final int limit) {
+        @Override public List<StoredItem> query(final String filter, final String server, final int limit) {
             final List<StoredItem> out = new ArrayList<>();
             for (final StoredItem item : stock) {
                 if (filter.isEmpty() || item.name().toLowerCase().contains(filter.toLowerCase())) {

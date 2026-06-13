@@ -41,12 +41,14 @@ public interface CliComputer {
     NetSummary network();
 
     /**
-     * Items the network holds, optionally filtered by a case-insensitive name substring.
+     * Items the network holds, optionally filtered by a case-insensitive name substring and scoped to a
+     * single server by name.
      *
      * @param filter a name fragment, or {@code ""} for everything
+     * @param server a server name to scope the read to, or {@code ""} for the whole network
      * @param limit  the maximum number of rows to return
      */
-    List<StoredItem> query(String filter, int limit);
+    List<StoredItem> query(String filter, String server, int limit);
 
     /** Which servers hold the named item and how much each has. */
     List<Holding> find(String item);

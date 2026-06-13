@@ -129,25 +129,32 @@ public final class ServerCliComputer implements CliComputer {
     }
 
     @Override
-    public List<StoredItem> query(final String filter, final int limit) {
+    public List<StoredItem> query(final String filter, final String server, final int limit) {
         final NetworkUuid net = host.networkUuid();
         if (net == null) {
             return List.of();
         }
+        final NetworkStorage storage;
+        if (server == null || server.isBlank()) {
+            storage = NetworkStorage.of(level, net);
+        } else {
+            final NodeUuid scoped = resolveServer(net, server);
+            if (scoped == null) {
+                return List.of(); // a WHERE server filter that names no server yields nothing
+            }
+            storage = NetworkStorage.ofServers(level, java.util.List.of(scoped));
+        }
         final String needle = filter.toLowerCase(java.util.Locale.ROOT);
-        final List<StoredItem> rows = new ArrayList<>();
-        NetworkStorage.of(level, net).query().entrySet().stream()
+        // Filter, then sort by quantity, then take the top rows: the limit must apply after the sort so
+        // the result is the largest holdings, and the whole catalog is not walked once the limit is met.
+        return storage.query().entrySet().stream()
+                .filter(entry -> needle.isEmpty()
+                        || entry.getKey().displayName().getString().toLowerCase(java.util.Locale.ROOT)
+                        .contains(needle))
                 .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
-                .forEach(entry -> {
-                    if (rows.size() >= limit) {
-                        return;
-                    }
-                    final String label = entry.getKey().displayName().getString();
-                    if (needle.isEmpty() || label.toLowerCase(java.util.Locale.ROOT).contains(needle)) {
-                        rows.add(new StoredItem(label, entry.getValue()));
-                    }
-                });
-        return rows;
+                .limit(Math.max(limit, 0))
+                .map(entry -> new StoredItem(entry.getKey().displayName().getString(), entry.getValue()))
+                .toList();
     }
 
     @Override

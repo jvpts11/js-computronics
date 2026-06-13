@@ -295,7 +295,7 @@ public final class BuiltinCommands {
                 ctx.out().error("not on a network");
                 return;
             }
-            final List<CliComputer.StoredItem> items = ctx.computer().query(ctx.rest(0), LIMIT);
+            final List<CliComputer.StoredItem> items = ctx.computer().query(ctx.rest(0), "", LIMIT);
             if (items.isEmpty()) {
                 ctx.out().dim(ctx.hasArgs() ? "nothing matches '" + ctx.rest(0) + "'" : "the network is empty");
                 return;
@@ -567,7 +567,7 @@ public final class BuiltinCommands {
                     return;
                 }
                 final int limit = op.limit() > 0 ? op.limit() : QUERY_LIMIT;
-                final List<CliComputer.StoredItem> items = ctx.computer().query(op.item(), limit);
+                final List<CliComputer.StoredItem> items = ctx.computer().query(op.item(), op.source(), limit);
                 if (items.isEmpty()) {
                     ctx.out().dim("no rows");
                     return;

@@ -110,7 +110,8 @@ public final class SqlParser {
         final int limit = limitValue(t, DEFAULT_QUERY_LIMIT);
         // SELECT * -> a read; SELECT <n> -> a pull of n.
         if (t.size() >= 2 && t.get(1).equals("*")) {
-            return SqlParseResult.ok(SqlOperation.query(item, limit));
+            // Carry the WHERE server filter into the read so a scoped query honors it.
+            return SqlParseResult.ok(new SqlOperation(SqlOperation.Verb.QUERY, item, 0L, server, "", limit));
         }
         final long quantity = parseQuantity(t.size() >= 2 ? t.get(1) : "");
         if (quantity <= 0L) {
