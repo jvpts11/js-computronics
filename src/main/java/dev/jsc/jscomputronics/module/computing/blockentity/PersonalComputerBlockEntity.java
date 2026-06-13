@@ -67,9 +67,12 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         return storageModCount;
     }
 
-    /** Marks the PC's storage as changed so the network index re-reads it; used by the slider write. */
+    /**
+     * Marks the PC's storage as changed so the network index re-reads it; used by the slider write, which
+     * changes the public view without moving any item. Defers to {@link #setChanged()}, which advances the
+     * counter once — so a slider write and a disk swap both bump it by exactly one.
+     */
     public void bumpStorageModCount() {
-        storageModCount++;
         setChanged();
     }
 
