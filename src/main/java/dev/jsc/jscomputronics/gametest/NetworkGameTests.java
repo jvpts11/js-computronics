@@ -22,6 +22,10 @@ import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
+import dev.jsc.jscomputronics.module.computing.block.ServerRackStructure;
+import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock;
+import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock;
+import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
@@ -689,6 +693,59 @@ public final class NetworkGameTests {
                     helper.assertTrue(helper.getBlockState(new BlockPos(5, 4, 3)).isAir(),
                             "the whole cabinet must dissolve, including the far-top-back corner");
                 })
+                .thenSucceed();
+    }
+
+    // Supercomputer Node (shares the Server Rack footprint; rides the shared multiblock lifecycle)
+
+    @GameTest(template = ARENA)
+    public static void supercomputerNode_formsAndDissolves(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(4, 2, 2); // footprint x[4,5] y[2,4] z[2,3]
+        final BlockPos part = new BlockPos(4, 3, 2);       // a part, one up from the controller
+        final Direction facing = Direction.EAST;           // cables attach through the rear (west side here)
+        helper.setBlock(controller, ComputingModule.SUPERCOMPUTER_NODE.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, facing));
+        // Drive the self-assembly the way item placement would, so all 11 parts exist.
+        ((SupercomputerNodeBlock) ComputingModule.SUPERCOMPUTER_NODE.get()).setPlacedBy(
+                helper.getLevel(), helper.absolutePos(controller),
+                helper.getBlockState(controller), null, ItemStack.EMPTY);
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> helper.assertTrue(
+                        helper.getBlockState(part).getBlock() instanceof SupercomputerNodePartBlock,
+                        "placing the node must raise its structural parts"))
+                .thenExecute(() -> helper.setBlock(part, Blocks.AIR)) // break one part
+                .thenExecuteAfter(SETTLE, () -> {
+                    helper.assertTrue(helper.getBlockState(controller).isAir(),
+                            "breaking a part must take the controller down too");
+                    helper.assertTrue(helper.getBlockState(part).isAir(),
+                            "the broken part must be gone");
+                    helper.assertTrue(helper.getBlockState(new BlockPos(5, 4, 3)).isAir(),
+                            "the whole cabinet must dissolve, including the far-top-back corner");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void supercomputerNode_teardownDropsNothing(final GameTestHelper helper) {
+        final BlockPos controller = new BlockPos(4, 2, 2);
+        final Direction facing = Direction.EAST;
+        helper.setBlock(controller, ComputingModule.SUPERCOMPUTER_NODE.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, facing));
+        ((SupercomputerNodeBlock) ComputingModule.SUPERCOMPUTER_NODE.get()).setPlacedBy(
+                helper.getLevel(), helper.absolutePos(controller),
+                helper.getBlockState(controller), null, ItemStack.EMPTY);
+        if (helper.getBlockEntity(controller) instanceof SupercomputerNodeBlockEntity node) {
+            node.getHardware().setStackInSlot(0, new ItemStack(Items.IRON_INGOT)); // installed hardware
+        } else {
+            helper.fail("no supercomputer node block entity placed");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(2, () -> helper.setBlock(
+                        ServerRackStructure.partPositions(controller, facing).get(0), Blocks.AIR))
+                .thenExecuteAfter(2, () -> helper.assertTrue(droppedItems(helper, controller) == 0,
+                        "dissolving the node must not drop the node or its hardware (creative-safe teardown)"))
                 .thenSucceed();
     }
 

@@ -8,10 +8,12 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
+import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
+import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -19,14 +21,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -38,10 +37,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The Mainframe — the network's orchestrator.
  */
-public class MainframeBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, dev.jsc.jscomputronics.common.network.DataNetworkConnectable,
-        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable,
-        dev.jsc.jscomputronics.common.multiblock.MultiblockBlock {
+public class MainframeBlock extends AbstractMultiblockControllerBlock
+        implements dev.jsc.jscomputronics.common.network.DataNetworkConnectable,
+        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
 
     public static final MapCodec<MainframeBlock> CODEC = simpleCodec(MainframeBlock::new);
 
@@ -73,8 +71,42 @@ public class MainframeBlock extends HorizontalDirectionalBlock
     }
 
     @Override
-    public java.util.List<BlockPos> footprint(final BlockPos origin, final Direction facing) {
-        return MainframeStructure.allPositions(origin, facing);
+    protected MultiblockGeometry geometry() {
+        return MainframeStructure.GEOMETRY;
+    }
+
+    @Override
+    protected boolean isOwnPart(final BlockState state) {
+        return state.getBlock() instanceof MainframePartBlock;
+    }
+
+    @Override
+    protected boolean isOwnController(final BlockState state) {
+        return state.getBlock() instanceof MainframeBlock;
+    }
+
+    @Override
+    protected BlockState partStateFor(final BlockPos controller, final Direction facing,
+                                      final BlockPos part, final BlockState controllerState) {
+        return ComputingModule.MAINFRAME_PART.get().defaultBlockState()
+                .setValue(FACING, facing)
+                .setValue(MainframePartBlock.CORE,
+                        MainframeStructure.isCentralColumn(controller, facing, part));
+    }
+
+    @Override
+    protected void dropContents(final ServerLevel level, final BlockPos controller) {
+        Block.popResource(level, controller, new ItemStack(ComputingModule.MAINFRAME_ITEM.get()));
+        if (level.getBlockEntity(controller) instanceof MainframeBlockEntity be) {
+            BlockDrops.spill(level, controller, be.getInventory());
+        }
+    }
+
+    @Override
+    protected void onControllerBroken(final ServerLevel level, final BlockPos controller) {
+        if (level.getBlockEntity(controller) instanceof MainframeBlockEntity be) {
+            be.onBroken();
+        }
     }
 
     @Override
@@ -85,24 +117,6 @@ public class MainframeBlock extends HorizontalDirectionalBlock
             return null; // no room for the 3x2x2 structure — cancel placement, item not consumed
         }
         return defaultBlockState().setValue(FACING, facing);
-    }
-
-    @Override
-    public void setPlacedBy(final Level level, final BlockPos pos, final BlockState state,
-                            @Nullable final LivingEntity placer, final ItemStack stack) {
-        super.setPlacedBy(level, pos, state, placer, stack);
-        // Build the whole footprint on BOTH sides. The client predicts block
-        final Direction facing = state.getValue(FACING);
-        final boolean server = !level.isClientSide();
-        for (final BlockPos part : MainframeStructure.partPositions(pos, facing)) {
-            final boolean core = MainframeStructure.isCentralColumn(pos, facing, part);
-            level.setBlock(part, ComputingModule.MAINFRAME_PART.get().defaultBlockState()
-                    .setValue(FACING, facing)
-                    .setValue(MainframePartBlock.CORE, core), Block.UPDATE_ALL);
-            if (server && level.getBlockEntity(part) instanceof MainframePartBlockEntity partBe) {
-                partBe.setController(pos);
-            }
-        }
     }
 
     @Override
@@ -118,62 +132,6 @@ public class MainframeBlock extends HorizontalDirectionalBlock
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
-    }
-
-    @Override
-    public BlockState playerWillDestroy(final Level level, final BlockPos pos, final BlockState state,
-                                        final Player player) {
-        // Drops happen here (not in dissolve) so creative mode never spills items.
-        if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild) {
-            dropContents(serverLevel, pos);
-        }
-        return super.playerWillDestroy(level, pos, state, player);
-    }
-
-    @Override
-    protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
-                            final BlockState newState, final boolean movedByPiston) {
-        if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
-            if (level.getBlockEntity(pos) instanceof MainframeBlockEntity mainframe) {
-                mainframe.onBroken();
-            }
-            dissolve(serverLevel, pos, state.getValue(FACING));
-        }
-        super.onRemove(state, level, pos, newState, movedByPiston);
-    }
-
-    private static final java.util.Set<BlockPos> DISSOLVING = java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-    static void dissolve(final ServerLevel level, final BlockPos controllerPos, final Direction facing) {
-        if (!DISSOLVING.add(controllerPos.immutable())) {
-            return;
-        }
-        try {
-            for (final BlockPos part : MainframeStructure.partPositions(controllerPos, facing)) {
-                if (level.getBlockState(part).getBlock() instanceof MainframePartBlock) {
-                    level.removeBlock(part, false);
-                }
-            }
-            if (level.getBlockState(controllerPos).getBlock() instanceof MainframeBlock) {
-                level.removeBlock(controllerPos, false);
-            }
-        } finally {
-            DISSOLVING.remove(controllerPos);
-        }
-    }
-
-    static void dropContents(final ServerLevel level, final BlockPos controllerPos) {
-        Block.popResource(level, controllerPos, new ItemStack(ComputingModule.MAINFRAME_ITEM.get()));
-        if (level.getBlockEntity(controllerPos) instanceof MainframeBlockEntity be) {
-            final var inventory = be.getInventory();
-            for (int i = 0; i < inventory.getSlots(); i++) {
-                final ItemStack part = inventory.getStackInSlot(i);
-                if (!part.isEmpty()) {
-                    Block.popResource(level, controllerPos, part);
-                    inventory.setStackInSlot(i, ItemStack.EMPTY);
-                }
-            }
-        }
     }
 
     @Override

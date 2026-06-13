@@ -95,8 +95,10 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
         // Drops happen here (not in dissolve) so creative mode never spills items.
         if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild
                 && level.getBlockEntity(pos) instanceof MainframePartBlockEntity part
-                && part.controllerPos() != null) {
-            MainframeBlock.dropContents(serverLevel, part.controllerPos());
+                && part.controllerPos() != null
+                && level.getBlockState(part.controllerPos()).getBlock()
+                        instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock controller) {
+            controller.dropContentsExternally(serverLevel, part.controllerPos());
         }
         return super.playerWillDestroy(level, pos, state, player);
     }
@@ -106,8 +108,10 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
                             final BlockState newState, final boolean movedByPiston) {
         if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel
                 && level.getBlockEntity(pos) instanceof MainframePartBlockEntity part
-                && part.controllerPos() != null) {
-            MainframeBlock.dissolve(serverLevel, part.controllerPos(), state.getValue(FACING));
+                && part.controllerPos() != null
+                && level.getBlockState(part.controllerPos()).getBlock()
+                        instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock controller) {
+            controller.dissolve(serverLevel, part.controllerPos(), state.getValue(FACING));
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
     }

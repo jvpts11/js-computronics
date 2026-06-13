@@ -99,8 +99,9 @@ public class SupercomputerNodePartBlock extends Block implements EntityBlock, Re
         if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild) {
             final BlockPos controller = controllerOf(level, pos);
             if (controller != null
-                    && level.getBlockState(controller).getBlock() instanceof SupercomputerNodeBlock) {
-                SupercomputerNodeBlock.dropContents(serverLevel, controller);
+                    && level.getBlockState(controller).getBlock()
+                            instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock owner) {
+                owner.dropContentsExternally(serverLevel, controller);
             }
         }
         return super.playerWillDestroy(level, pos, state, player);
@@ -112,10 +113,11 @@ public class SupercomputerNodePartBlock extends Block implements EntityBlock, Re
         if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
             final BlockPos controller = controllerOf(level, pos);
             if (controller != null
-                    && level.getBlockState(controller).getBlock() instanceof SupercomputerNodeBlock) {
+                    && level.getBlockState(controller).getBlock()
+                            instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock owner) {
                 // Take the whole cabinet down with non-dropping removals; the player-break path above
                 // already spilled the node and its hardware.
-                SupercomputerNodeBlock.dissolve(serverLevel, controller,
+                owner.dissolve(serverLevel, controller,
                         level.getBlockState(controller).getValue(HorizontalDirectionalBlock.FACING));
             }
         }

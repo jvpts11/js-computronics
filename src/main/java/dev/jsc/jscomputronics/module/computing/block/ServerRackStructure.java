@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
+import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -22,6 +23,24 @@ public final class ServerRackStructure {
     public static final int HEIGHT = 3;
     public static final int DEPTH = 2;
     public static final int BLOCK_COUNT = WIDTH * HEIGHT * DEPTH; // 12
+
+    /** This footprint as a value, shared by the Server Rack and the Supercomputer Node, for the multiblock lifecycle. */
+    public static final MultiblockGeometry GEOMETRY = new MultiblockGeometry() {
+        @Override
+        public List<BlockPos> allPositions(final BlockPos controller, final Direction facing) {
+            return ServerRackStructure.allPositions(controller, facing);
+        }
+
+        @Override
+        public List<BlockPos> partPositions(final BlockPos controller, final Direction facing) {
+            return ServerRackStructure.partPositions(controller, facing);
+        }
+
+        @Override
+        public int blockCount() {
+            return BLOCK_COUNT;
+        }
+    };
 
     private ServerRackStructure() {
     }

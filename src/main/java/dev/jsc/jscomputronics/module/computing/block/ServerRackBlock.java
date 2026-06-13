@@ -8,12 +8,14 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
+import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
+import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
 import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jsc.jscomputronics.common.util.BlockDrops;
 import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.ServerItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,14 +26,11 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -43,9 +42,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The Server Rack: a 2-wide, 3-tall, 2-deep multiblock cabinet that is logically a single rack.
  */
-public class ServerRackBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort,
-        dev.jsc.jscomputronics.common.multiblock.MultiblockBlock {
+public class ServerRackBlock extends AbstractMultiblockControllerBlock
+        implements RearFacingDataPort {
 
     public static final MapCodec<ServerRackBlock> CODEC = simpleCodec(ServerRackBlock::new);
 
@@ -74,8 +72,43 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
     }
 
     @Override
-    public java.util.List<BlockPos> footprint(final BlockPos origin, final Direction facing) {
-        return ServerRackStructure.allPositions(origin, facing);
+    protected MultiblockGeometry geometry() {
+        return ServerRackStructure.GEOMETRY;
+    }
+
+    @Override
+    protected boolean isOwnPart(final BlockState state) {
+        return state.getBlock() instanceof ServerRackPartBlock;
+    }
+
+    @Override
+    protected boolean isOwnController(final BlockState state) {
+        return state.getBlock() instanceof ServerRackBlock;
+    }
+
+    @Override
+    protected BlockState partStateFor(final BlockPos controller, final Direction facing,
+                                      final BlockPos part, final BlockState controllerState) {
+        return ComputingModule.SERVER_RACK_PART.get().defaultBlockState()
+                .setValue(ServerRackPartBlock.TOP, ServerRackStructure.isTopLayer(controller, part))
+                .setValue(ServerRackPartBlock.FACING, facing)
+                .setValue(ServerRackPartBlock.FRONT,
+                        ServerRackStructure.isFrontBayBlock(controller, facing, part));
+    }
+
+    @Override
+    protected void dropContents(final ServerLevel level, final BlockPos controller) {
+        Block.popResource(level, controller, new ItemStack(ComputingModule.SERVER_RACK_ITEM.get()));
+        if (level.getBlockEntity(controller) instanceof ServerRackBlockEntity rack) {
+            BlockDrops.spill(level, controller, rack.getServers());
+        }
+    }
+
+    @Override
+    protected void onControllerBroken(final ServerLevel level, final BlockPos controller) {
+        if (level.getBlockEntity(controller) instanceof ServerRackBlockEntity rack) {
+            rack.onBroken(level); // unregister the housed Server nodes
+        }
     }
 
     @Override
@@ -86,27 +119,6 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
             return null; // no room for the 2x3x2 cabinet — cancel placement, item not consumed
         }
         return defaultBlockState().setValue(FACING, facing);
-    }
-
-    @Override
-    public void setPlacedBy(final Level level, final BlockPos pos, final BlockState state,
-                            @Nullable final LivingEntity placer, final ItemStack stack) {
-        super.setPlacedBy(level, pos, state, placer, stack);
-        // Build the whole cabinet on BOTH sides so the client predicts it at once
-        final Direction facing = state.getValue(FACING);
-        final boolean server = !level.isClientSide();
-        for (final BlockPos part : ServerRackStructure.partPositions(pos, facing)) {
-            final boolean top = ServerRackStructure.isTopLayer(pos, part);
-            level.setBlock(part, ComputingModule.SERVER_RACK_PART.get().defaultBlockState()
-                    .setValue(ServerRackPartBlock.TOP, top)
-                    .setValue(ServerRackPartBlock.FACING, facing)
-                    .setValue(ServerRackPartBlock.FRONT,
-                            ServerRackStructure.isFrontBayBlock(pos, facing, part)),
-                    Block.UPDATE_ALL);
-            if (server && level.getBlockEntity(part) instanceof ServerRackPartBlockEntity partBe) {
-                partBe.setController(pos);
-            }
-        }
     }
 
     @Override
@@ -140,63 +152,6 @@ public class ServerRackBlock extends HorizontalDirectionalBlock
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
-    }
-
-    @Override
-    public BlockState playerWillDestroy(final Level level, final BlockPos pos, final BlockState state,
-                                        final Player player) {
-        // Drops happen here (not in dissolve) so creative mode never spills items.
-        if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild) {
-            dropContents(serverLevel, pos);
-        }
-        return super.playerWillDestroy(level, pos, state, player);
-    }
-
-    @Override
-    protected void onRemove(final BlockState state, final Level level, final BlockPos pos,
-                            final BlockState newState, final boolean movedByPiston) {
-        if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel) {
-            if (level.getBlockEntity(pos) instanceof ServerRackBlockEntity rack) {
-                rack.onBroken(serverLevel); // unregister the housed Server nodes
-            }
-            dissolve(serverLevel, pos, state.getValue(FACING));
-        }
-        super.onRemove(state, level, pos, newState, movedByPiston);
-    }
-
-    private static final java.util.Set<BlockPos> DISSOLVING =
-            java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-    static void dissolve(final ServerLevel level, final BlockPos controllerPos, final Direction facing) {
-        if (!DISSOLVING.add(controllerPos.immutable())) {
-            return;
-        }
-        try {
-            for (final BlockPos part : ServerRackStructure.partPositions(controllerPos, facing)) {
-                if (level.getBlockState(part).getBlock() instanceof ServerRackPartBlock) {
-                    level.removeBlock(part, false);
-                }
-            }
-            if (level.getBlockState(controllerPos).getBlock() instanceof ServerRackBlock) {
-                level.removeBlock(controllerPos, false);
-            }
-        } finally {
-            DISSOLVING.remove(controllerPos);
-        }
-    }
-
-    static void dropContents(final ServerLevel level, final BlockPos controllerPos) {
-        Block.popResource(level, controllerPos, new ItemStack(ComputingModule.SERVER_RACK_ITEM.get()));
-        if (level.getBlockEntity(controllerPos) instanceof ServerRackBlockEntity rack) {
-            final var servers = rack.getServers();
-            for (int i = 0; i < servers.getSlots(); i++) {
-                final ItemStack server = servers.getStackInSlot(i);
-                if (!server.isEmpty()) {
-                    Block.popResource(level, controllerPos, server);
-                    servers.setStackInSlot(i, ItemStack.EMPTY);
-                }
-            }
-        }
     }
 
     @Override

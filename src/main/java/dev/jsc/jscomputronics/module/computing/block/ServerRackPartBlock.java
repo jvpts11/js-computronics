@@ -123,8 +123,10 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
         // Drops happen here (not in dissolve) so creative mode never spills items.
         if (level instanceof ServerLevel serverLevel && !player.getAbilities().instabuild
                 && level.getBlockEntity(pos) instanceof ServerRackPartBlockEntity part
-                && part.controllerPos() != null) {
-            ServerRackBlock.dropContents(serverLevel, part.controllerPos());
+                && part.controllerPos() != null
+                && level.getBlockState(part.controllerPos()).getBlock()
+                        instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock controller) {
+            controller.dropContentsExternally(serverLevel, part.controllerPos());
         }
         return super.playerWillDestroy(level, pos, state, player);
     }
@@ -138,8 +140,9 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
             // The controller is still present when a part is broken; read its facing
             // so the whole cabinet dissolves. (Re-entrant calls are guarded.)
             final BlockState controller = level.getBlockState(part.controllerPos());
-            if (controller.getBlock() instanceof ServerRackBlock) {
-                ServerRackBlock.dissolve(serverLevel, part.controllerPos(),
+            if (controller.getBlock()
+                    instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock owner) {
+                owner.dissolve(serverLevel, part.controllerPos(),
                         controller.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING));
             }
         }

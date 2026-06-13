@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
+import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -22,6 +23,24 @@ public final class MainframeStructure {
     public static final int HEIGHT = 2;
     public static final int DEPTH = 2;
     public static final int BLOCK_COUNT = WIDTH * HEIGHT * DEPTH; // 12
+
+    /** This structure's footprint as a value, so a controller can hand it to the shared multiblock lifecycle. */
+    public static final MultiblockGeometry GEOMETRY = new MultiblockGeometry() {
+        @Override
+        public List<BlockPos> allPositions(final BlockPos controller, final Direction facing) {
+            return MainframeStructure.allPositions(controller, facing);
+        }
+
+        @Override
+        public List<BlockPos> partPositions(final BlockPos controller, final Direction facing) {
+            return MainframeStructure.partPositions(controller, facing);
+        }
+
+        @Override
+        public int blockCount() {
+            return BLOCK_COUNT;
+        }
+    };
 
     private MainframeStructure() {
     }
