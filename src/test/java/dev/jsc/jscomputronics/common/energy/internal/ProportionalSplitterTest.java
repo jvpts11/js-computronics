@@ -187,4 +187,26 @@ class ProportionalSplitterTest {
         assertTrue(result.getOrDefault(2L, 0L) <= 100L);
         assertTrue(result.getOrDefault(3L, 0L) <= 300L);
     }
+
+    @Test
+    void shortage_conservesTheTotalWithoutOverflowOnHugeSupply() {
+        // available * effDemand once overflowed a long here: 4e9 * 5e9 = 2e19 > Long.MAX (~9.2e18),
+        // corrupting the largest-remainder split. With long-range FE this is a reachable late-tier case.
+        final long demandEach = 5_000_000_000L;
+        final long available = 4_000_000_000L;
+        final Map<Long, Long> demand = new LinkedHashMap<>();
+        demand.put(1L, demandEach);
+        demand.put(2L, demandEach);
+        final Map<Long, Long> cap = Map.of(1L, Long.MAX_VALUE, 2L, Long.MAX_VALUE);
+
+        final Map<Long, Long> result = ProportionalSplitter.split(available, demand, cap);
+
+        long sum = 0L;
+        for (final Long v : result.values()) {
+            sum += v;
+        }
+        assertEquals(available, sum, "the split must conserve the available total exactly");
+        assertEquals(Long.valueOf(available / 2L), result.get(1L));
+        assertEquals(Long.valueOf(available / 2L), result.get(2L));
+    }
 }

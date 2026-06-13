@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.common.energy.internal;
 
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -53,13 +54,18 @@ public final class ProportionalSplitter {
         final Map<Long, Long> result = new LinkedHashMap<>();
         final Map<Long, Long> remainderNum = new LinkedHashMap<>();
         long allocated = 0L;
+        final BigInteger avail = BigInteger.valueOf(available);
+        final BigInteger total = BigInteger.valueOf(totalEffectiveDemand);
         for (final Map.Entry<Long, Long> e : effectiveCap.entrySet()) {
-            final long effDemand = e.getValue();
-            final long product = available * effDemand;
-            final long base = product / totalEffectiveDemand;
+            // base = floor(available * effDemand / totalEffectiveDemand). The product can exceed a long
+            // for late-tier supplies, so compute it in 128-bit precision; both the quotient (at most
+            // `available`) and the remainder (below the total) fit back into a long without loss.
+            final BigInteger product = avail.multiply(BigInteger.valueOf(e.getValue()));
+            final BigInteger[] divRem = product.divideAndRemainder(total);
+            final long base = divRem[0].longValueExact();
             result.put(e.getKey(), base);
             allocated += base;
-            remainderNum.put(e.getKey(), product - base * totalEffectiveDemand);
+            remainderNum.put(e.getKey(), divRem[1].longValueExact());
         }
 
         // Distribute leftover (available - allocated) by largest remainder.
