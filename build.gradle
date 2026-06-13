@@ -144,7 +144,9 @@ dependencies {
     // integration testing only; never a published dependency.
     // ============================================================
     localRuntime "mekanism:Mekanism:${mekanism_version}"
-    // JEI in the dev client only — recipe lookups while testing autocrafting; never published.
+    // JEI: API jar for compiling plugins (IModPlugin, IRecipeTransferHandler, etc.).
+    // The full runtime jar is localRuntime only — never published as a hard dependency.
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
     localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 
     // Example mod dependency from a flat libs directory:
