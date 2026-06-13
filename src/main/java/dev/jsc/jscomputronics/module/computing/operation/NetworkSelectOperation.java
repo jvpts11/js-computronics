@@ -11,16 +11,13 @@ import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
 import dev.jsc.jscomputronics.common.operation.index.Allocation;
 import dev.jsc.jscomputronics.common.operation.index.ItemLocation;
-import dev.jsc.jscomputronics.common.operation.exec.EqualShare;
-import dev.jsc.jscomputronics.common.operation.exec.OperationProgress;
-import dev.jsc.jscomputronics.common.operation.exec.TransferState;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,70 +25,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 
 /**
- * A multi-tick SELECT: pulls an item out of the network's servers into a destination over time.
+ * A multi-tick SELECT: pulls an item out of the network's servers into a destination over time. It reserves the items first and, if another Operation already holds them LOCKed, waits (holding nothing) until they free up.
  */
-public final class NetworkSelectOperation implements NetworkOperation {
-
-    private static final int STALL_LIMIT = 40;
+public final class NetworkSelectOperation extends AbstractTransferOperation {
 
     public static final int DEFAULT_WAIT_TIMEOUT_TICKS = 1200;
 
-    private final ServerLevel level;
-    private final NetworkUuid network;
-    private final StorageKey key;
-    private final long demand;
     private final DataSink destination;
     private final String destinationLabel;
     private final byte recordType;
     private final UUID operationId;
     private final NetworkIndex index;
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     private final LatencyScheduler scheduler;
-    private final java.util.Set<NodeUuid> sourceFilter;
+    private final Set<NodeUuid> sourceFilter;
     private final int waitTimeoutTicks;
 
-    private final List<Source> sources = new ArrayList<>();
-    private OperationProgress progress;
-    private final Map<NodeUuid, Long> movedPerServer = new HashMap<>();
-
-    private long movedTotal;
-    private int stalledTicks;
-    private boolean done;
+    @Nullable
+    private NetworkStorage tickStorage;
     private boolean waiting;
     private int waitTicks;
     private boolean timedOut;
-    private byte status = OperationRecord.STATUS_PARTIAL;
-    private Runnable onSettle;
-    private java.util.function.BooleanSupplier abortWhen;
-
-    /**
-     * One SubOperation: a source server's timed transfer, with its own identity, the per-tick cap the
-     * server's hardware imposes, and a {@code ready} gate that a virtual thread flips once the disk's
-     * read latency has elapsed (so several disks read in parallel, each parked on its own thread).
-     */
-    private static final class Source {
-        private final NodeUuid server;
-        private final TransferState state;
-        private final long hardwareCap;
-        private volatile boolean ready;
-
-        private Source(final NodeUuid server, final TransferState state,
-                       final long hardwareCap, final boolean ready) {
-            this.server = server;
-            this.state = state;
-            this.hardwareCap = hardwareCap;
-            this.ready = ready;
-        }
-    }
+    @Nullable
+    private BooleanSupplier abortWhen;
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final DataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
-                                  @org.jetbrains.annotations.Nullable final LatencyScheduler scheduler,
-                                  final java.util.Set<NodeUuid> sourceFilter) {
+                                  @Nullable final LatencyScheduler scheduler,
+                                  final Set<NodeUuid> sourceFilter) {
         this(level, network, key, demand, destination, destinationLabel, recordType, operationId, index,
                 scheduler, sourceFilter, DEFAULT_WAIT_TIMEOUT_TICKS);
     }
@@ -100,12 +66,9 @@ public final class NetworkSelectOperation implements NetworkOperation {
                                   final long demand, final DataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
-                                  @org.jetbrains.annotations.Nullable final LatencyScheduler scheduler,
-                                  final java.util.Set<NodeUuid> sourceFilter, final int waitTimeoutTicks) {
-        this.level = level;
-        this.network = network;
-        this.key = key;
-        this.demand = demand;
+                                  @Nullable final LatencyScheduler scheduler,
+                                  final Set<NodeUuid> sourceFilter, final int waitTimeoutTicks) {
+        super(level, network, key, demand);
         this.destination = destination;
         this.destinationLabel = destinationLabel;
         this.recordType = recordType;
@@ -123,11 +86,12 @@ public final class NetworkSelectOperation implements NetworkOperation {
         final Allocation plan = index.lock(operationId, key, demand, sourceFilter);
         if (!plan.covers(demand) && index.grossAvailable(key, sourceFilter) >= demand) {
             // The items physically exist but another Operation holds (part of) them LOCKed. Hold
+            // nothing and wait for them to free up.
             index.unlock(operationId);
             waiting = true;
         } else {
             buildSources(plan, tiers);
-            if (sources.isEmpty()) {
+            if (sourcesEmpty()) {
                 finish(); // nothing to serve — settles immediately as FAILED
             }
         }
@@ -142,32 +106,18 @@ public final class NetworkSelectOperation implements NetworkOperation {
     }
 
     private void buildSources(final Allocation plan, final Map<NodeUuid, StorageTier> tiers) {
-        plan.perServer().forEach((server, quantity) -> {
-            final StorageTier tier = tiers.getOrDefault(server, StorageTier.HDD);
-            final int latency = tier.latencyTicks();
-            final long cap = NetworkIndex.serverThroughputCap(level, server);
-            final Source source;
-            if (scheduler != null) {
-                // Model the disk's read latency as a parked virtual thread: the transfer state carries
-                // no latency of its own, and the scheduler flips the source ready once the read time has
-                // elapsed. Every source schedules independently, so the disks read in parallel.
-                source = new Source(server, new TransferState(quantity, 0), cap, false);
-                scheduler.afterTicks(latency, () -> source.ready = true);
-            } else {
-                // No dispatcher to park on (a directly driven operation): count the latency in the
-                // transfer state on the main thread, the original behavior.
-                source = new Source(server, new TransferState(quantity, latency), cap, true);
-            }
-            sources.add(source);
-        });
-        this.progress = new OperationProgress(sources.stream().map(s -> s.state).toList());
+        plan.perServer().forEach((server, quantity) ->
+                addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD), scheduler));
+        buildProgress();
     }
 
+    @Override
     public void tick(final long throughputBudget) {
-        if (done) {
+        if (settled()) {
             return;
         }
         // Stop before moving anything more once the destination is dead — a player who logged out
+        // or a closed terminal can no longer receive items.
         if (abortWhen != null && abortWhen.getAsBoolean()) {
             finish();
             return;
@@ -176,49 +126,25 @@ public final class NetworkSelectOperation implements NetworkOperation {
             retryLock();
             return;
         }
-        // Split this Operation's grant exactly across its sources (no floor), so the sources never
-        // move more than the Mainframe budgeted — a source that gets 0 simply waits for a later tick.
-        final long[] shares = EqualShare.split(throughputBudget, sources.size());
-        final NetworkStorage storage = NetworkStorage.of(level, network);
-        boolean movedAny = false;
-        boolean waiting = false;
+        runTransferTick(throughputBudget);
+    }
 
-        for (int i = 0; i < sources.size(); i++) {
-            final Source source = sources.get(i);
-            if (!source.ready) {
-                waiting = true; // the disk is still reading, parked on its own virtual thread
-                continue;
-            }
-            final boolean wasWaiting = source.state.waitingOnLatency();
-            // The server streams at the slower of its orchestration share and its own hardware.
-            final long planned = source.state.planTick(Math.min(shares[i], source.hardwareCap));
-            if (wasWaiting && planned == 0L) {
-                waiting = true; // no progress this tick only because of read latency
-            }
-            if (planned <= 0L) {
-                continue;
-            }
-            final long moved = storage.selectBreakdown(key, planned, destination, Set.of(source.server))
-                    .getOrDefault(source.server, 0L);
-            source.state.commit(moved);
-            if (moved > 0L) {
-                movedTotal += moved;
-                movedPerServer.merge(source.server, moved, Long::sum);
-                // The moved items have left the server, so drop them from the lock: this keeps the
-                // catalog from reading as over-locked to other concurrent Operations.
-                index.release(operationId, key, source.server, moved);
-                movedAny = true;
-            }
-        }
+    @Override
+    protected void onTickStart() {
+        // Build the live network view once per tick; every source pulls from the same snapshot.
+        tickStorage = NetworkStorage.of(level, network);
+    }
 
-        if (progress.isComplete()) {
-            finish();
-        } else if (!movedAny && !waiting && ++stalledTicks >= STALL_LIMIT) {
-            // No progress and nothing left to wait for (e.g. a full destination): settle.
-            finish();
-        } else if (movedAny) {
-            stalledTicks = 0;
+    @Override
+    protected long moveFromSource(final NodeUuid server, final long planned) {
+        final long moved = tickStorage.selectBreakdown(key, planned, destination, Set.of(server))
+                .getOrDefault(server, 0L);
+        if (moved > 0L) {
+            // The moved items have left the server, so drop them from the lock: this keeps the
+            // catalog from reading as over-locked to other concurrent Operations.
+            index.release(operationId, key, server, moved);
         }
+        return moved;
     }
 
     private void retryLock() {
@@ -235,7 +161,7 @@ public final class NetworkSelectOperation implements NetworkOperation {
             // coverage is no longer possible and the pull proceeds with what physically remains.
             waiting = false;
             buildSources(plan, tiers);
-            if (sources.isEmpty()) {
+            if (sourcesEmpty()) {
                 finish();
             }
         } else {
@@ -243,69 +169,45 @@ public final class NetworkSelectOperation implements NetworkOperation {
         }
     }
 
-    private void finish() {
-        if (done) {
+    @Override
+    protected void finish() {
+        if (settled()) {
             return;
         }
-        done = true;
         waiting = false;
         index.unlock(operationId);
-        status = timedOut ? OperationRecord.STATUS_RESOURCE_LOCKED
+        markSettled(timedOut ? OperationRecord.STATUS_RESOURCE_LOCKED
                 : movedTotal >= demand ? OperationRecord.STATUS_COMPLETED
-                : movedTotal > 0L ? OperationRecord.STATUS_PARTIAL : OperationRecord.STATUS_FAILED;
-        if (onSettle != null) {
-            onSettle.run();
-        }
+                : movedTotal > 0L ? OperationRecord.STATUS_PARTIAL : OperationRecord.STATUS_FAILED);
     }
 
     @Override
     public boolean isWaiting() {
-        return waiting && !done;
-    }
-
-    public boolean isDone() {
-        return done;
+        return waiting && !settled();
     }
 
     public NetworkSelectOperation onSettle(final Runnable callback) {
-        this.onSettle = callback;
-        if (done && callback != null) {
-            callback.run();
-        }
+        setOnSettle(callback);
         return this;
     }
 
-    public NetworkSelectOperation abortWhen(final java.util.function.BooleanSupplier predicate) {
+    public NetworkSelectOperation abortWhen(final BooleanSupplier predicate) {
         this.abortWhen = predicate;
         return this;
-    }
-
-    @Override
-    public void abandon() {
-        // Settling releases the lock and fixes the status from what was already moved; the holder
-        // then sees isDone() and recovers (the moved items already left for the destination).
-        finish();
     }
 
     public UUID operationId() {
         return operationId;
     }
 
-    public byte status() {
-        return status;
-    }
-
-    public int percent() {
-        return progress == null ? 0 : progress.percent();
-    }
-
+    @Override
     public OperationRecord toRecord() {
-        return buildRecord(status, false);
+        return buildRecord(status(), false);
     }
 
     @Override
     public OperationRecord liveRecord() {
-        final byte liveStatus = done ? status
+        final byte liveStatus = settled() ? status()
                 : waiting ? OperationRecord.STATUS_WAITING : OperationRecord.STATUS_PROCESSING;
         return buildRecord(liveStatus, true);
     }
@@ -317,25 +219,5 @@ public final class NetworkSelectOperation implements NetworkOperation {
         final List<OperationRecord.SubRow> subs = includeSubs ? subRows() : List.of();
         return new OperationRecord(recordType, key, demand, movedTotal,
                 recordStatus, List.copyOf(moves), subs);
-    }
-
-    private List<OperationRecord.SubRow> subRows() {
-        final List<OperationRecord.SubRow> subs = new ArrayList<>(Math.min(sources.size(),
-                OperationRecord.MAX_SUBS));
-        for (final Source source : sources) {
-            if (subs.size() >= OperationRecord.MAX_SUBS) {
-                break;
-            }
-            final byte state = source.state.isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
-                    : (!source.ready || source.state.waitingOnLatency()) ? OperationRecord.SubRow.SUB_READING
-                    : OperationRecord.SubRow.SUB_STREAMING;
-            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server.asString()),
-                    source.state.total(), source.state.moved(), state));
-        }
-        return subs;
-    }
-
-    private static String shortId(final String uuid) {
-        return uuid.length() >= 6 ? uuid.substring(0, 6) : uuid;
     }
 }

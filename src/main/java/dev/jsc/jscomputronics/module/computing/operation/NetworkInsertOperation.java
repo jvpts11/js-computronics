@@ -9,9 +9,6 @@ package dev.jsc.jscomputronics.module.computing.operation;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
-import dev.jsc.jscomputronics.common.operation.exec.EqualShare;
-import dev.jsc.jscomputronics.common.operation.exec.OperationProgress;
-import dev.jsc.jscomputronics.common.operation.exec.TransferState;
 import dev.jsc.jscomputronics.common.operation.index.Allocation;
 import dev.jsc.jscomputronics.common.operation.index.ItemLocation;
 import dev.jsc.jscomputronics.common.operation.index.StorageAllocator;
@@ -24,7 +21,7 @@ import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.ItemStack;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,54 +29,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A multi-tick INSERT: writes an item into the network's servers over time — the inverse of a SELECT.
+ * A multi-tick INSERT: writes an item into the network's servers over time — the inverse of a SELECT. It fills the fastest-tier servers first, up to each server's free space.
  */
-public final class NetworkInsertOperation implements NetworkOperation {
+public final class NetworkInsertOperation extends AbstractTransferOperation {
 
-    private static final int STALL_LIMIT = 40;
-
-    private final ServerLevel level;
-    private final NetworkUuid network;
-    private final StorageKey key;
-    private final long demand;
     private final String sourceLabel;
-
-    private final List<Source> sources = new ArrayList<>();
-    private final OperationProgress progress;
-    private final Map<NodeUuid, Long> writtenPerServer = new HashMap<>();
-
-    private long writtenTotal;
-    private int stalledTicks;
-    private boolean done;
-    private byte status = OperationRecord.STATUS_PARTIAL;
-    private Runnable onSettle;
-
-    /**
-     * One SubOperation: a destination server's timed write, with its own hardware cap and a {@code ready}
-     * gate a virtual thread flips once the disk's write latency has elapsed (disks write in parallel).
-     */
-    private static final class Source {
-        private final NodeUuid server;
-        private final TransferState state;
-        private final long hardwareCap;
-        private volatile boolean ready;
-
-        private Source(final NodeUuid server, final TransferState state,
-                       final long hardwareCap, final boolean ready) {
-            this.server = server;
-            this.state = state;
-            this.hardwareCap = hardwareCap;
-            this.ready = ready;
-        }
-    }
 
     public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final String sourceLabel, final NetworkIndex index,
-                                  @org.jetbrains.annotations.Nullable final LatencyScheduler scheduler) {
-        this.level = level;
-        this.network = network;
-        this.key = key;
-        this.demand = demand;
+                                  @Nullable final LatencyScheduler scheduler) {
+        super(level, network, key, demand);
         this.sourceLabel = sourceLabel;
 
         // Choose where to write: fill the fastest-tier servers first, up to each server's free space.
@@ -94,70 +53,29 @@ public final class NetworkInsertOperation implements NetworkOperation {
             }
         }
         final Allocation plan = StorageAllocator.allocate(free, demand);
-        plan.perServer().forEach((server, quantity) -> {
-            final StorageTier tier = tiers.getOrDefault(server, StorageTier.HDD);
-            final int latency = tier.latencyTicks();
-            final long cap = NetworkIndex.serverThroughputCap(level, server);
-            final Source source;
-            if (scheduler != null) {
-                // The disk's write latency is a parked virtual thread; the scheduler flips the source
-                // ready once it elapses, so the disks accept writes in parallel.
-                source = new Source(server, new TransferState(quantity, 0), cap, false);
-                scheduler.afterTicks(latency, () -> source.ready = true);
-            } else {
-                source = new Source(server, new TransferState(quantity, latency), cap, true);
-            }
-            sources.add(source);
-        });
-        this.progress = new OperationProgress(sources.stream().map(s -> s.state).toList());
-        if (sources.isEmpty()) {
+        plan.perServer().forEach((server, quantity) ->
+                addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD), scheduler));
+        buildProgress();
+        if (sourcesEmpty()) {
             finish(); // the network is full — nothing written
         }
     }
 
     @Override
     public void tick(final long throughputBudget) {
-        if (done) {
+        if (settled()) {
             return;
         }
-        final long[] shares = EqualShare.split(throughputBudget, sources.size());
-        boolean movedAny = false;
-        boolean waiting = false;
-
-        for (int i = 0; i < sources.size(); i++) {
-            final Source source = sources.get(i);
-            if (!source.ready) {
-                waiting = true; // the disk is still in its write latency, parked on its own virtual thread
-                continue;
-            }
-            final boolean wasWaiting = source.state.waitingOnLatency();
-            // The server absorbs writes at the slower of its orchestration share and its hardware.
-            final long planned = source.state.planTick(Math.min(shares[i], source.hardwareCap));
-            if (wasWaiting && planned == 0L) {
-                waiting = true;
-            }
-            if (planned <= 0L) {
-                continue;
-            }
-            final ServerStore store = storeOf(source.server);
-            final long written = store == null ? 0L : store.insert(key, planned);
-            source.state.commit(written);
-            if (written > 0L) {
-                writtenTotal += written;
-                writtenPerServer.merge(source.server, written, Long::sum);
-                movedAny = true;
-            }
-        }
-
-        if (progress.isComplete()) {
-            finish();
-        } else if (!movedAny && !waiting && ++stalledTicks >= STALL_LIMIT) {
-            finish();
-        } else if (movedAny) {
-            stalledTicks = 0;
-        }
+        runTransferTick(throughputBudget);
     }
 
+    @Override
+    protected long moveFromSource(final NodeUuid server, final long planned) {
+        final ServerStore store = storeOf(server);
+        return store == null ? 0L : store.insert(key, planned);
+    }
+
+    @Nullable
     private ServerStore storeOf(final NodeUuid server) {
         return NetworkSystem.get(level).locationOf(server)
                 .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack
@@ -165,86 +83,41 @@ public final class NetworkInsertOperation implements NetworkOperation {
                 .orElse(null);
     }
 
-    private void finish() {
-        if (done) {
-            return;
-        }
-        done = true;
-        status = writtenTotal >= demand ? OperationRecord.STATUS_COMPLETED
-                : writtenTotal > 0L ? OperationRecord.STATUS_PARTIAL : OperationRecord.STATUS_FAILED;
-        if (onSettle != null) {
-            onSettle.run();
-        }
-    }
-
     @Override
-    public boolean isDone() {
-        return done;
+    protected void finish() {
+        markSettled(movedTotal >= demand ? OperationRecord.STATUS_COMPLETED
+                : movedTotal > 0L ? OperationRecord.STATUS_PARTIAL : OperationRecord.STATUS_FAILED);
     }
 
     public NetworkInsertOperation onSettle(final Runnable callback) {
-        this.onSettle = callback;
-        if (done && callback != null) {
-            callback.run();
-        }
+        setOnSettle(callback);
         return this;
     }
 
-    @Override
-    public void abandon() {
-        // Settling fixes the status from what was already written; the holder then sees isDone() and
-        // re-buffers the unwritten remainder reported by leftover(), so no buffered items are lost.
-        finish();
-    }
-
-    public byte status() {
-        return status;
-    }
-
     public long writtenTotal() {
-        return writtenTotal;
+        return movedTotal;
     }
 
     public long leftover() {
-        return Math.max(0L, demand - writtenTotal);
+        return Math.max(0L, demand - movedTotal);
     }
 
     @Override
     public OperationRecord toRecord() {
-        return buildRecord(status, false);
+        return buildRecord(status(), false);
     }
 
     @Override
     public OperationRecord liveRecord() {
-        return buildRecord(done ? status : OperationRecord.STATUS_PROCESSING, true);
+        return buildRecord(settled() ? status() : OperationRecord.STATUS_PROCESSING, true);
     }
 
     private OperationRecord buildRecord(final byte recordStatus, final boolean includeSubs) {
         final List<OperationRecord.MoveRow> moves = new ArrayList<>();
-        writtenPerServer.forEach((server, written) ->
+        movedPerServer.forEach((server, written) ->
                 moves.add(new OperationRecord.MoveRow(sourceLabel, written, "SRV-" + shortId(server.asString()))));
         final List<OperationRecord.SubRow> subs = includeSubs ? subRows() : List.of();
-        return new OperationRecord(OperationRecord.TYPE_INSERT, key, demand, writtenTotal,
+        return new OperationRecord(OperationRecord.TYPE_INSERT, key, demand, movedTotal,
                 recordStatus, List.copyOf(moves), subs);
-    }
-
-    private List<OperationRecord.SubRow> subRows() {
-        final List<OperationRecord.SubRow> subs = new ArrayList<>(Math.min(sources.size(),
-                OperationRecord.MAX_SUBS));
-        for (final Source source : sources) {
-            if (subs.size() >= OperationRecord.MAX_SUBS) {
-                break;
-            }
-            final byte state = source.state.isComplete() ? OperationRecord.SubRow.SUB_COMPLETED
-                    : (!source.ready || source.state.waitingOnLatency()) ? OperationRecord.SubRow.SUB_READING
-                    : OperationRecord.SubRow.SUB_STREAMING;
-            subs.add(new OperationRecord.SubRow("SRV-" + shortId(source.server.asString()),
-                    source.state.total(), source.state.moved(), state));
-        }
-        return subs;
-    }
-
-    private static String shortId(final String uuid) {
-        return uuid.length() >= 6 ? uuid.substring(0, 6) : uuid;
     }
 }
