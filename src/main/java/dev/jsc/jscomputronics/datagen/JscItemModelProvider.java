@@ -15,10 +15,26 @@ import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 import net.minecraft.data.PackOutput;
 
+import java.util.List;
+
 /**
  * Generates item models.
  */
 public class JscItemModelProvider extends ItemModelProvider {
+
+    /**
+     * GPU ids whose textures are not yet in resources (the artwork is awaiting review). Their expected
+     * textures are marked as generated so a basic generated model can still be produced for them during
+     * datagen. Drop an id from this list once its real texture is added under resources.
+     */
+    private static final List<String> PREVIEW_ONLY_GPU_TEXTURES = List.of(
+            "gpu_prism_4",
+            "gpu_voodoo_gfx",
+            "gpu_radiance_9200_se",
+            "gpu_vertex_gtx_280",
+            "gpu_vertex_gtx_550_ti",
+            "gpu_radiance_hd_6850",
+            "gpu_vertex_gtx_780_ti");
 
     public JscItemModelProvider(final PackOutput output, final ExistingFileHelper existingFiles) {
         super(output, JsComputronics.MODID, existingFiles);
@@ -108,6 +124,12 @@ public class JscItemModelProvider extends ItemModelProvider {
         // Per-era hardware catalog — a generated (layer0 = item texture) model for every component.
         dev.jsc.jscomputronics.module.computing.HardwareItems.CPUS.forEach(h -> basicItem(h.get()));
         dev.jsc.jscomputronics.module.computing.HardwareItems.RAMS.forEach(h -> basicItem(h.get()));
+        // These newly added GPUs ship without a repo texture yet (the artwork is pending review); mark each
+        // expected texture as generated so basicItem can reference it without the datagen existence check
+        // failing. Remove the matching id from this set once its real texture lands in resources.
+        for (final String previewOnlyGpu : PREVIEW_ONLY_GPU_TEXTURES) {
+            existingFileHelper.trackGenerated(modLoc("item/" + previewOnlyGpu), TEXTURE);
+        }
         dev.jsc.jscomputronics.module.computing.HardwareItems.GPUS.forEach(h -> basicItem(h.get()));
         dev.jsc.jscomputronics.module.computing.HardwareItems.PSUS.forEach(h -> basicItem(h.get()));
         dev.jsc.jscomputronics.module.computing.HardwareItems.MOTHERBOARDS.forEach(h -> basicItem(h.get()));

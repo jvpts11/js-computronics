@@ -121,6 +121,8 @@ public class JscLanguageProvider extends LanguageProvider {
         add(HardwareItems.RAM_EDO_16.get(), "Stratix Layer EDO-16");
         add(HardwareItems.GPU_VGA_256.get(), "Visara VGA-256");
         add(HardwareItems.GPU_3D_BLASTER.get(), "Pyrix 3D Blaster");
+        add(HardwareItems.GPU_PRISM_4.get(), "Visara Prism 4");
+        add(HardwareItems.GPU_VOODOO_GFX.get(), "Pyrix Voodoo GFX");
         add(HardwareItems.PSU_300B.get(), "MF PowerBasic 300B");
         add(HardwareItems.MOTHERBOARD_BABYAT_VINTAGE.get(), "MF Baby-AT I Motherboard");
         add(HardwareItems.MOTHERBOARD_AT_VINTAGE.get(), "MF AT Standard Motherboard");
@@ -145,9 +147,11 @@ public class JscLanguageProvider extends LanguageProvider {
         add(HardwareItems.RAM_SDRAM_128.get(), "Stratix Layer SDRAM-128");
         add(HardwareItems.RAM_DDR_512.get(), "Stratix Layer DDR-512");
         add(HardwareItems.RAM_DDR2_2048.get(), "Stratix Layer DDR2-2048");
+        add(HardwareItems.GPU_RADIANCE_9200_SE.get(), "Pyrix Radiance 9200 SE");
         add(HardwareItems.GPU_VERTEX_256.get(), "Visara Vertex 256");
         add(HardwareItems.GPU_RADIANCE_9800_PRO.get(), "Pyrix Radiance 9800 Pro");
         add(HardwareItems.GPU_VERTEX_8800_GT.get(), "Visara Vertex 8800 GT");
+        add(HardwareItems.GPU_VERTEX_GTX_280.get(), "Visara Vertex GTX 280");
         add(HardwareItems.PSU_500B.get(), "MF PowerBasic 500B");
         add(HardwareItems.MOTHERBOARD_ATX_LEGACY_SKA.get(), "MF ATX Legacy Motherboard (Socket A)");
         add(HardwareItems.MOTHERBOARD_ATX_LEGACY_S370.get(), "MF ATX Legacy Motherboard (Socket 370)");
@@ -162,6 +166,9 @@ public class JscLanguageProvider extends LanguageProvider {
         add(HardwareItems.CPU_APEX_5_4590.get(), "Integra Apex 5 4590");
         add(HardwareItems.CPU_APEX_5_4690K.get(), "Integra Apex 5 4690K");
         add(HardwareItems.CPU_APEX_7_4790K.get(), "Integra Apex 7 4790K");
+        add(HardwareItems.GPU_VERTEX_GTX_550_TI.get(), "Visara Vertex GTX 550 Ti");
+        add(HardwareItems.GPU_RADIANCE_HD_6850.get(), "Pyrix Radiance HD 6850");
+        add(HardwareItems.GPU_VERTEX_GTX_780_TI.get(), "Visara Vertex GTX 780 Ti");
         add(HardwareItems.PSU_850G.get(), "MF PowerGold 850G");
         add(HardwareItems.MOTHERBOARD_ATX_STANDARD_LGA1150.get(), "MF ATX Standard Motherboard (LGA 1150)");
         add(HardwareItems.MOTHERBOARD_EATX_STANDARD_WS.get(), "MF EATX Standard Workstation Board");
