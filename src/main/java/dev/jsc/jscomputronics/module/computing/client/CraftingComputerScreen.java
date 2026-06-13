@@ -11,7 +11,6 @@ import dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -21,7 +20,7 @@ import java.util.Locale;
 /**
  * Screen for the Crafting Computer's assembly surface — the same flat-dark "computer OS" skin as the Personal Computer.
  */
-public class CraftingComputerScreen extends AbstractComputerScreen<CraftingComputerMenu> {
+public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingComputerMenu> {
 
     private static final int COL_R = 126;
     private static final int COL_R_W = 110;
@@ -38,8 +37,6 @@ public class CraftingComputerScreen extends AbstractComputerScreen<CraftingCompu
     private static final int AUTO_X = COL_R;
     private static final int AUTO_Y = 121;
 
-    private EditBox nameBox;
-
     public CraftingComputerScreen(final CraftingComputerMenu menu, final Inventory inventory,
                                   final Component title) {
         super(menu, inventory, title);
@@ -53,38 +50,10 @@ public class CraftingComputerScreen extends AbstractComputerScreen<CraftingCompu
     protected void init() {
         super.init();
         // Name field in the header — computers are renamed here, never via an anvil.
-        nameBox = new EditBox(font, leftPos + 28, topPos + 8, 126, 11, Component.literal("Name"));
-        nameBox.setBordered(false);
-        nameBox.setMaxLength(RenamePcPayload.MAX_LEN);
-        nameBox.setTextColor(JscOsTheme.TEXT);
-        nameBox.setHint(Component.literal("Name this computer...").withStyle(ChatFormatting.DARK_GRAY));
-        nameBox.setValue(menu.customName());
-        nameBox.setResponder(s -> PacketDistributor.sendToServer(new RenamePcPayload(menu.computerPos(), s)));
-        addRenderableWidget(nameBox);
-    }
-
-    @Override
-    public boolean keyPressed(final int key, final int scan, final int mods) {
-        // While the name field has focus, route typing to it so the inventory key
-        // never closes the GUI mid-word. ESC just unfocuses the field.
-        if (nameBox != null && nameBox.isFocused()) {
-            if (key == 256) {
-                nameBox.setFocused(false);
-                setFocused(null);
-                return true;
-            }
-            nameBox.keyPressed(key, scan, mods);
-            return true;
-        }
-        return super.keyPressed(key, scan, mods);
-    }
-
-    @Override
-    public boolean charTyped(final char c, final int mods) {
-        if (nameBox != null && nameBox.isFocused()) {
-            return nameBox.charTyped(c, mods);
-        }
-        return super.charTyped(c, mods);
+        setupNameBox(28, 8, 126, RenamePcPayload.MAX_LEN,
+                Component.literal("Name this computer...").withStyle(ChatFormatting.DARK_GRAY),
+                menu.customName(),
+                s -> PacketDistributor.sendToServer(new RenamePcPayload(menu.computerPos(), s)));
     }
 
     @Override

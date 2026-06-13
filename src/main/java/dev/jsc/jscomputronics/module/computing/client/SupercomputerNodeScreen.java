@@ -11,7 +11,6 @@ import dev.jsc.jscomputronics.module.computing.menu.SupercomputerNodeMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -19,15 +18,13 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * Screen for a Supercomputer Node's assembly — the shared "computer OS" skin.
  */
-public class SupercomputerNodeScreen extends AbstractComputerScreen<SupercomputerNodeMenu> {
+public class SupercomputerNodeScreen extends AbstractAssemblyScreen<SupercomputerNodeMenu> {
 
     private static final int COL_R = 126;
     private static final int COL_R_W = 110;
     private static final int BTN_H = 14;
     private static final int POWER_Y = 105;
     private static final int AUTO_Y = 121;
-
-    private EditBox nameBox;
 
     public SupercomputerNodeScreen(final SupercomputerNodeMenu menu, final Inventory inventory,
                                    final Component title) {
@@ -41,36 +38,11 @@ public class SupercomputerNodeScreen extends AbstractComputerScreen<Supercompute
     @Override
     protected void init() {
         super.init();
-        nameBox = new EditBox(font, leftPos + 28, topPos + 8, 126, 11, Component.literal("Name"));
-        nameBox.setBordered(false);
-        nameBox.setMaxLength(RenamePcPayload.MAX_LEN);
-        nameBox.setTextColor(JscOsTheme.TEXT);
-        nameBox.setHint(Component.literal("Name this node...").withStyle(ChatFormatting.DARK_GRAY));
-        nameBox.setValue(menu.customName());
-        nameBox.setResponder(s -> PacketDistributor.sendToServer(new RenamePcPayload(menu.computerPos(), s)));
-        addRenderableWidget(nameBox);
-    }
-
-    @Override
-    public boolean keyPressed(final int key, final int scan, final int mods) {
-        if (nameBox != null && nameBox.isFocused()) {
-            if (key == 256) {
-                nameBox.setFocused(false);
-                setFocused(null);
-                return true;
-            }
-            nameBox.keyPressed(key, scan, mods);
-            return true;
-        }
-        return super.keyPressed(key, scan, mods);
-    }
-
-    @Override
-    public boolean charTyped(final char c, final int mods) {
-        if (nameBox != null && nameBox.isFocused()) {
-            return nameBox.charTyped(c, mods);
-        }
-        return super.charTyped(c, mods);
+        // Name field in the header — a node is renamed here, never via an anvil.
+        setupNameBox(28, 8, 126, RenamePcPayload.MAX_LEN,
+                Component.literal("Name this node...").withStyle(ChatFormatting.DARK_GRAY),
+                menu.customName(),
+                s -> PacketDistributor.sendToServer(new RenamePcPayload(menu.computerPos(), s)));
     }
 
     @Override

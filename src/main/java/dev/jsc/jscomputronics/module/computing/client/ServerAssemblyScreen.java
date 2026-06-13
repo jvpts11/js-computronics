@@ -15,8 +15,6 @@ import dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenameServerPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -26,11 +24,9 @@ import java.util.List;
 /**
  * Screen for assembling a Server: a flat-dark "computer OS" modal.
  */
-public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssemblyMenu> {
+public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyMenu> {
 
     private final UnitFormatter fmt = UnitFormatter.forCurrentLocale();
-
-    private EditBox nameBox;
 
     public ServerAssemblyScreen(final ServerAssemblyMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
@@ -45,14 +41,10 @@ public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssembly
         super.init();
         // Name field in the header — renaming a computer happens here, in its assembly GUI, never via
         // an anvil. Each keystroke syncs the name to the held Server.
-        nameBox = new EditBox(font, leftPos + 52, topPos + 8, 104, 11, Component.literal("Name"));
-        nameBox.setBordered(false);
-        nameBox.setMaxLength(RenameServerPayload.MAX_LEN);
-        nameBox.setTextColor(JscOsTheme.TEXT);
-        nameBox.setHint(Component.literal("Name this server...").withStyle(ChatFormatting.DARK_GRAY));
-        nameBox.setValue(menu.serverName());
-        nameBox.setResponder(s -> PacketDistributor.sendToServer(new RenameServerPayload(s)));
-        addRenderableWidget(nameBox);
+        setupNameBox(52, 8, 104, RenameServerPayload.MAX_LEN,
+                Component.literal("Name this server...").withStyle(ChatFormatting.DARK_GRAY),
+                menu.serverName(),
+                s -> PacketDistributor.sendToServer(new RenameServerPayload(s)));
     }
 
     @Override
@@ -67,30 +59,6 @@ public class ServerAssemblyScreen extends AbstractContainerScreen<ServerAssembly
             nameBox.setFocused(false);
         }
         return super.mouseClicked(mouseX, mouseY, button);
-    }
-
-    @Override
-    public boolean keyPressed(final int key, final int scan, final int mods) {
-        // While the name field has focus, route typing to it and never let a key (e.g. the inventory
-        // key 'E') reach the screen and close the GUI. ESC just unfocuses the field.
-        if (nameBox != null && nameBox.isFocused()) {
-            if (key == 256) {
-                nameBox.setFocused(false);
-                setFocused(null);
-                return true;
-            }
-            nameBox.keyPressed(key, scan, mods);
-            return true;
-        }
-        return super.keyPressed(key, scan, mods);
-    }
-
-    @Override
-    public boolean charTyped(final char c, final int mods) {
-        if (nameBox != null && nameBox.isFocused()) {
-            return nameBox.charTyped(c, mods);
-        }
-        return super.charTyped(c, mods);
     }
 
     @Override
