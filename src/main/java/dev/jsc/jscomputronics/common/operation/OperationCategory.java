@@ -25,11 +25,7 @@ public enum OperationCategory {
 
     TRANSPORT,
 
-    ECONOMY,
-
     AGRICULTURE,
-
-    FACTION,
 
     GEOLOGICAL,
 

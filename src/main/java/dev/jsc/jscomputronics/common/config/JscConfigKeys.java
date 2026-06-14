@@ -13,7 +13,7 @@ import java.util.List;
  * The canonical declarations of every config entry the mod loads, together with the shared {@link JscConfigRegistry}
  * that owns them. This is the single source of truth for which TOML paths exist and what values are legal; the
  * NeoForge {@code ModConfigSpec} bridge mirrors these declarations, and the {@link ConfigValidator} clamps or rejects
- * loaded values against them. Future keys (including the faction toggles) are added here and picked up by the bridge.
+ * loaded values against them. Future keys are added here and picked up by the bridge.
  */
 public final class JscConfigKeys {
 
