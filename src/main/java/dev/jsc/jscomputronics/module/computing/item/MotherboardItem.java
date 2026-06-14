@@ -9,13 +9,16 @@ package dev.jsc.jscomputronics.module.computing.item;
 
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
 import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
+import dev.jsc.jscomputronics.common.hardware.RamGeneration;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * A motherboard item — the chassis that bounds a build (socket and counts of CPU/RAM/PCIe slots).
@@ -37,9 +40,15 @@ public class MotherboardItem extends SpecItem<MotherboardSpec> {
         final MotherboardSpec spec = spec();
         tooltip.add(Component.literal(spec.formFactor().label() + " form factor")
                 .withStyle(ChatFormatting.AQUA));
+        final String ramTypes = spec.acceptedRam().stream()
+                .sorted(Comparator.comparingInt(RamGeneration::ordinal))
+                .map(RamGeneration::name)
+                .collect(Collectors.joining(" / "));
+        final String slotFamily = spec.pcieGeneration().busFamily().label();
         tooltip.add(Component.literal(
-                spec.cpuSlots() + "x " + spec.socket() + "  -  "
-                        + spec.ramSlots() + " RAM  -  " + spec.pcieSlots() + " PCIe")
+                spec.cpuSlots() + "x " + spec.socket().name() + "  |  "
+                        + spec.ramSlots() + " RAM (" + ramTypes + ")  |  "
+                        + spec.pcieSlots() + " " + slotFamily)
                 .withStyle(ChatFormatting.GRAY));
     }
 }

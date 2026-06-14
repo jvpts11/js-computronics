@@ -27,8 +27,10 @@ import dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
+import dev.jsc.jscomputronics.module.computing.block.LegacyMonitorBlock;
 import dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.PersonalRouterBlock;
+import dev.jsc.jscomputronics.module.computing.block.VintageMonitorBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
@@ -192,9 +194,9 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> MONITOR_ITEM = ITEMS.register(
             "monitor", () -> new BlockItem(MONITOR.get(), new Item.Properties()));
 
-    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.VintageMonitorBlock> VINTAGE_MONITOR =
+    public static final DeferredBlock<VintageMonitorBlock> VINTAGE_MONITOR =
             BLOCKS.register("vintage_monitor",
-                    () -> new dev.jsc.jscomputronics.module.computing.block.VintageMonitorBlock(
+                    () -> new VintageMonitorBlock(
                             BlockBehaviour.Properties.of()
                                     .mapColor(MapColor.COLOR_BLACK)
                                     .strength(1.0F)
@@ -204,9 +206,9 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> VINTAGE_MONITOR_ITEM = ITEMS.register(
             "vintage_monitor", () -> new BlockItem(VINTAGE_MONITOR.get(), new Item.Properties()));
 
-    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.LegacyMonitorBlock> LEGACY_MONITOR =
+    public static final DeferredBlock<LegacyMonitorBlock> LEGACY_MONITOR =
             BLOCKS.register("legacy_monitor",
-                    () -> new dev.jsc.jscomputronics.module.computing.block.LegacyMonitorBlock(
+                    () -> new LegacyMonitorBlock(
                             BlockBehaviour.Properties.of()
                                     .mapColor(MapColor.COLOR_BLACK)
                                     .strength(1.0F)

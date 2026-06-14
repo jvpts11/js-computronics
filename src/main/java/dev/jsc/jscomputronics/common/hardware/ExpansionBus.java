@@ -15,8 +15,19 @@ package dev.jsc.jscomputronics.common.hardware;
  * across all generations (1.0 through 6.0) — any PCIe card fits any PCIe slot electrically.
  */
 public enum ExpansionBus {
-    ISA,
-    PCI,
-    AGP,
-    PCIE
+    ISA("ISA"),
+    PCI("PCI"),
+    AGP("AGP"),
+    PCIE("PCIe");
+
+    private final String label;
+
+    ExpansionBus(final String label) {
+        this.label = label;
+    }
+
+    /** Human-readable slot family name suitable for display in item tooltips. */
+    public String label() {
+        return label;
+    }
 }
