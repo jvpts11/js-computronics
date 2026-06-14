@@ -38,6 +38,8 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.SERVER_ROUTER, "Server Router");
         addBlock(ComputingModule.DATACENTER_STATION, "Datacenter Station");
         addBlock(ComputingModule.MONITOR, "Monitor");
+        addBlock(ComputingModule.VINTAGE_MONITOR, "Vintage Monitor");
+        addBlock(ComputingModule.LEGACY_MONITOR, "Legacy Monitor");
         addBlock(ComputingModule.TANK, "Tank");
         add("block.jsc.monitor.unlinked", "No computer linked");
         add("block.jsc.monitor.no_computer", "No computer found in range over a Peripheral Cable");
@@ -97,6 +99,8 @@ public class JscLanguageProvider extends LanguageProvider {
         add("jsc.gui.storage.always_public", "Public - network storage");
         add("jsc.gui.storage.no_disk", "no disk");
         add("jsc.gui.storage.disk", "Disk %s");
+        // Expansion card bus-family mismatch: shown when a card cannot enter a slot due to incompatible bus.
+        add("jsc.gui.computer.slot.bus_mismatch", "Wrong slot type: this card requires a %s slot");
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             add(disk.item().get(), disk.displayName());
         }

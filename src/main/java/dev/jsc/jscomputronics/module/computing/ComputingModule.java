@@ -192,6 +192,30 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> MONITOR_ITEM = ITEMS.register(
             "monitor", () -> new BlockItem(MONITOR.get(), new Item.Properties()));
 
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.VintageMonitorBlock> VINTAGE_MONITOR =
+            BLOCKS.register("vintage_monitor",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.VintageMonitorBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_BLACK)
+                                    .strength(1.0F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> VINTAGE_MONITOR_ITEM = ITEMS.register(
+            "vintage_monitor", () -> new BlockItem(VINTAGE_MONITOR.get(), new Item.Properties()));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.LegacyMonitorBlock> LEGACY_MONITOR =
+            BLOCKS.register("legacy_monitor",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.LegacyMonitorBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_BLACK)
+                                    .strength(1.0F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion()));
+
+    public static final DeferredItem<BlockItem> LEGACY_MONITOR_ITEM = ITEMS.register(
+            "legacy_monitor", () -> new BlockItem(LEGACY_MONITOR.get(), new Item.Properties()));
+
     // Block entities
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DataCableBlockEntity>> DATA_CABLE_BE =
@@ -259,7 +283,7 @@ public final class ComputingModule {
             BLOCK_ENTITIES.register("monitor",
                     () -> BlockEntityType.Builder.of(
                             dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity::new,
-                            MONITOR.get()).build(null));
+                            MONITOR.get(), VINTAGE_MONITOR.get(), LEGACY_MONITOR.get()).build(null));
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.TankBlock> TANK =
             BLOCKS.register("tank", () -> new dev.jsc.jscomputronics.module.computing.block.TankBlock(

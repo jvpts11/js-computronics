@@ -22,7 +22,21 @@ public enum PcieGeneration {
     PCIE_5_0,
     PCIE_6_0;
 
-    public boolean fitsInto(final PcieGeneration slot) {
-        return this.ordinal() <= slot.ordinal();
+    /** The physical bus family this generation belongs to. */
+    public ExpansionBus busFamily() {
+        return switch (this) {
+            case ISA -> ExpansionBus.ISA;
+            case PCI -> ExpansionBus.PCI;
+            case AGP_4X, AGP_8X -> ExpansionBus.AGP;
+            case PCIE_1_0, PCIE_2_0, PCIE_3_0, PCIE_4_0, PCIE_5_0, PCIE_6_0 -> ExpansionBus.PCIE;
+        };
+    }
+
+    /**
+     * Whether this card bus is compatible with the given motherboard slot. ISA, PCI, and AGP are
+     * physically distinct and reject each other; all PCIe generations are cross-compatible.
+     */
+    public boolean compatibleWith(final PcieGeneration slot) {
+        return this.busFamily() == slot.busFamily();
     }
 }

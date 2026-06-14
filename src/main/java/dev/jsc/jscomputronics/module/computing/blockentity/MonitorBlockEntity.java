@@ -18,6 +18,9 @@ import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -113,7 +116,11 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
             return;
         }
         final boolean lit = state.getValue(MonitorBlock.LIT);
-        if (linkedOwner == null) {
+        // LIT = true only when the linked computer is actively running — not just linked but powered off.
+        final boolean computerRunning = linkedOwner != null
+                && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof AbstractComputerBlockEntity host
+                && host.isRunning();
+        if (!computerRunning) {
             bootTicks = 0;
             if (lit) {
                 level.setBlock(worldPosition, state.setValue(MonitorBlock.LIT, false), Block.UPDATE_CLIENTS);
@@ -135,6 +142,16 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
             owner.onEndpointUnlinked(worldPosition.asLong());
         }
         onOwnerUnlinked();
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     @Override

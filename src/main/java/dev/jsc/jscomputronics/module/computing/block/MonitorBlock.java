@@ -11,6 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
@@ -42,8 +43,12 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * The Monitor: a peripheral that displays the interface of the computer it is linked to (over a Peripheral Cable, ≤ 16 blocks).
+ *
+ * <p>Implements {@link EraChassisBlock} so era-specific subclasses ({@link VintageMonitorBlock},
+ * {@link LegacyMonitorBlock}) each wear their own era's textures and the {@code LIT} blockstate
+ * texture resolves to the correct on-screen OS style.
  */
-public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBlock, PeripheralConnectable {
+public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBlock, PeripheralConnectable, EraChassisBlock {
 
     public static final MapCodec<MonitorBlock> CODEC = simpleCodec(MonitorBlock::new);
 
@@ -55,8 +60,18 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     }
 
     @Override
-    protected MapCodec<MonitorBlock> codec() {
+    protected MapCodec<? extends MonitorBlock> codec() {
         return CODEC;
+    }
+
+    /** The hardware era this monitor chassis belongs to. Overridden by era-specific subclasses. */
+    public HardwareEra era() {
+        return HardwareEra.STANDARD;
+    }
+
+    @Override
+    public HardwareEra chassisEra() {
+        return era();
     }
 
     @Override

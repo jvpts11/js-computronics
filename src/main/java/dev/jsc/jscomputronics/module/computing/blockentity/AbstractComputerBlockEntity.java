@@ -131,7 +131,15 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity implements
     }
 
     protected boolean isValidPcieCard(final ItemStack stack) {
-        return stack.getItem() instanceof ExpansionCardItem;
+        if (!(stack.getItem() instanceof ExpansionCardItem card)) {
+            return false;
+        }
+        final ItemStack boardStack = hardware.getStackInSlot(layout.motherboardSlot());
+        if (!(boardStack.getItem() instanceof MotherboardItem motherboard)) {
+            // No board yet — accept the card so it can be pre-staged; the slot will be inoperative until a board arrives.
+            return true;
+        }
+        return card.cardSpec().bus().compatibleWith(motherboard.spec().pcieGeneration());
     }
 
     public boolean isValidForSlot(final int slot, final ItemStack stack) {

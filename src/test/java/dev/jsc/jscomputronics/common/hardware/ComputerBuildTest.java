@@ -90,16 +90,26 @@ class ComputerBuildTest {
     }
 
     @Test
-    void gpuBusNewerThanBoard_isNotPowered() {
-        final GpuSpec pcie5Gpu = new GpuSpec(HardwareEra.EXA, PcieGeneration.PCIE_5_0, 19456, 192000, 750);
+    void agpCardInPcieBoard_isNotPowered() {
+        // AGP and PCIe are physically distinct bus families — an AGP card cannot enter a PCIe slot.
+        final GpuSpec agpGpu = new GpuSpec(HardwareEra.LEGACY, PcieGeneration.AGP_8X, 8, 128, 70);
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
-                List.of(standardCpu()), List.of(pcie5Gpu), List.of(ddr3()), psu(2000));
+                List.of(standardCpu()), List.of(agpGpu), List.of(ddr3()), psu(650));
         assertFalse(build.isPowered());
     }
 
     @Test
-    void gpuBusOlderThanBoard_isPowered() {
-        // Backward compatible: a PCIe 1.0 card fits a PCIe 3.0 board.
+    void pcieCardNewerGenerationInPcieBoard_isPowered() {
+        // All PCIe generations are cross-compatible — a PCIe 5.0 card fits a PCIe 3.0 slot.
+        final GpuSpec pcie5Gpu = new GpuSpec(HardwareEra.EXA, PcieGeneration.PCIE_5_0, 19456, 192000, 750);
+        final ComputerBuild build = new ComputerBuild(mtxStandard(),
+                List.of(standardCpu()), List.of(pcie5Gpu), List.of(ddr3()), psu(2000));
+        assertTrue(build.isPowered());
+    }
+
+    @Test
+    void pcie1CardInPcie3Board_isPowered() {
+        // All PCIe generations are cross-compatible — a PCIe 1.0 card fits a PCIe 3.0 slot.
         final GpuSpec pcie1Gpu = new GpuSpec(HardwareEra.LEGACY, PcieGeneration.PCIE_1_0, 112, 512, 110);
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(pcie1Gpu), List.of(ddr3()), psu(650));

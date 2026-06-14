@@ -155,9 +155,9 @@ public record ComputerBuild(MotherboardSpec motherboard,
                     + motherboard.pcieSlots() + " PCIe slots");
         }
         for (final ExpansionCardSpec card : pcieCards) {
-            if (!card.bus().fitsInto(motherboard.pcieGeneration())) {
-                problems.add("PCIe card bus " + card.bus() + " is newer than board bus "
-                        + motherboard.pcieGeneration());
+            if (!card.bus().compatibleWith(motherboard.pcieGeneration())) {
+                problems.add("expansion card bus family " + card.bus().busFamily()
+                        + " is not compatible with board bus " + motherboard.pcieGeneration().busFamily());
             }
         }
 

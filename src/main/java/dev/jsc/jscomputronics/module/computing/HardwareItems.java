@@ -133,7 +133,7 @@ public final class HardwareItems {
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_BABYAT_VINTAGE =
             board("motherboard_babyat_vintage", new MotherboardSpec(FormFactor.BABY_AT, HardwareEra.VINTAGE,
-                    CpuSocket.SOCKET_3, 1, Set.of(RamGeneration.SIMM), 4, PcieGeneration.PCI, 4, 2, 2));
+                    CpuSocket.SOCKET_3, 1, Set.of(RamGeneration.SIMM), 4, PcieGeneration.ISA, 4, 2, 2));
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_AT_VINTAGE =
             board("motherboard_at_vintage", new MotherboardSpec(FormFactor.AT, HardwareEra.VINTAGE,
                     CpuSocket.SOCKET_7, 1, Set.of(RamGeneration.SIMM, RamGeneration.EDO), 8,
@@ -204,10 +204,11 @@ public final class HardwareItems {
 
     // The Legacy ATX board lists "one of Socket A / Socket 370 / LGA 775". A board spec carries a single
     // socket, so this is modeled as one board item per socket — the clean one-value-per-record mapping.
+    // Socket A (Athlon XP generation) pre-dates PCIe; its primary GPU slot is AGP 8x.
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_ATX_LEGACY_SKA =
             board("motherboard_atx_legacy_ska", new MotherboardSpec(FormFactor.ATX, HardwareEra.LEGACY,
                     CpuSocket.SOCKET_A, 1, Set.of(RamGeneration.DDR, RamGeneration.DDR2), 4,
-                    PcieGeneration.PCIE_1_0, 4, 4, 4));
+                    PcieGeneration.AGP_8X, 4, 4, 4));
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_ATX_LEGACY_S370 =
             board("motherboard_atx_legacy_s370", new MotherboardSpec(FormFactor.ATX, HardwareEra.LEGACY,
                     CpuSocket.SOCKET_370, 1, Set.of(RamGeneration.DDR, RamGeneration.DDR2), 4,
