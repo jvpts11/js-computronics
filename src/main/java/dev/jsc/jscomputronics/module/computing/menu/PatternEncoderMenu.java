@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.menu;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -128,6 +129,10 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
             previewMirror.setStackInSlot(0, blockEntity.preview().copy());
         }
         super.broadcastChanges();
+    }
+
+    public BlockPos blockEntityPos() {
+        return blockEntity.getBlockPos();
     }
 
     public ItemStack preview() {
