@@ -9,10 +9,13 @@ package dev.jsc.jscomputronics.module.industrial;
 
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.industrial.block.CoalGeneratorBlock;
+import dev.jsc.jscomputronics.module.industrial.block.ElectricFurnaceBlock;
 import dev.jsc.jscomputronics.module.industrial.block.MaceratorBlock;
 import dev.jsc.jscomputronics.module.industrial.blockentity.CoalGeneratorBlockEntity;
+import dev.jsc.jscomputronics.module.industrial.blockentity.ElectricFurnaceBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.menu.CoalGeneratorMenu;
+import dev.jsc.jscomputronics.module.industrial.menu.ElectricFurnaceMenu;
 import dev.jsc.jscomputronics.module.industrial.menu.MaceratorMenu;
 import dev.jsc.jscomputronics.module.industrial.recipe.MaceratingRecipe;
 import net.minecraft.core.registries.Registries;
@@ -78,6 +81,12 @@ public final class IndustrialModule {
     public static final DeferredItem<BlockItem> COAL_GENERATOR_ITEM = ITEMS.register(
             "coal_generator", () -> new BlockItem(COAL_GENERATOR.get(), new Item.Properties()));
 
+    public static final DeferredBlock<ElectricFurnaceBlock> ELECTRIC_FURNACE = BLOCKS.register(
+            "electric_furnace", () -> new ElectricFurnaceBlock(machineProperties()));
+
+    public static final DeferredItem<BlockItem> ELECTRIC_FURNACE_ITEM = ITEMS.register(
+            "electric_furnace", () -> new BlockItem(ELECTRIC_FURNACE.get(), new Item.Properties()));
+
     public static final DeferredItem<Item> IRON_DUST = ITEMS.register(
             "iron_dust", () -> new Item(new Item.Properties()));
 
@@ -90,6 +99,10 @@ public final class IndustrialModule {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CoalGeneratorBlockEntity>> COAL_GENERATOR_BE =
             BLOCK_ENTITIES.register("coal_generator",
                     () -> BlockEntityType.Builder.of(CoalGeneratorBlockEntity::new, COAL_GENERATOR.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ElectricFurnaceBlockEntity>> ELECTRIC_FURNACE_BE =
+            BLOCK_ENTITIES.register("electric_furnace",
+                    () -> BlockEntityType.Builder.of(ElectricFurnaceBlockEntity::new, ELECTRIC_FURNACE.get()).build(null));
 
     // Recipes
 
@@ -111,6 +124,9 @@ public final class IndustrialModule {
 
     public static final DeferredHolder<MenuType<?>, MenuType<CoalGeneratorMenu>> COAL_GENERATOR_MENU =
             MENUS.register("coal_generator", () -> IMenuTypeExtension.create(CoalGeneratorMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<ElectricFurnaceMenu>> ELECTRIC_FURNACE_MENU =
+            MENUS.register("electric_furnace", () -> IMenuTypeExtension.create(ElectricFurnaceMenu::new));
 
     public static void register(final IEventBus modEventBus) {
         BLOCKS.register(modEventBus);

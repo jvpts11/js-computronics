@@ -41,5 +41,14 @@ public final class IndustrialCapabilities {
                 Capabilities.EnergyStorage.BLOCK,
                 IndustrialModule.COAL_GENERATOR_BE.get(),
                 (be, side) -> be.getEnergy());
+
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                IndustrialModule.ELECTRIC_FURNACE_BE.get(),
+                (be, side) -> be.getInventory());
+        event.registerBlockEntity(
+                Capabilities.EnergyStorage.BLOCK,
+                IndustrialModule.ELECTRIC_FURNACE_BE.get(),
+                (be, side) -> be.getEnergy());
     }
 }

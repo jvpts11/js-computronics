@@ -27,5 +27,6 @@ public final class IndustrialClientSetup {
     public static void registerScreens(final RegisterMenuScreensEvent event) {
         event.register(IndustrialModule.MACERATOR_MENU.get(), MaceratorScreen::new);
         event.register(IndustrialModule.COAL_GENERATOR_MENU.get(), CoalGeneratorScreen::new);
+        event.register(IndustrialModule.ELECTRIC_FURNACE_MENU.get(), ElectricFurnaceScreen::new);
     }
 }

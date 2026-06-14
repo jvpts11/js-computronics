@@ -7,16 +7,16 @@
  */
 package dev.jsc.jscomputronics.module.industrial.client;
 
+import dev.jsc.jscomputronics.client.gui.screen.AbstractMachineScreen;
 import dev.jsc.jscomputronics.module.industrial.menu.CoalGeneratorMenu;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
  * Screen for the Coal Generator: a fuel slot, a burn indicator and an FE gauge showing the energy produced.
  */
-public class CoalGeneratorScreen extends AbstractContainerScreen<CoalGeneratorMenu> {
+public class CoalGeneratorScreen extends AbstractMachineScreen<CoalGeneratorMenu> {
 
     private static final int FLAME_EMPTY = 0xFF555555;
     private static final int FLAME_FULL = 0xFFFF9020;
@@ -57,11 +57,8 @@ public class CoalGeneratorScreen extends AbstractContainerScreen<CoalGeneratorMe
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        // AbstractContainerScreen#render already draws the dimmed/blurred
-        // background; calling renderBackground here too would darken it twice.
         super.render(g, mouseX, mouseY, partialTick);
-        renderTooltip(g, mouseX, mouseY);
-        if (isHovering(ENERGY_X, ENERGY_Y, ENERGY_W, ENERGY_H, mouseX, mouseY)) {
+        if (hover(mouseX, mouseY, ENERGY_X, ENERGY_Y, ENERGY_W, ENERGY_H)) {
             g.renderTooltip(font,
                     Component.literal(menu.getEnergy() + " / " + menu.getMaxEnergy() + " FE"),
                     mouseX, mouseY);

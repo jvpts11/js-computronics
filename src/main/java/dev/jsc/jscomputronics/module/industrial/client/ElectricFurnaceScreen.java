@@ -8,23 +8,24 @@
 package dev.jsc.jscomputronics.module.industrial.client;
 
 import dev.jsc.jscomputronics.client.gui.screen.AbstractMachineScreen;
-import dev.jsc.jscomputronics.module.industrial.menu.MaceratorMenu;
+import dev.jsc.jscomputronics.module.industrial.menu.ElectricFurnaceMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
- * Screen for the Macerator: input/output slots, a grinding progress bar and an FE gauge.
+ * Screen for the Electric Furnace: an input slot, a smelting progress bar and an FE gauge.
  */
-public class MaceratorScreen extends AbstractMachineScreen<MaceratorMenu> {
+public class ElectricFurnaceScreen extends AbstractMachineScreen<ElectricFurnaceMenu> {
 
-    private static final int PROGRESS_FILL = 0xFF3DCC3D;
+    private static final int PROGRESS_FILL = 0xFFFF8000;
     private static final int ENERGY_X = 8;
     private static final int ENERGY_Y = 16;
     private static final int ENERGY_W = 10;
     private static final int ENERGY_H = 52;
 
-    public MaceratorScreen(final MaceratorMenu menu, final Inventory inventory, final Component title) {
+    public ElectricFurnaceScreen(final ElectricFurnaceMenu menu, final Inventory inventory,
+                                 final Component title) {
         super(menu, inventory, title);
         this.imageWidth = 176;
         this.imageHeight = 166;
