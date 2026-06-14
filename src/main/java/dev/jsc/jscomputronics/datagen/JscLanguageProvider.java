@@ -29,6 +29,7 @@ public class JscLanguageProvider extends LanguageProvider {
         add("itemGroup.jsc.computing", "J's Computronics: Computing");
         addBlock(IndustrialModule.MACERATOR, "Macerator");
         addBlock(IndustrialModule.COAL_GENERATOR, "Coal Generator");
+        addBlock(IndustrialModule.ELECTRIC_FURNACE, "Electric Furnace");
         add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");

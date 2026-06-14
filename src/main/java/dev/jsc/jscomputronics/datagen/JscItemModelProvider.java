@@ -64,6 +64,10 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/datacenter_station")));
         getBuilder("monitor")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/monitor")));
+        getBuilder("vintage_monitor")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/vintage_monitor")));
+        getBuilder("legacy_monitor")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/legacy_monitor")));
         getBuilder("tank")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/tank")));
         getBuilder("personal_computer")

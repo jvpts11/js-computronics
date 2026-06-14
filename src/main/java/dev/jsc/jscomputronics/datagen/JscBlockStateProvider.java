@@ -247,6 +247,50 @@ public class JscBlockStateProvider extends BlockStateProvider {
                     .build();
         });
 
+        // Vintage Monitor: same lit/facing logic, era-specific textures.
+        final ModelFile vintageMonitorOff = models().orientable(
+                "vintage_monitor",
+                modLoc("block/vintage_monitor_side"),
+                modLoc("block/vintage_monitor_front"),
+                modLoc("block/vintage_monitor_side"));
+        final ModelFile vintageMonitorOn = models().orientable(
+                "vintage_monitor_on",
+                modLoc("block/vintage_monitor_side"),
+                modLoc("block/vintage_monitor_front_on"),
+                modLoc("block/vintage_monitor_side"));
+        getVariantBuilder(ComputingModule.VINTAGE_MONITOR.get()).forAllStates(state -> {
+            final boolean lit = state.getValue(
+                    net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT);
+            final net.minecraft.core.Direction facing = state.getValue(
+                    net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                    .modelFile(lit ? vintageMonitorOn : vintageMonitorOff)
+                    .rotationY((int) facing.toYRot() % 360)
+                    .build();
+        });
+
+        // Legacy Monitor: same lit/facing logic, era-specific textures.
+        final ModelFile legacyMonitorOff = models().orientable(
+                "legacy_monitor",
+                modLoc("block/legacy_monitor_side"),
+                modLoc("block/legacy_monitor_front"),
+                modLoc("block/legacy_monitor_side"));
+        final ModelFile legacyMonitorOn = models().orientable(
+                "legacy_monitor_on",
+                modLoc("block/legacy_monitor_side"),
+                modLoc("block/legacy_monitor_front_on"),
+                modLoc("block/legacy_monitor_side"));
+        getVariantBuilder(ComputingModule.LEGACY_MONITOR.get()).forAllStates(state -> {
+            final boolean lit = state.getValue(
+                    net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT);
+            final net.minecraft.core.Direction facing = state.getValue(
+                    net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                    .modelFile(lit ? legacyMonitorOn : legacyMonitorOff)
+                    .rotationY((int) facing.toYRot() % 360)
+                    .build();
+        });
+
         // Interaction buses are not blocks: they are parts mounted on a data cable's face,
     }
 
