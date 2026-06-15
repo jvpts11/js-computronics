@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.computing;
 
 import dev.jsc.jscomputronics.common.hardware.CpuSocket;
 import dev.jsc.jscomputronics.common.hardware.CpuSpec;
+import dev.jsc.jscomputronics.common.hardware.DiskSpec;
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
 import dev.jsc.jscomputronics.common.hardware.GpuSpec;
 import dev.jsc.jscomputronics.common.hardware.MotherboardSpec;
@@ -16,8 +17,10 @@ import dev.jsc.jscomputronics.common.hardware.PcieGeneration;
 import dev.jsc.jscomputronics.common.hardware.PsuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamGeneration;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
+import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
+import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;
 import dev.jsc.jscomputronics.module.computing.item.MotherboardItem;
 import dev.jsc.jscomputronics.module.computing.item.PsuItem;
@@ -58,6 +61,7 @@ public final class HardwareItems {
     public static final List<DeferredItem<GpuItem>> GPUS = new ArrayList<>();
     public static final List<DeferredItem<PsuItem>> PSUS = new ArrayList<>();
     public static final List<DeferredItem<MotherboardItem>> MOTHERBOARDS = new ArrayList<>();
+    public static final List<DeferredItem<DiskItem>> DISKS = new ArrayList<>();
 
     private static DeferredItem<CpuItem> cpu(final String id, final CpuSpec spec) {
         final DeferredItem<CpuItem> holder =
@@ -91,6 +95,13 @@ public final class HardwareItems {
         final DeferredItem<MotherboardItem> holder =
                 ComputingModule.ITEMS.register(id, () -> new MotherboardItem(new Item.Properties(), spec));
         MOTHERBOARDS.add(holder);
+        return holder;
+    }
+
+    private static DeferredItem<DiskItem> disk(final String id, final DiskSpec spec) {
+        final DeferredItem<DiskItem> holder =
+                ComputingModule.ITEMS.register(id, () -> new DiskItem(new Item.Properties(), spec));
+        DISKS.add(holder);
         return holder;
     }
 
@@ -142,6 +153,13 @@ public final class HardwareItems {
             board("motherboard_mtx_vintage", new MotherboardSpec(FormFactor.MTX, HardwareEra.VINTAGE,
                     CpuSocket.SOCKET_7, 2, Set.of(RamGeneration.SIMM, RamGeneration.EDO), 16,
                     PcieGeneration.PCI, 8, 4, 8));
+
+    // Vintage spinning disks: MFM/IDE rotating platters (20 MB and 100 MB). Tiny capacity by design —
+    // these are the floor of the storage ladder, appropriate for single-digit MHz CPUs.
+    public static final DeferredItem<DiskItem> DISK_TRENCH_20M =
+            disk("disk_vaultis_trench_20m", new DiskSpec(StorageTier.HDD, 80L, 5));
+    public static final DeferredItem<DiskItem> DISK_TRENCH_100M =
+            disk("disk_vaultis_trench_100m", new DiskSpec(StorageTier.HDD, 400L, 6));
 
     // ==========================================================================================
     //  LEGACY — AGP/PCIe 1.0 buses, SDRAM/DDR/DDR2 RAM, first multi-core CPUs
@@ -228,6 +246,15 @@ public final class HardwareItems {
             board("motherboard_mtx_legacy", new MotherboardSpec(FormFactor.MTX, HardwareEra.LEGACY,
                     CpuSocket.SOCKET_940, 4, Set.of(RamGeneration.DDR2), 24, PcieGeneration.PCIE_1_0, 8, 6, 8));
 
+    // Legacy rotating and early solid-state disks: IDE HDDs (4 GB and 20 GB) and the first affordable
+    // SATA SSD (64 GB). Capacity sits between vintage and the standard 500 GB / 1 TB floor.
+    public static final DeferredItem<DiskItem> DISK_LINK_IDE_4G =
+            disk("disk_vaultis_link_ide_4g", new DiskSpec(StorageTier.HDD, 640L, 7));
+    public static final DeferredItem<DiskItem> DISK_LINK_IDE_20G =
+            disk("disk_vaultis_link_ide_20g", new DiskSpec(StorageTier.HDD, 1280L, 8));
+    public static final DeferredItem<DiskItem> DISK_LINK_SATA_SSD_64G =
+            disk("disk_vaultis_link_sata_ssd_64g", new DiskSpec(StorageTier.SSD, 768L, 3));
+
     // ==========================================================================================
     //  STANDARD — completion of the partially-registered set (PCIe 2.0/3.0, DDR3)
     //  The Servo 2620/2690/2699, the Ascent X4 965, the DDR3-8192, the HD 7970 GPU, the MTX-P /
@@ -300,6 +327,9 @@ public final class HardwareItems {
             // not possible, so they are appended once at the end in registration (era) order below.
         }
         for (final DeferredItem<PsuItem> h : PSUS) {
+            ordered.add(h.get());
+        }
+        for (final DeferredItem<DiskItem> h : DISKS) {
             ordered.add(h.get());
         }
         return ordered;

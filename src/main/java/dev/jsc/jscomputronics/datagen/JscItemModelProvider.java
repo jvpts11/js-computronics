@@ -120,7 +120,7 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.SERVER_CASE.get());
         basicItem(ComputingModule.SERVER.get());
         getBuilder("server_rack")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack_left_bottom_front")));
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack_bays_0")));
         getBuilder("import_bus")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/import_bus_part")));
         getBuilder("export_bus")
@@ -130,6 +130,7 @@ public class JscItemModelProvider extends ItemModelProvider {
         }
 
         // Per-era hardware catalog — a generated (layer0 = item texture) model for every component.
+        dev.jsc.jscomputronics.module.computing.HardwareItems.DISKS.forEach(h -> basicItem(h.get()));
         dev.jsc.jscomputronics.module.computing.HardwareItems.CPUS.forEach(h -> basicItem(h.get()));
         dev.jsc.jscomputronics.module.computing.HardwareItems.RAMS.forEach(h -> basicItem(h.get()));
         // These newly added GPUs ship without a repo texture yet (the artwork is pending review); mark each

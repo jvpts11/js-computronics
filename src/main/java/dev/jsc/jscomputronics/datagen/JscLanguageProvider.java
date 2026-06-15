@@ -138,6 +138,8 @@ public class JscLanguageProvider extends LanguageProvider {
         add(HardwareItems.MOTHERBOARD_BABYAT_VINTAGE.get(), "MF Baby-AT I Motherboard");
         add(HardwareItems.MOTHERBOARD_AT_VINTAGE.get(), "MF AT Standard Motherboard");
         add(HardwareItems.MOTHERBOARD_MTX_VINTAGE.get(), "MF MTX-V Motherboard");
+        add(HardwareItems.DISK_TRENCH_20M.get(), "Vaultis Trench HDD 20M");
+        add(HardwareItems.DISK_TRENCH_100M.get(), "Vaultis Trench HDD 100M");
 
         // Legacy
         add(HardwareItems.CPU_INTEGRA_VERTEX_700.get(), "Integra Vertex 700");
@@ -170,6 +172,9 @@ public class JscLanguageProvider extends LanguageProvider {
         add(HardwareItems.MOTHERBOARD_EATX_LEGACY_LGA775.get(), "MF EATX Legacy Motherboard (LGA 775)");
         add(HardwareItems.MOTHERBOARD_EATX_LEGACY_S940.get(), "MF EATX Legacy Motherboard (Socket 940)");
         add(HardwareItems.MOTHERBOARD_MTX_LEGACY.get(), "MF MTX-L Motherboard");
+        add(HardwareItems.DISK_LINK_IDE_4G.get(), "Vaultis Link IDE-HDD 4G");
+        add(HardwareItems.DISK_LINK_IDE_20G.get(), "Vaultis Link IDE-HDD 20G");
+        add(HardwareItems.DISK_LINK_SATA_SSD_64G.get(), "Vaultis Link SATA-SSD 64G");
 
         // Standard (completion)
         add(HardwareItems.CPU_ASCENT_X4_955.get(), "Velocion Ascent X4 955");
