@@ -37,6 +37,7 @@ public final class ImportBusPart implements CablePart {
     private long bufferAmount;
     private dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation activeOp;
     private StorageKey flushedKey;
+    private long flushedAmount;
     private int ticksSinceFlush;
 
     @Override
@@ -65,6 +66,7 @@ public final class ImportBusPart implements CablePart {
             }
             activeOp = null;
             flushedKey = null;
+            flushedAmount = 0L;
             ticksSinceFlush = 0;
         }
         final ServerLevel level = host.serverLevel();
@@ -74,8 +76,8 @@ public final class ImportBusPart implements CablePart {
         final NetworkUuid network = host.network();
         final MainframeBlockEntity mainframe = network == null ? null : host.mainframe();
         // The batch size and pull rate follow the network's orchestration capacity.
-        final long cap = mainframe == null ? MIN_BATCH
-                : Math.max(MIN_BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
+        final long cap = mainframe == null ? 1L
+                : Math.max(1L, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
         final ExternalDataPort port = host.neighborPort(face);
         ticksSinceFlush++;
 
@@ -123,10 +125,12 @@ public final class ImportBusPart implements CablePart {
         // as the Operation's leftover and is re-buffered when it finishes (above).
         activeOp = mainframe.submitNetworkInsert(payloadKey, payloadAmount, "import");
         flushedKey = payloadKey;
+        flushedAmount = payloadAmount;
         if (activeOp == null) {
             bufferKey = payloadKey; // dispatch failed (not running): keep the data
             bufferAmount = payloadAmount;
             flushedKey = null;
+            flushedAmount = 0L;
         }
         host.setChanged();
     }
@@ -139,13 +143,19 @@ public final class ImportBusPart implements CablePart {
     @Override
     public void dropContents(final ServerLevel level) {
         // Drop a buffered item back into the world; a buffered fluid (rare, transient) is discarded.
-        if (bufferKey != null && !bufferKey.isFluid() && host != null) {
+        // If an INSERT operation is in flight, the payload was already extracted from the source but
+        // not yet confirmed by the network, so drop the in-flight amount too; nothing is silently lost.
+        final StorageKey drop = bufferKey != null ? bufferKey : flushedKey;
+        final long dropAmount = bufferKey != null ? bufferAmount : flushedAmount;
+        if (drop != null && !drop.isFluid() && dropAmount > 0L && host != null) {
             net.minecraft.world.Containers.dropItemStack(level,
                     host.getBlockPos().getX(), host.getBlockPos().getY(), host.getBlockPos().getZ(),
-                    bufferKey.stack((int) Math.min(bufferAmount, Integer.MAX_VALUE)));
+                    drop.stack((int) Math.min(dropAmount, Integer.MAX_VALUE)));
         }
         bufferKey = null;
         bufferAmount = 0L;
+        flushedKey = null;
+        flushedAmount = 0L;
     }
 
     @Override
@@ -155,17 +165,35 @@ public final class ImportBusPart implements CablePart {
                     .result().ifPresent(encoded -> tag.put("BufferKey", encoded));
             tag.putLong("BufferAmount", bufferAmount);
         }
+        // Persist the in-flight payload so a save/reload cannot destroy items that were extracted
+        // from the source but whose INSERT operation has not yet been confirmed by the network.
+        if (flushedKey != null && flushedAmount > 0L) {
+            StorageKey.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), flushedKey)
+                    .result().ifPresent(encoded -> tag.put("FlushedKey", encoded));
+            tag.putLong("FlushedAmount", flushedAmount);
+        }
     }
 
     @Override
     public void load(final CompoundTag tag, final HolderLookup.Provider registries) {
         bufferKey = null;
         bufferAmount = 0L;
+        flushedKey = null;
+        flushedAmount = 0L;
         if (tag.contains("BufferKey")) {
             StorageKey.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get("BufferKey"))
                     .result().ifPresent(key -> {
                         bufferKey = key;
                         bufferAmount = tag.getLong("BufferAmount");
+                    });
+        }
+        // Recover items that were in flight before the reload; the timed operation is gone but the
+        // data must not be lost, so move them back into the buffer to be re-inserted next tick.
+        if (tag.contains("FlushedKey")) {
+            StorageKey.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get("FlushedKey"))
+                    .result().ifPresent(key -> {
+                        bufferKey = key;
+                        bufferAmount = tag.getLong("FlushedAmount");
                     });
         }
     }

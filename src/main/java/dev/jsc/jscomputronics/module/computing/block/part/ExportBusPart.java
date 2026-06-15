@@ -32,7 +32,6 @@ public final class ExportBusPart implements CablePart {
     public static final int MODE_CONTINUOUS = 0;
     public static final int MODE_REDSTONE = 1;
 
-    private static final int BATCH = 64;
     private static final int EXPORT_INTERVAL = 2;
 
     private DataCableBlockEntity host;
@@ -183,7 +182,7 @@ public final class ExportBusPart implements CablePart {
             return;
         }
         // Throughput follows the network's orchestration capacity, not a fixed batch.
-        final long batch = Math.max(BATCH, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
+        final long batch = Math.max(1L, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
         final long want = computeWant(dest, key, batch);
         if (want <= 0L) {
             return;
