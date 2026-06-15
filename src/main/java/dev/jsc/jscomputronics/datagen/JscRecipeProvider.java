@@ -11,7 +11,6 @@ import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.material.MaterialForm;
 import dev.jsc.jscomputronics.common.material.MaterialItems;
 import dev.jsc.jscomputronics.common.material.ModMaterial;
-import dev.jsc.jscomputronics.module.industrial.recipe.CompressingRecipe;
 import dev.jsc.jscomputronics.module.industrial.recipe.MaceratingRecipe;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
@@ -50,13 +49,10 @@ public class JscRecipeProvider extends RecipeProvider {
         macerating(recipeOutput, Ingredient.of(c("raw_materials/iron")),
                 new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), 2), "raw_iron_to_dust");
 
-        // Tag-based recipes so any ingot from other mods works as input.
-        macerating(recipeOutput, Ingredient.of(c("ingots/iron")),
-                new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), 1), "iron_ingot_to_dust");
-        compressing(recipeOutput, Ingredient.of(c("ingots/iron")),
-                new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get(), 1), "iron_ingot_to_plate");
-        compressing(recipeOutput, Ingredient.of(c("ingots/copper")),
-                new ItemStack(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get(), 1), "copper_ingot_to_plate");
+        // Derived machine recipes (ingot->dust macerating, ingot->plate compressing) are generated for
+        // every active (material, form) pair from the c: ingot tag, so any ingot from another mod works
+        // as input and adding a new plate or dust later is a one-line change in ModMaterial.
+        MaterialFormRecipes.generateAll(recipeOutput);
 
         // Smelting and blasting dust back into ingots. The ingredient uses the c:dusts/iron tag so
         // iron dust from other mods can also be smelted here.
@@ -84,14 +80,6 @@ public class JscRecipeProvider extends RecipeProvider {
         recipeOutput.accept(
                 ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "macerating/" + name),
                 new MaceratingRecipe(ingredient, result, 200),
-                null);
-    }
-
-    private static void compressing(final RecipeOutput recipeOutput, final Ingredient ingredient,
-                                    final ItemStack result, final String name) {
-        recipeOutput.accept(
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "compressing/" + name),
-                new CompressingRecipe(ingredient, result, CompressingRecipe.DEFAULT_PROCESSING_TIME),
                 null);
     }
 }

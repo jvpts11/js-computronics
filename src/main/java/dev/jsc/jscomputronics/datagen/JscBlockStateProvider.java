@@ -38,6 +38,13 @@ public class JscBlockStateProvider extends BlockStateProvider {
 
         horizontalBlock(IndustrialModule.MACERATOR.get(), maceratorModel);
 
+        final ModelFile compressorModel = models().orientable(
+                "compressor",
+                modLoc("block/compressor_side"),
+                modLoc("block/compressor_front"),
+                modLoc("block/compressor_top"));
+        horizontalBlock(IndustrialModule.COMPRESSOR.get(), compressorModel);
+
         final ModelFile coalGeneratorModel = models().orientable(
                 "coal_generator",
                 modLoc("block/coal_generator_side"),

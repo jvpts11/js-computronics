@@ -38,6 +38,8 @@ public final class JscCreativeModeTabs {
                     .icon(() -> new ItemStack(IndustrialModule.MACERATOR_ITEM.get()))
                     .displayItems((parameters, output) -> {
                         output.accept(IndustrialModule.MACERATOR_ITEM.get());
+                        output.accept(IndustrialModule.ELECTRIC_FURNACE_ITEM.get());
+                        output.accept(IndustrialModule.COMPRESSOR_ITEM.get());
                         output.accept(IndustrialModule.COAL_GENERATOR_ITEM.get());
                         output.accept(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get());
                         output.accept(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get());
