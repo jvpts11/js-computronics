@@ -8,6 +8,9 @@
 package dev.jsc.jscomputronics.common.registry;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.material.MaterialForm;
+import dev.jsc.jscomputronics.common.material.MaterialItems;
+import dev.jsc.jscomputronics.common.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.minecraft.core.registries.Registries;
@@ -36,7 +39,9 @@ public final class JscCreativeModeTabs {
                     .displayItems((parameters, output) -> {
                         output.accept(IndustrialModule.MACERATOR_ITEM.get());
                         output.accept(IndustrialModule.COAL_GENERATOR_ITEM.get());
-                        output.accept(IndustrialModule.IRON_DUST.get());
+                        output.accept(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get());
+                        output.accept(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get());
+                        output.accept(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get());
                     })
                     .build());
 

@@ -8,7 +8,10 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
+import dev.jsc.jscomputronics.common.material.MaterialForm;
+import dev.jsc.jscomputronics.common.material.MaterialItems;
+import dev.jsc.jscomputronics.common.material.ModMaterial;
+import dev.jsc.jscomputronics.module.industrial.recipe.CompressingRecipe;
 import dev.jsc.jscomputronics.module.industrial.recipe.MaceratingRecipe;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.PackOutput;
@@ -17,6 +20,9 @@ import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.SimpleCookingRecipeBuilder;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -24,7 +30,9 @@ import net.minecraft.world.item.crafting.Ingredient;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Generates the module's recipes: the Macerator's grinding recipes plus the vanilla cooking recipes that smelt the resulting dust back into ingots, so macerating an ore drop genuinely doubles the metal.
+ * Generates the module's recipes: the Macerator's grinding recipes plus the vanilla cooking recipes
+ * that smelt the resulting dust back into ingots, so macerating an ore drop genuinely doubles the
+ * metal. All machine recipe ingredients use {@code c:} common tags for interop with other mods.
  */
 public class JscRecipeProvider extends RecipeProvider {
 
@@ -35,24 +43,40 @@ public class JscRecipeProvider extends RecipeProvider {
 
     @Override
     protected void buildRecipes(final RecipeOutput recipeOutput) {
-        // Ore doubling: macerating one raw iron yields two iron dust, and each
-        // dust smelts back into an ingot, so one raw iron becomes two ingots.
-        macerating(recipeOutput, Ingredient.of(Items.RAW_IRON),
-                new ItemStack(IndustrialModule.IRON_DUST.get(), 2), "raw_iron");
+        // Ore doubling: both the ore block (c:ores/iron) and the raw drop accept two iron dust each,
+        // and each dust smelts back into an ingot, so one mined ore becomes two ingots.
+        macerating(recipeOutput, Ingredient.of(c("ores/iron")),
+                new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), 2), "iron_ore_to_dust");
+        macerating(recipeOutput, Ingredient.of(c("raw_materials/iron")),
+                new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), 2), "raw_iron_to_dust");
 
+        // Tag-based recipes so any ingot from other mods works as input.
+        macerating(recipeOutput, Ingredient.of(c("ingots/iron")),
+                new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), 1), "iron_ingot_to_dust");
+        compressing(recipeOutput, Ingredient.of(c("ingots/iron")),
+                new ItemStack(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get(), 1), "iron_ingot_to_plate");
+        compressing(recipeOutput, Ingredient.of(c("ingots/copper")),
+                new ItemStack(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get(), 1), "copper_ingot_to_plate");
+
+        // Smelting and blasting dust back into ingots. The ingredient uses the c:dusts/iron tag so
+        // iron dust from other mods can also be smelted here.
         SimpleCookingRecipeBuilder.smelting(
-                        Ingredient.of(IndustrialModule.IRON_DUST.get()),
+                        Ingredient.of(c("dusts/iron")),
                         RecipeCategory.MISC, Items.IRON_INGOT, 0.7F, 200)
-                .unlockedBy("has_iron_dust", has(IndustrialModule.IRON_DUST.get()))
+                .unlockedBy("has_iron_dust", has(c("dusts/iron")))
                 .save(recipeOutput, ResourceLocation.fromNamespaceAndPath(
                         JsComputronics.MODID, "iron_ingot_from_smelting_iron_dust"));
 
         SimpleCookingRecipeBuilder.blasting(
-                        Ingredient.of(IndustrialModule.IRON_DUST.get()),
+                        Ingredient.of(c("dusts/iron")),
                         RecipeCategory.MISC, Items.IRON_INGOT, 0.7F, 100)
-                .unlockedBy("has_iron_dust", has(IndustrialModule.IRON_DUST.get()))
+                .unlockedBy("has_iron_dust", has(c("dusts/iron")))
                 .save(recipeOutput, ResourceLocation.fromNamespaceAndPath(
                         JsComputronics.MODID, "iron_ingot_from_blasting_iron_dust"));
+    }
+
+    private static TagKey<Item> c(final String path) {
+        return ItemTags.create(ResourceLocation.fromNamespaceAndPath("c", path));
     }
 
     private static void macerating(final RecipeOutput recipeOutput, final Ingredient ingredient,
@@ -60,6 +84,14 @@ public class JscRecipeProvider extends RecipeProvider {
         recipeOutput.accept(
                 ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "macerating/" + name),
                 new MaceratingRecipe(ingredient, result, 200),
+                null);
+    }
+
+    private static void compressing(final RecipeOutput recipeOutput, final Ingredient ingredient,
+                                    final ItemStack result, final String name) {
+        recipeOutput.accept(
+                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "compressing/" + name),
+                new CompressingRecipe(ingredient, result, CompressingRecipe.DEFAULT_PROCESSING_TIME),
                 null);
     }
 }

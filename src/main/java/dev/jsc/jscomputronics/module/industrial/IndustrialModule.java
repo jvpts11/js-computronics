@@ -8,15 +8,20 @@
 package dev.jsc.jscomputronics.module.industrial;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.material.MaterialItems;
 import dev.jsc.jscomputronics.module.industrial.block.CoalGeneratorBlock;
+import dev.jsc.jscomputronics.module.industrial.block.CompressorBlock;
 import dev.jsc.jscomputronics.module.industrial.block.ElectricFurnaceBlock;
 import dev.jsc.jscomputronics.module.industrial.block.MaceratorBlock;
 import dev.jsc.jscomputronics.module.industrial.blockentity.CoalGeneratorBlockEntity;
+import dev.jsc.jscomputronics.module.industrial.blockentity.CompressorBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.blockentity.ElectricFurnaceBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.menu.CoalGeneratorMenu;
+import dev.jsc.jscomputronics.module.industrial.menu.CompressorMenu;
 import dev.jsc.jscomputronics.module.industrial.menu.ElectricFurnaceMenu;
 import dev.jsc.jscomputronics.module.industrial.menu.MaceratorMenu;
+import dev.jsc.jscomputronics.module.industrial.recipe.CompressingRecipe;
 import dev.jsc.jscomputronics.module.industrial.recipe.MaceratingRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
@@ -47,6 +52,10 @@ public final class IndustrialModule {
 
     public static final DeferredRegister.Items ITEMS =
             DeferredRegister.createItems(JsComputronics.MODID);
+
+    static {
+        MaterialItems.register(ITEMS);
+    }
 
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, JsComputronics.MODID);
@@ -87,8 +96,11 @@ public final class IndustrialModule {
     public static final DeferredItem<BlockItem> ELECTRIC_FURNACE_ITEM = ITEMS.register(
             "electric_furnace", () -> new BlockItem(ELECTRIC_FURNACE.get(), new Item.Properties()));
 
-    public static final DeferredItem<Item> IRON_DUST = ITEMS.register(
-            "iron_dust", () -> new Item(new Item.Properties()));
+    public static final DeferredBlock<CompressorBlock> COMPRESSOR = BLOCKS.register(
+            "compressor", () -> new CompressorBlock(machineProperties()));
+
+    public static final DeferredItem<BlockItem> COMPRESSOR_ITEM = ITEMS.register(
+            "compressor", () -> new BlockItem(COMPRESSOR.get(), new Item.Properties()));
 
     // Block entities
 
@@ -104,6 +116,10 @@ public final class IndustrialModule {
             BLOCK_ENTITIES.register("electric_furnace",
                     () -> BlockEntityType.Builder.of(ElectricFurnaceBlockEntity::new, ELECTRIC_FURNACE.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CompressorBlockEntity>> COMPRESSOR_BE =
+            BLOCK_ENTITIES.register("compressor",
+                    () -> BlockEntityType.Builder.of(CompressorBlockEntity::new, COMPRESSOR.get()).build(null));
+
     // Recipes
 
     public static final DeferredHolder<RecipeType<?>, RecipeType<MaceratingRecipe>> MACERATING_TYPE =
@@ -117,6 +133,17 @@ public final class IndustrialModule {
     public static final DeferredHolder<RecipeSerializer<?>, MaceratingRecipe.Serializer> MACERATING_SERIALIZER =
             RECIPE_SERIALIZERS.register("macerating", MaceratingRecipe.Serializer::new);
 
+    public static final DeferredHolder<RecipeType<?>, RecipeType<CompressingRecipe>> COMPRESSING_TYPE =
+            RECIPE_TYPES.register("compressing", () -> new RecipeType<CompressingRecipe>() {
+                @Override
+                public String toString() {
+                    return "compressing";
+                }
+            });
+
+    public static final DeferredHolder<RecipeSerializer<?>, CompressingRecipe.Serializer> COMPRESSING_SERIALIZER =
+            RECIPE_SERIALIZERS.register("compressing", CompressingRecipe.Serializer::new);
+
     // Menus
 
     public static final DeferredHolder<MenuType<?>, MenuType<MaceratorMenu>> MACERATOR_MENU =
@@ -127,6 +154,9 @@ public final class IndustrialModule {
 
     public static final DeferredHolder<MenuType<?>, MenuType<ElectricFurnaceMenu>> ELECTRIC_FURNACE_MENU =
             MENUS.register("electric_furnace", () -> IMenuTypeExtension.create(ElectricFurnaceMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<CompressorMenu>> COMPRESSOR_MENU =
+            MENUS.register("compressor", () -> IMenuTypeExtension.create(CompressorMenu::new));
 
     public static void register(final IEventBus modEventBus) {
         BLOCKS.register(modEventBus);

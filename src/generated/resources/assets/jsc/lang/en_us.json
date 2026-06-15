@@ -1,5 +1,6 @@
 {
   "block.jsc.coal_generator": "Coal Generator",
+  "block.jsc.compressor": "Compressor",
   "block.jsc.crafting_computer": "Crafting Computer",
   "block.jsc.datacenter_station": "Datacenter Station",
   "block.jsc.electric_furnace": "Electric Furnace",
@@ -31,6 +32,7 @@
   "block.jsc.vintage_personal_computer": "Vintage Personal Computer",
   "gui.jsc.cancel": "Cancel",
   "gui.jsc.confirm": "Confirm",
+  "item.jsc.copper_plate": "Copper Plate",
   "item.jsc.cpu_apex_5_4590": "Integra Apex 5 4590",
   "item.jsc.cpu_apex_5_4690k": "Integra Apex 5 4690K",
   "item.jsc.cpu_apex_7_4790k": "Integra Apex 7 4790K",
@@ -97,6 +99,7 @@
   "item.jsc.import_bus": "Import Bus",
   "item.jsc.import_bus.tooltip": "Right-click a data cable to attach; pulls items into the network",
   "item.jsc.iron_dust": "Iron Dust",
+  "item.jsc.iron_plate": "Iron Plate",
   "item.jsc.mainframe.tooltip": "Forms a 3x2x2 structure when placed",
   "item.jsc.motherboard_at_vintage": "MF AT Standard Motherboard",
   "item.jsc.motherboard_atx_legacy_lga775": "MF ATX Legacy Motherboard (LGA 775)",

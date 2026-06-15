@@ -46,6 +46,13 @@ public class JscBlockStateProvider extends BlockStateProvider {
 
         horizontalBlock(IndustrialModule.COAL_GENERATOR.get(), coalGeneratorModel);
 
+        final ModelFile electricFurnaceModel = models().orientable(
+                "electric_furnace",
+                modLoc("block/electric_furnace_side"),
+                modLoc("block/electric_furnace_front"),
+                modLoc("block/electric_furnace_top"));
+        horizontalBlock(IndustrialModule.ELECTRIC_FURNACE.get(), electricFurnaceModel);
+
         pipeCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
         pipeCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
         pipeCable(ComputingModule.HPC_CABLE.get(), "hpc_cable");

@@ -5,7 +5,7 @@
       "conditions": {
         "items": [
           {
-            "items": "jsc:iron_dust"
+            "items": "#c:dusts/iron"
           }
         ]
       },

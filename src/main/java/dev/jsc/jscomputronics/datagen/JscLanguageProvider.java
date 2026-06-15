@@ -8,6 +8,9 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.material.MaterialForm;
+import dev.jsc.jscomputronics.common.material.MaterialItems;
+import dev.jsc.jscomputronics.common.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.HardwareItems;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
@@ -30,7 +33,10 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(IndustrialModule.MACERATOR, "Macerator");
         addBlock(IndustrialModule.COAL_GENERATOR, "Coal Generator");
         addBlock(IndustrialModule.ELECTRIC_FURNACE, "Electric Furnace");
-        add(IndustrialModule.IRON_DUST.get(), "Iron Dust");
+        addBlock(IndustrialModule.COMPRESSOR, "Compressor");
+        add(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), "Iron Dust");
+        add(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get(), "Iron Plate");
+        add(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get(), "Copper Plate");
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
         addBlock(ComputingModule.HPC_CABLE, "High Compute Cable");

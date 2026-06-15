@@ -8,8 +8,10 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.material.MaterialForm;
+import dev.jsc.jscomputronics.common.material.MaterialItems;
+import dev.jsc.jscomputronics.common.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
@@ -41,8 +43,17 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/macerator")));
         getBuilder("coal_generator")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/coal_generator")));
+        getBuilder("electric_furnace")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/electric_furnace")));
+        getBuilder("compressor")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/compressor")));
 
-        basicItem(IndustrialModule.IRON_DUST.get());
+        basicItem(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get());
+        // iron_plate and copper_plate textures are pending artwork; mark as generated so datagen does not fail before they land.
+        existingFileHelper.trackGenerated(modLoc("item/iron_plate"), TEXTURE);
+        basicItem(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get());
+        existingFileHelper.trackGenerated(modLoc("item/copper_plate"), TEXTURE);
+        basicItem(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get());
 
         // Cables show their core model in the inventory.
         getBuilder("ethernet_cable")
@@ -109,7 +120,7 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.SERVER_CASE.get());
         basicItem(ComputingModule.SERVER.get());
         getBuilder("server_rack")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack_bays_0")));
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/server_rack_left_bottom_front")));
         getBuilder("import_bus")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/import_bus_part")));
         getBuilder("export_bus")

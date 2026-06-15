@@ -1,0 +1,10 @@
+{
+  "type": "jsc:macerating",
+  "ingredient": {
+    "tag": "c:raw_materials/iron"
+  },
+  "result": {
+    "count": 2,
+    "id": "jsc:iron_dust"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "type": "jsc:compressing",
+  "ingredient": {
+    "tag": "c:ingots/iron"
+  },
+  "result": {
+    "count": 1,
+    "id": "jsc:iron_plate"
+  }
+}
