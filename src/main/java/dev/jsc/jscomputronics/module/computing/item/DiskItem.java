@@ -93,8 +93,8 @@ public class DiskItem extends SpecItem<DiskSpec> {
                 tooltip.add(Component.literal("  ...and more").withStyle(ChatFormatting.DARK_GRAY));
                 break;
             }
-            // Item/fluid name in gray, the stored quantity trailing in a dimmer grey (mB for fluids).
-            final String qty = entry.getKey().isFluid() ? entry.getValue() + " mB" : "x" + entry.getValue();
+            // Name in gray, the stored quantity trailing in a dimmer grey (mB for fluids and chemicals).
+            final String qty = entry.getKey().isItem() ? "x" + entry.getValue() : entry.getValue() + " mB";
             tooltip.add(Component.literal("  ")
                     .append(entry.getKey().displayName().copy().withStyle(ChatFormatting.GRAY))
                     .append(Component.literal("  " + qty).withStyle(ChatFormatting.DARK_GRAY)));

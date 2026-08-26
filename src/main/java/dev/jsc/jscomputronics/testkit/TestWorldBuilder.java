@@ -77,6 +77,21 @@ public final class TestWorldBuilder {
         level.setBlock(absolute(relative), state, 3);
     }
 
+    /**
+     * Places a block the way a player placing its item does: the block entity receives the item's default
+     * data components. Third-party machines keep their factory settings (side configuration, upgrades, ...)
+     * in those components, so a raw {@link #setBlock} would leave them with every face disabled.
+     */
+    public BlockEntity placeFromItem(final BlockPos relative, final Block block) {
+        setBlock(relative, block.defaultBlockState());
+        final BlockEntity entity = level.getBlockEntity(absolute(relative));
+        if (entity != null) {
+            entity.applyComponentsFromItemStack(new ItemStack(block));
+            entity.setChanged();
+        }
+        return entity;
+    }
+
     public BlockState getBlockState(final BlockPos relative) {
         return level.getBlockState(absolute(relative));
     }

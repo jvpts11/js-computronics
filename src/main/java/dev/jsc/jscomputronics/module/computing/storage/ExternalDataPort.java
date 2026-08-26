@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.storage;
 
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -17,25 +18,36 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
- * A {@link DataSink} + {@link DataSource} over an external block's item AND fluid capabilities at once.
+ * A {@link DataSink} + {@link DataSource} over an external block's item, fluid AND chemical capabilities at
+ * once — the one place where "everything is data" meets a real machine.
  */
-public final class ExternalDataPort implements DataSink, DataSource {
+public final class ExternalDataPort implements DataPort {
 
     @Nullable
     private final IItemHandler items;
     @Nullable
     private final IFluidHandler fluids;
+    @Nullable
+    private final ChemicalPort chemicals;
 
     public ExternalDataPort(@Nullable final IItemHandler items, @Nullable final IFluidHandler fluids) {
-        this.items = items;
-        this.fluids = fluids;
+        this(items, fluids, null);
     }
 
+    public ExternalDataPort(@Nullable final IItemHandler items, @Nullable final IFluidHandler fluids,
+                            @Nullable final ChemicalPort chemicals) {
+        this.items = items;
+        this.fluids = fluids;
+        this.chemicals = chemicals;
+    }
+
+    @Override
     public boolean isEmpty() {
-        return items == null && fluids == null;
+        return items == null && fluids == null && chemicals == null;
     }
 
     private static IFluidHandler.FluidAction action(final boolean simulate) {
@@ -47,12 +59,19 @@ public final class ExternalDataPort implements DataSink, DataSource {
         if (amount <= 0L) {
             return 0L;
         }
-        if (key.isFluid()) {
-            if (fluids == null) {
-                return 0L;
+        switch (key.kind()) {
+            case FLUID -> {
+                if (fluids == null) {
+                    return 0L;
+                }
+                final int want = (int) Math.min(amount, Integer.MAX_VALUE);
+                return fluids.fill(key.fluidStack(want), action(simulate));
             }
-            final int want = (int) Math.min(amount, Integer.MAX_VALUE);
-            return fluids.fill(key.fluidStack(want), action(simulate));
+            case CHEMICAL -> {
+                return chemicals == null ? 0L
+                        : chemicals.fill(Objects.requireNonNull(key.chemicalId()), amount, simulate);
+            }
+            default -> { }
         }
         if (items == null) {
             return 0L;
@@ -83,12 +102,19 @@ public final class ExternalDataPort implements DataSink, DataSource {
         if (amount <= 0L) {
             return 0L;
         }
-        if (key.isFluid()) {
-            if (fluids == null) {
-                return 0L;
+        switch (key.kind()) {
+            case FLUID -> {
+                if (fluids == null) {
+                    return 0L;
+                }
+                final int want = (int) Math.min(amount, Integer.MAX_VALUE);
+                return fluids.drain(key.fluidStack(want), action(simulate)).getAmount();
             }
-            final int want = (int) Math.min(amount, Integer.MAX_VALUE);
-            return fluids.drain(key.fluidStack(want), action(simulate)).getAmount();
+            case CHEMICAL -> {
+                return chemicals == null ? 0L
+                        : chemicals.drain(Objects.requireNonNull(key.chemicalId()), amount, simulate);
+            }
+            default -> { }
         }
         if (items == null) {
             return 0L;
@@ -106,22 +132,33 @@ public final class ExternalDataPort implements DataSink, DataSource {
         return extracted;
     }
 
+    @Override
     public long count(final StorageKey key) {
         long total = 0L;
-        if (key.isFluid()) {
-            if (fluids != null) {
-                for (int tank = 0; tank < fluids.getTanks(); tank++) {
-                    final FluidStack inTank = fluids.getFluidInTank(tank);
-                    if (FluidStack.isSameFluidSameComponents(inTank, key.fluidPrototype())) {
-                        total += inTank.getAmount();
+        switch (key.kind()) {
+            case FLUID -> {
+                if (fluids != null) {
+                    for (int tank = 0; tank < fluids.getTanks(); tank++) {
+                        final FluidStack inTank = fluids.getFluidInTank(tank);
+                        if (FluidStack.isSameFluidSameComponents(inTank, key.fluidPrototype())) {
+                            total += inTank.getAmount();
+                        }
                     }
                 }
             }
-        } else if (items != null) {
-            for (int slot = 0; slot < items.getSlots(); slot++) {
-                final ItemStack inSlot = items.getStackInSlot(slot);
-                if (ItemStack.isSameItemSameComponents(inSlot, key.stack(1))) {
-                    total += inSlot.getCount();
+            case CHEMICAL -> {
+                if (chemicals != null) {
+                    total = chemicals.count(Objects.requireNonNull(key.chemicalId()));
+                }
+            }
+            case ITEM -> {
+                if (items != null) {
+                    for (int slot = 0; slot < items.getSlots(); slot++) {
+                        final ItemStack inSlot = items.getStackInSlot(slot);
+                        if (ItemStack.isSameItemSameComponents(inSlot, key.stack(1))) {
+                            total += inSlot.getCount();
+                        }
+                    }
                 }
             }
         }
@@ -145,6 +182,11 @@ public final class ExternalDataPort implements DataSink, DataSource {
                 if (!inTank.isEmpty()) {
                     keys.add(StorageKey.of(inTank));
                 }
+            }
+        }
+        if (chemicals != null) {
+            for (final ResourceLocation chemical : chemicals.available()) {
+                keys.add(StorageKey.chemical(chemical));
             }
         }
         return new ArrayList<>(keys);

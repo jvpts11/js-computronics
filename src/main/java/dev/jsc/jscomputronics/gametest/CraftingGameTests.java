@@ -1660,7 +1660,8 @@ public final class CraftingGameTests {
                             List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
                                     storageKey(Items.STONE), 1L, 100)),
                             machineType, 200);
-                    helper.assertTrue(net.mainframe.submitNetworkProcessing(pattern, 4, "fill") != null,
+                    // Feeding never exceeds the demand, so ask for enough to let Fill mode show its cadence.
+                    helper.assertTrue(net.mainframe.submitNetworkProcessing(pattern, 64, "fill") != null,
                             "the processing operation is accepted");
                 })
                 .thenExecuteAfter(8, () -> {

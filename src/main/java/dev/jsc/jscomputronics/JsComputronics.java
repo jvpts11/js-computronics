@@ -40,5 +40,8 @@ public class JsComputronics {
         ComputingModule.register(modEventBus);
         JscCreativeModeTabs.register(modEventBus);
         JscAttachments.register(modEventBus);
+
+        // Soft integrations: each one checks for its mod and stays a no-op without it.
+        dev.jsc.jscomputronics.integration.mekanism.MekanismIntegration.bootstrap();
     }
 }

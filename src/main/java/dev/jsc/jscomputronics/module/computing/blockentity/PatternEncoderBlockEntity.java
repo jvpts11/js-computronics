@@ -306,7 +306,7 @@ public class PatternEncoderBlockEntity extends BlockEntity {
             return false;
         }
         final ProcessingPattern.ProcessingOutput primary = pattern.primaryOutput();
-        final String base = primary != null && !primary.key().isFluid()
+        final String base = primary != null && primary.key().isItem()
                 ? itemBaseName(primary.key().stack(1))
                 : machineBaseName(machineType);
         return writeToMedia(craftFileName(base), serialized.get());

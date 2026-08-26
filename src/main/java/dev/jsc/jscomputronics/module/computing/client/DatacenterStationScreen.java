@@ -194,9 +194,9 @@ public final class DatacenterStationScreen extends AbstractContainerScreen<Datac
             final int idx = gridIndexAt(mouseX, mouseY);
             if (idx >= 0 && idx < menu.items().size()) {
                 final NetworkItemEntry entry = menu.items().get(idx);
-                final String qty = entry.isFluid()
-                        ? String.format("%,d mB", entry.total())
-                        : String.format("%,d", entry.total());
+                final String qty = entry.key().isItem()
+                        ? String.format("%,d", entry.total())
+                        : String.format("%,d mB", entry.total());
                 g.renderComponentTooltip(font,
                         List.of(entry.name(), Component.literal(qty)), mouseX, mouseY);
             }
@@ -326,7 +326,9 @@ public final class DatacenterStationScreen extends AbstractContainerScreen<Datac
         JscOsTheme.window(g, px, py, POP_W, POP_H);
         JscOsTheme.headerBar(g, px + 4, py + 4, POP_W - 8);
         if (popupKey != null) {
-            if (popupKey.isFluid()) {
+            if (popupKey.isChemical()) {
+                ChemicalSprite.draw(g, popupKey, px + 6, py + 4);
+            } else if (popupKey.isFluid()) {
                 FluidSprite.draw(g, popupKey.fluidPrototype(), px + 6, py + 4);
             } else {
                 g.renderItem(popupKey.stack(1), px + 6, py + 4);
@@ -386,8 +388,12 @@ public final class DatacenterStationScreen extends AbstractContainerScreen<Datac
     }
 
     private void drawDataIcon(final GuiGraphics g, final StorageKey key, final long count, final int x, final int y) {
-        if (key.isFluid()) {
-            FluidSprite.draw(g, key.fluidPrototype(), x, y);
+        if (!key.isItem()) {
+            if (key.isChemical()) {
+                ChemicalSprite.draw(g, key, x, y);
+            } else {
+                FluidSprite.draw(g, key.fluidPrototype(), x, y);
+            }
             final String c = JscOsTheme.fmt(count);
             g.pose().pushPose();
             g.pose().translate(0, 0, 200);

@@ -3248,8 +3248,8 @@ public final class ComputingPayloads {
                         sendNetworkInteractor(player, level, computer);
                     }
                 });
-            } else if (key.isFluid()) {
-                return; // a fluid cannot be held in the inventory
+            } else if (!key.isItem()) {
+                return; // a fluid or chemical cannot be held in the inventory
             } else {
                 // Withdraw from local storage into the player's inventory (terminal Storage-tab withdraw).
                 final int maxStack = Math.max(1, key.stack(1).getMaxStackSize());
@@ -3496,8 +3496,8 @@ public final class ComputingPayloads {
                 return;
             }
             final StorageKey key = payload.key();
-            if (key.isFluid()) {
-                return; // a fluid cannot be held in the inventory — withdraw it via an Export Bus
+            if (!key.isItem()) {
+                return; // a fluid or chemical cannot be held in the inventory — withdraw it via an Export Bus
             }
             final int maxStack = Math.max(1, key.stack(1).getMaxStackSize());
             // Take only as much as the player's inventory can actually hold, so a "withdraw all" on a

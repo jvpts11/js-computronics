@@ -176,6 +176,9 @@ dependencies {
     localRuntime "mekanism:Mekanism:${mekanism_version}"
     // Mekanism Generators: the Fusion Reactor and its parts are the target of the big autocrafting battery.
     localRuntime "mekanism:Mekanism:${mekanism_version}:generators"
+    // Mekanism API, compile-only: the chemical bridge adapter compiles against it but the mod never loads a
+    // Mekanism class unless Mekanism is present (soft dependency, guarded at runtime).
+    compileOnly "mekanism:Mekanism:${mekanism_version}:api"
     // Applied Energistics 2 — dev-runtime only, a second network to prove ours coexists with it.
     localRuntime "appeng:appliedenergistics2:${ae2_version}"
     // Create — dev-runtime, sustained tick load. TEMPORARILY DISABLED: its transitive dep

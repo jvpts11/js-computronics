@@ -2009,7 +2009,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         drawDataIcon(g, popupEntry.key(), -1L, px + 8, py + 5);
         g.drawString(font, font.plainSubstrByWidth(popupEntry.name().getString(), POPUP_W - 78),
                 px + 28, py + 6, TEXT, false);
-        g.drawString(font, fmt(popupEntry.total()) + (popupEntry.isFluid() ? " mB" : "")
+        g.drawString(font, fmt(popupEntry.total()) + (popupEntry.key().isItem() ? "" : " mB")
                         + (popupFromStorage ? " in local" : " available"),
                 px + 28, py + 17, DIM, false);
         if (!popupFromStorage) {
@@ -2111,8 +2111,12 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     void drawDataIcon(final GuiGraphics g, final StorageKey key, final long count,
                               final int x, final int y) {
-        if (key.isFluid()) {
-            FluidSprite.draw(g, key.fluidPrototype(), x, y);
+        if (!key.isItem()) {
+            if (key.isChemical()) {
+                ChemicalSprite.draw(g, key, x, y);
+            } else {
+                FluidSprite.draw(g, key.fluidPrototype(), x, y);
+            }
             if (count >= 0L) {
                 final String c = fmt(count);
                 g.pose().pushPose();

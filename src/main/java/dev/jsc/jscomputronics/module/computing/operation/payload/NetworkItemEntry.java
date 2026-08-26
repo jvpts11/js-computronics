@@ -51,6 +51,10 @@ public record NetworkItemEntry(StorageKey key, long total, List<StorageShare> sh
         return key.isFluid();
     }
 
+    public boolean isChemical() {
+        return key.isChemical();
+    }
+
     public ItemStack icon() {
         return key.stack(1);
     }

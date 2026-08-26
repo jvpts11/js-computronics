@@ -181,7 +181,7 @@ public non-sealed class ImportBusPart extends AbstractBusPart {
         // not yet confirmed by the network, so drop the in-flight amount too; nothing is silently lost.
         final StorageKey drop = bufferKey != null ? bufferKey : flushedKey;
         final long dropAmount = bufferKey != null ? bufferAmount : flushedAmount;
-        if (drop != null && !drop.isFluid() && dropAmount > 0L && host != null) {
+        if (drop != null && drop.isItem() && dropAmount > 0L && host != null) {
             net.minecraft.world.Containers.dropItemStack(level,
                     host.getBlockPos().getX(), host.getBlockPos().getY(), host.getBlockPos().getZ(),
                     drop.stack((int) Math.min(dropAmount, Integer.MAX_VALUE)));

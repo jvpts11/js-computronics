@@ -13,6 +13,8 @@ import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEn
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.operation.PersistentOperation;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
+import dev.jsc.jscomputronics.module.computing.storage.CompositeDataPort;
+import dev.jsc.jscomputronics.module.computing.storage.DataPort;
 import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
@@ -52,6 +54,9 @@ public final class NetworkProcessingOperation implements PersistentOperation {
 
     private CraftingSwitchBlockEntity.DeclaredMachine machine;
     private long produced;
+    private long lotsFed;
+    /** Per pattern input: how much has reached the machine so far, against {@code lotsFed} lots' worth. */
+    private long[] delivered;
     private boolean done;
     private boolean waiting = true;
     private int idleTicks;
@@ -73,6 +78,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         this.requesterLabel = requesterLabel;
         final ProcessingPattern.ProcessingOutput primary = pattern.primaryOutput();
         this.resultKey = primary == null ? null : primary.key();
+        this.delivered = new long[pattern.inputs().size()];
         if (this.resultKey == null || pattern.inputs().isEmpty() || requested <= 0) {
             finish(); // malformed pattern: settle immediately as FAILED
         }
@@ -96,9 +102,8 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         }
         // Sided machines route through crafting buses when present: an Input Bus aimed at the machine carries
         // the deliveries, a Receiving Bus the pickups. Without buses both ride the switch-touched face.
-        final ExternalDataPort inPort = portFor(dev.jsc.jscomputronics.module.computing.block.part.CablePartType.INPUT);
-        final ExternalDataPort outPort =
-                portFor(dev.jsc.jscomputronics.module.computing.block.part.CablePartType.RECEIVING);
+        final DataPort inPort = portFor(dev.jsc.jscomputronics.module.computing.block.part.CablePartType.INPUT);
+        final DataPort outPort = portFor(dev.jsc.jscomputronics.module.computing.block.part.CablePartType.RECEIVING);
         if (inPort.isEmpty() && outPort.isEmpty()) {
             machine = null; // the machine was broken/removed; re-resolve next tick
             return;
@@ -137,20 +142,27 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         waiting = false;
 
         // 2) Feed inputs when the cooldown elapses (so we don't overfill a slow machine). feedMax keeps feeding
-        // until the machine is full each cycle; otherwise a single lot goes in.
+        // until the machine is full each cycle; otherwise a single lot goes in. Feeding is bounded by the
+        // demand: lots still inside the machine are expected to yield their share, so nothing beyond what the
+        // request needs leaves the network. A lot whose chance-based output fell short is simply fed again.
+        // A lot is only ever committed whole: what the machine could not take at once (a small chemical tank,
+        // a full slot) stays owed and is topped up on the following cycles as the machine consumes.
         if (--feedCooldown <= 0) {
             feedCooldown = FEED_INTERVAL;
             final int maxLots = config.feedMax() ? 64 : 1;
             for (int lot = 0; lot < maxLots; lot++) {
-                boolean fedThisLot = false;
-                for (final ProcessingPattern.ProcessingInput in : pattern.inputs()) {
-                    if (storage.select(in.key(), in.amount(), inPort) > 0) {
-                        fedThisLot = true;
-                        progressed = true;
+                if (fullyDelivered()) {
+                    if (lotsFed >= lotsNeeded()) {
+                        break;
                     }
+                    lotsFed++;
                 }
-                if (!fedThisLot) {
+                if (deliverOwed(storage, inPort) <= 0) {
                     break; // the machine is full or the network is drained
+                }
+                progressed = true;
+                if (!fullyDelivered()) {
+                    break; // the machine could not take the whole lot yet; finish it before the next one
                 }
             }
         }
@@ -206,19 +218,27 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     }
 
     private ExternalDataPort machinePort() {
-        final Direction side = machine.face().getOpposite();
+        return portOn(machine.face().getOpposite());
+    }
+
+    /** The machine's item + fluid + chemical port on {@code side}; chemicals come through the registered bridges. */
+    private ExternalDataPort portOn(final Direction side) {
         return new ExternalDataPort(
                 level.getCapability(Capabilities.ItemHandler.BLOCK, machine.machinePos(), side),
-                level.getCapability(Capabilities.FluidHandler.BLOCK, machine.machinePos(), side));
+                level.getCapability(Capabilities.FluidHandler.BLOCK, machine.machinePos(), side),
+                dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges
+                        .portFor(level, machine.machinePos(), side).orElse(null));
     }
 
     /**
-     * The port to move items through for the given bus kind. When a crafting cable adjacent to the machine has
-     * an Input Bus (deliveries) or Receiving Bus (pickups) mounted against it, that bus's machine face is used —
-     * this is how sided machines whose I/O faces differ from the switch-touched face are driven. Without a bus,
-     * the switch-touched face serves both directions.
+     * The port to move data through for the given bus kind. Every crafting cable adjacent to the machine with an
+     * Input Bus (deliveries) or Receiving Bus (pickups) mounted against it contributes its machine face, and the
+     * faces act as one port — this is how sided machines whose I/O faces differ from the switch-touched face, or
+     * that spread outputs over several faces, are driven. Without a bus, the switch-touched face serves both
+     * directions.
      */
-    private ExternalDataPort portFor(final dev.jsc.jscomputronics.module.computing.block.part.CablePartType kind) {
+    private DataPort portFor(final dev.jsc.jscomputronics.module.computing.block.part.CablePartType kind) {
+        final List<DataPort> faces = new java.util.ArrayList<>();
         for (final Direction d : Direction.values()) {
             final net.minecraft.core.BlockPos cablePos = machine.machinePos().relative(d);
             if (level.getBlockEntity(cablePos)
@@ -226,15 +246,52 @@ public final class NetworkProcessingOperation implements PersistentOperation {
                     && cable.getPart(d.getOpposite())
                     instanceof dev.jsc.jscomputronics.module.computing.block.part.AbstractBusPart bus
                     && bus.type() == kind) {
-                final ExternalDataPort port = new ExternalDataPort(
-                        level.getCapability(Capabilities.ItemHandler.BLOCK, machine.machinePos(), d),
-                        level.getCapability(Capabilities.FluidHandler.BLOCK, machine.machinePos(), d));
+                final ExternalDataPort port = portOn(d);
                 if (!port.isEmpty()) {
-                    return port;
+                    faces.add(port);
                 }
             }
         }
-        return machinePort();
+        return faces.isEmpty() ? machinePort() : CompositeDataPort.of(faces);
+    }
+
+    /** Whether every input of the lots committed so far has reached the machine in full. */
+    private boolean fullyDelivered() {
+        final List<ProcessingPattern.ProcessingInput> inputs = pattern.inputs();
+        for (int i = 0; i < inputs.size(); i++) {
+            if (delivered[i] < lotsFed * inputs.get(i).amount()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Moves what is still owed for the committed lots into the machine; returns the total moved this call. */
+    private long deliverOwed(final NetworkStorage storage, final DataPort inPort) {
+        final List<ProcessingPattern.ProcessingInput> inputs = pattern.inputs();
+        long moved = 0L;
+        for (int i = 0; i < inputs.size(); i++) {
+            final ProcessingPattern.ProcessingInput in = inputs.get(i);
+            final long owed = lotsFed * in.amount() - delivered[i];
+            if (owed > 0) {
+                final long sent = storage.select(in.key(), owed, inPort);
+                delivered[i] += sent;
+                moved += sent;
+            }
+        }
+        return moved;
+    }
+
+    /**
+     * How many lots the request still justifies: the lots already fed are credited with the yield they are
+     * expected to return, minus what has actually come back so far.
+     */
+    private long lotsNeeded() {
+        final long perLot = Math.max(1L, pattern.primaryOutput().amount());
+        final long expectedFromFed = lotsFed * perLot;
+        final long stillWanted = requested - produced;
+        final long inFlight = Math.max(0L, expectedFromFed - produced);
+        return lotsFed + Math.max(0L, (stillWanted - inFlight + perLot - 1) / perLot);
     }
 
     /** Puts {@code amount} of a key (item OR fluid) into the network; returns how much was stored. */
@@ -294,6 +351,8 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         ProcessingPattern.CODEC.encodeStart(ops, pattern).result().ifPresent(t -> tag.put("Pattern", t));
         tag.putLong("Requested", requested);
         tag.putLong("Produced", produced);
+        tag.putLong("LotsFed", lotsFed);
+        tag.putLongArray("Delivered", delivered);
         tag.putInt("IdleTicks", idleTicks);
         tag.putString("Label", requesterLabel);
         return tag;
@@ -318,6 +377,11 @@ public final class NetworkProcessingOperation implements PersistentOperation {
                 tag.getLong("Requested"), candidateComputers,
                 tag.hasUUID(ID_KEY) ? tag.getUUID(ID_KEY) : UUID.randomUUID(), tag.getString("Label"));
         op.produced = tag.getLong("Produced");
+        op.lotsFed = tag.getLong("LotsFed");
+        final long[] savedDelivered = tag.getLongArray("Delivered");
+        if (savedDelivered.length == op.delivered.length) {
+            op.delivered = savedDelivered;
+        }
         op.idleTicks = tag.getInt("IdleTicks");
         return op;
     }
