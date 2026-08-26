@@ -53,6 +53,11 @@ public final class NetworkCraftOperation implements PersistentOperation {
         if (embeddedPattern != null) {
             CraftingPattern.CODEC.encodeStart(ops, embeddedPattern).result().ifPresent(t -> tag.put("Embedded", t));
         }
+        if (machineStep != null && !machineStep.isDone()) {
+            // The machine step keeps running on its own after a reload; the re-planned craft waits for it so
+            // its output is in stock when the plan is made, instead of being made a second time.
+            tag.putUUID(MACHINE_STEP_KEY, machineStep.operationId());
+        }
         // Everything this craft has drained from the network but not delivered yet: intermediates and
         // finished results alike. They are handed back to storage on resume, so nothing is lost or doubled.
         final ListTag pool = new ListTag();
@@ -86,6 +91,25 @@ public final class NetworkCraftOperation implements PersistentOperation {
     public static Restored restore(final CompoundTag tag, final MainframeBlockEntity mainframe,
                                    final ServerLevel level, final NetworkUuid network,
                                    final HolderLookup.Provider registries) {
+        return restore(tag, mainframe, level, network, registries, null);
+    }
+
+    /** The id of the machine step a saved craft was waiting on, or null. */
+    @org.jetbrains.annotations.Nullable
+    public static UUID savedMachineStep(final CompoundTag tag) {
+        return tag.hasUUID(MACHINE_STEP_KEY) ? tag.getUUID(MACHINE_STEP_KEY) : null;
+    }
+
+    /**
+     * Like {@link #restore(CompoundTag, MainframeBlockEntity, ServerLevel, NetworkUuid, HolderLookup.Provider)},
+     * but when the craft was waiting on {@code machineStep} (restored and still running), the items in flight
+     * go back to storage now and the re-plan waits until that machine step settles, so its output counts as
+     * stock. Such a craft is reported as not yet running ({@code operation} null, {@code complete} false).
+     */
+    public static Restored restore(final CompoundTag tag, final MainframeBlockEntity mainframe,
+                                   final ServerLevel level, final NetworkUuid network,
+                                   final HolderLookup.Provider registries,
+                                   @org.jetbrains.annotations.Nullable final NetworkProcessingOperation machineStep) {
         final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         final StorageKey result = tag.contains("Result")
                 ? StorageKey.CODEC.parse(ops, tag.get("Result")).result().orElse(null) : null;
@@ -112,9 +136,17 @@ public final class NetworkCraftOperation implements PersistentOperation {
         }
         final CraftingPattern embedded = tag.contains("Embedded")
                 ? CraftingPattern.CODEC.parse(ops, tag.get("Embedded")).result().orElse(null) : null;
-        return new Restored(mainframe.submitNetworkCraft(result, remaining, true, tag.getString("Label"), embedded), false);
+        final String label = tag.getString("Label");
+        if (machineStep != null && !machineStep.isDone()) {
+            // Re-plan a tick after the step settles, once the storage index has seen what it delivered.
+            machineStep.onSettle(() -> mainframe.runNextTick(
+                    () -> mainframe.submitNetworkCraft(result, remaining, true, label, embedded)));
+            return new Restored(null, false);
+        }
+        return new Restored(mainframe.submitNetworkCraft(result, remaining, true, label, embedded), false);
     }
 
+    private static final String MACHINE_STEP_KEY = "MachineStep";
     private static final int STALL_LIMIT = 100;
 
     public static final int DEFAULT_WAIT_TIMEOUT_TICKS = 1200;

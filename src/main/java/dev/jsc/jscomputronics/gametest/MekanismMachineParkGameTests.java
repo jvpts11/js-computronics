@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
@@ -18,6 +19,7 @@ import dev.jsc.jscomputronics.module.computing.operation.NetworkOperation;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -362,6 +364,74 @@ public final class MekanismMachineParkGameTests {
                     helper.assertTrue(storage.count(frame) == 4, "four frames must land in the network; got " + storage.count(frame));
                     helper.assertTrue(storage.count(Items.COPPER_INGOT) == 0 && storage.count(MekanismRig.itemKey(STEEL_CASING)) == 0,
                             "the raw stock must be spent to the unit");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 4000)
+    public static void flatPatterns_craftSurvivesAReloadWhileItsMachineStepRuns(final GameTestHelper helper) {
+        // The Mainframe is torn down and rebuilt from its NBT while the first infuser step is running. The
+        // machine step resumes on its own; the craft must wait for it and then finish from what it made,
+        // instead of planning the alloy a second time (which the drained raw stock could not even cover).
+        final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
+        final StorageKey frame = MekanismRig.itemKey(FRAME);
+        final BlockPos mainframePos = new BlockPos(1, 2, 2);
+        final net.minecraft.nbt.CompoundTag[] snapshot = new net.minecraft.nbt.CompoundTag[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    MekanismRig.mountBuses(helper);
+                    MekanismRig.mountBottomInputBus(helper);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    rig.net().seed(Items.COPPER_INGOT, 4);
+                    rig.net().seed(Items.REDSTONE, 4);
+                    storage.insert(MekanismRig.itemKey(DUST_DIAMOND), 8);
+                    storage.insert(MekanismRig.itemKey(DUST_REFINED_OBSIDIAN), 16);
+                    storage.insert(MekanismRig.itemKey(PELLET_POLONIUM), 4);
+                    storage.insert(MekanismRig.itemKey(STEEL_CASING), 1);
+                    final CraftingComputerBlockEntity cc = rig.net().cc();
+                    helper.assertTrue(cc.loadPattern(framePattern()), "the frame pattern must load into the ROM");
+                    for (final ProcessingPattern machine : new ProcessingPattern[]{infusedAlloy(), reinforcedAlloy(), atomicAlloy()}) {
+                        helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(machine)),
+                                "the machine pattern must load into the ROM: " + machine.machineType());
+                    }
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> helper.assertTrue(
+                        rig.net().mainframe().submitNetworkCraft(frame, 4, false, "battery", null) != null,
+                        "the Mainframe must plan the frames through the machine patterns"))
+                // The first machine step is running: copper and redstone have left the network for the infuser.
+                .thenExecuteAfter(30, () -> {
+                    MekanismRig.power(helper);
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(storage.count(Items.COPPER_INGOT) == 0,
+                            "the infuser step must have taken the copper before the reload; left " + storage.count(Items.COPPER_INGOT)
+                                    + " active=" + rig.net().mainframe().activeOperationRecords());
+                    snapshot[0] = rig.net().mainframe().saveWithoutMetadata(helper.getLevel().registryAccess());
+                    helper.assertTrue(snapshot[0].contains("ActiveOperations"), "the Mainframe's NBT must carry the in-flight operations");
+                    rig.world().setBlock(mainframePos, net.minecraft.world.level.block.Blocks.AIR);
+                })
+                .thenExecuteAfter(SETTLE, () -> {
+                    rig.world().setBlock(mainframePos, ComputingModule.MAINFRAME.get());
+                    rig.world().blockEntity(mainframePos, dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity.class)
+                            .loadWithComponents(snapshot[0], helper.getLevel().registryAccess());
+                })
+                .thenWaitUntil(() -> {
+                    MekanismRig.power(helper);
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(storage.count(frame) >= 4, "waiting for the frames after the reload: "
+                            + rig.world().blockEntity(mainframePos, dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity.class)
+                                    .activeOperationRecords());
+                })
+                .thenExecute(() -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(storage.count(frame) == 4, "four frames must land in the network; got " + storage.count(frame));
+                    for (final StorageKey raw : new StorageKey[]{StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE),
+                            MekanismRig.itemKey(DUST_DIAMOND), MekanismRig.itemKey(DUST_REFINED_OBSIDIAN),
+                            MekanismRig.itemKey(PELLET_POLONIUM), MekanismRig.itemKey(STEEL_CASING),
+                            MekanismRig.itemKey(ALLOY_INFUSED), MekanismRig.itemKey(ALLOY_REINFORCED), MekanismRig.itemKey(ALLOY_ATOMIC)}) {
+                        helper.assertTrue(storage.count(raw) == 0, raw + " must be fully consumed, nothing made twice; left " + storage.count(raw));
+                    }
                 })
                 .thenSucceed();
     }

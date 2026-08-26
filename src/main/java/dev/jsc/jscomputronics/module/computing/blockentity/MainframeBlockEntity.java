@@ -955,6 +955,9 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final java.util.Set<java.util.UUID> completedStages = new java.util.HashSet<>();
         final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation>
                 pipelines = new java.util.ArrayList<>();
+        // Crafts that were waiting on a machine step re-plan only once every operation is back, so the step
+        // they waited on can be found by id and its output counted before the plan is made.
+        final java.util.List<CompoundTag> craftsOnMachines = new java.util.ArrayList<>();
         for (int i = 0; i < saved.size(); i++) {
             final CompoundTag tag = saved.getCompound(i);
             final java.util.UUID savedId = tag.hasUUID(
@@ -971,6 +974,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                     }
                 }
                 case dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation.KIND -> {
+                    if (dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation.savedMachineStep(tag) != null) {
+                        craftsOnMachines.add(tag);
+                        continue;
+                    }
                     // submitNetworkCraft already registers the re-planned craft in activeOperations.
                     final var restored = dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
                             .restore(tag, this, level, networkUuid(), registries);
@@ -992,6 +999,14 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 default -> { }
             }
         }
+        for (final CompoundTag tag : craftsOnMachines) {
+            final java.util.UUID stepId = dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                    .savedMachineStep(tag);
+            final var step = byId.get(stepId)
+                    instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc ? proc : null;
+            dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                    .restore(tag, this, level, networkUuid(), registries, step);
+        }
         for (final var pipeline : pipelines) {
             final java.util.UUID stageId = pipeline.pendingStageId();
             if (stageId != null && completedStages.contains(stageId)) {
@@ -1003,7 +1018,20 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         setChanged();
     }
 
+    /** Work queued by an operation's settle callback that must run on a later tick (the index is current then). */
+    private final java.util.List<Runnable> deferredWork = new java.util.ArrayList<>();
+
+    /** Runs {@code work} on the next operations tick, after the storage index has caught up with this one. */
+    public void runNextTick(final Runnable work) {
+        deferredWork.add(work);
+    }
+
     private void tickOperations() {
+        if (!deferredWork.isEmpty()) {
+            final java.util.List<Runnable> work = new java.util.ArrayList<>(deferredWork);
+            deferredWork.clear();
+            work.forEach(Runnable::run);
+        }
         if (activeOperations.isEmpty()) {
             return;
         }
