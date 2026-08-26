@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * The Crafting Computer block: an ATX-class computer that executes recipes for the network.
  */
 public class CraftingComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort, PeripheralConnectable {
+        implements EntityBlock, RearFacingDataPort, PeripheralConnectable, EraChassisBlock {
 
     public static final MapCodec<CraftingComputerBlock> CODEC = simpleCodec(CraftingComputerBlock::new);
 
@@ -43,8 +43,22 @@ public class CraftingComputerBlock extends HorizontalDirectionalBlock
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
+    /**
+     * The hardware era this Crafting Computer belongs to. It selects the block's skin and gates which
+     * board the machine accepts: only a board of this era (and of the era's form factor) installs. The
+     * base block is the Standard era; the Vintage and Legacy variants override this.
+     */
+    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
+        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    }
+
     @Override
-    protected MapCodec<CraftingComputerBlock> codec() {
+    public dev.jsc.jscomputronics.common.tier.HardwareEra chassisEra() {
+        return era();
+    }
+
+    @Override
+    protected MapCodec<? extends CraftingComputerBlock> codec() {
         return CODEC;
     }
 
@@ -55,7 +69,17 @@ public class CraftingComputerBlock extends HorizontalDirectionalBlock
 
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
-        return java.util.Set.of(DataTier.T1_ETHERNET); // reach the HBW backbone through a Personal Router
+        // Data via Ethernet (rear port, through a Personal Router to the backbone) plus the crafting cable
+        // that runs to the Crafting Switches.
+        return java.util.Set.of(DataTier.T1_ETHERNET, DataTier.CRAFTING);
+    }
+
+    @Override
+    public boolean connectsOnFace(final net.minecraft.world.level.block.state.BlockState state,
+                                  final net.minecraft.core.Direction face, final DataTier tier) {
+        // The crafting cable attaches on any face (the machine-delivery search walks out of all six);
+        // the data cable keeps the rear-only port.
+        return tier == DataTier.CRAFTING || connectsOnFace(state, face);
     }
 
     @Override

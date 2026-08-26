@@ -9,6 +9,9 @@ package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.FirmwareScreenOpener;
+import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
+import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -27,13 +30,16 @@ public final class ComputingClientSetup {
 
     @SubscribeEvent
     public static void registerScreens(final RegisterMenuScreensEvent event) {
+        // Wire the client-side firmware screen opener so blocks can open it without importing Minecraft.
+        FirmwareScreenOpener.Holder.set(
+                (pos, kind, name) -> Minecraft.getInstance().setScreen(new FirmwareScreen(pos, kind, name)));
+
+        event.register(ComputingModule.DESKTOP_MENU.get(), DesktopScreen::new);
         event.register(ComputingModule.MAINFRAME_MENU.get(), MainframeScreen::new);
         event.register(ComputingModule.PERSONAL_COMPUTER_MENU.get(), PersonalComputerScreen::new);
         event.register(ComputingModule.CRAFTING_COMPUTER_MENU.get(), CraftingComputerScreen::new);
         event.register(ComputingModule.PATTERN_ENCODER_MENU.get(), PatternEncoderScreen::new);
-        event.register(ComputingModule.PATTERN_READER_MENU.get(), PatternReaderScreen::new);
         event.register(ComputingModule.COMMAND_PROMPT_MENU.get(), CommandPromptScreen::new);
-        event.register(ComputingModule.NMS_MENU.get(), NmsScreen::new);
         event.register(ComputingModule.SUPERCOMPUTER_CONSOLE_MENU.get(), SupercomputerConsoleScreen::new);
         event.register(ComputingModule.SUPERCOMPUTER_NODE_MENU.get(), SupercomputerNodeScreen::new);
         event.register(ComputingModule.SERVER_RACK_MENU.get(), ServerRackScreen::new);
@@ -42,6 +48,10 @@ public final class ComputingClientSetup {
         event.register(ComputingModule.SERVER_ASSEMBLY_MENU.get(), ServerAssemblyScreen::new);
         event.register(ComputingModule.COMPUTER_TERMINAL_MENU.get(), ComputerTerminalScreen::new);
         event.register(ComputingModule.EXPORT_BUS_MENU.get(), ExportBusScreen::new);
+        event.register(ComputingModule.IMPORT_BUS_MENU.get(), ImportBusScreen::new);
+        event.register(ComputingModule.CRAFTING_SWITCH_MENU.get(), CraftingSwitchScreen::new);
+        event.register(ComputingModule.INPUT_BUS_MENU.get(), InputBusScreen::new);
+        event.register(ComputingModule.RECEIVING_BUS_MENU.get(), ReceivingBusScreen::new);
     }
 
     @SubscribeEvent

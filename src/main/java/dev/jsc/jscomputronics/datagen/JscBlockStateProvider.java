@@ -63,6 +63,7 @@ public class JscBlockStateProvider extends BlockStateProvider {
         pipeCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
         pipeCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
         pipeCable(ComputingModule.HPC_CABLE.get(), "hpc_cable");
+        pipeCable(ComputingModule.CRAFTING_CABLE.get(), "crafting_cable");
         pipeCable(ComputingModule.PERIPHERAL_CABLE.get(), "peripheral_cable");
 
         // The Mainframe is a 3x2x2 server rack. The controller carries the control
@@ -74,17 +75,56 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/mainframe_top"));
         horizontalBlock(ComputingModule.MAINFRAME.get(), mainframeModel);
 
-        // Parts: the central column wears a lit data-spine face, the side columns wear
+        // Earlier-era Mainframes: same orientable controller model, era-specific faces. The shared
+        // multiblock parts keep their casing; only the controller carries the era skin.
+        final ModelFile vintageMainframeModel = models().orientable(
+                "vintage_mainframe",
+                modLoc("block/vintage_mainframe_side"),
+                modLoc("block/vintage_mainframe_front"),
+                modLoc("block/vintage_mainframe_top"));
+        horizontalBlock(ComputingModule.VINTAGE_MAINFRAME.get(), vintageMainframeModel);
+
+        final ModelFile legacyMainframeModel = models().orientable(
+                "legacy_mainframe",
+                modLoc("block/legacy_mainframe_side"),
+                modLoc("block/legacy_mainframe_front"),
+                modLoc("block/legacy_mainframe_top"));
+        horizontalBlock(ComputingModule.LEGACY_MAINFRAME.get(), legacyMainframeModel);
+
+        // Parts inherit the controller's era so the whole footprint wears one skin. The central column
+        // wears the lit data-spine (front) face; the side columns wear the casing (side) face. One
+        // casing/core model pair per era, selected by the part's ERA and CORE properties.
         final ModelFile partCasing = models().cubeColumn(
                 "mainframe_part", modLoc("block/mainframe_panel"), modLoc("block/mainframe_top"));
         final ModelFile partCore = models().cubeColumn(
                 "mainframe_part_core", modLoc("block/mainframe_core"), modLoc("block/mainframe_top"));
-        getVariantBuilder(ComputingModule.MAINFRAME_PART.get()).forAllStates(state ->
-                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(state.getValue(
-                                dev.jsc.jscomputronics.module.computing.block.MainframePartBlock.CORE)
-                                ? partCore : partCasing)
-                        .build());
+        final ModelFile vintagePartCasing = models().cubeColumn(
+                "vintage_mainframe_part",
+                modLoc("block/vintage_mainframe_side"), modLoc("block/vintage_mainframe_top"));
+        final ModelFile vintagePartCore = models().cubeColumn(
+                "vintage_mainframe_part_core",
+                modLoc("block/vintage_mainframe_front"), modLoc("block/vintage_mainframe_top"));
+        final ModelFile legacyPartCasing = models().cubeColumn(
+                "legacy_mainframe_part",
+                modLoc("block/legacy_mainframe_side"), modLoc("block/legacy_mainframe_top"));
+        final ModelFile legacyPartCore = models().cubeColumn(
+                "legacy_mainframe_part_core",
+                modLoc("block/legacy_mainframe_front"), modLoc("block/legacy_mainframe_top"));
+        getVariantBuilder(ComputingModule.MAINFRAME_PART.get()).forAllStates(state -> {
+            final boolean core = state.getValue(
+                    dev.jsc.jscomputronics.module.computing.block.MainframePartBlock.CORE);
+            final dev.jsc.jscomputronics.common.tier.HardwareEra era =
+                    dev.jsc.jscomputronics.common.tier.HardwareEra.fromLevel(state.getValue(
+                            dev.jsc.jscomputronics.module.computing.block.MainframePartBlock.ERA));
+            final ModelFile model = switch (era) {
+                case VINTAGE -> core ? vintagePartCore : vintagePartCasing;
+                case LEGACY -> core ? legacyPartCore : legacyPartCasing;
+                default -> core ? partCore : partCasing;
+            };
+            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                    .modelFile(model)
+                    .build();
+        });
 
         // Routers: the facing carries the status/port panel; the other faces are casing.
         final ModelFile personalRouterModel = models().orientable(
@@ -117,6 +157,9 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 .cubeBottomTop("tank", mcLoc("block/glass"),
                         modLoc("block/mainframe_side"), modLoc("block/mainframe_side"))
                 .renderType("cutout"));
+
+        simpleBlock(ComputingModule.CRAFTING_SWITCH.get(),
+                models().cubeAll("crafting_switch", modLoc("block/crafting_switch")));
 
         // Server Rack: a 2x3x2 multiblock cabinet. The four front bay blocks each show their
         // populated or empty bay model.
@@ -182,6 +225,21 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/crafting_computer_top"));
         horizontalBlock(ComputingModule.CRAFTING_COMPUTER.get(), craftingComputerModel);
 
+        // Earlier-era Crafting Computers: same orientable model, era-specific faces.
+        final ModelFile vintageCraftingComputerModel = models().orientable(
+                "vintage_crafting_computer",
+                modLoc("block/vintage_crafting_computer_side"),
+                modLoc("block/vintage_crafting_computer_front"),
+                modLoc("block/vintage_crafting_computer_top"));
+        horizontalBlock(ComputingModule.VINTAGE_CRAFTING_COMPUTER.get(), vintageCraftingComputerModel);
+
+        final ModelFile legacyCraftingComputerModel = models().orientable(
+                "legacy_crafting_computer",
+                modLoc("block/legacy_crafting_computer_side"),
+                modLoc("block/legacy_crafting_computer_front"),
+                modLoc("block/legacy_crafting_computer_top"));
+        horizontalBlock(ComputingModule.LEGACY_CRAFTING_COMPUTER.get(), legacyCraftingComputerModel);
+
         // Supercomputer cluster: the node is a rack-sized cabinet whose front lights up while it
         // runs; the HBW Interface is the uplink; the console is a hand-written kiosk model.
         final ModelFile nodeFront = models().orientable(
@@ -232,12 +290,32 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/pattern_station_top"));
         horizontalBlock(ComputingModule.PATTERN_ENCODER.get(), patternEncoderModel);
 
-        final ModelFile patternReaderModel = models().orientable(
-                "pattern_reader",
-                modLoc("block/pattern_station_side"),
-                modLoc("block/pattern_reader_front"),
-                modLoc("block/pattern_station_top"));
-        horizontalBlock(ComputingModule.PATTERN_READER.get(), patternReaderModel);
+        // Media reader drives: the front carries the drive face, the sides and top use the drive's
+        // own casing texture, and the LOADED blockstate swaps the front to the lit "_active" face.
+        final ModelFile floppyIdle = models().orientable("floppy_drive",
+                modLoc("block/floppy_drive_casing"), modLoc("block/floppy_drive_front"), modLoc("block/floppy_drive_casing"));
+        final ModelFile floppyActive = models().orientable("floppy_drive_active",
+                modLoc("block/floppy_drive_casing"), modLoc("block/floppy_drive_active"), modLoc("block/floppy_drive_casing"));
+        horizontalBlock(ComputingModule.FLOPPY_DRIVE.get(),
+                s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? floppyActive : floppyIdle);
+        final ModelFile cdIdle = models().orientable("cd_drive",
+                modLoc("block/cd_drive_casing"), modLoc("block/cd_drive_front"), modLoc("block/cd_drive_casing"));
+        final ModelFile cdActive = models().orientable("cd_drive_active",
+                modLoc("block/cd_drive_casing"), modLoc("block/cd_drive_active"), modLoc("block/cd_drive_casing"));
+        horizontalBlock(ComputingModule.CD_DRIVE.get(),
+                s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? cdActive : cdIdle);
+        final ModelFile dvdIdle = models().orientable("dvd_drive",
+                modLoc("block/dvd_drive_casing"), modLoc("block/dvd_drive_front"), modLoc("block/dvd_drive_casing"));
+        final ModelFile dvdActive = models().orientable("dvd_drive_active",
+                modLoc("block/dvd_drive_casing"), modLoc("block/dvd_drive_active"), modLoc("block/dvd_drive_casing"));
+        horizontalBlock(ComputingModule.DVD_DRIVE.get(),
+                s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? dvdActive : dvdIdle);
+        final ModelFile dockIdle = models().orientable("dock_station",
+                modLoc("block/dock_station_casing"), modLoc("block/dock_station_front"), modLoc("block/dock_station_casing"));
+        final ModelFile dockActive = models().orientable("dock_station_active",
+                modLoc("block/dock_station_casing"), modLoc("block/dock_station_active"), modLoc("block/dock_station_casing"));
+        horizontalBlock(ComputingModule.DOCK_STATION.get(),
+                s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? dockActive : dockIdle);
 
         // Monitor: a screen on the front, casing on the other faces. The screen has
         final ModelFile monitorOff = models().orientable(

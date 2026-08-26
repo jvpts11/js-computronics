@@ -40,6 +40,10 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
     private static final int LINE_H = 9;
 
     private final Deque<Line> scrollback = new ArrayDeque<>();
+    // Per-computer scrollback kept across leaving and re-entering the Monitor in the same session, so the
+    // console is not wiped (as if a cls had run) just because the screen was closed and reopened.
+    private static final java.util.Map<net.minecraft.core.BlockPos, java.util.List<Line>> SAVED_SCROLLBACK =
+            new java.util.HashMap<>();
     private final List<String> history = new ArrayList<>();
     private final List<String> commandNames = new ArrayList<>();
     private final Map<String, String> commandUsage = new LinkedHashMap<>();
@@ -62,7 +66,7 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
     protected void init() {
         super.init();
         // Start the input box just past the "jsc> " prompt so the caret never sits on top of it.
-        final int promptW = font.width("jsc> ");
+        final int promptW = font.width(prompt() + " ");
         input = new EditBox(font, leftPos + 10 + promptW, topPos + imageHeight - 18,
                 imageWidth - 18 - promptW, 11, Component.literal("command"));
         input.setBordered(false);
@@ -81,9 +85,22 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
         setInitialFocus(input);
         addRenderableWidget(input);
         if (scrollback.isEmpty()) {
-            push("J's Computronics Shell v1.0", CliStyle.ACCENT);
-            push("type 'help' for commands, TAB to complete", CliStyle.DIM);
-            push("", CliStyle.PLAIN);
+            final List<Line> saved = SAVED_SCROLLBACK.get(menu.hostPos());
+            if (saved != null && !saved.isEmpty()) {
+                // Re-entering the Monitor: restore the console exactly as it was left.
+                scrollback.addAll(saved);
+            } else if (dosStyle()) {
+                // MC-DOS wears a period boot banner instead of the generic shell greeting. The lines are
+                // kept short on purpose so they never overflow the narrow 256px window.
+                push("MC-DOS  Version 1.0  [Network Build]", CliStyle.ACCENT);
+                push("(C) 2026 J's Computronics Corp.", CliStyle.DIM);
+                push("640K base memory", CliStyle.DIM);
+                push("", CliStyle.PLAIN);
+            } else {
+                push("J's Computronics Shell v1.0", CliStyle.ACCENT);
+                push("type 'help' for commands, TAB to complete", CliStyle.DIM);
+                push("", CliStyle.PLAIN);
+            }
         }
         // Ask the server for this computer's saved history and the command list (for completion).
         PacketDistributor.sendToServer(new RequestConsoleInitPayload(menu.hostPos()));
@@ -138,7 +155,7 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
         final String line = input.getValue().trim();
         input.setValue("");
         historyIndex = -1;
-        push("jsc> " + line, CliStyle.PROMPT);
+        push(prompt() + " " + line, CliStyle.PROMPT);
         if (line.isEmpty()) {
             return;
         }
@@ -155,6 +172,8 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
+        // The monitor frame wraps the whole software window in the host computer's hardware-era bezel.
+        MonitorFrame.renderBody(g, x, y, imageWidth, imageHeight, screenEra(), font);
         JscOsTheme.window(g, x, y, imageWidth, imageHeight);
         JscOsTheme.headerBar(g, x + 6, y + 6, imageWidth - 12);
         // The console panel.
@@ -169,9 +188,9 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "COMMAND PROMPT", 12, 11, JscOsTheme.text());
-        // PROGRAM chip-ish marker + host on the right of the header.
-        JscOsTheme.textRight(g, font, "PROGRAM", imageWidth - 10, 11, JscOsTheme.accent());
+        JscOsTheme.text(g, font, dosStyle() ? "MC-DOS" : "COMMAND PROMPT", 12, 11, JscOsTheme.text());
+        // MC-DOS version on the right (or the PROGRAM marker for the generic prompt).
+        JscOsTheme.textRight(g, font, dosStyle() ? "v1.0" : "PROGRAM", imageWidth - 10, 11, JscOsTheme.accent());
 
         // Console scrollback, newest at the bottom, honoring the scroll offset.
         final int top = 27;
@@ -192,7 +211,7 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
         }
 
         // Prompt glyph before the input box.
-        JscOsTheme.text(g, font, "jsc>", 10, imageHeight - 18, JscOsTheme.accent());
+        JscOsTheme.text(g, font, prompt(), 10, imageHeight - 18, JscOsTheme.accent());
 
         // Usage hint: once the verb is recognised, show how it is used, dimmed on the right.
         final String typed = input == null ? "" : input.getValue().trim();
@@ -339,8 +358,25 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
     }
 
     @Override
+    public void removed() {
+        // Remember this computer's console so re-entering the Monitor restores it instead of wiping it.
+        SAVED_SCROLLBACK.put(menu.hostPos(), new ArrayList<>(scrollback));
+        super.removed();
+    }
+
+    @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+    }
+
+    /** True when this terminal is the MC-DOS shell (Vintage era), so it wears a DOS identity. */
+    private boolean dosStyle() {
+        return screenEra() == HardwareEra.VINTAGE;
+    }
+
+    /** The shell prompt: a DOS drive prompt for MC-DOS, the jsc prompt otherwise. */
+    private String prompt() {
+        return dosStyle() ? "C:\\>" : "jsc>";
     }
 
     @Override

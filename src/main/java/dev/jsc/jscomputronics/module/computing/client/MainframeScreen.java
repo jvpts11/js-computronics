@@ -32,6 +32,15 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
     private static final int FAILOVER_X = 124;
     private static final int NODES_X = 182;
 
+    /** Window-relative centre of the POWER button (client tests press it the way the player does). */
+    public static int powerButtonX() {
+        return POWER_X + BTN_W / 2;
+    }
+
+    public static int powerButtonY() {
+        return BTN_Y + BTN_H / 2;
+    }
+
     public MainframeScreen(final MainframeMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
         this.imageWidth = 244;

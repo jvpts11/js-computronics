@@ -27,7 +27,7 @@ class ComputerBuildTest {
     }
 
     private static CpuSpec standardCpu() {
-        // 8 cores at 3500 MHz -> 4480 items/tick
+        // 8 cores at 3500 MHz -> 1120 items/tick
         return new CpuSpec(HardwareEra.STANDARD, CpuSocket.LGA_2011, 8, 3500, 130, false);
     }
 
@@ -156,10 +156,10 @@ class ComputerBuildTest {
 
     @Test
     void totalCapacity_sumsCpus() {
-        // Two CPUs at 4480 each = 8960.
+        // Two CPUs at 1120 each = 2240.
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu(), standardCpu()), List.of(), List.of(ddr3()), psu(650));
-        assertEquals(8960L, build.totalCapacity());
+        assertEquals(2240L, build.totalCapacity());
     }
 
     @Test

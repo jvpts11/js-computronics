@@ -12,6 +12,7 @@ import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
@@ -31,6 +32,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,9 +53,19 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
 
     public static final BooleanProperty CORE = BooleanProperty.create("core");
 
+    // The part inherits its controller's hardware era so the whole footprint wears one skin. The value
+    // is the era's level() ordinal (0=Vintage, 1=Legacy, 2=Standard) — only the eras that actually have
+    // a Mainframe controller. Storing the ordinal keeps the Minecraft-aware property type out of the
+    // pure HardwareEra enum; consumers map it back with HardwareEra.fromLevel(int).
+    public static final IntegerProperty ERA = IntegerProperty.create(
+            "era", HardwareEra.VINTAGE.level(), HardwareEra.STANDARD.level());
+
     public MainframePartBlock(final Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(CORE, false));
+        registerDefaultState(stateDefinition.any()
+                .setValue(FACING, Direction.NORTH)
+                .setValue(CORE, false)
+                .setValue(ERA, HardwareEra.STANDARD.level()));
     }
 
     @Override
@@ -69,7 +81,7 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
 
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, CORE);
+        builder.add(FACING, CORE, ERA);
     }
 
     @Override

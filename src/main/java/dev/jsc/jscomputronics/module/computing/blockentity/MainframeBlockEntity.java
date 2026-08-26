@@ -93,6 +93,28 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     private final java.util.List<dev.jsc.jscomputronics.module.computing.operation.NetworkOperation>
             activeOperations = new java.util.ArrayList<>();
     private long completedTotal;
+    // Operations that were in flight when the world was saved, waiting for the first booted tick to resume.
+    @Nullable
+    private net.minecraft.nbt.ListTag pendingOperations;
+    private int resumeCountdown;
+    // Ticks to let the storage index and the switch surveys settle after a boot before resuming operations.
+    private static final int RESUME_DELAY_TICKS = 20;
+    // Set when the block is being destroyed, so setRemoved can tell a break (discard) from a chunk unload (keep).
+    private boolean broken;
+
+    // The IQL Engine: a service installed on the Mainframe that holds the network's saved IQL objects
+    // (views/procedures/jobs) and runs the jobs. The catalog persists with the Mainframe; the NMS only
+    // opens when the Engine is installed and running. A running Mainframe runs its Engine by default.
+    private final dev.jsc.jscomputronics.module.computing.program.iql.IqlCatalog iqlCatalog =
+            new dev.jsc.jscomputronics.module.computing.program.iql.IqlCatalog();
+    private boolean iqlEngineInstalled;
+    private boolean iqlEngineRunning = true;
+    private final dev.jsc.jscomputronics.module.computing.program.IqlJobAgent iqlJobAgent =
+            new dev.jsc.jscomputronics.module.computing.program.IqlJobAgent();
+    /** Jobs the player paused from the Processes tab (lowercased names); a paused job never fires. */
+    private final java.util.Set<String> pausedJobs = new java.util.HashSet<>();
+    /** The last script the NMS editor held, persisted so it survives closing and reopening the studio. */
+    private String savedScript = "";
 
     private static final int OPERATION_LOG_MAX = 32;
     private static final int FAILOVER_PROMOTE_DELAY = 60;
@@ -107,6 +129,22 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     protected Set<FormFactor> acceptedFormFactors() {
         // A Mainframe takes the MTX board of every shipped era.
         return Set.of(FormFactor.MTX);
+    }
+
+    /**
+     * A Mainframe accepts only an MTX board of its own era: a board of a different era is neither
+     * installable nor counted in the build.
+     */
+    @Override
+    protected dev.jsc.jscomputronics.common.tier.HardwareEra requiredBoardEra() {
+        return blockEra();
+    }
+
+    private dev.jsc.jscomputronics.common.tier.HardwareEra blockEra() {
+        return getBlockState().getBlock()
+                instanceof dev.jsc.jscomputronics.module.computing.block.MainframeBlock mf
+                ? mf.era()
+                : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
     }
 
     // Slot validity is governed by the inherited instance isValidForSlot, which the acceptedFormFactors
@@ -132,9 +170,17 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return new dev.jsc.jscomputronics.module.computing.storage.LocalStore(disks, this::setChanged);
     }
 
+    /**
+     * The net storage capacity in item-equivalents after subtracting the installed OS footprint.
+     * This is the capacity available for data held on the network and in the local store; the OS
+     * occupies disk space from installation.
+     */
     public long storageItems() {
         final ComputerBuild build = currentBuild();
-        return build == null ? 0L : build.totalStorageItems();
+        if (build == null) {
+            return 0L;
+        }
+        return Math.max(0L, build.totalStorageItems() - reservedByOs());
     }
 
     public int parallelQueues() {
@@ -169,10 +215,20 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             closeDispatch();
             return;
         }
+        if (!hasOs()) {
+            // Network orchestration requires a booted OS. Without one the Mainframe holds its network
+            // UUID and topology but skips the dispatcher, index, Operation processing, and the IQL job
+            // agent. Any submitted Operations remain PENDING until an OS is installed; on the tick when
+            // the OS becomes present the dispatcher picks them up automatically (self-healing).
+            return;
+        }
         runDispatch();
         // Reconcile the in-RAM storage catalog with the network's servers: a changes-only ANALYZE
         networkIndex.analyzeIncremental(level, networkUuid());
+        restorePendingOperations(level);
         tickOperations();
+        // The IQL Engine's job agent fires scheduled/conditional jobs (no-op unless the Engine runs).
+        iqlJobAgent.tick(this, level);
     }
 
     public dev.jsc.jscomputronics.module.computing.operation.NetworkIndex networkIndex() {
@@ -318,6 +374,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     public void onBroken() {
+        broken = true;
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
@@ -477,6 +534,16 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     private void closeDispatch() {
+        closeDispatch(false);
+    }
+
+    /**
+     * Tears the dispatcher down. With {@code keepPersistent}, the resumable Operations are dropped WITHOUT
+     * being abandoned or logged: this is the chunk-unload path, where the block entity was just written to
+     * disk with those Operations inside it, and abandoning them here would move items after the save (a
+     * craft returning its pool) — items the resumed Operation would move again on reload.
+     */
+    private void closeDispatch(final boolean keepPersistent) {
         if (dispatch != null) {
             // Fold the dying dispatcher's tally into the persisted lifetime total so the
             // completed count carries across power cycles and chunk unloads.
@@ -488,6 +555,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             // INSERT returning leftover, a SELECT freeing its lock) recovers; then record each as
             // DISCARDED so a conflict or power-off leaves a trace in the log instead of vanishing.
             for (final var operation : activeOperations) {
+                if (keepPersistent && operation instanceof dev.jsc.jscomputronics.module.computing.operation
+                        .PersistentOperation) {
+                    continue; // already saved with the block entity; it resumes on reload
+                }
                 operation.abandon();
                 recordOperation(operation.toRecord().withStatus(
                         dev.jsc.jscomputronics.module.computing.operation.payload
@@ -628,7 +699,9 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
             final byte recordType,
             final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
-        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+        // A SELECT/MOVE/DELETE also needs the dispatcher; without an OS the Operation would never tick and would
+        // just pile up in activeOperations. Refuse it so callers no-op cleanly instead of accumulating dead work.
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
             return null;
         }
         final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation(
@@ -642,7 +715,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation submitNetworkInsert(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
             final String sourceLabel) {
-        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+        // Without a booted OS the dispatcher never ticks (see tick()), so an Operation submitted here would
+        // sit forever in activeOperations holding items the caller already took out of the world. Refuse it so
+        // callers hit their op == null branch and return the items to the player instead of losing them.
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
             return null;
         }
         final var operation = new dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation(
@@ -684,6 +760,24 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return positions;
     }
 
+    /**
+     * The network's parallel craft-slot capacity from its online supercomputers, as {@code [used, total]}.
+     * The Tasks view uses it to show how many crafts can run at once and how many are currently running.
+     */
+    public int[] supercomputerCraftSlots() {
+        int used = 0;
+        int total = 0;
+        for (final net.minecraft.core.BlockPos pos : supercomputerPositions()) {
+            if (level != null && level.getBlockEntity(pos)
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity sc
+                    && sc.clusterOnline()) {
+                total += (int) sc.parallelCrafts();
+                used += sc.craftSlotsInUse();
+            }
+        }
+        return new int[] {used, total};
+    }
+
     public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> networkPatterns() {
         final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> patterns =
                 new java.util.ArrayList<>();
@@ -696,15 +790,45 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return patterns;
     }
 
+    /** Every machine recipe (processing / multi-stage) the network's running Crafting Computers hold. */
+    public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe> networkMachineRecipes() {
+        final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe> recipes =
+                new java.util.ArrayList<>();
+        for (final net.minecraft.core.BlockPos pos : craftingComputerPositions()) {
+            if (level != null && level.getBlockEntity(pos)
+                    instanceof CraftingComputerBlockEntity cc && cc.isRunning()) {
+                recipes.addAll(cc.machineRecipes());
+            }
+        }
+        return recipes;
+    }
+
     @Nullable
     public dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation submitNetworkCraft(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
             final boolean partial, final String requesterLabel) {
-        if (!isRunning() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
+        return submitNetworkCraft(key, demand, partial, requesterLabel, null);
+    }
+
+    /**
+     * Same as {@link #submitNetworkCraft(dev.jsc.jscomputronics.module.computing.storage.StorageKey, long,
+     * boolean, String)}, but plans with one extra pattern alongside the network's Recipe ROMs. A multi-stage
+     * pipeline's bench stage carries its own embedded pattern, so it must craft even when that pattern was
+     * never loaded into any Recipe ROM on the network.
+     */
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation submitNetworkCraft(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final boolean partial, final String requesterLabel,
+            @Nullable final dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern extraPattern) {
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
                 || demand <= 0) {
             return null;
         }
         final var patterns = networkPatterns();
+        if (extraPattern != null && !patterns.contains(extraPattern)) {
+            patterns.add(extraPattern);
+        }
         final var stock = networkIndex.snapshot();
         long target = demand;
         var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
@@ -729,7 +853,39 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation(
                 serverLevel, networkUuid(), key, demand, plan, networkIndex,
                 java.util.UUID.randomUUID(), craftingComputerPositions(), supercomputerPositions(),
-                requesterLabel);
+                requesterLabel, extraPattern);
+        activeOperations.add(operation);
+        return operation;
+    }
+
+    /**
+     * Runs a machine recipe: feeds a {@link dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern}'s
+     * inputs into the matching machine (declared on a Crafting Switch) and collects its outputs back into the
+     * network, until {@code demand} of the primary output is produced or the pattern times out.
+     */
+    public dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation submitNetworkProcessing(
+            final dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern pattern, final long demand,
+            final String requesterLabel) {
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
+                || demand <= 0) {
+            return null;
+        }
+        final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation(
+                serverLevel, networkUuid(), pattern, demand, craftingComputerPositions(),
+                java.util.UUID.randomUUID(), requesterLabel);
+        activeOperations.add(operation);
+        return operation;
+    }
+
+    /** Runs a multi-stage recipe: an ordered pipeline of bench/processing stages, one at a time. */
+    public dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation submitNetworkMultiStage(
+            final dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern pattern, final long demand,
+            final String requesterLabel) {
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel) || networkUuid() == null || demand <= 0) {
+            return null;
+        }
+        final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation(
+                this, pattern, demand, requesterLabel);
         activeOperations.add(operation);
         return operation;
     }
@@ -754,16 +910,116 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return networkIndex.manualLockView();
     }
 
+    /** The configured concurrent-job cap for a machine key, from the first Crafting Computer that set one. */
+    private int resolveMaxJobs(final String machineKey) {
+        for (final net.minecraft.core.BlockPos pos : craftingComputerPositions()) {
+            if (level != null && level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc) {
+                final CraftingComputerBlockEntity.MachineConfig cfg = cc.machineConfig(machineKey);
+                if (cfg != CraftingComputerBlockEntity.MachineConfig.DEFAULT) {
+                    return cfg.maxJobs();
+                }
+            }
+        }
+        return CraftingComputerBlockEntity.MachineConfig.DEFAULT.maxJobs();
+    }
+
+    /**
+     * Rebuilds the Operations that were in flight when the world was saved, once the boot has settled (the
+     * storage index is analyzed and the Crafting Switch surveys have run). Stage operations are restored
+     * first so a multi-stage pipeline can find the stage it was waiting on by id.
+     */
+    private void restorePendingOperations(final ServerLevel level) {
+        if (pendingOperations == null || networkUuid() == null) {
+            return;
+        }
+        if (++resumeCountdown < RESUME_DELAY_TICKS) {
+            return;
+        }
+        final net.minecraft.nbt.ListTag saved = pendingOperations;
+        pendingOperations = null;
+        final HolderLookup.Provider registries = level.registryAccess();
+        final java.util.Map<java.util.UUID, dev.jsc.jscomputronics.module.computing.operation.NetworkOperation>
+                byId = new java.util.HashMap<>();
+        final java.util.Set<java.util.UUID> completedStages = new java.util.HashSet<>();
+        final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation>
+                pipelines = new java.util.ArrayList<>();
+        for (int i = 0; i < saved.size(); i++) {
+            final CompoundTag tag = saved.getCompound(i);
+            final java.util.UUID savedId = tag.hasUUID(
+                    dev.jsc.jscomputronics.module.computing.operation.PersistentOperation.ID_KEY)
+                    ? tag.getUUID(dev.jsc.jscomputronics.module.computing.operation.PersistentOperation.ID_KEY)
+                    : java.util.UUID.randomUUID();
+            switch (tag.getString(dev.jsc.jscomputronics.module.computing.operation.PersistentOperation.KIND_KEY)) {
+                case dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation.KIND -> {
+                    final var op = dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation
+                            .restore(tag, level, networkUuid(), craftingComputerPositions(), registries);
+                    if (op != null) {
+                        activeOperations.add(op);
+                        byId.put(savedId, op);
+                    }
+                }
+                case dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation.KIND -> {
+                    // submitNetworkCraft already registers the re-planned craft in activeOperations.
+                    final var restored = dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                            .restore(tag, this, level, networkUuid(), registries);
+                    if (restored.operation() != null) {
+                        byId.put(savedId, restored.operation());
+                    } else if (restored.complete()) {
+                        completedStages.add(savedId);
+                    }
+                }
+                case dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation.KIND -> {
+                    final var op = dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation
+                            .restore(tag, this, registries);
+                    if (op != null) {
+                        activeOperations.add(op);
+                        pipelines.add(op);
+                        byId.put(savedId, op);
+                    }
+                }
+                default -> { }
+            }
+        }
+        for (final var pipeline : pipelines) {
+            final java.util.UUID stageId = pipeline.pendingStageId();
+            if (stageId != null && completedStages.contains(stageId)) {
+                pipeline.skipCompletedStage();
+            } else {
+                pipeline.adoptStage(stageId == null ? null : byId.get(stageId));
+            }
+        }
+        setChanged();
+    }
+
     private void tickOperations() {
         if (activeOperations.isEmpty()) {
             return;
         }
+        // Progress lives in the Operations themselves and is saved with this block entity.
+        setChanged();
         // A queue processes at most the RAM buffer per tick: a buffer smaller than the CPU leaves
         // the CPU idle waiting on RAM, so the effective rate is the lesser of the two.
         final long effectiveCapacity = Math.min(capacity(), ramBuffer());
         final int slots = Math.max(1, parallelQueues());
         int used = 0;
+        // Cap concurrent processing jobs per machine (the Machines tab's maxJobs). Earlier ops in the list take
+        // the slots; ops over the cap are flagged blocked and stay WAITING this tick.
+        final java.util.Map<String, Integer> machineRunning = new java.util.HashMap<>();
         for (final var operation : activeOperations) {
+            if (operation instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc
+                    && !proc.isDone()) {
+                final String key = proc.machineKey();
+                if (machineRunning.getOrDefault(key, 0) >= resolveMaxJobs(key)) {
+                    proc.setConcurrencyBlocked(true);
+                } else {
+                    proc.setConcurrencyBlocked(false);
+                    machineRunning.merge(key, 1, Integer::sum);
+                }
+            }
+        }
+        // Iterate a snapshot: a multi-stage operation submits its sub-stage into activeOperations mid-tick,
+        // which would otherwise be a concurrent modification. The new stage simply ticks next tick.
+        for (final var operation : new java.util.ArrayList<>(activeOperations)) {
             if (operation.isDone()) {
                 continue;
             }
@@ -909,11 +1165,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     public int usableStorageSlots() {
-        final ComputerBuild build = currentBuild();
-        if (build == null) {
-            return 0;
-        }
-        final long capacity = build.totalStorageItems();
+        final long capacity = storageItems(); // already net of OS footprint
         return capacity <= 0 ? 0 : (int) Math.min(STORAGE_SLOTS, (capacity + 63) / 64);
     }
 
@@ -1057,7 +1309,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         // and drop the registry snapshot, so neither leaks for a mainframe that is gone.
         // This override is authoritative — the base setRemoved's passive onBroken/unregisterNode
         // path is a no-op for the Mainframe (its node hooks are no-ops), so there is no double teardown.
-        closeDispatch();
+        // A chunk unload keeps the resumable Operations (they are in the saved NBT); a break discards them.
+        closeDispatch(!broken);
         if (level instanceof ServerLevel serverLevel) {
             unregister(NetworkSystem.get(serverLevel));
         }
@@ -1068,6 +1321,16 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         // Hardware (under the "Inventory" key), ManualOn, AutoStart, NodeUuid, LinkedMonitors and
         // Console are loaded by the base; only the Mainframe-only state is restored here.
         failoverEnabled = tag.getBoolean("Failover");
+        // Persist the standby role + countdown so a reload mid-promotion does not reset the timer (which
+        // could, with frequent chunk cycling, stop a standby from ever promoting).
+        if (tag.contains("FailoverRole")) {
+            try {
+                failoverRole = FailoverRole.valueOf(tag.getString("FailoverRole"));
+            } catch (final IllegalArgumentException ignored) {
+                failoverRole = FailoverRole.NONE;
+            }
+        }
+        failoverWaitTicks = tag.getInt("FailoverWaitTicks");
         if (tag.contains("NetworkUuid")) {
             nativeNetworkUuid = NetworkUuid.fromString(tag.getString("NetworkUuid"));
         }
@@ -1078,11 +1341,37 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             operationLog.addLast(dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord
                     .fromNbt(ops.getCompound(i), registries));
         }
+        if (tag.contains("ActiveOperations", net.minecraft.nbt.Tag.TAG_LIST)) {
+            pendingOperations = tag.getList("ActiveOperations", net.minecraft.nbt.Tag.TAG_COMPOUND).copy();
+            resumeCountdown = 0;
+        }
+        iqlEngineInstalled = tag.getBoolean("IqlEngineInstalled");
+        iqlEngineRunning = !tag.contains("IqlEngineRunning") || tag.getBoolean("IqlEngineRunning");
+        iqlCatalog.clear();
+        final net.minecraft.nbt.ListTag catalog = tag.getList("IqlCatalog", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        for (int i = 0; i < catalog.size(); i++) {
+            final CompoundTag entry = catalog.getCompound(i);
+            iqlCatalog.put(new dev.jsc.jscomputronics.module.computing.program.iql.IqlSavedObject(
+                    dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.ObjectType
+                            .valueOf(entry.getString("Type")),
+                    entry.getString("Name"), entry.getString("Body"),
+                    dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.TriggerKind
+                            .valueOf(entry.getString("Trigger")),
+                    entry.getString("Spec")));
+        }
+        pausedJobs.clear();
+        final net.minecraft.nbt.ListTag paused = tag.getList("PausedJobs", net.minecraft.nbt.Tag.TAG_STRING);
+        for (int i = 0; i < paused.size(); i++) {
+            pausedJobs.add(paused.getString(i));
+        }
+        savedScript = tag.getString("IqlScript");
     }
 
     @Override
     protected void saveExtra(final CompoundTag tag, final HolderLookup.Provider registries) {
         tag.putBoolean("Failover", failoverEnabled);
+        tag.putString("FailoverRole", failoverRole.name());
+        tag.putInt("FailoverWaitTicks", failoverWaitTicks);
         if (nativeNetworkUuid != null) {
             tag.putString("NetworkUuid", nativeNetworkUuid.asString());
         }
@@ -1096,5 +1385,119 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
             tag.put("OperationLog", ops);
         }
+        // Operations in flight resume after a reload: save their state (plus any not yet resumed).
+        final net.minecraft.nbt.ListTag inFlight = new net.minecraft.nbt.ListTag();
+        for (final var operation : activeOperations) {
+            if (operation instanceof dev.jsc.jscomputronics.module.computing.operation.PersistentOperation persistent
+                    && !operation.isDone()) {
+                inFlight.add(persistent.saveState(registries));
+            }
+        }
+        if (pendingOperations != null) {
+            inFlight.addAll(pendingOperations);
+        }
+        if (!inFlight.isEmpty()) {
+            tag.put("ActiveOperations", inFlight);
+        }
+        tag.putBoolean("IqlEngineInstalled", iqlEngineInstalled);
+        tag.putBoolean("IqlEngineRunning", iqlEngineRunning);
+        if (!iqlCatalog.isEmpty()) {
+            final net.minecraft.nbt.ListTag catalog = new net.minecraft.nbt.ListTag();
+            for (final dev.jsc.jscomputronics.module.computing.program.iql.IqlSavedObject object : iqlCatalog.all()) {
+                final CompoundTag entry = new CompoundTag();
+                entry.putString("Type", object.type().name());
+                entry.putString("Name", object.name());
+                entry.putString("Body", object.body());
+                entry.putString("Trigger", object.triggerKind().name());
+                entry.putString("Spec", object.triggerSpec());
+                catalog.add(entry);
+            }
+            tag.put("IqlCatalog", catalog);
+        }
+        if (!pausedJobs.isEmpty()) {
+            final net.minecraft.nbt.ListTag paused = new net.minecraft.nbt.ListTag();
+            for (final String name : pausedJobs) {
+                paused.add(net.minecraft.nbt.StringTag.valueOf(name));
+            }
+            tag.put("PausedJobs", paused);
+        }
+        if (!savedScript.isEmpty()) {
+            tag.putString("IqlScript", savedScript);
+        }
+    }
+
+    // --- IQL Engine (the saved-object service installed on the Mainframe) -------------------------
+
+    public dev.jsc.jscomputronics.module.computing.program.iql.IqlCatalog iqlCatalog() {
+        return iqlCatalog;
+    }
+
+    public boolean isIqlEngineInstalled() {
+        return iqlEngineInstalled;
+    }
+
+    public boolean isIqlEngineRunning() {
+        return iqlEngineRunning;
+    }
+
+    /** The Engine is usable only when installed, not stopped, and the Mainframe itself is powered. */
+    public boolean isIqlEngineActive() {
+        return iqlEngineInstalled && iqlEngineRunning && isRunning();
+    }
+
+    /** Installs the Engine on the Mainframe; returns false if it was already installed. */
+    public boolean installIqlEngine() {
+        if (iqlEngineInstalled) {
+            return false;
+        }
+        iqlEngineInstalled = true;
+        iqlEngineRunning = true;
+        setChanged();
+        return true;
+    }
+
+    /** Starts or stops the installed Engine service; returns false if there is nothing to change. */
+    public boolean setIqlEngineRunning(final boolean running) {
+        if (!iqlEngineInstalled || iqlEngineRunning == running) {
+            return false;
+        }
+        iqlEngineRunning = running;
+        setChanged();
+        return true;
+    }
+
+    public void markIqlCatalogChanged() {
+        setChanged();
+    }
+
+    // --- IQL job process control (the Processes-tab task manager) ---------------------------------
+
+    public boolean isJobPaused(final String jobName) {
+        return pausedJobs.contains(jobName.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Pauses a job (a resumable "End"): the agent stops firing it until it is restarted. */
+    public void pauseJob(final String jobName) {
+        if (pausedJobs.add(jobName.toLowerCase(java.util.Locale.ROOT))) {
+            setChanged();
+        }
+    }
+
+    /** Restarts a job: resumes it if paused and re-arms its trigger so it reschedules from now. */
+    public void restartJob(final String jobName) {
+        pausedJobs.remove(jobName.toLowerCase(java.util.Locale.ROOT));
+        iqlJobAgent.rearm(jobName);
+        setChanged();
+    }
+
+    /** The persisted NMS editor script for this Mainframe, or "" if none has been saved. */
+    public String savedScript() {
+        return savedScript;
+    }
+
+    /** Persists the NMS editor script so it survives closing and reopening the studio (and a reload). */
+    public void setSavedScript(final String script) {
+        this.savedScript = script == null ? "" : script;
+        setChanged();
     }
 }

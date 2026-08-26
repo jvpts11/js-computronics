@@ -59,7 +59,9 @@ public final class CraftPlanner {
     public static long maxFeasible(final StorageKey resultKey, final long quantity,
                                    final List<CraftingPattern> patterns, final Map<StorageKey, Long> stock) {
         long low = 0;
-        long high = quantity;
+        // Cap the search ceiling so the midpoint arithmetic below cannot overflow when quantity is near
+        // Long.MAX_VALUE (e.g. an IQL CRAFT with no count cap); a craft beyond this bound is unrealistic.
+        long high = Math.min(quantity, 2_000_000_000L);
         while (low < high) {
             final long mid = low + (high - low + 1) / 2;
             if (plan(resultKey, mid, patterns, stock).feasible()) {

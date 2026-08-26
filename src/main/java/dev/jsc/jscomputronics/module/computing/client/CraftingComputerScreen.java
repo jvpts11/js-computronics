@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingComputerLayout;
 import dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;
 import net.minecraft.ChatFormatting;
@@ -19,30 +20,34 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.Locale;
 
 /**
- * Screen for the Crafting Computer's assembly surface — the same flat-dark "computer OS" skin as the Personal Computer.
+ * Screen for the Crafting Computer's assembly surface — the same flat-dark "computer OS" skin as the
+ * Personal Computer. This is a hardware-only surface: recipe files are managed by the Crafting Manager
+ * program on the linked monitor, not here.
  */
 public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingComputerMenu> {
 
-    private static final int COL_R = 126;
-    private static final int COL_R_W = 110;
-    private static final int BTN_H = 14;
-
-    // The right column: three 20px-tall tiles at a 22px pitch (tileText draws its
-    private static final int TILE_H = 20;
-    private static final int TILE_Y0 = 27;
-    private static final int TILE_Y1 = 49;
-    private static final int TILE_Y2 = 71;
+    // All position/size constants live in CraftingComputerLayout so the menu, the screen
+    // and the layout unit test share one source of truth.
+    private static final int COL_R     = CraftingComputerLayout.COL_R;
+    private static final int COL_R_W   = CraftingComputerLayout.COL_R_W;
+    private static final int BTN_H     = CraftingComputerLayout.BTN_H;
+    private static final int TILE_H    = CraftingComputerLayout.TILE_H;
+    private static final int TILE_Y0   = CraftingComputerLayout.TILE_Y0;
+    private static final int TILE_Y1   = CraftingComputerLayout.TILE_Y1;
+    private static final int TILE_Y2   = CraftingComputerLayout.TILE_Y2;
+    private static final int POWER_X   = CraftingComputerLayout.POWER_X;
+    private static final int POWER_Y   = CraftingComputerLayout.POWER_Y;
+    private static final int AUTO_X    = CraftingComputerLayout.AUTO_X;
+    private static final int AUTO_Y    = CraftingComputerLayout.AUTO_Y;
+    private static final int INV_X     = CraftingComputerLayout.INV_X;
+    private static final int INV_Y     = CraftingComputerLayout.INV_Y;
     private static final int NETWORK_Y = 95;
-    private static final int POWER_X = COL_R;
-    private static final int POWER_Y = 105;
-    private static final int AUTO_X = COL_R;
-    private static final int AUTO_Y = 121;
 
     public CraftingComputerScreen(final CraftingComputerMenu menu, final Inventory inventory,
                                   final Component title) {
         super(menu, inventory, title);
-        this.imageWidth = 244;
-        this.imageHeight = 218;
+        this.imageWidth = CraftingComputerLayout.WIDTH;
+        this.imageHeight = CraftingComputerLayout.HEIGHT;
         this.titleLabelX = -10000;
         this.inventoryLabelY = -10000;
     }
@@ -96,13 +101,14 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
         JscOsTheme.button(g, x + AUTO_X, y + AUTO_Y, COL_R_W, BTN_H,
                 hover(mouseX, mouseY, AUTO_X, AUTO_Y, COL_R_W, BTN_H));
 
+        // Player inventory slots.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + 8 + col * 18, y + 138 + row * 18);
+                JscOsTheme.slot(g, x + INV_X + col * 18, y + INV_Y + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + 8 + col * 18, y + 196);
+            JscOsTheme.slot(g, x + INV_X + col * 18, y + INV_Y + 58);
         }
     }
 
@@ -178,7 +184,7 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
 
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
-        // Clicking the name field selects it for typing; clicking anywhere else deselects it.
+        // Computer rename field interaction.
         if (nameBox != null) {
             if (nameBox.isMouseOver(mouseX, mouseY)) {
                 setFocused(nameBox);

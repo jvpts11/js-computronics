@@ -65,6 +65,12 @@ public class DiskItem extends SpecItem<DiskSpec> {
                 spec.tier() + "  -  " + spec.tier().latencyTicks() + "t latency  -  "
                         + spec.tier().speedMultiplier() + "x speed")
                 .withStyle(ChatFormatting.DARK_GRAY));
+        // Files on the disk's filesystem (e.g. .iql scripts, .craft recipes) — separate from the
+        // item/fluid storage listed below.
+        final dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents fs = stack.getOrDefault(
+                ComputingModule.FILESYSTEM.get(),
+                dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.EMPTY);
+        dev.jsc.jscomputronics.module.computing.os.fs.FilesystemTooltip.append(fs, tooltip);
         appendContents(stack, tooltip);
     }
 

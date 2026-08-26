@@ -1,27 +1,75 @@
 {
   "variants": {
-    "core=false,facing=east": {
+    "core=false,era=0,facing=east": {
+      "model": "jsc:block/vintage_mainframe_part"
+    },
+    "core=false,era=0,facing=north": {
+      "model": "jsc:block/vintage_mainframe_part"
+    },
+    "core=false,era=0,facing=south": {
+      "model": "jsc:block/vintage_mainframe_part"
+    },
+    "core=false,era=0,facing=west": {
+      "model": "jsc:block/vintage_mainframe_part"
+    },
+    "core=false,era=1,facing=east": {
+      "model": "jsc:block/legacy_mainframe_part"
+    },
+    "core=false,era=1,facing=north": {
+      "model": "jsc:block/legacy_mainframe_part"
+    },
+    "core=false,era=1,facing=south": {
+      "model": "jsc:block/legacy_mainframe_part"
+    },
+    "core=false,era=1,facing=west": {
+      "model": "jsc:block/legacy_mainframe_part"
+    },
+    "core=false,era=2,facing=east": {
       "model": "jsc:block/mainframe_part"
     },
-    "core=false,facing=north": {
+    "core=false,era=2,facing=north": {
       "model": "jsc:block/mainframe_part"
     },
-    "core=false,facing=south": {
+    "core=false,era=2,facing=south": {
       "model": "jsc:block/mainframe_part"
     },
-    "core=false,facing=west": {
+    "core=false,era=2,facing=west": {
       "model": "jsc:block/mainframe_part"
     },
-    "core=true,facing=east": {
+    "core=true,era=0,facing=east": {
+      "model": "jsc:block/vintage_mainframe_part_core"
+    },
+    "core=true,era=0,facing=north": {
+      "model": "jsc:block/vintage_mainframe_part_core"
+    },
+    "core=true,era=0,facing=south": {
+      "model": "jsc:block/vintage_mainframe_part_core"
+    },
+    "core=true,era=0,facing=west": {
+      "model": "jsc:block/vintage_mainframe_part_core"
+    },
+    "core=true,era=1,facing=east": {
+      "model": "jsc:block/legacy_mainframe_part_core"
+    },
+    "core=true,era=1,facing=north": {
+      "model": "jsc:block/legacy_mainframe_part_core"
+    },
+    "core=true,era=1,facing=south": {
+      "model": "jsc:block/legacy_mainframe_part_core"
+    },
+    "core=true,era=1,facing=west": {
+      "model": "jsc:block/legacy_mainframe_part_core"
+    },
+    "core=true,era=2,facing=east": {
       "model": "jsc:block/mainframe_part_core"
     },
-    "core=true,facing=north": {
+    "core=true,era=2,facing=north": {
       "model": "jsc:block/mainframe_part_core"
     },
-    "core=true,facing=south": {
+    "core=true,era=2,facing=south": {
       "model": "jsc:block/mainframe_part_core"
     },
-    "core=true,facing=west": {
+    "core=true,era=2,facing=west": {
       "model": "jsc:block/mainframe_part_core"
     }
   }

@@ -15,7 +15,9 @@ import org.jetbrains.annotations.Nullable;
 public enum CablePartType {
 
     IMPORT,
-    EXPORT;
+    EXPORT,
+    INPUT,
+    RECEIVING;
 
     private static final CablePartType[] BY_ID = values();
 
@@ -32,6 +34,8 @@ public enum CablePartType {
         return switch (this) {
             case IMPORT -> new ImportBusPart();
             case EXPORT -> new ExportBusPart();
+            case INPUT -> new InputBusPart();
+            case RECEIVING -> new ReceivingBusPart();
         };
     }
 }

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HardwareEraTest {
@@ -57,5 +58,25 @@ class HardwareEraTest {
         assertTrue(HardwareEra.ADVANCED.isAtLeast(HardwareEra.VINTAGE));
         assertTrue(HardwareEra.ADVANCED.isAtLeast(HardwareEra.ADVANCED));
         assertFalse(HardwareEra.LEGACY.isAtLeast(HardwareEra.EXA));
+    }
+
+    @Test
+    void fromLevel_returnsEraAtThatLevel() {
+        assertEquals(HardwareEra.VINTAGE, HardwareEra.fromLevel(0));
+        assertEquals(HardwareEra.STANDARD, HardwareEra.fromLevel(2));
+        assertEquals(HardwareEra.SINGULARITY, HardwareEra.fromLevel(5));
+    }
+
+    @Test
+    void fromLevel_isInverseOfLevel() {
+        for (final HardwareEra era : HardwareEra.values()) {
+            assertEquals(era, HardwareEra.fromLevel(era.level()));
+        }
+    }
+
+    @Test
+    void fromLevel_rejectsOutOfRange() {
+        assertThrows(IllegalArgumentException.class, () -> HardwareEra.fromLevel(-1));
+        assertThrows(IllegalArgumentException.class, () -> HardwareEra.fromLevel(6));
     }
 }

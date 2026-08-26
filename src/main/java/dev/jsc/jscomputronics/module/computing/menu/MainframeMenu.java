@@ -178,7 +178,14 @@ public class MainframeMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        return stillValid(access, player, ComputingModule.MAINFRAME.get());
+        // Validate against the block family, not a single block: the Standard, Vintage and Legacy
+        // Mainframe controllers are distinct blocks that share this menu. Checking only the Standard
+        // block would make the server reject a Vintage/Legacy menu as invalid and close it the instant
+        // it opens.
+        return access.evaluate((level, pos) ->
+                level.getBlockState(pos).getBlock()
+                        instanceof dev.jsc.jscomputronics.module.computing.block.MainframeBlock
+                        && player.canInteractWithBlock(pos, 4.0), true);
     }
 
     @Override

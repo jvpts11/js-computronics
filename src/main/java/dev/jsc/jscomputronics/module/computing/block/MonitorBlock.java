@@ -15,9 +15,15 @@ import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
+import dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
+import dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
+import dev.jsc.jscomputronics.module.computing.operation.payload.OpenComputerUiPayload;
+import dev.jsc.jscomputronics.module.computing.os.FirmwareKind;
+import dev.jsc.jscomputronics.module.computing.os.boot.BootController;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -86,7 +92,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
 
     @Override
     public BlockState getStateForPlacement(final BlockPlaceContext context) {
-        // A Monitor is meant to be looked AT, so the screen faces the player who
+        // A Monitor is meant to be looked AT, so the screen faces the player who places it.
         return defaultBlockState()
                 .setValue(FACING, context.getHorizontalDirection())
                 .setValue(LIT, false);
@@ -95,19 +101,74 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     @Override
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
-        if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
-                && level.getBlockEntity(pos) instanceof MonitorBlockEntity monitor) {
-            final BlockPos owner = monitor.ownerPos();
-            if (owner == null) {
-                // Explain WHY the screen is dark instead of a generic "not linked", so a missing GPU
-                // (the most common cause) or a full host is obvious rather than silent.
+        if (!(level.getBlockEntity(pos) instanceof MonitorBlockEntity monitor)) {
+            return InteractionResult.sidedSuccess(level.isClientSide());
+        }
+        final BlockPos owner = monitor.ownerPos();
+        if (owner == null) {
+            // Explain WHY the screen is dark instead of a generic "not linked", so a missing GPU
+            // (the most common cause) or a full host is obvious rather than silent.
+            if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.displayClientMessage(diagnoseUnlinked(level, pos), true);
-            } else {
-                // The terminal opens; the Command Prompt is reached from its Console rail entry.
-                openTerminal(serverPlayer, level, pos, owner);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide());
+        }
+
+        // The monitor mirrors the linked computer's OS: the screen depends on the installed OS, not on
+        // the monitor. The desktop, terminal and network GUI are all server-opened container menus; the
+        // firmware setup is a client-only screen the server requests via OpenComputerUiPayload; with no
+        // OS the screen stays dark with a hint.
+        final BlockEntity ownerBe = level.getBlockEntity(owner);
+        final BootController.BootTarget target = BootController.targetForComputer(ownerBe);
+        if (level.isClientSide()) {
+            // The server (which alone knows the installed OS) decides and opens the right screen.
+            return InteractionResult.SUCCESS;
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            switch (target) {
+                case FIRMWARE -> openFirmwareUi(serverPlayer, level, pos, owner, ownerBe);
+                case FULL_DESKTOP -> openDesktopUi(serverPlayer, level, pos, owner, ownerBe);
+                case TERMINAL_ONLY -> openCommandPrompt(serverPlayer, level, pos, owner);
+                case NETWORK_GUI -> openTerminal(serverPlayer, level, pos, owner);
             }
         }
-        return InteractionResult.sidedSuccess(level.isClientSide());
+        return InteractionResult.SUCCESS;
+    }
+
+    /** Sends the client the era-correct firmware setup screen for the host computer. */
+    private static void openFirmwareUi(final ServerPlayer player, final Level level, final BlockPos monitorPos,
+                                       final BlockPos owner, final BlockEntity ownerBe) {
+        final String name = level.getBlockState(owner).getBlock().getName().getString();
+        final HardwareEra era = ownerBe instanceof AbstractComputerBlockEntity c ? c.displayEra() : null;
+        final FirmwareKind kind = FirmwareKind.forEra(era != null ? era : HardwareEra.STANDARD);
+        PacketDistributor.sendToPlayer(player, new OpenComputerUiPayload(owner, monitorPos, kind.ordinal(), name));
+    }
+
+    /** Opens the desktop shell (a real container menu) for the host's installed FULL_DESKTOP OS. */
+    private static void openDesktopUi(final ServerPlayer player, final Level level, final BlockPos monitorPos,
+                                      final BlockPos owner, final BlockEntity ownerBe) {
+        if (ownerBe instanceof AbstractComputerBlockEntity c && c.installedOsId() != null) {
+            final String name = level.getBlockState(owner).getBlock().getName().getString();
+            final net.minecraft.resources.ResourceLocation osId = c.installedOsId();
+            final Component title = level.getBlockState(owner).getBlock().getName();
+            player.openMenu(new SimpleMenuProvider(
+                    (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.DesktopMenu(
+                            id, inv, monitorPos, owner, osId, name), title),
+                    buf -> dev.jsc.jscomputronics.module.computing.menu.DesktopMenu.writeOpenBuffer(
+                            buf, monitorPos, owner, osId, name));
+        }
+    }
+
+    /** Opens the Command Prompt (the sole shell of a terminal-only OS) on this monitor for its host. */
+    private static void openCommandPrompt(final ServerPlayer player, final Level level,
+                                          final BlockPos monitorPos, final BlockPos owner) {
+        if (level.getBlockEntity(owner) instanceof AbstractComputerBlockEntity host) {
+            final HardwareEra era = host.displayEra();
+            final Component title = level.getBlockState(owner).getBlock().getName();
+            player.openMenu(new SimpleMenuProvider(
+                    (id, inv, p) -> new CommandPromptMenu(id, inv, monitorPos, owner, era), title),
+                    buf -> CommandPromptMenu.writeOpenBuffer(buf, monitorPos, owner, era));
+        }
     }
 
     private static void openTerminal(final ServerPlayer player, final Level level,

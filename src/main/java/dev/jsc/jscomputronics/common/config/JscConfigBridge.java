@@ -7,27 +7,21 @@
  */
 package dev.jsc.jscomputronics.common.config;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.module.computing.program.ProgramSettings;
-import dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 
 /**
- * Connects the on-disk NeoForge config to the project config model and to the runtime settings that read it.
+ * Connects the on-disk NeoForge config to the mod: it registers {@link JscServerConfig#SPEC} as a SERVER config on the
+ * mod container and listens for it being loaded and reloaded.
  *
- * <p>It registers {@link JscServerConfig#SPEC} as a SERVER config on the mod container, then listens for the config
- * being loaded and reloaded. On each event for our own spec it reads the raw value, routes it through the
+ * <p>There are no server keys to read yet — the only one was the SQL dialect toggle, removed when the operation surface
+ * became IQL (a single language). The load/reload hooks stay so a future key is wired in one place, routed through the
  * {@link ConfigValidator} against the {@link JscConfigKeys} whitelist (clamp/whitelist house rule: a bad value never
- * crashes and always falls back to the default), and pushes the resolved dialect into {@link ProgramSettings}, which
- * is the single source of truth the {@code operation} CLI verb and the Network Management Studio already read.
+ * crashes and always falls back to the default).
  */
 public final class JscConfigBridge {
-
-    private static final ConfigValidator VALIDATOR =
-            new ConfigValidator(message -> JsComputronics.LOGGER.warn("[config] {}", message));
 
     private JscConfigBridge() {
     }
@@ -50,13 +44,10 @@ public final class JscConfigBridge {
     }
 
     private static void apply(final ModConfig config) {
-        // Only react to our own spec; other mods' configs raise the same events.
+        // Only react to our own spec; other mods' configs raise the same events. No keys to read yet, so this is a
+        // no-op until a server setting is added back here.
         if (config.getSpec() != JscServerConfig.SPEC) {
             return;
         }
-        final ConfigValidationResult<String> result =
-                VALIDATOR.validate(JscConfigKeys.SQL_DIALECT, JscServerConfig.SQL_DIALECT.get());
-        // The validator guarantees result.value() is one of the whitelisted strings, so valueOf is safe.
-        ProgramSettings.setSqlDialect(SqlDialect.valueOf(result.value()));
     }
 }

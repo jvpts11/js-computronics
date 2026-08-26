@@ -31,6 +31,13 @@ import dev.jsc.jscomputronics.module.computing.block.LegacyMonitorBlock;
 import dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.PersonalRouterBlock;
 import dev.jsc.jscomputronics.module.computing.block.VintageMonitorBlock;
+import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaDriveType;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaFormat;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
@@ -124,21 +131,6 @@ public final class ComputingModule {
                     .persistent(com.mojang.serialization.Codec.STRING)
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8));
 
-    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
-            net.minecraft.core.component.DataComponentType<java.util.List<
-                    dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern>>>
-            DISC_PATTERNS = COMPONENTS.registerComponentType("disc_patterns", b -> b
-                    .persistent(dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern.CODEC.listOf())
-                    .networkSynchronized(
-                            dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern.STREAM_CODEC
-                                    .apply(net.minecraft.network.codec.ByteBufCodecs.list())));
-
-    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
-            net.minecraft.core.component.DataComponentType<Integer>>
-            DISC_CYCLES = COMPONENTS.registerComponentType("disc_cycles", b -> b
-                    .persistent(com.mojang.serialization.Codec.intRange(0, Integer.MAX_VALUE))
-                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
-
     // How much of a (non-Server) computer disk's storage is public, as a per-mille 0..1000. The
     // component rides on the disk ItemStack so the split travels with the disk when it is pulled
     // and reinserted. An absent component reads as fully private (see DiskItem.publicPermille).
@@ -147,6 +139,71 @@ public final class ComputingModule {
             DISK_PUBLIC_PERMILLE = COMPONENTS.registerComponentType("disk_public_permille", b -> b
                     .persistent(com.mojang.serialization.Codec.intRange(0, 1000))
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
+
+    // OS media subsystem — components that together describe the content of a MediaItem.
+    // A medium carries exactly one kind and the matching content component for that kind.
+
+    // Installer payload (OS_INSTALL / PROGRAM_INSTALL): the OS or program id.
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<net.minecraft.resources.ResourceLocation>>
+            MEDIA_PAYLOAD = COMPONENTS.registerComponentType("media_payload", b -> b
+                    .persistent(net.minecraft.resources.ResourceLocation.CODEC)
+                    .networkSynchronized(net.minecraft.resources.ResourceLocation.STREAM_CODEC));
+
+    // Which of the three content kinds this medium carries. Absent component → OS_INSTALL (safe
+    // default that keeps legacy blank media behaving as installer media).
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<MediaKind>>
+            MEDIA_KIND = COMPONENTS.registerComponentType("media_kind", b -> b
+                    .persistent(com.mojang.serialization.Codec.STRING.xmap(
+                            MediaKind::valueOf, MediaKind::name))
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8.map(
+                            MediaKind::valueOf, MediaKind::name)));
+
+    // Data contents (DATA kind): a portable item/fluid storage snapshot.
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<
+                    dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents>>
+            MEDIA_DATA = COMPONENTS.registerComponentType("media_data", b -> b
+                    .persistent(dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.CODEC)
+                    .networkSynchronized(
+                            dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.STREAM_CODEC));
+
+    // Capacity of a DATA medium in item-equivalents. Absent → MediaItem.DEFAULT_CAPACITY.
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<Integer>>
+            MEDIA_CAPACITY = COMPONENTS.registerComponentType("media_capacity", b -> b
+                    .persistent(com.mojang.serialization.Codec.INT)
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
+
+    // Disk filesystem components — files and the installed OS live on the DiskItem stack so
+    // they travel with the disk when it is inserted or removed.
+
+    // The filesystem contents of a disk volume: path-keyed map of stored files.
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<
+                    dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents>>
+            FILESYSTEM = COMPONENTS.registerComponentType("filesystem", b -> b
+                    .persistent(dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.CODEC)
+                    .networkSynchronized(
+                            dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.STREAM_CODEC));
+
+    // The OS installed on a system disk: a ResourceLocation identifying the registered OsDef.
+    // Present only on bootable disks; absent on plain data disks.
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<net.minecraft.resources.ResourceLocation>>
+            SYSTEM_OS = COMPONENTS.registerComponentType("system_os", b -> b
+                    .persistent(net.minecraft.resources.ResourceLocation.CODEC)
+                    .networkSynchronized(net.minecraft.resources.ResourceLocation.STREAM_CODEC));
+
+    // A user-chosen label for a disk or media volume, shown in This PC and the explorer drive tree and
+    // editable there. Rides on the ItemStack so it travels with the disk/medium. Absent → the volume's
+    // default name (e.g. "Local Disk" for a system disk, "Removable Drive" for a medium).
+    public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
+            net.minecraft.core.component.DataComponentType<String>>
+            VOLUME_LABEL = COMPONENTS.registerComponentType("volume_label", b -> b
+                    .persistent(com.mojang.serialization.Codec.STRING)
+                    .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8));
 
     private static BlockBehaviour.Properties cableProperties() {
         return BlockBehaviour.Properties.of()
@@ -175,6 +232,22 @@ public final class ComputingModule {
 
     public static final DeferredItem<BlockItem> HPC_CABLE_ITEM = ITEMS.register(
             "hpc_cable", () -> new BlockItem(HPC_CABLE.get(), new Item.Properties()));
+
+    // Crafting cable: links a Crafting Switch to its Crafting Computer (a local machine cluster).
+    public static final DeferredBlock<DataCableBlock> CRAFTING_CABLE = BLOCKS.register(
+            "crafting_cable", () -> new DataCableBlock(cableProperties(), DataTier.CRAFTING));
+
+    public static final DeferredItem<BlockItem> CRAFTING_CABLE_ITEM = ITEMS.register(
+            "crafting_cable", () -> new BlockItem(CRAFTING_CABLE.get(), new Item.Properties()));
+
+    // Crafting Switch: declares up to 5 adjacent machines, wired to a Crafting Computer over the crafting cable.
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.CraftingSwitchBlock> CRAFTING_SWITCH =
+            BLOCKS.register("crafting_switch",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.CraftingSwitchBlock(
+                            BlockBehaviour.Properties.of().strength(1.5F)));
+
+    public static final DeferredItem<BlockItem> CRAFTING_SWITCH_ITEM = ITEMS.register(
+            "crafting_switch", () -> new BlockItem(CRAFTING_SWITCH.get(), new Item.Properties()));
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PeripheralCableBlock> PERIPHERAL_CABLE =
             BLOCKS.register("peripheral_cable",
@@ -223,7 +296,15 @@ public final class ComputingModule {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DataCableBlockEntity>> DATA_CABLE_BE =
             BLOCK_ENTITIES.register("data_cable",
                     () -> BlockEntityType.Builder.of(DataCableBlockEntity::new,
-                            ETHERNET_CABLE.get(), HBW_CABLE.get(), HPC_CABLE.get()).build(null));
+                            ETHERNET_CABLE.get(), HBW_CABLE.get(), HPC_CABLE.get(),
+                            CRAFTING_CABLE.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>,
+            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity>>
+            CRAFTING_SWITCH_BE = BLOCK_ENTITIES.register("crafting_switch",
+                    () -> BlockEntityType.Builder.of(
+                            dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity::new,
+                            CRAFTING_SWITCH.get()).build(null));
 
     // Routers
 
@@ -317,10 +398,40 @@ public final class ComputingModule {
                     new Item.Properties(),
                     dev.jsc.jscomputronics.module.computing.block.part.CablePartType.EXPORT));
 
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.block.part.CablePartItem> INPUT_BUS_ITEM =
+            ITEMS.register("input_bus", () -> new dev.jsc.jscomputronics.module.computing.block.part.CablePartItem(
+                    new Item.Properties(),
+                    dev.jsc.jscomputronics.module.computing.block.part.CablePartType.INPUT));
+
+    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.block.part.CablePartItem> RECEIVING_BUS_ITEM =
+            ITEMS.register("receiving_bus", () -> new dev.jsc.jscomputronics.module.computing.block.part.CablePartItem(
+                    new Item.Properties(),
+                    dev.jsc.jscomputronics.module.computing.block.part.CablePartType.RECEIVING));
+
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu>> EXPORT_BUS_MENU =
             MENUS.register("export_bus", () -> IMenuTypeExtension.create(
                     dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ImportBusMenu>> IMPORT_BUS_MENU =
+            MENUS.register("import_bus", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ImportBusMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.CraftingSwitchMenu>> CRAFTING_SWITCH_MENU =
+            MENUS.register("crafting_switch", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.CraftingSwitchMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.InputBusMenu>> INPUT_BUS_MENU =
+            MENUS.register("input_bus", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.InputBusMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>,
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.ReceivingBusMenu>> RECEIVING_BUS_MENU =
+            MENUS.register("receiving_bus", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.ReceivingBusMenu::fromNetwork));
 
     // Server Rack — houses Server items as network nodes
 
@@ -377,9 +488,9 @@ public final class ComputingModule {
                     dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu::fromNetwork));
 
     public static final DeferredHolder<MenuType<?>,
-            MenuType<dev.jsc.jscomputronics.module.computing.menu.NmsMenu>> NMS_MENU =
-            MENUS.register("nms", () -> IMenuTypeExtension.create(
-                    dev.jsc.jscomputronics.module.computing.menu.NmsMenu::fromNetwork));
+            MenuType<dev.jsc.jscomputronics.module.computing.menu.DesktopMenu>> DESKTOP_MENU =
+            MENUS.register("desktop", () -> IMenuTypeExtension.create(
+                    dev.jsc.jscomputronics.module.computing.menu.DesktopMenu::fromNetwork));
 
     // Hardware components (Standard era — minimal set to build a Mainframe)
 
@@ -420,15 +531,7 @@ public final class ComputingModule {
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
 
-    // Pattern system — media, encoder and reader
-
-    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PatternDiscItem> PATTERN_DISC =
-            ITEMS.register("pattern_disc", () -> new dev.jsc.jscomputronics.module.computing.item.PatternDiscItem(
-                    new Item.Properties(), false));
-
-    public static final DeferredItem<dev.jsc.jscomputronics.module.computing.item.PatternDiscItem> PATTERN_DISC_RW =
-            ITEMS.register("pattern_disc_rw", () -> new dev.jsc.jscomputronics.module.computing.item.PatternDiscItem(
-                    new Item.Properties(), true));
+    // Pattern system — the Pattern Encoder writes .craft files onto removable media
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock> PATTERN_ENCODER =
             BLOCKS.register("pattern_encoder",
@@ -453,28 +556,50 @@ public final class ComputingModule {
             MENUS.register("pattern_encoder", () -> IMenuTypeExtension.create(
                     dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu::fromNetwork));
 
-    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternReaderBlock> PATTERN_READER =
-            BLOCKS.register("pattern_reader",
-                    () -> new dev.jsc.jscomputronics.module.computing.block.PatternReaderBlock(
-                            BlockBehaviour.Properties.of()
-                                    .mapColor(MapColor.COLOR_GRAY)
-                                    .strength(1.5F)
-                                    .sound(SoundType.METAL)));
+    // OS media subsystem — a peripheral block that holds one MediaItem and exposes the
+    // installer payload or data contents so the firmware boot screen and transfer logic can read it.
 
-    public static final DeferredItem<BlockItem> PATTERN_READER_ITEM = ITEMS.register(
-            "pattern_reader", () -> new BlockItem(PATTERN_READER.get(), new Item.Properties()));
+    // Media reader drives: one block per drive type, each linked to a computer via the Peripheral Cable.
+    public static final DeferredBlock<MediaReaderBlock> FLOPPY_DRIVE = BLOCKS.register("floppy_drive",
+            () -> new MediaReaderBlock(MediaDriveType.FLOPPY_DRIVE, BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY).strength(1.5F).sound(SoundType.METAL)));
+    public static final DeferredBlock<MediaReaderBlock> CD_DRIVE = BLOCKS.register("cd_drive",
+            () -> new MediaReaderBlock(MediaDriveType.CD_DRIVE, BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_GRAY).strength(1.5F).sound(SoundType.METAL)));
+    public static final DeferredBlock<MediaReaderBlock> DVD_DRIVE = BLOCKS.register("dvd_drive",
+            () -> new MediaReaderBlock(MediaDriveType.DVD_DRIVE, BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BLACK).strength(1.5F).sound(SoundType.METAL)));
+    public static final DeferredBlock<MediaReaderBlock> DOCK_STATION = BLOCKS.register("dock_station",
+            () -> new MediaReaderBlock(MediaDriveType.DOCK_STATION, BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BLACK).strength(1.5F).sound(SoundType.METAL)));
 
-    public static final DeferredHolder<BlockEntityType<?>,
-            BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.PatternReaderBlockEntity>> PATTERN_READER_BE =
-            BLOCK_ENTITIES.register("pattern_reader",
-                    () -> BlockEntityType.Builder.of(
-                            dev.jsc.jscomputronics.module.computing.blockentity.PatternReaderBlockEntity::new,
-                            PATTERN_READER.get()).build(null));
+    public static final DeferredItem<BlockItem> FLOPPY_DRIVE_ITEM = ITEMS.register("floppy_drive",
+            () -> new BlockItem(FLOPPY_DRIVE.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> CD_DRIVE_ITEM = ITEMS.register("cd_drive",
+            () -> new BlockItem(CD_DRIVE.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> DVD_DRIVE_ITEM = ITEMS.register("dvd_drive",
+            () -> new BlockItem(DVD_DRIVE.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> DOCK_STATION_ITEM = ITEMS.register("dock_station",
+            () -> new BlockItem(DOCK_STATION.get(), new Item.Properties()));
 
-    public static final DeferredHolder<MenuType<?>,
-            MenuType<dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu>> PATTERN_READER_MENU =
-            MENUS.register("pattern_reader", () -> IMenuTypeExtension.create(
-                    dev.jsc.jscomputronics.module.computing.menu.PatternReaderMenu::fromNetwork));
+    // Typed physical media. The format is the item's identity; the content lives in components.
+    public static final DeferredItem<FormattedMediaItem> FLOPPY_DISK = ITEMS.register("floppy_disk",
+            () -> new FormattedMediaItem(new Item.Properties(), MediaFormat.FLOPPY, true));
+    public static final DeferredItem<FormattedMediaItem> CD_ROM = ITEMS.register("cd_rom",
+            () -> new FormattedMediaItem(new Item.Properties(), MediaFormat.CD, false));
+    public static final DeferredItem<FormattedMediaItem> CD_RW = ITEMS.register("cd_rw",
+            () -> new FormattedMediaItem(new Item.Properties(), MediaFormat.CD, true));
+    public static final DeferredItem<FormattedMediaItem> DVD_ROM = ITEMS.register("dvd_rom",
+            () -> new FormattedMediaItem(new Item.Properties(), MediaFormat.DVD, false));
+    public static final DeferredItem<FormattedMediaItem> DVD_RW = ITEMS.register("dvd_rw",
+            () -> new FormattedMediaItem(new Item.Properties(), MediaFormat.DVD, true));
+    public static final DeferredItem<FormattedMediaItem> USB_FLASH_DRIVE = ITEMS.register("usb_flash_drive",
+            () -> new FormattedMediaItem(new Item.Properties(), MediaFormat.USB, true));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MediaReaderBlockEntity>> MEDIA_READER_BE =
+            BLOCK_ENTITIES.register("media_reader",
+                    () -> BlockEntityType.Builder.of(MediaReaderBlockEntity::new,
+                            FLOPPY_DRIVE.get(), CD_DRIVE.get(), DVD_DRIVE.get(), DOCK_STATION.get()).build(null));
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_EEB_P = ITEMS.register(
             "motherboard_eeb_p", () -> new MotherboardItem(new Item.Properties(),
@@ -594,9 +719,28 @@ public final class ComputingModule {
             "mainframe", () -> new dev.jsc.jscomputronics.module.computing.item.MainframeBlockItem(
                     MAINFRAME.get(), new Item.Properties()));
 
+    // Earlier-era Mainframes — the same orchestrator and block entity, differing only by era, accepted
+    // MTX board and skin. Same 3x2x2 multiblock geometry and shared parts.
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.VintageMainframeBlock>
+            VINTAGE_MAINFRAME = BLOCKS.register("vintage_mainframe",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.VintageMainframeBlock(mainframeProperties()));
+
+    public static final DeferredItem<BlockItem> VINTAGE_MAINFRAME_ITEM = ITEMS.register(
+            "vintage_mainframe", () -> new dev.jsc.jscomputronics.module.computing.item.MainframeBlockItem(
+                    VINTAGE_MAINFRAME.get(), new Item.Properties()));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.LegacyMainframeBlock>
+            LEGACY_MAINFRAME = BLOCKS.register("legacy_mainframe",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.LegacyMainframeBlock(mainframeProperties()));
+
+    public static final DeferredItem<BlockItem> LEGACY_MAINFRAME_ITEM = ITEMS.register(
+            "legacy_mainframe", () -> new dev.jsc.jscomputronics.module.computing.item.MainframeBlockItem(
+                    LEGACY_MAINFRAME.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MainframeBlockEntity>> MAINFRAME_BE =
             BLOCK_ENTITIES.register("mainframe",
-                    () -> BlockEntityType.Builder.of(MainframeBlockEntity::new, MAINFRAME.get()).build(null));
+                    () -> BlockEntityType.Builder.of(MainframeBlockEntity::new,
+                            MAINFRAME.get(), VINTAGE_MAINFRAME.get(), LEGACY_MAINFRAME.get()).build(null));
 
     public static final DeferredBlock<MainframePartBlock> MAINFRAME_PART = BLOCKS.register(
             "mainframe_part", () -> new MainframePartBlock(mainframeProperties()));
@@ -661,10 +805,35 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> CRAFTING_COMPUTER_ITEM = ITEMS.register(
             "crafting_computer", () -> new BlockItem(CRAFTING_COMPUTER.get(), new Item.Properties()));
 
+    // Earlier-era Crafting Computers — the same machine and block entity, differing only by era, accepted
+    // board and skin.
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.VintageCraftingComputerBlock>
+            VINTAGE_CRAFTING_COMPUTER = BLOCKS.register("vintage_crafting_computer",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.VintageCraftingComputerBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(2.0F)));
+
+    public static final DeferredItem<BlockItem> VINTAGE_CRAFTING_COMPUTER_ITEM = ITEMS.register(
+            "vintage_crafting_computer",
+            () -> new BlockItem(VINTAGE_CRAFTING_COMPUTER.get(), new Item.Properties()));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.LegacyCraftingComputerBlock>
+            LEGACY_CRAFTING_COMPUTER = BLOCKS.register("legacy_crafting_computer",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.LegacyCraftingComputerBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_GRAY)
+                                    .strength(2.0F)));
+
+    public static final DeferredItem<BlockItem> LEGACY_CRAFTING_COMPUTER_ITEM = ITEMS.register(
+            "legacy_crafting_computer",
+            () -> new BlockItem(LEGACY_CRAFTING_COMPUTER.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CraftingComputerBlockEntity>> CRAFTING_COMPUTER_BE =
             BLOCK_ENTITIES.register("crafting_computer",
                     () -> BlockEntityType.Builder.of(CraftingComputerBlockEntity::new,
-                            CRAFTING_COMPUTER.get()).build(null));
+                            CRAFTING_COMPUTER.get(), VINTAGE_CRAFTING_COMPUTER.get(),
+                            LEGACY_CRAFTING_COMPUTER.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu>> CRAFTING_COMPUTER_MENU =

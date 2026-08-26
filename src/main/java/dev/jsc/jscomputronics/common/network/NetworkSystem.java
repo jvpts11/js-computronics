@@ -122,9 +122,22 @@ public final class NetworkSystem {
 
     public void registerSubframe(SubframeNode subframe) {
         java.util.Objects.requireNonNull(subframe, "subframe must not be null");
-        subframesByNetwork
-                .computeIfAbsent(subframe.networkUuid(), k -> new java.util.ArrayList<>())
-                .add(subframe);
+        final java.util.List<SubframeNode> list =
+                subframesByNetwork.computeIfAbsent(subframe.networkUuid(), k -> new java.util.ArrayList<>());
+        // Idempotent by node UUID, like registerServer: a Subframe re-registering each tick from tickNode()
+        // must not duplicate entries, or the orchestration-capacity sum inflates N-fold over time.
+        list.removeIf(s -> s.nodeUuid().equals(subframe.nodeUuid()));
+        list.add(subframe);
+    }
+
+    public void unregisterSubframe(NetworkUuid network, NodeUuid node) {
+        final java.util.List<SubframeNode> list = subframesByNetwork.get(network);
+        if (list != null) {
+            list.removeIf(s -> s.nodeUuid().equals(node));
+            if (list.isEmpty()) {
+                subframesByNetwork.remove(network);
+            }
+        }
     }
 
     public Optional<MainframeNode> mainframeOf(NetworkUuid networkUuid) {

@@ -153,6 +153,12 @@ public final class HardwareItems {
             board("motherboard_mtx_vintage", new MotherboardSpec(FormFactor.MTX, HardwareEra.VINTAGE,
                     CpuSocket.SOCKET_7, 2, Set.of(RamGeneration.SIMM, RamGeneration.EDO), 16,
                     PcieGeneration.PCI, 8, 4, 8));
+    // Dual-socket server board for vintage-era rack hardware; more RAM slots and PCIe slots
+    // than the desktop MTX variant to match server-class density expectations of the era.
+    public static final DeferredItem<MotherboardItem> MOTHERBOARD_EEB_VINTAGE =
+            board("motherboard_eeb_vintage", new MotherboardSpec(FormFactor.EEB, HardwareEra.VINTAGE,
+                    CpuSocket.SOCKET_7, 2, Set.of(RamGeneration.SIMM, RamGeneration.EDO), 16,
+                    PcieGeneration.PCI, 10, 8, 8));
 
     // Vintage spinning disks: MFM/IDE rotating platters (20 MB and 100 MB). Tiny capacity by design —
     // these are the floor of the storage ladder, appropriate for single-digit MHz CPUs.

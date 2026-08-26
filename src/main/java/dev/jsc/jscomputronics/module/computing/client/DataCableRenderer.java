@@ -54,6 +54,9 @@ public class DataCableRenderer implements BlockEntityRenderer<DataCableBlockEnti
             final ModelResourceLocation modelLocation = switch (type) {
                 case IMPORT -> IMPORT_MODEL;
                 case EXPORT -> EXPORT_MODEL;
+                // Input feeds like an Export, Receiving pulls like an Import; they reuse the part models for now.
+                case INPUT -> EXPORT_MODEL;
+                case RECEIVING -> IMPORT_MODEL;
             };
             final BakedModel model = mc.getModelManager().getModel(modelLocation);
             pose.pushPose();

@@ -179,6 +179,28 @@ public final class NetworkStorage {
         return (int) (stack.getCount() - remaining);
     }
 
+    /**
+     * Inserts {@code amount} of a key (item OR fluid) into the network, returning how much was stored. This is
+     * the key-typed counterpart of {@link #insert(ItemStack)}, used to put a machine craft's fluid (or item)
+     * output back into the network.
+     */
+    public long insert(final StorageKey key, final long amount) {
+        if (key == null || amount <= 0L) {
+            return 0L;
+        }
+        long remaining = amount;
+        for (final Entry entry : entries) {
+            if (remaining <= 0L) {
+                break;
+            }
+            if (!entry.acceptsInsert()) {
+                continue; // never write into a PC's public area
+            }
+            remaining -= entry.store().insert(key, remaining);
+        }
+        return amount - remaining;
+    }
+
     public Map<NodeUuid, Long> insertBreakdown(final ItemStack stack) {
         final Map<NodeUuid, Long> stored = new LinkedHashMap<>();
         if (stack.isEmpty()) {

@@ -11,80 +11,26 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu;
+import dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.inventory.ContainerData;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.neoforged.neoforge.items.ItemStackHandler;
 
 /**
  * An Export Bus part: pulls the filtered item out of the network and into the inventory its mounted face touches, as DELETE Operations dispatched by the Mainframe ("DELETE" = leaves the network for an external inventory, not destruction).
  */
-public final class ExportBusPart implements CablePart {
+public non-sealed class ExportBusPart extends AbstractBusPart {
 
-    public static final int MODE_CONTINUOUS = 0;
-    public static final int MODE_REDSTONE = 1;
+    protected static final int EXPORT_INTERVAL = 2;
 
-    private static final int EXPORT_INTERVAL = 2;
-
-    private DataCableBlockEntity host;
-    private Direction face = Direction.NORTH;
-
-    private final ItemStackHandler filter = new ItemStackHandler(1) {
-        @Override
-        public int getSlotLimit(final int slot) {
-            return 1;
-        }
-
-        @Override
-        protected void onContentsChanged(final int slot) {
-            markHostChanged();
-        }
-    };
-
-    private int min;
-    private int max;
-    private int mode = MODE_CONTINUOUS;
-    private boolean linked;
-    private boolean active = true;
-    private dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation activeOp;
+    private NetworkSelectOperation activeOp;
     private int ticksSinceExport;
-
-    private final ContainerData data = new ContainerData() {
-        @Override
-        public int get(final int index) {
-            return switch (index) {
-                case 0 -> min;
-                case 1 -> max;
-                case 2 -> mode;
-                case 3 -> linked ? 1 : 0;
-                default -> 0;
-            };
-        }
-
-        @Override
-        public void set(final int index, final int value) {
-            switch (index) {
-                case 0 -> min = value;
-                case 1 -> max = value;
-                case 2 -> mode = value;
-                case 3 -> linked = value != 0;
-                default -> { /* no-op */ }
-            }
-        }
-
-        @Override
-        public int getCount() {
-            return 4;
-        }
-    };
 
     @Override
     public CablePartType type() {
@@ -92,49 +38,9 @@ public final class ExportBusPart implements CablePart {
     }
 
     @Override
-    public void attach(final DataCableBlockEntity host, final Direction face) {
-        this.host = host;
-        this.face = face;
-    }
-
-    @Override
-    public boolean hasMenu() {
-        return true;
-    }
-
-    public ItemStackHandler getFilterHandler() {
-        return filter;
-    }
-
-    public ContainerData getDataAccess() {
-        return data;
-    }
-
-    public void setFilter(final ItemStack stack) {
-        filter.setStackInSlot(0, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
-        active = true;
-        markHostChanged();
-    }
-
-    public void adjustMin(final int delta) {
-        min = Math.max(0, min + delta);
-        active = true;
-        markHostChanged();
-    }
-
-    public void adjustMax(final int delta) {
-        max = Math.max(0, max + delta);
-        active = true;
-        markHostChanged();
-    }
-
-    public void toggleMode() {
-        mode = mode == MODE_CONTINUOUS ? MODE_REDSTONE : MODE_CONTINUOUS;
-        markHostChanged();
-    }
-
-    public Item filterItem() {
-        return filter.getStackInSlot(0).isEmpty() ? Items.AIR : filter.getStackInSlot(0).getItem();
+    public AbstractContainerMenu createMenu(final int containerId, final Inventory inventory,
+                                            final DataCableBlockEntity cable, final Direction mountedFace) {
+        return ExportBusMenu.create(containerId, inventory, cable, mountedFace);
     }
 
     @Override
@@ -152,7 +58,7 @@ public final class ExportBusPart implements CablePart {
             }
             activeOp = null;
         }
-        if (mode == MODE_REDSTONE && !level.hasNeighborSignal(host.getBlockPos())) {
+        if (redstoneBlocked()) {
             return;
         }
         if (++ticksSinceExport < EXPORT_INTERVAL) {
@@ -160,19 +66,14 @@ public final class ExportBusPart implements CablePart {
         }
         ticksSinceExport = 0;
 
-        final ItemStack filterStack = filter.getStackInSlot(0);
-        if (filterStack.isEmpty() || network == null) {
+        final StorageKey key = filterKey();
+        if (key == null || network == null) {
             return;
         }
-        final ExternalDataPort dest = host.neighborPort(face);
+        final ExternalDataPort dest = neighborPort();
         if (dest.isEmpty()) {
             return;
         }
-        // A fluid container in the filter (e.g. a filled bucket) exports its FLUID; any other item
-        final StorageKey key = net.neoforged.neoforge.fluids.FluidUtil.getFluidContained(filterStack)
-                .filter(f -> !f.isEmpty())
-                .map(StorageKey::of)
-                .orElseGet(() -> StorageKey.of(filterStack));
         final MainframeBlockEntity mainframe = host.mainframe();
         if (mainframe == null) {
             return;
@@ -187,7 +88,7 @@ public final class ExportBusPart implements CablePart {
         if (want <= 0L) {
             return;
         }
-        // Pull the data out of the network into the faced block (item or fluid) as a timed DELETE
+        // Pull the data out of the network into the faced block (item or fluid) as a timed DELETE.
         activeOp = mainframe.submitNetworkDelete(key, want, dest, "export");
     }
 
@@ -209,30 +110,8 @@ public final class ExportBusPart implements CablePart {
         return Math.min(batch, (long) max - destCount);
     }
 
-    private void markHostChanged() {
-        if (host != null) {
-            host.setChanged();
-        }
-    }
-
     @Override
     public ItemStack partItem() {
         return new ItemStack(ComputingModule.EXPORT_BUS_ITEM.get());
-    }
-
-    @Override
-    public void save(final CompoundTag tag, final HolderLookup.Provider registries) {
-        tag.put("Filter", filter.serializeNBT(registries));
-        tag.putInt("Min", min);
-        tag.putInt("Max", max);
-        tag.putInt("Mode", mode);
-    }
-
-    @Override
-    public void load(final CompoundTag tag, final HolderLookup.Provider registries) {
-        filter.deserializeNBT(registries, tag.getCompound("Filter"));
-        min = tag.getInt("Min");
-        max = tag.getInt("Max");
-        mode = tag.getInt("Mode");
     }
 }

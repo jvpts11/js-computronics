@@ -14,9 +14,9 @@ import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.part.AbstractBusPart;
 import dev.jsc.jscomputronics.module.computing.block.part.CablePart;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
-import dev.jsc.jscomputronics.module.computing.menu.ExportBusMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -119,7 +119,7 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         // (a computer accepts one on its rear only), so the rendered nub never lies about connectivity.
         return neighbor instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable device
                 && device.acceptedCableTiers().contains(this.tier)
-                && device.connectsOnFace(neighborState, direction.getOpposite());
+                && device.connectsOnFace(neighborState, direction.getOpposite(), this.tier);
     }
 
     // Shape: the cable pipe plus a box for each mounted part
@@ -153,16 +153,18 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
-        // A plain click opens the part's menu (export buses); picking a part off the cable is
-        // done with a left-click, handled separately so it never breaks the cable.
+        // A plain click opens the part's configuration menu (import / export buses); picking a part off
+        // the cable is done with a left-click, handled separately so it never breaks the cable. Each bus
+        // builds its own menu, and the open packet carries the bus name so the field shows it client-side.
         final CablePart part = cable.getPart(face);
-        if (part != null && part.hasMenu() && player instanceof ServerPlayer serverPlayer) {
+        if (part instanceof AbstractBusPart bus && player instanceof ServerPlayer serverPlayer) {
             serverPlayer.openMenu(new SimpleMenuProvider(
-                            (id, inv, p) -> ExportBusMenu.create(id, inv, cable, face),
+                            (id, inv, p) -> bus.createMenu(id, inv, cable, face),
                             state.getBlock().getName()),
                     buf -> {
                         buf.writeBlockPos(pos);
                         buf.writeByte(face.get3DDataValue());
+                        buf.writeUtf(bus.name());
                     });
         }
         return InteractionResult.CONSUME;
@@ -283,7 +285,12 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
                 // Never void real items the parts are buffering, on any removal path.
                 cable.dropAllBuffers(serverLevel);
             }
-            NetworkSystem.get(serverLevel).connectivity().onCableRemoved(pos.asLong());
+            // A cable removed before its lazy onLoad registered it (placed and broken the same tick) has
+            // nothing in the index; calling onCableRemoved would throw "Position not registered".
+            final var connectivity = NetworkSystem.get(serverLevel).connectivity();
+            if (connectivity.contains(pos.asLong())) {
+                connectivity.onCableRemoved(pos.asLong());
+            }
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
     }

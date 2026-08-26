@@ -40,6 +40,8 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
         addBlock(ComputingModule.HPC_CABLE, "High Compute Cable");
+        addBlock(ComputingModule.CRAFTING_CABLE, "Crafting Cable");
+        addBlock(ComputingModule.CRAFTING_SWITCH, "Crafting Switch");
         addBlock(ComputingModule.PERIPHERAL_CABLE, "Peripheral Cable");
         addBlock(ComputingModule.PERSONAL_ROUTER, "Personal Router");
         addBlock(ComputingModule.SERVER_ROUTER, "Server Router");
@@ -52,17 +54,39 @@ public class JscLanguageProvider extends LanguageProvider {
         add("block.jsc.monitor.no_computer", "No computer found in range over a Peripheral Cable");
         add("block.jsc.monitor.no_gpu", "The computer has no GPU - install a GPU to host monitors (4 per GPU)");
         add("block.jsc.monitor.at_capacity", "The computer's monitor outputs are all in use");
+        add("block.jsc.monitor.no_os", "No operating system - sneak-use the computer to open its firmware and install one");
         add("block.jsc.monitor.hint_command_prompt", "Sneak-use to open the Command Prompt");
         add("program.jsc.command_prompt", "Command Prompt");
         add("program.jsc.nms", "Network Management Studio");
+        add("program.jsc.iqlengine", "IQL Engine");
+        add("program.jsc.crafting_manager", "Crafting Manager");
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
         add("item.jsc.mainframe.tooltip", "Forms a 3x2x2 structure when placed");
+        addBlock(ComputingModule.VINTAGE_MAINFRAME, "Vintage Mainframe");
+        addBlock(ComputingModule.LEGACY_MAINFRAME, "Legacy Mainframe");
         addBlock(ComputingModule.PERSONAL_COMPUTER, "Personal Computer");
         addBlock(ComputingModule.VINTAGE_PERSONAL_COMPUTER, "Vintage Personal Computer");
         addBlock(ComputingModule.LEGACY_PERSONAL_COMPUTER, "Legacy Personal Computer");
         addBlock(ComputingModule.CRAFTING_COMPUTER, "Crafting Computer");
+        addBlock(ComputingModule.VINTAGE_CRAFTING_COMPUTER, "Vintage Crafting Computer");
+        addBlock(ComputingModule.LEGACY_CRAFTING_COMPUTER, "Legacy Crafting Computer");
         addBlock(ComputingModule.PATTERN_ENCODER, "Pattern Encoder");
-        addBlock(ComputingModule.PATTERN_READER, "Pattern Reader");
+        addBlock(ComputingModule.FLOPPY_DRIVE, "Floppy Drive");
+        addBlock(ComputingModule.CD_DRIVE, "CD Drive");
+        addBlock(ComputingModule.DVD_DRIVE, "DVD Drive");
+        addBlock(ComputingModule.DOCK_STATION, "Dock Station");
+        add(ComputingModule.FLOPPY_DISK.get(), "Floppy Disk");
+        add(ComputingModule.CD_ROM.get(), "CD-ROM");
+        add(ComputingModule.CD_RW.get(), "CD-RW");
+        add(ComputingModule.DVD_ROM.get(), "DVD-ROM");
+        add(ComputingModule.DVD_RW.get(), "DVD-RW");
+        add(ComputingModule.USB_FLASH_DRIVE.get(), "USB Flash Drive");
+        // Operating-system display names (the ids stay technical; players see these).
+        add("os.jsc.mc_dos", "MC-DOS");
+        add("os.jsc.mc_net", "MC-NET");
+        add("os.jsc.panes_95", "Panes 95");
+        add("os.jsc.panes_xp", "Panes XP");
+        add("os.jsc.panes_11", "Panes 11");
         addBlock(ComputingModule.SUPERCOMPUTER_NODE, "Supercomputer Node");
         add("item.jsc.supercomputer_node.tooltip", "A full computer: assemble it, seat a Phi, wire it with High Compute Cable");
         addBlock(ComputingModule.HBW_INTERFACE, "HBW Interface");
@@ -72,13 +96,17 @@ public class JscLanguageProvider extends LanguageProvider {
         add(ComputingModule.PHI_7120.get(), "Integra Phi 7120 Co-processor");
         add(ComputingModule.PHI_7290.get(), "Integra Phi 7290 Co-processor");
         add(ComputingModule.PHI_9000.get(), "Integra Phi 9000 Co-processor");
-        add(ComputingModule.PATTERN_DISC.get(), "Pattern Disc");
-        add(ComputingModule.PATTERN_DISC_RW.get(), "Rewritable Pattern Disc");
         addBlock(ComputingModule.SERVER_RACK, "Server Rack");
         add(ComputingModule.IMPORT_BUS_ITEM.get(), "Import Bus");
         add("item.jsc.import_bus.tooltip", "Right-click a data cable to attach; pulls items into the network");
         add(ComputingModule.EXPORT_BUS_ITEM.get(), "Export Bus");
         add("item.jsc.export_bus.tooltip", "Right-click a data cable to attach; pushes the filtered item out");
+        add(ComputingModule.INPUT_BUS_ITEM.get(), "Crafting Input Bus");
+        add("item.jsc.input_bus.tooltip",
+                "Right-click a crafting cable to attach; marks the face machine crafts deliver inputs through");
+        add(ComputingModule.RECEIVING_BUS_ITEM.get(), "Crafting Receiving Bus");
+        add("item.jsc.receiving_bus.tooltip",
+                "Right-click a crafting cable to attach; marks the face machine crafts collect outputs from");
         add(ComputingModule.MOTHERBOARD_MTX_P.get(), "MTX-P Motherboard");
         add(ComputingModule.MOTHERBOARD_ATX_P.get(), "ATX-P Motherboard");
         add(ComputingModule.CPU_SERVO_2620.get(), "Integra Servo 2620");
@@ -138,6 +166,7 @@ public class JscLanguageProvider extends LanguageProvider {
         add(HardwareItems.MOTHERBOARD_BABYAT_VINTAGE.get(), "MF Baby-AT I Motherboard");
         add(HardwareItems.MOTHERBOARD_AT_VINTAGE.get(), "MF AT Standard Motherboard");
         add(HardwareItems.MOTHERBOARD_MTX_VINTAGE.get(), "MF MTX-V Motherboard");
+        add(HardwareItems.MOTHERBOARD_EEB_VINTAGE.get(), "MF EEB-V Server Board");
         add(HardwareItems.DISK_TRENCH_20M.get(), "Vaultis Trench HDD 20M");
         add(HardwareItems.DISK_TRENCH_100M.get(), "Vaultis Trench HDD 100M");
 

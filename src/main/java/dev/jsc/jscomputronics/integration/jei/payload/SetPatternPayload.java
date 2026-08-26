@@ -35,7 +35,7 @@ public record SetPatternPayload(BlockPos pos, List<ItemStack> grid)
     public static final StreamCodec<RegistryFriendlyByteBuf, SetPatternPayload> STREAM_CODEC =
             StreamCodec.composite(
                     BlockPos.STREAM_CODEC, SetPatternPayload::pos,
-                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list()), SetPatternPayload::grid,
+                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list(16)), SetPatternPayload::grid,
                     SetPatternPayload::new);
 
     @Override

@@ -70,7 +70,10 @@ final class OpsTerminalTab extends AbstractTerminalTab {
         if (screen.selectedOp >= 0 && screen.selectedOp < ops.size()) {
             final OperationRecord op = ops.get(screen.selectedOp);
             g.drawString(font(), op.name().getString(), cx + 24, cy + 96, TEXT(), false);
-            final String sub = fmt(op.moved()) + " of " + fmt(op.requested()) + "  " + statusLabel(op.status());
+            // Show "all" for an uncapped request, so a Long.MAX demand never renders as an absurd,
+            // overflowing "9223372036854.8M" total.
+            final String reqLabel = op.requested() >= 1_000_000_000L ? "all" : fmt(op.requested());
+            final String sub = fmt(op.moved()) + " of " + reqLabel + "  " + statusLabel(op.status());
             g.drawString(font(), sub, cx + 24, cy + 106, statusColor(op.status()), false);
             // At most two provenance rows fit in the box; if there are more sources,
             // the second row is replaced by a one-line summary so nothing overflows.

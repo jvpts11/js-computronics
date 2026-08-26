@@ -93,7 +93,7 @@ class CliShellTest {
     @Test
     void run_operationQueryOffNetworkErrors() {
         computer.onNetwork = false;
-        assertTrue(anyStyle("operation query", CliStyle.ERROR));
+        assertTrue(anyStyle("operation query items", CliStyle.ERROR));
     }
 
     @Test
@@ -107,7 +107,7 @@ class CliShellTest {
     void run_operationQueryReadsStorageInsteadOfExecuting() {
         computer.onNetwork = true;
         computer.stock.add(new CliComputer.StoredItem("cobblestone", 100));
-        final String out = joined("operation query");
+        final String out = joined("operation query items");
         assertTrue(out.contains("cobblestone"));
     }
 
@@ -186,14 +186,24 @@ class CliShellTest {
             return new NetSummary(onNetwork, 2, 1, 0, stock.size(), true);
         }
 
-        @Override public List<StoredItem> query(final String filter, final String server, final int limit) {
+        @Override public List<StoredItem> query(
+                final dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition where,
+                final String server, final int limit) {
+            final String filter = dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition
+                    .itemNameFilter(where).toLowerCase();
             final List<StoredItem> out = new ArrayList<>();
             for (final StoredItem item : stock) {
-                if (filter.isEmpty() || item.name().toLowerCase().contains(filter.toLowerCase())) {
+                if (filter.isEmpty() || item.name().toLowerCase().contains(filter)) {
                     out.add(item);
                 }
             }
             return out;
+        }
+
+        @Override public List<StoredItem> queryObject(final String object,
+                final dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition where,
+                final String server, final int limit) {
+            return object.equalsIgnoreCase("items") ? query(where, server, limit) : List.of();
         }
 
         @Override public List<Holding> find(final String item) {
@@ -251,12 +261,8 @@ class CliShellTest {
             return OpResult.ok("installed " + programId);
         }
 
-        @Override public dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect dialect() {
-            return dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect.SIMPLE;
-        }
-
         @Override public OpResult execute(
-                final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation operation) {
+                final dev.jsc.jscomputronics.module.computing.program.iql.IqlOperation operation) {
             lastCall = "execute(" + operation.verb() + "," + operation.item() + "," + operation.quantity() + ")";
             return OpResult.ok("queued " + operation.verb());
         }

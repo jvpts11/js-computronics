@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "jsc:block/dock_station_active",
+    "side": "jsc:block/dock_station_casing",
+    "top": "jsc:block/dock_station_casing"
+  }
+}

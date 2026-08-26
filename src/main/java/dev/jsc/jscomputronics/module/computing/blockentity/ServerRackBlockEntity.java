@@ -33,6 +33,13 @@ import java.util.UUID;
 
 /**
  * A Server Rack: a passive container (network Category A, no UUID of its own) that houses up to {@link #CAPACITY} Server items.
+ *
+ * <p>Server items are currently plain items with a ServerItem descriptor; they have no OS slot and
+ * no AbstractComputerBlockEntity lifecycle. OS case (b) — rack servers auto-provisioning a minimal
+ * server OS on insert — is therefore not yet applicable. Once servers gain an OS slot (a future
+ * hardware-era slice), auto-provisioning should be wired into {@link #onContentsChanged} here.
+ *
+ * <p>TODO(os): rack servers auto-provision a server OS once servers gain an OS slot.
  */
 public class ServerRackBlockEntity extends BlockEntity {
 

@@ -11,12 +11,19 @@ import dev.jsc.jscomputronics.common.operation.index.Allocation;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkIndex;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkOperation;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jsc.jscomputronics.module.computing.operation.PersistentOperation;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 
@@ -30,7 +37,83 @@ import java.util.UUID;
 /**
  * A multi-tick CRAFT: executes a {@link CraftPlanner.Plan} on a Crafting Computer.
  */
-public final class NetworkCraftOperation implements NetworkOperation {
+public final class NetworkCraftOperation implements PersistentOperation {
+
+    public static final String KIND = "craft";
+
+    @Override
+    public CompoundTag saveState(final HolderLookup.Provider registries) {
+        final CompoundTag tag = new CompoundTag();
+        tag.putString(KIND_KEY, KIND);
+        tag.putUUID(ID_KEY, operationId);
+        final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        StorageKey.CODEC.encodeStart(ops, resultKey).result().ifPresent(t -> tag.put("Result", t));
+        tag.putLong("Requested", requested);
+        tag.putString("Label", requesterLabel);
+        if (embeddedPattern != null) {
+            CraftingPattern.CODEC.encodeStart(ops, embeddedPattern).result().ifPresent(t -> tag.put("Embedded", t));
+        }
+        // Everything this craft has drained from the network but not delivered yet: intermediates and
+        // finished results alike. They are handed back to storage on resume, so nothing is lost or doubled.
+        final ListTag pool = new ListTag();
+        for (final Map.Entry<StorageKey, Long> entry : this.pool.entrySet()) {
+            if (entry.getValue() > 0) {
+                StorageKey.CODEC.encodeStart(ops, entry.getKey()).result().ifPresent(keyTag -> {
+                    final CompoundTag row = new CompoundTag();
+                    row.put("Key", keyTag);
+                    row.putLong("Amount", entry.getValue());
+                    pool.add(row);
+                });
+            }
+        }
+        tag.put("Pool", pool);
+        return tag;
+    }
+
+    /**
+     * The outcome of {@link #restore}: the operation now running the remaining demand, or none because the
+     * request was already fully delivered from the items in flight ({@code complete}) or could not be
+     * planned again ({@code complete} false, {@code operation} null).
+     */
+    public record Restored(@org.jetbrains.annotations.Nullable NetworkCraftOperation operation, boolean complete) {
+    }
+
+    /**
+     * Resumes a bench craft saved by {@link #saveState}: the items it held in flight go back into network
+     * storage, and the remaining demand is planned again as a fresh craft (reservations and computer claims
+     * live in RAM and are gone after a reload, so re-planning is the honest way to continue).
+     */
+    public static Restored restore(final CompoundTag tag, final MainframeBlockEntity mainframe,
+                                   final ServerLevel level, final NetworkUuid network,
+                                   final HolderLookup.Provider registries) {
+        final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        final StorageKey result = tag.contains("Result")
+                ? StorageKey.CODEC.parse(ops, tag.get("Result")).result().orElse(null) : null;
+        if (result == null) {
+            return new Restored(null, false);
+        }
+        final NetworkStorage storage = NetworkStorage.of(level, network);
+        long delivered = 0;
+        final ListTag pool = tag.getList("Pool", Tag.TAG_COMPOUND);
+        for (int i = 0; i < pool.size(); i++) {
+            final CompoundTag row = pool.getCompound(i);
+            final StorageKey key = StorageKey.CODEC.parse(ops, row.get("Key")).result().orElse(null);
+            final long amount = row.getLong("Amount");
+            if (key != null && amount > 0) {
+                final long stored = storage.insert(key, amount);
+                if (key.equals(result)) {
+                    delivered += stored;
+                }
+            }
+        }
+        final long remaining = tag.getLong("Requested") - delivered;
+        if (remaining <= 0) {
+            return new Restored(null, true);
+        }
+        final CraftingPattern embedded = tag.contains("Embedded")
+                ? CraftingPattern.CODEC.parse(ops, tag.get("Embedded")).result().orElse(null) : null;
+        return new Restored(mainframe.submitNetworkCraft(result, remaining, true, tag.getString("Label"), embedded), false);
+    }
 
     private static final int STALL_LIMIT = 100;
 
@@ -46,6 +129,10 @@ public final class NetworkCraftOperation implements NetworkOperation {
     private final List<BlockPos> candidateComputers;
     private final List<BlockPos> supercomputers;
     private final String requesterLabel;
+    // A pattern that travels with the request instead of living in a Recipe ROM: a multi-stage
+    // pipeline's bench stage embeds its pattern, so any online computer may execute it.
+    @org.jetbrains.annotations.Nullable
+    private final CraftingPattern embeddedPattern;
 
     private final Map<StorageKey, Long> pool = new HashMap<>();
     // The servers each ingredient's reservation was placed on, so the per-tick drain targets the same
@@ -53,7 +140,9 @@ public final class NetworkCraftOperation implements NetworkOperation {
     private final Map<StorageKey, java.util.Set<NodeUuid>> lockedServers = new HashMap<>();
     private final long[] runsDone;
 
-    private CraftingComputerBlockEntity executor;
+    // With a supercomputer, one request fans out across several CCs at once (one per granted slot); without
+    // one, a single exclusively-claimed CC. The per-tick rate is the summed throughput of the live executors.
+    private final List<CraftingComputerBlockEntity> executors = new ArrayList<>();
     private dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity orchestrator;
     private boolean exclusiveClaim;
     private boolean locked;
@@ -72,6 +161,16 @@ public final class NetworkCraftOperation implements NetworkOperation {
                                  final CraftPlanner.Plan plan, final NetworkIndex index,
                                  final UUID operationId, final List<BlockPos> candidateComputers,
                                  final List<BlockPos> supercomputers, final String requesterLabel) {
+        this(level, network, resultKey, requested, plan, index, operationId, candidateComputers,
+                supercomputers, requesterLabel, null);
+    }
+
+    public NetworkCraftOperation(final ServerLevel level, final NetworkUuid network,
+                                 final StorageKey resultKey, final long requested,
+                                 final CraftPlanner.Plan plan, final NetworkIndex index,
+                                 final UUID operationId, final List<BlockPos> candidateComputers,
+                                 final List<BlockPos> supercomputers, final String requesterLabel,
+                                 @org.jetbrains.annotations.Nullable final CraftingPattern embeddedPattern) {
         this.level = level;
         this.network = network;
         this.resultKey = resultKey;
@@ -82,6 +181,7 @@ public final class NetworkCraftOperation implements NetworkOperation {
         this.candidateComputers = List.copyOf(candidateComputers);
         this.supercomputers = List.copyOf(supercomputers);
         this.requesterLabel = requesterLabel;
+        this.embeddedPattern = embeddedPattern;
         this.runsDone = new long[plan.steps().size()];
         if (plan.steps().isEmpty()) {
             finish();
@@ -104,20 +204,21 @@ public final class NetworkCraftOperation implements NetworkOperation {
             if (!locked && !tryLockIngredients()) {
                 return;
             }
-            if (!tryClaimExecutor()) {
+            if (!tryClaimExecutors()) {
                 return;
             }
             waiting = false;
         }
-        if (!executorAlive()) {
-            // The computer was broken or powered off mid-craft: settle with what was produced.
+        if (!executorsAlive()) {
+            // Every computer was broken or powered off mid-craft: settle with what was produced.
             finish();
             return;
         }
 
-        // The computer crafts at its card throughput, never above the Mainframe's grant. Work is
-        // measured in ingredient items handled, so denser recipes genuinely take longer.
-        final long rate = Math.min(throughputBudget, executor.craftingThroughput());
+        // The craft runs at the summed throughput of its computers (never above the Mainframe's grant). Work is
+        // measured in ingredient items handled, so denser recipes genuinely take longer; faster computers in the
+        // fan-out contribute proportionally more of each tick's work.
+        final long rate = Math.min(throughputBudget, aliveThroughput());
         if (rate <= 0) {
             return;
         }
@@ -180,23 +281,33 @@ public final class NetworkCraftOperation implements NetworkOperation {
         return true;
     }
 
-    private boolean tryClaimExecutor() {
+    private boolean tryClaimExecutors() {
         final CraftingPattern root = plan.steps().isEmpty()
                 ? null : plan.steps().get(plan.steps().size() - 1).pattern();
         final var sc = findRunningSupercomputer();
         if (sc != null) {
-            final CraftingComputerBlockEntity cc = findCapableComputer(root, false);
-            if (cc != null && sc.tryAcquireCraftSlot(operationId)) {
-                orchestrator = sc;
-                executor = cc;
-                return true;
+            // Fan out: take every capable computer (fastest first) the supercomputer's free slots allow — one
+            // slot per computer. The summed throughput crafts the request faster, weighted toward the faster
+            // computers; requesting one slot per capable computer honors "use the maximum available computers".
+            final List<CraftingComputerBlockEntity> capable = capableComputers(root);
+            if (capable.isEmpty()) {
+                return false;
             }
-            return false; // no capable computer yet, or the parallel budget is spent — wait in line
+            final int granted = sc.acquireCraftSlots(operationId, capable.size());
+            if (granted <= 0) {
+                return false; // the parallel budget is spent — wait in line
+            }
+            orchestrator = sc;
+            executors.clear();
+            executors.addAll(capable.subList(0, Math.min(granted, capable.size())));
+            return true;
         }
+        // No supercomputer: a single computer, claimed exclusively.
         final CraftingComputerBlockEntity cc = findCapableComputer(root, true);
         if (cc != null) {
             exclusiveClaim = true;
-            executor = cc;
+            executors.clear();
+            executors.add(cc);
             return true;
         }
         return false;
@@ -215,32 +326,70 @@ public final class NetworkCraftOperation implements NetworkOperation {
         return null;
     }
 
+    /**
+     * The capable computers (online, holding the root pattern), sorted fastest-first by crafting throughput.
+     * Smart selection picks from the front; the supercomputer fan-out takes as many as its free slots allow.
+     */
+    private List<CraftingComputerBlockEntity> capableComputers(
+            @org.jetbrains.annotations.Nullable final CraftingPattern root) {
+        final List<CraftingComputerBlockEntity> capable = new ArrayList<>();
+        for (final BlockPos pos : candidateComputers) {
+            // An embedded pattern travels with the request (a multi-stage's bench stage), so knowing
+            // it does not require a Recipe ROM entry of its own.
+            if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc
+                    && cc.canCraft()
+                    && (root == null || cc.romContains(root) || root.equals(embeddedPattern))) {
+                capable.add(cc);
+            }
+        }
+        capable.sort((a, b) -> Long.compare(b.craftingThroughput(), a.craftingThroughput()));
+        return capable;
+    }
+
     @org.jetbrains.annotations.Nullable
     private CraftingComputerBlockEntity findCapableComputer(final CraftingPattern root,
                                                             final boolean claimExclusive) {
-        for (final BlockPos pos : candidateComputers) {
-            if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc
-                    && cc.canCraft()
-                    && (root == null || cc.romContains(root))
-                    && (!claimExclusive || cc.tryClaimCraft(operationId))) {
+        for (final CraftingComputerBlockEntity cc : capableComputers(root)) {
+            // For an exclusive claim, fall through to the next-fastest if the fastest is already busy.
+            if (!claimExclusive || cc.tryClaimCraft(operationId)) {
                 return cc;
             }
         }
         return null;
     }
 
-    private boolean executorAlive() {
-        return executor != null && !executor.isRemoved() && executor.canCraft();
+    /** Sum of the crafting throughput of every live executor; faster computers contribute more of each tick. */
+    private long aliveThroughput() {
+        long sum = 0;
+        for (final CraftingComputerBlockEntity cc : executors) {
+            if (cc != null && !cc.isRemoved() && cc.canCraft()) {
+                sum += cc.craftingThroughput();
+            }
+        }
+        return sum;
+    }
+
+    private boolean executorsAlive() {
+        for (final CraftingComputerBlockEntity cc : executors) {
+            if (cc != null && !cc.isRemoved() && cc.canCraft()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private long consumeIngredients(final NetworkStorage storage, final CraftingPattern pattern,
                                     final long runs) {
         long executable = runs;
-        // First pass: how many runs can the pools + network actually deliver?
+        // First pass: how many runs can the pools + LOCKED network actually deliver? Only ingredients this
+        // operation holds a lock on may come from the network; an UNLOCKED ingredient is an intermediate that
+        // must come from the pool (its upstream step), so it is never pulled from the shared network under
+        // another operation's reservation — counting it here would let this craft bypass the lock system.
         for (final Map.Entry<StorageKey, Long> entry : pattern.ingredientTotals().entrySet()) {
             final long perRun = entry.getValue();
             final long pooled = pool.getOrDefault(entry.getKey(), 0L);
-            final long networkHas = storage.count(entry.getKey());
+            final long networkHas = lockedServers.containsKey(entry.getKey())
+                    ? storage.count(entry.getKey()) : 0L;
             executable = Math.min(executable, (pooled + networkHas) / perRun);
         }
         if (executable <= 0) {
@@ -255,6 +404,11 @@ public final class NetworkCraftOperation implements NetworkOperation {
                 need -= fromPool;
             }
             if (need > 0) {
+                if (!lockedServers.containsKey(key)) {
+                    // Intermediate shortfall with no lock: stall rather than bypass the lock by pulling
+                    // from the open network; the upstream step replenishes the pool on a later tick.
+                    return 0;
+                }
                 // Crafting consumes the items: extract from the SAME servers the lock holds (not just any
                 // server in discovery order) so each release frees its matching reservation as the items
                 // leave, instead of missing and leaving them reserved until the craft finishes.
@@ -276,8 +430,12 @@ public final class NetworkCraftOperation implements NetworkOperation {
         if (orchestrator != null) {
             orchestrator.releaseCraftSlot(operationId);
         }
-        if (exclusiveClaim && executor != null) {
-            executor.releaseCraft(operationId);
+        if (exclusiveClaim) {
+            for (final CraftingComputerBlockEntity cc : executors) {
+                if (cc != null) {
+                    cc.releaseCraft(operationId);
+                }
+            }
         }
 
         // Deliver the result, then return every leftover intermediate — nothing is ever wasted.
@@ -313,11 +471,12 @@ public final class NetworkCraftOperation implements NetworkOperation {
             final int accepted = storage.insert(prototype.copyWithCount(chunk));
             remaining -= chunk;
             final int overflow = chunk - accepted;
-            if (overflow > 0 && executor != null) {
+            final CraftingComputerBlockEntity drop = executors.isEmpty() ? null : executors.get(0);
+            if (overflow > 0 && drop != null) {
                 // Network storage filled mid-craft: surface the items in the world, never void them.
                 net.minecraft.world.Containers.dropItemStack(level,
-                        executor.getBlockPos().getX() + 0.5, executor.getBlockPos().getY() + 1.0,
-                        executor.getBlockPos().getZ() + 0.5, prototype.copyWithCount(overflow));
+                        drop.getBlockPos().getX() + 0.5, drop.getBlockPos().getY() + 1.0,
+                        drop.getBlockPos().getZ() + 0.5, prototype.copyWithCount(overflow));
             }
         }
     }
@@ -337,6 +496,7 @@ public final class NetworkCraftOperation implements NetworkOperation {
         finish();
     }
 
+    @Override
     public UUID operationId() {
         return operationId;
     }
@@ -347,6 +507,11 @@ public final class NetworkCraftOperation implements NetworkOperation {
 
     public long delivered() {
         return deliveredResult;
+    }
+
+    /** How many crafting computers this craft is fanned out across (set when it claims; persists after it settles). */
+    public int executorCount() {
+        return executors.size();
     }
 
     public NetworkCraftOperation onSettle(final Runnable callback) {
@@ -404,10 +569,13 @@ public final class NetworkCraftOperation implements NetworkOperation {
     }
 
     private String executorLabel() {
-        if (executor == null) {
+        if (executors.isEmpty()) {
             return "CC";
         }
-        final String name = executor.customName();
-        return name.isEmpty() ? "CC" : name;
+        final String name = executors.get(0).customName();
+        final String base = name.isEmpty() ? "CC" : name;
+        // Show the lead computer plus how many others share the craft, so the fan-out is visible in the log.
+        return executors.size() > 1 ? base + " +" + (executors.size() - 1) : base;
     }
+
 }

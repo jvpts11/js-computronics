@@ -87,6 +87,24 @@ public final class ConnectivityIndex {
         return result;
     }
 
+    /**
+     * Every cable position belonging to the given network. A read-only scan (the same shape as
+     * {@link #componentPositions}) used to locate a named device, such as a bus, mounted anywhere on the
+     * network's cabling without needing a starting position.
+     */
+    public Set<Long> positionsOf(final NetworkUuid network) {
+        if (network == null) {
+            return Set.of();
+        }
+        final Set<Long> result = new LinkedHashSet<>();
+        for (final Map.Entry<Long, Integer> entry : posToId.entrySet()) {
+            if (network.equals(rootToUuid.get(dsu.find(entry.getValue())))) {
+                result.add(entry.getKey());
+            }
+        }
+        return result;
+    }
+
     // Mutations
 
     public PlacementResult onCablePlaced(long encodedPos, Set<Long> neighbors) {
@@ -182,8 +200,12 @@ public final class ConnectivityIndex {
                 continue;
             }
             ids.add(id);
-            if (surviving == null) {
-                surviving = rootToUuid.get(dsu.find(id));
+            // Deterministic survivor: the lexicographically smallest UUID among the merged components, so
+            // which network identity wins a merge does not depend on iteration order (unpredictable to the
+            // player and unstable across reloads).
+            final NetworkUuid uuid = rootToUuid.get(dsu.find(id));
+            if (uuid != null && (surviving == null || uuid.asString().compareTo(surviving.asString()) < 0)) {
+                surviving = uuid;
             }
         }
         if (ids.size() < 2) {

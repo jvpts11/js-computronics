@@ -117,8 +117,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private static final int DEPOSIT_W = NET_COLS * 18 - 2;
     private static final int DEPOSIT_H = 14;
 
+    // Indexed by ComputerTerminalMenu.TAB_* id — keep in sync with those constants (Processes = 7, Console = 8).
     private static final String[] TAB_NAMES =
-            {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Console"};
+            {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Processes", "Console"};
 
     private int netScrollRow;
     int selectedOp;
@@ -255,6 +256,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             new TasksTerminalTab(this, menu),
             new MaintenanceTerminalTab(this, menu),
             new CraftTerminalTab(this, menu),
+            new ProcessesTerminalTab(this, menu),
         };
     }
 
@@ -335,17 +337,19 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                     ? new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
                             ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_CRAFT,
                             ComputerTerminalMenu.TAB_OPS, ComputerTerminalMenu.TAB_TASKS,
-                            ComputerTerminalMenu.TAB_MAINTENANCE}
+                            ComputerTerminalMenu.TAB_MAINTENANCE, ComputerTerminalMenu.TAB_PROCESSES}
                     : new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
                             ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS,
-                            ComputerTerminalMenu.TAB_TASKS, ComputerTerminalMenu.TAB_MAINTENANCE};
+                            ComputerTerminalMenu.TAB_TASKS, ComputerTerminalMenu.TAB_MAINTENANCE,
+                            ComputerTerminalMenu.TAB_PROCESSES};
         }
         return craft
                 ? new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
                         ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_CRAFT,
-                        ComputerTerminalMenu.TAB_OPS}
+                        ComputerTerminalMenu.TAB_OPS, ComputerTerminalMenu.TAB_PROCESSES}
                 : new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
-                        ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS};
+                        ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS,
+                        ComputerTerminalMenu.TAB_PROCESSES};
     }
 
     // Per-tab rendering delegates; instantiated in init() once menu and screen geometry are ready.
@@ -382,6 +386,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         syncPalette();
         final int x = leftPos;
         final int y = topPos;
+
+        // The host computer's hardware-era monitor frame wraps the whole terminal window.
+        MonitorFrame.renderBody(g, x, y, imageWidth, imageHeight, screenEra(), font);
 
         g.fill(x - 1, y - 1, x + imageWidth + 1, y + imageHeight + 1, OUTER);
         g.fill(x, y, x + imageWidth, y + imageHeight, SCREEN);
@@ -1293,7 +1300,17 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                     }
                 }
             }
-            case 7 -> { // Console — a ">" prompt and a blinking cursor underscore
+            case 7 -> { // Processes — a cog (the network's background services)
+                g.fill(x + 7, y + 2, x + 9, y + 4, c);   // tooth: top
+                g.fill(x + 7, y + 12, x + 9, y + 14, c); // tooth: bottom
+                g.fill(x + 2, y + 7, x + 4, y + 9, c);   // tooth: left
+                g.fill(x + 12, y + 7, x + 14, y + 9, c); // tooth: right
+                g.fill(x + 5, y + 5, x + 11, y + 7, c);  // ring: top edge
+                g.fill(x + 5, y + 9, x + 11, y + 11, c); // ring: bottom edge
+                g.fill(x + 5, y + 5, x + 7, y + 11, c);  // ring: left edge
+                g.fill(x + 9, y + 5, x + 11, y + 11, c); // ring: right edge
+            }
+            case 8 -> { // Console — a ">" prompt and a blinking cursor underscore
                 g.fill(x + 3, y + 4, x + 5, y + 6, c);
                 g.fill(x + 5, y + 6, x + 7, y + 8, c);
                 g.fill(x + 3, y + 8, x + 5, y + 10, c);
@@ -1421,6 +1438,12 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
         if (popupOp != null) {
             return handleOpPopupClick(mouseX, mouseY, button);
+        }
+        // Let the active content tab claim the press (e.g. the Processes tab's action buttons), after any
+        // modal popup above has had its chance but before the rail/grid handlers below.
+        final int active = menu.activeTab();
+        if (active >= 0 && active < tabs.length && tabs[active].onMouseClicked(mouseX, mouseY, button)) {
+            return true;
         }
         // Privacy slider (Storage tab): a press on a disk's track starts a drag and jumps the value to
         // the cursor. Handled before the deposit/grid handlers so a slider drag never deposits a stack.

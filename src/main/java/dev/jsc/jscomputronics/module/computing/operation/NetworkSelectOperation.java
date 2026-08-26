@@ -160,7 +160,7 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
     }
 
     private void retryLock() {
-        if (++waitTicks > waitTimeoutTicks) {
+        if (++waitTicks >= waitTimeoutTicks) {
             timedOut = true;
             finish();
             return;

@@ -9,7 +9,7 @@ package dev.jsc.jscomputronics.module.computing.menu;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.item.PatternDiscItem;
+import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -21,6 +21,10 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Menu for the Pattern Encoder: a ghost 3x3 recipe grid (clicks set count-1 copies, the player's items are never consumed), a live result preview resolved server-side from the recipe book, a real media slot, and the player inventory.
  */
@@ -28,6 +32,11 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
 
     public static final int BUTTON_WRITE = 0;
     public static final int BUTTON_ERASE = 1;
+
+    /** Authoring tabs. The crafting grid + preview slots are active only on {@link #TAB_CRAFTING}. */
+    public static final int TAB_CRAFTING = 0;
+    public static final int TAB_PROCESSING = 1;
+    public static final int TAB_MULTI = 2;
 
     public static final int GRID_START = 0;
     public static final int PREVIEW_SLOT = 9;
@@ -39,20 +48,23 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
 
     private final ItemStackHandler previewMirror = new ItemStackHandler(1);
 
+    private int activeTab = TAB_CRAFTING;
+
     public PatternEncoderMenu(final int containerId, final Inventory playerInventory,
                               final PatternEncoderBlockEntity be) {
         super(ComputingModule.PATTERN_ENCODER_MENU.get(), containerId);
         this.blockEntity = be;
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
 
-        // Ghost grid 3x3 — clicks are intercepted in clicked(); items never move.
+        // Ghost grid 3x3 — clicks are intercepted in clicked(); items never move. Only on the crafting tab.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
-                addSlot(new GhostSlot(be.ghostGrid(), col + row * 3, 26 + col * 18, 32 + row * 18));
+                addSlot(new GhostSlot(be.ghostGrid(), col + row * 3, 26 + col * 18, 44 + row * 18,
+                        () -> activeTab == TAB_CRAFTING));
             }
         }
-        // Result preview — read-only, written by broadcastChanges from the BE's resolver.
-        addSlot(new SlotItemHandler(previewMirror, 0, 100, 50) {
+        // Result preview — read-only, written by broadcastChanges from the BE's resolver. Only on the crafting tab.
+        addSlot(new SlotItemHandler(previewMirror, 0, 100, 62) {
             @Override
             public boolean mayPlace(final ItemStack stack) {
                 return false;
@@ -62,9 +74,14 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
             public boolean mayPickup(final Player player) {
                 return false;
             }
+
+            @Override
+            public boolean isActive() {
+                return activeTab == TAB_CRAFTING;
+            }
         });
-        // Media bay — a real slot restricted to pattern discs.
-        addSlot(new SlotItemHandler(be.media(), 0, 138, 32));
+        // Media bay — accepts writable removable media (floppy, CD-RW, DVD-RW, USB). Shared by every tab.
+        addSlot(new SlotItemHandler(be.media(), 0, 8, 108));
 
         addPlayerInventory(playerInventory, 8, 138);
     }
@@ -84,8 +101,12 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
      * A ghost cell: never holds a real item — a click records a copy of the carried stack.
      */
     private static final class GhostSlot extends SlotItemHandler {
-        private GhostSlot(final ItemStackHandler handler, final int index, final int x, final int y) {
+        private final java.util.function.BooleanSupplier activeWhen;
+
+        private GhostSlot(final ItemStackHandler handler, final int index, final int x, final int y,
+                          final java.util.function.BooleanSupplier activeWhen) {
             super(handler, index, x, y);
+            this.activeWhen = activeWhen;
         }
 
         @Override
@@ -96,6 +117,11 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
         @Override
         public boolean mayPickup(final Player player) {
             return false;
+        }
+
+        @Override
+        public boolean isActive() {
+            return activeWhen.getAsBoolean();
         }
     }
 
@@ -131,6 +157,14 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
         super.broadcastChanges();
     }
 
+    public int activeTab() {
+        return activeTab;
+    }
+
+    public void setActiveTab(final int tab) {
+        this.activeTab = tab;
+    }
+
     public BlockPos blockEntityPos() {
         return blockEntity.getBlockPos();
     }
@@ -144,8 +178,19 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
     }
 
     public boolean canErase() {
-        final ItemStack disc = mediaStack();
-        return disc.getItem() instanceof PatternDiscItem item && item.canErase(disc);
+        return false;
+    }
+
+    // Craft-file list — delivered via RequestPatternEncoderFilesPayload on the client thread.
+
+    private List<String> craftFiles = List.of();
+
+    public void setCraftFiles(final List<String> files) {
+        craftFiles = Collections.unmodifiableList(new ArrayList<>(files));
+    }
+
+    public List<String> craftFiles() {
+        return craftFiles;
     }
 
     public boolean canWrite() {
@@ -176,9 +221,9 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
         }
         final ItemStack stack = slot.getItem();
         final ItemStack original = stack.copy();
-        // From the inventory: discs go to the media bay; everything else stays put
-        // (the recipe grid is ghost-only and never receives real items).
-        if (stack.getItem() instanceof PatternDiscItem) {
+        // From the inventory: writable removable media goes to the media bay; everything else
+        // stays put (the recipe grid is ghost-only and never receives real items).
+        if (stack.getItem() instanceof FormattedMediaItem item && item.writable()) {
             if (!moveItemStackTo(stack, MEDIA_SLOT, MEDIA_SLOT + 1, false)) {
                 return ItemStack.EMPTY;
             }

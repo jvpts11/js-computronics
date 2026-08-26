@@ -11,6 +11,9 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.menu.ImportBusMenu;
+import dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation;
+import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.Direction;
@@ -18,24 +21,22 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.List;
-
 /**
- * An Import Bus part: pulls whatever data its mounted face touches — items OR fluids, with no distinction — and pushes it into the network as INSERT Operations dispatched by the Mainframe.
+ * An Import Bus part: pulls data from the inventory its mounted face touches — items OR fluids, with no distinction — and pushes it into the network as INSERT Operations dispatched by the Mainframe. An empty filter imports everything; a set filter imports only that one type and the min/max window keeps the NETWORK stocked of it (with hysteresis).
  */
-public final class ImportBusPart implements CablePart {
+public non-sealed class ImportBusPart extends AbstractBusPart {
 
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
     private static final int MIN_BATCH = 64;
     private static final int FLUSH_TICKS = 20;
 
-    private DataCableBlockEntity host;
-    private Direction face = Direction.NORTH;
-
     private StorageKey bufferKey;
     private long bufferAmount;
-    private dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation activeOp;
+    private NetworkInsertOperation activeOp;
     private StorageKey flushedKey;
     private long flushedAmount;
     private int ticksSinceFlush;
@@ -46,9 +47,9 @@ public final class ImportBusPart implements CablePart {
     }
 
     @Override
-    public void attach(final DataCableBlockEntity host, final Direction face) {
-        this.host = host;
-        this.face = face;
+    public AbstractContainerMenu createMenu(final int containerId, final Inventory inventory,
+                                            final DataCableBlockEntity cable, final Direction mountedFace) {
+        return ImportBusMenu.create(containerId, inventory, cable, mountedFace);
     }
 
     @Override
@@ -74,19 +75,23 @@ public final class ImportBusPart implements CablePart {
             return;
         }
         final NetworkUuid network = host.network();
+        linked = network != null;
         final MainframeBlockEntity mainframe = network == null ? null : host.mainframe();
+        ticksSinceFlush++;
+        // Redstone mode holds off pulling new data; an already-buffered payload still flushes below.
+        final boolean pulling = !redstoneBlocked();
         // The batch size and pull rate follow the network's orchestration capacity.
         final long cap = mainframe == null ? 1L
                 : Math.max(1L, Math.min(Integer.MAX_VALUE, mainframe.capacity()));
-        final ExternalDataPort port = host.neighborPort(face);
-        ticksSinceFlush++;
+        final ExternalDataPort port = neighborPort();
+        final StorageKey filter = filterKey(); // null = import anything
 
         boolean typeChange = false;
-        if (!port.isEmpty()) {
+        if (pulling && !port.isEmpty() && canAcceptMore(level, network, filter)) {
             if (bufferKey == null) {
-                final List<StorageKey> available = port.available();
-                if (!available.isEmpty()) {
-                    final StorageKey pick = available.get(0);
+                final StorageKey pick = filter != null ? filter
+                        : (port.available().isEmpty() ? null : port.available().get(0));
+                if (pick != null) {
                     final long pulled = port.extract(pick, cap, false);
                     if (pulled > 0L) {
                         bufferKey = pick;
@@ -94,6 +99,9 @@ public final class ImportBusPart implements CablePart {
                         host.setChanged();
                     }
                 }
+            } else if (filter != null && !bufferKey.equals(filter)) {
+                // The filter changed while a different type was buffered: flush the old one, add no more.
+                typeChange = true;
             } else {
                 final long room = cap - bufferAmount;
                 if (room > 0L) {
@@ -103,12 +111,14 @@ public final class ImportBusPart implements CablePart {
                         host.setChanged();
                     }
                 }
-                typeChange = port.available().stream().anyMatch(k -> !k.equals(bufferKey));
+                if (filter == null) {
+                    typeChange = port.available().stream().anyMatch(k -> !k.equals(bufferKey));
+                }
             }
         }
 
         final boolean flush = bufferKey != null
-                && (bufferAmount >= cap || ticksSinceFlush >= FLUSH_TICKS || typeChange);
+                && (bufferAmount >= cap || bufferAmount >= MIN_BATCH || ticksSinceFlush >= FLUSH_TICKS || typeChange);
         if (!flush) {
             return;
         }
@@ -133,6 +143,30 @@ public final class ImportBusPart implements CablePart {
             flushedAmount = 0L;
         }
         host.setChanged();
+    }
+
+    /**
+     * Whether the bus may pull more right now. With no filter or no max it always may; with a filter and a
+     * max it stops once the network already holds {@code max} of that type, resuming only after the network
+     * stock falls back to the {@code min} low-water mark (hysteresis), exactly mirroring the Export Bus but
+     * measured on the network instead of the faced inventory.
+     */
+    private boolean canAcceptMore(final ServerLevel level, final NetworkUuid network, final StorageKey filter) {
+        if (filter == null || max <= 0 || network == null) {
+            return true;
+        }
+        final long have = NetworkStorage.of(level, network).count(filter);
+        if (have >= max) {
+            active = false;
+            return false;
+        }
+        if (min > 0) {
+            if (!active && have > min) {
+                return false;
+            }
+            active = true;
+        }
+        return true;
     }
 
     @Override
@@ -160,6 +194,7 @@ public final class ImportBusPart implements CablePart {
 
     @Override
     public void save(final CompoundTag tag, final HolderLookup.Provider registries) {
+        super.save(tag, registries);
         if (bufferKey != null && bufferAmount > 0L) {
             StorageKey.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), bufferKey)
                     .result().ifPresent(encoded -> tag.put("BufferKey", encoded));
@@ -176,24 +211,38 @@ public final class ImportBusPart implements CablePart {
 
     @Override
     public void load(final CompoundTag tag, final HolderLookup.Provider registries) {
+        super.load(tag, registries);
         bufferKey = null;
         bufferAmount = 0L;
         flushedKey = null;
         flushedAmount = 0L;
+        final var ops = registries.createSerializationContext(NbtOps.INSTANCE);
         if (tag.contains("BufferKey")) {
-            StorageKey.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get("BufferKey"))
-                    .result().ifPresent(key -> {
+            StorageKey.CODEC.parse(ops, tag.get("BufferKey"))
+                    .resultOrPartial(err -> LOGGER.warn("Import bus dropped a buffered payload it could not decode: {}", err))
+                    .ifPresent(key -> {
                         bufferKey = key;
                         bufferAmount = tag.getLong("BufferAmount");
                     });
         }
-        // Recover items that were in flight before the reload; the timed operation is gone but the
-        // data must not be lost, so move them back into the buffer to be re-inserted next tick.
+        // Recover items that were in flight before the reload; the timed operation is gone but the data
+        // must not be lost, so move them into the buffer to be re-inserted next tick. Buffer and flushed
+        // should be mutually exclusive at a save point, but if both are present, accumulate (same key) or
+        // keep the larger batch rather than overwrite, so no items are silently dropped.
         if (tag.contains("FlushedKey")) {
-            StorageKey.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), tag.get("FlushedKey"))
-                    .result().ifPresent(key -> {
-                        bufferKey = key;
-                        bufferAmount = tag.getLong("FlushedAmount");
+            final long flushedAmt = tag.getLong("FlushedAmount");
+            StorageKey.CODEC.parse(ops, tag.get("FlushedKey"))
+                    .resultOrPartial(err -> LOGGER.warn("Import bus dropped an in-flight payload it could not decode: {}", err))
+                    .ifPresent(key -> {
+                        if (bufferKey == null) {
+                            bufferKey = key;
+                            bufferAmount = flushedAmt;
+                        } else if (bufferKey.equals(key)) {
+                            bufferAmount += flushedAmt;
+                        } else if (flushedAmt > bufferAmount) {
+                            bufferKey = key;
+                            bufferAmount = flushedAmt;
+                        }
                     });
         }
     }

@@ -46,9 +46,9 @@ class DataTierTest {
 
     @Test
     void noT5Tier_existsInDataCables() {
-        // Six data tiers (the numbered ladder plus the HPC cluster fabric), with no T5.
+        // Seven data tiers (the numbered ladder, the HPC cluster fabric, and the crafting cable), with no T5.
         DataTier[] tiers = DataTier.values();
-        assertEquals(6, tiers.length);
+        assertEquals(7, tiers.length);
         for (DataTier tier : tiers) {
             assertEquals(false, tier.name().contains("T5"));
         }

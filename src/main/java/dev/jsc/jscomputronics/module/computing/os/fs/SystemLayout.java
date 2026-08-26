@@ -1,0 +1,51 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jsc.jscomputronics.module.computing.os.fs;
+
+import dev.jsc.jscomputronics.module.computing.os.OsCapability;
+
+import java.util.List;
+
+/**
+ * The system folder skeleton a graphical desktop OS lays down on the system disk when it is
+ * installed. Only a {@link OsCapability#FULL_DESKTOP} OS gets the full tree; terminal-only and
+ * network OSes keep a bare filesystem.
+ *
+ * <p>This class is pure and carries no Minecraft dependency, so the layout can be unit-tested in
+ * JUnit and reused by the install path in the binding layer. Parent directories are listed before
+ * their children so a caller that materialises them in order never references a missing parent.
+ */
+public final class SystemLayout {
+
+    private SystemLayout() {
+    }
+
+    /** The directory whose files are shown as icons on the desktop background. */
+    public static final String DESKTOP_DIR = "Users/Public/Desktop";
+
+    /** The ordered system directories a full desktop OS provides (parents before children). */
+    private static final List<String> DESKTOP_DIRECTORIES = List.of(
+            "Program Files",
+            "Program Files (x86)",
+            "Windows",
+            "Users",
+            "Users/Public",
+            "Users/Public/Desktop",
+            "Users/Public/Documents"
+    );
+
+    /**
+     * Returns the system directories the given capability provisions on install.
+     *
+     * @param capability the capability tier of the OS being installed
+     * @return the ordered directory paths to create, or an empty list for non-desktop OSes
+     */
+    public static List<String> directoriesFor(final OsCapability capability) {
+        return capability == OsCapability.FULL_DESKTOP ? DESKTOP_DIRECTORIES : List.of();
+    }
+}

@@ -18,7 +18,18 @@ import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlock
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
+import dev.jsc.jscomputronics.module.computing.os.KernelDef;
+import dev.jsc.jscomputronics.module.computing.os.OsDef;
+import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
+import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
+import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
+import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
+import dev.jsc.jscomputronics.module.computing.os.fs.FsPaths;
 import dev.jsc.jscomputronics.module.computing.program.cli.CliComputer;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlOperation;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlParseResult;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlParser;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlVerb;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;
@@ -26,6 +37,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.ArrayList;
@@ -130,32 +142,176 @@ public final class ServerCliComputer implements CliComputer {
     }
 
     @Override
-    public List<StoredItem> query(final String filter, final String server, final int limit) {
+    public List<StoredItem> query(final dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition where,
+                                  final String server, final int limit) {
         final NetworkUuid net = host.networkUuid();
         if (net == null) {
             return List.of();
         }
+        // WHERE server=X scopes the read to that server; every other field is evaluated per item, so the
+        // full condition (qty < 100, name contains "ore", damaged = true, ...) really filters now.
+        final String serverName = (server == null || server.isBlank())
+                ? dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition.firstValue(where, "server")
+                : server;
         final NetworkStorage storage;
-        if (server == null || server.isBlank()) {
+        final String scopedServer;
+        if (serverName == null || serverName.isBlank()) {
             storage = NetworkStorage.of(level, net);
+            scopedServer = "";
         } else {
-            final NodeUuid scoped = resolveServer(net, server);
+            final NodeUuid scoped = resolveServer(net, serverName);
             if (scoped == null) {
-                return List.of(); // a WHERE server filter that names no server yields nothing
+                return List.of(); // a WHERE server that names no server yields nothing
             }
             storage = NetworkStorage.ofServers(level, java.util.List.of(scoped));
+            scopedServer = serverName;
         }
-        final String needle = filter.toLowerCase(java.util.Locale.ROOT);
-        // Filter, then sort by quantity, then take the top rows: the limit must apply after the sort so
-        // the result is the largest holdings, and the whole catalog is not walked once the limit is met.
+        // Filter by the condition, then sort by quantity and take the top rows: the limit applies after the
+        // sort so the result is the largest holdings, not an arbitrary slice.
         return storage.query().entrySet().stream()
-                .filter(entry -> needle.isEmpty()
-                        || entry.getKey().displayName().getString().toLowerCase(java.util.Locale.ROOT)
-                        .contains(needle))
+                .filter(entry -> where == null
+                        || where.matches(rowOf(entry.getKey(), entry.getValue(), scopedServer)))
                 .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
                 .limit(Math.max(limit, 0))
-                .map(entry -> new StoredItem(entry.getKey().displayName().getString(), entry.getValue()))
+                .map(entry -> new StoredItem(entry.getKey().displayName().getString(), entry.getValue(),
+                        location(net, entry.getKey(), scopedServer)))
                 .toList();
+    }
+
+    /** Where an item lives: the scoped server, the single server holding it, or "N servers" across the net. */
+    private String location(final NetworkUuid net, final StorageKey key, final String scopedServer) {
+        if (!scopedServer.isEmpty()) {
+            return scopedServer;
+        }
+        final java.util.Map<NodeUuid, Long> breakdown = NetworkStorage.of(level, net).breakdown(key);
+        if (breakdown.size() == 1) {
+            return ComputingPayloads.serverLabel(level, breakdown.keySet().iterator().next());
+        }
+        return breakdown.size() + " servers";
+    }
+
+    /** The fields a WHERE can test on an item row: item id, name, qty, server (scoped), damaged, durability. */
+    private static java.util.function.Function<String, String> rowOf(final StorageKey key, final long qty,
+                                                                     final String scopedServer) {
+        return field -> switch (field.toLowerCase(java.util.Locale.ROOT)) {
+            case "item" -> itemPath(key);
+            case "name" -> key.displayName().getString();
+            case "qty", "count", "amount" -> Long.toString(qty);
+            case "server" -> scopedServer;
+            case "damaged" -> Boolean.toString(key.stack(1).isDamaged());
+            case "durability" -> durabilityPercent(key);
+            default -> null; // an unknown field makes its comparison false, so the row is excluded
+        };
+    }
+
+    private static String itemPath(final StorageKey key) {
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).getPath();
+    }
+
+    private static String durabilityPercent(final StorageKey key) {
+        final net.minecraft.world.item.ItemStack stack = key.stack(1);
+        if (!stack.isDamageableItem() || stack.getMaxDamage() == 0) {
+            return "100";
+        }
+        return Long.toString(Math.round(
+                100.0 * (stack.getMaxDamage() - stack.getDamageValue()) / stack.getMaxDamage()));
+    }
+
+    @Override
+    public List<StoredItem> queryObject(final String object,
+                                        final dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition where,
+                                        final String server, final int limit) {
+        return switch (object.toLowerCase(java.util.Locale.ROOT)) {
+            case "items", "*" -> query(where, server, limit); // '*' means every item, like SELECT *
+            case "servers" -> queryServers(limit);
+            case "operations" -> queryOperations(limit);
+            case "computers" -> queryComputers(limit);
+            case "recipes" -> queryRecipes(limit);
+            // disks: the schema object exists, the per-disk live data is not wired yet.
+            default -> List.of();
+        };
+    }
+
+    /** One row per network node: the Mainframe, then servers, personal computers, and crafting computers. */
+    private List<StoredItem> queryComputers(final int limit) {
+        final NetworkUuid net = host.networkUuid();
+        if (net == null) {
+            return List.of();
+        }
+        final NetworkSystem system = NetworkSystem.get(level);
+        final List<StoredItem> out = new ArrayList<>();
+        if (mainframe(net) != null) {
+            out.add(new StoredItem("Mainframe", 1L));
+        }
+        for (final dev.jsc.jscomputronics.common.network.ServerNode server : system.serversOf(net)) {
+            if (out.size() >= limit) {
+                break;
+            }
+            out.add(new StoredItem(ComputingPayloads.serverLabel(level, server.nodeUuid()) + " (server)", 1L));
+        }
+        for (final var pc : system.personalComputersOf(net)) {
+            if (out.size() >= limit) {
+                break;
+            }
+            out.add(new StoredItem("PC-"
+                    + dev.jsc.jscomputronics.common.util.ShortId.of(pc.nodeUuid().asString()) + " (pc)", 1L));
+        }
+        for (final var cc : system.craftingComputersOf(net)) {
+            if (out.size() >= limit) {
+                break;
+            }
+            out.add(new StoredItem("CC-"
+                    + dev.jsc.jscomputronics.common.util.ShortId.of(cc.nodeUuid().asString()) + " (crafting)", 1L));
+        }
+        return out;
+    }
+
+    /** One row per craftable recipe known to the network: the result item and its output count. */
+    private List<StoredItem> queryRecipes(final int limit) {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return List.of();
+        }
+        final List<StoredItem> out = new ArrayList<>();
+        for (final var pattern : mainframe.networkPatterns()) {
+            if (out.size() >= limit) {
+                break;
+            }
+            final net.minecraft.world.item.ItemStack result = pattern.result();
+            out.add(new StoredItem(result.getHoverName().getString(), result.getCount()));
+        }
+        return out;
+    }
+
+    /** One row per server: its label and the total item count it stores. */
+    private List<StoredItem> queryServers(final int limit) {
+        final NetworkUuid net = host.networkUuid();
+        if (net == null) {
+            return List.of();
+        }
+        final List<StoredItem> out = new ArrayList<>();
+        for (final dev.jsc.jscomputronics.common.network.ServerNode srv
+                : NetworkSystem.get(level).serversOf(net)) {
+            final long used = NetworkStorage.ofServers(level, java.util.List.of(srv.nodeUuid()))
+                    .query().values().stream().mapToLong(Long::longValue).sum();
+            out.add(new StoredItem(ComputingPayloads.serverLabel(level, srv.nodeUuid()), used));
+            if (out.size() >= limit) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /** One row per in-flight operation: a "VERB item" label and how much it has moved so far. */
+    private List<StoredItem> queryOperations(final int limit) {
+        final List<StoredItem> out = new ArrayList<>();
+        for (final ActiveOp op : activeOps()) {
+            out.add(new StoredItem(op.type() + " " + op.item(), op.progress()));
+            if (out.size() >= limit) {
+                break;
+            }
+        }
+        return out;
     }
 
     @Override
@@ -185,11 +341,11 @@ public final class ServerCliComputer implements CliComputer {
         if (mainframe == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        final var op = mainframe.submitNetworkSelect(key, quantity, host.localStorage(), "cli");
+        final var op = mainframe.submitNetworkSelect(key, demand(quantity), host.localStorage(), "cli");
         if (op == null) {
             return OpResult.fail("could not start the SELECT");
         }
-        return OpResult.ok("SELECT queued: " + quantity + " " + key.displayName().getString()
+        return OpResult.ok("SELECT queued: " + qtyLabel(quantity) + " " + key.displayName().getString()
                 + " -> local storage");
     }
 
@@ -203,7 +359,7 @@ public final class ServerCliComputer implements CliComputer {
         if (held <= 0L) {
             return OpResult.fail("this computer holds no " + key.displayName().getString());
         }
-        final long take = Math.min(quantity, held);
+        final long take = Math.min(demand(quantity), held);
         final long taken = host.localStore().extract(key, take);
         if (taken <= 0L) {
             return OpResult.fail("nothing to push");
@@ -233,11 +389,11 @@ public final class ServerCliComputer implements CliComputer {
         if (mainframe == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        final var op = mainframe.submitNetworkCraft(key, quantity, true, "cli");
+        final var op = mainframe.submitNetworkCraft(key, demand(quantity), true, "cli");
         if (op == null) {
             return OpResult.fail("no pattern crafts " + key.displayName().getString());
         }
-        return OpResult.ok("CRAFT queued: " + quantity + " " + key.displayName().getString());
+        return OpResult.ok("CRAFT queued: " + qtyLabel(quantity) + " " + key.displayName().getString());
     }
 
     @Override
@@ -370,8 +526,23 @@ public final class ServerCliComputer implements CliComputer {
         if (program == null) {
             return OpResult.fail("no such program: " + programId);
         }
+        if (program.id().equals(Programs.IQL_ENGINE)) {
+            // The Engine is a service on the Mainframe, not a console-local app — install it there.
+            return engineControl("install");
+        }
         if (program.preinstalled()) {
             return OpResult.fail(program.commandName() + " is pre-installed on every computer");
+        }
+        // Install economy: an app needs its physical install medium in a linked drive — you cannot conjure
+        // a program out of thin air.
+        if (!hasInstallMediumFor(program.id())) {
+            return OpResult.fail(program.commandName() + " needs its install disc in a linked drive");
+        }
+        // OS-capability gate: e.g. the NMS only runs on a full desktop OS (Panes), not MC-DOS/MC-NET.
+        if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity oc
+                && !dev.jsc.jscomputronics.module.computing.os.OsRegistry.canHostRun(
+                        oc.installedOsId(), program.id())) {
+            return OpResult.fail(program.commandName() + " needs a more capable OS (a graphical desktop)");
         }
         final ComputerConsoleState console = host.console();
         if (console == null) {
@@ -384,67 +555,318 @@ public final class ServerCliComputer implements CliComputer {
         return OpResult.ok("installed " + program.commandName());
     }
 
-    @Override
-    public dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect dialect() {
-        return ProgramSettings.sqlDialect();
+    /** Whether a media reader linked to this computer holds a PROGRAM_INSTALL medium for {@code programId}. */
+    private boolean hasInstallMediumFor(final ResourceLocation programId) {
+        if (!(host instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                .AbstractComputerBlockEntity computer)) {
+            return false;
+        }
+        for (final long endpoint : computer.linkedEndpoints()) {
+            if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
+                    instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity reader
+                    && reader.insertedKind()
+                            == dev.jsc.jscomputronics.module.computing.os.media.MediaKind.PROGRAM_INSTALL
+                    && programId.equals(reader.insertedPayload())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
-    public OpResult execute(final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation op) {
-        return switch (op.verb()) {
-            case SELECT -> select(op.item(), op.quantity());
-            case INSERT -> insert(op.item(), op.quantity());
-            case CRAFT -> craft(op.item(), op.quantity());
-            case DELETE -> executeDelete(op);
-            case MOVE -> executeMove(op);
-            case QUERY -> OpResult.fail("a query reads the network; it does not run as an operation");
+    public OpResult engineControl(final String action) {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe to host the IQL Engine");
+        }
+        return switch (action.toLowerCase(java.util.Locale.ROOT)) {
+            case "install" -> mainframe.installIqlEngine()
+                    ? OpResult.ok("IQL Engine installed on the Mainframe and started")
+                    : OpResult.fail("the IQL Engine is already installed");
+            case "start" -> mainframe.setIqlEngineRunning(true)
+                    ? OpResult.ok("IQL Engine started")
+                    : OpResult.fail(mainframe.isIqlEngineInstalled()
+                            ? "the IQL Engine is already running" : "the IQL Engine is not installed");
+            case "stop" -> mainframe.setIqlEngineRunning(false)
+                    ? OpResult.ok("IQL Engine stopped")
+                    : OpResult.fail(mainframe.isIqlEngineInstalled()
+                            ? "the IQL Engine is already stopped" : "the IQL Engine is not installed");
+            case "status", "" -> OpResult.ok("IQL Engine: " + engineState(mainframe));
+            default -> OpResult.fail("usage: iqlengine install|start|stop|status");
         };
     }
 
-    private OpResult executeDelete(final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation op) {
-        final StorageKey key = resolveKey(op.item());
-        if (key == null) {
-            return OpResult.fail("unknown item: " + op.item());
-        }
+    @Override
+    public java.util.List<ServiceStatus> services() {
         final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
         if (mainframe == null) {
-            return OpResult.fail("the network has no running Mainframe");
+            return java.util.List.of();
         }
-        // DELETE extracts and discards: a sink that accepts everything and keeps nothing.
-        final dev.jsc.jscomputronics.module.computing.storage.DataSink voidSink =
-                (k, amount, simulate) -> amount;
-        final var operation = mainframe.submitNetworkDelete(key, op.quantity(), voidSink, "cli");
-        return operation == null ? OpResult.fail("could not start the DELETE")
-                : OpResult.ok("DELETE queued: " + op.quantity() + " " + key.displayName().getString());
+        return java.util.List.of(new ServiceStatus("IQL Engine", engineState(mainframe)));
     }
 
-    private OpResult executeMove(final dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation op) {
-        final StorageKey key = resolveKey(op.item());
-        if (key == null) {
-            return OpResult.fail("unknown item: " + op.item());
+    @Override
+    public boolean iqlEngineInstalled() {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        return mainframe != null && mainframe.isIqlEngineInstalled();
+    }
+
+    private static String engineState(final MainframeBlockEntity mainframe) {
+        if (!mainframe.isIqlEngineInstalled()) {
+            return "not installed";
         }
+        return mainframe.isIqlEngineRunning() ? "running" : "stopped";
+    }
+
+    @Override
+    public OpResult execute(final IqlOperation op) {
+        return switch (op.verb()) {
+            case SELECT -> executeSelect(op);
+            case INSERT -> executeInsert(op);
+            case CRAFT -> craft(op.item(), op.quantity());
+            case DELETE -> executeDestroy(op, "DELETE");
+            case DROP -> executeDestroy(op, "DROP");
+            case MOVE -> executeMove(op);
+            case LOCK -> lock(op.item(), op.quantity());
+            case UNLOCK -> unlock(op.item());
+            case ANALYZE -> maintenance("analyze");
+            case VACUUM -> maintenance("vacuum");
+            case REINDEX -> maintenance("reindex");
+            case QUERY, COUNT -> OpResult.fail("a read does not run as an operation");
+        };
+    }
+
+    /** Safety cap on how many item types a single {@code *} operation expands to. */
+    private static final int MAX_WILDCARD_TYPES = 256;
+
+    /**
+     * The keys an operation targets: a single resolved item, or every item type in scope (the whole network, or one
+     * server) when the item is the {@code *} wildcard, capped at {@link #MAX_WILDCARD_TYPES}.
+     */
+    private List<StorageKey> keysFor(final String item, final NodeUuid scopeServer) {
+        if (IqlOperation.ANY_ITEM.equals(item)) {
+            final NetworkUuid net = host.networkUuid();
+            if (net == null) {
+                return List.of();
+            }
+            final NetworkStorage storage = scopeServer == null
+                    ? NetworkStorage.of(level, net)
+                    : NetworkStorage.ofServers(level, java.util.List.of(scopeServer));
+            return storage.query().keySet().stream().limit(MAX_WILDCARD_TYPES).toList();
+        }
+        final StorageKey key = resolveKey(item);
+        return key == null ? List.of() : List.of(key);
+    }
+
+    /** How an operation reads back: "N item types" for a {@code *}, else "qty item". */
+    private static String describe(final IqlOperation op, final List<StorageKey> keys) {
+        if (op.isAnyItem()) {
+            return keys.size() + (keys.size() == 1 ? " item type" : " item types");
+        }
+        return qtyLabel(op.quantity()) + " " + keys.get(0).displayName().getString();
+    }
+
+    /**
+     * INSERT from a named bus imports through that bus's external inventory; an INSERT with no bus source
+     * pushes this computer's local storage into the network, as it always did (the source name, if any, is
+     * then informational).
+     */
+    private OpResult executeInsert(final IqlOperation op) {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (op.from() != null && !op.from().isBlank() && mainframe != null) {
+            final dev.jsc.jscomputronics.module.computing.block.part.NamedBus.Located bus =
+                    dev.jsc.jscomputronics.module.computing.block.part.NamedBus.find(level, host.networkUuid(), op.from());
+            if (bus != null) {
+                return moveFromBus(op, mainframe, bus.port());
+            }
+        }
+        return insert(op.item(), op.quantity());
+    }
+
+    private OpResult executeSelect(final IqlOperation op) {
         final NetworkUuid net = host.networkUuid();
         final MainframeBlockEntity mainframe = mainframe(net);
         if (mainframe == null || net == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        final NodeUuid source = resolveServer(net, op.source());
-        final NodeUuid dest = resolveServer(net, op.dest());
+        NodeUuid from = null;
+        if (op.hasFrom()) {
+            from = resolveServer(net, op.from());
+            if (from == null) {
+                return OpResult.fail("no server named '" + op.from() + "'");
+            }
+        }
+        final List<StorageKey> keys = keysFor(op.item(), from);
+        if (keys.isEmpty()) {
+            return op.isAnyItem() ? OpResult.fail("nothing to select") : OpResult.fail("unknown item: " + op.item());
+        }
+        int queued = 0;
+        for (final StorageKey key : keys) {
+            // SELECT pulls from the whole network; SELECT ... FROM <server> is a move scoped to that server,
+            // both landing in this computer's local storage.
+            final var operation = from == null
+                    ? mainframe.submitNetworkSelect(key, demand(op.quantity()), host.localStorage(), "cli")
+                    : mainframe.submitNetworkMove(key, demand(op.quantity()), host.localStorage(), "cli",
+                            java.util.Set.of(from));
+            if (operation != null) {
+                queued++;
+            }
+        }
+        if (queued == 0) {
+            return OpResult.fail("could not start the SELECT");
+        }
+        return OpResult.ok("SELECT queued: " + describe(op, keys)
+                + (from == null ? "" : " from " + op.from()) + " -> local storage");
+    }
+
+    private OpResult executeDestroy(final IqlOperation op, final String verb) {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        // A DELETE that names a bus EXPORTS to that bus's external inventory (the "leaves the network" sense);
+        // a DROP, or a DELETE with no target, trashes via a sink that accepts everything and keeps nothing.
+        dev.jsc.jscomputronics.module.computing.storage.DataSink target = (k, amount, simulate) -> amount;
+        if ("DELETE".equals(verb) && op.to() != null && !op.to().isBlank()) {
+            final dev.jsc.jscomputronics.module.computing.block.part.NamedBus.Located bus =
+                    dev.jsc.jscomputronics.module.computing.block.part.NamedBus.find(level, host.networkUuid(), op.to());
+            if (bus == null) {
+                return OpResult.fail("no bus named '" + op.to() + "'");
+            }
+            target = bus.port();
+        }
+        final List<StorageKey> keys = keysFor(op.item(), null);
+        if (keys.isEmpty()) {
+            return op.isAnyItem()
+                    ? OpResult.ok("nothing to " + verb.toLowerCase(java.util.Locale.ROOT))
+                    : OpResult.fail("unknown item: " + op.item());
+        }
+        // Only act on items the network actually holds, so a repeating job's DROP/DELETE becomes a quiet
+        // no-op once the stock runs out, instead of a stream of failed operations polluting the log.
+        final java.util.Map<StorageKey, Long> stock = NetworkStorage.of(level, host.networkUuid()).query();
+        int queued = 0;
+        for (final StorageKey key : keys) {
+            if (stock.getOrDefault(key, 0L) <= 0L) {
+                continue;
+            }
+            if (mainframe.submitNetworkDelete(key, demand(op.quantity()), target, "cli") != null) {
+                queued++;
+            }
+        }
+        return queued == 0 ? OpResult.ok("nothing to " + verb.toLowerCase(java.util.Locale.ROOT))
+                : OpResult.ok(verb + " queued: " + describe(op, keys));
+    }
+
+    private OpResult executeMove(final IqlOperation op) {
+        final NetworkUuid net = host.networkUuid();
+        final MainframeBlockEntity mainframe = mainframe(net);
+        if (mainframe == null || net == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        // A named bus on either side routes through its external inventory: TO a bus EXPORTS, FROM a bus
+        // IMPORTS. Otherwise both sides name servers and it is an internal server-to-server move.
+        final dev.jsc.jscomputronics.module.computing.block.part.NamedBus.Located toBus =
+                dev.jsc.jscomputronics.module.computing.block.part.NamedBus.find(level, net, op.to());
+        if (toBus != null) {
+            return moveToBus(op, mainframe, toBus.port());
+        }
+        final dev.jsc.jscomputronics.module.computing.block.part.NamedBus.Located fromBus =
+                dev.jsc.jscomputronics.module.computing.block.part.NamedBus.find(level, net, op.from());
+        if (fromBus != null) {
+            return moveFromBus(op, mainframe, fromBus.port());
+        }
+        final NodeUuid source = resolveServer(net, op.from());
+        final NodeUuid dest = resolveServer(net, op.to());
         if (source == null) {
-            return OpResult.fail("no server named '" + op.source() + "'");
+            return OpResult.fail("no server or bus named '" + op.from() + "'");
         }
         if (dest == null) {
-            return OpResult.fail("no server named '" + op.dest() + "'");
+            return OpResult.fail("no server or bus named '" + op.to() + "'");
         }
         final dev.jsc.jscomputronics.module.computing.storage.DataSink destSink = serverSink(dest);
         if (destSink == null) {
             return OpResult.fail("the destination server is unavailable");
         }
-        final var operation = mainframe.submitNetworkMove(key, op.quantity(), destSink, "cli",
-                java.util.Set.of(source));
-        return operation == null ? OpResult.fail("could not start the MOVE")
-                : OpResult.ok("MOVE queued: " + op.quantity() + " " + key.displayName().getString()
-                        + " -> " + ComputingPayloads.serverLabel(level, dest));
+        final List<StorageKey> keys = keysFor(op.item(), source);
+        if (keys.isEmpty()) {
+            return op.isAnyItem() ? OpResult.fail("nothing to move") : OpResult.fail("unknown item: " + op.item());
+        }
+        int queued = 0;
+        for (final StorageKey key : keys) {
+            if (mainframe.submitNetworkMove(key, demand(op.quantity()), destSink, "cli",
+                    java.util.Set.of(source)) != null) {
+                queued++;
+            }
+        }
+        return queued == 0 ? OpResult.fail("could not start the MOVE")
+                : OpResult.ok("MOVE queued: " + describe(op, keys)
+                        + " " + op.from() + " -> " + ComputingPayloads.serverLabel(level, dest));
+    }
+
+    /** Network -> a named bus's external inventory: a timed export, the same path the Export Bus uses. */
+    private OpResult moveToBus(final IqlOperation op, final MainframeBlockEntity mainframe,
+                               final dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort port) {
+        if (port.isEmpty()) {
+            return OpResult.fail("the bus '" + op.to() + "' touches no inventory");
+        }
+        final List<StorageKey> keys = keysFor(op.item(), null);
+        if (keys.isEmpty()) {
+            return op.isAnyItem() ? OpResult.ok("nothing to move") : OpResult.fail("unknown item: " + op.item());
+        }
+        final java.util.Map<StorageKey, Long> stock = NetworkStorage.of(level, host.networkUuid()).query();
+        int queued = 0;
+        for (final StorageKey key : keys) {
+            if (stock.getOrDefault(key, 0L) <= 0L) {
+                continue;
+            }
+            if (mainframe.submitNetworkDelete(key, demand(op.quantity()), port, "cli") != null) {
+                queued++;
+            }
+        }
+        return queued == 0 ? OpResult.ok("nothing to move to " + op.to())
+                : OpResult.ok("MOVE queued: " + describe(op, keys) + " -> " + op.to());
+    }
+
+    /**
+     * A named bus's external inventory -> network. Pulls from the bus and inserts into the network as a
+     * timed operation; anything the network cannot hold is returned to the source, so nothing is lost.
+     */
+    private OpResult moveFromBus(final IqlOperation op, final MainframeBlockEntity mainframe,
+                                 final dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort port) {
+        if (port.isEmpty()) {
+            return OpResult.fail("the bus '" + op.from() + "' touches no inventory");
+        }
+        final List<StorageKey> keys = op.isAnyItem() ? port.available() : keysFor(op.item(), null);
+        if (keys.isEmpty()) {
+            return op.isAnyItem() ? OpResult.ok("nothing to import") : OpResult.fail("unknown item: " + op.item());
+        }
+        final long perKey = demand(op.quantity());
+        int queued = 0;
+        for (final StorageKey key : keys) {
+            final long avail = port.extract(key, perKey, true);
+            if (avail <= 0L) {
+                continue;
+            }
+            final long pulled = port.extract(key, avail, false);
+            if (pulled <= 0L) {
+                continue;
+            }
+            final dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation insert =
+                    mainframe.submitNetworkInsert(key, pulled, "cli");
+            if (insert != null) {
+                insert.onSettle(() -> {
+                    final long left = insert.leftover();
+                    if (left > 0L) {
+                        port.insert(key, left, false); // the network could not hold it all: return to the source
+                    }
+                });
+                queued++;
+            } else {
+                port.insert(key, pulled, false); // dispatch failed (engine off): put it back, lose nothing
+            }
+        }
+        return queued == 0 ? OpResult.ok("nothing to import from " + op.from())
+                : OpResult.ok("MOVE queued: import from " + op.from());
     }
 
     private NodeUuid resolveServer(final NetworkUuid net, final String name) {
@@ -499,6 +921,16 @@ public final class ServerCliComputer implements CliComputer {
         return BuiltInRegistries.ITEM.getOptional(location).orElse(null);
     }
 
+    /** Resolves a parsed quantity to a concrete demand: ALL or unspecified means "as much as possible". */
+    private static long demand(final long quantity) {
+        return quantity <= 0L ? Long.MAX_VALUE : quantity;
+    }
+
+    /** How a quantity reads back to the player: a real count, or {@code "all"} for ALL/unspecified. */
+    private static String qtyLabel(final long quantity) {
+        return quantity <= 0L ? "all" : Long.toString(quantity);
+    }
+
     private static String opType(final byte type) {
         return switch (type) {
             case OperationRecord.TYPE_SELECT -> "SELECT";
@@ -526,5 +958,168 @@ public final class ServerCliComputer implements CliComputer {
             case OperationRecord.STATUS_DISCARDED -> "discarded";
             default -> "?";
         };
+    }
+
+    // --- filesystem -------------------------------------------------------------------------------
+
+    /**
+     * Resolved system-disk context: the disk {@link ItemStack} held by the hardware inventory and
+     * the filesystem kind derived from the installed OS kernel.
+     */
+    private record DiskCtx(ItemStack disk, FilesystemKind kind) {}
+
+    /**
+     * Resolves the host's system disk and filesystem kind, or {@code null} when no bootable disk
+     * is present, the OS has no known kernel, or the kernel's filesystem is {@link FilesystemKind#NONE}.
+     */
+    private DiskCtx resolveDiskCtx() {
+        if (!(hostBlock instanceof AbstractComputerBlockEntity computer)) {
+            return null;
+        }
+        final ItemStack disk = computer.systemDisk();
+        if (disk.isEmpty()) {
+            return null;
+        }
+        final OsDef os = computer.installedOs();
+        if (os == null) {
+            return null;
+        }
+        final KernelDef kernel = OsRegistry.getKernel(os.kernelId());
+        final FilesystemKind kind = kernel != null ? kernel.filesystem() : FilesystemKind.NONE;
+        if (kind == FilesystemKind.NONE) {
+            return null;
+        }
+        return new DiskCtx(disk, kind);
+    }
+
+    @Override
+    public FsResult listDisk(final String dir) {
+        final DiskCtx ctx = resolveDiskCtx();
+        if (ctx == null) {
+            return FsResult.noOs();
+        }
+        final List<DiskFilesystem.FileEntry> raw = DiskFilesystem.list(ctx.disk(), dir, ctx.kind());
+        final List<FsEntry> entries = new ArrayList<>(raw.size());
+        for (final DiskFilesystem.FileEntry e : raw) {
+            entries.add(new FsEntry(e.path(), e.type().extension(), e.weight(), e.readOnly()));
+        }
+        return FsResult.listing(entries);
+    }
+
+    @Override
+    public FsResult readFile(final String path) {
+        final DiskCtx ctx = resolveDiskCtx();
+        if (ctx == null) {
+            return FsResult.noOs();
+        }
+        final java.util.Optional<String> content = DiskFilesystem.read(ctx.disk(), path);
+        if (content.isEmpty()) {
+            // Distinguish a .dat rejection from a plain missing file for a cleaner error.
+            final List<DiskFilesystem.FileEntry> all = DiskFilesystem.list(ctx.disk(), "", ctx.kind());
+            final boolean isDat = all.stream().anyMatch(e -> e.path().equals(path) && e.readOnly());
+            if (isDat) {
+                return FsResult.fail(path + ": .dat files are read-only (use the Network Interactor to access items)");
+            }
+            return FsResult.fail(path + ": file not found");
+        }
+        return FsResult.content(content.get());
+    }
+
+    @Override
+    public FsResult deleteFile(final String path) {
+        final DiskCtx ctx = resolveDiskCtx();
+        if (ctx == null) {
+            return FsResult.noOs();
+        }
+        // Reject .dat entries before attempting deletion so we surface a clear message.
+        final List<DiskFilesystem.FileEntry> all = DiskFilesystem.list(ctx.disk(), "", ctx.kind());
+        final boolean isDat = all.stream().anyMatch(e -> e.path().equals(path) && e.readOnly());
+        if (isDat) {
+            return FsResult.fail(path + ": .dat files cannot be deleted (use the Network Interactor)");
+        }
+        final boolean deleted = DiskFilesystem.delete(ctx.disk(), path);
+        if (!deleted) {
+            return FsResult.fail(path + ": file not found");
+        }
+        // DiskFilesystem.delete mutated the component in-place on the stack that is stored inside
+        // the AbstractComputerBlockEntity's ItemStackHandler. Mark the BE dirty so NBT is saved.
+        if (hostBlock instanceof AbstractComputerBlockEntity computer) {
+            computer.setChanged();
+        }
+        return FsResult.ok("deleted " + path);
+    }
+
+    @Override
+    public FsResult runScript(final String path) {
+        final DiskCtx ctx = resolveDiskCtx();
+        if (ctx == null) {
+            return FsResult.noOs();
+        }
+        // Check the extension first so the error names the right problem.
+        final String ext = extensionOf(path);
+        if (!"iql".equalsIgnoreCase(ext)) {
+            return FsResult.fail(path + ": only .iql files can be run (got ." + (ext.isEmpty() ? "<none>" : ext) + ")");
+        }
+        final java.util.Optional<String> content = DiskFilesystem.read(ctx.disk(), path);
+        if (content.isEmpty()) {
+            return FsResult.fail(path + ": file not found");
+        }
+        // Parse and dispatch through the exact same path the 'operation' command uses.
+        final IqlParseResult parsed = IqlParser.tryParse(content.get().trim());
+        if (!parsed.ok()) {
+            return FsResult.fail(path + ": syntax error: " + parsed.error());
+        }
+        final IqlOperation op = parsed.operation();
+        // QUERY/COUNT are read operations that produce rows, not timed operations; they cannot be
+        // dispatched via execute(). The caller should use 'operation' for those.
+        if (op.verb() == IqlVerb.QUERY || op.verb() == IqlVerb.COUNT) {
+            return FsResult.fail(path + ": QUERY/COUNT are not supported by 'run' — use 'operation' instead");
+        }
+        final OpResult result = execute(op);
+        return FsResult.iqlResult(result);
+    }
+
+    @Override
+    public FsResult writeFile(final String path, final String content) {
+        final DiskCtx ctx = resolveDiskCtx();
+        if (ctx == null) {
+            return FsResult.noOs();
+        }
+        final FileType type = FileType.fromExtension(extensionOf(path)).orElse(null);
+        if (type == null) {
+            return FsResult.fail(path + ": unknown file type (use .txt/.iql/.cfg/.csv/.cmd)");
+        }
+        if (!type.userEditable()) {
+            return FsResult.fail(path + ": ." + type.extension() + " files cannot be edited");
+        }
+        // Free space available, crediting back the file being overwritten so a same-size rewrite fits.
+        long freeWeight = 0L;
+        if (hostBlock instanceof AbstractComputerBlockEntity computer) {
+            freeWeight = computer.systemDiskFreeWeight();
+        }
+        final long oldWeight = DiskFilesystem.read(ctx.disk(), path)
+                .map(c -> FsPaths.sizeMbEq(c.getBytes(java.nio.charset.StandardCharsets.UTF_8).length))
+                .orElse(0L);
+        final DiskFilesystem.WriteResult result = DiskFilesystem.write(
+                ctx.disk(), path, type, content, freeWeight + oldWeight, ctx.kind());
+        return switch (result) {
+            case OK -> {
+                if (hostBlock instanceof AbstractComputerBlockEntity computer) {
+                    computer.setChanged();
+                }
+                yield FsResult.ok("wrote " + path);
+            }
+            case INVALID_PATH -> FsResult.fail(path + ": invalid file name for this filesystem");
+            case DISK_FULL -> FsResult.fail(path + ": not enough free space on the disk");
+            case READ_ONLY -> FsResult.fail(path + ": ." + type.extension() + " is read-only");
+        };
+    }
+
+    /** Returns the lowercase extension of a file path (after the last dot), or {@code ""} if none. */
+    private static String extensionOf(final String path) {
+        final int dot = path.lastIndexOf('.');
+        return dot >= 0 && dot < path.length() - 1
+                ? path.substring(dot + 1).toLowerCase(java.util.Locale.ROOT)
+                : "";
     }
 }

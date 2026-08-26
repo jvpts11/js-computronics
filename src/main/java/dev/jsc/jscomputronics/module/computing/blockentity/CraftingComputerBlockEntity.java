@@ -26,7 +26,8 @@ import java.util.Set;
 /**
  * The Crafting Computer: a Category-C computer that executes crafting recipes for the network.
  */
-public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
+public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
+        implements dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost {
 
     // Slot layout — an ATX board: one CPU, four RAM, four PCIe (GPU and/or Crafting Card), one PSU,
     // two disks. Kept public so the assembly Menu and Screen address slots by name.
@@ -53,8 +54,31 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
 
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        // A Crafting Computer is a PC-class machine: it takes the consumer ATX board of every shipped era.
-        return Set.of(FormFactor.ATX);
+        // A Crafting Computer is a PC-class machine: each era takes its own consumer form factor —
+        // Vintage on Baby-AT/AT, Legacy and Standard on ATX.
+        return switch (blockEra()) {
+            case VINTAGE -> Set.of(FormFactor.BABY_AT, FormFactor.AT);
+            default -> Set.of(FormFactor.ATX);
+        };
+    }
+
+    @Override
+    protected dev.jsc.jscomputronics.common.tier.HardwareEra requiredBoardEra() {
+        // A Crafting Computer accepts only a board of its own era, so a Legacy and a Standard ATX board
+        // are not interchangeable: each installs in its matching machine alone.
+        return blockEra();
+    }
+
+    /**
+     * The era this Crafting Computer belongs to, read from its block. Defaults to Standard for any block that
+     * is not a {@link dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock} (never happens in
+     * practice, but keeps the read total).
+     */
+    private dev.jsc.jscomputronics.common.tier.HardwareEra blockEra() {
+        return getBlockState().getBlock()
+                instanceof dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock cc
+                ? cc.era()
+                : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
     }
 
     public static void serverTick(final Level level, final BlockPos pos,
@@ -126,8 +150,104 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
     private final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> rom =
             new java.util.ArrayList<>();
 
+    // Machine recipes (processing / multi-stage) share the ROM's slot budget but live in their own list, so the
+    // bench-craft path stays untouched. Both count toward RECIPE_ROM_LIMIT.
+    private final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe> machineRecipes =
+            new java.util.ArrayList<>();
+
     public int romUsed() {
-        return rom.size();
+        return rom.size() + machineRecipes.size();
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe> machineRecipes() {
+        return java.util.Collections.unmodifiableList(machineRecipes);
+    }
+
+    public boolean loadMachineRecipe(final dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe recipe) {
+        if (romUsed() >= RECIPE_ROM_LIMIT) {
+            return false;
+        }
+        for (final var existing : machineRecipes) {
+            if (existing.sameRecipe(recipe)) {
+                return false;
+            }
+        }
+        machineRecipes.add(recipe);
+        setChanged();
+        return true;
+    }
+
+    public void removeMachineRecipe(final int index) {
+        if (index >= 0 && index < machineRecipes.size()) {
+            machineRecipes.remove(index);
+            setChanged();
+        }
+    }
+
+    /**
+     * Per-machine concurrency settings the Machines tab edits and the engine honors: how many processing jobs
+     * may run on a machine at once, whether it is paused, and whether to fill it rather than feed one lot.
+     */
+    public record MachineConfig(int maxJobs, boolean locked, boolean feedMax) {
+        public static final MachineConfig DEFAULT = new MachineConfig(1, false, false);
+
+        public MachineConfig {
+            maxJobs = Math.max(1, maxJobs);
+        }
+    }
+
+    // Keyed by the machine's name or registry-id (the same key a ProcessingPattern.machineType resolves to).
+    private final java.util.Map<String, MachineConfig> machineConfigs = new java.util.HashMap<>();
+
+    public MachineConfig machineConfig(final String machineKey) {
+        return machineConfigs.getOrDefault(machineKey, MachineConfig.DEFAULT);
+    }
+
+    public void setMachineConfig(final String machineKey, final MachineConfig config) {
+        if (machineKey == null || machineKey.isBlank() || config == null) {
+            return;
+        }
+        machineConfigs.put(machineKey, config);
+        setChanged();
+    }
+
+    /**
+     * Machines offered by the Crafting Switches wired to this computer over crafting cable, discovered by a BFS
+     * through that cable (the mirror of how a switch finds its computer). The engine routes a processing
+     * pattern's machine type/name to one of these to deliver inputs and collect outputs.
+     */
+    public java.util.List<CraftingSwitchBlockEntity.DeclaredMachine> availableMachines() {
+        final java.util.List<CraftingSwitchBlockEntity.DeclaredMachine> out = new java.util.ArrayList<>();
+        if (!(level instanceof net.minecraft.server.level.ServerLevel)) {
+            return out;
+        }
+        final java.util.Set<net.minecraft.core.BlockPos> visited = new java.util.HashSet<>();
+        final java.util.Deque<net.minecraft.core.BlockPos> queue = new java.util.ArrayDeque<>();
+        for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+            final net.minecraft.core.BlockPos n = worldPosition.relative(d);
+            if (visited.add(n)) {
+                queue.add(n);
+            }
+        }
+        int steps = 0;
+        while (!queue.isEmpty() && steps++ < 128) {
+            final net.minecraft.core.BlockPos current = queue.poll();
+            if (level.getBlockEntity(current) instanceof CraftingSwitchBlockEntity sw) {
+                out.addAll(sw.declaredMachines());
+                continue; // a switch terminates the search; do not cross it
+            }
+            if (level.getBlockState(current).getBlock()
+                    instanceof dev.jsc.jscomputronics.module.computing.block.DataCableBlock cable
+                    && cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.CRAFTING) {
+                for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
+                    final net.minecraft.core.BlockPos nb = current.relative(d);
+                    if (visited.add(nb)) {
+                        queue.add(nb);
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> romPatterns() {
@@ -144,7 +264,8 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
     }
 
     public boolean loadPattern(final dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern pattern) {
-        if (rom.size() >= RECIPE_ROM_LIMIT || romContains(pattern)) {
+        // romUsed(), not rom.size(): bench and machine recipes share the one ROM budget.
+        if (romUsed() >= RECIPE_ROM_LIMIT || romContains(pattern)) {
             return false;
         }
         rom.add(pattern);
@@ -169,6 +290,24 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
                     .resultOrPartial(error -> JsComputronics.LOGGER.warn("Failed to save Recipe ROM: {}", error))
                     .ifPresent(encoded -> tag.put("RecipeRom", encoded));
         }
+        if (!machineRecipes.isEmpty()) {
+            final var ops = net.minecraft.resources.RegistryOps.create(net.minecraft.nbt.NbtOps.INSTANCE, registries);
+            dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe.CODEC.listOf()
+                    .encodeStart(ops, machineRecipes)
+                    .resultOrPartial(error -> JsComputronics.LOGGER.warn("Failed to save machine ROM: {}", error))
+                    .ifPresent(encoded -> tag.put("MachineRom", encoded));
+        }
+        if (!machineConfigs.isEmpty()) {
+            final net.minecraft.nbt.CompoundTag configs = new net.minecraft.nbt.CompoundTag();
+            machineConfigs.forEach((key, cfg) -> {
+                final net.minecraft.nbt.CompoundTag c = new net.minecraft.nbt.CompoundTag();
+                c.putInt("MaxJobs", cfg.maxJobs());
+                c.putBoolean("Locked", cfg.locked());
+                c.putBoolean("FeedMax", cfg.feedMax());
+                configs.put(key, c);
+            });
+            tag.put("MachineConfigs", configs);
+        }
     }
 
     @Override
@@ -181,6 +320,23 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
                     .parse(ops, tag.get("RecipeRom"))
                     .resultOrPartial(error -> JsComputronics.LOGGER.warn("Failed to load Recipe ROM: {}", error))
                     .ifPresent(rom::addAll);
+        }
+        machineRecipes.clear();
+        if (tag.contains("MachineRom")) {
+            final var ops = net.minecraft.resources.RegistryOps.create(net.minecraft.nbt.NbtOps.INSTANCE, registries);
+            dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe.CODEC.listOf()
+                    .parse(ops, tag.get("MachineRom"))
+                    .resultOrPartial(error -> JsComputronics.LOGGER.warn("Failed to load machine ROM: {}", error))
+                    .ifPresent(machineRecipes::addAll);
+        }
+        machineConfigs.clear();
+        if (tag.contains("MachineConfigs")) {
+            final net.minecraft.nbt.CompoundTag configs = tag.getCompound("MachineConfigs");
+            for (final String key : configs.getAllKeys()) {
+                final net.minecraft.nbt.CompoundTag c = configs.getCompound(key);
+                machineConfigs.put(key, new MachineConfig(
+                        c.getInt("MaxJobs"), c.getBoolean("Locked"), c.getBoolean("FeedMax")));
+            }
         }
     }
 
@@ -239,5 +395,87 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity {
 
     public net.minecraft.world.inventory.ContainerData getDataAccess() {
         return dataAccess;
+    }
+
+    // ComputerTerminalHost — read-only monitoring so the Network Interactor works on a Crafting Computer
+    // (the storage/hardware getters are inherited from the base; only these computer-semantic ones differ).
+
+    @Override
+    public boolean computerRunning() {
+        return isRunning();
+    }
+
+    @Override
+    public boolean computerBuildValid() {
+        return buildValid();
+    }
+
+    @Override
+    public int networkLinkState() {
+        return networkUuid != null ? 1 : 0; // a Crafting Computer never conflicts; it only reads a network
+    }
+
+    @Override
+    public long orchestrationCapacity() {
+        return capacity();
+    }
+
+    @Override
+    public int computerQueues() {
+        return isRunning() ? 1 : 0;
+    }
+
+    @Override
+    public long computerRamBuffer() {
+        return ramBuffer();
+    }
+
+    @Override
+    public boolean isMainframeHost() {
+        return false;
+    }
+
+    @Override
+    public int networkServerCount() {
+        if (networkUuid == null || !(level instanceof ServerLevel serverLevel)) {
+            return 0;
+        }
+        return NetworkSystem.get(serverLevel).serversOf(networkUuid).size();
+    }
+
+    @Override
+    public dev.jsc.jscomputronics.module.computing.storage.LocalStore localStore() {
+        final java.util.List<net.minecraft.world.item.ItemStack> disks = new java.util.ArrayList<>(DISK_SLOTS);
+        for (int i = 0; i < DISK_SLOTS; i++) {
+            disks.add(getHardware().getStackInSlot(DISK_SLOTS_START + i));
+        }
+        return new dev.jsc.jscomputronics.module.computing.storage.LocalStore(disks, this::setChanged);
+    }
+
+    /** Net local-storage capacity in item-equivalents, after the installed OS footprint. */
+    private long netStorageItems() {
+        final ComputerBuild build = currentBuild();
+        return build == null ? 0L : Math.max(0L, build.totalStorageItems() - reservedByOs());
+    }
+
+    @Override
+    public int usableStorageSlots() {
+        final long capacity = netStorageItems();
+        return capacity <= 0 ? 0 : (int) Math.min(18, (capacity + 63) / 64);
+    }
+
+    @Override
+    public long localStorageUsed() {
+        return localStore().used();
+    }
+
+    @Override
+    public long localStorageCapacity() {
+        return netStorageItems();
+    }
+
+    @Override
+    public dev.jsc.jscomputronics.module.computing.storage.DataSink localStorage() {
+        return new dev.jsc.jscomputronics.module.computing.storage.StoreSink(localStore());
     }
 }

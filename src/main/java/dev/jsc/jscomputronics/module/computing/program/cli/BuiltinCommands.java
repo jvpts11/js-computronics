@@ -7,9 +7,11 @@
  */
 package dev.jsc.jscomputronics.module.computing.program.cli;
 
-import dev.jsc.jscomputronics.module.computing.program.sql.SqlOperation;
-import dev.jsc.jscomputronics.module.computing.program.sql.SqlParseResult;
-import dev.jsc.jscomputronics.module.computing.program.sql.SqlParser;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlCondition;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlOperation;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlParseResult;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlParser;
+import dev.jsc.jscomputronics.module.computing.program.iql.IqlVerb;
 
 import java.util.List;
 import java.util.Locale;
@@ -41,9 +43,17 @@ public final class BuiltinCommands {
                 new Devices(),
                 new ProgramsList(),
                 new Install(),
+                new Store(),
+                new IqlEngineCommand(),
+                new Services(),
                 new Maint("analyze", "analyze"),
                 new Maint("reindex", "reindex"),
-                new Maint("vacuum", "vacuum"));
+                new Maint("vacuum", "vacuum"),
+                new Dir(),
+                new Type(),
+                new Del(),
+                new Write(),
+                new Run());
     }
 
     private static String group(final long n) {
@@ -85,7 +95,9 @@ public final class BuiltinCommands {
             }
             ctx.out().header("commands");
             for (final CliCommand command : ctx.shell().commands()) {
-                ctx.out().row("  " + command.name(), command.summary());
+                if (command.available(ctx.computer())) {
+                    ctx.out().row("  " + command.name(), command.summary());
+                }
             }
             ctx.out().blank();
             ctx.out().dim("'help <command>' for details");
@@ -427,7 +439,7 @@ public final class BuiltinCommands {
         }
 
         @Override public String summary() {
-            return "run an SQL-style operation on the network";
+            return "run an IQL statement on the network";
         }
 
         @Override public String usage() {
@@ -439,25 +451,27 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: operation <statement>   e.g. operation SELECT 64 Cobblestone");
                 return;
             }
-            final SqlParseResult parsed = SqlParser.parse(ctx.rest(0), ctx.computer().dialect());
+            final IqlParseResult parsed = IqlParser.tryParse(ctx.rest(0));
             if (!parsed.ok()) {
                 ctx.out().error("syntax: " + parsed.error());
                 return;
             }
-            final SqlOperation op = parsed.operation();
-            if (op.verb() == SqlOperation.Verb.QUERY) {
+            final IqlOperation op = parsed.operation();
+            if (op.verb() == IqlVerb.QUERY || op.verb() == IqlVerb.COUNT) {
                 if (!ctx.computer().onNetwork()) {
                     ctx.out().error("not on a network");
                     return;
                 }
                 final int limit = op.limit() > 0 ? op.limit() : QUERY_LIMIT;
-                final List<CliComputer.StoredItem> items = ctx.computer().query(op.item(), op.source(), limit);
+                final List<CliComputer.StoredItem> items = ctx.computer().queryObject(op.item(),
+                        op.where(), "", limit);
                 if (items.isEmpty()) {
                     ctx.out().dim("no rows");
                     return;
                 }
                 for (final CliComputer.StoredItem item : items) {
-                    ctx.out().row(item.name(), group(item.quantity()));
+                    ctx.out().row(item.detail().isEmpty() ? item.name() : item.name() + " · " + item.detail(),
+                            group(item.quantity()));
                 }
                 return;
             }
@@ -489,6 +503,91 @@ public final class BuiltinCommands {
         }
     }
 
+    static final class Store implements CliCommand {
+        @Override public String name() {
+            return "store";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("available");
+        }
+
+        @Override public String summary() {
+            return "list programs you can install on this computer";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            boolean any = false;
+            for (final dev.jsc.jscomputronics.module.computing.program.Program program
+                    : dev.jsc.jscomputronics.module.computing.program.Programs.all()) {
+                if (program.preinstalled()) {
+                    continue;
+                }
+                ctx.out().row("  " + program.commandName(), "install " + program.commandName());
+                any = true;
+            }
+            if (!any) {
+                ctx.out().dim("nothing else to install");
+            }
+        }
+    }
+
+    static final class IqlEngineCommand implements CliCommand {
+        @Override public String name() {
+            return "iqlengine";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("engine");
+        }
+
+        @Override public String summary() {
+            return "start/stop the network's IQL Engine service";
+        }
+
+        @Override public String usage() {
+            return "start|stop|status";
+        }
+
+        @Override public boolean available(final CliComputer computer) {
+            return computer.iqlEngineInstalled(); // shown only after 'install iqlengine'
+        }
+
+        @Override public void run(final CliContext ctx) {
+            final CliComputer.OpResult result = ctx.computer().engineControl(ctx.hasArgs() ? ctx.arg(0) : "status");
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    static final class Services implements CliCommand {
+        @Override public String name() {
+            return "services";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("ps");
+        }
+
+        @Override public String summary() {
+            return "list the network's services and their state";
+        }
+
+        @Override public boolean available(final CliComputer computer) {
+            return computer.iqlEngineInstalled();
+        }
+
+        @Override public void run(final CliContext ctx) {
+            final List<CliComputer.ServiceStatus> services = ctx.computer().services();
+            if (services.isEmpty()) {
+                ctx.out().dim("no services");
+                return;
+            }
+            for (final CliComputer.ServiceStatus service : services) {
+                ctx.out().row("  " + service.name(), service.state());
+            }
+        }
+    }
+
     static final class Maint implements CliCommand {
         private final String verb;
         private final String action;
@@ -509,6 +608,163 @@ public final class BuiltinCommands {
         @Override public void run(final CliContext ctx) {
             final CliComputer.OpResult result = ctx.computer().maintenance(action);
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    // --- filesystem -------------------------------------------------------------------------------
+
+    /**
+     * Lists the files on the system disk. Each entry shows the file name, its size in mB-equivalents,
+     * and a {@code [RO]} marker for read-only {@code .dat} projection entries.
+     */
+    static final class Dir implements CliCommand {
+        @Override public String name() { return "dir"; }
+
+        @Override public List<String> aliases() { return List.of("ls"); }
+
+        @Override public String summary() { return "list files on the system disk"; }
+
+        @Override public String usage() { return "[directory]"; }
+
+        @Override public void run(final CliContext ctx) {
+            final String dir = ctx.hasArgs() ? ctx.arg(0) : "";
+            final CliComputer.FsResult result = ctx.computer().listDisk(dir);
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            final List<CliComputer.FsEntry> entries = result.entries();
+            if (entries.isEmpty()) {
+                ctx.out().dim("(no files)");
+                return;
+            }
+            for (final CliComputer.FsEntry entry : entries) {
+                final String label = entry.path() + "." + entry.ext()
+                        + (entry.readOnly() ? "  [RO]" : "");
+                ctx.out().row(label, entry.weightMbEq() + " mB");
+            }
+            ctx.out().blank();
+            ctx.out().dim(entries.size() + (entries.size() == 1 ? " file" : " files"));
+        }
+    }
+
+    /**
+     * Prints the content of a file on the system disk to the console.
+     * Refuses to open {@code .dat} (read-only storage projections).
+     */
+    static final class Type implements CliCommand {
+        @Override public String name() { return "type"; }
+
+        @Override public List<String> aliases() { return List.of("cat"); }
+
+        @Override public String summary() { return "print the content of a file"; }
+
+        @Override public String usage() { return "<file>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: type <file>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().readFile(ctx.arg(0));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            // Print each line of the file content as a plain output line.
+            final String content = result.message();
+            if (content.isEmpty()) {
+                ctx.out().dim("(empty file)");
+                return;
+            }
+            for (final String line : content.split("\n", -1)) {
+                ctx.out().line(line);
+            }
+        }
+    }
+
+    /**
+     * Deletes a file from the system disk. Refuses to delete {@code .dat} storage projections;
+     * use the Network Interactor to move items out of disk storage.
+     */
+    static final class Del implements CliCommand {
+        @Override public String name() { return "del"; }
+
+        @Override public List<String> aliases() { return List.of("rm"); }
+
+        @Override public String summary() { return "delete a file from the system disk"; }
+
+        @Override public String usage() { return "<file>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: del <file>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().deleteFile(ctx.arg(0));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            ctx.out().styled(result.message(), CliStyle.OK);
+        }
+    }
+
+    /**
+     * Creates or overwrites a file on the system disk with the given text. The file type is inferred
+     * from the extension; non-editable types ({@code .dat}, {@code .log}) are refused.
+     */
+    static final class Write implements CliCommand {
+        @Override public String name() { return "write"; }
+
+        @Override public List<String> aliases() { return List.of("save"); }
+
+        @Override public String summary() { return "create or overwrite a file on the system disk"; }
+
+        @Override public String usage() { return "<file> <text...>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (ctx.argCount() < 1) {
+                ctx.out().error("usage: write <file> <text...>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().writeFile(ctx.arg(0), ctx.rest(1));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            ctx.out().styled(result.message(), CliStyle.OK);
+        }
+    }
+
+    /**
+     * Reads a {@code .iql} file from the system disk and executes it as an IQL statement, routing
+     * through the same dispatch path as the {@code operation} command.
+     */
+    static final class Run implements CliCommand {
+        @Override public String name() { return "run"; }
+
+        @Override public String summary() { return "execute an .iql script from the system disk"; }
+
+        @Override public String usage() { return "<file.iql>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: run <file.iql>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().runScript(ctx.arg(0));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            // Forward the underlying OpResult style: OK in green, fail in red.
+            final CliComputer.OpResult op = result.opResult();
+            if (op != null) {
+                ctx.out().styled(op.message(), op.ok() ? CliStyle.OK : CliStyle.ERROR);
+            } else {
+                ctx.out().styled(result.message(), CliStyle.OK);
+            }
         }
     }
 }

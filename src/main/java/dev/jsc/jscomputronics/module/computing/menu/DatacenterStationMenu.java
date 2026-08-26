@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.menu;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
 import dev.jsc.jscomputronics.module.computing.datacenter.LoadBalanceMode;
+import dev.jsc.jscomputronics.module.computing.gui.layout.DatacenterStationLayout;
 import dev.jsc.jscomputronics.module.computing.operation.payload.DatacenterSnapshotPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry;
 import net.minecraft.core.BlockPos;
@@ -26,9 +27,10 @@ import java.util.List;
  */
 public class DatacenterStationMenu extends AbstractComputerMenu {
 
-    public static final int INV_X = 34;
-    public static final int INV_Y = 170;
-    public static final int HOTBAR_Y = 228;
+    // Inventory positions come from DatacenterStationLayout, the single source the layout test validates.
+    public static final int INV_X = DatacenterStationLayout.INV_X;
+    public static final int INV_Y = DatacenterStationLayout.INV_Y;
+    public static final int HOTBAR_Y = DatacenterStationLayout.HOTBAR_Y;
 
     private final BlockPos stationPos;
     private final ContainerLevelAccess access;

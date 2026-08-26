@@ -80,6 +80,20 @@ public class CablePartItem extends Item {
             return InteractionResult.PASS; // every candidate face is taken
         }
         final Level level = context.getLevel();
+        // Crafting buses belong on crafting cables and storage buses on data cables. A storage bus on a
+        // crafting cable would autonomously move items the crafting engine is accounting for (and vice versa
+        // the crafting buses are inert), so a mismatched mount is refused with a hint instead.
+        final boolean craftingPart = type == CablePartType.INPUT || type == CablePartType.RECEIVING;
+        final boolean craftingCable =
+                cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.CRAFTING;
+        if (craftingPart != craftingCable) {
+            if (!level.isClientSide() && context.getPlayer() != null) {
+                context.getPlayer().displayClientMessage(net.minecraft.network.chat.Component.literal(
+                        craftingPart ? "Crafting buses mount on crafting cables"
+                                : "Storage buses mount on data cables"), true);
+            }
+            return InteractionResult.FAIL;
+        }
         if (!level.isClientSide()) {
             cable.addPart(face, type.create());
             level.playSound(null, cable.getBlockPos(), SoundType.METAL.getPlaceSound(),

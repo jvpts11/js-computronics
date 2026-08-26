@@ -29,11 +29,25 @@ public final class Programs {
     public static final ResourceLocation NMS =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");
 
+    /** The IQL Engine: a background service installed on the Mainframe (the network's "SQL Server"). */
+    public static final ResourceLocation IQL_ENGINE =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "iqlengine");
+
+    /**
+     * The Crafting Manager: the desktop app that moves {@code .craft} recipe files between removable
+     * media and a Crafting Computer's recipe store. It installs only on a Crafting Computer (the
+     * install is rejected elsewhere) and needs a Crafting Card to actually run its actions.
+     */
+    public static final ResourceLocation CRAFTING_MANAGER =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "crafting_manager");
+
     private static final Map<ResourceLocation, Program> REGISTERED = new LinkedHashMap<>();
 
     static {
         register(new Program(COMMAND_PROMPT, "cmd", "program.jsc.command_prompt", true));
         register(new Program(NMS, "nms", "program.jsc.nms", false));
+        register(new Program(IQL_ENGINE, "iqlengine", "program.jsc.iqlengine", false));
+        register(new Program(CRAFTING_MANAGER, "craftmgr", "program.jsc.crafting_manager", false));
     }
 
     private Programs() {

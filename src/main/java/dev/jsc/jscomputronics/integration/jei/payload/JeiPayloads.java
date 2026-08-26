@@ -39,6 +39,31 @@ public final class JeiPayloads {
                 SetPatternPayload.TYPE,
                 SetPatternPayload.STREAM_CODEC,
                 JeiPayloads::handleSetPattern);
+        event.registrar("1").playToServer(
+                SetProcessingPatternPayload.TYPE,
+                SetProcessingPatternPayload.STREAM_CODEC,
+                JeiPayloads::handleSetProcessingPattern);
+    }
+
+    private static void handleSetProcessingPattern(
+            final SetProcessingPatternPayload payload,
+            final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            // Same trust model as handleSetPattern: the open, still-valid menu decides which encoder is written.
+            if (!(player.containerMenu instanceof PatternEncoderMenu menu)
+                    || !menu.stillValid(player)) {
+                return;
+            }
+            if (!(player.serverLevel().getBlockEntity(menu.blockEntityPos())
+                    instanceof PatternEncoderBlockEntity be)) {
+                return;
+            }
+            be.applyProcessingRecipe(payload.inputs(), payload.outputs());
+            menu.setActiveTab(PatternEncoderMenu.TAB_PROCESSING);
+        });
     }
 
     private static void handleSetPattern(

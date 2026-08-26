@@ -62,11 +62,19 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/hbw_cable_core")));
         getBuilder("hpc_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/hpc_cable_core")));
+        getBuilder("crafting_cable")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/crafting_cable_core")));
+        getBuilder("crafting_switch")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/crafting_switch")));
         getBuilder("peripheral_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/peripheral_cable_core")));
 
         getBuilder("mainframe")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/mainframe")));
+        getBuilder("vintage_mainframe")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/vintage_mainframe")));
+        getBuilder("legacy_mainframe")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/legacy_mainframe")));
         getBuilder("personal_router")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/personal_router")));
         getBuilder("server_router")
@@ -89,6 +97,10 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/legacy_personal_computer")));
         getBuilder("crafting_computer")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/crafting_computer")));
+        getBuilder("vintage_crafting_computer")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/vintage_crafting_computer")));
+        getBuilder("legacy_crafting_computer")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/legacy_crafting_computer")));
         getBuilder("supercomputer_node")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/supercomputer_node")));
         getBuilder("hbw_interface")
@@ -101,10 +113,16 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.PHI_9000.get());
         getBuilder("pattern_encoder")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/pattern_encoder")));
-        getBuilder("pattern_reader")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/pattern_reader")));
-        basicItem(ComputingModule.PATTERN_DISC.get());
-        basicItem(ComputingModule.PATTERN_DISC_RW.get());
+        getBuilder("floppy_drive").parent(new ModelFile.UncheckedModelFile(modLoc("block/floppy_drive")));
+        getBuilder("cd_drive").parent(new ModelFile.UncheckedModelFile(modLoc("block/cd_drive")));
+        getBuilder("dvd_drive").parent(new ModelFile.UncheckedModelFile(modLoc("block/dvd_drive")));
+        getBuilder("dock_station").parent(new ModelFile.UncheckedModelFile(modLoc("block/dock_station")));
+        basicItem(ComputingModule.FLOPPY_DISK.get());
+        basicItem(ComputingModule.CD_ROM.get());
+        basicItem(ComputingModule.CD_RW.get());
+        basicItem(ComputingModule.DVD_ROM.get());
+        basicItem(ComputingModule.DVD_RW.get());
+        basicItem(ComputingModule.USB_FLASH_DRIVE.get());
         basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());
         basicItem(ComputingModule.MOTHERBOARD_ATX_P.get());
         basicItem(ComputingModule.CPU_SERVO_2620.get());
@@ -125,6 +143,10 @@ public class JscItemModelProvider extends ItemModelProvider {
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/import_bus_part")));
         getBuilder("export_bus")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/export_bus_part")));
+        getBuilder("input_bus")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/export_bus_part")));
+        getBuilder("receiving_bus")
+                .parent(new ModelFile.UncheckedModelFile(modLoc("block/import_bus_part")));
         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
             basicItem(disk.item().get());
         }

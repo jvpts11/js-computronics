@@ -28,7 +28,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -58,7 +57,8 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     private int unslottedNodes;
     private long parallelCrafts;
 
-    private final Set<UUID> activeCraftSlots = new LinkedHashSet<>();
+    // operationId -> number of parallel slots it holds; one craft can hold several so it can fan out across CCs.
+    private final java.util.Map<UUID, Integer> activeCraftSlots = new java.util.LinkedHashMap<>();
 
     public HbwInterfaceBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.HBW_INTERFACE_BE.get(), pos, state);
@@ -207,21 +207,33 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     }
 
     public int craftSlotsInUse() {
-        return activeCraftSlots.size();
+        int sum = 0;
+        for (final int held : activeCraftSlots.values()) {
+            sum += held;
+        }
+        return sum;
+    }
+
+    /**
+     * Grants up to {@code wanted} parallel craft slots to {@code operationId}, capped by the cluster's free
+     * capacity, and returns how many were granted (0 when the cluster is offline or has no free slots). One
+     * operation may hold several slots so a single large craft can fan out across that many crafting computers
+     * at once.
+     */
+    public int acquireCraftSlots(final UUID operationId, final int wanted) {
+        if (!clusterOnline() || wanted <= 0) {
+            return 0;
+        }
+        final int free = (int) Math.max(0L, parallelCrafts - craftSlotsInUse());
+        final int grant = Math.min(wanted, free);
+        if (grant > 0) {
+            activeCraftSlots.merge(operationId, grant, Integer::sum);
+        }
+        return grant;
     }
 
     public boolean tryAcquireCraftSlot(final UUID operationId) {
-        if (!clusterOnline()) {
-            return false;
-        }
-        if (activeCraftSlots.contains(operationId)) {
-            return true;
-        }
-        if (activeCraftSlots.size() >= parallelCrafts) {
-            return false;
-        }
-        activeCraftSlots.add(operationId);
-        return true;
+        return activeCraftSlots.containsKey(operationId) || acquireCraftSlots(operationId, 1) > 0;
     }
 
     public void releaseCraftSlot(final UUID operationId) {

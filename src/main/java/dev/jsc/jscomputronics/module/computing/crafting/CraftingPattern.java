@@ -40,7 +40,7 @@ public record CraftingPattern(List<ItemStack> grid, ItemStack result) {
 
     public static final StreamCodec<RegistryFriendlyByteBuf, CraftingPattern> STREAM_CODEC =
             StreamCodec.composite(
-                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list()), CraftingPattern::grid,
+                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list(16)), CraftingPattern::grid,
                     ItemStack.STREAM_CODEC, CraftingPattern::result,
                     CraftingPattern::new);
 

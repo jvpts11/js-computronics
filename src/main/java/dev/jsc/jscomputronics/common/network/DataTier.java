@@ -16,7 +16,10 @@ public enum DataTier {
     T3_FIBER(7_000L, 1_024, "fiber_optic_cable"),
     T4_VLDC(5_000L, 10_000, "vldc_cable"),
     T6_QUANTUM(50_000L, 64, "quantum_interconnect_cable"),
-    HPC(20_000L, 32, "hpc_cable");
+    HPC(20_000L, 32, "hpc_cable"),
+    // Dedicated short-range cable that links a Crafting Switch to its Crafting Computer. It carries machine
+    // I/O coordination rather than bulk data, so its throughput is nominal; range is short (a local cluster).
+    CRAFTING(1_000L, 16, "crafting_cable");
 
     private final long maxThroughput;
     private final int maxLength;

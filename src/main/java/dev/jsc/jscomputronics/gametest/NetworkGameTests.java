@@ -43,6 +43,7 @@ import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
+import dev.jsc.jscomputronics.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -753,12 +754,23 @@ public final class NetworkGameTests {
     public static void mainframe_buildPicksUpInstalledDisk(final GameTestHelper helper) {
         final BlockPos a = new BlockPos(2, 2, 2);
         final MainframeBlockEntity be = placeRunningMainframe(helper, a);
+        // Replace the disk installed by the setup helper with a larger one.
         be.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
         helper.startSequence()
-                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(
-                        be.storageItems() == DiskSize.TB_1.capacityItems(),
-                        "build should report the installed disk's capacity; got " + be.storageItems()))
+                .thenExecuteAfter(SETTLE, () -> {
+                    // The installed OS (mc_net, 512-item footprint) reserves part of the disk;
+                    // the usable storage is the raw disk capacity minus the OS reservation.
+                    final long osFootprint = be.reservedByOs();
+                    final long expected = DiskSize.TB_1.capacityItems() - osFootprint;
+                    helper.assertTrue(
+                            be.storageItems() == expected,
+                            "build should report the installed disk's capacity net of the OS footprint"
+                                    + " (raw=" + DiskSize.TB_1.capacityItems()
+                                    + " footprint=" + osFootprint
+                                    + " expected=" + expected
+                                    + "); got " + be.storageItems());
+                })
                 .thenSucceed();
     }
 
@@ -1245,9 +1257,10 @@ public final class NetworkGameTests {
                             "whoami should report the computer kind");
                     helper.assertTrue(cliContains(shell.run("status", cli), "ONLINE"),
                             "status should report the running computer as online");
-                    helper.assertTrue(cliContains(shell.run("operation query", cli), "cobblestone"),
-                            "operation query should list the network's cobblestone");
-                    helper.assertTrue(cliContains(shell.run("operation query diamond", cli), "no rows"),
+                    helper.assertTrue(cliContains(shell.run("operation query items", cli), "cobblestone"),
+                            "operation query items should list the network's cobblestone");
+                    helper.assertTrue(
+                            cliContains(shell.run("operation query items WHERE name contains diamond", cli), "no rows"),
                             "operation query with a non-matching filter should say so");
                     helper.assertTrue(cliContains(shell.run("operation select 50 cobblestone", cli), "SELECT queued"),
                             "operation select should queue an operation through the network");
@@ -1258,7 +1271,7 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
-    public static void nms_runsParsedSqlAgainstTheNetwork(final GameTestHelper helper) {
+    public static void nms_runsParsedIqlAgainstTheNetwork(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);
         final BlockPos router = new BlockPos(3, 2, 2);
@@ -1283,20 +1296,148 @@ public final class NetworkGameTests {
                     final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
                             (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer,
                             helper.getLevel());
-                    final var dialect = dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect.STANDARD;
-
-                    final var read = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
-                            "SELECT * FROM network", dialect);
+                    final var read = dev.jsc.jscomputronics.module.computing.program.iql.IqlParser.tryParse(
+                            "QUERY items");
                     helper.assertTrue(read.ok(), "the read statement must parse");
-                    helper.assertFalse(cli.query(read.operation().item(), read.operation().source(), 64).isEmpty(),
-                            "SELECT * must return the network's rows");
+                    helper.assertFalse(cli.queryObject("items", null, "", 64).isEmpty(),
+                            "QUERY items must return the network's rows");
+                    helper.assertFalse(cli.queryObject("servers", null, "", 64).isEmpty(),
+                            "QUERY servers must list the rack's server");
 
-                    final var pull = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
-                            "SELECT 50 FROM network WHERE item = 'cobblestone'", dialect);
+                    final var selectAll = dev.jsc.jscomputronics.module.computing.program.iql.IqlParser.tryParse(
+                            "SELECT *");
+                    helper.assertTrue(selectAll.ok(), "SELECT * must parse");
+                    helper.assertTrue(cli.execute(selectAll.operation()).ok(),
+                            "SELECT * must queue an extraction for every item type");
+
+                    final var pull = dev.jsc.jscomputronics.module.computing.program.iql.IqlParser.tryParse(
+                            "SELECT 50 cobblestone");
                     helper.assertTrue(pull.ok(), "the pull statement must parse");
                     helper.assertTrue(cli.execute(pull.operation()).ok(),
                             "executing the pull must queue an operation");
+
+                    // The Object Explorer snapshot must mirror the real network, not a static example tree.
+                    final var schema = dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                            .nmsSchema(helper.getLevel(),
+                                    (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer);
+                    helper.assertTrue(schema.networkLabel().startsWith("jsc-net-"),
+                            "the Object Explorer must show the real network label");
+                    helper.assertFalse(schema.servers().isEmpty(),
+                            "the Object Explorer must list the rack's real server");
+                    helper.assertTrue(schema.itemTypes() >= 1,
+                            "the Object Explorer must count the network's item types");
                 })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iqlEngine_storesAndRunsSavedObjects(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final var viewType = dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.ObjectType.VIEW;
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer,
+                            helper.getLevel());
+                    // 'install iqlengine' (the normal install command) installs the Engine service on the Mainframe.
+                    helper.assertTrue(cli.install("iqlengine").ok(),
+                            "'install iqlengine' must install the Engine on the Mainframe");
+                    helper.assertTrue(mainframe.isIqlEngineInstalled(),
+                            "the Engine must be installed after 'install iqlengine'");
+                    helper.assertTrue(cli.iqlEngineInstalled(),
+                            "the computer must report the Engine installed");
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(
+                            mainframe, cli, 64);
+
+                    helper.assertTrue(engine.run("CREATE VIEW stock AS QUERY items").ok(),
+                            "CREATE VIEW must succeed");
+                    helper.assertTrue(mainframe.iqlCatalog().contains(viewType, "stock"),
+                            "the catalog must hold the created view");
+
+                    // The NMS Object Explorer snapshot must reflect the real catalog, not mock examples.
+                    final var schema = dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                            .nmsSchema(helper.getLevel(),
+                                    (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer);
+                    helper.assertTrue(schema.engine().views().contains("stock"),
+                            "the NMS Object Explorer must list the created view");
+                    helper.assertTrue("running".equals(schema.engine().state()),
+                            "the NMS must show the Engine as running");
+
+                    final var query = engine.run("QUERY stock");
+                    helper.assertTrue(query.ok(), "QUERY <view> must run the saved query: " + query.message());
+                    helper.assertFalse(query.rows().isEmpty(), "QUERY <view> must return the network's rows");
+
+                    // QUERY * returns every item; the full WHERE really filters by qty now (cobblestone = 200).
+                    helper.assertFalse(engine.run("QUERY *").rows().isEmpty(), "QUERY * must return all items");
+                    helper.assertFalse(engine.run("QUERY items WHERE qty > 100").rows().isEmpty(),
+                            "WHERE qty > 100 must keep the 200 cobblestone");
+                    helper.assertTrue(engine.run("QUERY items WHERE qty > 1000").rows().isEmpty(),
+                            "WHERE qty > 1000 must filter out the 200 cobblestone");
+
+                    helper.assertTrue(engine.run("CREATE PROCEDURE refresh AS { QUERY items; QUERY servers }").ok(),
+                            "CREATE PROCEDURE must succeed");
+                    helper.assertTrue(engine.run("EXEC refresh").ok(),
+                            "EXEC must run the procedure's statements in order");
+
+                    // Gate: a stopped Engine rejects definitions; ad-hoc actions are unaffected.
+                    mainframe.setIqlEngineRunning(false);
+                    helper.assertFalse(engine.run("CREATE VIEW v2 AS QUERY items").ok(),
+                            "a CREATE must fail when the Engine is stopped");
+                    mainframe.setIqlEngineRunning(true);
+
+                    helper.assertTrue(engine.run("DROP VIEW stock").ok(), "DROP VIEW must succeed");
+                    helper.assertFalse(mainframe.iqlCatalog().contains(viewType, "stock"),
+                            "the view must be gone after DROP");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iqlJobAgent_firesScheduledJobs(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 8, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 1_000_000L);
+                    mainframe.installIqlEngine();
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                                    mainframe, helper.getLevel()), 64);
+                    // EVERY 1t: the agent (evaluating every 10 ticks) fires this within a couple of evaluations.
+                    helper.assertTrue(engine.run("CREATE JOB drainer AS DROP 100 cobblestone EVERY 1t").ok(),
+                            "CREATE JOB must succeed");
+                })
+                .thenExecuteAfter(60, () -> helper.assertTrue(
+                        mainframe.completedOps() > 0 || !mainframe.recentOperations().isEmpty(),
+                        "the EVERY job must have fired its DROP operation by now"))
                 .thenSucceed();
     }
 
@@ -1491,8 +1632,12 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     final long capacityBefore = be.capacity();
                     final long storageBefore = be.storageItems();
-                    helper.assertTrue(storageBefore == DiskSize.TB_1.capacityItems(),
-                            "build should report the installed disk's capacity before reload; got " + storageBefore);
+                    // The OS (installed by the setup helper) reserves part of the disk; the usable storage is
+                    // the raw disk capacity minus the OS footprint.
+                    final long expectedStorage = DiskSize.TB_1.capacityItems() - be.reservedByOs();
+                    helper.assertTrue(storageBefore == expectedStorage,
+                            "build should report the disk's capacity net of the OS footprint before reload; got "
+                                    + storageBefore + " expected " + expectedStorage);
 
                     final var registries = helper.getLevel().registryAccess();
                     final net.minecraft.nbt.CompoundTag saved = be.saveWithFullMetadata(registries);
@@ -1563,6 +1708,61 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void importBus_flushConservation(final GameTestHelper helper) {
+        // Break the cable while items are in the "flushed" state (extracted from source,
+        // INSERT dispatched but not yet settled) and verify nothing is silently discarded.
+        // Items must be conserved: either in network storage (if INSERT completed first)
+        // or dropped as entities at the cable position (if INSERT was still in flight).
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack at " + rack);
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.EAST, new ImportBusPart());
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, Blocks.BARREL);
+        if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container container) {
+            container.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+        }
+
+        // After SETTLE the network is live and extraction starts. FLUSH_TICKS (20) later the bus
+        // dispatches an INSERT; the HDD's disk-seek latency (10 ticks) means the INSERT is still
+        // in flight at tick SETTLE+22. Breaking the cable at that point exercises the dropContents
+        // path for in-flight flushes — items must not vanish.
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 22, () -> helper.destroyBlock(cableEnd))
+                .thenExecuteAfter(SETTLE, () -> {
+                    final long inNetwork = mainframe.networkUuid() != null
+                            ? NetworkStorage.of(helper.getLevel(), mainframe.networkUuid()).count(Items.COBBLESTONE)
+                            : 0L;
+                    final long inWorld = helper.getLevel().getEntitiesOfClass(
+                                    net.minecraft.world.entity.item.ItemEntity.class,
+                                    new net.minecraft.world.phys.AABB(helper.absolutePos(cableEnd)).inflate(6.0))
+                            .stream()
+                            .filter(e -> e.getItem().is(Items.COBBLESTONE))
+                            .mapToLong(e -> e.getItem().getCount())
+                            .sum();
+                    helper.assertTrue(inNetwork + inWorld > 0L,
+                            "cobblestone must not be silently discarded: inNetwork=" + inNetwork
+                                    + " inWorld=" + inWorld);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void exportBus_movesNetworkItemsIntoChest(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
@@ -1611,6 +1811,191 @@ public final class NetworkGameTests {
                     helper.assertTrue(!log.get(0).moves().isEmpty()
                                     && log.get(0).moves().get(0).to().equals("export"),
                             "provenance should go to 'export'");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void importBus_filterImportsOnlyThatType(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            final ImportBusPart bus = new ImportBusPart();
+            cable.addPart(Direction.EAST, bus);
+            bus.setFilter(new ItemStack(Items.COBBLESTONE)); // import only cobblestone, leave the dirt
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container c) {
+                        c.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+                        c.setItem(1, new ItemStack(Items.DIRT, 64));
+                    }
+                })
+                .thenExecuteAfter(80, () -> {
+                    final long cobble = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    final long dirt = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.DIRT);
+                    helper.assertTrue(cobble > 0L, "the filtered import must pull cobblestone; got " + cobble);
+                    helper.assertTrue(dirt == 0L, "the filter must leave dirt in the barrel; net dirt=" + dirt);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iql_deleteToNamedBusExports(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            final ExportBusPart bus = new ExportBusPart();
+            cable.addPart(Direction.EAST, bus);
+            bus.setName("out"); // no filter, so it never auto-exports; the query drives it by name
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () ->
+                        rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))
+                .thenExecuteAfter(10, () -> {
+                    // Run the export only after the network has indexed the server's stock.
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(mainframe,
+                                    helper.getLevel()), 64);
+                    final var outcome = engine.run("DELETE cobblestone TO out");
+                    helper.assertTrue(outcome.ok(), "DELETE TO a named bus should be accepted: " + outcome.message());
+                })
+                .thenExecuteAfter(40, () -> {
+                    long inBarrel = 0L;
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container c) {
+                        for (int i = 0; i < c.getContainerSize(); i++) {
+                            if (c.getItem(i).is(Items.COBBLESTONE)) {
+                                inBarrel += c.getItem(i).getCount();
+                            }
+                        }
+                    }
+                    helper.assertTrue(inBarrel > 0L, "DELETE TO a named bus must export into its inventory; got " + inBarrel);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iql_insertFromNamedBusImports(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            final ImportBusPart bus = new ImportBusPart();
+            cable.addPart(Direction.EAST, bus);
+            bus.setName("in");
+            bus.toggleMode(); // redstone mode: with no signal it never auto-imports, so the query drives it
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container c) {
+                        c.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+                    }
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(mainframe,
+                                    helper.getLevel()), 64);
+                    final var outcome = engine.run("INSERT cobblestone FROM in");
+                    helper.assertTrue(outcome.ok(), "INSERT FROM a named bus should be accepted: " + outcome.message());
+                })
+                .thenExecuteAfter(80, () -> {
+                    final long net = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(net > 0L, "INSERT FROM a named bus must import into the network; got " + net);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void job_pausePreventsFiringUntilRestart(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 1000);
+                    mainframe.installIqlEngine();
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(mainframe,
+                                    helper.getLevel()), 64);
+                    engine.run("CREATE JOB killer AS DROP 64 cobblestone EVERY 5t");
+                    mainframe.pauseJob("killer"); // paused from the start, so it must never fire
+                })
+                .thenExecuteAfter(40, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left == 1000L, "a paused job must not fire; cobblestone left=" + left);
+                    mainframe.restartJob("killer"); // resume + re-arm
+                })
+                .thenExecuteAfter(40, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left < 1000L, "a restarted job must fire again; cobblestone left=" + left);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void nmsScript_travelsInSchemaSnapshot(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, new BlockPos(1, 2, 2));
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    mainframe.installIqlEngine();
+                    mainframe.setSavedScript("QUERY items WHERE qty > 10");
+                    final var schema = dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                            .nmsSchema(helper.getLevel(), mainframe);
+                    helper.assertTrue("QUERY items WHERE qty > 10".equals(schema.engine().script()),
+                            "the saved script must travel in the schema snapshot; got: '"
+                                    + schema.engine().script() + "'");
                 })
                 .thenSucceed();
     }
@@ -2138,12 +2523,10 @@ public final class NetworkGameTests {
 
     // Helpers
 
-    private static MainframeBlockEntity placeRunningMainframe(final GameTestHelper helper, final BlockPos relative) {
-        helper.setBlock(relative, ComputingModule.MAINFRAME.get());
-        final MainframeBlockEntity be = mainframeAt(helper, relative);
-        installValidBuild(be);
-        be.togglePower(); // valid build never powers on by itself
-        return be;
+    // Package-private so the performance benchmarks (PerformanceGameTests) can reuse the same powered-up
+    // Mainframe setup without duplicating the hardware-install plumbing.
+    static MainframeBlockEntity placeRunningMainframe(final GameTestHelper helper, final BlockPos relative) {
+        return TestWorldBuilder.forGameTest(helper).placeRunningMainframe(relative);
     }
 
     private static MainframeBlockEntity formRunningMainframe(final GameTestHelper helper,
@@ -2754,11 +3137,7 @@ public final class NetworkGameTests {
     }
 
     private static void seedServer(final GameTestHelper helper, final BlockPos rack) {
-        if (helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe) {
-            rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
-        } else {
-            helper.fail("no server rack at " + rack);
-        }
+        TestWorldBuilder.forGameTest(helper).seedServer(rack);
     }
 
     @GameTest(template = ARENA)
@@ -2798,71 +3177,21 @@ public final class NetworkGameTests {
      * cable must orient it; this keeps the fixtures declaring "computer next to cable" working.
      */
     private static void faceRearTowardCable(final GameTestHelper helper, final BlockPos pos) {
-        final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pos);
-        if (!state.hasProperty(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)) {
-            return;
-        }
-        for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-            if (helper.getBlockState(pos.relative(d)).getBlock()
-                    instanceof dev.jsc.jscomputronics.module.computing.block.DataCableBlock) {
-                helper.setBlock(pos, state.setValue(
-                        net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, d.getOpposite()));
-                return;
-            }
-        }
+        TestWorldBuilder.forGameTest(helper).faceRearTowardCable(pos);
     }
 
     private static PersonalComputerBlockEntity placeRunningPC(final GameTestHelper helper, final BlockPos relative) {
-        helper.setBlock(relative, ComputingModule.PERSONAL_COMPUTER.get());
-        faceRearTowardCable(helper, relative);
-        if (!(helper.getBlockEntity(relative) instanceof PersonalComputerBlockEntity be)) {
-            throw new IllegalStateException("no personal computer at " + relative);
-        }
-        final ItemStackHandler hw = be.getHardware();
-        hw.setStackInSlot(PersonalComputerBlockEntity.MOTHERBOARD_SLOT,
-                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
-        hw.setStackInSlot(PersonalComputerBlockEntity.CPU_SLOT,
-                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
-        hw.setStackInSlot(PersonalComputerBlockEntity.RAM_SLOTS_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,
-                new ItemStack(ComputingModule.PSU_650G.get()));
-        be.togglePower();
-        return be;
+        return TestWorldBuilder.forGameTest(helper).placeRunningPersonalComputer(relative);
     }
 
-    private static CraftingComputerBlockEntity placeRunningCraftingComputer(
+    // Package-private so the performance benchmarks can reuse the powered-up Crafting Computer setup.
+    static CraftingComputerBlockEntity placeRunningCraftingComputer(
             final GameTestHelper helper, final BlockPos relative) {
-        helper.setBlock(relative, ComputingModule.CRAFTING_COMPUTER.get());
-        faceRearTowardCable(helper, relative);
-        if (!(helper.getBlockEntity(relative) instanceof CraftingComputerBlockEntity be)) {
-            throw new IllegalStateException("no crafting computer at " + relative);
-        }
-        final ItemStackHandler hw = be.getHardware();
-        hw.setStackInSlot(CraftingComputerBlockEntity.MOTHERBOARD_SLOT,
-                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.CPU_SLOT,
-                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.RAM_SLOTS_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START,
-                new ItemStack(ComputingModule.CRAFTING_CARD_T2.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.PSU_SLOT,
-                new ItemStack(ComputingModule.PSU_650G.get()));
-        be.togglePower();
-        return be;
+        return TestWorldBuilder.forGameTest(helper).placeRunningCraftingComputer(relative);
     }
 
     private static void installValidBuild(final MainframeBlockEntity be) {
-        final ItemStackHandler inv = be.getInventory();
-        inv.setStackInSlot(MainframeBlockEntity.MOTHERBOARD_SLOT,
-                new ItemStack(ComputingModule.MOTHERBOARD_MTX_P.get()));
-        inv.setStackInSlot(MainframeBlockEntity.CPU_SLOTS_START,
-                new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-        inv.setStackInSlot(MainframeBlockEntity.RAM_SLOTS_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT,
-                new ItemStack(ComputingModule.PSU_650G.get()));
+        TestWorldBuilder.installMainframeBuild(be);
     }
 
     private static int droppedItems(final GameTestHelper helper, final BlockPos around) {
