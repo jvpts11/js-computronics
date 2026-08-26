@@ -1693,20 +1693,22 @@ public final class ComputingPayloads {
                 return;
             }
             final var patterns = mainframe.networkPatterns();
+            final var machines = mainframe.networkProcessingPatterns();
             final var stock = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
                     .of(level, host.networkUuid()).query();
             final StorageKey key = StorageKey.of(payload.result());
-            // A machine recipe (processing or multi-stage) plans by its own inputs: the bench planner knows
-            // nothing about it and would list the result itself as a missing raw ingredient.
+            // A machine recipe whose inputs are in stock, or a multi-stage pipeline, plans by its own inputs.
+            // Otherwise the recursive planner expands bench and machine patterns alike, so a machine-made
+            // ingredient shows up as the raw materials of its own recipe rather than as missing.
             final var machinePlan = planMachineRecipe(mainframe, key, payload.quantity(), stock);
-            if (machinePlan != null) {
+            if (machinePlan != null && (machinePlan.feasible() || !machinePlan.plainMachine())) {
                 PacketDistributor.sendToPlayer(player, new CraftPlanPayload(
                         payload.result(), payload.quantity(), machinePlan.rows(),
                         machinePlan.feasible(), machinePlan.maxFeasible(), machinePlan.estimateTicks()));
                 return;
             }
             final var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner
-                    .plan(key, payload.quantity(), patterns, stock);
+                    .plan(key, payload.quantity(), patterns, machines, stock);
 
             // Raw-ingredient rows: total needed (consumed + still missing) vs what the network has.
             final java.util.Map<StorageKey, Long> need = new java.util.LinkedHashMap<>(plan.rawConsumption());
@@ -1725,7 +1727,7 @@ public final class ComputingPayloads {
             final boolean feasible = plan.feasible();
             final long maxFeasible = feasible ? payload.quantity()
                     : dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner
-                            .maxFeasible(key, payload.quantity(), patterns, stock);
+                            .maxFeasible(key, payload.quantity(), patterns, machines, stock);
             PacketDistributor.sendToPlayer(player, new CraftPlanPayload(
                     payload.result(), payload.quantity(), java.util.List.copyOf(rows),
                     feasible, maxFeasible, estimateTicks(level, mainframe, plan)));
@@ -1735,8 +1737,12 @@ public final class ComputingPayloads {
     private static int estimateTicks(final ServerLevel level, final MainframeBlockEntity mainframe,
                                      final dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.Plan plan) {
         long units = 0;
+        long machineTicks = 0;
         for (final var step : plan.steps()) {
-            units += step.runs() * Math.max(1, step.pattern().filledCells());
+            units += step.runs() * step.unitsPerRun();
+            if (step.isMachine()) {
+                machineTicks += step.machine().timeoutTicks();
+            }
         }
         long rate = 0;
         for (final net.minecraft.core.BlockPos pos : mainframe.craftingComputerPositions()) {
@@ -1749,12 +1755,12 @@ public final class ComputingPayloads {
         if (rate <= 0) {
             return 0;
         }
-        return (int) Math.max(1, (units + rate - 1) / rate);
+        return (int) Math.max(1, (units + rate - 1) / rate + machineTicks);
     }
 
     /** A machine recipe's plan for the request popup: raw rows (need vs have), feasibility, max and estimate. */
     private record MachinePlan(java.util.List<CraftPlanPayload.Row> rows, boolean feasible, long maxFeasible,
-                               int estimateTicks) {
+                               int estimateTicks, boolean plainMachine) {
     }
 
     /**
@@ -1803,7 +1809,7 @@ public final class ComputingPayloads {
                     }
                     final long maxFirst = maxRuns == Long.MAX_VALUE ? 0 : maxRuns * bench.result().getCount();
                     return new MachinePlan(java.util.List.copyOf(rows), maxFirst >= firstDemand,
-                            Math.min(quantity, forwardYield(multi, maxFirst)), estimate);
+                            Math.min(quantity, forwardYield(multi, maxFirst)), estimate, false);
                 }
             } else {
                 return null;
@@ -1824,9 +1830,32 @@ public final class ComputingPayloads {
             final long maxFinal = recipe.multi().isPresent()
                     ? forwardYield(recipe.multi().get(), maxFirst) : maxFirst;
             return new MachinePlan(java.util.List.copyOf(rows), maxFirst >= firstDemand,
-                    Math.min(quantity, maxFinal), estimate);
+                    Math.min(quantity, maxFinal), estimate, recipe.proc().isPresent());
         }
         return null;
+    }
+
+    /** Whether the network holds every input a machine pattern needs to produce {@code quantity}. */
+    private static boolean inputsInStock(final MainframeBlockEntity mainframe,
+                                         final dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern machine,
+                                         final long quantity) {
+        if (!(mainframe.getLevel() instanceof ServerLevel level) || mainframe.networkUuid() == null) {
+            return true;
+        }
+        final var storage = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
+                .of(level, mainframe.networkUuid());
+        final var primary = machine.primaryOutput();
+        final long runs = ceilDiv(quantity, primary == null ? 1 : Math.max(1, primary.amount()));
+        final java.util.Map<StorageKey, Long> need = new java.util.HashMap<>();
+        for (final var in : machine.inputs()) {
+            need.merge(in.key(), in.amount() * runs, Long::sum);
+        }
+        for (final var entry : need.entrySet()) {
+            if (storage.count(entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static long ceilDiv(final long amount, final long perRun) {
@@ -1853,6 +1882,16 @@ public final class ComputingPayloads {
         for (final var recipe : mainframe.networkMachineRecipes()) {
             if (resultKey.equals(recipe.resultKey())) {
                 if (recipe.proc().isPresent()) {
+                    if (!inputsInStock(mainframe, recipe.proc().get(), quantity)) {
+                        // Some input is not on the network: if other patterns can make it, run the whole tree
+                        // as one craft (the machine becomes a step of it); otherwise fall back to the bare
+                        // machine run, which delivers what the network does hold.
+                        final var planned = mainframe.submitNetworkCraft(resultKey, quantity, false, label);
+                        if (planned != null) {
+                            planned.onSettle(onSettle);
+                            return planned;
+                        }
+                    }
                     final var op = mainframe.submitNetworkProcessing(recipe.proc().get(), quantity, label);
                     if (op != null) {
                         op.onSettle(onSettle);

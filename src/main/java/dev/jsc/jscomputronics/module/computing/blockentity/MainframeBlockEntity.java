@@ -790,6 +790,16 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return patterns;
     }
 
+    /** The plain machine (processing) patterns on the network, for the recursive craft planner. */
+    public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern> networkProcessingPatterns() {
+        final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern> machines =
+                new java.util.ArrayList<>();
+        for (final var recipe : networkMachineRecipes()) {
+            recipe.proc().ifPresent(machines::add);
+        }
+        return machines;
+    }
+
     /** Every machine recipe (processing / multi-stage) the network's running Crafting Computers hold. */
     public java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe> networkMachineRecipes() {
         final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe> recipes =
@@ -829,10 +839,12 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         if (extraPattern != null && !patterns.contains(extraPattern)) {
             patterns.add(extraPattern);
         }
+        // Machine patterns take part in the plan: an ingredient no bench makes may come out of a machine.
+        final var machines = networkProcessingPatterns();
         final var stock = networkIndex.snapshot();
         long target = demand;
         var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
-                key, target, patterns, stock);
+                key, target, patterns, machines, stock);
         if (plan.steps().isEmpty()) {
             return null; // no pattern on the network produces this item
         }
@@ -841,19 +853,19 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 return null;
             }
             target = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.maxFeasible(
-                    key, demand, patterns, stock);
+                    key, demand, patterns, machines, stock);
             if (target <= 0) {
                 return null;
             }
             plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
-                    key, target, patterns, stock);
+                    key, target, patterns, machines, stock);
         }
         // The record keeps the ORIGINAL request: a scaled-down partial run settles as
         // COMPLETED_PARTIAL showing produced vs requested, exactly what the player asked to see.
         final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation(
                 serverLevel, networkUuid(), key, demand, plan, networkIndex,
                 java.util.UUID.randomUUID(), craftingComputerPositions(), supercomputerPositions(),
-                requesterLabel, extraPattern);
+                requesterLabel, extraPattern, this);
         activeOperations.add(operation);
         return operation;
     }

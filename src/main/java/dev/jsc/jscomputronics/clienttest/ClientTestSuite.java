@@ -21,7 +21,8 @@ public final class ClientTestSuite {
 
     private static final List<Class<?>> CLASSES = List.of(
             CraftingChainClientTests.class,
-            FullJourneyClientTests.class);
+            FullJourneyClientTests.class,
+            MekanismClientTests.class);
 
     private ClientTestSuite() {
     }

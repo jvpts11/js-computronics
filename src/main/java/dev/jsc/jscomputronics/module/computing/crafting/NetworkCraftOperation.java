@@ -155,6 +155,13 @@ public final class NetworkCraftOperation implements PersistentOperation {
     private boolean done;
     private byte status = OperationRecord.STATUS_FAILED;
     private Runnable onSettle;
+    // The Mainframe that runs this craft's machine steps as processing operations of their own; null only for
+    // plans without machine steps.
+    @org.jetbrains.annotations.Nullable
+    private final MainframeBlockEntity mainframe;
+    // The processing operation currently running the machine step at stepIndex, if any.
+    @org.jetbrains.annotations.Nullable
+    private NetworkProcessingOperation machineStep;
 
     public NetworkCraftOperation(final ServerLevel level, final NetworkUuid network,
                                  final StorageKey resultKey, final long requested,
@@ -162,7 +169,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
                                  final UUID operationId, final List<BlockPos> candidateComputers,
                                  final List<BlockPos> supercomputers, final String requesterLabel) {
         this(level, network, resultKey, requested, plan, index, operationId, candidateComputers,
-                supercomputers, requesterLabel, null);
+                supercomputers, requesterLabel, null, null);
     }
 
     public NetworkCraftOperation(final ServerLevel level, final NetworkUuid network,
@@ -170,7 +177,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
                                  final CraftPlanner.Plan plan, final NetworkIndex index,
                                  final UUID operationId, final List<BlockPos> candidateComputers,
                                  final List<BlockPos> supercomputers, final String requesterLabel,
-                                 @org.jetbrains.annotations.Nullable final CraftingPattern embeddedPattern) {
+                                 @org.jetbrains.annotations.Nullable final CraftingPattern embeddedPattern,
+                                 @org.jetbrains.annotations.Nullable final MainframeBlockEntity mainframe) {
+        this.mainframe = mainframe;
         this.level = level;
         this.network = network;
         this.resultKey = resultKey;
@@ -214,6 +223,18 @@ public final class NetworkCraftOperation implements PersistentOperation {
             finish();
             return;
         }
+        if (machineStep != null) {
+            // Waiting on a machine step: poll it whatever the budget (this tick may carry none, since a waiting
+            // craft holds no queue slot); bench work resumes once a slot is granted again.
+            final int outcome = tickMachineStep(plan.steps().get(stepIndex), NetworkStorage.of(level, network));
+            if (outcome == 0 || done) {
+                return;
+            }
+            if (stepIndex >= plan.steps().size()) {
+                finish();
+                return;
+            }
+        }
 
         // The craft runs at the summed throughput of its computers (never above the Mainframe's grant). Work is
         // measured in ingredient items handled, so denser recipes genuinely take longer; faster computers in the
@@ -233,7 +254,18 @@ public final class NetworkCraftOperation implements PersistentOperation {
                 stepIndex++;
                 continue;
             }
-            final long unitsPerRun = Math.max(1, step.pattern().filledCells());
+            if (step.isMachine()) {
+                // A machine step runs as a processing operation of its own; this craft waits on it and pulls
+                // its output into the pool for the steps after it. Waiting is progress, not a stall.
+                final int outcome = tickMachineStep(step, storage);
+                if (outcome > 0) {
+                    progressed = true;
+                    continue;
+                }
+                progressed |= outcome == 0;
+                break;
+            }
+            final long unitsPerRun = step.unitsPerRun();
             final long runsAffordable = Math.max(budget >= unitsPerRun ? budget / unitsPerRun : 0, 0);
             if (runsAffordable <= 0) {
                 break; // budget exhausted mid-step; resume next tick
@@ -259,6 +291,53 @@ public final class NetworkCraftOperation implements PersistentOperation {
             finish();
         } else if (progressed) {
             stalledTicks = 0;
+        }
+    }
+
+    /**
+     * Drives the machine step at {@code stepIndex}: starts its processing operation on the first call (after
+     * handing this craft's intermediates back to the network, where the machine draws its inputs from), then
+     * waits for it. Returns 1 once the step is complete and its output sits in the pool, 0 while the machine
+     * is still working, and -1 when the step could not start or fell short.
+     */
+    private int tickMachineStep(final CraftPlanner.Step step, final NetworkStorage storage) {
+        if (machineStep == null) {
+            if (mainframe == null) {
+                finish();
+                return -1;
+            }
+            flushIntermediates();
+            machineStep = mainframe.submitNetworkProcessing(step.machine(), step.produced(), requesterLabel);
+            if (machineStep == null) {
+                finish();
+                return -1;
+            }
+            return 0;
+        }
+        if (!machineStep.isDone()) {
+            return 0;
+        }
+        final StorageKey made = step.resultKey();
+        final long wanted = Math.min(step.produced(), machineStep.produced());
+        final long got = made == null || wanted <= 0 ? 0
+                : storage.select(made, wanted, (key, amount, simulate) -> amount);
+        if (got > 0) {
+            pool.merge(made, got, Long::sum);
+        }
+        runsDone[stepIndex] = Math.min(step.runs(), got / step.perRun());
+        final boolean complete = got >= step.produced();
+        machineStep = null;
+        stepIndex++;
+        return complete ? 1 : -1;
+    }
+
+    /** Hands every intermediate (never the result itself) back to the network before a machine step. */
+    private void flushIntermediates() {
+        for (final Map.Entry<StorageKey, Long> entry : new LinkedHashMap<>(pool).entrySet()) {
+            if (entry.getValue() > 0 && !entry.getKey().equals(resultKey)) {
+                writeBack(entry.getKey(), entry.getValue());
+                pool.remove(entry.getKey());
+            }
         }
     }
 
@@ -461,10 +540,11 @@ public final class NetworkCraftOperation implements PersistentOperation {
 
     private void writeBack(final StorageKey key, final long amount) {
         final ItemStack prototype = key.stack(1);
-        if (prototype.isEmpty()) {
-            return; // 3x3 patterns never produce fluids; nothing to write for a fluid key
-        }
         final NetworkStorage storage = NetworkStorage.of(level, network);
+        if (prototype.isEmpty()) {
+            storage.insert(key, amount); // a fluid or chemical made by a machine step goes back as data
+            return;
+        }
         long remaining = amount;
         while (remaining > 0) {
             final int chunk = (int) Math.min(remaining, prototype.getMaxStackSize());
@@ -483,7 +563,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
 
     @Override
     public boolean isWaiting() {
-        return waiting && !done;
+        // Blocked on a machine step, the craft is waiting on that operation: it holds no queue slot of its own,
+        // otherwise a Mainframe with a single queue could never tick the machine it waits for.
+        return (waiting || machineStep != null) && !done;
     }
 
     @Override
@@ -550,7 +632,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
             return 0;
         }
         final int last = plan.steps().size() - 1;
-        return runsDone[last] * plan.steps().get(last).pattern().result().getCount();
+        return runsDone[last] * plan.steps().get(last).perRun();
     }
 
     private List<OperationRecord.SubRow> subRows() {
@@ -562,7 +644,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
                     : i == stepIndex && !waiting ? OperationRecord.SubRow.SUB_STREAMING
                     : OperationRecord.SubRow.SUB_READING;
             subs.add(new OperationRecord.SubRow(
-                    step.pattern().result().getHoverName().getString() + " x" + step.produced(),
+                    step.resultName() + " x" + step.produced(),
                     step.runs(), runsDone[i], state));
         }
         return subs;

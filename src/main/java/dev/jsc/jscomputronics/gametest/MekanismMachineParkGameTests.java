@@ -8,8 +8,10 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
+import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
 import dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkOperation;
@@ -30,8 +32,8 @@ import java.util.List;
 /**
  * The Mekanism machine classes the Fusion Reactor build needs, each driven by the network through the crafting
  * switch: the Metallurgic Infuser and the Osmium Compressor (an "extra" slot fed through the bottom face), the
- * Crusher (the plain electric family), and finally the whole alloy chain as one multi-stage pipeline ending in
- * Fusion Reactor Frames on the bench.
+ * Crusher (the plain electric family), and finally the whole alloy chain ending in Fusion Reactor Frames on the
+ * bench — once as one multi-stage pipeline, once as flat patterns the planner composes on its own.
  */
 @GameTestHolder(JsComputronics.MODID)
 @PrefixGameTestTemplate(false)
@@ -248,6 +250,62 @@ public final class MekanismMachineParkGameTests {
                     helper.assertTrue(storage.count(frame) == 4, "four Fusion Reactor Frames must land in the network; got "
                             + storage.count(frame));
                     // Everything seeded was sized for exactly one bench run: the raw stock must be spent to the unit.
+                    for (final StorageKey raw : new StorageKey[]{StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE),
+                            MekanismRig.itemKey(DUST_DIAMOND), MekanismRig.itemKey(DUST_REFINED_OBSIDIAN),
+                            MekanismRig.itemKey(PELLET_POLONIUM), MekanismRig.itemKey(STEEL_CASING),
+                            MekanismRig.itemKey(ALLOY_INFUSED), MekanismRig.itemKey(ALLOY_REINFORCED), MekanismRig.itemKey(ALLOY_ATOMIC)}) {
+                        helper.assertTrue(storage.count(raw) == 0, raw + " must be fully consumed; left " + storage.count(raw));
+                    }
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 4000)
+    public static void flatPatterns_makeFusionReactorFramesFromRawMaterials(final GameTestHelper helper) {
+        // Strategy A, "flat patterns": one pattern per recipe in the Recipe ROM and a single request for the
+        // frames. The planner walks the tree itself (bench <- machine <- machine <- machine) and the craft runs
+        // each machine step as a processing operation of its own before the bench step.
+        final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
+        final StorageKey frame = MekanismRig.itemKey(FRAME);
+        final NetworkOperation[] op = new NetworkOperation[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    MekanismRig.mountBuses(helper);
+                    MekanismRig.mountBottomInputBus(helper);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    rig.net().seed(Items.COPPER_INGOT, 4);
+                    rig.net().seed(Items.REDSTONE, 4);
+                    storage.insert(MekanismRig.itemKey(DUST_DIAMOND), 8);
+                    storage.insert(MekanismRig.itemKey(DUST_REFINED_OBSIDIAN), 16);
+                    storage.insert(MekanismRig.itemKey(PELLET_POLONIUM), 4);
+                    storage.insert(MekanismRig.itemKey(STEEL_CASING), 1);
+                    final CraftingComputerBlockEntity cc = rig.net().cc();
+                    helper.assertTrue(cc.loadPattern(framePattern()), "the frame pattern must load into the ROM");
+                    for (final ProcessingPattern machine : new ProcessingPattern[]{infusedAlloy(), reinforcedAlloy(), atomicAlloy()}) {
+                        helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(machine)),
+                                "the machine pattern must load into the ROM: " + machine.machineType());
+                    }
+                })
+                // The network index picks the seeded stock up on the next tick; plan against it after that.
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    op[0] = rig.net().mainframe().submitNetworkCraft(frame, 4, false, "battery", null);
+                    helper.assertTrue(op[0] != null, "the Mainframe must plan the frames through the machine patterns; machines="
+                            + rig.net().mainframe().networkProcessingPatterns().size() + " benches="
+                            + rig.net().mainframe().networkPatterns().size());
+                })
+                .thenWaitUntil(() -> {
+                    helper.assertTrue(op[0] != null, "no craft was planned");
+                    MekanismRig.power(helper);
+                    helper.assertTrue(op[0].isDone(), "the craft is still running: "
+                            + rig.net().mainframe().activeOperationRecords());
+                })
+                .thenExecute(() -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    assertCompleted(helper, op[0], "the flat-pattern craft");
+                    helper.assertTrue(storage.count(frame) == 4, "four Fusion Reactor Frames must land in the network; got "
+                            + storage.count(frame));
                     for (final StorageKey raw : new StorageKey[]{StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE),
                             MekanismRig.itemKey(DUST_DIAMOND), MekanismRig.itemKey(DUST_REFINED_OBSIDIAN),
                             MekanismRig.itemKey(PELLET_POLONIUM), MekanismRig.itemKey(STEEL_CASING),

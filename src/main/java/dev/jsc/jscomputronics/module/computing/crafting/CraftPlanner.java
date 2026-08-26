@@ -9,6 +9,8 @@ package dev.jsc.jscomputronics.module.computing.crafting;
 
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,12 +30,52 @@ public final class CraftPlanner {
     }
 
     /**
-     * One pattern executed {@code runs} times, inputs guaranteed by the steps before it.
+     * One recipe executed {@code runs} times, inputs guaranteed by the steps before it: either a bench pattern
+     * a Crafting Computer runs, or a machine pattern the network feeds through a Crafting Switch.
      */
-    public record Step(CraftingPattern pattern, long runs) {
+    public record Step(@Nullable CraftingPattern pattern, @Nullable ProcessingPattern machine, long runs) {
+
+        public static Step bench(final CraftingPattern pattern, final long runs) {
+            return new Step(pattern, null, runs);
+        }
+
+        public static Step machine(final ProcessingPattern machine, final long runs) {
+            return new Step(null, machine, runs);
+        }
+
+        public boolean isMachine() {
+            return machine != null;
+        }
+
+        /** Units of the result one run yields. */
+        public long perRun() {
+            if (machine != null) {
+                final ProcessingPattern.ProcessingOutput primary = machine.primaryOutput();
+                return primary == null ? 1 : Math.max(1, primary.amount());
+            }
+            return Math.max(1, pattern.result().getCount());
+        }
+
+        public StorageKey resultKey() {
+            if (machine != null) {
+                final ProcessingPattern.ProcessingOutput primary = machine.primaryOutput();
+                return primary == null ? null : primary.key();
+            }
+            return StorageKey.of(pattern.result());
+        }
+
+        public String resultName() {
+            final StorageKey key = resultKey();
+            return key == null ? "?" : key.displayName().getString();
+        }
+
+        /** Work units one run costs a computer: the ingredients it handles. */
+        public long unitsPerRun() {
+            return machine != null ? Math.max(1, machine.inputs().size()) : Math.max(1, pattern.filledCells());
+        }
 
         public long produced() {
-            return runs * pattern.result().getCount();
+            return runs * perRun();
         }
     }
 
@@ -50,7 +92,17 @@ public final class CraftPlanner {
 
     public static Plan plan(final StorageKey resultKey, final long quantity,
                             final List<CraftingPattern> patterns, final Map<StorageKey, Long> stock) {
-        final State state = new State(patterns, stock);
+        return plan(resultKey, quantity, patterns, List.of(), stock);
+    }
+
+    /**
+     * Plans with bench patterns AND machine patterns: an ingredient no bench pattern makes may come out of a
+     * machine, whose own inputs are planned the same way, so a request expands through both kinds of recipe.
+     */
+    public static Plan plan(final StorageKey resultKey, final long quantity,
+                            final List<CraftingPattern> patterns, final List<ProcessingPattern> machines,
+                            final Map<StorageKey, Long> stock) {
+        final State state = new State(patterns, machines, stock);
         final long covered = state.produce(resultKey, quantity, 0, new HashSet<>(), true);
         return new Plan(List.copyOf(state.steps), Map.copyOf(state.rawConsumption),
                 Map.copyOf(state.missing), covered);
@@ -58,13 +110,19 @@ public final class CraftPlanner {
 
     public static long maxFeasible(final StorageKey resultKey, final long quantity,
                                    final List<CraftingPattern> patterns, final Map<StorageKey, Long> stock) {
+        return maxFeasible(resultKey, quantity, patterns, List.of(), stock);
+    }
+
+    public static long maxFeasible(final StorageKey resultKey, final long quantity,
+                                   final List<CraftingPattern> patterns, final List<ProcessingPattern> machines,
+                                   final Map<StorageKey, Long> stock) {
         long low = 0;
         // Cap the search ceiling so the midpoint arithmetic below cannot overflow when quantity is near
         // Long.MAX_VALUE (e.g. an IQL CRAFT with no count cap); a craft beyond this bound is unrealistic.
         long high = Math.min(quantity, 2_000_000_000L);
         while (low < high) {
             final long mid = low + (high - low + 1) / 2;
-            if (plan(resultKey, mid, patterns, stock).feasible()) {
+            if (plan(resultKey, mid, patterns, machines, stock).feasible()) {
                 low = mid;
             } else {
                 high = mid - 1;
@@ -78,14 +136,17 @@ public final class CraftPlanner {
      */
     private static final class State {
         private final List<CraftingPattern> patterns;
+        private final List<ProcessingPattern> machines;
         private final Map<StorageKey, Long> remainingStock;
         private final Map<StorageKey, Long> intermediates = new HashMap<>();
         private final List<Step> steps = new ArrayList<>();
         private final Map<StorageKey, Long> rawConsumption = new LinkedHashMap<>();
         private final Map<StorageKey, Long> missing = new LinkedHashMap<>();
 
-        private State(final List<CraftingPattern> patterns, final Map<StorageKey, Long> stock) {
+        private State(final List<CraftingPattern> patterns, final List<ProcessingPattern> machines,
+                      final Map<StorageKey, Long> stock) {
             this.patterns = patterns;
+            this.machines = machines;
             this.remainingStock = new HashMap<>(stock);
         }
 
@@ -105,19 +166,24 @@ public final class CraftPlanner {
                 return quantity;
             }
 
+            // A bench pattern wins; otherwise a machine pattern whose primary output is the key.
             final CraftingPattern pattern = patternFor(key);
-            if (pattern == null || depth >= MAX_DEPTH || chain.contains(key)) {
+            final ProcessingPattern machine = pattern == null ? machineFor(key) : null;
+            if ((pattern == null && machine == null) || depth >= MAX_DEPTH || chain.contains(key)) {
                 missing.merge(key, deficit, Long::sum);
                 return quantity - deficit;
             }
 
-            final long perRun = pattern.result().getCount();
+            final long perRun = pattern != null ? Math.max(1, pattern.result().getCount())
+                    : Math.max(1, machine.primaryOutput().amount());
             final long runs = (deficit + perRun - 1) / perRun;
+            final Map<StorageKey, Long> ingredients = pattern != null
+                    ? pattern.ingredientTotals() : machineInputs(machine);
 
             // Secure every ingredient before this step executes (dependency order).
             chain.add(key);
             long feasibleRuns = runs;
-            for (final Map.Entry<StorageKey, Long> ingredient : pattern.ingredientTotals().entrySet()) {
+            for (final Map.Entry<StorageKey, Long> ingredient : ingredients.entrySet()) {
                 final long need = ingredient.getValue() * runs;
                 final long got = produce(ingredient.getKey(), need, depth + 1, chain, false);
                 if (got < need) {
@@ -133,7 +199,7 @@ public final class CraftPlanner {
                 missing.merge(key, deficit - feasibleRuns * perRun, Long::sum);
             }
             if (feasibleRuns > 0) {
-                steps.add(new Step(pattern, feasibleRuns));
+                steps.add(pattern != null ? Step.bench(pattern, feasibleRuns) : Step.machine(machine, feasibleRuns));
                 final long produced = feasibleRuns * perRun;
                 final long surplus = produced - Math.min(deficit, produced);
                 if (surplus > 0) {
@@ -151,6 +217,26 @@ public final class CraftPlanner {
                 }
             }
             return null;
+        }
+
+        @Nullable
+        private ProcessingPattern machineFor(final StorageKey key) {
+            for (final ProcessingPattern machine : machines) {
+                final ProcessingPattern.ProcessingOutput primary = machine.primaryOutput();
+                if (primary != null && primary.key().equals(key) && !machine.inputs().isEmpty()) {
+                    return machine;
+                }
+            }
+            return null;
+        }
+
+        /** A machine pattern's inputs per run, duplicates merged, in declaration order. */
+        private static Map<StorageKey, Long> machineInputs(final ProcessingPattern machine) {
+            final Map<StorageKey, Long> totals = new LinkedHashMap<>();
+            for (final ProcessingPattern.ProcessingInput in : machine.inputs()) {
+                totals.merge(in.key(), in.amount(), Long::sum);
+            }
+            return totals;
         }
 
         private static long takeFrom(final Map<StorageKey, Long> pool, final StorageKey key, final long want) {

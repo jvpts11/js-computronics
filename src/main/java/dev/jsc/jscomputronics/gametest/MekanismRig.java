@@ -19,6 +19,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -29,52 +30,52 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 /**
- * One Mekanism machine hung off the crafting switch through buses, for the machine GameTests. The crafting run
- * leaves the Crafting Computer (5,2,2) southward along x=5 through the switch at (5,2,4); the machine stands
- * east of the run's last cable. Mekanism machines take inputs on their top and, for the "extra" slot, their
- * bottom; they give outputs on their right face (west, for the factory north orientation) and, for two-output
- * machines, their left face (east) too; energy goes in through any face. Cables reach every one of those faces
- * so a bus can be mounted against each: the Input Bus above (and below), the Receiving Bus west (and east).
- * Machines are placed the way a player places them, so their factory side configuration applies.
+ * One Mekanism machine hung off the crafting switch through buses, for the machine GameTests and client tests.
+ * The crafting run leaves the Crafting Computer (5,2,2) southward along x=5 through the switch at (5,2,4); the
+ * machine stands east of the run's last cable. Mekanism machines take inputs on their top and, for the "extra"
+ * slot, their bottom; they give outputs on their right face (west, for the factory north orientation) and, for
+ * two-output machines, their left face (east) too; energy goes in through any face. Cables reach every one of
+ * those faces so a bus can be mounted against each: the Input Bus above (and below), the Receiving Bus west (and
+ * east). Machines are placed the way a player places them, so their factory side configuration applies.
  */
-final class MekanismRig {
+public final class MekanismRig {
 
     private MekanismRig() {
     }
 
-    static final int SETTLE = 4;
-    static final BlockPos SWITCH = new BlockPos(5, 2, 4);
-    static final BlockPos MACHINE = new BlockPos(6, 2, 7);
-    static final BlockPos CABLE_WEST = new BlockPos(5, 2, 7);
-    static final BlockPos CABLE_ABOVE = new BlockPos(6, 3, 7);
-    static final BlockPos CABLE_BELOW = new BlockPos(6, 1, 7);
-    static final BlockPos CABLE_EAST = new BlockPos(7, 2, 7);
+    public static final int SETTLE = 4;
+    public static final BlockPos SWITCH = new BlockPos(5, 2, 4);
+    public static final BlockPos MACHINE = new BlockPos(6, 2, 7);
+    public static final BlockPos CABLE_WEST = new BlockPos(5, 2, 7);
+    public static final BlockPos CABLE_ABOVE = new BlockPos(6, 3, 7);
+    public static final BlockPos CABLE_BELOW = new BlockPos(6, 1, 7);
+    public static final BlockPos CABLE_EAST = new BlockPos(7, 2, 7);
 
-    record Rig(TestWorldBuilder world, TestWorldBuilder.CraftingNetwork net) {
+    public record Rig(TestWorldBuilder world, TestWorldBuilder.CraftingNetwork net) {
     }
 
-    static ResourceLocation mek(final String path) {
+    public static ResourceLocation mek(final String path) {
         return ResourceLocation.fromNamespaceAndPath("mekanism", path);
     }
 
-    static ResourceLocation generators(final String path) {
+    public static ResourceLocation generators(final String path) {
         return ResourceLocation.fromNamespaceAndPath("mekanismgenerators", path);
     }
 
-    static Item item(final ResourceLocation id) {
+    public static Item item(final ResourceLocation id) {
         return BuiltInRegistries.ITEM.get(id);
     }
 
-    static StorageKey itemKey(final ResourceLocation id) {
+    public static StorageKey itemKey(final ResourceLocation id) {
         return StorageKey.of(item(id));
     }
 
-    static StorageKey water() {
+    public static StorageKey water() {
         return StorageKey.of(new FluidStack(Fluids.WATER, 1));
     }
 
-    static Rig build(final GameTestHelper helper, final ResourceLocation machineId) {
-        final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
+    /** Builds the crafting network and the machine rig in {@code world}; fails loudly if the machine is missing. */
+    public static TestWorldBuilder.CraftingNetwork place(final TestWorldBuilder world, final ResourceLocation machineId) {
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
         world.setBlock(new BlockPos(5, 2, 3), ComputingModule.CRAFTING_CABLE.get());
         world.setBlock(SWITCH, ComputingModule.CRAFTING_SWITCH.get());
@@ -89,51 +90,83 @@ final class MekanismRig {
         world.setBlock(new BlockPos(5, 1, 7), ComputingModule.CRAFTING_CABLE.get());
         world.setBlock(CABLE_BELOW, ComputingModule.CRAFTING_CABLE.get());
         final Block machine = BuiltInRegistries.BLOCK.get(machineId);
-        helper.assertTrue(machine != null && machine != Blocks.AIR, machineId + " must exist on the dev runtime");
+        if (machine == null || machine == Blocks.AIR) {
+            throw new IllegalStateException(machineId + " must exist on the dev runtime");
+        }
         world.placeFromItem(MACHINE, machine);
         final Direction facing = world.getBlockState(MACHINE)
                 .getOptionalValue(BlockStateProperties.HORIZONTAL_FACING).orElse(Direction.NORTH);
-        helper.assertTrue(facing == Direction.NORTH,
-                "the rig's face math assumes the factory orientation (north); got " + facing);
-        return new Rig(world, net);
+        if (facing != Direction.NORTH) {
+            throw new IllegalStateException("the rig's face math assumes the factory orientation (north); got " + facing);
+        }
+        return net;
+    }
+
+    public static Rig build(final GameTestHelper helper, final ResourceLocation machineId) {
+        final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
+        return new Rig(world, place(world, machineId));
     }
 
     /** Input Bus against the top, Receiving Bus against the right (west) face. */
-    static void mountBuses(final GameTestHelper helper) {
-        if (helper.getBlockEntity(CABLE_ABOVE) instanceof DataCableBlockEntity cable) {
+    public static void mountBuses(final TestWorldBuilder world) {
+        if (world.getBlockEntity(CABLE_ABOVE) instanceof DataCableBlockEntity cable) {
             cable.addPart(Direction.DOWN, new InputBusPart());
         }
-        if (helper.getBlockEntity(CABLE_WEST) instanceof DataCableBlockEntity cable) {
+        if (world.getBlockEntity(CABLE_WEST) instanceof DataCableBlockEntity cable) {
             cable.addPart(Direction.EAST, new ReceivingBusPart());
         }
     }
 
+    public static void mountBuses(final GameTestHelper helper) {
+        mountBuses(TestWorldBuilder.forGameTest(helper));
+    }
+
     /** A second Input Bus against the bottom: the "extra" slot of infusers and compressors lives there. */
-    static void mountBottomInputBus(final GameTestHelper helper) {
-        if (helper.getBlockEntity(CABLE_BELOW) instanceof DataCableBlockEntity cable) {
+    public static void mountBottomInputBus(final TestWorldBuilder world) {
+        if (world.getBlockEntity(CABLE_BELOW) instanceof DataCableBlockEntity cable) {
             cable.addPart(Direction.UP, new InputBusPart());
         }
     }
 
+    public static void mountBottomInputBus(final GameTestHelper helper) {
+        mountBottomInputBus(TestWorldBuilder.forGameTest(helper));
+    }
+
     /** A second Receiving Bus against the left (east) face, for machines that output on both sides. */
-    static void mountLeftReceivingBus(final GameTestHelper helper) {
-        if (helper.getBlockEntity(CABLE_EAST) instanceof DataCableBlockEntity cable) {
+    public static void mountLeftReceivingBus(final TestWorldBuilder world) {
+        if (world.getBlockEntity(CABLE_EAST) instanceof DataCableBlockEntity cable) {
             cable.addPart(Direction.WEST, new ReceivingBusPart());
         }
     }
 
-    /** Tops the machine's buffer up through the FE capability on its back face (a creative cube's role). */
-    static void power(final GameTestHelper helper) {
-        final IEnergyStorage fe = helper.getLevel().getCapability(Capabilities.EnergyStorage.BLOCK,
-                helper.absolutePos(MACHINE), Direction.SOUTH);
-        helper.assertTrue(fe != null, "the machine must expose FE on its back face");
-        fe.receiveEnergy(Integer.MAX_VALUE, false);
+    public static void mountLeftReceivingBus(final GameTestHelper helper) {
+        mountLeftReceivingBus(TestWorldBuilder.forGameTest(helper));
     }
 
-    static void assertDiscovered(final GameTestHelper helper, final ResourceLocation machineId) {
-        final CraftingSwitchBlockEntity sw = (CraftingSwitchBlockEntity) helper.getBlockEntity(SWITCH);
-        helper.assertTrue(sw != null && sw.declaredMachines().stream()
-                        .anyMatch(m -> m.machineType().equals(machineId.toString())),
+    /**
+     * Tops the machine's buffer up through the FE capability on its back face (a creative cube's role); returns
+     * false when the machine exposes no FE there.
+     */
+    public static boolean power(final ServerLevel level, final BlockPos machine) {
+        final IEnergyStorage fe = level.getCapability(Capabilities.EnergyStorage.BLOCK, machine, Direction.SOUTH);
+        if (fe == null) {
+            return false;
+        }
+        fe.receiveEnergy(Integer.MAX_VALUE, false);
+        return true;
+    }
+
+    public static void power(final GameTestHelper helper) {
+        helper.assertTrue(power(helper.getLevel(), helper.absolutePos(MACHINE)), "the machine must expose FE on its back face");
+    }
+
+    public static boolean discovered(final TestWorldBuilder world, final ResourceLocation machineId) {
+        return world.getBlockEntity(SWITCH) instanceof CraftingSwitchBlockEntity sw
+                && sw.declaredMachines().stream().anyMatch(m -> m.machineType().equals(machineId.toString()));
+    }
+
+    public static void assertDiscovered(final GameTestHelper helper, final ResourceLocation machineId) {
+        helper.assertTrue(discovered(TestWorldBuilder.forGameTest(helper), machineId),
                 "the switch must discover " + machineId + " through its buses");
     }
 }
