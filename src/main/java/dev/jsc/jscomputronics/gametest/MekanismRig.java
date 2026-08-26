@@ -1,0 +1,139 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jsc.jscomputronics.gametest;
+
+import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.part.InputBusPart;
+import dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart;
+import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jsc.jscomputronics.testkit.TestWorldBuilder;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.fluids.FluidStack;
+
+/**
+ * One Mekanism machine hung off the crafting switch through buses, for the machine GameTests. The crafting run
+ * leaves the Crafting Computer (5,2,2) southward along x=5 through the switch at (5,2,4); the machine stands
+ * east of the run's last cable. Mekanism machines take inputs on their top and, for the "extra" slot, their
+ * bottom; they give outputs on their right face (west, for the factory north orientation) and, for two-output
+ * machines, their left face (east) too; energy goes in through any face. Cables reach every one of those faces
+ * so a bus can be mounted against each: the Input Bus above (and below), the Receiving Bus west (and east).
+ * Machines are placed the way a player places them, so their factory side configuration applies.
+ */
+final class MekanismRig {
+
+    private MekanismRig() {
+    }
+
+    static final int SETTLE = 4;
+    static final BlockPos SWITCH = new BlockPos(5, 2, 4);
+    static final BlockPos MACHINE = new BlockPos(6, 2, 7);
+    static final BlockPos CABLE_WEST = new BlockPos(5, 2, 7);
+    static final BlockPos CABLE_ABOVE = new BlockPos(6, 3, 7);
+    static final BlockPos CABLE_BELOW = new BlockPos(6, 1, 7);
+    static final BlockPos CABLE_EAST = new BlockPos(7, 2, 7);
+
+    record Rig(TestWorldBuilder world, TestWorldBuilder.CraftingNetwork net) {
+    }
+
+    static ResourceLocation mek(final String path) {
+        return ResourceLocation.fromNamespaceAndPath("mekanism", path);
+    }
+
+    static ResourceLocation generators(final String path) {
+        return ResourceLocation.fromNamespaceAndPath("mekanismgenerators", path);
+    }
+
+    static Item item(final ResourceLocation id) {
+        return BuiltInRegistries.ITEM.get(id);
+    }
+
+    static StorageKey itemKey(final ResourceLocation id) {
+        return StorageKey.of(item(id));
+    }
+
+    static StorageKey water() {
+        return StorageKey.of(new FluidStack(Fluids.WATER, 1));
+    }
+
+    static Rig build(final GameTestHelper helper, final ResourceLocation machineId) {
+        final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
+        final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
+        world.setBlock(new BlockPos(5, 2, 3), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(SWITCH, ComputingModule.CRAFTING_SWITCH.get());
+        for (int z = 5; z <= 7; z++) {
+            world.setBlock(new BlockPos(5, 2, z), ComputingModule.CRAFTING_CABLE.get());
+        }
+        // Spurs over and under the machine, each continuing to its far (east) face.
+        world.setBlock(new BlockPos(5, 3, 7), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(CABLE_ABOVE, ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(new BlockPos(7, 3, 7), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(CABLE_EAST, ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(new BlockPos(5, 1, 7), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(CABLE_BELOW, ComputingModule.CRAFTING_CABLE.get());
+        final Block machine = BuiltInRegistries.BLOCK.get(machineId);
+        helper.assertTrue(machine != null && machine != Blocks.AIR, machineId + " must exist on the dev runtime");
+        world.placeFromItem(MACHINE, machine);
+        final Direction facing = world.getBlockState(MACHINE)
+                .getOptionalValue(BlockStateProperties.HORIZONTAL_FACING).orElse(Direction.NORTH);
+        helper.assertTrue(facing == Direction.NORTH,
+                "the rig's face math assumes the factory orientation (north); got " + facing);
+        return new Rig(world, net);
+    }
+
+    /** Input Bus against the top, Receiving Bus against the right (west) face. */
+    static void mountBuses(final GameTestHelper helper) {
+        if (helper.getBlockEntity(CABLE_ABOVE) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.DOWN, new InputBusPart());
+        }
+        if (helper.getBlockEntity(CABLE_WEST) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.EAST, new ReceivingBusPart());
+        }
+    }
+
+    /** A second Input Bus against the bottom: the "extra" slot of infusers and compressors lives there. */
+    static void mountBottomInputBus(final GameTestHelper helper) {
+        if (helper.getBlockEntity(CABLE_BELOW) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.UP, new InputBusPart());
+        }
+    }
+
+    /** A second Receiving Bus against the left (east) face, for machines that output on both sides. */
+    static void mountLeftReceivingBus(final GameTestHelper helper) {
+        if (helper.getBlockEntity(CABLE_EAST) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.WEST, new ReceivingBusPart());
+        }
+    }
+
+    /** Tops the machine's buffer up through the FE capability on its back face (a creative cube's role). */
+    static void power(final GameTestHelper helper) {
+        final IEnergyStorage fe = helper.getLevel().getCapability(Capabilities.EnergyStorage.BLOCK,
+                helper.absolutePos(MACHINE), Direction.SOUTH);
+        helper.assertTrue(fe != null, "the machine must expose FE on its back face");
+        fe.receiveEnergy(Integer.MAX_VALUE, false);
+    }
+
+    static void assertDiscovered(final GameTestHelper helper, final ResourceLocation machineId) {
+        final CraftingSwitchBlockEntity sw = (CraftingSwitchBlockEntity) helper.getBlockEntity(SWITCH);
+        helper.assertTrue(sw != null && sw.declaredMachines().stream()
+                        .anyMatch(m -> m.machineType().equals(machineId.toString())),
+                "the switch must discover " + machineId + " through its buses");
+    }
+}
