@@ -315,4 +315,54 @@ public final class MekanismMachineParkGameTests {
                 })
                 .thenSucceed();
     }
+
+    @GameTest(template = ARENA, timeoutTicks = 4000)
+    public static void cliCraft_plansTheAlloyChainFromTheCommandLine(final GameTestHelper helper) {
+        // The command-line route (MC-NET / MC-DOS shells): "operation craft" on the Crafting Computer's console
+        // must reach the same planner and drive the same machine steps as the desktop request.
+        final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
+        final StorageKey frame = MekanismRig.itemKey(FRAME);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    MekanismRig.mountBuses(helper);
+                    MekanismRig.mountBottomInputBus(helper);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    rig.net().seed(Items.COPPER_INGOT, 4);
+                    rig.net().seed(Items.REDSTONE, 4);
+                    storage.insert(MekanismRig.itemKey(DUST_DIAMOND), 8);
+                    storage.insert(MekanismRig.itemKey(DUST_REFINED_OBSIDIAN), 16);
+                    storage.insert(MekanismRig.itemKey(PELLET_POLONIUM), 4);
+                    storage.insert(MekanismRig.itemKey(STEEL_CASING), 1);
+                    final CraftingComputerBlockEntity cc = rig.net().cc();
+                    helper.assertTrue(cc.loadPattern(framePattern()), "the frame pattern must load into the ROM");
+                    for (final ProcessingPattern machine : new ProcessingPattern[]{infusedAlloy(), reinforcedAlloy(), atomicAlloy()}) {
+                        helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(machine)),
+                                "the machine pattern must load into the ROM: " + machine.machineType());
+                    }
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) rig.net().cc(), helper.getLevel());
+                    final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(50);
+                    final var response = shell.run("operation craft 4 " + FRAME, cli);
+                    final boolean queued = response.lines().stream().anyMatch(l -> l.text().contains("CRAFT queued"));
+                    helper.assertTrue(queued, "the shell must queue the craft; got " + response.lines().stream().map(l -> l.text()).toList());
+                    helper.assertTrue(!rig.net().mainframe().activeOperationRecords().isEmpty(), "the craft must be active on the Mainframe");
+                })
+                .thenWaitUntil(() -> {
+                    MekanismRig.power(helper);
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(storage.count(frame) >= 4, "waiting for the frames: "
+                            + rig.net().mainframe().activeOperationRecords());
+                })
+                .thenExecute(() -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(storage.count(frame) == 4, "four frames must land in the network; got " + storage.count(frame));
+                    helper.assertTrue(storage.count(Items.COPPER_INGOT) == 0 && storage.count(MekanismRig.itemKey(STEEL_CASING)) == 0,
+                            "the raw stock must be spent to the unit");
+                })
+                .thenSucceed();
+    }
 }
