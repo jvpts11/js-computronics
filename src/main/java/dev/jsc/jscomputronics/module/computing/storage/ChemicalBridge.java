@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,4 +35,12 @@ public interface ChemicalBridge {
 
     /** The chemical's colour (ARGB), for the GUIs' tinted swatch. */
     int tint(ResourceLocation chemical);
+
+    /**
+     * The chemical an item carries (a filled tank item, a hohlraum), if any: how a bus filter names a chemical,
+     * the way a filled bucket names a fluid.
+     */
+    default Optional<ResourceLocation> chemicalOf(final ItemStack stack) {
+        return Optional.empty();
+    }
 }

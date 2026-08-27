@@ -25,10 +25,13 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -154,6 +157,92 @@ public final class ChemicalDataGameTests {
                     helper.assertTrue(pulled == 1200, "the port must drain the tank; got " + pulled);
                     final long back = storage.insert(oxygen, pulled);
                     helper.assertTrue(back == 1200 && storage.count(oxygen) == 2000, "the oxygen must land back in the network as data");
+                })
+                .thenSucceed();
+    }
+
+    // The bus cable hangs south of the Ethernet at (4,2,2); tank A's front (north) touches the cable's south
+    // face — the tank's only output face — and tank B stands west of the cable, taking input on its east face.
+    private static final BlockPos BUS_CABLE = new BlockPos(4, 2, 3);
+    private static final BlockPos TANK_A = new BlockPos(4, 2, 4);
+    private static final BlockPos TANK_B = new BlockPos(3, 2, 3);
+
+    @GameTest(template = ARENA, timeoutTicks = 400)
+    public static void importBus_pullsAGasOutOfATankIntoTheNetwork(final GameTestHelper helper) {
+        final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
+        final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
+        world.setBlock(BUS_CABLE, dev.jsc.jscomputronics.module.computing.ComputingModule.ETHERNET_CABLE.get());
+        world.placeFromItem(TANK_A, BuiltInRegistries.BLOCK.get(TANK));
+        final StorageKey oxygen = StorageKey.chemical(OXYGEN);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
+                    helper.assertTrue(tank.isPresent() && tank.get().fill(OXYGEN, 500, false) == 500, "the tank must take 500 mB of oxygen");
+                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable) {
+                        cable.addPart(Direction.SOUTH, new dev.jsc.jscomputronics.module.computing.block.part.ImportBusPart());
+                    }
+                })
+                .thenWaitUntil(() -> helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) >= 500,
+                        "the Import Bus must bring the oxygen into the network as data; got " + net.storage(helper.getLevel()).count(oxygen)
+                                + " active=" + net.mainframe().activeOperationRecords()))
+                .thenExecute(() -> {
+                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
+                    helper.assertTrue(tank.isPresent() && tank.get().count(OXYGEN) == 0, "the tank must be drained; holds "
+                            + tank.map(t -> t.count(OXYGEN)).orElse(-1L));
+                    helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) == 500, "exactly 500 mB must be in the network");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 400)
+    public static void exportBus_metersAGasIntoATankUpToItsMax(final GameTestHelper helper) {
+        // The filter names the chemical the way a bucket names a fluid: with an item that carries it — here a
+        // tank item that held oxygen when it was picked up. The max keeps the faced tank at 300 mB, no more.
+        final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
+        final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
+        world.setBlock(BUS_CABLE, dev.jsc.jscomputronics.module.computing.ComputingModule.ETHERNET_CABLE.get());
+        world.placeFromItem(TANK_A, BuiltInRegistries.BLOCK.get(TANK));
+        world.placeFromItem(TANK_B, BuiltInRegistries.BLOCK.get(TANK));
+        final StorageKey oxygen = StorageKey.chemical(OXYGEN);
+        final ItemStack[] filterItem = {ItemStack.EMPTY};
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
+                    helper.assertTrue(tank.isPresent() && tank.get().fill(OXYGEN, 100, false) == 100, "tank A must take 100 mB of oxygen");
+                    net.storage(helper.getLevel()).insert(oxygen, 2000);
+                    // Pick tank A up: the item keeps its gas, and that item is the filter.
+                    helper.getLevel().destroyBlock(world.absolute(TANK_A), true);
+                })
+                .thenExecuteAfter(2, () -> {
+                    for (final ItemEntity drop : helper.getLevel().getEntitiesOfClass(
+                            ItemEntity.class,
+                            AABB.encapsulatingFullBlocks(world.absolute(TANK_A.offset(-1, -1, -1)), world.absolute(TANK_A.offset(1, 1, 1))))) {
+                        if (drop.getItem().is(BuiltInRegistries.BLOCK.get(TANK).asItem())) {
+                            filterItem[0] = drop.getItem().copy();
+                            drop.discard();
+                        }
+                    }
+                    helper.assertTrue(!filterItem[0].isEmpty(), "picking the tank up must drop its item");
+                    helper.assertTrue(ChemicalBridges.chemicalOf(filterItem[0]).filter(OXYGEN::equals).isPresent(),
+                            "the tank item must carry the oxygen; got " + ChemicalBridges.chemicalOf(filterItem[0]));
+                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable) {
+                        final var bus = new dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart();
+                        cable.addPart(Direction.WEST, bus);
+                        bus.setFilter(filterItem[0]);
+                        bus.getDataAccess().set(1, 300); // max: keep the faced block at 300 mB
+                    }
+                })
+                .thenWaitUntil(() -> {
+                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_B), Direction.UP);
+                    helper.assertTrue(tank.isPresent() && tank.get().count(OXYGEN) >= 300, "the Export Bus must push oxygen into tank B; holds "
+                            + tank.map(t -> t.count(OXYGEN)).orElse(-1L) + " active=" + net.mainframe().activeOperationRecords());
+                })
+                .thenExecuteAfter(40, () -> {
+                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_B), Direction.UP);
+                    helper.assertTrue(tank.isPresent() && tank.get().count(OXYGEN) == 300, "the max must hold tank B at 300 mB; holds "
+                            + tank.map(t -> t.count(OXYGEN)).orElse(-1L));
+                    helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) == 1700, "the network must have handed over exactly 300 mB; holds "
+                            + net.storage(helper.getLevel()).count(oxygen));
                 })
                 .thenSucceed();
     }

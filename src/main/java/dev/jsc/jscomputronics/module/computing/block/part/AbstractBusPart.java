@@ -151,7 +151,8 @@ public abstract sealed class AbstractBusPart implements CablePart permits Import
 
     /**
      * The storage key the filter selects, or {@code null} for an empty filter. A fluid container in the slot
-     * (e.g. a filled bucket) selects its FLUID, so a bus can target a fluid the same way it targets an item.
+     * (e.g. a filled bucket) selects its FLUID, and an item carrying a chemical (a filled tank item, a
+     * hohlraum) selects that CHEMICAL, so a bus can target any kind of data the same way it targets an item.
      */
     @Nullable
     protected StorageKey filterKey() {
@@ -162,6 +163,8 @@ public abstract sealed class AbstractBusPart implements CablePart permits Import
         return FluidUtil.getFluidContained(stack)
                 .filter(f -> !f.isEmpty())
                 .map(StorageKey::of)
+                .or(() -> dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges.chemicalOf(stack)
+                        .map(StorageKey::chemical))
                 .orElseGet(() -> StorageKey.of(stack));
     }
 

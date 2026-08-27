@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,6 +45,20 @@ public final class ChemicalBridges {
             final Optional<ChemicalPort> port = bridge.portFor(level, pos, side);
             if (port.isPresent()) {
                 return port;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The chemical carried by {@code stack}, from the first bridge that recognises the item. */
+    public static Optional<ResourceLocation> chemicalOf(final ItemStack stack) {
+        if (stack.isEmpty()) {
+            return Optional.empty();
+        }
+        for (final ChemicalBridge bridge : BRIDGES) {
+            final Optional<ResourceLocation> chemical = bridge.chemicalOf(stack);
+            if (chemical.isPresent()) {
+                return chemical;
             }
         }
         return Optional.empty();

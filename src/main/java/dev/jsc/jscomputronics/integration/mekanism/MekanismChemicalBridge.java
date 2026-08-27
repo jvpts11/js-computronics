@@ -19,7 +19,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.capabilities.BlockCapability;
+import net.neoforged.neoforge.capabilities.ItemCapability;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -36,6 +38,10 @@ import java.util.Set;
 final class MekanismChemicalBridge implements ChemicalBridge {
 
     /** Mekanism's sided block capability for chemical handlers; capabilities are interned by name. */
+    // The item form of the same capability: what a filled tank item or a hohlraum holds.
+    private static final ItemCapability<IChemicalHandler, Void> ITEM_CHEMICAL_HANDLER =
+            ItemCapability.createVoid(ResourceLocation.fromNamespaceAndPath("mekanism", "chemical_handler"),
+                    IChemicalHandler.class);
     private static final BlockCapability<IChemicalHandler, @Nullable Direction> CHEMICAL_HANDLER =
             BlockCapability.createSided(ResourceLocation.fromNamespaceAndPath("mekanism", "chemical_handler"),
                     IChemicalHandler.class);
@@ -54,6 +60,21 @@ final class MekanismChemicalBridge implements ChemicalBridge {
     @Override
     public Component displayName(final ResourceLocation chemical) {
         return lookup(chemical).getTextComponent();
+    }
+
+    @Override
+    public Optional<ResourceLocation> chemicalOf(final ItemStack stack) {
+        final IChemicalHandler handler = stack.getCapability(ITEM_CHEMICAL_HANDLER);
+        if (handler == null) {
+            return Optional.empty();
+        }
+        for (int tank = 0; tank < handler.getChemicalTanks(); tank++) {
+            final ChemicalStack inTank = handler.getChemicalInTank(tank);
+            if (!inTank.isEmpty()) {
+                return Optional.ofNullable(HandlerPort.idOf(inTank.getChemical()));
+            }
+        }
+        return Optional.empty();
     }
 
     @Override
