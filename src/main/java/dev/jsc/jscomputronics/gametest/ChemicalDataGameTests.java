@@ -246,4 +246,28 @@ public final class ChemicalDataGameTests {
                 })
                 .thenSucceed();
     }
+
+    @GameTest(template = ARENA)
+    public static void externalPort_offersEveryKindOfDataTheBlockHas(final GameTestHelper helper) {
+        // The one factory every production port goes through must find each kind a block offers on a face —
+        // a chemical tank has item slots and a chemical tank, a furnace only item slots — and none it lacks.
+        final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
+        final BlockPos tank = new BlockPos(2, 2, 2);
+        final BlockPos furnace = new BlockPos(4, 2, 2);
+        world.placeFromItem(tank, BuiltInRegistries.BLOCK.get(TANK));
+        world.setBlock(furnace, Blocks.FURNACE);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final ExternalDataPort tankPort = ExternalDataPort.at(helper.getLevel(), world.absolute(tank), Direction.UP);
+                    helper.assertTrue(tankPort.kinds().contains(StorageKey.Kind.CHEMICAL) && tankPort.kinds().contains(StorageKey.Kind.ITEM)
+                                    && !tankPort.kinds().contains(StorageKey.Kind.FLUID),
+                            "a chemical tank's top offers items and chemicals, not fluids; got " + tankPort.kinds());
+                    final ExternalDataPort furnacePort = ExternalDataPort.at(helper.getLevel(), world.absolute(furnace), Direction.UP);
+                    helper.assertTrue(furnacePort.kinds().equals(java.util.Set.of(StorageKey.Kind.ITEM)),
+                            "a furnace offers items only; got " + furnacePort.kinds());
+                    helper.assertTrue(ExternalDataPort.at(helper.getLevel(), world.absolute(new BlockPos(6, 2, 2)), Direction.UP).isEmpty(),
+                            "air offers nothing");
+                })
+                .thenSucceed();
+    }
 }

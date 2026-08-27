@@ -117,13 +117,9 @@ public class DataCableBlockEntity extends BlockEntity {
         if (serverLevel == null) {
             return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(null, null);
         }
-        final net.minecraft.core.BlockPos at = worldPosition.relative(face);
-        final Direction side = face.getOpposite();
-        // Items, fluids and chemicals alike: a bus moves whatever data the faced block holds.
-        return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(
-                serverLevel.getCapability(Capabilities.ItemHandler.BLOCK, at, side),
-                serverLevel.getCapability(Capabilities.FluidHandler.BLOCK, at, side),
-                dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges.portFor(serverLevel, at, side).orElse(null));
+        // Every kind of data the faced block holds: a bus moves whatever is there.
+        return dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort.at(
+                serverLevel, worldPosition.relative(face), face.getOpposite());
     }
 
     // Part hosting
