@@ -197,6 +197,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
     // Intermediates handed back to the network for the running machine step, to be taken back into the pool
     // once it settles: bench steps only ever consume from the pool or from locked raw stock.
     private final Map<StorageKey, Long> flushed = new LinkedHashMap<>();
+    // True while the exclusively claimed computer is let go during a machine step (the machine, not the
+    // computer, is working); the craft claims a computer again once the step settles.
+    private boolean executorsParked;
 
     public NetworkCraftOperation(final ServerLevel level, final NetworkUuid network,
                                  final StorageKey resultKey, final long requested,
@@ -268,6 +271,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
             if (stepIndex >= plan.steps().size()) {
                 finish();
                 return;
+            }
+            if (waiting) {
+                return; // a computer is claimed again on the next tick before bench work resumes
             }
         }
 
@@ -347,10 +353,23 @@ public final class NetworkCraftOperation implements PersistentOperation {
                 finish();
                 return -1;
             }
+            if (exclusiveClaim) {
+                // The computer has nothing to do while the machine works: free it for other crafts.
+                for (final CraftingComputerBlockEntity cc : executors) {
+                    cc.releaseCraft(operationId);
+                }
+                executorsParked = true;
+            }
             return 0;
         }
         if (!machineStep.isDone()) {
             return 0;
+        }
+        if (executorsParked) {
+            // Back to the acquisition phase for a computer (the ingredients stay locked).
+            executorsParked = false;
+            waiting = true;
+            waitTicks = 0;
         }
         // Take back what was handed to the network for this step, then the step's own output.
         for (final Map.Entry<StorageKey, Long> entry : flushed.entrySet()) {

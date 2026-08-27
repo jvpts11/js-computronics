@@ -29,7 +29,7 @@ import java.util.Map;
 
 /**
  * The whole Fusion Reactor shell as a planning problem: every part of the 5x5x5 (controller, four ports, two
- * logic adapters, eight reactor glass, the laser focus matrix and the 38 plain frames) is requested against
+ * logic adapters, eight reactor glass, the laser focus matrix and the 51 plain frames) is requested against
  * one raw stock with flat patterns only — bench recipes and machine recipes side by side — and the planner
  * must find every part feasible and spend the raw stock to the unit. Polonium pellets and steel casings are
  * raw by decision; ingots (lead, osmium, iron) are raw to keep the tree at the reactor's own recipes.
@@ -113,13 +113,13 @@ public final class FusionReactorBomGameTests {
     /** The raw stock the shell needs, to the unit, when each part is requested on its own. */
     private static Map<StorageKey, Long> rawStock() {
         final Map<StorageKey, Long> stock = new LinkedHashMap<>();
-        // 15 frame crafts (60 frames for 53 needed) + 4 ultimate circuits' 8 atomic: 68 atomic alloys.
-        stock.put(StorageKey.of(Items.COPPER_INGOT), 88L);          // 68 atomic + 8 (elite) + 8 (advanced) + 4 (tank) infused alloys
-        stock.put(StorageKey.of(Items.REDSTONE), 104L);             // 88 infusions + 4 basic circuits x2 + 2 adapters x4
-        stock.put(StorageKey.of(mek("dust_diamond")), 152L);        // 76 reinforced x2
-        stock.put(StorageKey.of(mek("dust_refined_obsidian")), 272L); // 68 atomic x4
-        stock.put(StorageKey.of(mek("pellet_polonium")), 60L);      // 15 frame crafts x4
-        stock.put(StorageKey.of(mek("steel_casing")), 15L);         // 15 frame crafts
+        // 17 frame crafts (68 frames for 66 needed) + 4 ultimate circuits' 8 atomic: 76 atomic alloys.
+        stock.put(StorageKey.of(Items.COPPER_INGOT), 96L);          // 76 atomic + 8 (elite) + 8 (advanced) + 4 (tank) infused alloys
+        stock.put(StorageKey.of(Items.REDSTONE), 112L);             // 96 infusions + 4 basic circuits x2 + 2 adapters x4
+        stock.put(StorageKey.of(mek("dust_diamond")), 168L);        // 84 reinforced x2
+        stock.put(StorageKey.of(mek("dust_refined_obsidian")), 304L); // 76 atomic x4
+        stock.put(StorageKey.of(mek("pellet_polonium")), 68L);      // 17 frame crafts x4
+        stock.put(StorageKey.of(mek("steel_casing")), 17L);         // 17 frame crafts
         stock.put(StorageKey.of(mek("ingot_osmium")), 8L);          // 4 basic circuits + 4 for the chemical tank
         stock.put(StorageKey.of(Items.IRON_INGOT), 12L);            // 12 enriched iron for 3 reactor glass crafts
         stock.put(StorageKey.of(Items.COAL), 12L);
@@ -141,7 +141,7 @@ public final class FusionReactorBomGameTests {
         parts.put(StorageKey.of(gen("fusion_reactor_logic_adapter")), 2L);
         parts.put(StorageKey.of(gen("reactor_glass")), 8L);
         parts.put(StorageKey.of(gen("laser_focus_matrix")), 1L);
-        parts.put(StorageKey.of(gen("fusion_reactor_frame")), 38L);
+        parts.put(StorageKey.of(gen("fusion_reactor_frame")), 51L); // 36 ring/edge frames + 15 on casing cells
 
         long machineRuns = 0;
         long benchRuns = 0;
@@ -156,16 +156,46 @@ public final class FusionReactorBomGameTests {
                     benchRuns += step.runs();
                 }
             }
-            // The next part plans against what this one left.
+            // The next part plans against what this one left: raw stock minus what it drew, plus the surplus
+            // of every intermediate its steps made beyond what they consumed (a craft returns those to storage).
             plan.rawConsumption().forEach((key, used) -> stock.merge(key, -used, Long::sum));
+            final Map<StorageKey, Long> balance = new HashMap<>();
+            for (final CraftPlanner.Step step : plan.steps()) {
+                balance.merge(step.resultKey(), step.produced(), Long::sum);
+                if (step.isMachine()) {
+                    for (final ProcessingPattern.ProcessingInput in : step.machine().inputs()) {
+                        balance.merge(in.key(), -in.amount() * step.runs(), Long::sum);
+                    }
+                } else {
+                    for (final Map.Entry<StorageKey, Long> in : step.pattern().ingredientTotals().entrySet()) {
+                        balance.merge(in.getKey(), -in.getValue() * step.runs(), Long::sum);
+                    }
+                }
+            }
+            balance.merge(part.getKey(), -part.getValue(), Long::sum);
+            // What a step drew from stock was already taken off the stock above; it is not production spent.
+            plan.rawConsumption().forEach((key, taken) -> {
+                if (balance.containsKey(key)) {
+                    balance.merge(key, taken, Long::sum);
+                }
+            });
+            balance.forEach((key, surplus) -> {
+                if (surplus > 0) {
+                    stock.merge(key, surplus, Long::sum);
+                }
+            });
         }
         for (final Map.Entry<StorageKey, Long> left : stock.entrySet()) {
-            helper.assertTrue(left.getValue() == 0L, left.getKey() + " must be spent to the unit; left " + left.getValue());
+            // Honest surpluses: two frames (17 crafts of four for 66 needed) and one laser focus matrix (the
+            // recipe makes two); everything else is spent.
+            final long expected = left.getKey().equals(StorageKey.of(gen("fusion_reactor_frame"))) ? 2L
+                    : left.getKey().equals(StorageKey.of(gen("laser_focus_matrix"))) ? 1L : 0L;
+            helper.assertTrue(left.getValue() == expected, left.getKey() + " must be spent to the unit; left " + left.getValue());
         }
-        // 88 infused + 76 reinforced + 68 atomic + 4 basic circuits + 12 enriched iron.
-        helper.assertTrue(machineRuns == 248, "the shell costs 248 machine runs; planned " + machineRuns);
-        // 15 frames + 4 ultimate + 4 elite + 4 advanced + 1 tank + 1 controller + 2 ports + 2 adapters + 3 glass + 1 matrix.
-        helper.assertTrue(benchRuns == 37, "the shell costs 37 bench runs; planned " + benchRuns);
+        // 96 infused + 84 reinforced + 76 atomic + 4 basic circuits + 12 enriched iron.
+        helper.assertTrue(machineRuns == 272, "the shell costs 272 machine runs; planned " + machineRuns);
+        // 17 frames + 4 ultimate + 4 elite + 4 advanced + 1 tank + 1 controller + 2 ports + 2 adapters + 3 glass + 1 matrix.
+        helper.assertTrue(benchRuns == 39, "the shell costs 39 bench runs; planned " + benchRuns);
         helper.succeed();
     }
 }
