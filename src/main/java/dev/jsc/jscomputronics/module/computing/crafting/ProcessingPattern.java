@@ -33,17 +33,28 @@ public record ProcessingPattern(List<ProcessingInput> inputs, List<ProcessingOut
     public static final int DEFAULT_TIMEOUT_TICKS = 200;
     public static final int FULL_CHANCE = 100;
 
-    /** One input: a key (item or fluid) and how much of it the machine consumes per run. */
-    public record ProcessingInput(StorageKey key, long amount) {
+    /**
+     * One input: a key (item, fluid or chemical) and how much of it the machine consumes per run. An
+     * {@code estimated} amount was worked out from a recipe that meters its input per tick (per-tick usage
+     * times the machine's base duration) rather than confirmed by the author; it runs like any other, the
+     * flag only lets the GUIs say so until the author edits or confirms it.
+     */
+    public record ProcessingInput(StorageKey key, long amount, boolean estimated) {
+        public ProcessingInput(final StorageKey key, final long amount) {
+            this(key, amount, false);
+        }
+
         public static final Codec<ProcessingInput> CODEC = RecordCodecBuilder.create(i -> i.group(
                 StorageKey.CODEC.fieldOf("key").forGetter(ProcessingInput::key),
-                Codec.LONG.fieldOf("amount").forGetter(ProcessingInput::amount)
+                Codec.LONG.fieldOf("amount").forGetter(ProcessingInput::amount),
+                Codec.BOOL.optionalFieldOf("estimated", false).forGetter(ProcessingInput::estimated)
         ).apply(i, ProcessingInput::new));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, ProcessingInput> STREAM_CODEC =
                 StreamCodec.composite(
                         StorageKey.STREAM_CODEC, ProcessingInput::key,
                         ByteBufCodecs.VAR_LONG, ProcessingInput::amount,
+                        ByteBufCodecs.BOOL, ProcessingInput::estimated,
                         ProcessingInput::new);
     }
 

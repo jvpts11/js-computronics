@@ -14,6 +14,7 @@ import mekanism.api.MekanismAPI;
 import mekanism.api.chemical.Chemical;
 import mekanism.api.chemical.ChemicalStack;
 import mekanism.api.chemical.IChemicalHandler;
+import mekanism.api.recipes.ItemStackChemicalToObjectRecipe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -75,6 +76,20 @@ final class MekanismChemicalBridge implements ChemicalBridge {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<ChemicalAmount> chemicalIngredient(final Object ingredient) {
+        if (ingredient instanceof ChemicalStack stack && !stack.isEmpty()) {
+            final ResourceLocation id = HandlerPort.idOf(stack.getChemical());
+            return id == null ? Optional.empty() : Optional.of(new ChemicalAmount(id, stack.getAmount()));
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean perTickUsage(final Object recipe) {
+        return recipe instanceof ItemStackChemicalToObjectRecipe<?> metered && metered.perTickUsage();
     }
 
     @Override

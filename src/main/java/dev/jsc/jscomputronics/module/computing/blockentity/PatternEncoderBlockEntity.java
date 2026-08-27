@@ -17,13 +17,20 @@ import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
 import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
 import dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents;
 import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
+import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -36,7 +43,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.items.ItemStackHandler;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -80,23 +89,65 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         }
     };
 
-    // PROCESSING authoring state. Inputs/outputs are ghost stacks whose count is the per-run amount; each output
-    // carries a chance (100 = guaranteed). The machine TYPE is a block registry-id string (or a Crafting Switch
-    // face name) the engine matches against a declared machine. All of this is synced to the client by the update
-    // tag so the screen can read it back without a dedicated payload.
-    private final ItemStackHandler procInputs = new ItemStackHandler(PROC_GRID) {
-        @Override
-        protected void onContentsChanged(final int slot) {
-            setChanged();
-        }
-    };
+    /**
+     * One processing cell: a kind of data (item, fluid or chemical), the amount per run and whether that amount
+     * is an estimate a recipe transfer worked out rather than one the author confirmed. Cells are ghost data —
+     * an item cell shows the item, a fluid or chemical cell shows the substance — and never hold real items.
+     */
+    public record DataCell(StorageKey key, long amount, boolean estimated) {
 
-    private final ItemStackHandler procOutputs = new ItemStackHandler(PROC_GRID) {
-        @Override
-        protected void onContentsChanged(final int slot) {
-            setChanged();
+        /** What a fluid or chemical cell gets when it is placed from an item that carries it: one bucket. */
+        public static final long CONTINUOUS_DEFAULT_AMOUNT = StorageKey.MB_EQ_PER_ITEM;
+
+        public static final Codec<DataCell> CODEC = RecordCodecBuilder.create(i -> i.group(
+                StorageKey.CODEC.fieldOf("key").forGetter(DataCell::key),
+                Codec.LONG.fieldOf("amount").forGetter(DataCell::amount),
+                Codec.BOOL.optionalFieldOf("estimated", false).forGetter(DataCell::estimated)
+        ).apply(i, DataCell::new));
+
+        public static final StreamCodec<RegistryFriendlyByteBuf, DataCell> STREAM_CODEC = StreamCodec.composite(
+                StorageKey.STREAM_CODEC, DataCell::key,
+                ByteBufCodecs.VAR_LONG, DataCell::amount,
+                ByteBufCodecs.BOOL, DataCell::estimated,
+                DataCell::new);
+
+        public boolean isItem() {
+            return key.isItem();
         }
-    };
+
+        /** The ghost stack an item cell shows, with the amount as its count; empty for fluids and chemicals. */
+        public ItemStack stack() {
+            return key.isItem() ? key.stack((int) Math.min(amount, Integer.MAX_VALUE)) : ItemStack.EMPTY;
+        }
+
+        /**
+         * The cell a carried stack places: a fluid container names its fluid and a chemical-carrying item its
+         * chemical (a bucket's worth each), any other stack is an item cell with the stack's count as the amount.
+         */
+        @Nullable
+        public static DataCell fromStack(final ItemStack carried) {
+            if (carried.isEmpty()) {
+                return null;
+            }
+            final Optional<StorageKey> fluid = FluidUtil.getFluidContained(carried)
+                    .filter(f -> !f.isEmpty()).map(StorageKey::of);
+            if (fluid.isPresent()) {
+                return new DataCell(fluid.get(), CONTINUOUS_DEFAULT_AMOUNT, false);
+            }
+            final Optional<StorageKey> chemical = ChemicalBridges.chemicalOf(carried).map(StorageKey::chemical);
+            if (chemical.isPresent()) {
+                return new DataCell(chemical.get(), CONTINUOUS_DEFAULT_AMOUNT, false);
+            }
+            return new DataCell(StorageKey.of(carried), carried.getCount(), false);
+        }
+    }
+
+    // PROCESSING authoring state. Inputs/outputs are data cells (null = empty); each output carries a chance
+    // (100 = guaranteed). The machine TYPE is a block registry-id string (or a Crafting Switch face name) the
+    // engine matches against a declared machine. All of this is synced to the client by the update tag so the
+    // screen can read it back without a dedicated payload.
+    private final DataCell[] procInputs = new DataCell[PROC_GRID];
+    private final DataCell[] procOutputs = new DataCell[PROC_GRID];
 
     private final int[] outputChances = newFullChances();
     private String machineType = "";
@@ -127,12 +178,16 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         return media;
     }
 
-    public ItemStackHandler procInputs() {
-        return procInputs;
+    /** The input cell at {@code cell}, or null when empty. */
+    @Nullable
+    public DataCell procInput(final int cell) {
+        return cell >= 0 && cell < PROC_GRID ? procInputs[cell] : null;
     }
 
-    public ItemStackHandler procOutputs() {
-        return procOutputs;
+    /** The output cell at {@code cell}, or null when empty. */
+    @Nullable
+    public DataCell procOutput(final int cell) {
+        return cell >= 0 && cell < PROC_GRID ? procOutputs[cell] : null;
     }
 
     public ItemStack preview() {
@@ -196,38 +251,66 @@ public class PatternEncoderBlockEntity extends BlockEntity {
 
     // --- PROCESSING authoring ---
 
+    /** Places the carried stack's data into an input cell (an empty hand clears it); items are never consumed. */
     public void setProcInput(final int cell, final ItemStack carried) {
-        if (cell < 0 || cell >= PROC_GRID) {
-            return;
-        }
-        // The ghost keeps the carried count as the per-run amount; the player's items are never consumed.
-        procInputs.setStackInSlot(cell, carried.isEmpty() ? ItemStack.EMPTY : carried.copy());
-        sync();
+        setProcCell(false, cell, DataCell.fromStack(carried));
     }
 
     public void setProcOutput(final int cell, final ItemStack carried) {
+        setProcCell(true, cell, DataCell.fromStack(carried));
+    }
+
+    /** Sets or clears ({@code null}) a processing cell directly. */
+    public void setProcCell(final boolean output, final int cell, @Nullable final DataCell value) {
         if (cell < 0 || cell >= PROC_GRID) {
             return;
         }
-        procOutputs.setStackInSlot(cell, carried.isEmpty() ? ItemStack.EMPTY : carried.copy());
+        (output ? procOutputs : procInputs)[cell] = value;
+        setChanged();
         sync();
     }
 
+    /** Sets a cell's amount per run; a confirmed amount is no longer an estimate. Clears the cell at 0. */
+    public void setProcAmount(final boolean output, final int cell, final long amount) {
+        final DataCell current = output ? procOutput(cell) : procInput(cell);
+        if (current == null) {
+            return;
+        }
+        setProcCell(output, cell, amount <= 0 ? null : new DataCell(current.key(), amount, false));
+    }
+
     /**
-     * Replaces the whole processing draft with the given recipe — used by the JEI "+" transfer, which hands us a
-     * recipe's inputs and outputs at once. All output chances reset to guaranteed; the machine choice is kept
-     * (the player pairs the recipe with its machine explicitly).
+     * Replaces the whole processing draft with the given recipe — used by the recipe viewer's transfer, which
+     * hands us a recipe's inputs and outputs at once. All output chances reset to guaranteed; the machine choice
+     * is kept (the player pairs the recipe with its machine explicitly).
      */
-    public void applyProcessingRecipe(final java.util.List<ItemStack> inputs,
-                                      final java.util.List<ItemStack> outputs) {
+    public void applyProcessingCells(final List<DataCell> inputs, final List<DataCell> outputs) {
         for (int i = 0; i < PROC_GRID; i++) {
-            final ItemStack in = i < inputs.size() ? inputs.get(i) : ItemStack.EMPTY;
-            final ItemStack out = i < outputs.size() ? outputs.get(i) : ItemStack.EMPTY;
-            procInputs.setStackInSlot(i, in.isEmpty() ? ItemStack.EMPTY : in.copy());
-            procOutputs.setStackInSlot(i, out.isEmpty() ? ItemStack.EMPTY : out.copy());
+            procInputs[i] = i < inputs.size() ? inputs.get(i) : null;
+            procOutputs[i] = i < outputs.size() ? outputs.get(i) : null;
             outputChances[i] = ProcessingPattern.FULL_CHANCE;
         }
+        setChanged();
         sync();
+    }
+
+    /** {@link #applyProcessingCells} for plain item stacks (each stack's count is its amount). */
+    public void applyProcessingRecipe(final List<ItemStack> inputs, final List<ItemStack> outputs) {
+        final List<DataCell> ins = new ArrayList<>();
+        for (final ItemStack in : inputs) {
+            final DataCell cell = DataCell.fromStack(in);
+            if (cell != null) {
+                ins.add(cell);
+            }
+        }
+        final List<DataCell> outs = new ArrayList<>();
+        for (final ItemStack out : outputs) {
+            final DataCell cell = DataCell.fromStack(out);
+            if (cell != null) {
+                outs.add(cell);
+            }
+        }
+        applyProcessingCells(ins, outs);
     }
 
     public int outputChance(final int cell) {
@@ -262,10 +345,11 @@ public class PatternEncoderBlockEntity extends BlockEntity {
 
     public void clearProcessing() {
         for (int i = 0; i < PROC_GRID; i++) {
-            procInputs.setStackInSlot(i, ItemStack.EMPTY);
-            procOutputs.setStackInSlot(i, ItemStack.EMPTY);
+            procInputs[i] = null;
+            procOutputs[i] = null;
             outputChances[i] = ProcessingPattern.FULL_CHANCE;
         }
+        setChanged();
         sync();
     }
 
@@ -274,14 +358,13 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         final List<ProcessingPattern.ProcessingInput> ins = new ArrayList<>();
         final List<ProcessingPattern.ProcessingOutput> outs = new ArrayList<>();
         for (int i = 0; i < PROC_GRID; i++) {
-            final ItemStack in = procInputs.getStackInSlot(i);
-            if (!in.isEmpty()) {
-                ins.add(new ProcessingPattern.ProcessingInput(StorageKey.of(in), in.getCount()));
+            final DataCell in = procInputs[i];
+            if (in != null) {
+                ins.add(new ProcessingPattern.ProcessingInput(in.key(), in.amount(), in.estimated()));
             }
-            final ItemStack out = procOutputs.getStackInSlot(i);
-            if (!out.isEmpty()) {
-                outs.add(new ProcessingPattern.ProcessingOutput(
-                        StorageKey.of(out), out.getCount(), outputChances[i]));
+            final DataCell out = procOutputs[i];
+            if (out != null) {
+                outs.add(new ProcessingPattern.ProcessingOutput(out.key(), out.amount(), outputChances[i]));
             }
         }
         return new ProcessingPattern(ins, outs, machineType, procTimeout);
@@ -523,12 +606,10 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         if (tag.contains("Media")) {
             media.deserializeNBT(registries, tag.getCompound("Media"));
         }
-        if (tag.contains("ProcInputs")) {
-            procInputs.deserializeNBT(registries, tag.getCompound("ProcInputs"));
-        }
-        if (tag.contains("ProcOutputs")) {
-            procOutputs.deserializeNBT(registries, tag.getCompound("ProcOutputs"));
-        }
+        // Cells are a list of {Cell (codec), Index}; a draft saved by an older version as item slots is dropped.
+        final RegistryOps<Tag> cellOps = RegistryOps.create(NbtOps.INSTANCE, registries);
+        loadCells(tag, "ProcInputs", procInputs, cellOps);
+        loadCells(tag, "ProcOutputs", procOutputs, cellOps);
         final int[] chances = tag.getIntArray("OutputChances");
         for (int i = 0; i < PROC_GRID; i++) {
             outputChances[i] = i < chances.length && chances[i] >= 1 && chances[i] <= ProcessingPattern.FULL_CHANCE
@@ -545,17 +626,49 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         }
     }
 
+    private static ListTag saveCells(final DataCell[] cells, final RegistryOps<Tag> ops) {
+        final ListTag list = new ListTag();
+        for (int i = 0; i < cells.length; i++) {
+            if (cells[i] == null) {
+                continue;
+            }
+            final int index = i;
+            DataCell.CODEC.encodeStart(ops, cells[i]).result().ifPresent(cellTag -> {
+                final CompoundTag row = new CompoundTag();
+                row.put("Cell", cellTag);
+                row.putInt("Index", index);
+                list.add(row);
+            });
+        }
+        return list;
+    }
+
+    private static void loadCells(final CompoundTag tag, final String name, final DataCell[] cells,
+                                  final RegistryOps<Tag> ops) {
+        java.util.Arrays.fill(cells, null);
+        if (!(tag.get(name) instanceof ListTag list)) {
+            return;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            final CompoundTag row = list.getCompound(i);
+            final int index = row.getInt("Index");
+            if (index >= 0 && index < cells.length && row.contains("Cell")) {
+                cells[index] = DataCell.CODEC.parse(ops, row.get("Cell")).result().orElse(null);
+            }
+        }
+    }
+
     @Override
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("GhostGrid", ghostGrid.serializeNBT(registries));
         tag.put("Media", media.serializeNBT(registries));
-        tag.put("ProcInputs", procInputs.serializeNBT(registries));
-        tag.put("ProcOutputs", procOutputs.serializeNBT(registries));
+        final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+        tag.put("ProcInputs", saveCells(procInputs, ops));
+        tag.put("ProcOutputs", saveCells(procOutputs, ops));
         tag.putIntArray("OutputChances", outputChances.clone());
         tag.putString("MachineType", machineType);
         tag.putInt("ProcTimeout", procTimeout);
-        final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         MultiStagePattern.CODEC.encodeStart(ops, new MultiStagePattern(stages)).result()
                 .ifPresent(stagesTag -> tag.put("Stages", stagesTag));
     }

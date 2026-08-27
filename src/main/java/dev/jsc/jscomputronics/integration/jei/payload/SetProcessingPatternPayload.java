@@ -8,36 +8,36 @@
 package dev.jsc.jscomputronics.integration.jei.payload;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 
 import java.util.List;
 
 /**
- * Client-to-server payload that writes a machine recipe's inputs and outputs into the processing draft of the
- * Pattern Encoder the player currently has open.
- *
- * Sent by the universal JEI recipe-transfer handler when the player clicks "+" on any non-crafting recipe
- * (smelting, mod machine categories, ...). The server validates that the player's open menu corresponds to the
- * indicated block position before applying any changes.
+ * Client → server: the recipe the player transferred from the recipe viewer into the Pattern Encoder's
+ * processing tab — its inputs and outputs as data cells (item, fluid or chemical, with an amount and whether
+ * that amount is an estimate), in display order.
  */
-public record SetProcessingPatternPayload(BlockPos pos, List<ItemStack> inputs, List<ItemStack> outputs)
+public record SetProcessingPatternPayload(BlockPos pos, List<PatternEncoderBlockEntity.DataCell> inputs,
+                                          List<PatternEncoderBlockEntity.DataCell> outputs)
         implements CustomPacketPayload {
 
     public static final Type<SetProcessingPatternPayload> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "set_processing_pattern"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "jei_set_processing_pattern"));
+
+    private static final int MAX_CELLS = PatternEncoderBlockEntity.PROC_GRID;
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SetProcessingPatternPayload> STREAM_CODEC =
             StreamCodec.composite(
                     BlockPos.STREAM_CODEC, SetProcessingPatternPayload::pos,
-                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list(32)),
+                    PatternEncoderBlockEntity.DataCell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_CELLS)),
                     SetProcessingPatternPayload::inputs,
-                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list(32)),
+                    PatternEncoderBlockEntity.DataCell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_CELLS)),
                     SetProcessingPatternPayload::outputs,
                     SetProcessingPatternPayload::new);
 

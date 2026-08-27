@@ -61,7 +61,7 @@ public final class JeiPayloads {
                     instanceof PatternEncoderBlockEntity be)) {
                 return;
             }
-            be.applyProcessingRecipe(payload.inputs(), payload.outputs());
+            be.applyProcessingCells(payload.inputs(), payload.outputs());
             menu.setActiveTab(PatternEncoderMenu.TAB_PROCESSING);
         });
     }

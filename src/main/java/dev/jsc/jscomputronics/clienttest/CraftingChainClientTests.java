@@ -142,9 +142,9 @@ public final class CraftingChainClientTests {
                 .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
                 .thenServer(SETTLE, level -> {
                     final var be = encoder(ctx, level);
-                    ctx.assertTrue(be.procInputs().getStackInSlot(0).is(Items.RAW_IRON),
+                    ctx.assertTrue(be.procInput(0) != null && be.procInput(0).key().equals(StorageKey.of(Items.RAW_IRON)),
                             "input cell 0 must hold the raw iron placed from the cursor");
-                    ctx.assertTrue(be.procOutputs().getStackInSlot(0).is(Items.IRON_INGOT),
+                    ctx.assertTrue(be.procOutput(0) != null && be.procOutput(0).key().equals(StorageKey.of(Items.IRON_INGOT)),
                             "output cell 0 must hold the ingot placed from the cursor");
                 })
                 .thenScreenshot(2, "grids-filled")
@@ -177,6 +177,113 @@ public final class CraftingChainClientTests {
                     ctx.assertTrue(craft, "WRITE PROCESSING must put a .craft file on the floppy");
                 })
                 .thenScreenshot(2, "written")
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT);
+    }
+
+    private static final BlockPos GAS_TANK = new BlockPos(3, 2, 6);
+    private static final ResourceLocation OXYGEN = ResourceLocation.fromNamespaceAndPath("mekanism", "oxygen");
+
+    /**
+     * Authors a chemical processing pattern the way the player does: a tank item that holds oxygen names the
+     * gas in an input cell (a bucket's worth), the amount popup brings it to the 200 mB one purification burns,
+     * an estimated cell wears its mark, and WRITE puts the recipe on the floppy with the confirmed amount.
+     */
+    @ClientTest
+    public static void patternEncoder_writesChemicalPatternThroughTheGui(final ClientTestContext ctx) {
+        final ItemStack[] gasItem = {ItemStack.EMPTY};
+        ctx.thenBuild(0, world -> {
+                    world.buildCraftingNetwork();
+                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
+                    world.placeFromItem(GAS_TANK, net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            ResourceLocation.fromNamespaceAndPath("mekanism", "basic_chemical_tank")));
+                })
+                .thenServer(SETTLE, level -> {
+                    // A tank with a little oxygen, picked up: its item carries the gas and names it for the cell.
+                    final var port = dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges
+                            .portFor(level, ctx.abs(GAS_TANK), Direction.UP);
+                    ctx.assertTrue(port.isPresent() && port.get().fill(OXYGEN, 100, false) == 100, "the tank takes oxygen");
+                    level.destroyBlock(ctx.abs(GAS_TANK), true);
+                })
+                .thenServer(2, level -> {
+                    for (final net.minecraft.world.entity.item.ItemEntity drop : level.getEntitiesOfClass(
+                            net.minecraft.world.entity.item.ItemEntity.class,
+                            net.minecraft.world.phys.AABB.encapsulatingFullBlocks(ctx.abs(GAS_TANK.offset(-1, -1, -1)), ctx.abs(GAS_TANK.offset(1, 1, 1))))) {
+                        if (dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges.chemicalOf(drop.getItem()).isPresent()) {
+                            gasItem[0] = drop.getItem().copy();
+                            drop.discard();
+                        }
+                    }
+                    ctx.assertTrue(!gasItem[0].isEmpty(), "picking the tank up must give an item that carries the oxygen");
+                    ctx.give(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
+                    ctx.give(1, gasItem[0]);
+                    ctx.give(2, new ItemStack(Items.RAW_IRON));
+                })
+                .thenTeleport(SETTLE, PLAYER_AT_ENCODER, Direction.NORTH)
+                .thenRightClick(SETTLE, ENCODER)
+                .thenAwaitScreen(PatternEncoderScreen.class, SCREEN_WAIT)
+                .then(2, () -> ctx.clickGui(hotbarX(0), HOTBAR_Y))
+                .then(2, () -> ctx.clickGui(MEDIA_SLOT_X, MEDIA_SLOT_Y))
+                .then(0, () -> ctx.clickGui(TAB_PROCESSING_X, TAB_ROW_Y))
+                // The gas item into the first input cell, then back to the hotbar; the raw iron into the second.
+                .then(2, () -> ctx.clickGui(hotbarX(1), HOTBAR_Y))
+                .then(2, () -> ctx.clickGui(INPUT_CELL_X, PROC_CELL_Y))
+                .then(2, () -> ctx.clickGui(hotbarX(1), HOTBAR_Y))
+                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
+                .then(2, () -> ctx.clickGui(INPUT_CELL_X + 18, PROC_CELL_Y))
+                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
+                .thenServer(SETTLE, level -> {
+                    final var cell = encoder(ctx, level).procInput(0);
+                    ctx.assertTrue(cell != null && cell.key().isChemical() && OXYGEN.equals(cell.key().chemicalId())
+                                    && cell.amount() == 1000, "the gas item must name oxygen with a bucket's worth; got " + cell);
+                    // An estimated cell beside it, the way a recipe transfer leaves one, for the eye.
+                    encoder(ctx, level).setProcCell(false, 2, new dev.jsc.jscomputronics.module.computing.blockentity
+                            .PatternEncoderBlockEntity.DataCell(StorageKey.chemical(OXYGEN), 200, true));
+                })
+                .thenScreenshot(2, "chemical-cells")
+                // Click the gas cell with an empty hand: the amount popup; -100 eight times brings 1 000 to 200.
+                .then(2, () -> ctx.clickGui(INPUT_CELL_X, PROC_CELL_Y))
+                .thenAssert(1, () -> ctx.screen(PatternEncoderScreen.class).isAmountPopupOpen(), "a gas cell opens the amount popup")
+                .thenScreenshot(2, "amount-popup")
+                .then(1, () -> {
+                    for (int i = 0; i < 8; i++) {
+                        ctx.clickGui(PatternEncoderScreen.amountStepperX(0), PatternEncoderScreen.amountStepperY());
+                    }
+                })
+                .thenServer(SETTLE, level -> ctx.assertTrue(encoder(ctx, level).procInput(0) != null
+                        && encoder(ctx, level).procInput(0).amount() == 200, "eight -100 steps must leave 200 mB; got "
+                        + encoder(ctx, level).procInput(0)))
+                .then(0, () -> ctx.clickGui(PatternEncoderScreen.amountDoneX(), PatternEncoderScreen.amountDoneY()))
+                .thenAssert(1, () -> !ctx.screen(PatternEncoderScreen.class).isAmountPopupOpen(), "DONE closes the popup")
+                // Output and machine as before, then WRITE.
+                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
+                .then(2, () -> ctx.clickGui(OUTPUT_CELL_X, PROC_CELL_Y))
+                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
+                .then(0, () -> ctx.clickGui(MACHINE_BTN_X, MACHINE_BTN_Y))
+                .then(0, () -> ctx.type("purification"))
+                .then(1, () -> {
+                    final PatternEncoderScreen screen = ctx.screen(PatternEncoderScreen.class);
+                    final int row = screen.machinePickerRows().indexOf("mekanism:purification_chamber");
+                    ctx.assertTrue(row >= 0, "searching 'purification' must list the chamber; rows=" + screen.machinePickerRows());
+                    ctx.clickGui(screen.machinePickerRowX(), screen.machinePickerRowY(row - screen.machinePickerScroll()));
+                })
+                .thenServer(SETTLE, level -> {
+                    final var built = encoder(ctx, level).buildProcessingPattern();
+                    ctx.assertTrue(built.inputs().size() == 3 && built.inputs().get(0).key().isChemical()
+                                    && built.inputs().get(0).amount() == 200 && !built.inputs().get(0).estimated(),
+                            "the confirmed oxygen input must be 200 mB and no estimate; got " + built.inputs());
+                    ctx.assertTrue(built.inputs().get(2).estimated(), "the untouched cell stays an estimate");
+                })
+                .then(0, () -> ctx.clickGui(WRITE_X, WRITE_Y))
+                .thenServer(SETTLE + 2, level -> {
+                    final ItemStack media = encoder(ctx, level).media().getStackInSlot(0);
+                    boolean craft = false;
+                    for (final DiskFilesystem.FileEntry e : DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL)) {
+                        craft |= e.type() == FileType.CRAFT;
+                    }
+                    ctx.assertTrue(craft, "WRITE PROCESSING must put the chemical .craft on the floppy");
+                })
+                .thenScreenshot(2, "chemical-written")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }

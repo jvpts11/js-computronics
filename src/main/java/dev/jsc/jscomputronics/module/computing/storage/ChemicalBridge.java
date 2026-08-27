@@ -43,4 +43,24 @@ public interface ChemicalBridge {
     default Optional<ResourceLocation> chemicalOf(final ItemStack stack) {
         return Optional.empty();
     }
+
+    /** A chemical and an amount in millibuckets, as a recipe viewer lists them. */
+    record ChemicalAmount(ResourceLocation chemical, long amount) {
+    }
+
+    /**
+     * The chemical a recipe viewer's ingredient object stands for (its mod's chemical stack type), if this
+     * bridge recognises it — how a recipe transfer reads chemical ingredients without naming the mod.
+     */
+    default Optional<ChemicalAmount> chemicalIngredient(final Object ingredient) {
+        return Optional.empty();
+    }
+
+    /**
+     * Whether a recipe object meters its chemical input per tick of the operation rather than per operation,
+     * so a transfer must multiply the displayed amount by the machine's duration.
+     */
+    default boolean perTickUsage(final Object recipe) {
+        return false;
+    }
 }

@@ -3746,6 +3746,10 @@ public final class ComputingPayloads {
                 case PatternEncoderEditPayload.ACTION_REMOVE_STAGE -> be.removeStage(payload.index());
                 case PatternEncoderEditPayload.ACTION_CLEAR_STAGES -> be.clearStages();
                 case PatternEncoderEditPayload.ACTION_CLEAR_PROC -> be.clearProcessing();
+                case PatternEncoderEditPayload.ACTION_SET_AMOUNT ->
+                        be.setProcAmount("out".equals(payload.text()), payload.index(), payload.value());
+                case PatternEncoderEditPayload.ACTION_CLEAR_CELL ->
+                        be.setProcCell("out".equals(payload.text()), payload.index(), null);
                 case PatternEncoderEditPayload.ACTION_ADD_STAGE_FROM_MEDIA ->
                         be.addStageFromMedia(payload.text());
                 default -> {

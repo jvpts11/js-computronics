@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
+import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity.DataCell;
 import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
 import dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu;
@@ -74,6 +75,12 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
     private static final int PW = 120;
     private static final int PH = 44;
 
+    // Amount popup (the same idiom, for a fluid or chemical cell): title, steppers around the value, DONE.
+    private static final int AX = 40;
+    private static final int AY = 40;
+    private static final int AW = 122;
+    private static final int AH = 58;
+
     // Stage picker popup (multi-stage tab): a modal list of the craftings on the inserted medium.
     private static final int PICK_X = 24;
     private static final int PICK_Y = 32;
@@ -117,6 +124,13 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
     private int stageScroll;
     private Button guaranteedBtn;
 
+    // Amount popup state: which grid and cell it edits, its value box and its buttons.
+    private boolean amountPopupOpen;
+    private boolean amountForOutput;
+    private int amountCell = -1;
+    private EditBox amountBox;
+    private final List<Button> amountButtons = new java.util.ArrayList<>();
+
     // --- inspection (client tests assert on what the player sees) ---
 
     /** The tab currently shown: one of the {@code PatternEncoderMenu.TAB_*} constants. */
@@ -138,6 +152,27 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
 
     public boolean isChancePopupOpen() {
         return chancePopupOpen;
+    }
+
+    public boolean isAmountPopupOpen() {
+        return amountPopupOpen;
+    }
+
+    /** GUI-local centre of the amount popup's stepper {@code index} (0 = -100, 1 = -10, 2 = +10, 3 = +100). */
+    public static int amountStepperX(final int index) {
+        return AX + new int[]{15, 33, 89, 107}[index];
+    }
+
+    public static int amountStepperY() {
+        return AY + 32;
+    }
+
+    public static int amountDoneX() {
+        return AX + 97;
+    }
+
+    public static int amountDoneY() {
+        return AY + 51;
     }
 
     public boolean isStagePickerOpen() {
@@ -258,6 +293,26 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
                 });
         addWidget(guaranteedBtn);
 
+        // Amount popup widgets: -100 / -10 / [value] / +10 / +100 on one row, DONE below.
+        amountBox = new EditBox(this.font, leftPos + AX + 42, topPos + AY + 27, 38, 11, Component.empty());
+        amountBox.setMaxLength(9);
+        amountBox.setFilter(s -> s.isEmpty() || s.matches("\\d{1,9}"));
+        amountBox.setResponder(this::onAmountChanged);
+        addWidget(amountBox);
+        amountButtons.clear();
+        final int[][] steppers = {{6, 18, -100}, {26, 14, -10}, {82, 14, 10}, {98, 18, 100}};
+        for (final int[] stepper : steppers) {
+            final int delta = stepper[2];
+            final Button b = new ThemeButton(leftPos + AX + stepper[0], topPos + AY + 27, stepper[1], 11,
+                    Component.literal((delta > 0 ? "+" : "") + delta), btn -> stepAmount(delta));
+            amountButtons.add(b);
+            addWidget(b);
+        }
+        final Button done = new ThemeButton(leftPos + AX + 78, topPos + AY + 46, 38, 10, Component.literal("DONE"),
+                btn -> confirmAmount());
+        amountButtons.add(done);
+        addWidget(done);
+
         applyTabVisibility();
         if (tab == PatternEncoderMenu.TAB_CRAFTING) {
             requestFiles();
@@ -297,8 +352,13 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
         final boolean proc = tab == PatternEncoderMenu.TAB_PROCESSING;
         final boolean multi = tab == PatternEncoderMenu.TAB_MULTI;
         final boolean popup = proc && chancePopupOpen;
+        final boolean amountPopup = proc && amountPopupOpen;
         // While a popup is open the underlying processing controls hide, so they neither bleed through nor steal clicks.
-        final boolean procIdle = proc && !popup && !machinePickerOpen;
+        final boolean procIdle = proc && !popup && !amountPopup && !machinePickerOpen;
+        amountBox.visible = amountPopup;
+        for (final Button b : amountButtons) {
+            b.visible = amountPopup;
+        }
         machineBtn.visible = procIdle;
         timeoutBox.visible = procIdle;
         machineSearch.visible = proc && machinePickerOpen;
@@ -575,6 +635,110 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
         applyTabVisibility();
     }
 
+    // --- amount popup (fluid and chemical cells) ---
+
+    /** The cell the amount popup is editing, or null when it is closed or the cell went away. */
+    @org.jetbrains.annotations.Nullable
+    private DataCell amountPopupCell() {
+        final PatternEncoderBlockEntity be = be();
+        if (be == null || !amountPopupOpen || amountCell < 0) {
+            return null;
+        }
+        return amountForOutput ? be.procOutput(amountCell) : be.procInput(amountCell);
+    }
+
+    /** Opens the amount editor on a fluid or chemical cell (item cells carry their amount as the stack count). */
+    private void openAmountPopup(final boolean output, final int cell, final DataCell current) {
+        amountForOutput = output;
+        amountCell = cell;
+        amountPopupOpen = true;
+        setBox(amountBox, String.valueOf(current.amount()));
+        applyTabVisibility();
+        setFocused(amountBox);
+        amountBox.setFocused(true);
+    }
+
+    private void closeAmountPopup() {
+        amountPopupOpen = false;
+        amountCell = -1;
+        amountBox.setFocused(false);
+        applyTabVisibility();
+    }
+
+    private void onAmountChanged(final String value) {
+        if (suppressResponder || value.isEmpty() || amountPopupCell() == null) {
+            return;
+        }
+        try {
+            sendAmount(Long.parseLong(value));
+        } catch (final NumberFormatException ignored) {
+            // A partial edit; the filter keeps it to digits.
+        }
+    }
+
+    private void stepAmount(final int delta) {
+        final DataCell cell = amountPopupCell();
+        if (cell == null) {
+            return;
+        }
+        // Read the box, not the server-synced cell, so several fast clicks in one tick compound instead of all
+        // reading the same value before the first round trip lands.
+        long current = cell.amount();
+        try {
+            current = Long.parseLong(amountBox.getValue());
+        } catch (final NumberFormatException ignored) {
+            // A blank or partial box: fall back to the last synced amount.
+        }
+        final long next = Math.max(1L, current + delta);
+        setBox(amountBox, String.valueOf(next));
+        sendAmount(next);
+    }
+
+    /** DONE confirms the amount as the author's own (an estimate stops being one) and closes the popup. */
+    private void confirmAmount() {
+        final DataCell cell = amountPopupCell();
+        if (cell != null) {
+            sendAmount(cell.amount());
+        }
+        closeAmountPopup();
+    }
+
+    private void sendAmount(final long amount) {
+        if (amountCell < 0) {
+            return;
+        }
+        send(new PatternEncoderEditPayload(menu.blockEntityPos(), PatternEncoderEditPayload.ACTION_SET_AMOUNT,
+                amountCell, (int) Math.max(1L, Math.min(amount, Integer.MAX_VALUE)), amountForOutput ? "out" : "in"));
+    }
+
+    /** The amount popup: the cell's swatch and name, the steppers around the value, where the number came from. */
+    private void renderAmountPopup(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
+        final DataCell cell = amountPopupCell();
+        if (cell == null) {
+            return;
+        }
+        final int x = leftPos + AX;
+        final int y = topPos + AY;
+        g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xC0000000);
+        JscOsTheme.panel(g, x, y, AW, AH);
+        JscOsTheme.vLine(g, x, y, AH);
+        JscOsTheme.vLine(g, x + AW - 1, y, AH);
+        if (cell.key().isFluid()) {
+            FluidSprite.draw(g, cell.key().fluidStack(1), x + 6, y + 4);
+        } else {
+            ChemicalSprite.draw(g, cell.key(), x + 6, y + 4);
+        }
+        JscOsTheme.text(g, font, cell.key().displayName().getString().toUpperCase(java.util.Locale.ROOT),
+                x + 24, y + 5, JscOsTheme.text());
+        JscOsTheme.textS(g, font, "amount per operation (mB)", x + 24, y + 15, JscOsTheme.dim());
+        JscOsTheme.textS(g, font, cell.estimated() ? "estimated from the recipe: confirm or edit"
+                : "the machine gets this much every run", x + 6, y + 42, cell.estimated() ? JscOsTheme.amber() : JscOsTheme.dim());
+        for (final Button b : amountButtons) {
+            b.render(g, mouseX, mouseY, partialTick);
+        }
+        amountBox.render(g, mouseX, mouseY, partialTick);
+    }
+
     // --- render ---
 
     @Override
@@ -584,12 +748,16 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
         // Popups draw at a raised Z so they sit above the slot ITEMS (Minecraft renders those at Z~150-250), not
         // just above the flat background — otherwise the disc/write button bleed through the modal.
         final boolean anyPopup = (stagePickerOpen && tab == PatternEncoderMenu.TAB_MULTI)
-                || (tab == PatternEncoderMenu.TAB_PROCESSING && (chancePopupOpen || machinePickerOpen));
+                || (tab == PatternEncoderMenu.TAB_PROCESSING && (chancePopupOpen || amountPopupOpen || machinePickerOpen));
         if (!anyPopup) {
             renderTooltip(g, mouseX, mouseY); // real slots: crafting grid, result, media, player inventory
-            final ItemStack ghost = hoveredProcStack(mouseX, mouseY);
-            if (!ghost.isEmpty() && menu.getCarried().isEmpty()) {
-                g.renderTooltip(this.font, ghost, mouseX, mouseY);
+            final DataCell ghost = hoveredProcCell(mouseX, mouseY);
+            if (ghost != null && menu.getCarried().isEmpty()) {
+                if (ghost.isItem()) {
+                    g.renderTooltip(this.font, ghost.stack(), mouseX, mouseY);
+                } else {
+                    g.renderTooltip(this.font, cellTooltip(ghost), java.util.Optional.empty(), mouseX, mouseY);
+                }
             }
         }
         if (anyPopup) {
@@ -600,6 +768,9 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
             }
             if (chancePopupOpen && tab == PatternEncoderMenu.TAB_PROCESSING) {
                 renderChancePopup(g, mouseX, mouseY, partialTick);
+            }
+            if (amountPopupOpen && tab == PatternEncoderMenu.TAB_PROCESSING) {
+                renderAmountPopup(g, mouseX, mouseY, partialTick);
             }
             if (machinePickerOpen && tab == PatternEncoderMenu.TAB_PROCESSING) {
                 renderMachinePicker(g, mouseX, mouseY, partialTick);
@@ -750,17 +921,15 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
                 JscOsTheme.slot(g, ix, iy);
                 JscOsTheme.slot(g, ox, oy);
                 if (be != null && iIn < PROC) {
-                    final ItemStack in = be.procInputs().getStackInSlot(iIn);
-                    if (!in.isEmpty()) {
-                        g.renderItem(in, ix, iy);
-                        g.renderItemDecorations(font, in, ix, iy);
+                    final DataCell in = be.procInput(iIn);
+                    if (in != null) {
+                        renderCell(g, in, ix, iy);
                     }
                 }
                 if (be != null && iOut < PROC) {
-                    final ItemStack out = be.procOutputs().getStackInSlot(iOut);
-                    if (!out.isEmpty()) {
-                        g.renderItem(out, ox, oy);
-                        g.renderItemDecorations(font, out, ox, oy);
+                    final DataCell out = be.procOutput(iOut);
+                    if (out != null) {
+                        renderCell(g, out, ox, oy);
                         final int chance = be.outputChance(iOut);
                         if (chance < ProcessingPattern.FULL_CHANCE) {
                             JscOsTheme.textSRight(g, font, chance + "%", ox + 16, oy + 11, JscOsTheme.amber());
@@ -774,7 +943,7 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
         drawScrollbar(g, x + SB_OUT_X, y + IN_Y, outScroll);
 
         // Hover highlight over the ghost cells, raised above the drawn items (renderItem uses Z~150).
-        if (!chancePopupOpen && !machinePickerOpen) {
+        if (!chancePopupOpen && !amountPopupOpen && !machinePickerOpen) {
             for (int visRow = 0; visRow < PROC_VIS_ROWS; visRow++) {
                 for (int col = 0; col < PROC_COLS; col++) {
                     final int ix = x + IN_X + col * 18;
@@ -795,29 +964,68 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
         }
     }
 
-    /** The processing ghost stack under the cursor (inputs or outputs, honoring each grid's scroll), if any. */
-    private ItemStack hoveredProcStack(final int mouseX, final int mouseY) {
+    /**
+     * One processing cell: an item draws as its stack (count = amount); a fluid or chemical draws as its sprite
+     * with the amount in millibuckets, and an estimated amount wears the "≈" mark until the author confirms it.
+     */
+    private void renderCell(final GuiGraphics g, final DataCell cell, final int x, final int y) {
+        if (cell.isItem()) {
+            final ItemStack stack = cell.stack();
+            g.renderItem(stack, x, y);
+            g.renderItemDecorations(font, stack, x, y);
+        } else {
+            if (cell.key().isFluid()) {
+                FluidSprite.draw(g, cell.key().fluidStack(1), x, y);
+            } else {
+                ChemicalSprite.draw(g, cell.key(), x, y);
+            }
+            JscOsTheme.textSRight(g, font, amountLabel(cell.amount()), x + 16, y + 11, JscOsTheme.text());
+        }
+        if (cell.estimated()) {
+            JscOsTheme.textS(g, font, "≈", x + 1, y, JscOsTheme.amber());
+        }
+    }
+
+    /** Millibuckets in a cell corner: whole numbers up to 9 999, then thousands ("12k"). */
+    private static String amountLabel(final long amount) {
+        return amount >= 10_000L ? (amount / 1000L) + "k" : String.valueOf(amount);
+    }
+
+    /** What the tooltip of a fluid or chemical cell says: the name, the amount, and whether it is an estimate. */
+    private List<Component> cellTooltip(final DataCell cell) {
+        final List<Component> lines = new java.util.ArrayList<>();
+        lines.add(Component.literal(cell.key().displayName().getString() + " · " + cell.amount() + " mB"));
+        lines.add(Component.literal("per operation").withStyle(net.minecraft.ChatFormatting.GRAY));
+        if (cell.estimated()) {
+            lines.add(Component.literal("estimated from the recipe; speed upgrades may need less")
+                    .withStyle(net.minecraft.ChatFormatting.GOLD));
+        }
+        lines.add(Component.literal("click to edit · right-click to clear").withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+        return lines;
+    }
+
+    /** The processing cell under the cursor (inputs or outputs, honoring each grid's scroll), if any. */
+    @org.jetbrains.annotations.Nullable
+    private DataCell hoveredProcCell(final int mouseX, final int mouseY) {
         final PatternEncoderBlockEntity be = be();
         if (be == null || tab != PatternEncoderMenu.TAB_PROCESSING) {
-            return ItemStack.EMPTY;
+            return null;
         }
         for (int visRow = 0; visRow < PROC_VIS_ROWS; visRow++) {
             for (int col = 0; col < PROC_COLS; col++) {
                 final int ix = leftPos + IN_X + col * 18;
                 final int iy = topPos + IN_Y + visRow * 18;
                 if (mouseX >= ix && mouseX < ix + 16 && mouseY >= iy && mouseY < iy + 16) {
-                    final int i = (inScroll + visRow) * PROC_COLS + col;
-                    return i < PROC ? be.procInputs().getStackInSlot(i) : ItemStack.EMPTY;
+                    return be.procInput((inScroll + visRow) * PROC_COLS + col);
                 }
                 final int ox = leftPos + OUT_X + col * 18;
                 final int oy = topPos + OUT_Y + visRow * 18;
                 if (mouseX >= ox && mouseX < ox + 16 && mouseY >= oy && mouseY < oy + 16) {
-                    final int i = (outScroll + visRow) * PROC_COLS + col;
-                    return i < PROC ? be.procOutputs().getStackInSlot(i) : ItemStack.EMPTY;
+                    return be.procOutput((outScroll + visRow) * PROC_COLS + col);
                 }
             }
         }
-        return ItemStack.EMPTY;
+        return null;
     }
 
     /** A real scrollbar: a recessed visible track with an accent thumb sized to the visible fraction. */
@@ -981,6 +1189,16 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
             closeChancePopup();
             return true;
         }
+        // The amount popup is modal in the same way; a click outside it keeps the value typed so far.
+        if (amountPopupOpen && tab == PatternEncoderMenu.TAB_PROCESSING) {
+            final boolean inPanel = mouseX >= leftPos + AX && mouseX < leftPos + AX + AW
+                    && mouseY >= topPos + AY && mouseY < topPos + AY + AH;
+            if (inPanel && super.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+            closeAmountPopup();
+            return true;
+        }
         // Manual hit areas (tabs, write, ghost grids, stage list) are tested BEFORE the container, so an empty
         // slot or the creative inventory can't swallow a tab/button click (the dead-button bug).
         if (button == 0) {
@@ -1034,25 +1252,36 @@ public class PatternEncoderScreen extends AbstractComputerScreen<PatternEncoderM
                 final int iOut = (outScroll + visRow) * PROC_COLS + col;
                 final int ix = leftPos + IN_X + col * 18;
                 final int iy = topPos + IN_Y + visRow * 18;
-                if (button == 0 && iIn < PROC && inRect(mouseX, mouseY, ix, iy, 16, 16)) {
-                    // Place from the carried stack (keeps its count as the amount); empty hand clears.
-                    send(PatternEncoderEditPayload.indexed(menu.blockEntityPos(),
-                            PatternEncoderEditPayload.ACTION_SET_INPUT, iIn));
+                if (iIn < PROC && inRect(mouseX, mouseY, ix, iy, 16, 16)) {
+                    final DataCell current = be() == null ? null : be().procInput(iIn);
+                    if (button == 0 && !carried.isEmpty()) {
+                        // Place from the carried stack: an item keeps its count as the amount, a fluid or
+                        // chemical container names its substance with a bucket's worth to start from.
+                        send(PatternEncoderEditPayload.indexed(menu.blockEntityPos(),
+                                PatternEncoderEditPayload.ACTION_SET_INPUT, iIn));
+                    } else if (button == 0 && current != null && !current.isItem()) {
+                        openAmountPopup(false, iIn, current);
+                    } else if (button == 0 || button == 1) {
+                        // An empty hand (left) or a right-click clears the cell.
+                        send(new PatternEncoderEditPayload(menu.blockEntityPos(),
+                                PatternEncoderEditPayload.ACTION_CLEAR_CELL, iIn, 0, "in"));
+                    }
                     return true;
                 }
                 final int ox = leftPos + OUT_X + col * 18;
                 final int oy = topPos + OUT_Y + visRow * 18;
                 if (iOut < PROC && inRect(mouseX, mouseY, ox, oy, 16, 16)) {
-                    final boolean filled = be() != null && !be().procOutputs().getStackInSlot(iOut).isEmpty();
+                    final DataCell current = be() == null ? null : be().procOutput(iOut);
                     if (button == 0 && !carried.isEmpty()) {
                         send(PatternEncoderEditPayload.indexed(menu.blockEntityPos(),
                                 PatternEncoderEditPayload.ACTION_SET_OUTPUT, iOut));
-                    } else if (button == 0 && filled) {
+                    } else if (button == 0 && current != null && !current.isItem()) {
+                        openAmountPopup(true, iOut, current);
+                    } else if (button == 0 && current != null) {
                         openChancePopup(iOut);
                     } else if (button == 1) {
-                        // Right-click clears the cell (the server reads the empty hand as a clear).
-                        send(PatternEncoderEditPayload.indexed(menu.blockEntityPos(),
-                                PatternEncoderEditPayload.ACTION_SET_OUTPUT, iOut));
+                        send(new PatternEncoderEditPayload(menu.blockEntityPos(),
+                                PatternEncoderEditPayload.ACTION_CLEAR_CELL, iOut, 0, "out"));
                     }
                     return true;
                 }

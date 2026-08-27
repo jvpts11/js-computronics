@@ -46,6 +46,10 @@ public record PatternEncoderEditPayload(BlockPos pos, int action, int index, int
     public static final int ACTION_CLEAR_STAGES = 11;
     public static final int ACTION_CLEAR_PROC = 12;
     public static final int ACTION_ADD_STAGE_FROM_MEDIA = 13;
+    /** Sets a processing cell's amount ({@code value}); {@code text} is "out" for an output cell, else an input. */
+    public static final int ACTION_SET_AMOUNT = 14;
+    /** Clears a processing cell; {@code text} is "out" for an output cell, else an input. */
+    public static final int ACTION_CLEAR_CELL = 15;
 
     /** Bound on the machine-type string so a forged payload cannot allocate without limit. */
     private static final int MAX_TEXT = 256;

@@ -64,6 +64,27 @@ public final class ChemicalBridges {
         return Optional.empty();
     }
 
+    /** The chemical a recipe viewer's ingredient object stands for, from the first bridge that recognises it. */
+    public static Optional<ChemicalBridge.ChemicalAmount> chemicalIngredient(final Object ingredient) {
+        for (final ChemicalBridge bridge : BRIDGES) {
+            final Optional<ChemicalBridge.ChemicalAmount> chemical = bridge.chemicalIngredient(ingredient);
+            if (chemical.isPresent()) {
+                return chemical;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Whether any bridge knows {@code recipe} to meter its chemical input per tick. */
+    public static boolean perTickUsage(final Object recipe) {
+        for (final ChemicalBridge bridge : BRIDGES) {
+            if (bridge.perTickUsage(recipe)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static boolean exists(final ResourceLocation chemical) {
         for (final ChemicalBridge bridge : BRIDGES) {
             if (bridge.exists(chemical)) {

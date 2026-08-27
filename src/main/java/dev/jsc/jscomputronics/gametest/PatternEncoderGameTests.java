@@ -11,11 +11,14 @@ import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
+import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -101,10 +104,49 @@ public final class PatternEncoderGameTests {
         }
         reloaded.loadWithComponents(saved, reg);
         helper.assertTrue("jsc:macerator".equals(reloaded.machineType()), "machine type survived");
-        helper.assertTrue(reloaded.procInputs().getStackInSlot(0).getCount() == 3, "input survived");
-        helper.assertTrue(reloaded.procOutputs().getStackInSlot(1).getCount() == 5, "output survived");
+        helper.assertTrue(reloaded.procInput(0) != null && reloaded.procInput(0).amount() == 3, "input survived");
+        helper.assertTrue(reloaded.procOutput(1) != null && reloaded.procOutput(1).amount() == 5, "output survived");
         helper.assertTrue(reloaded.outputChance(1) == 50, "output chance survived");
         helper.assertTrue(reloaded.procTimeout() == 123, "timeout survived");
+        helper.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void patternEncoder_cellsHoldFluidsAndChemicalsWithAmounts(final GameTestHelper helper) {
+        final HolderLookup.Provider reg = helper.getLevel().registryAccess();
+        final PatternEncoderBlockEntity be = place(helper, new BlockPos(2, 2, 2));
+        be.setMachineType("mekanism:purification_chamber");
+        // A water bucket names water, a bucket's worth; a plain stack is an item with its count.
+        be.setProcInput(0, new ItemStack(Items.WATER_BUCKET));
+        be.setProcInput(1, new ItemStack(Items.RAW_IRON, 1));
+        final PatternEncoderBlockEntity.DataCell water = be.procInput(0);
+        helper.assertTrue(water != null && water.key().isFluid()
+                        && water.amount() == PatternEncoderBlockEntity.DataCell.CONTINUOUS_DEFAULT_AMOUNT,
+                "a fluid container places its fluid, one bucket's worth; got " + water);
+        // A chemical cell set by a recipe transfer carries an estimated amount until the author confirms it.
+        final StorageKey oxygen = StorageKey.chemical(ResourceLocation.fromNamespaceAndPath("mekanism", "oxygen"));
+        be.setProcCell(false, 2, new PatternEncoderBlockEntity.DataCell(oxygen, 200, true));
+        be.setProcCell(true, 0, new PatternEncoderBlockEntity.DataCell(StorageKey.of(Items.IRON_NUGGET), 2, false));
+
+        final ProcessingPattern built = be.buildProcessingPattern();
+        helper.assertTrue(built.inputs().size() == 3, "three inputs; got " + built.inputs());
+        final ProcessingPattern.ProcessingInput estimated = built.inputs().get(2);
+        helper.assertTrue(estimated.key().equals(oxygen) && estimated.amount() == 200 && estimated.estimated(),
+                "the chemical input keeps its estimate flag; got " + estimated);
+        // The flag survives the .craft file and the block's own save.
+        final String snbt = CraftFile.serializeProcessing(built, reg).orElseThrow();
+        final ProcessingPattern parsed = CraftFile.parseProcessing(snbt, reg).orElseThrow();
+        helper.assertTrue(parsed.inputs().get(2).estimated() && parsed.inputs().get(0).key().isFluid(),
+                "fluid and estimate survive the .craft round trip");
+        final CompoundTag saved = be.saveWithFullMetadata(reg);
+        be.clearProcessing();
+        be.loadWithComponents(saved, reg);
+        helper.assertTrue(be.procInput(2) != null && be.procInput(2).estimated(), "the estimate survives the block's save");
+        // Confirming an amount makes it the author's own.
+        be.setProcAmount(false, 2, 200);
+        helper.assertTrue(be.procInput(2) != null && !be.procInput(2).estimated(), "setting the amount clears the estimate");
+        be.setProcAmount(false, 2, 0);
+        helper.assertTrue(be.procInput(2) == null, "an amount of zero clears the cell");
         helper.succeed();
     }
 
