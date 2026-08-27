@@ -76,8 +76,9 @@ public abstract class AbstractBusMenu extends AbstractComputerMenu {
 
             @Override
             public boolean isActive() {
-                // The crafting buses are passive markers: filter/min/max/mode do not apply, so the slot hides.
-                return transferControlsApply();
+                // Every bus has a filter: on a crafting bus it pins what the face carries so the engine routes
+                // per face. Only the stock controls (min/max/mode) hide on the passive buses.
+                return filterApplies();
             }
         });
         addPlayerInventory(playerInventory, BusLayout.INV_X, BusLayout.INV_Y);
@@ -85,11 +86,21 @@ public abstract class AbstractBusMenu extends AbstractComputerMenu {
     }
 
     /**
-     * Whether the transfer controls (filter, min/max stock, mode) apply to this bus. The crafting Input and
-     * Receiving buses are passive markers driven by the crafting engine, so their controls hide and their
-     * buttons are refused server-side.
+     * Whether this bus exposes a filter. Every bus does: on the autonomous Import/Export buses it selects what
+     * to move, and on the passive crafting Input/Receiving buses it pins what the mounted face carries so the
+     * crafting engine can route each ingredient (or each output) to the correct face. An empty filter means the
+     * face carries anything, matching the raw machine face.
      */
-    public boolean transferControlsApply() {
+    public boolean filterApplies() {
+        return true;
+    }
+
+    /**
+     * Whether the stock controls (min/max window and continuous/redstone mode) apply to this bus. Only the
+     * autonomous Import and Export buses hold stock; the crafting Input and Receiving buses are demand-driven by
+     * the crafting engine, so those controls hide and their buttons are refused server-side.
+     */
+    public boolean stockControlsApply() {
         final var kind = part.type();
         return kind != dev.jsc.jscomputronics.module.computing.block.part.CablePartType.INPUT
                 && kind != dev.jsc.jscomputronics.module.computing.block.part.CablePartType.RECEIVING;
@@ -137,7 +148,7 @@ public abstract class AbstractBusMenu extends AbstractComputerMenu {
         // Clicking the filter slot sets it from the carried item (a copy), or clears
         // it with an empty cursor — the player's item is never consumed.
         if (slotId == FILTER_SLOT) {
-            if (transferControlsApply()) {
+            if (filterApplies()) {
                 part.setFilter(getCarried());
             }
             return;
@@ -147,8 +158,8 @@ public abstract class AbstractBusMenu extends AbstractComputerMenu {
 
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
-        if (!transferControlsApply()) {
-            return false; // passive crafting buses have no transfer settings to edit
+        if (!stockControlsApply()) {
+            return false; // passive crafting buses have no stock settings to edit
         }
         switch (id) {
             case BTN_MIN_DOWN1 -> part.adjustMin(-1);

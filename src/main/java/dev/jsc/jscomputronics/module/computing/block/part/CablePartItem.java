@@ -107,12 +107,12 @@ public class CablePartItem extends Item {
 
     @Nullable
     private static Direction chooseFace(final DataCableBlockEntity cable, final Direction clicked) {
-        if (!cable.hasPart(clicked) && cable.neighborHandler(clicked) != null) {
+        if (!cable.hasPart(clicked) && !cable.neighborPort(clicked).isEmpty()) {
             return clicked;
         }
         Direction firstFree = null;
-        Direction inventoryFace = null;
-        int inventoryCount = 0;
+        Direction dataFace = null;
+        int dataCount = 0;
         for (final Direction direction : Direction.values()) {
             if (cable.hasPart(direction)) {
                 continue;
@@ -120,13 +120,16 @@ public class CablePartItem extends Item {
             if (firstFree == null) {
                 firstFree = direction;
             }
-            if (cable.neighborHandler(direction) != null) {
-                inventoryFace = direction;
-                inventoryCount++;
+            // Any face touching a block that offers data — items, fluids, or chemicals — is a candidate, so a
+            // fluid- or chemical-only machine face (e.g. a chemical tank side) snaps the bus the same way an
+            // inventory does, now that buses carry every kind of data.
+            if (!cable.neighborPort(direction).isEmpty()) {
+                dataFace = direction;
+                dataCount++;
             }
         }
-        if (inventoryCount == 1) {
-            return inventoryFace;
+        if (dataCount == 1) {
+            return dataFace;
         }
         if (!cable.hasPart(clicked)) {
             return clicked;

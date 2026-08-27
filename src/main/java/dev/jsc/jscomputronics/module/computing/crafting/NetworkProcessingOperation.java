@@ -16,6 +16,7 @@ import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord
 import dev.jsc.jscomputronics.module.computing.storage.CompositeDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.DataPort;
 import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
+import dev.jsc.jscomputronics.module.computing.storage.FilteredDataPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -235,8 +236,9 @@ public final class NetworkProcessingOperation implements PersistentOperation {
      * The port to move data through for the given bus kind. Every crafting cable adjacent to the machine with an
      * Input Bus (deliveries) or Receiving Bus (pickups) mounted against it contributes its machine face, and the
      * faces act as one port — this is how sided machines whose I/O faces differ from the switch-touched face, or
-     * that spread outputs over several faces, are driven. Without a bus, the switch-touched face serves both
-     * directions.
+     * that spread outputs over several faces, are driven. A bus carrying a filter restricts its face to that one
+     * key, so a machine fed two ingredients from two sides routes each to the correct face; an unfiltered bus
+     * carries anything. Without a bus, the switch-touched face serves both directions.
      */
     private DataPort portFor(final dev.jsc.jscomputronics.module.computing.block.part.CablePartType kind) {
         final List<DataPort> faces = new java.util.ArrayList<>();
@@ -249,7 +251,10 @@ public final class NetworkProcessingOperation implements PersistentOperation {
                     && bus.type() == kind) {
                 final ExternalDataPort port = portOn(d);
                 if (!port.isEmpty()) {
-                    faces.add(port);
+                    // Honor the bus filter so the player can pin which face each ingredient (or output) uses:
+                    // a filtered face carries only that key, an empty filter carries anything.
+                    final StorageKey filter = bus.filterKey();
+                    faces.add(filter == null ? port : new FilteredDataPort(port, filter));
                 }
             }
         }

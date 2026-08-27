@@ -32,8 +32,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
@@ -100,16 +98,6 @@ public class DataCableBlockEntity extends BlockEntity {
                 .filter(MainframeBlockEntity.class::isInstance)
                 .map(MainframeBlockEntity.class::cast)
                 .orElse(null);
-    }
-
-    @Nullable
-    public IItemHandler neighborHandler(final Direction face) {
-        final ServerLevel serverLevel = serverLevel();
-        if (serverLevel == null) {
-            return null;
-        }
-        return serverLevel.getCapability(Capabilities.ItemHandler.BLOCK,
-                worldPosition.relative(face), face.getOpposite());
     }
 
     public dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort neighborPort(final Direction face) {

@@ -80,9 +80,12 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
         JscOsTheme.vLine(g, nx, ny, BusLayout.NAME_H);
         JscOsTheme.vLine(g, nx + BusLayout.NAME_W - 1, ny, BusLayout.NAME_H);
 
-        // Passive crafting buses have no filter/stock/mode: those controls vanish rather than lie.
-        if (menu.transferControlsApply()) {
+        // Every bus shows its filter slot (on a crafting bus it routes the mounted face). Only the stock
+        // controls (min/max window, mode) vanish on the passive crafting buses rather than lie.
+        if (menu.filterApplies()) {
             JscOsTheme.slot(g, x + BusLayout.FILTER_X, y + BusLayout.FILTER_Y); // ghost filter slot
+        }
+        if (menu.stockControlsApply()) {
             stepperBg(g, x, y, BusLayout.MIN_Y, mouseX, mouseY);
             stepperBg(g, x, y, BusLayout.MAX_Y, mouseX, mouseY);
             JscOsTheme.button(g, x + BusLayout.MODE_X, y + BusLayout.MODE_Y, BusLayout.MODE_W, BusLayout.MODE_H,
@@ -123,7 +126,7 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
 
         JscOsTheme.text(g, font, "NAME", BusLayout.NAME_LABEL_X, BusLayout.NAME_LABEL_Y, JscOsTheme.dim());
 
-        if (menu.transferControlsApply()) {
+        if (menu.stockControlsApply()) {
             // Min / max steppers: label + centered value + "-"/"+".
             JscOsTheme.text(g, font, "MIN", BusLayout.LABEL_X, BusLayout.MIN_Y + 3, JscOsTheme.dim());
             JscOsTheme.text(g, font, "MAX", BusLayout.LABEL_X, BusLayout.MAX_Y + 3, JscOsTheme.dim());
@@ -147,10 +150,11 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
             JscOsTheme.textCenter(g, font, modeText, BusLayout.MODE_X + BusLayout.MODE_W / 2,
                     BusLayout.MODE_Y + 4, JscOsTheme.accent());
         } else {
-            // What a passive crafting bus actually does, in place of the inapplicable controls.
-            JscOsTheme.textS(g, font, "Passive port: machine crafts move", BusLayout.LABEL_X,
+            // A passive crafting bus keeps its filter (it routes the mounted face) but has no stock window:
+            // explain the filter in place of the inapplicable min/max/mode controls.
+            JscOsTheme.textS(g, font, "Filter pins what this face", BusLayout.LABEL_X,
                     BusLayout.MIN_Y + 1, JscOsTheme.dim());
-            JscOsTheme.textS(g, font, "items through this face; the", BusLayout.LABEL_X,
+            JscOsTheme.textS(g, font, "carries (empty = any). The", BusLayout.LABEL_X,
                     BusLayout.MIN_Y + 10, JscOsTheme.dim());
             JscOsTheme.textS(g, font, "crafting engine drives it.", BusLayout.LABEL_X,
                     BusLayout.MIN_Y + 19, JscOsTheme.dim());
@@ -177,7 +181,7 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
 
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
-        if (button == 0 && menu.transferControlsApply()) {
+        if (button == 0 && menu.stockControlsApply()) {
             final boolean shift = hasShiftDown();
             if (hover((int) mouseX, (int) mouseY, BusLayout.MINUS_X, BusLayout.MIN_Y, BusLayout.STEP, BusLayout.STEP)) {
                 sendButton(shift ? AbstractBusMenu.BTN_MIN_DOWN16 : AbstractBusMenu.BTN_MIN_DOWN1);
@@ -207,7 +211,7 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
         // Hint on the empty ghost filter slot (a held item sets the filter, not consumed).
-        if (menu.transferControlsApply() && menu.filterStack().isEmpty()
+        if (menu.filterApplies() && menu.filterStack().isEmpty()
                 && hover(mouseX, mouseY, BusLayout.FILTER_X, BusLayout.FILTER_Y, 16, 16)) {
             g.renderTooltip(font, Component.literal(filterHint()), mouseX, mouseY);
         }

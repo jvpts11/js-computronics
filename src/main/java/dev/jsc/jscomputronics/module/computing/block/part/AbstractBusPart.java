@@ -155,7 +155,7 @@ public abstract sealed class AbstractBusPart implements CablePart permits Import
      * hohlraum) selects that CHEMICAL, so a bus can target any kind of data the same way it targets an item.
      */
     @Nullable
-    protected StorageKey filterKey() {
+    public StorageKey filterKey() {
         final ItemStack stack = filter.getStackInSlot(0);
         if (stack.isEmpty()) {
             return null;
