@@ -144,6 +144,15 @@ public class CommandPromptScreen extends AbstractComputerScreen<CommandPromptMen
         scrollOffset = 0;
     }
 
+    /** The console's scrollback, oldest first — what the player can read on the prompt right now. */
+    public List<String> scrollbackText() {
+        final List<String> lines = new ArrayList<>(scrollback.size());
+        for (final Line line : scrollback) {
+            lines.add(line.text());
+        }
+        return lines;
+    }
+
     private void push(final String text, final CliStyle style) {
         scrollback.addLast(new Line(text, style));
         while (scrollback.size() > MAX_SCROLLBACK) {

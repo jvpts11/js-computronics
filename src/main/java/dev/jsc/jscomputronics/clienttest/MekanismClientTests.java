@@ -11,6 +11,7 @@ import dev.jsc.jscomputronics.gametest.MekanismRig;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jsc.jscomputronics.module.computing.client.CommandPromptScreen;
 import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
 import dev.jsc.jscomputronics.module.computing.client.os.DesktopWindow;
 import dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp;
@@ -33,9 +34,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Mekanism build as the player drives it from the desktop: with the alloy machine patterns and the frame
- * recipe in the Recipe ROM, one request in the Network Interactor's Crafting tab must plan the whole tree,
- * run the infuser three times over through its buses and finish on the bench with Fusion Reactor Frames.
+ * The Mekanism build as the player drives it: with the alloy machine patterns and the frame recipe in the Recipe
+ * ROM, one request — from the Network Interactor's Crafting tab on the Panes desktop, or typed at the MC-DOS
+ * Command Prompt — must plan the whole tree, run the infuser three times over through its buses and finish on
+ * the bench with Fusion Reactor Frames.
  */
 public final class MekanismClientTests {
 
@@ -50,6 +52,7 @@ public final class MekanismClientTests {
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
     private static final String NETWORK_LAUNCHER = "Network";
     private static final ResourceLocation PANES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "panes_95");
+    private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_dos");
     private static final ResourceLocation INFUSER = MekanismRig.mek("metallurgic_infuser");
     private static final ResourceLocation ALLOY_INFUSED = MekanismRig.mek("alloy_infused");
     private static final ResourceLocation ALLOY_REINFORCED = MekanismRig.mek("alloy_reinforced");
@@ -189,6 +192,64 @@ public final class MekanismClientTests {
                 .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
                 .thenWaitUntil(() -> networkInteractor(ctx) != null, SCREEN_WAIT, "the Network Interactor window again")
                 .thenScreenshot(2, "mekanism-frames-in-storage")
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT);
+    }
+
+    @ClientTest(timeoutTicks = 6000)
+    public static void commandPrompt_craftRequestPlansTheAlloyChainThroughTheInfuser(final ClientTestContext ctx) {
+        // The terminal-only route: MC-DOS on the Crafting Computer, the Command Prompt on its monitor, and
+        // "operation craft" typed by the player must reach the same planner and drive the same machine steps.
+        ctx.thenBuild(0, world -> {
+                    final TestWorldBuilder.CraftingNetwork net = MekanismRig.place(world, INFUSER);
+                    TestWorldBuilder.installDesktop(net.cc(), MC_DOS);
+                    net.cc().togglePower();
+                    net.cc().togglePower();
+                    world.placeMonitor(MONITOR, Direction.EAST);
+                    net.seed(Items.COPPER_INGOT, 4);
+                    net.seed(Items.REDSTONE, 4);
+                    net.seed(MekanismRig.item(DUST_DIAMOND), 8);
+                    net.seed(MekanismRig.item(DUST_REFINED_OBSIDIAN), 16);
+                    net.seed(MekanismRig.item(PELLET_POLONIUM), 4);
+                    net.seed(MekanismRig.item(STEEL_CASING), 1);
+                })
+                .thenServer(SETTLE + 2, level -> {
+                    final TestWorldBuilder world = TestWorldBuilder.at(level, ctx.origin());
+                    MekanismRig.mountBuses(world);
+                    MekanismRig.mountBottomInputBus(world);
+                    final CraftingComputerBlockEntity cc = world.blockEntity(CRAFTING_COMPUTER, CraftingComputerBlockEntity.class);
+                    ctx.assertTrue(cc.loadPattern(framePattern()), "the frame pattern loads into the ROM");
+                    ctx.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
+                            StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE), 1, MekanismRig.itemKey(ALLOY_INFUSED)))), "infused loads");
+                    ctx.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
+                            MekanismRig.itemKey(ALLOY_INFUSED), MekanismRig.itemKey(DUST_DIAMOND), 2, MekanismRig.itemKey(ALLOY_REINFORCED)))), "reinforced loads");
+                    ctx.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
+                            MekanismRig.itemKey(ALLOY_REINFORCED), MekanismRig.itemKey(DUST_REFINED_OBSIDIAN), 4, MekanismRig.itemKey(ALLOY_ATOMIC)))), "atomic loads");
+                })
+                .thenTeleport(SETTLE + 2, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(CommandPromptScreen.class, SCREEN_WAIT)
+                .thenScreenshot(2, "mc-dos-prompt")
+                .then(2, () -> ctx.type("operation craft 4 " + FRAME))
+                .then(1, () -> ctx.key(GLFW.GLFW_KEY_ENTER))
+                .thenWaitUntil(() -> ctx.screen(CommandPromptScreen.class).scrollbackText().stream().anyMatch(l -> l.contains("CRAFT queued")),
+                        SCREEN_WAIT, "the prompt to confirm the queued craft")
+                .thenScreenshot(2, "mc-dos-craft-queued")
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT)
+                .thenWaitUntilServer(level -> {
+                            MekanismRig.power(level, ctx.abs(MekanismRig.MACHINE));
+                            return stored(ctx, level, MekanismRig.itemKey(FRAME)) >= 4;
+                        }, 5000, "four frames from the alloy chain to reach network storage",
+                        level -> "frames=" + stored(ctx, level, MekanismRig.itemKey(FRAME))
+                                + " active=" + mainframe(ctx, level).activeOperationRecords()
+                                + " recent=" + mainframe(ctx, level).recentOperations())
+                // Back at the prompt, the operation log names the finished craft.
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(CommandPromptScreen.class, SCREEN_WAIT)
+                .then(2, () -> ctx.type("operation query operations"))
+                .then(1, () -> ctx.key(GLFW.GLFW_KEY_ENTER))
+                .thenScreenshot(4, "mc-dos-operations")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }
