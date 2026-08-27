@@ -353,11 +353,16 @@ public final class NetworkCraftOperation implements PersistentOperation {
                 finish();
                 return -1;
             }
+            // Neither the computer nor the cluster's craft slots do anything while the machine works: free them
+            // for other crafts and claim again once the step settles (the ingredients stay locked).
             if (exclusiveClaim) {
-                // The computer has nothing to do while the machine works: free it for other crafts.
                 for (final CraftingComputerBlockEntity cc : executors) {
                     cc.releaseCraft(operationId);
                 }
+                executorsParked = true;
+            } else if (orchestrator != null) {
+                orchestrator.releaseCraftSlot(operationId);
+                orchestrator = null;
                 executorsParked = true;
             }
             return 0;

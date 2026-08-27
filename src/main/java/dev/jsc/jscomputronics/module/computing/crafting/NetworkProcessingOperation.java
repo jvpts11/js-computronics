@@ -25,7 +25,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.level.ServerLevel;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -147,19 +146,25 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         // request needs leaves the network. A lot whose chance-based output fell short is simply fed again.
         // A lot is only ever committed whole: what the machine could not take at once (a small chemical tank,
         // a full slot) stays owed and is topped up on the following cycles as the machine consumes.
+        // What leaves the network for the machine in one tick is bounded by the Mainframe's orchestration
+        // capacity, like any other transfer: a faster CPU feeds machines faster. The budget is items per tick;
+        // fluids and chemicals count by the same weight (1 000 mB = one item).
         if (--feedCooldown <= 0) {
             feedCooldown = FEED_INTERVAL;
             final int maxLots = config.feedMax() ? 64 : 1;
-            for (int lot = 0; lot < maxLots; lot++) {
+            long budgetLeft = Math.max(0L, throughputBudget) * StorageKey.MB_EQ_PER_ITEM;
+            for (int lot = 0; lot < maxLots && budgetLeft > 0L; lot++) {
                 if (fullyDelivered()) {
                     if (lotsFed >= lotsNeeded()) {
                         break;
                     }
                     lotsFed++;
                 }
-                if (deliverOwed(storage, inPort) <= 0) {
-                    break; // the machine is full or the network is drained
+                final long movedWeight = deliverOwed(storage, inPort, budgetLeft);
+                if (movedWeight <= 0) {
+                    break; // the machine is full, the network is drained, or the budget is spent
                 }
+                budgetLeft -= movedWeight;
                 progressed = true;
                 if (!fullyDelivered()) {
                     break; // the machine could not take the whole lot yet; finish it before the next one
@@ -221,13 +226,9 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         return portOn(machine.face().getOpposite());
     }
 
-    /** The machine's item + fluid + chemical port on {@code side}; chemicals come through the registered bridges. */
+    /** The machine's port on {@code side}, with every kind of data the machine offers there. */
     private ExternalDataPort portOn(final Direction side) {
-        return new ExternalDataPort(
-                level.getCapability(Capabilities.ItemHandler.BLOCK, machine.machinePos(), side),
-                level.getCapability(Capabilities.FluidHandler.BLOCK, machine.machinePos(), side),
-                dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges
-                        .portFor(level, machine.machinePos(), side).orElse(null));
+        return ExternalDataPort.at(level, machine.machinePos(), side);
     }
 
     /**
@@ -266,20 +267,32 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         return true;
     }
 
-    /** Moves what is still owed for the committed lots into the machine; returns the total moved this call. */
-    private long deliverOwed(final NetworkStorage storage, final DataPort inPort) {
+    /**
+     * Moves what the machine is owed into it, within {@code budgetWeight} (mB-equivalent) for this tick, and
+     * returns the weight moved. Items are owed lot by lot. Fluids and chemicals are continuous: the machine is
+     * kept topped up with as much as the whole request still needs, so a tank never starves a machine that
+     * could run faster than one lot every few ticks — the pattern's amount only sets the ratio.
+     */
+    private long deliverOwed(final NetworkStorage storage, final DataPort inPort, final long budgetWeight) {
         final List<ProcessingPattern.ProcessingInput> inputs = pattern.inputs();
-        long moved = 0L;
-        for (int i = 0; i < inputs.size(); i++) {
+        long movedWeight = 0L;
+        for (int i = 0; i < inputs.size() && movedWeight < budgetWeight; i++) {
             final ProcessingPattern.ProcessingInput in = inputs.get(i);
-            final long owed = lotsFed * in.amount() - delivered[i];
-            if (owed > 0) {
-                final long sent = storage.select(in.key(), owed, inPort);
-                delivered[i] += sent;
-                moved += sent;
+            final long lots = in.key().isItem() ? lotsFed : Math.max(lotsFed, lotsNeeded());
+            final long owed = lots * in.amount() - delivered[i];
+            if (owed <= 0) {
+                continue;
             }
+            final long unitWeight = Math.max(1L, in.key().weight(1));
+            final long affordable = Math.min(owed, (budgetWeight - movedWeight) / unitWeight);
+            if (affordable <= 0) {
+                break;
+            }
+            final long sent = storage.select(in.key(), affordable, inPort);
+            delivered[i] += sent;
+            movedWeight += sent * unitWeight;
         }
-        return moved;
+        return movedWeight;
     }
 
     /**

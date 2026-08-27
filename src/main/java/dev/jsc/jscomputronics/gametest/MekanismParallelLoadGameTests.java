@@ -179,6 +179,11 @@ public final class MekanismParallelLoadGameTests {
                                     && r.status() == OperationRecord.STATUS_PROCESSING)
                             .count();
                     helper.assertTrue(running == 2, "both machines must be working at once on their own queues; active=" + records);
+                    // Crafts waiting on their machines hold no cluster slot: the planks are done, the other
+                    // two are parked on the infuser and the crusher, so the cluster is free for the next request.
+                    helper.assertTrue(world.blockEntity(HUB, HbwInterfaceBlockEntity.class).craftSlotsInUse() == 0,
+                            "a craft waiting on a machine step must not hold cluster slots; in use="
+                                    + world.blockEntity(HUB, HbwInterfaceBlockEntity.class).craftSlotsInUse());
                 })
                 .thenWaitUntil(() -> {
                     MekanismRig.power(helper);
