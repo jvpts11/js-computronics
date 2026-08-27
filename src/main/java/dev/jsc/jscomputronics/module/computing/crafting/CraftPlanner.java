@@ -104,8 +104,61 @@ public final class CraftPlanner {
                             final Map<StorageKey, Long> stock) {
         final State state = new State(patterns, machines, stock);
         final long covered = state.produce(resultKey, quantity, 0, new HashSet<>(), true);
-        return new Plan(List.copyOf(state.steps), Map.copyOf(state.rawConsumption),
+        return new Plan(mergeMachineSteps(state.steps), Map.copyOf(state.rawConsumption),
                 Map.copyOf(state.missing), covered);
+    }
+
+    /**
+     * Folds later machine steps of the same pattern into the first one, so a machine is fed once for all the
+     * runs a request needs instead of once per ingredient that needs it. A later step only moves up when every
+     * input of that machine is raw stock or is made by a step that already precedes the first occurrence, so
+     * the dependency order still holds; making more of an intermediate earlier never harms a later consumer.
+     */
+    private static List<Step> mergeMachineSteps(final List<Step> steps) {
+        final List<Step> merged = new ArrayList<>();
+        for (final Step step : steps) {
+            boolean folded = false;
+            if (step.isMachine()) {
+                for (int i = 0; i < merged.size(); i++) {
+                    final Step earlier = merged.get(i);
+                    if (earlier.isMachine() && earlier.machine().sameRecipe(step.machine())
+                            && inputsAvailableBefore(step.machine(), merged, i)) {
+                        merged.set(i, Step.machine(earlier.machine(), earlier.runs() + step.runs()));
+                        folded = true;
+                        break;
+                    }
+                }
+            }
+            if (!folded) {
+                merged.add(step);
+            }
+        }
+        return List.copyOf(merged);
+    }
+
+    /** Whether every input of {@code machine} is raw stock or produced by a step before index {@code at}. */
+    private static boolean inputsAvailableBefore(final ProcessingPattern machine, final List<Step> steps, final int at) {
+        final Set<StorageKey> madeAnywhere = new HashSet<>();
+        for (final Step step : steps) {
+            final StorageKey made = step.resultKey();
+            if (made != null) {
+                madeAnywhere.add(made);
+            }
+        }
+        final Set<StorageKey> madeEarlier = new HashSet<>();
+        for (int i = 0; i < at; i++) {
+            final StorageKey made = steps.get(i).resultKey();
+            if (made != null) {
+                madeEarlier.add(made);
+            }
+        }
+        for (final ProcessingPattern.ProcessingInput in : machine.inputs()) {
+            // An input no step makes is raw stock (locked from the start); an intermediate must already exist.
+            if (madeAnywhere.contains(in.key()) && !madeEarlier.contains(in.key())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public static long maxFeasible(final StorageKey resultKey, final long quantity,

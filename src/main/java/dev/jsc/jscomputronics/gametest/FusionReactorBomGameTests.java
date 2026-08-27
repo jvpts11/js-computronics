@@ -149,9 +149,14 @@ public final class FusionReactorBomGameTests {
             final CraftPlanner.Plan plan = CraftPlanner.plan(part.getKey(), part.getValue(), benches, machines, stock);
             helper.assertTrue(plan.feasible(), part.getKey() + " x" + part.getValue() + " must be feasible from the raw stock; missing="
                     + plan.missing() + " stock=" + stock);
+            final List<ProcessingPattern> machinesInPlan = new ArrayList<>();
             for (final CraftPlanner.Step step : plan.steps()) {
                 if (step.isMachine()) {
                     machineRuns += step.runs();
+                    // A machine is fed once for all the runs a request needs, not once per ingredient.
+                    helper.assertTrue(machinesInPlan.stream().noneMatch(m -> m.sameRecipe(step.machine())),
+                            part.getKey() + ": the plan must fold the runs of one machine pattern into one step; steps=" + plan.steps());
+                    machinesInPlan.add(step.machine());
                 } else {
                     benchRuns += step.runs();
                 }
