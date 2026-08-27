@@ -194,6 +194,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
     // The processing operation currently running the machine step at stepIndex, if any.
     @org.jetbrains.annotations.Nullable
     private NetworkProcessingOperation machineStep;
+    // Intermediates handed back to the network for the running machine step, to be taken back into the pool
+    // once it settles: bench steps only ever consume from the pool or from locked raw stock.
+    private final Map<StorageKey, Long> flushed = new LinkedHashMap<>();
 
     public NetworkCraftOperation(final ServerLevel level, final NetworkUuid network,
                                  final StorageKey resultKey, final long requested,
@@ -349,6 +352,14 @@ public final class NetworkCraftOperation implements PersistentOperation {
         if (!machineStep.isDone()) {
             return 0;
         }
+        // Take back what was handed to the network for this step, then the step's own output.
+        for (final Map.Entry<StorageKey, Long> entry : flushed.entrySet()) {
+            final long back = storage.select(entry.getKey(), entry.getValue(), (key, amount, simulate) -> amount);
+            if (back > 0) {
+                pool.merge(entry.getKey(), back, Long::sum);
+            }
+        }
+        flushed.clear();
         final StorageKey made = step.resultKey();
         final long wanted = Math.min(step.produced(), machineStep.produced());
         final long got = made == null || wanted <= 0 ? 0
@@ -363,11 +374,15 @@ public final class NetworkCraftOperation implements PersistentOperation {
         return complete ? 1 : -1;
     }
 
-    /** Hands every intermediate (never the result itself) back to the network before a machine step. */
+    /**
+     * Hands every intermediate (never the result itself) back to the network before a machine step — the
+     * machine draws its inputs from storage — remembering the amounts so they return to the pool afterwards.
+     */
     private void flushIntermediates() {
         for (final Map.Entry<StorageKey, Long> entry : new LinkedHashMap<>(pool).entrySet()) {
             if (entry.getValue() > 0 && !entry.getKey().equals(resultKey)) {
                 writeBack(entry.getKey(), entry.getValue());
+                flushed.merge(entry.getKey(), entry.getValue(), Long::sum);
                 pool.remove(entry.getKey());
             }
         }
