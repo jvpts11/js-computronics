@@ -447,7 +447,10 @@ public final class NetworkCraftOperation implements PersistentOperation {
             if (granted <= 0) {
                 return false; // the parallel budget is spent — wait in line
             }
+            // A re-claim can flip a craft that started exclusive (no cluster then) into fan-out: reset the
+            // exclusive latch so a later machine-step park releases the cluster slot, not a no-op computer claim.
             orchestrator = sc;
+            exclusiveClaim = false;
             executors.clear();
             executors.addAll(capable.subList(0, Math.min(granted, capable.size())));
             return true;
@@ -456,6 +459,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
         final CraftingComputerBlockEntity cc = findCapableComputer(root, true);
         if (cc != null) {
             exclusiveClaim = true;
+            orchestrator = null;
             executors.clear();
             executors.add(cc);
             return true;
@@ -528,6 +532,21 @@ public final class NetworkCraftOperation implements PersistentOperation {
         return false;
     }
 
+    /** How much of {@code key} sits on the servers this operation locked — what {@link #consumeIngredients} can extract. */
+    private long lockedServersHold(final NetworkStorage storage, final StorageKey key) {
+        final java.util.Set<NodeUuid> allowed = lockedServers.get(key);
+        if (allowed == null || allowed.isEmpty()) {
+            return 0L;
+        }
+        long held = 0L;
+        for (final Map.Entry<NodeUuid, Long> entry : storage.breakdown(key).entrySet()) {
+            if (allowed.contains(entry.getKey())) {
+                held += entry.getValue();
+            }
+        }
+        return held;
+    }
+
     private long consumeIngredients(final NetworkStorage storage, final CraftingPattern pattern,
                                     final long runs) {
         long executable = runs;
@@ -538,8 +557,10 @@ public final class NetworkCraftOperation implements PersistentOperation {
         for (final Map.Entry<StorageKey, Long> entry : pattern.ingredientTotals().entrySet()) {
             final long perRun = entry.getValue();
             final long pooled = pool.getOrDefault(entry.getKey(), 0L);
-            final long networkHas = lockedServers.containsKey(entry.getKey())
-                    ? storage.count(entry.getKey()) : 0L;
+            // Count only the servers this operation locked — the same servers the extract below pulls from —
+            // not the whole network. A concurrent machine step can drain unlocked (or another op's) servers, so
+            // counting the whole network would let this craft credit runs whose input it cannot actually remove.
+            final long networkHas = lockedServersHold(storage, entry.getKey());
             executable = Math.min(executable, (pooled + networkHas) / perRun);
         }
         if (executable <= 0) {

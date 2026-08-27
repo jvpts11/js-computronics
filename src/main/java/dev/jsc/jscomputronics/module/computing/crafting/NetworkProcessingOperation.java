@@ -296,15 +296,20 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     }
 
     /**
-     * How many lots the request still justifies: the lots already fed are credited with the yield they are
-     * expected to return, minus what has actually come back so far.
+     * How many lots the request justifies. A guaranteed primary output needs exactly {@code ceil(requested /
+     * amount)} lots — no more, so nothing is wasted. A probabilistic primary output cannot be counted ahead of
+     * time: crediting fed lots at their expected yield cancels the real {@code produced} out of the arithmetic
+     * and the machine would stop one batch short. So while the request is still short, one more lot than has
+     * been fed is always allowed — a lot that rolled low is simply replaced — and the request-complete check in
+     * {@link #tick} stops the op the moment real production catches up.
      */
     private long lotsNeeded() {
-        final long perLot = Math.max(1L, pattern.primaryOutput().amount());
-        final long expectedFromFed = lotsFed * perLot;
-        final long stillWanted = requested - produced;
-        final long inFlight = Math.max(0L, expectedFromFed - produced);
-        return lotsFed + Math.max(0L, (stillWanted - inFlight + perLot - 1) / perLot);
+        final ProcessingPattern.ProcessingOutput primary = pattern.primaryOutput();
+        final long perLot = Math.max(1L, primary.amount());
+        if (!primary.probabilistic()) {
+            return (requested + perLot - 1) / perLot;
+        }
+        return produced >= requested ? lotsFed : lotsFed + 1;
     }
 
     /** Puts {@code amount} of a key (item OR fluid) into the network; returns how much was stored. */

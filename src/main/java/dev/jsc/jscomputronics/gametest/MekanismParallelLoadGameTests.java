@@ -92,18 +92,107 @@ public final class MekanismParallelLoadGameTests {
         return new CraftingPattern(grid, new ItemStack(Items.OAK_PLANKS, 4));
     }
 
-    private static void placeCluster(final TestWorldBuilder world) {
+    private static final BlockPos NODE = HUB.east();
+
+    /** Builds the cluster hub + one node with a Phi, ready to power; leaves the node OFF. */
+    private static void placeClusterOffline(final TestWorldBuilder world) {
         world.setBlock(HUB, ComputingModule.HBW_INTERFACE.get());
-        final BlockPos nodePos = HUB.east();
-        world.setBlock(nodePos, ComputingModule.SUPERCOMPUTER_NODE.get());
-        final SupercomputerNodeBlockEntity node = world.blockEntity(nodePos, SupercomputerNodeBlockEntity.class);
+        world.setBlock(NODE, ComputingModule.SUPERCOMPUTER_NODE.get());
+        final SupercomputerNodeBlockEntity node = world.blockEntity(NODE, SupercomputerNodeBlockEntity.class);
         final var hw = node.getHardware();
         hw.setStackInSlot(SupercomputerNodeBlockEntity.MOTHERBOARD_SLOT, new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
         hw.setStackInSlot(SupercomputerNodeBlockEntity.CPU_SLOT, new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
         hw.setStackInSlot(SupercomputerNodeBlockEntity.RAM_SLOTS_START, new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         hw.setStackInSlot(SupercomputerNodeBlockEntity.PHI_SLOT, new ItemStack(ComputingModule.PHI_5100.get()));
         hw.setStackInSlot(SupercomputerNodeBlockEntity.PSU_SLOT, new ItemStack(ComputingModule.PSU_650G.get()));
-        node.togglePower();
+    }
+
+    private static void powerCluster(final TestWorldBuilder world) {
+        world.blockEntity(NODE, SupercomputerNodeBlockEntity.class).togglePower();
+    }
+
+    private static void placeCluster(final TestWorldBuilder world) {
+        placeClusterOffline(world);
+        powerCluster(world);
+    }
+
+    private static void loadAlloyChain(final GameTestHelper helper, final MekanismRig.Rig rig) {
+        final CraftingComputerBlockEntity cc = rig.net().cc();
+        helper.assertTrue(cc.loadPattern(framePattern()), "the frame pattern must load");
+        helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
+                StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE), 1, MekanismRig.itemKey(MekanismRig.mek("alloy_infused"))))), "infused loads");
+        helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
+                MekanismRig.itemKey(MekanismRig.mek("alloy_infused")), MekanismRig.itemKey(MekanismRig.mek("dust_diamond")), 2, MekanismRig.itemKey(MekanismRig.mek("alloy_reinforced"))))), "reinforced loads");
+        helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
+                MekanismRig.itemKey(MekanismRig.mek("alloy_reinforced")), MekanismRig.itemKey(MekanismRig.mek("dust_refined_obsidian")), 4, MekanismRig.itemKey(MekanismRig.mek("alloy_atomic"))))), "atomic loads");
+        rig.net().seed(Items.COPPER_INGOT, 4);
+        rig.net().seed(Items.REDSTONE, 4);
+        rig.net().seed(MekanismRig.item(MekanismRig.mek("dust_diamond")), 8);
+        rig.net().seed(MekanismRig.item(MekanismRig.mek("dust_refined_obsidian")), 16);
+        rig.net().seed(MekanismRig.item(MekanismRig.mek("pellet_polonium")), 4);
+        rig.net().seed(MekanismRig.item(MekanismRig.mek("steel_casing")), 1);
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 6000)
+    public static void clusterComingOnlineMidCraft_freesItsSlotWhileWaitingOnAMachine(final GameTestHelper helper) {
+        // Regression for the exclusiveClaim latch: a craft that starts with no cluster (exclusive claim) and then
+        // sees the cluster come online mid-flight must switch to fan-out AND still release the cluster slot while
+        // it waits on a later machine step — so a second request can use the cluster.
+        final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
+        final TestWorldBuilder world = rig.world();
+        final StorageKey frame = MekanismRig.itemKey(MekanismRig.generators("fusion_reactor_frame"));
+        placeClusterOffline(world); // present but OFF at submit → the craft claims a single computer exclusively
+        final NetworkOperation[] op = new NetworkOperation[1];
+        // The longest run of consecutive ticks the craft held a cluster slot after the cluster came online. With
+        // the stale-latch bug, a fanned-out craft never releases the slot, so it stays held for a whole machine
+        // step (dozens of ticks); with the fix it is taken and freed within one tick per machine step.
+        final int[] maxHeld = {0};
+        final int[] held = {0};
+        final boolean[] clusterWasOnlineMidCraft = {false};
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    MekanismRig.mountBuses(helper);
+                    MekanismRig.mountBottomInputBus(helper);
+                    loadAlloyChain(helper, rig);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(!world.blockEntity(HUB, HbwInterfaceBlockEntity.class).clusterOnline(),
+                            "the cluster must be offline when the craft is submitted");
+                    op[0] = rig.net().mainframe().submitNetworkCraft(frame, 4, false, "reactor", null);
+                    helper.assertTrue(op[0] != null, "the frame craft is planned");
+                })
+                // The first machine step is running exclusively; now bring the cluster online with steps to go.
+                .thenExecuteAfter(30, () -> {
+                    MekanismRig.power(helper);
+                    powerCluster(world);
+                })
+                .thenExecuteAfter(SETTLE, () -> {
+                    clusterWasOnlineMidCraft[0] = world.blockEntity(HUB, HbwInterfaceBlockEntity.class).clusterOnline()
+                            && !op[0].isDone();
+                })
+                .thenWaitUntil(() -> {
+                    MekanismRig.power(helper);
+                    final HbwInterfaceBlockEntity sc = world.blockEntity(HUB, HbwInterfaceBlockEntity.class);
+                    if (sc.clusterOnline() && !op[0].isDone() && sc.craftSlotsInUse() > 0) {
+                        held[0]++;
+                        maxHeld[0] = Math.max(maxHeld[0], held[0]);
+                    } else {
+                        held[0] = 0;
+                    }
+                    helper.assertTrue(op[0].isDone(), "the craft is still running");
+                })
+                .thenExecute(() -> {
+                    helper.assertTrue(op[0].toRecord().status() == OperationRecord.STATUS_COMPLETED,
+                            "the craft must complete; status=" + op[0].toRecord().status());
+                    helper.assertTrue(rig.net().storage(helper.getLevel()).count(frame) == 4, "four frames must be made");
+                    helper.assertTrue(clusterWasOnlineMidCraft[0],
+                            "the cluster must have come online while the craft still had machine steps to run");
+                    // The final bench step legitimately holds the slot for a few ticks; a stale exclusiveClaim
+                    // latch would instead pin it across a whole ~200-tick machine step. 20 separates the two.
+                    helper.assertTrue(maxHeld[0] <= 20,
+                            "a fanned-out craft must not hold a cluster slot across a machine-step wait; held for " + maxHeld[0] + " ticks");
+                })
+                .thenSucceed();
     }
 
     @GameTest(template = ARENA, timeoutTicks = 9000)
