@@ -50,6 +50,7 @@ public final class MekanismRig {
     public static final BlockPos CABLE_ABOVE = new BlockPos(6, 3, 7);
     public static final BlockPos CABLE_BELOW = new BlockPos(6, 1, 7);
     public static final BlockPos CABLE_EAST = new BlockPos(7, 2, 7);
+    public static final BlockPos CABLE_NORTH = new BlockPos(6, 2, 6);
 
     public record Rig(TestWorldBuilder world, TestWorldBuilder.CraftingNetwork net) {
     }
@@ -89,6 +90,8 @@ public final class MekanismRig {
         world.setBlock(CABLE_EAST, ComputingModule.CRAFTING_CABLE.get());
         world.setBlock(new BlockPos(5, 1, 7), ComputingModule.CRAFTING_CABLE.get());
         world.setBlock(CABLE_BELOW, ComputingModule.CRAFTING_CABLE.get());
+        // And one against the front (north) face, off the run's (5,2,6), for machines that output forward.
+        world.setBlock(CABLE_NORTH, ComputingModule.CRAFTING_CABLE.get());
         final Block machine = BuiltInRegistries.BLOCK.get(machineId);
         if (machine == null || machine == Blocks.AIR) {
             throw new IllegalStateException(machineId + " must exist on the dev runtime");
@@ -141,6 +144,20 @@ public final class MekanismRig {
 
     public static void mountLeftReceivingBus(final GameTestHelper helper) {
         mountLeftReceivingBus(TestWorldBuilder.forGameTest(helper));
+    }
+
+    /** An Input Bus against the left (east) face: the first input of two-input machines. */
+    public static void mountLeftInputBus(final TestWorldBuilder world) {
+        if (world.getBlockEntity(CABLE_EAST) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.WEST, new InputBusPart());
+        }
+    }
+
+    /** A Receiving Bus against the front (north) face: where two-input machines give their output. */
+    public static void mountFrontReceivingBus(final TestWorldBuilder world) {
+        if (world.getBlockEntity(CABLE_NORTH) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.SOUTH, new ReceivingBusPart());
+        }
     }
 
     /**

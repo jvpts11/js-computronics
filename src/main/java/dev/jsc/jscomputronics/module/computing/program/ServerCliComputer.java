@@ -302,13 +302,27 @@ public final class ServerCliComputer implements CliComputer {
         return out;
     }
 
-    /** One row per in-flight operation: a "VERB item" label and how much it has moved so far. */
+    /**
+     * One row per operation: the in-flight ones first ("VERB item [STATUS]" and how much moved so far), then
+     * the settled ones from the Mainframe's log, newest first, so a craft that finished a moment ago is still
+     * there to be read.
+     */
     private List<StoredItem> queryOperations(final int limit) {
         final List<StoredItem> out = new ArrayList<>();
         for (final ActiveOp op : activeOps()) {
-            out.add(new StoredItem(op.type() + " " + op.item(), op.progress()));
+            out.add(new StoredItem(op.type() + " " + op.item() + " [" + op.status() + "]", op.progress()));
             if (out.size() >= limit) {
-                break;
+                return out;
+            }
+        }
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe != null) {
+            for (final OperationRecord record : mainframe.recentOperations()) {
+                out.add(new StoredItem(opType(record.type()) + " " + record.name().getString()
+                        + " [" + opStatus(record.status()) + "]", record.moved()));
+                if (out.size() >= limit) {
+                    break;
+                }
             }
         }
         return out;

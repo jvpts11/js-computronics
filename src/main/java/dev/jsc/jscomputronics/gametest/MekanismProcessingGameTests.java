@@ -11,6 +11,7 @@ import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
 import dev.jsc.jscomputronics.module.computing.storage.ChemicalPort;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
@@ -196,6 +197,55 @@ public final class MekanismProcessingGameTests {
                             "two raw iron must have been fed, no more; left " + storage.count(Items.RAW_IRON));
                     helper.assertTrue(storage.count(oxygen) <= 1600,
                             "the chamber must have taken the oxygen for two runs; left " + storage.count(oxygen));
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 600)
+    public static void chemicalInfuser_makesFusionFuelFromDeuteriumAndTritiumData(final GameTestHelper helper) {
+        // The reactor's fuel as data: deuterium and tritium held by the network go into the Chemical Infuser
+        // through one bus on each side face (the machine takes a different input on each), and the D-T fuel
+        // comes back through the bus on its front.
+        final MekanismRig.Rig rig = MekanismRig.build(helper, MekanismRig.mek("chemical_infuser"));
+        final StorageKey deuterium = StorageKey.chemical(MekanismRig.generators("deuterium"));
+        final StorageKey tritium = StorageKey.chemical(MekanismRig.generators("tritium"));
+        final StorageKey fuel = StorageKey.chemical(MekanismRig.generators("fusion_fuel"));
+        final NetworkProcessingOperation[] op = new NetworkProcessingOperation[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final dev.jsc.jscomputronics.testkit.TestWorldBuilder world = rig.world();
+                    // Right (west) face: the run cable already touches it; left (east) and front (north) spurs.
+                    if (world.getBlockEntity(MekanismRig.CABLE_WEST) instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable) {
+                        cable.addPart(Direction.EAST, new dev.jsc.jscomputronics.module.computing.block.part.InputBusPart());
+                    }
+                    MekanismRig.mountLeftInputBus(world);
+                    MekanismRig.mountFrontReceivingBus(world);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(storage.insert(deuterium, 1000) == 1000 && storage.insert(tritium, 1000) == 1000,
+                            "both fuel gases must go in as data");
+                    MekanismRig.assertDiscovered(helper, MekanismRig.mek("chemical_infuser"));
+                    // One lot: 100 mB of each gas make 200 mB of D-T fuel.
+                    final ProcessingPattern pattern = new ProcessingPattern(
+                            List.of(new ProcessingPattern.ProcessingInput(deuterium, 100),
+                                    new ProcessingPattern.ProcessingInput(tritium, 100)),
+                            List.of(new ProcessingPattern.ProcessingOutput(fuel, 200, 100)),
+                            MekanismRig.mek("chemical_infuser").toString(), 200);
+                    op[0] = rig.net().mainframe().submitNetworkProcessing(pattern, 600, "battery");
+                    helper.assertTrue(op[0] != null, "the Mainframe must accept the processing operation");
+                })
+                .thenWaitUntil(() -> {
+                    MekanismRig.power(helper);
+                    helper.assertTrue(op[0].isDone(), "the infuser is still working: " + rig.net().mainframe().activeOperationRecords());
+                })
+                .thenExecute(() -> {
+                    final NetworkStorage storage = rig.net().storage(helper.getLevel());
+                    helper.assertTrue(op[0].produced() >= 600 && op[0].toRecord().status() == OperationRecord.STATUS_COMPLETED,
+                            "600 mB of fuel must be made; produced " + op[0].produced() + " status=" + op[0].toRecord().status());
+                    helper.assertTrue(storage.count(fuel) >= 600, "the D-T fuel must land in the network as data; got " + storage.count(fuel));
+                    helper.assertTrue(storage.count(deuterium) == 700 && storage.count(tritium) == 700,
+                            "three lots of each gas must have been fed, no more; D=" + storage.count(deuterium) + " T=" + storage.count(tritium));
                 })
                 .thenSucceed();
     }
