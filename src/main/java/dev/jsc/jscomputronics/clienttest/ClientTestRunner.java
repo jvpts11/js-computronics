@@ -55,6 +55,8 @@ public final class ClientTestRunner {
     private static final boolean ENABLED = Boolean.getBoolean("jsc.clienttests");
     private static final int SHARD = Integer.getInteger("jsc.clienttests.shard", 0);
     private static final int SHARDS = Math.max(1, Integer.getInteger("jsc.clienttests.shards", 1));
+    /** Optional name substring: when set, only client tests whose name contains it (any case) run. */
+    private static final String ONLY = System.getProperty("jsc.clienttests.only", "").trim();
     static final String WORLD_NAME = "jsc-clienttests";
     private static final int AREA_SPACING = 64;
     private static final int SETTLE_TICKS = 40;
@@ -137,6 +139,12 @@ public final class ClientTestRunner {
             return;
         }
         tests = ClientTestSuite.shard(SHARD, SHARDS);
+        if (!ONLY.isEmpty()) {
+            final String needle = ONLY.toLowerCase(java.util.Locale.ROOT);
+            tests = tests.stream()
+                    .filter(t -> t.name().toLowerCase(java.util.Locale.ROOT).contains(needle))
+                    .toList();
+        }
         LOGGER.info("[JSC-CT] shard {}/{} runs {} tests", SHARD, SHARDS, tests.size());
         deleteOldWorld(mc);
         final GameRules rules = new GameRules();

@@ -102,6 +102,9 @@ neoForge {
                 systemProperty 'jsc.clienttests', 'true'
                 systemProperty 'jsc.clienttests.shard', "${shard}"
                 systemProperty 'jsc.clienttests.shards', "${clientShards}"
+                // -PctOnly=<substring> runs only the client tests whose name contains it (case-insensitive),
+                // so a single test can be driven without stealing the mouse for the whole suite.
+                systemProperty 'jsc.clienttests.only', (providers.gradleProperty('ctOnly').getOrElse(''))
             }
         }
 

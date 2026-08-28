@@ -52,6 +52,14 @@ public final class MekanismRig {
     public static final BlockPos CABLE_EAST = new BlockPos(7, 2, 7);
     public static final BlockPos CABLE_NORTH = new BlockPos(6, 2, 6);
 
+    // A second machine of the same kind, further south, for tests that need two physical machines (concurrency
+    // scales with the machines present). Its buses hang from B_ABOVE (top input), B_BELOW (bottom extra) and
+    // B_RUN (right/west receiving); the run links back to the first machine's cables at (5,2,8).
+    public static final BlockPos MACHINE_B = new BlockPos(6, 2, 10);
+    public static final BlockPos B_RUN = new BlockPos(5, 2, 10);
+    public static final BlockPos B_ABOVE = new BlockPos(6, 3, 10);
+    public static final BlockPos B_BELOW = new BlockPos(6, 1, 10);
+
     public record Rig(TestWorldBuilder world, TestWorldBuilder.CraftingNetwork net) {
     }
 
@@ -133,6 +141,45 @@ public final class MekanismRig {
 
     public static void mountBottomInputBus(final GameTestHelper helper) {
         mountBottomInputBus(TestWorldBuilder.forGameTest(helper));
+    }
+
+    /** Places a second machine of {@code machineId} south of the first, its cables linked to the run. */
+    public static void placeSecondMachine(final TestWorldBuilder world, final ResourceLocation machineId) {
+        world.setBlock(new BlockPos(5, 2, 8), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(new BlockPos(5, 2, 9), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(B_RUN, ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(new BlockPos(5, 3, 10), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(B_ABOVE, ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(new BlockPos(5, 1, 10), ComputingModule.CRAFTING_CABLE.get());
+        world.setBlock(B_BELOW, ComputingModule.CRAFTING_CABLE.get());
+        world.placeFromItem(MACHINE_B, BuiltInRegistries.BLOCK.get(machineId));
+    }
+
+    /**
+     * Mounts the second machine's buses: a top Input Bus (main input), a bottom Input Bus (the "extra" slot), and
+     * a right (west) Receiving Bus. A null filter leaves that bus unfiltered (a wildcard); a non-null one restricts
+     * it, which is how two same-type machines are told apart so each stage of a chain routes to its own machine.
+     */
+    public static void mountSecondMachineBuses(final TestWorldBuilder world,
+                                               final net.minecraft.world.item.ItemStack topFilter,
+                                               final net.minecraft.world.item.ItemStack bottomFilter) {
+        if (world.getBlockEntity(B_ABOVE) instanceof DataCableBlockEntity cable) {
+            final InputBusPart top = new InputBusPart();
+            cable.addPart(Direction.DOWN, top);
+            if (topFilter != null) {
+                top.setFilter(topFilter);
+            }
+        }
+        if (world.getBlockEntity(B_BELOW) instanceof DataCableBlockEntity cable) {
+            final InputBusPart bottom = new InputBusPart();
+            cable.addPart(Direction.UP, bottom);
+            if (bottomFilter != null) {
+                bottom.setFilter(bottomFilter);
+            }
+        }
+        if (world.getBlockEntity(B_RUN) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.EAST, new ReceivingBusPart());
+        }
     }
 
     /** A second Receiving Bus against the left (east) face, for machines that output on both sides. */

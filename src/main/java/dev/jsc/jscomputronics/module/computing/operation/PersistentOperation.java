@@ -30,4 +30,14 @@ public interface PersistentOperation extends NetworkOperation {
 
     /** The state needed to resume this operation later; includes {@link #KIND_KEY} and {@link #ID_KEY}. */
     CompoundTag saveState(HolderLookup.Provider registries);
+
+    /**
+     * True when this operation must NOT be written to disk on save. A machine step run inside a recursive craft
+     * is ephemeral: it reads and writes the parent craft's in-memory pool, which does not survive a reload, so
+     * it is abandoned on save and the parent craft re-plans and re-creates it. Ordinary operations return false
+     * and persist as before.
+     */
+    default boolean isEphemeral() {
+        return false;
+    }
 }

@@ -516,6 +516,110 @@ public final class CraftingChainClientTests {
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }
 
+    private static final String TERMINAL_LAUNCHER = "Terminal";
+
+    /**
+     * The player crafts through the Command Prompt: they open the Terminal, type an IQL {@code operation craft}
+     * for a multi-stage-only recipe, and run it. The recursive craft planner never unwraps a multi-stage recipe,
+     * so before the CLI and IQL shared the terminal's craft entry point this request could not run at all; now it
+     * drives the furnace through the switch and buses exactly like the graphical terminal, and the ingots land in
+     * network storage — proving the CLI/IQL is a true alternative interface, not a lesser one.
+     */
+    @ClientTest(timeoutTicks = 2400)
+    public static void commandPrompt_iqlCraftRunsAMultiStageRecipe(final ClientTestContext ctx) {
+        ctx.thenBuild(0, world -> {
+                    final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
+                    net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
+                            new ItemStack(ComputingModule.GPU_HD_7970.get()));
+                    TestWorldBuilder.installDesktop(net.cc(), PANES_95, Programs.COMMAND_PROMPT);
+                    net.cc().togglePower();
+                    net.cc().togglePower();
+                    world.placeMonitor(MONITOR, Direction.EAST);
+                    world.setBlock(CRAFTING_CABLE, ComputingModule.CRAFTING_CABLE.get());
+                    world.setBlock(SWITCH, ComputingModule.CRAFTING_SWITCH.get());
+                    world.setBlock(FURNACE, Blocks.FURNACE);
+                    world.setBlock(CABLE_ABOVE_FURNACE, ComputingModule.CRAFTING_CABLE.get());
+                    world.setBlock(CABLE_BELOW_FURNACE, ComputingModule.CRAFTING_CABLE.get());
+                    net.seed(Items.RAW_IRON, 32);
+                    // Finished ingots already in the furnace output: collecting them proves the receiving path
+                    // without waiting out real smelting (the furnace has no fuel here).
+                    if (world.getBlockEntity(FURNACE) instanceof FurnaceBlockEntity furnace) {
+                        furnace.setItem(2, new ItemStack(Items.IRON_INGOT, 8));
+                    }
+                })
+                .thenServer(SETTLE + 2, level -> {
+                    final TestWorldBuilder world = TestWorldBuilder.at(level, ctx.origin());
+                    if (world.getBlockEntity(CABLE_ABOVE_FURNACE) instanceof DataCableBlockEntity c) {
+                        c.addPart(Direction.DOWN, new InputBusPart());
+                    }
+                    if (world.getBlockEntity(CABLE_BELOW_FURNACE) instanceof DataCableBlockEntity c) {
+                        c.addPart(Direction.UP, new ReceivingBusPart());
+                    }
+                    // A MULTI-STAGE recipe for iron ingots whose single stage is the furnace smelt.
+                    final ProcessingPattern proc = new ProcessingPattern(
+                            List.of(new ProcessingPattern.ProcessingInput(StorageKey.of(Items.RAW_IRON), 1L)),
+                            List.of(new ProcessingPattern.ProcessingOutput(StorageKey.of(Items.IRON_INGOT), 1L, 100)),
+                            "minecraft:furnace", 200);
+                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
+                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc)));
+                    ctx.assertTrue(world.blockEntity(CRAFTING_COMPUTER, CraftingComputerBlockEntity.class)
+                            .loadMachineRecipe(NetworkRecipe.ofMultiStage(multi)),
+                            "the multi-stage iron recipe loads into the ROM");
+                    // The recursive planner alone is blind to a multi-stage-only recipe, so the CLI/IQL depends on
+                    // the shared entry point to run it at all.
+                    final MainframeBlockEntity mainframe = world.blockEntity(MAINFRAME, MainframeBlockEntity.class);
+                    ctx.assertTrue(mainframe.submitNetworkCraft(StorageKey.of(Items.IRON_INGOT), 1, true, "check") == null,
+                            "the recursive planner must not see the multi-stage-only recipe");
+                })
+                // Open the desktop and launch the Terminal (the Command Prompt) from Start.
+                .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(TERMINAL_LAUNCHER),
+                        SCREEN_WAIT, "the Terminal to be listed in Start")
+                .then(0, () -> {
+                    final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
+                    ctx.click(desktop.startButtonX(), desktop.startButtonY());
+                })
+                .thenAssert(1, () -> ctx.screen(DesktopScreen.class).isStartOpen(), "the Start button opens the menu")
+                .then(0, () -> {
+                    final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
+                    ctx.click(desktop.startMenuItemX(),
+                            desktop.startMenuItemY(desktop.launcherLabels().indexOf(TERMINAL_LAUNCHER)));
+                })
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).windowFor(TERMINAL_LAUNCHER) != null,
+                        SCREEN_WAIT, "the Terminal window to open")
+                .thenScreenshot(2, "terminal")
+                // Type the IQL craft and run it with Enter.
+                .then(0, () -> ctx.type("operation craft 8 iron_ingot"))
+                .thenScreenshot(1, "iql-typed")
+                .then(1, () -> ctx.key(GLFW.GLFW_KEY_ENTER))
+                .thenScreenshot(2, "iql-run")
+                .thenServer(SETTLE, level -> {
+                    final MainframeBlockEntity mainframe = TestWorldBuilder.at(level, ctx.origin())
+                            .blockEntity(MAINFRAME, MainframeBlockEntity.class);
+                    ctx.assertTrue(!mainframe.activeOperationRecords().isEmpty() || !mainframe.recentOperations().isEmpty(),
+                            "the IQL craft must create an operation on the Mainframe");
+                })
+                .thenWaitUntilServer(level -> {
+                            final TestWorldBuilder world = TestWorldBuilder.at(level, ctx.origin());
+                            final MainframeBlockEntity mainframe = world.blockEntity(MAINFRAME, MainframeBlockEntity.class);
+                            return NetworkStorage.of(level, mainframe.networkUuid())
+                                    .count(StorageKey.of(Items.IRON_INGOT)) >= 8;
+                        }, CRAFT_WAIT, "the ingots to reach storage after the IQL craft",
+                        level -> {
+                            final TestWorldBuilder world = TestWorldBuilder.at(level, ctx.origin());
+                            final MainframeBlockEntity mainframe = world.blockEntity(MAINFRAME, MainframeBlockEntity.class);
+                            return "iron=" + NetworkStorage.of(level, mainframe.networkUuid())
+                                    .count(StorageKey.of(Items.IRON_INGOT))
+                                    + " active=" + mainframe.activeOperationRecords()
+                                    + " recent=" + mainframe.recentOperations();
+                        })
+                .thenScreenshot(2, "iql-crafted")
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT);
+    }
+
     /**
      * A recipe loaded into the Recipe ROM must still be there after the world is saved, left and reopened —
      * seen from the Crafting Manager, the way the player would check.

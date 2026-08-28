@@ -27,12 +27,13 @@ public record CraftCatalogPayload(List<Entry> entries) implements CustomPacketPa
 
     public static final int MAX_ENTRIES = 512;
 
-    public record Entry(ItemStack result, byte availability) {
+    public record Entry(ItemStack result, byte availability, boolean multiStage) {
 
         public static final StreamCodec<RegistryFriendlyByteBuf, Entry> STREAM_CODEC =
                 StreamCodec.composite(
                         ItemStack.STREAM_CODEC, Entry::result,
                         ByteBufCodecs.BYTE, Entry::availability,
+                        ByteBufCodecs.BOOL, Entry::multiStage,
                         Entry::new);
     }
 

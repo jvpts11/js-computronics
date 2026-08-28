@@ -119,6 +119,26 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         return (long) (capacity() * craftingCardFactor());
     }
 
+    /**
+     * The number of crafting stages this computer can run in parallel, summed over its installed crafting cards'
+     * thread counts. This is the hardware ceiling on a single craft's concurrent stages: the computer orchestrates
+     * its own craft's stages up to this many at once, independent of the Mainframe's operation queues. Zero when no
+     * crafting card is installed (the computer cannot craft at all).
+     */
+    public int craftingThreads() {
+        final ComputerBuild build = currentBuild();
+        if (build == null) {
+            return 0;
+        }
+        int threads = 0;
+        for (final ExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CRAFTING)) {
+            if (card instanceof CraftingCardSpec craftingCard) {
+                threads += craftingCard.threads();
+            }
+        }
+        return threads;
+    }
+
     public boolean canCraft() {
         return isRunning() && craftingCardFactor() > 0.0;
     }
@@ -189,15 +209,25 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
      * may run on a machine at once, whether it is paused, and whether to fill it rather than feed one lot.
      */
     public record MachineConfig(int maxJobs, boolean locked, boolean feedMax) {
-        public static final MachineConfig DEFAULT = new MachineConfig(1, false, false);
+        // maxJobs is an OPTIONAL per-type ceiling on concurrent jobs; 0 means "auto" — use every machine of the
+        // type that exists (the dispatcher gives each job a distinct physical machine, so concurrency already
+        // scales with the machines present). A positive value caps below that.
+        public static final MachineConfig DEFAULT = new MachineConfig(0, false, false);
 
         public MachineConfig {
-            maxJobs = Math.max(1, maxJobs);
+            maxJobs = Math.max(0, maxJobs);
         }
     }
 
-    // Keyed by the machine's name or registry-id (the same key a ProcessingPattern.machineType resolves to).
+    // Config lives in one map under two kinds of key: a machine TYPE (e.g. "mekanism:...factory") holds that
+    // type's Max Jobs ceiling; a per-PHYSICAL-machine key (see machineStateKey, prefixed "@") holds that one
+    // machine's Paused/Feed state. So Max Jobs is set once per type, while a machine can be paused on its own.
     private final java.util.Map<String, MachineConfig> machineConfigs = new java.util.HashMap<>();
+
+    /** The config key for one physical machine's per-machine state (Paused/Feed), by its world position. */
+    public static String machineStateKey(final net.minecraft.core.BlockPos pos) {
+        return "@" + pos.getX() + "," + pos.getY() + "," + pos.getZ();
+    }
 
     public MachineConfig machineConfig(final String machineKey) {
         return machineConfigs.getOrDefault(machineKey, MachineConfig.DEFAULT);
@@ -351,7 +381,8 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
     public static final int DATA_CRAFT_FACTOR_X100 = 6;
     public static final int DATA_CRAFT_THROUGHPUT = 7;
     public static final int DATA_ROM_USED = 8;
-    public static final int DATA_COUNT = DATA_ROM_USED + 1;
+    public static final int DATA_CRAFT_THREADS = 9;
+    public static final int DATA_COUNT = DATA_CRAFT_THREADS + 1;
 
     private final int[] clientData = new int[DATA_COUNT];
 
@@ -366,6 +397,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
             case DATA_CRAFT_FACTOR_X100 -> (int) Math.round(craftingCardFactor() * 100.0);
             case DATA_CRAFT_THROUGHPUT -> (int) Math.min(Integer.MAX_VALUE, craftingThroughput());
             case DATA_ROM_USED -> romUsed();
+            case DATA_CRAFT_THREADS -> craftingThreads();
             default -> 0;
         };
     }

@@ -144,7 +144,9 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
                 JscOsTheme.text());
         final int factor = menu.craftFactorX100();
         if (factor > 0) {
-            JscOsTheme.tileText(g, font, COL_R, TILE_Y1, "CRAFT x" + formatFactor(factor),
+            // The Crafting Card is an accelerator with two stats: throughput (this tile's value, factor x CPU) and
+            // threads (how many of a craft's stages this computer runs at once, summed over the installed cards).
+            JscOsTheme.tileText(g, font, COL_R, TILE_Y1, "CRAFT " + menu.craftThreads() + "T x" + formatFactor(factor),
                     JscOsTheme.fmt(menu.craftThroughput()), "it/t", JscOsTheme.accent());
         } else {
             // No Crafting Card installed: the computer runs but cannot craft.

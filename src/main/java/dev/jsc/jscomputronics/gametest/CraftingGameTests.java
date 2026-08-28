@@ -729,6 +729,57 @@ public final class CraftingGameTests {
     }
 
     @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void craftRequest_runsAMultiStageRecipeTheRecursivePlannerCannotSee(final GameTestHelper helper) {
+        final Network net = buildCraftingNetwork(helper);
+        final BlockPos cable = new BlockPos(5, 2, 3);
+        final BlockPos sw = new BlockPos(5, 2, 4);
+        final BlockPos machine = new BlockPos(5, 2, 5);
+        helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
+        helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
+        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        final String machineType = BuiltInRegistries.BLOCK.getKey(
+                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+        final var stone = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE);
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    net.seed(helper, Items.COBBLESTONE, 64);
+                    // Pre-place the declared output so the run has something to collect.
+                    if (helper.getBlockEntity(machine)
+                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                                    .CompressorBlockEntity compressor) {
+                        compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
+                    }
+                    // Load ONLY a multi-stage recipe for stone. The recursive craft planner unwraps processing
+                    // patterns but never multi-stage ones, so it is blind to this recipe — which is why the CLI
+                    // and IQL, before they shared the terminal's entry point, could not craft it.
+                    final var proc = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
+                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                                    stone, 1L, 100)),
+                            machineType, 200);
+                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
+                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc)));
+                    net.cc.loadMachineRecipe(
+                            dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe.ofMultiStage(multi));
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    // The old recursive-plan path cannot make stone: no bench or processing pattern produces it.
+                    helper.assertTrue(net.mainframe.submitNetworkCraft(stone, 1, true, "test") == null,
+                            "the recursive planner must be blind to a multi-stage-only recipe");
+                    // The shared entry point the CLI/IQL, terminal and Network Interactor all route through finds
+                    // the recipe by its result and runs the pipeline.
+                    helper.assertTrue(net.mainframe.submitCraftRequest(stone, 1, true, "cli", null) != null,
+                            "the shared craft entry point must run the multi-stage recipe");
+                })
+                .thenExecuteAfter(14, () -> helper.assertTrue(net.storage(helper).count(stone) > 0,
+                        "the multi-stage recipe ran through the shared entry point; net stone="
+                                + net.storage(helper).count(stone)))
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 200)
     public static void processing_unknownMachineTimesOutAndConservesInputs(final GameTestHelper helper) {
         final Network net = buildCraftingNetwork(helper);
         final java.util.concurrent.atomic.AtomicReference<

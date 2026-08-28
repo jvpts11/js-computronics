@@ -75,19 +75,21 @@ public record CraftManagerStatePayload(
      * @param label   a human-readable label (the name, or the block id's path)
      * @param active  true when the machine is currently reachable/active on a switch face
      * @param maxJobs how many processing jobs may run on it at once
-     * @param locked  true when the machine is paused
-     * @param feedMax true when it is fed to fill rather than one lot at a time
+     * One physical machine on the network. {@code machineKey} is its per-machine config key (Paused/Feed are set
+     * on it); {@code typeKey} is its machine type (Max Jobs is a per-type ceiling, and rows group by it);
+     * {@code label} distinguishes it within the type (its switch face + position). {@code typeMaxJobs} is the
+     * type's shared Max Jobs.
      */
-    public record WireMachine(String key, String label, boolean active, int maxJobs, boolean locked,
-                              boolean feedMax) {
+    public record WireMachine(String machineKey, String typeKey, String label,
+                              boolean locked, boolean feedMax, int typeMaxJobs) {
         public static final StreamCodec<RegistryFriendlyByteBuf, WireMachine> STREAM_CODEC =
                 StreamCodec.composite(
-                        ByteBufCodecs.stringUtf8(80), WireMachine::key,
-                        ByteBufCodecs.stringUtf8(48), WireMachine::label,
-                        ByteBufCodecs.BOOL, WireMachine::active,
-                        ByteBufCodecs.VAR_INT, WireMachine::maxJobs,
+                        ByteBufCodecs.stringUtf8(48), WireMachine::machineKey,
+                        ByteBufCodecs.stringUtf8(80), WireMachine::typeKey,
+                        ByteBufCodecs.stringUtf8(64), WireMachine::label,
                         ByteBufCodecs.BOOL, WireMachine::locked,
                         ByteBufCodecs.BOOL, WireMachine::feedMax,
+                        ByteBufCodecs.VAR_INT, WireMachine::typeMaxJobs,
                         WireMachine::new);
     }
 

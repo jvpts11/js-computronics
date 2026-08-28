@@ -140,6 +140,10 @@ public class CraftingComputerMenu extends AbstractComputerMenu {
         return data.get(CraftingComputerBlockEntity.DATA_CRAFT_THROUGHPUT);
     }
 
+    public int craftThreads() {
+        return data.get(CraftingComputerBlockEntity.DATA_CRAFT_THREADS);
+    }
+
     public int romUsed() {
         return data.get(CraftingComputerBlockEntity.DATA_ROM_USED);
     }

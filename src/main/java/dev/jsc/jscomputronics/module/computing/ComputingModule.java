@@ -522,11 +522,11 @@ public final class ComputingModule {
 
     public static final DeferredItem<CraftingCardItem> CRAFTING_CARD_T2 = ITEMS.register(
             "crafting_card_t2", () -> new CraftingCardItem(new Item.Properties(),
-                    new CraftingCardSpec(IndustrialTier.T2, PcieGeneration.PCIE_1_0, 0.5, 75)));
+                    new CraftingCardSpec(IndustrialTier.T2, PcieGeneration.PCIE_1_0, 0.05, 2, 75)));
 
     public static final DeferredItem<CraftingCardItem> CRAFTING_CARD_T3 = ITEMS.register(
             "crafting_card_t3", () -> new CraftingCardItem(new Item.Properties(),
-                    new CraftingCardSpec(IndustrialTier.T3, PcieGeneration.PCIE_2_0, 1.0, 100)));
+                    new CraftingCardSpec(IndustrialTier.T3, PcieGeneration.PCIE_2_0, 0.1, 4, 100)));
 
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));

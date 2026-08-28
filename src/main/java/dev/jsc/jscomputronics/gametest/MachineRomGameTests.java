@@ -88,9 +88,9 @@ public final class MachineRomGameTests {
     public static void machineConfig_clampDefaultAndAccess(final GameTestHelper helper) {
         final CraftingComputerBlockEntity cc = placeComputer(helper, new BlockPos(2, 2, 2));
         helper.assertTrue(cc.machineConfig("unknown").equals(MachineConfig.DEFAULT), "unknown key gives DEFAULT");
-        helper.assertTrue(MachineConfig.DEFAULT.maxJobs() == 1, "DEFAULT is one job");
-        helper.assertTrue(new MachineConfig(0, false, false).maxJobs() == 1, "maxJobs 0 clamps to 1");
-        helper.assertTrue(new MachineConfig(-9, false, false).maxJobs() == 1, "negative maxJobs clamps to 1");
+        helper.assertTrue(MachineConfig.DEFAULT.maxJobs() == 0, "DEFAULT is auto (0 = use every machine)");
+        helper.assertTrue(new MachineConfig(0, false, false).maxJobs() == 0, "maxJobs 0 stays 0 (auto)");
+        helper.assertTrue(new MachineConfig(-9, false, false).maxJobs() == 0, "negative maxJobs clamps to 0 (auto)");
         cc.setMachineConfig("jsc:compressor", new MachineConfig(4, true, true));
         helper.assertTrue(cc.machineConfig("jsc:compressor").maxJobs() == 4, "set config is read back");
         helper.assertTrue(cc.machineConfig("jsc:compressor").locked(), "locked is read back");

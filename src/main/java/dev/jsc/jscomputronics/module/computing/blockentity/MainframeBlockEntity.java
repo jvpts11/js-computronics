@@ -511,9 +511,14 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     private void runDispatch() {
         final int queues = Math.max(1, parallelQueues());
-        if (dispatch == null || dispatchQueues != queues) {
-            closeDispatch();
+        if (dispatch == null) {
             dispatch = new OperationDispatch(queues);
+            dispatchQueues = queues;
+        } else if (dispatchQueues != queues) {
+            // The GPU count changed (a hot-swap): resize the dispatcher's lanes in place. Rebuilding it would run
+            // closeDispatch, which abandons every in-flight Operation — so pulling a GPU mid-craft would discard
+            // the craft and leave its machines stranded. Resizing keeps the active Operations running untouched.
+            dispatch.setParallelQueues(queues);
             dispatchQueues = queues;
         }
         dispatch.tick();
@@ -556,7 +561,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             // DISCARDED so a conflict or power-off leaves a trace in the log instead of vanishing.
             for (final var operation : activeOperations) {
                 if (keepPersistent && operation instanceof dev.jsc.jscomputronics.module.computing.operation
-                        .PersistentOperation) {
+                        .PersistentOperation persistent && !persistent.isEphemeral()) {
                     continue; // already saved with the block entity; it resumes on reload
                 }
                 operation.abandon();
@@ -591,6 +596,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
             if (operation.isWaiting()) {
                 queued++; // blocked on another Operation's LOCK — not streaming
+            } else if (!occupiesQueue(operation)) {
+                continue; // a machine stage runs under its computer's threads, never queued in the Mainframe
             } else if (used < slots) {
                 used++;
             } else {
@@ -604,7 +611,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final int slots = Math.max(1, parallelQueues());
         int used = 0;
         for (final var operation : activeOperations) {
-            if (!operation.isDone() && !operation.isWaiting() && used < slots) {
+            if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation) && used < slots) {
                 used++;
             }
         }
@@ -878,13 +885,25 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation submitNetworkProcessing(
             final dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern pattern, final long demand,
             final String requesterLabel) {
+        return submitNetworkProcessing(pattern, demand, requesterLabel, null);
+    }
+
+    /**
+     * As above, but the step draws its inputs from and returns its outputs to {@code io} instead of the network.
+     * A recursive craft passes its own pool here so its machine steps pipeline through the pool (concurrent,
+     * race-free) rather than through the shared network; such a step is ephemeral and does not persist a reload.
+     */
+    public dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation submitNetworkProcessing(
+            final dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern pattern, final long demand,
+            final String requesterLabel,
+            @Nullable final dev.jsc.jscomputronics.module.computing.crafting.CraftIo io) {
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
                 || demand <= 0) {
             return null;
         }
         final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation(
                 serverLevel, networkUuid(), pattern, demand, craftingComputerPositions(),
-                java.util.UUID.randomUUID(), requesterLabel);
+                java.util.UUID.randomUUID(), requesterLabel, io);
         activeOperations.add(operation);
         return operation;
     }
@@ -900,6 +919,110 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 this, pattern, demand, requesterLabel);
         activeOperations.add(operation);
         return operation;
+    }
+
+    /**
+     * The single craft entry point every OS surface — the terminal, the Network Interactor, and the CLI/IQL —
+     * routes a request through, so all three behave the same. If a machine recipe on the network produces
+     * {@code key} directly, that recipe runs (a processing run, or a multi-stage pipeline); otherwise a recursive
+     * bench-and-machine craft is planned. When a machine recipe's own inputs are not all in stock and other
+     * patterns can make them, the whole tree runs as one craft with the machine as a step; if nothing can make a
+     * missing input, the bare machine run delivers what the network does hold. {@code partial} applies only to
+     * the recursive fallback (a machine run always delivers what it can). {@code onSettle}, if given, fires when
+     * the resulting operation settles. Returns the operation, or null if nothing on the network makes {@code key}.
+     */
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkOperation submitCraftRequest(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final boolean partial, final String label, @Nullable final Runnable onSettle) {
+        return submitCraftRequest(key, demand, partial, label, onSettle, true);
+    }
+
+    /**
+     * As above, but {@code preferMultiStage} chooses which recipe wins when an item can be made BOTH by a
+     * multi-stage pipeline and by composing the individual step patterns: true runs the multi-stage recipe; false
+     * skips it and lets the recursive planner build the tree from the flat patterns. Only affects results that
+     * have a multi-stage recipe; everything else routes the same way regardless.
+     */
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.operation.NetworkOperation submitCraftRequest(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
+            final boolean partial, final String label, @Nullable final Runnable onSettle,
+            final boolean preferMultiStage) {
+        for (final var recipe : networkMachineRecipes()) {
+            if (!key.equals(recipe.resultKey())) {
+                continue;
+            }
+            if (recipe.proc().isPresent()) {
+                if (!inputsInStock(recipe.proc().get(), demand)) {
+                    // A machine input is missing: if other patterns can make it, run the whole tree as one craft
+                    // (all-or-nothing, so partial is false here); otherwise fall through to the bare machine run.
+                    final var planned = submitNetworkCraft(key, demand, false, label);
+                    if (planned != null) {
+                        if (onSettle != null) {
+                            planned.onSettle(onSettle);
+                        }
+                        return planned;
+                    }
+                }
+                final var op = submitNetworkProcessing(recipe.proc().get(), demand, label);
+                if (op != null && onSettle != null) {
+                    op.onSettle(onSettle);
+                }
+                return op;
+            }
+            if (recipe.multi().isPresent() && preferMultiStage) {
+                final var op = submitNetworkMultiStage(recipe.multi().get(), demand, label);
+                if (op != null && onSettle != null) {
+                    op.onSettle(onSettle);
+                }
+                return op;
+            }
+        }
+        // No machine makes it directly (or multi-stage was declined): plan a recursive bench-and-machine craft.
+        final var op = submitNetworkCraft(key, demand, partial, label);
+        if (op != null && onSettle != null) {
+            op.onSettle(onSettle);
+        }
+        return op;
+    }
+
+    /** Whether the network has a multi-stage recipe whose end result is {@code key} (so a caller can offer the
+     *  player the choice between the pipeline and the flat, recursively-planned path). */
+    public boolean hasMultiStageRecipe(final dev.jsc.jscomputronics.module.computing.storage.StorageKey key) {
+        for (final var recipe : networkMachineRecipes()) {
+            if (key.equals(recipe.resultKey()) && recipe.multi().isPresent()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether the network currently stocks every input a processing run producing {@code quantity} would use. */
+    private boolean inputsInStock(final dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern machine,
+                                  final long quantity) {
+        if (!(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+            return true;
+        }
+        final var storage = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
+                .of(serverLevel, networkUuid());
+        final var primary = machine.primaryOutput();
+        final long runs = ceilDiv(quantity, primary == null ? 1 : Math.max(1, primary.amount()));
+        final java.util.Map<dev.jsc.jscomputronics.module.computing.storage.StorageKey, Long> need =
+                new java.util.HashMap<>();
+        for (final var in : machine.inputs()) {
+            need.merge(in.key(), in.amount() * runs, Long::sum);
+        }
+        for (final var entry : need.entrySet()) {
+            if (storage.count(entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static long ceilDiv(final long amount, final long perRun) {
+        return (amount + perRun - 1) / perRun;
     }
 
     // Manual LOCK / UNLOCK — player-issued holds on a network item type that make concurrent
@@ -955,8 +1078,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final java.util.Set<java.util.UUID> completedStages = new java.util.HashSet<>();
         final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation>
                 pipelines = new java.util.ArrayList<>();
-        // Crafts that were waiting on a machine step re-plan only once every operation is back, so the step
-        // they waited on can be found by id and its output counted before the plan is made.
+        // Crafts that had machine steps in flight re-plan only once every operation is back, so the steps they
+        // were running can be found by id and their output counted before the remaining demand is planned.
         final java.util.List<CompoundTag> craftsOnMachines = new java.util.ArrayList<>();
         for (int i = 0; i < saved.size(); i++) {
             final CompoundTag tag = saved.getCompound(i);
@@ -974,7 +1097,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                     }
                 }
                 case dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation.KIND -> {
-                    if (dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation.savedMachineStep(tag) != null) {
+                    if (!dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                            .savedMachineSteps(tag).isEmpty()) {
                         craftsOnMachines.add(tag);
                         continue;
                     }
@@ -1000,12 +1124,17 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
         }
         for (final CompoundTag tag : craftsOnMachines) {
-            final java.util.UUID stepId = dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
-                    .savedMachineStep(tag);
-            final var step = byId.get(stepId)
-                    instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc ? proc : null;
+            final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> steps =
+                    new java.util.ArrayList<>();
+            for (final java.util.UUID stepId : dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                    .savedMachineSteps(tag)) {
+                if (byId.get(stepId)
+                        instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc) {
+                    steps.add(proc);
+                }
+            }
             dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
-                    .restore(tag, this, level, networkUuid(), registries, step);
+                    .restore(tag, this, level, networkUuid(), registries, steps);
         }
         for (final var pipeline : pipelines) {
             final java.util.UUID stageId = pipeline.pendingStageId();
@@ -1042,18 +1171,18 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final long effectiveCapacity = Math.min(capacity(), ramBuffer());
         final int slots = Math.max(1, parallelQueues());
         int used = 0;
-        // Cap concurrent processing jobs per machine (the Machines tab's maxJobs). Earlier ops in the list take
-        // the slots; ops over the cap are flagged blocked and stay WAITING this tick.
-        final java.util.Map<String, Integer> machineRunning = new java.util.HashMap<>();
+        assignMachines();
+        // A machine step feeds at its Crafting Computer's crafting-card throughput (card x CPU), NOT the
+        // Mainframe's capacity — the card is what governs how fast any craft runs, bench or machine. That
+        // throughput is SHARED among the steps one computer is driving at once, so a computer feeding three
+        // machines splits its card's throughput three ways (the machine's own speed is still the ceiling).
+        final java.util.Map<net.minecraft.core.BlockPos, Integer> stepsPerComputer = new java.util.HashMap<>();
         for (final var operation : activeOperations) {
             if (operation instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc
-                    && !proc.isDone()) {
-                final String key = proc.machineKey();
-                if (machineRunning.getOrDefault(key, 0) >= resolveMaxJobs(key)) {
-                    proc.setConcurrencyBlocked(true);
-                } else {
-                    proc.setConcurrencyBlocked(false);
-                    machineRunning.merge(key, 1, Integer::sum);
+                    && !proc.isDone() && !proc.isWaiting()) {
+                final net.minecraft.core.BlockPos cc = proc.executorComputer();
+                if (cc != null) {
+                    stepsPerComputer.merge(cc, 1, Integer::sum);
                 }
             }
         }
@@ -1065,9 +1194,13 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
             if (operation.isWaiting()) {
                 operation.tick(0L); // lock retry + timeout only; holds no queue slot
+            } else if (!occupiesQueue(operation)) {
+                // A craft's machine stage runs under its Crafting Computer's thread ceiling, not a Mainframe
+                // queue: it always gets its feed and never counts against the queue budget.
+                operation.tick(machineFeedBudget(operation, effectiveCapacity, stepsPerComputer));
             } else if (used < slots) {
                 used++;
-                operation.tick(effectiveCapacity);
+                operation.tick(machineFeedBudget(operation, effectiveCapacity, stepsPerComputer));
             }
             // Ready Operations beyond the queue count stay PENDING this tick: no progress,
             // no latency countdown — their disks have not started reading yet.
@@ -1077,15 +1210,113 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         while (it.hasNext()) {
             final var operation = it.next();
             if (operation.isDone()) {
-                final var record = operation.toRecord();
-                recordOperation(record);
-                if (record.status() == dev.jsc.jscomputronics.module.computing.operation.payload
-                        .OperationRecord.STATUS_COMPLETED) {
-                    completedTotal++; // network Operations count toward the lifetime tally too
+                // A craft's machine steps are nested stages, not operations of their own: the parent craft logs
+                // them as its sub-operations, so don't write them to the log or the lifetime tally separately.
+                final boolean nested = operation instanceof dev.jsc.jscomputronics.module.computing.crafting
+                        .NetworkProcessingOperation proc && proc.isNested();
+                if (!nested) {
+                    final var record = operation.toRecord();
+                    recordOperation(record);
+                    if (record.status() == dev.jsc.jscomputronics.module.computing.operation.payload
+                            .OperationRecord.STATUS_COMPLETED) {
+                        completedTotal++; // network Operations count toward the lifetime tally too
+                    }
                 }
                 it.remove();
             }
         }
+    }
+
+    /**
+     * Gives every running processing job a distinct physical machine, so concurrency on a machine type scales
+     * with the machines actually present — two same-type jobs never share (and jam) one block. A job keeps the
+     * machine it already holds (as long as it is still there and routable); a new job claims a free one of the
+     * ones its recipe can route to. A job with no free machine is flagged blocked (it waits, it does not time
+     * out). The Machines tab's Max Jobs is an OPTIONAL per-type ceiling on top of this: 0 means "use them all".
+     */
+    private void assignMachines() {
+        final java.util.Set<net.minecraft.core.BlockPos> taken = new java.util.HashSet<>();
+        final java.util.Map<String, Integer> perType = new java.util.HashMap<>();
+        final java.util.List<dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> jobs =
+                new java.util.ArrayList<>();
+        for (final var operation : activeOperations) {
+            if (operation instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc
+                    && !proc.isDone()) {
+                jobs.add(proc);
+            }
+        }
+        // Pass 1: a job that already holds a still-valid, unclaimed machine keeps it (stable across ticks so a
+        // machine is never fed by two jobs turn and turn about).
+        for (final var proc : jobs) {
+            final net.minecraft.core.BlockPos held = proc.assignedMachine();
+            if (held != null && !taken.contains(held) && proc.routableMachines().contains(held)) {
+                taken.add(held);
+                perType.merge(proc.machineKey(), 1, Integer::sum);
+                proc.setConcurrencyBlocked(false);
+            } else {
+                proc.setAssignedMachine(null);
+            }
+        }
+        // Pass 2: an unassigned job claims a free routable machine, within its type's optional Max Jobs ceiling.
+        for (final var proc : jobs) {
+            if (proc.assignedMachine() != null) {
+                continue;
+            }
+            final String key = proc.machineKey();
+            final int ceiling = resolveMaxJobs(key); // 0 = auto: no ceiling, bounded only by the machines present
+            if (ceiling > 0 && perType.getOrDefault(key, 0) >= ceiling) {
+                proc.setConcurrencyBlocked(true);
+                continue;
+            }
+            net.minecraft.core.BlockPos free = null;
+            for (final net.minecraft.core.BlockPos candidate : proc.routableMachines()) {
+                if (!taken.contains(candidate)) {
+                    free = candidate;
+                    break;
+                }
+            }
+            if (free != null) {
+                proc.setAssignedMachine(free);
+                taken.add(free);
+                perType.merge(key, 1, Integer::sum);
+                proc.setConcurrencyBlocked(false);
+            } else {
+                proc.setConcurrencyBlocked(true); // every machine of this type is busy: wait, do not time out
+            }
+        }
+    }
+
+    /**
+     * The per-tick throughput to run {@code operation} at. A machine step feeds at its Crafting Computer's
+     * crafting-card throughput (card x CPU), shared among the steps that computer drives at once — the card, not
+     * the machine, sets the crafting speed. Everything else runs at the Mainframe's own orchestration capacity.
+     */
+    private long machineFeedBudget(final dev.jsc.jscomputronics.module.computing.operation.NetworkOperation operation,
+                                   final long effectiveCapacity,
+                                   final java.util.Map<net.minecraft.core.BlockPos, Integer> stepsPerComputer) {
+        if (operation instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc) {
+            final net.minecraft.core.BlockPos cc = proc.executorComputer();
+            if (cc == null) {
+                return 0L; // no Crafting Computer drives this machine, so it cannot be fed
+            }
+            final long throughput = level != null
+                    && level.getBlockEntity(cc) instanceof CraftingComputerBlockEntity computer
+                    ? computer.craftingThroughput() : 0L;
+            return throughput / Math.max(1, stepsPerComputer.getOrDefault(cc, 1));
+        }
+        return effectiveCapacity;
+    }
+
+    /**
+     * Whether {@code operation} occupies one of the Mainframe's operation queues. A craft's machine stage is
+     * orchestrated by its Crafting Computer and gated by that computer's crafting threads, not by the Mainframe,
+     * so it never occupies a Mainframe queue: the queues gate distinct operations (a craft, a SELECT, an INSERT),
+     * the crafting threads gate one craft's concurrent stages. Every non-stage operation occupies a queue.
+     */
+    private static boolean occupiesQueue(
+            final dev.jsc.jscomputronics.module.computing.operation.NetworkOperation operation) {
+        return !(operation instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation proc
+                && proc.isNested());
     }
 
     public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> recentOperations() {
@@ -1099,7 +1330,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         int used = 0;
         for (final var operation : activeOperations) {
             var record = operation.liveRecord();
-            if (!operation.isDone() && !operation.isWaiting()) {
+            if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation)) {
                 if (used < slots) {
                     used++;
                 } else {
@@ -1107,6 +1338,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                             .OperationRecord.STATUS_PENDING);
                 }
             }
+            // A machine stage keeps its live status (PROCESSING while it runs): it is gated by its Crafting
+            // Computer's threads, not a Mainframe queue, so the queue limit never forces it to PENDING.
             out.add(record);
         }
         return out;
@@ -1429,7 +1662,9 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final net.minecraft.nbt.ListTag inFlight = new net.minecraft.nbt.ListTag();
         for (final var operation : activeOperations) {
             if (operation instanceof dev.jsc.jscomputronics.module.computing.operation.PersistentOperation persistent
-                    && !operation.isDone()) {
+                    && !operation.isDone() && !persistent.isEphemeral()) {
+                // A craft's machine steps read and write its in-memory pool, which does not survive a reload, so
+                // they are not persisted; the parent craft re-plans and re-creates them from the handed-back pool.
                 inFlight.add(persistent.saveState(registries));
             }
         }

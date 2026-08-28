@@ -53,10 +53,18 @@ public final class NetworkCraftOperation implements PersistentOperation {
         if (embeddedPattern != null) {
             CraftingPattern.CODEC.encodeStart(ops, embeddedPattern).result().ifPresent(t -> tag.put("Embedded", t));
         }
-        if (machineStep != null && !machineStep.isDone()) {
-            // The machine step keeps running on its own after a reload; the re-planned craft waits for it so
-            // its output is in stock when the plan is made, instead of being made a second time.
-            tag.putUUID(MACHINE_STEP_KEY, machineStep.operationId());
+        // Every machine step still running keeps going on its own after a reload; the re-planned craft waits for
+        // them all so their output is in stock when the plan is made, instead of being made a second time.
+        final ListTag machineSteps = new ListTag();
+        for (final MachineRun run : machineRuns) {
+            if (!run.op.isDone()) {
+                final CompoundTag row = new CompoundTag();
+                row.putUUID("Id", run.op.operationId());
+                machineSteps.add(row);
+            }
+        }
+        if (!machineSteps.isEmpty()) {
+            tag.put(MACHINE_STEPS_KEY, machineSteps);
         }
         // Everything this craft has drained from the network but not delivered yet: intermediates and
         // finished results alike. They are handed back to storage on resume, so nothing is lost or doubled.
@@ -84,32 +92,39 @@ public final class NetworkCraftOperation implements PersistentOperation {
     }
 
     /**
-     * Resumes a bench craft saved by {@link #saveState}: the items it held in flight go back into network
-     * storage, and the remaining demand is planned again as a fresh craft (reservations and computer claims
-     * live in RAM and are gone after a reload, so re-planning is the honest way to continue).
+     * Resumes a craft saved by {@link #saveState}: the items it held in flight go back into network storage, and
+     * the remaining demand is planned again as a fresh craft (reservations and computer claims live in RAM and
+     * are gone after a reload, so re-planning is the honest way to continue).
      */
     public static Restored restore(final CompoundTag tag, final MainframeBlockEntity mainframe,
                                    final ServerLevel level, final NetworkUuid network,
                                    final HolderLookup.Provider registries) {
-        return restore(tag, mainframe, level, network, registries, null);
+        return restore(tag, mainframe, level, network, registries, List.of());
     }
 
-    /** The id of the machine step a saved craft was waiting on, or null. */
-    @org.jetbrains.annotations.Nullable
-    public static UUID savedMachineStep(final CompoundTag tag) {
-        return tag.hasUUID(MACHINE_STEP_KEY) ? tag.getUUID(MACHINE_STEP_KEY) : null;
+    /** The ids of the machine steps a saved craft still had running, empty if none. */
+    public static List<UUID> savedMachineSteps(final CompoundTag tag) {
+        final List<UUID> ids = new ArrayList<>();
+        final ListTag steps = tag.getList(MACHINE_STEPS_KEY, Tag.TAG_COMPOUND);
+        for (int i = 0; i < steps.size(); i++) {
+            final CompoundTag row = steps.getCompound(i);
+            if (row.hasUUID("Id")) {
+                ids.add(row.getUUID("Id"));
+            }
+        }
+        return ids;
     }
 
     /**
      * Like {@link #restore(CompoundTag, MainframeBlockEntity, ServerLevel, NetworkUuid, HolderLookup.Provider)},
-     * but when the craft was waiting on {@code machineStep} (restored and still running), the items in flight
-     * go back to storage now and the re-plan waits until that machine step settles, so its output counts as
-     * stock. Such a craft is reported as not yet running ({@code operation} null, {@code complete} false).
+     * but when the craft had machine steps in flight (restored and still running), the items it held go back to
+     * storage now and the re-plan waits until every one of those steps settles, so their output counts as stock.
+     * Such a craft is reported as not yet running ({@code operation} null, {@code complete} false).
      */
     public static Restored restore(final CompoundTag tag, final MainframeBlockEntity mainframe,
                                    final ServerLevel level, final NetworkUuid network,
                                    final HolderLookup.Provider registries,
-                                   @org.jetbrains.annotations.Nullable final NetworkProcessingOperation machineStep) {
+                                   final List<NetworkProcessingOperation> machineSteps) {
         final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         final StorageKey result = tag.contains("Result")
                 ? StorageKey.CODEC.parse(ops, tag.get("Result")).result().orElse(null) : null;
@@ -137,16 +152,28 @@ public final class NetworkCraftOperation implements PersistentOperation {
         final CraftingPattern embedded = tag.contains("Embedded")
                 ? CraftingPattern.CODEC.parse(ops, tag.get("Embedded")).result().orElse(null) : null;
         final String label = tag.getString("Label");
-        if (machineStep != null && !machineStep.isDone()) {
-            // Re-plan a tick after the step settles, once the storage index has seen what it delivered.
-            machineStep.onSettle(() -> mainframe.runNextTick(
-                    () -> mainframe.submitNetworkCraft(result, remaining, true, label, embedded)));
-            return new Restored(null, false);
+        final List<NetworkProcessingOperation> running = new ArrayList<>();
+        for (final NetworkProcessingOperation step : machineSteps) {
+            if (step != null && !step.isDone()) {
+                running.add(step);
+            }
         }
-        return new Restored(mainframe.submitNetworkCraft(result, remaining, true, label, embedded), false);
+        if (running.isEmpty()) {
+            return new Restored(mainframe.submitNetworkCraft(result, remaining, true, label, embedded), false);
+        }
+        // Re-plan a tick after the last in-flight step settles, once the storage index has seen what they made.
+        final int[] pending = {running.size()};
+        for (final NetworkProcessingOperation step : running) {
+            step.onSettle(() -> {
+                if (--pending[0] == 0) {
+                    mainframe.runNextTick(() -> mainframe.submitNetworkCraft(result, remaining, true, label, embedded));
+                }
+            });
+        }
+        return new Restored(null, false);
     }
 
-    private static final String MACHINE_STEP_KEY = "MachineStep";
+    private static final String MACHINE_STEPS_KEY = "MachineSteps";
     private static final int STALL_LIMIT = 100;
 
     public static final int DEFAULT_WAIT_TIMEOUT_TICKS = 1200;
@@ -182,7 +209,6 @@ public final class NetworkCraftOperation implements PersistentOperation {
     private int waitTicks;
     private boolean timedOut;
     private int stalledTicks;
-    private int stepIndex;
     private long deliveredResult;
     private boolean done;
     private byte status = OperationRecord.STATUS_FAILED;
@@ -191,15 +217,28 @@ public final class NetworkCraftOperation implements PersistentOperation {
     // plans without machine steps.
     @org.jetbrains.annotations.Nullable
     private final MainframeBlockEntity mainframe;
-    // The processing operation currently running the machine step at stepIndex, if any.
-    @org.jetbrains.annotations.Nullable
-    private NetworkProcessingOperation machineStep;
-    // Intermediates handed back to the network for the running machine step, to be taken back into the pool
-    // once it settles: bench steps only ever consume from the pool or from locked raw stock.
-    private final Map<StorageKey, Long> flushed = new LinkedHashMap<>();
-    // True while the exclusively claimed computer is let go during a machine step (the machine, not the
-    // computer, is working); the craft claims a computer again once the step settles.
+    // The machine steps this craft is running right now, one processing operation each. A downstream step
+    // launches as soon as its inputs reach the pool (raws are locked; an upstream step delivers its output
+    // there), so a chain pipelines instead of running one stage at a time; the count is bounded by the executing
+    // computer's crafting-thread ceiling. This is the Operations system's concurrent design applied WITHIN one craft.
+    private final List<MachineRun> machineRuns = new ArrayList<>();
+    // Each machine step is launched at most once (its own operation feeds all of its runs); a step that fell
+    // short because its machine broke or timed out is not retried.
+    private final boolean[] launched;
+    // True while the claimed computer or cluster slots are let go during the machine steps (the machines, not
+    // the computer, are working); the craft claims a computer again once every step clears and bench work remains.
     private boolean executorsParked;
+
+    /** One running machine step: which plan step it is and the processing operation executing it. */
+    private static final class MachineRun {
+        final int step;
+        final NetworkProcessingOperation op;
+
+        MachineRun(final int step, final NetworkProcessingOperation op) {
+            this.step = step;
+            this.op = op;
+        }
+    }
 
     public NetworkCraftOperation(final ServerLevel level, final NetworkUuid network,
                                  final StorageKey resultKey, final long requested,
@@ -230,6 +269,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
         this.requesterLabel = requesterLabel;
         this.embeddedPattern = embeddedPattern;
         this.runsDone = new long[plan.steps().size()];
+        this.launched = new boolean[plan.steps().size()];
         if (plan.steps().isEmpty()) {
             finish();
         }
@@ -240,9 +280,22 @@ public final class NetworkCraftOperation implements PersistentOperation {
         if (done) {
             return;
         }
+        // Collect finished machine steps: their output was delivered to the network, so count what each made. A
+        // step that fell short (its machine broke or timed out) is not retried; it contributes what it managed.
+        machineRuns.removeIf(run -> {
+            if (!run.op.isDone()) {
+                return false;
+            }
+            final CraftPlanner.Step step = plan.steps().get(run.step);
+            runsDone[run.step] = Math.min(step.runs(), run.op.produced() / Math.max(1L, step.perRun()));
+            return true;
+        });
+
         if (waiting) {
             // Acquire in two stages, holding nothing while blocked so waiters cannot deadlock:
-            // first the full ingredient reservation, then an idle computer that can execute.
+            // first the full ingredient reservation, then an idle computer that can execute. Distinct crafts are
+            // gated by executor availability (a lone Crafting Computer serves one at a time; a Supercomputer
+            // cluster unlocks parallel crafts), not by the Mainframe's operation queues — crafting is a subnet.
             if (++waitTicks > DEFAULT_WAIT_TIMEOUT_TICKS) {
                 timedOut = true;
                 finish();
@@ -255,79 +308,73 @@ public final class NetworkCraftOperation implements PersistentOperation {
                 return;
             }
             waiting = false;
+            executorsParked = false;
         }
         if (!executorsAlive()) {
-            // Every computer was broken or powered off mid-craft: settle with what was produced.
+            // The computer was broken or powered off mid-craft: settle with what was produced. Any machine step
+            // already in flight is an operation of its own and runs on to deliver its output to the network, so
+            // nothing it was making is lost; the craft simply stops launching new steps and doing bench work.
             finish();
             return;
         }
-        if (machineStep != null) {
-            // Waiting on a machine step: poll it whatever the budget (this tick may carry none, since a waiting
-            // craft holds no queue slot); bench work resumes once a slot is granted again.
-            final int outcome = tickMachineStep(plan.steps().get(stepIndex), NetworkStorage.of(level, network));
-            if (outcome == 0 || done) {
-                return;
-            }
-            if (stepIndex >= plan.steps().size()) {
-                finish();
-                return;
-            }
-            if (waiting) {
-                return; // a computer is claimed again on the next tick before bench work resumes
-            }
-        }
 
-        // The craft runs at the summed throughput of its computers (never above the Mainframe's grant). Work is
-        // measured in ingredient items handled, so denser recipes genuinely take longer; faster computers in the
-        // fan-out contribute proportionally more of each tick's work.
-        final long rate = Math.min(throughputBudget, aliveThroughput());
-        if (rate <= 0) {
+        // Launch every machine step whose inputs are ready (raws are locked; an upstream step's output sits in
+        // the pool), up to the executing computer's crafting-thread ceiling. Launching needs only a live computer
+        // to exist, not the held claim, so a downstream step starts while an upstream step still runs and this
+        // craft is parked: a chain pipelines and independent steps run at once, instead of one stage at a time.
+        boolean progressed = startReadyMachineSteps();
+
+        if (allRunsDone() && machineRuns.isEmpty()) {
+            finish();
             return;
         }
-        long budget = rate;
-        boolean progressed = false;
-        final NetworkStorage storage = NetworkStorage.of(level, network);
 
-        while (budget > 0 && stepIndex < plan.steps().size()) {
-            final CraftPlanner.Step step = plan.steps().get(stepIndex);
-            final long remainingRuns = step.runs() - runsDone[stepIndex];
-            if (remainingRuns <= 0) {
-                stepIndex++;
-                continue;
+        if (!machineRuns.isEmpty()) {
+            // The machines are doing the work: let go of the computer and the cluster slots so other crafts can
+            // use them while this craft waits (it keeps a reference to the computer for the liveness check above),
+            // and claim again once every step clears and bench work remains.
+            parkExecutors();
+            progressed = true;
+        } else {
+            if (executorsParked) {
+                executorsParked = false;
+                waiting = true;
+                waitTicks = 0;
+                return; // re-claim a computer before the bench work resumes
             }
-            if (step.isMachine()) {
-                // A machine step runs as a processing operation of its own; this craft waits on it and pulls
-                // its output into the pool for the steps after it. Waiting is progress, not a stall.
-                final int outcome = tickMachineStep(step, storage);
-                if (outcome > 0) {
-                    progressed = true;
+            // Bench work at the summed throughput of the live computers (never above the Mainframe's grant).
+            // Denser recipes take longer; faster computers contribute proportionally more of each tick's work.
+            long budget = Math.min(throughputBudget, aliveThroughput());
+            final NetworkStorage storage = NetworkStorage.of(level, network);
+            for (int i = 0; i < plan.steps().size() && budget > 0; i++) {
+                final CraftPlanner.Step step = plan.steps().get(i);
+                if (step.isMachine() || runsDone[i] >= step.runs()) {
                     continue;
                 }
-                progressed |= outcome == 0;
-                break;
-            }
-            final long unitsPerRun = step.unitsPerRun();
-            final long runsAffordable = Math.max(budget >= unitsPerRun ? budget / unitsPerRun : 0, 0);
-            if (runsAffordable <= 0) {
-                break; // budget exhausted mid-step; resume next tick
-            }
-            final long runsNow = Math.min(remainingRuns, runsAffordable);
-            final long executable = consumeIngredients(storage, step.pattern(), runsNow);
-            if (executable <= 0) {
-                break; // ingredients not deliverable this tick (stall counter decides)
-            }
-            pool.merge(StorageKey.of(step.pattern().result()),
-                    executable * step.pattern().result().getCount(), Long::sum);
-            runsDone[stepIndex] += executable;
-            budget -= executable * unitsPerRun;
-            progressed = true;
-            if (runsDone[stepIndex] >= step.runs()) {
-                stepIndex++;
+                final long unitsPerRun = step.unitsPerRun();
+                final long runsAffordable = Math.max(budget >= unitsPerRun ? budget / unitsPerRun : 0, 0);
+                if (runsAffordable <= 0) {
+                    continue;
+                }
+                final long runsNow = Math.min(step.runs() - runsDone[i], runsAffordable);
+                // A bench step consumes its machine-made intermediates straight from the pool (a machine step
+                // delivered them there) plus its locked raw stock; its result goes back into the pool.
+                final long executable = consumeIngredients(storage, step.pattern(), runsNow);
+                if (executable <= 0) {
+                    continue; // ingredients not deliverable yet (an upstream step must fill the pool first)
+                }
+                pool.merge(StorageKey.of(step.pattern().result()),
+                        executable * step.pattern().result().getCount(), Long::sum);
+                runsDone[i] += executable;
+                budget -= executable * unitsPerRun;
+                progressed = true;
             }
         }
 
-        if (stepIndex >= plan.steps().size()) {
-            finish();
+        if (allRunsDone()) {
+            if (machineRuns.isEmpty()) {
+                finish();
+            }
         } else if (!progressed && ++stalledTicks >= STALL_LIMIT) {
             finish();
         } else if (progressed) {
@@ -336,80 +383,139 @@ public final class NetworkCraftOperation implements PersistentOperation {
     }
 
     /**
-     * Drives the machine step at {@code stepIndex}: starts its processing operation on the first call (after
-     * handing this craft's intermediates back to the network, where the machine draws its inputs from), then
-     * waits for it. Returns 1 once the step is complete and its output sits in the pool, 0 while the machine
-     * is still working, and -1 when the step could not start or fell short.
+     * Starts a processing operation for every machine step whose inputs are ready, up to this craft's stage
+     * ceiling. A step is ready when the pool holds at least one run of each of its intermediate inputs (raws stay
+     * locked and available); each step is launched at most once, feeds from and delivers to this craft's isolated
+     * pool through {@link #poolIo()}, so a chain pipelines through the pool without ever putting an intermediate
+     * into shared network storage (which would confuse another craft's planner) and independent steps run at once.
+     * The ceiling is the executing computers' summed crafting-thread count, not the Mainframe's operation queues:
+     * a craft orchestrates its own stages with its Crafting Computer's hardware, independent of how many distinct
+     * operations the Mainframe runs at once.
      */
-    private int tickMachineStep(final CraftPlanner.Step step, final NetworkStorage storage) {
-        if (machineStep == null) {
-            if (mainframe == null) {
-                finish();
-                return -1;
+    private boolean startReadyMachineSteps() {
+        if (mainframe == null) {
+            return !machineRuns.isEmpty();
+        }
+        final int cap = Math.max(1, aliveThreads());
+        for (int i = 0; i < plan.steps().size() && machineRuns.size() < cap; i++) {
+            final CraftPlanner.Step step = plan.steps().get(i);
+            if (!step.isMachine() || launched[i] || runsDone[i] >= step.runs() || !machineInputsReady(step)) {
+                continue;
             }
-            flushIntermediates();
-            machineStep = mainframe.submitNetworkProcessing(step.machine(), step.produced(), requesterLabel);
-            if (machineStep == null) {
-                finish();
-                return -1;
+            final NetworkProcessingOperation op =
+                    mainframe.submitNetworkProcessing(step.machine(), step.produced(), requesterLabel, poolIo());
+            if (op == null) {
+                continue;
             }
-            // Neither the computer nor the cluster's craft slots do anything while the machine works: free them
-            // for other crafts and claim again once the step settles (the ingredients stay locked).
-            if (exclusiveClaim) {
-                for (final CraftingComputerBlockEntity cc : executors) {
-                    cc.releaseCraft(operationId);
-                }
-                executorsParked = true;
-            } else if (orchestrator != null) {
-                orchestrator.releaseCraftSlot(operationId);
-                orchestrator = null;
-                executorsParked = true;
-            }
-            return 0;
+            machineRuns.add(new MachineRun(i, op));
+            launched[i] = true;
         }
-        if (!machineStep.isDone()) {
-            return 0;
-        }
-        if (executorsParked) {
-            // Back to the acquisition phase for a computer (the ingredients stay locked).
-            executorsParked = false;
-            waiting = true;
-            waitTicks = 0;
-        }
-        // Take back what was handed to the network for this step, then the step's own output.
-        for (final Map.Entry<StorageKey, Long> entry : flushed.entrySet()) {
-            final long back = storage.select(entry.getKey(), entry.getValue(), (key, amount, simulate) -> amount);
-            if (back > 0) {
-                pool.merge(entry.getKey(), back, Long::sum);
-            }
-        }
-        flushed.clear();
-        final StorageKey made = step.resultKey();
-        final long wanted = Math.min(step.produced(), machineStep.produced());
-        final long got = made == null || wanted <= 0 ? 0
-                : storage.select(made, wanted, (key, amount, simulate) -> amount);
-        if (got > 0) {
-            pool.merge(made, got, Long::sum);
-        }
-        runsDone[stepIndex] = Math.min(step.runs(), got / step.perRun());
-        final boolean complete = got >= step.produced();
-        machineStep = null;
-        stepIndex++;
-        return complete ? 1 : -1;
+        return !machineRuns.isEmpty();
     }
 
     /**
-     * Hands every intermediate (never the result itself) back to the network before a machine step — the
-     * machine draws its inputs from storage — remembering the amounts so they return to the pool afterwards.
+     * Whether the pool already holds at least one run of each of {@code step}'s non-raw inputs. Raw inputs are
+     * drawn from the servers this craft locked (by the pool CraftIo) and are available while the reservation
+     * holds; an intermediate must have been produced into the pool by an upstream step first.
      */
-    private void flushIntermediates() {
-        for (final Map.Entry<StorageKey, Long> entry : new LinkedHashMap<>(pool).entrySet()) {
-            if (entry.getValue() > 0 && !entry.getKey().equals(resultKey)) {
-                writeBack(entry.getKey(), entry.getValue());
-                flushed.merge(entry.getKey(), entry.getValue(), Long::sum);
-                pool.remove(entry.getKey());
+    private boolean machineInputsReady(final CraftPlanner.Step step) {
+        for (final ProcessingPattern.ProcessingInput in : step.machine().inputs()) {
+            if (lockedServers.containsKey(in.key())) {
+                continue; // a raw served from the locked servers
+            }
+            if (pool.getOrDefault(in.key(), 0L) < in.amount()) {
+                return false; // an intermediate not yet produced by an upstream step
             }
         }
+        return true;
+    }
+
+    /**
+     * This craft's isolated I/O for a machine step: inputs come from the pool (intermediates an upstream step
+     * produced) or from the servers this craft locked (raws, extracted scoped to those servers and released as
+     * they leave — race-free, the way the bench path already consumes); outputs go straight into the pool. So the
+     * craft's intermediates never touch shared network storage while it runs, which keeps concurrent steps
+     * pipelining without racing and keeps other crafts' planners from ever seeing a half-made intermediate.
+     *
+     * <p>Once the craft has settled, the step is on its own (a computer died, or the craft timed out): it then
+     * reads from and writes to the network, so a machine already in motion still delivers its output to storage
+     * instead of into a pool nothing hands back.
+     */
+    private CraftIo poolIo() {
+        return new CraftIo() {
+            @Override
+            public long select(final StorageKey key, final long amount,
+                               final dev.jsc.jscomputronics.module.computing.storage.DataSink into) {
+                if (done) {
+                    return NetworkStorage.of(level, network).select(key, amount, into);
+                }
+                long moved = 0L;
+                final long pooled = pool.getOrDefault(key, 0L);
+                if (pooled > 0) {
+                    final long want = Math.min(amount, pooled);
+                    final long inserted = into.insert(key, want, false);
+                    if (inserted > 0) {
+                        pool.merge(key, -inserted, Long::sum);
+                        moved += inserted;
+                    }
+                }
+                if (moved < amount && lockedServers.containsKey(key)) {
+                    final Map<NodeUuid, Long> byServer = NetworkStorage.of(level, network)
+                            .selectBreakdown(key, amount - moved, into, lockedServers.get(key));
+                    for (final Map.Entry<NodeUuid, Long> e : byServer.entrySet()) {
+                        index.release(operationId, key, e.getKey(), e.getValue());
+                        moved += e.getValue();
+                    }
+                }
+                return moved;
+            }
+
+            @Override
+            public long insert(final StorageKey key, final long amount) {
+                if (done) {
+                    return NetworkStorage.of(level, network).insert(key, amount);
+                }
+                pool.merge(key, amount, Long::sum);
+                return amount;
+            }
+        };
+    }
+
+    private boolean allRunsDone() {
+        for (int i = 0; i < plan.steps().size(); i++) {
+            if (runsDone[i] < plan.steps().get(i).runs()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Whether the machine step at plan index {@code step} has a processing operation running right now. */
+    private boolean isRunningStep(final int step) {
+        for (final MachineRun run : machineRuns) {
+            if (run.step == step) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Lets go of the exclusively claimed computer, or the cluster's craft slot, while the machine steps work. */
+    private void parkExecutors() {
+        if (executorsParked) {
+            return;
+        }
+        if (exclusiveClaim) {
+            for (final CraftingComputerBlockEntity cc : executors) {
+                if (cc != null) {
+                    cc.releaseCraft(operationId);
+                }
+            }
+        } else if (orchestrator != null) {
+            orchestrator.releaseCraftSlot(operationId);
+            orchestrator = null;
+        }
+        executorsParked = true;
     }
 
     private boolean tryLockIngredients() {
@@ -523,6 +629,21 @@ public final class NetworkCraftOperation implements PersistentOperation {
         return sum;
     }
 
+    /**
+     * Sum of the crafting-thread ceilings of the live executors: how many of this craft's machine stages may run
+     * at once. The executing computer orchestrates its own stages up to this hardware ceiling, independent of the
+     * Mainframe's operation queues; a supercomputer fan-out sums the thread counts of the computers it granted.
+     */
+    private int aliveThreads() {
+        int sum = 0;
+        for (final CraftingComputerBlockEntity cc : executors) {
+            if (cc != null && !cc.isRemoved() && cc.canCraft()) {
+                sum += cc.craftingThreads();
+            }
+        }
+        return sum;
+    }
+
     private boolean executorsAlive() {
         for (final CraftingComputerBlockEntity cc : executors) {
             if (cc != null && !cc.isRemoved() && cc.canCraft()) {
@@ -609,7 +730,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
             }
         }
 
-        // Deliver the result, then return every leftover intermediate — nothing is ever wasted.
+        // Deliver the result, then return every leftover intermediate. A machine step delivered its output into
+        // this craft's pool (like a bench step), so both the result and any leftover intermediates sit in the
+        // pool here and go back to the network from there — nothing is ever wasted.
         deliveredResult = Math.min(pool.getOrDefault(resultKey, 0L), requested);
         if (deliveredResult > 0) {
             pool.merge(resultKey, -deliveredResult, Long::sum);
@@ -655,9 +778,11 @@ public final class NetworkCraftOperation implements PersistentOperation {
 
     @Override
     public boolean isWaiting() {
-        // Blocked on a machine step, the craft is waiting on that operation: it holds no queue slot of its own,
-        // otherwise a Mainframe with a single queue could never tick the machine it waits for.
-        return (waiting || machineStep != null) && !done;
+        // While its machine steps run, the craft is parked on those operations and holds no Mainframe queue of its
+        // own: crafting is a subnet independent of the Mainframe's operation queues, so a parked craft frees the
+        // queue for other operations while its machines (gated by the Crafting Computer's threads) do the work.
+        // Its own liveRecord still reads PROCESSING (the waiting field, not this), so the log shows it under way.
+        return (waiting || !machineRuns.isEmpty()) && !done;
     }
 
     @Override
@@ -698,7 +823,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
 
     @Override
     public OperationRecord toRecord() {
-        return buildRecord(status, false);
+        // Keep the sub-operations (each plan step) in the settled record too, so the operations log shows what a
+        // craft was made of — its machine and bench stages — instead of the stages appearing as separate entries.
+        return buildRecord(status, true);
     }
 
     @Override
@@ -732,8 +859,11 @@ public final class NetworkCraftOperation implements PersistentOperation {
                 OperationRecord.MAX_SUBS));
         for (int i = 0; i < plan.steps().size() && subs.size() < OperationRecord.MAX_SUBS; i++) {
             final CraftPlanner.Step step = plan.steps().get(i);
+            // A step is streaming when it is actually being worked now: a machine step with a running operation,
+            // or a bench step that has started and is not currently yielding to the machine steps.
             final byte state = runsDone[i] >= step.runs() ? OperationRecord.SubRow.SUB_COMPLETED
-                    : i == stepIndex && !waiting ? OperationRecord.SubRow.SUB_STREAMING
+                    : isRunningStep(i) || (!step.isMachine() && !waiting && machineRuns.isEmpty() && runsDone[i] > 0)
+                        ? OperationRecord.SubRow.SUB_STREAMING
                     : OperationRecord.SubRow.SUB_READING;
             subs.add(new OperationRecord.SubRow(
                     step.resultName() + " x" + step.produced(),

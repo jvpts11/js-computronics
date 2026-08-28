@@ -1641,7 +1641,8 @@ public final class ComputingPayloads {
                 }
                 dot = any ? CraftCatalogPayload.DOT_AMBER : CraftCatalogPayload.DOT_RED;
             }
-            entries.put(key, new CraftCatalogPayload.Entry(pattern.result().copy(), dot));
+            entries.put(key, new CraftCatalogPayload.Entry(pattern.result().copy(), dot,
+                    mainframe.hasMultiStageRecipe(key)));
             if (entries.size() >= CraftCatalogPayload.MAX_ENTRIES) {
                 break;
             }
@@ -1673,7 +1674,7 @@ public final class ComputingPayloads {
                 dot = all ? CraftCatalogPayload.DOT_GREEN
                         : (any ? CraftCatalogPayload.DOT_AMBER : CraftCatalogPayload.DOT_RED);
             }
-            entries.put(key, new CraftCatalogPayload.Entry(result, dot));
+            entries.put(key, new CraftCatalogPayload.Entry(result, dot, recipe.multi().isPresent()));
         }
         return java.util.List.copyOf(entries.values());
     }
@@ -1835,29 +1836,6 @@ public final class ComputingPayloads {
         return null;
     }
 
-    /** Whether the network holds every input a machine pattern needs to produce {@code quantity}. */
-    private static boolean inputsInStock(final MainframeBlockEntity mainframe,
-                                         final dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern machine,
-                                         final long quantity) {
-        if (!(mainframe.getLevel() instanceof ServerLevel level) || mainframe.networkUuid() == null) {
-            return true;
-        }
-        final var storage = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
-                .of(level, mainframe.networkUuid());
-        final var primary = machine.primaryOutput();
-        final long runs = ceilDiv(quantity, primary == null ? 1 : Math.max(1, primary.amount()));
-        final java.util.Map<StorageKey, Long> need = new java.util.HashMap<>();
-        for (final var in : machine.inputs()) {
-            need.merge(in.key(), in.amount() * runs, Long::sum);
-        }
-        for (final var entry : need.entrySet()) {
-            if (storage.count(entry.getKey()) < entry.getValue()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private static long ceilDiv(final long amount, final long perRun) {
         return (amount + perRun - 1) / perRun;
     }
@@ -1868,46 +1846,6 @@ public final class ComputingPayloads {
         // Walk the stage demands for one unit of final result to get each stage's output per final unit.
         final long[] perUnit = multi.stageDemands(1);
         return perUnit.length == 0 || perUnit[0] <= 0 ? firstOutput : firstOutput / perUnit[0];
-    }
-
-    /**
-     * If {@code resultKey} is produced by a machine recipe on the network, dispatches it to the processing /
-     * multi-stage engine and returns the operation; otherwise returns null so the caller runs a normal
-     * bench craft. {@code onSettle} runs when the machine craft settles (the caller refreshes its screen).
-     */
-    @org.jetbrains.annotations.Nullable
-    private static dev.jsc.jscomputronics.module.computing.operation.NetworkOperation submitMachineCraft(
-            final MainframeBlockEntity mainframe, final StorageKey resultKey, final long quantity,
-            final String label, final Runnable onSettle) {
-        for (final var recipe : mainframe.networkMachineRecipes()) {
-            if (resultKey.equals(recipe.resultKey())) {
-                if (recipe.proc().isPresent()) {
-                    if (!inputsInStock(mainframe, recipe.proc().get(), quantity)) {
-                        // Some input is not on the network: if other patterns can make it, run the whole tree
-                        // as one craft (the machine becomes a step of it); otherwise fall back to the bare
-                        // machine run, which delivers what the network does hold.
-                        final var planned = mainframe.submitNetworkCraft(resultKey, quantity, false, label);
-                        if (planned != null) {
-                            planned.onSettle(onSettle);
-                            return planned;
-                        }
-                    }
-                    final var op = mainframe.submitNetworkProcessing(recipe.proc().get(), quantity, label);
-                    if (op != null) {
-                        op.onSettle(onSettle);
-                    }
-                    return op;
-                }
-                if (recipe.multi().isPresent()) {
-                    final var op = mainframe.submitNetworkMultiStage(recipe.multi().get(), quantity, label);
-                    if (op != null) {
-                        op.onSettle(onSettle);
-                    }
-                    return op;
-                }
-            }
-        }
-        return null;
     }
 
     private static void handleCraftSubmit(final CraftSubmitPayload payload, final IPayloadContext context) {
@@ -1930,21 +1868,12 @@ public final class ComputingPayloads {
                 dispatchActiveOperations(player, net, level);
                 dispatchCraftCatalog(player, net, level);
             };
-            if (submitMachineCraft(mainframe, resultKey, payload.quantity(), "terminal", refresh) != null) {
-                refresh.run();
-                return;
-            }
-            final var operation = mainframe.submitNetworkCraft(
-                    resultKey, payload.quantity(), payload.partial(), "terminal");
-            if (operation != null) {
-                operation.onSettle(() -> {
-                    dispatchTerminalOpsLog(player, net, level);
-                    dispatchActiveOperations(player, net, level);
-                    dispatchCraftCatalog(player, net, level);
-                });
-            }
-            dispatchActiveOperations(player, net, level);
-            dispatchCraftCatalog(player, net, level);
+            // The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
+            // craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. The
+            // multiStage flag picks the pipeline over the flat recursive path when a result has both.
+            mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(), "terminal", refresh,
+                    payload.multiStage());
+            refresh.run();
         });
     }
 
@@ -3477,17 +3406,10 @@ public final class ComputingPayloads {
                     sendNetworkInteractor(player, level, computer);
                 }
             };
-            if (submitMachineCraft(mainframe, StorageKey.of(payload.result()), safeAmount, "ni", refreshNi) != null) {
-                refreshNi.run();
-                return;
-            }
-            final var op = mainframe.submitNetworkCraft(StorageKey.of(payload.result()), safeAmount, true, "ni");
-            if (op != null && computer != null) {
-                op.onSettle(() -> sendNetworkInteractor(player, level, computer));
-            }
-            if (computer != null) {
-                sendNetworkInteractor(player, level, computer);
-            }
+            // The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
+            // craft; refreshNi resends the Network Interactor now and again when the operation settles.
+            mainframe.submitCraftRequest(StorageKey.of(payload.result()), safeAmount, true, "ni", refreshNi);
+            refreshNi.run();
         });
     }
 
@@ -4160,20 +4082,26 @@ public final class ComputingPayloads {
         }
         // The routed machines (the Machines tab): each distinct machine type the wired switches declare, with
         // its concurrency config. Keyed by the machine's block registry id, which is what a pattern targets.
+        // One wire per PHYSICAL machine (deduped by position). Paused/Feed are read per machine; Max Jobs is the
+        // machine type's shared ceiling. The label distinguishes machines of one type by their face and position.
         final List<CraftManagerStatePayload.WireMachine> machines = new ArrayList<>();
-        final Set<String> machineKeys = new HashSet<>();
+        final Set<net.minecraft.core.BlockPos> seen = new HashSet<>();
         for (final var dm : cc.availableMachines()) {
-            final String key = dm.machineType();
-            if (key == null || key.isBlank() || !machineKeys.add(key)
+            final net.minecraft.core.BlockPos pos = dm.machinePos();
+            final String typeKey = dm.machineType();
+            if (typeKey == null || typeKey.isBlank() || pos == null || !seen.add(pos)
                     || machines.size() >= CraftManagerStatePayload.MAX_MACHINES) {
                 continue;
             }
-            final CraftingComputerBlockEntity.MachineConfig cfg = cc.machineConfig(key);
-            final int colon = key.indexOf(':');
+            final String machineKey = CraftingComputerBlockEntity.machineStateKey(pos);
+            final CraftingComputerBlockEntity.MachineConfig perMachine = cc.machineConfig(machineKey);
+            final int typeMaxJobs = cc.machineConfig(typeKey).maxJobs();
+            final String face = dm.face() != null
+                    ? dm.face().getName().substring(0, 1).toUpperCase(java.util.Locale.ROOT) + " " : "";
             final String label = !dm.name().isBlank() ? dm.name()
-                    : (colon >= 0 ? key.substring(colon + 1) : key);
+                    : face + "(" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ")";
             machines.add(new CraftManagerStatePayload.WireMachine(
-                    key, label, true, cfg.maxJobs(), cfg.locked(), cfg.feedMax()));
+                    machineKey, typeKey, label, perMachine.locked(), perMachine.feedMax(), typeMaxJobs));
         }
         return new CraftManagerStatePayload(mediaVolumeKey, mediaLabel, mediaFiles, romEntries,
                 cc.craftingCardFactor() > 0.0, status, machines);

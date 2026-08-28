@@ -403,7 +403,9 @@ public final class ServerCliComputer implements CliComputer {
         if (mainframe == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        final var op = mainframe.submitNetworkCraft(key, demand(quantity), true, "cli");
+        // Route through the shared entry point so the CLI and IQL craft a machine or multi-stage recipe
+        // directly (not only a bench-planned tree), exactly as the terminal and Network Interactor do.
+        final var op = mainframe.submitCraftRequest(key, demand(quantity), true, "cli", null);
         if (op == null) {
             return OpResult.fail("no pattern crafts " + key.displayName().getString());
         }

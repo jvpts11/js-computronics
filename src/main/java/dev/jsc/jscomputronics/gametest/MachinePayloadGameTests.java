@@ -44,8 +44,8 @@ public final class MachinePayloadGameTests {
                 new CraftManagerStatePayload.WireRomEntry(0, "Iron Block", true),
                 new CraftManagerStatePayload.WireRomEntry(1, "Gold Block", false));
         final List<CraftManagerStatePayload.WireMachine> machines = List.of(
-                new CraftManagerStatePayload.WireMachine("jsc:compressor", "compressor", true, 4, false, true),
-                new CraftManagerStatePayload.WireMachine("jsc:macerator", "macerator", true, 1, true, false));
+                new CraftManagerStatePayload.WireMachine("@1,2,3", "jsc:compressor", "N (1, 2, 3)", false, true, 4),
+                new CraftManagerStatePayload.WireMachine("@4,5,6", "jsc:macerator", "E (4, 5, 6)", true, false, 1));
         final CraftManagerStatePayload payload = new CraftManagerStatePayload(
                 "media:42", "Floppy (A:)", List.of("alpha.craft", "beta.craft"), rom, true, "Loaded 2", machines);
         assertRoundTrip(helper, CraftManagerStatePayload.STREAM_CODEC, payload);
@@ -64,8 +64,8 @@ public final class MachinePayloadGameTests {
     public static void craftManagerState_maxMachinesRoundTrip(final GameTestHelper helper) {
         final List<CraftManagerStatePayload.WireMachine> machines = new ArrayList<>();
         for (int i = 0; i < CraftManagerStatePayload.MAX_MACHINES; i++) {
-            machines.add(new CraftManagerStatePayload.WireMachine("jsc:m" + i, "m" + i, i % 2 == 0, i + 1,
-                    i % 3 == 0, i % 4 == 0));
+            machines.add(new CraftManagerStatePayload.WireMachine("@" + i, "jsc:m" + i, "m" + i,
+                    i % 3 == 0, i % 4 == 0, i + 1));
         }
         final CraftManagerStatePayload payload = new CraftManagerStatePayload(
                 "media:1", "Disc", List.of(), List.of(), true, "", machines);

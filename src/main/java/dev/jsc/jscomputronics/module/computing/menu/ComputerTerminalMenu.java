@@ -437,6 +437,11 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         if (activeTab == TAB_TASKS || activeTab == TAB_OPS) {
             ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
         }
+        if (activeTab == TAB_OPS) {
+            // Keep the log live too: a craft that just settled drops out of the active list and must appear in
+            // the recent log the same tick, so the Operations view is fully real-time (in flight and just done).
+            ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
+        }
         if (activeTab == TAB_CRAFT
                 && ComputingPayloads.networkHasActiveOps(serverLevel, host.networkUuid())) {
             // Keep the RUNNING bars moving and settle finished crafts into RECENT.

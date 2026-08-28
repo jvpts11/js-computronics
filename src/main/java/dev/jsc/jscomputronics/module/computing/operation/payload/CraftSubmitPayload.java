@@ -19,7 +19,7 @@ import net.minecraft.world.item.ItemStack;
  * Client to server: submit the CRAFT the popup configured.
  */
 public record CraftSubmitPayload(BlockPos monitorPos, BlockPos hostPos,
-                                 ItemStack result, long quantity, boolean partial)
+                                 ItemStack result, long quantity, boolean partial, boolean multiStage)
         implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<CraftSubmitPayload> TYPE =
@@ -32,6 +32,7 @@ public record CraftSubmitPayload(BlockPos monitorPos, BlockPos hostPos,
                     ItemStack.STREAM_CODEC, CraftSubmitPayload::result,
                     ByteBufCodecs.VAR_LONG, CraftSubmitPayload::quantity,
                     ByteBufCodecs.BOOL, CraftSubmitPayload::partial,
+                    ByteBufCodecs.BOOL, CraftSubmitPayload::multiStage,
                     CraftSubmitPayload::new);
 
     @Override

@@ -10,7 +10,6 @@ package dev.jsc.jscomputronics.module.computing.crafting;
 import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.operation.PersistentOperation;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.CompositeDataPort;
@@ -53,6 +52,10 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     private final StorageKey resultKey;
 
     private CraftingSwitchBlockEntity.DeclaredMachine machine;
+    // The physical machine the dispatcher assigned this job, so two concurrent jobs of one machine type never
+    // land on the same block and jam it. Null means unassigned (a standalone run that just takes the first it can).
+    @Nullable
+    private BlockPos assignedMachinePos;
     private long produced;
     private long lotsFed;
     /** Per pattern input: how much has reached the machine so far, against {@code lotsFed} lots' worth. */
@@ -64,11 +67,26 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     private byte status = OperationRecord.STATUS_FAILED;
     private Runnable onSettle;
     private boolean concurrencyBlocked;
+    // Where inputs are drawn from and outputs returned to: the network by default; a craft's isolated pool for a
+    // machine step run inside a recursive craft, so concurrent steps pipeline without racing on network stock.
+    private final CraftIo io;
+    private final boolean ephemeral;
+    // A machine step run inside a craft (given a pool CraftIo) is "nested": it is one stage of the parent craft,
+    // so it is NOT logged as an operation of its own — the parent's log entry carries it as a sub-operation.
+    private final boolean nested;
 
     public NetworkProcessingOperation(final ServerLevel level, final NetworkUuid network,
                                       final ProcessingPattern pattern, final long requested,
                                       final List<BlockPos> candidateComputers, final UUID operationId,
                                       final String requesterLabel) {
+        this(level, network, pattern, requested, candidateComputers, operationId, requesterLabel, null);
+    }
+
+    public NetworkProcessingOperation(final ServerLevel level, final NetworkUuid network,
+                                      final ProcessingPattern pattern, final long requested,
+                                      final List<BlockPos> candidateComputers, final UUID operationId,
+                                      final String requesterLabel,
+                                      @org.jetbrains.annotations.Nullable final CraftIo io) {
         this.level = level;
         this.network = network;
         this.pattern = pattern;
@@ -76,6 +94,14 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         this.candidateComputers = List.copyOf(candidateComputers);
         this.operationId = operationId;
         this.requesterLabel = requesterLabel;
+        this.io = io != null ? io : CraftIo.network(level, network);
+        // A craft's machine step reads and writes that craft's isolated pool through {@code io}, but it still
+        // persists across a reload: on resume it is rebuilt with the network as its I/O and finishes whatever the
+        // machine still holds into the network, where the re-planned parent craft counts it as stock. So nothing
+        // fed into a machine before a save is ever lost.
+        this.ephemeral = false;
+        // A step given its own I/O is a craft's internal stage: don't log it as a separate operation.
+        this.nested = io != null;
         final ProcessingPattern.ProcessingOutput primary = pattern.primaryOutput();
         this.resultKey = primary == null ? null : primary.key();
         this.delivered = new long[pattern.inputs().size()];
@@ -108,10 +134,10 @@ public final class NetworkProcessingOperation implements PersistentOperation {
             machine = null; // the machine was broken/removed; re-resolve next tick
             return;
         }
-        final NetworkStorage storage = NetworkStorage.of(level, network);
         boolean progressed = false;
 
-        // 1) Collect any finished output the machine holds, back into the network, counting the primary yield.
+        // 1) Collect any finished output the machine holds, back into the sink (the network, or the craft's
+        //    pool for a craft-internal step), counting the primary yield.
         for (final ProcessingPattern.ProcessingOutput out : pattern.outputs()) {
             final long inMachine = outPort.count(out.key());
             if (inMachine <= 0) {
@@ -119,7 +145,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
             }
             final long pulled = outPort.extract(out.key(), inMachine, false);
             if (pulled > 0) {
-                final long stored = writeBack(storage, out.key(), pulled);
+                final long stored = writeBack(out.key(), pulled);
                 if (out.key().equals(resultKey)) {
                     produced += stored;
                 }
@@ -161,7 +187,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
                     }
                     lotsFed++;
                 }
-                final long movedWeight = deliverOwed(storage, inPort, budgetLeft);
+                final long movedWeight = deliverOwed(inPort, budgetLeft);
                 if (movedWeight <= 0) {
                     break; // the machine is full, the network is drained, or the budget is spent
                 }
@@ -191,18 +217,28 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         return m.machineType().equals(want) || m.name().equalsIgnoreCase(want);
     }
 
-    /** The concurrency config the Machines tab set for this machine, resolved through the owning computer. */
+    /**
+     * This physical machine's per-machine state (Paused / Feed), set on the Machines tab — resolved by the
+     * machine's position, so pausing one machine of a type does not pause the others. (The Max Jobs ceiling is a
+     * per-type setting, read by the Mainframe's dispatcher, not here.)
+     */
     private CraftingComputerBlockEntity.MachineConfig resolveConfig() {
+        final BlockPos machinePos = machine != null ? machine.machinePos() : assignedMachinePos;
+        final String machineKey = machinePos != null
+                ? CraftingComputerBlockEntity.machineStateKey(machinePos) : null;
         for (final BlockPos pos : candidateComputers) {
             if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc) {
-                for (final CraftingSwitchBlockEntity.DeclaredMachine m : cc.availableMachines()) {
-                    if (machineMatches(m, pattern.machineType())) {
-                        // Config is keyed by what the pattern targets, falling back to the machine's own name.
-                        final CraftingComputerBlockEntity.MachineConfig byType =
-                                cc.machineConfig(pattern.machineType());
-                        return byType != CraftingComputerBlockEntity.MachineConfig.DEFAULT
-                                ? byType : cc.machineConfig(m.name());
+                // This one machine's own state wins; otherwise a state set on the whole machine type applies
+                // (so you can pause a single machine, or a whole type, whichever you set).
+                if (machineKey != null) {
+                    final CraftingComputerBlockEntity.MachineConfig perMachine = cc.machineConfig(machineKey);
+                    if (perMachine != CraftingComputerBlockEntity.MachineConfig.DEFAULT) {
+                        return perMachine;
                     }
+                }
+                final CraftingComputerBlockEntity.MachineConfig byType = cc.machineConfig(pattern.machineType());
+                if (byType != CraftingComputerBlockEntity.MachineConfig.DEFAULT) {
+                    return byType;
                 }
             }
         }
@@ -211,16 +247,161 @@ public final class NetworkProcessingOperation implements PersistentOperation {
 
     @Nullable
     private CraftingSwitchBlockEntity.DeclaredMachine findMachine() {
+        CraftingSwitchBlockEntity.DeclaredMachine firstOfType = null;
+        CraftingSwitchBlockEntity.DeclaredMachine firstRoutable = null;
+        CraftingSwitchBlockEntity.DeclaredMachine assigned = null;
         for (final BlockPos pos : candidateComputers) {
             if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc) {
                 for (final CraftingSwitchBlockEntity.DeclaredMachine m : cc.availableMachines()) {
-                    if (machineMatches(m, pattern.machineType())) {
-                        return m;
+                    if (!machineMatches(m, pattern.machineType())) {
+                        continue;
+                    }
+                    if (firstOfType == null) {
+                        firstOfType = m;
+                    }
+                    // The dispatcher gives each concurrent job a distinct physical machine so two never share and
+                    // jam one; honor that assignment exactly (it may be a fallback machine with no matching bus).
+                    if (assignedMachinePos != null && assignedMachinePos.equals(m.machinePos())) {
+                        assigned = m;
+                    }
+                    // Prefer a machine whose Input Buses can actually route this recipe's inputs. Several
+                    // machines of one type are told apart only by their bus filters (one factory filtered to
+                    // iron, another to enriched iron), so picking the first by type alone feeds a machine that
+                    // cannot accept the inputs. This is what makes a group of same-type machines usable.
+                    if (firstRoutable == null && machineCanRoute(m)) {
+                        firstRoutable = m;
+                    }
+                }
+            }
+        }
+        if (assignedMachinePos != null) {
+            return assigned; // null only if the assigned machine vanished; the dispatcher re-assigns next tick
+        }
+        // Unassigned (a standalone run): the first routable machine, or the first of the type as a last resort.
+        return firstRoutable != null ? firstRoutable : firstOfType;
+    }
+
+    /**
+     * The distinct physical machines this job could run on. Machines whose Input Buses can actually route its
+     * inputs come first; if none can (a bus-less machine fed through the switch face, or a chemical input no item
+     * bus filters), every machine of the type is a fallback — the same reach the single-machine path always had.
+     * The dispatcher picks a free one per job, so concurrency scales with the machines actually present.
+     */
+    public List<BlockPos> routableMachines() {
+        final List<BlockPos> routable = new java.util.ArrayList<>();
+        final List<BlockPos> ofType = new java.util.ArrayList<>();
+        for (final BlockPos pos : candidateComputers) {
+            if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc) {
+                for (final CraftingSwitchBlockEntity.DeclaredMachine m : cc.availableMachines()) {
+                    if (!machineMatches(m, pattern.machineType())) {
+                        continue;
+                    }
+                    if (!ofType.contains(m.machinePos())) {
+                        ofType.add(m.machinePos());
+                    }
+                    if (machineCanRoute(m) && !routable.contains(m.machinePos())) {
+                        routable.add(m.machinePos());
+                    }
+                }
+            }
+        }
+        return routable.isEmpty() ? ofType : routable;
+    }
+
+    /** The physical machine the dispatcher assigned this job, or null if unassigned. */
+    @Nullable
+    public BlockPos assignedMachine() {
+        return assignedMachinePos;
+    }
+
+    /**
+     * The Crafting Computer that drives this job — the one whose Crafting Switch declares the machine it is
+     * assigned to (or currently on). Its crafting card sets the feed rate, so the card, not the machine, governs
+     * how fast the step runs. Null when no computer declares the machine (then it cannot be fed).
+     */
+    @Nullable
+    public BlockPos executorComputer() {
+        final BlockPos target = assignedMachinePos != null ? assignedMachinePos
+                : (machine != null ? machine.machinePos() : null);
+        if (target == null) {
+            return null;
+        }
+        for (final BlockPos pos : candidateComputers) {
+            if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc) {
+                for (final CraftingSwitchBlockEntity.DeclaredMachine m : cc.availableMachines()) {
+                    if (m.machinePos().equals(target)) {
+                        return pos;
                     }
                 }
             }
         }
         return null;
+    }
+
+    /** Set by the dispatcher each tick: the distinct physical machine this job may use (null to clear). */
+    public void setAssignedMachine(@Nullable final BlockPos pos) {
+        this.assignedMachinePos = pos;
+        if (pos != null && machine != null && !pos.equals(machine.machinePos())) {
+            machine = null; // re-resolve to the newly assigned machine on the next tick
+        }
+    }
+
+    /**
+     * Whether {@code m}'s Crafting Input Buses can carry every one of this pattern's inputs at once: each input
+     * must be assignable to a distinct Input Bus whose filter selects it, and an unfiltered bus is a wildcard
+     * that carries anything. A machine with no Input Bus is fed through its switch-touched face and accepts
+     * anything, exactly as before this check existed.
+     */
+    private boolean machineCanRoute(final CraftingSwitchBlockEntity.DeclaredMachine m) {
+        final List<StorageKey> filters = new java.util.ArrayList<>();
+        for (final Direction d : Direction.values()) {
+            final net.minecraft.core.BlockPos cablePos = m.machinePos().relative(d);
+            if (level.getBlockEntity(cablePos)
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable
+                    && cable.getPart(d.getOpposite())
+                    instanceof dev.jsc.jscomputronics.module.computing.block.part.AbstractBusPart bus
+                    && bus.type() == dev.jsc.jscomputronics.module.computing.block.part.CablePartType.INPUT) {
+                filters.add(bus.filterKey()); // null = an unfiltered bus, a wildcard
+            }
+        }
+        if (filters.isEmpty()) {
+            return true; // no Input Bus: fed through the switch-touched face, which accepts anything
+        }
+        final List<StorageKey> inputs = new java.util.ArrayList<>();
+        for (final ProcessingPattern.ProcessingInput in : pattern.inputs()) {
+            inputs.add(in.key());
+        }
+        return hasFullMatching(inputs, filters);
+    }
+
+    private static boolean busServes(@Nullable final StorageKey filter, final StorageKey input) {
+        return filter == null || filter.equals(input);
+    }
+
+    /** True when every input can be matched to a distinct bus (Hungarian-style augmenting-path matching). */
+    private static boolean hasFullMatching(final List<StorageKey> inputs, final List<StorageKey> filters) {
+        final int[] inputForBus = new int[filters.size()];
+        java.util.Arrays.fill(inputForBus, -1);
+        for (int i = 0; i < inputs.size(); i++) {
+            if (!augment(i, inputs, filters, inputForBus, new boolean[filters.size()])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean augment(final int input, final List<StorageKey> inputs, final List<StorageKey> filters,
+                                   final int[] inputForBus, final boolean[] visited) {
+        for (int b = 0; b < filters.size(); b++) {
+            if (!visited[b] && busServes(filters.get(b), inputs.get(input))) {
+                visited[b] = true;
+                if (inputForBus[b] == -1 || augment(inputForBus[b], inputs, filters, inputForBus, visited)) {
+                    inputForBus[b] = input;
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private ExternalDataPort machinePort() {
@@ -278,7 +459,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
      * kept topped up with as much as the whole request still needs, so a tank never starves a machine that
      * could run faster than one lot every few ticks — the pattern's amount only sets the ratio.
      */
-    private long deliverOwed(final NetworkStorage storage, final DataPort inPort, final long budgetWeight) {
+    private long deliverOwed(final DataPort inPort, final long budgetWeight) {
         final List<ProcessingPattern.ProcessingInput> inputs = pattern.inputs();
         long movedWeight = 0L;
         for (int i = 0; i < inputs.size() && movedWeight < budgetWeight; i++) {
@@ -293,7 +474,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
             if (affordable <= 0) {
                 break;
             }
-            final long sent = storage.select(in.key(), affordable, inPort);
+            final long sent = io.select(in.key(), affordable, inPort);
             delivered[i] += sent;
             movedWeight += sent * unitWeight;
         }
@@ -318,8 +499,8 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     }
 
     /** Puts {@code amount} of a key (item OR fluid) into the network; returns how much was stored. */
-    private long writeBack(final NetworkStorage storage, final StorageKey key, final long amount) {
-        return storage.insert(key, amount);
+    private long writeBack(final StorageKey key, final long amount) {
+        return io.insert(key, amount);
     }
 
     private void finishTimedOut() {
@@ -358,6 +539,18 @@ public final class NetworkProcessingOperation implements PersistentOperation {
 
     public long produced() {
         return produced;
+    }
+
+    @Override
+    public boolean isEphemeral() {
+        return ephemeral;
+    }
+
+    /** Whether this is a craft's internal machine stage (fed from the craft's pool), not a standalone operation.
+     *  Nested steps are not written to the operations log on their own — the parent craft records them as its
+     *  sub-operations. */
+    public boolean isNested() {
+        return nested;
     }
 
     @Override

@@ -690,7 +690,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new dev.jsc.jscomputronics.module.computing.operation.payload.CraftSubmitPayload(
-                        menu.monitorPos(), menu.hostPos(), craftPopup.result(), craftQty, partial));
+                        menu.monitorPos(), menu.hostPos(), craftPopup.result(), craftQty, partial, true));
         closeCraftPopup();
     }
 

@@ -497,7 +497,7 @@ public final class CraftingManagerApp implements DesktopApp {
                 y + 3, fg, false);
     }
 
-    // --- Machines tab: a row per routed machine with its concurrency controls ---
+    // --- Machines tab: physical machines grouped by type, with per-machine Pause/Feed and a per-type Max Jobs ---
 
     private int machineButtonW(final int width) {
         return Math.max(20, (width / 2 - PAD * 2) / 3);
@@ -505,6 +505,41 @@ public final class CraftingManagerApp implements DesktopApp {
 
     private int machineButtonX(final int x, final int width, final int idx) {
         return x + width / 2 + PAD + idx * (machineButtonW(width) + 2);
+    }
+
+    /** A machine-type group header row: the type, how many machines it has, and its shared Max Jobs. */
+    private record MachineGroup(String typeKey, int count, int maxJobs) { }
+
+    /** The Machines tab as a flat display list: a group header per machine type, then that type's machines. */
+    private java.util.List<Object> machineDisplay() {
+        final java.util.LinkedHashMap<String, java.util.List<CraftManagerStatePayload.WireMachine>> byType =
+                new java.util.LinkedHashMap<>();
+        for (final var m : machines) {
+            byType.computeIfAbsent(m.typeKey(), k -> new java.util.ArrayList<>()).add(m);
+        }
+        final java.util.List<Object> items = new java.util.ArrayList<>();
+        for (final var e : byType.entrySet()) {
+            items.add(new MachineGroup(e.getKey(), e.getValue().size(), e.getValue().get(0).typeMaxJobs()));
+            items.addAll(e.getValue());
+        }
+        return items;
+    }
+
+    /** "mekanism:ultimate_infusing_factory" -> "Ultimate Infusing Factory". */
+    private static String prettyType(final String typeKey) {
+        final int colon = typeKey.indexOf(':');
+        final String base = (colon >= 0 ? typeKey.substring(colon + 1) : typeKey).replace('_', ' ');
+        final StringBuilder sb = new StringBuilder();
+        boolean cap = true;
+        for (final char c : base.toCharArray()) {
+            sb.append(cap && c != ' ' ? Character.toUpperCase(c) : c);
+            cap = c == ' ';
+        }
+        return sb.toString();
+    }
+
+    private static boolean inButton(final int bx, final int by, final int bw, final double mx, final double my) {
+        return mx >= bx && mx < bx + bw && my >= by && my < by + BTN_H;
     }
 
     private void renderMachines(final GuiGraphics g, final Font font, final int x, final int y,
@@ -517,24 +552,36 @@ public final class CraftingManagerApp implements DesktopApp {
             g.drawString(font, "No machines on the crafting network.", x + PAD, y + PAD, SUB, false);
             return;
         }
-        final int listH = height - PAD;
-        final int visible = Math.max(1, listH / M_ROW_H);
-        machineScroll = Math.max(0, Math.min(machineScroll, Math.max(0, machines.size() - visible)));
+        final java.util.List<Object> items = machineDisplay();
         final int bw = machineButtonW(width);
+        // Column headers, so each control's purpose is clear.
+        g.drawString(font, "MACHINE", x + PAD, y + 2, SUB, false);
+        g.drawString(font, "STATE", machineButtonX(x, width, 0), y + 2, SUB, false);
+        g.drawString(font, "FEED", machineButtonX(x, width, 1), y + 2, SUB, false);
+        final int top = y + 12;
+        final int listH = height - 12 - PAD;
+        final int visible = Math.max(1, listH / M_ROW_H);
+        machineScroll = Math.max(0, Math.min(machineScroll, Math.max(0, items.size() - visible)));
         for (int row = 0; row < visible; row++) {
             final int i = machineScroll + row;
-            if (i >= machines.size()) {
+            if (i >= items.size()) {
                 break;
             }
-            final CraftManagerStatePayload.WireMachine m = machines.get(i);
-            final int ry = y + PAD / 2 + row * M_ROW_H;
-            g.drawString(font, trim(font, m.label(), width / 2 - PAD * 2), x + PAD, ry + 3,
-                    m.active() ? TEXT : SUB, false);
-            drawButton(g, font, machineButtonX(x, width, 0), ry, bw, "Jobs " + m.maxJobs(), true, mouseX, mouseY);
-            drawButton(g, font, machineButtonX(x, width, 1), ry, bw, m.locked() ? "Paused" : "Run",
-                    true, mouseX, mouseY);
-            drawButton(g, font, machineButtonX(x, width, 2), ry, bw, m.feedMax() ? "Fill" : "One",
-                    true, mouseX, mouseY);
+            final int ry = top + row * M_ROW_H;
+            final Object it = items.get(i);
+            if (it instanceof MachineGroup grp) {
+                final String head = prettyType(grp.typeKey()) + "  ·  " + grp.count()
+                        + (grp.count() == 1 ? " machine" : " machines");
+                g.drawString(font, trim(font, head, width / 2 - PAD), x + PAD, ry + 3, SEL_BG, false);
+                drawButton(g, font, machineButtonX(x, width, 2), ry, bw,
+                        "Jobs " + (grp.maxJobs() == 0 ? "Auto" : String.valueOf(grp.maxJobs())), true, mouseX, mouseY);
+            } else if (it instanceof CraftManagerStatePayload.WireMachine m) {
+                g.drawString(font, trim(font, m.label(), width / 2 - PAD * 2 - 6), x + PAD + 6, ry + 3, TEXT, false);
+                drawButton(g, font, machineButtonX(x, width, 0), ry, bw, m.locked() ? "Paused" : "Running",
+                        true, mouseX, mouseY);
+                drawButton(g, font, machineButtonX(x, width, 1), ry, bw, m.feedMax() ? "Fill" : "1 lot",
+                        true, mouseX, mouseY);
+            }
         }
     }
 
@@ -543,34 +590,40 @@ public final class CraftingManagerApp implements DesktopApp {
         if (!hasCard || machines.isEmpty()) {
             return;
         }
-        final int listH = height - PAD;
-        final int visible = Math.max(1, listH / M_ROW_H);
+        final java.util.List<Object> items = machineDisplay();
         final int bw = machineButtonW(width);
+        final int top = y + 12;
+        final int listH = height - 12 - PAD;
+        final int visible = Math.max(1, listH / M_ROW_H);
         for (int row = 0; row < visible; row++) {
             final int i = machineScroll + row;
-            if (i >= machines.size()) {
+            if (i >= items.size()) {
                 break;
             }
-            final CraftManagerStatePayload.WireMachine m = machines.get(i);
-            final int ry = y + PAD / 2 + row * M_ROW_H;
+            final int ry = top + row * M_ROW_H;
             if (mouseY < ry || mouseY >= ry + BTN_H) {
                 continue;
             }
-            for (int b = 0; b < 3; b++) {
-                final int bx = machineButtonX(x, width, b);
-                if (mouseX >= bx && mouseX < bx + bw) {
-                    int jobs = m.maxJobs();
-                    boolean locked = m.locked();
-                    boolean fill = m.feedMax();
-                    switch (b) {
-                        case 0 -> jobs = jobs >= MAX_JOBS ? 1 : jobs + 1;
-                        case 1 -> locked = !locked;
-                        case 2 -> fill = !fill;
-                        default -> { }
-                    }
+            final Object it = items.get(i);
+            if (it instanceof MachineGroup grp && inButton(machineButtonX(x, width, 2), ry, bw, mouseX, mouseY)) {
+                // Max Jobs cycles ...->MAX_JOBS->Auto, per machine TYPE.
+                final int jobs = grp.maxJobs() >= MAX_JOBS ? 0 : grp.maxJobs() + 1;
+                PacketDistributor.sendToServer(
+                        new dev.jsc.jscomputronics.module.computing.operation.payload.SetMachineConfigPayload(
+                                host, grp.typeKey(), jobs, false, false));
+                return;
+            }
+            if (it instanceof CraftManagerStatePayload.WireMachine m) {
+                if (inButton(machineButtonX(x, width, 0), ry, bw, mouseX, mouseY)) {
                     PacketDistributor.sendToServer(
                             new dev.jsc.jscomputronics.module.computing.operation.payload.SetMachineConfigPayload(
-                                    host, m.key(), jobs, locked, fill));
+                                    host, m.machineKey(), 0, !m.locked(), m.feedMax()));
+                    return;
+                }
+                if (inButton(machineButtonX(x, width, 1), ry, bw, mouseX, mouseY)) {
+                    PacketDistributor.sendToServer(
+                            new dev.jsc.jscomputronics.module.computing.operation.payload.SetMachineConfigPayload(
+                                    host, m.machineKey(), 0, m.locked(), !m.feedMax()));
                     return;
                 }
             }

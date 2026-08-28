@@ -127,6 +127,14 @@ public final class NetworkInteractorApp implements DesktopApp {
     // crafting, instead of crafting a fixed amount immediately. craftPopup == null means no craft popup is open.
     private dev.jsc.jscomputronics.module.computing.operation.payload.CraftCatalogPayload.Entry craftPopup;
     private long craftQty = 1;
+    // When the item in the craft popup can be made BOTH by a multi-stage pipeline and by composing its flat
+    // patterns, this toggle chooses: true runs the pipeline, false lets the recursive planner build the tree.
+    // Only shown (and only meaningful) when the popup's entry has a multi-stage recipe.
+    private boolean craftMulti = true;
+    // Frames since the last live refresh: the Network Interactor re-asks the server for the storage grid and,
+    // on the Operations tab, the live operations a few times a second, so stock and craft progress move on their
+    // own instead of only when a command is run.
+    private int refreshFrames;
     private dev.jsc.jscomputronics.module.computing.operation.payload.CraftPlanPayload craftPlan;
     private static final int CRAFT_W = 196;
     private static final int CRAFT_H = 150;
@@ -344,6 +352,12 @@ public final class NetworkInteractorApp implements DesktopApp {
                               final float partialTick) {
         this.contentW = width;
         this.contentH = height;
+        // Keep the view live: a few times a second, re-ask for the storage grid (and the live operations on the
+        // Operations tab) so stock counts and craft progress update on their own, without a manual refresh.
+        if (++refreshFrames >= 20) {
+            refreshFrames = 0;
+            request();
+        }
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(width, height);
         clampGridScroll(z);
         g.fill(x, y, x + width, y + height, PANEL);
@@ -1384,6 +1398,7 @@ public final class NetworkInteractorApp implements DesktopApp {
         // Open the MC-NET-style craft popup (quantity + live plan), instead of crafting a fixed amount at once.
         craftPopup = list.get(idx);
         craftQty = 1;
+        craftMulti = true; // default to the pipeline when the item has one; the toggle lets the player switch
         craftPlan = null;
         closePopup();
         requestCraftPlan();
@@ -1411,9 +1426,11 @@ public final class NetworkInteractorApp implements DesktopApp {
     /** Submits the craft (full or partial up to what is currently feasible) and closes the popup. */
     private void submitCraft(final boolean partial) {
         if (craftPopup != null) {
+            // A multi-stage choice only bites when the entry actually has a pipeline; otherwise it is ignored.
+            final boolean multi = !craftPopup.multiStage() || craftMulti;
             PacketDistributor.sendToServer(
                     new dev.jsc.jscomputronics.module.computing.operation.payload.CraftSubmitPayload(
-                            monitorPos, host, craftPopup.result(), craftQty, partial));
+                            monitorPos, host, craftPopup.result(), craftQty, partial, multi));
         }
         closeCraftPopup();
     }
@@ -1471,6 +1488,15 @@ public final class NetworkInteractorApp implements DesktopApp {
             }
         }
 
+        // Recipe toggle: only when the item can be made as a multi-stage pipeline (and thus also flat). It picks
+        // which recipe the craft runs — the whole pipeline, or the flat patterns composed by the planner.
+        if (craftPopup.multiStage()) {
+            final int tx = px + 118;
+            final int tw = CRAFT_W - 118 - 5;
+            drawButton(g, font, tx, py + CRAFT_H - 33, tw, 12, craftMulti ? "Multi-stage" : "Flat",
+                    hovered(mouseX, mouseY, tx, py + CRAFT_H - 33, tw, 12));
+        }
+
         // Buttons: Craft (full) / Partial (up to feasible) / Close.
         final int by = py + CRAFT_H - 19;
         drawButton(g, font, px + 5, by, 58, 16, "Craft", hovered(mouseX, mouseY, px + 5, by, 58, 16));
@@ -1489,6 +1515,14 @@ public final class NetworkInteractorApp implements DesktopApp {
             final int bx = px + 70 + i * 31;
             if (inRect(lx, ly, bx, py + 22, 29, 14)) {
                 setCraftQty(craftQty + CRAFT_STEPS[i]);
+                return;
+            }
+        }
+        if (craftPopup.multiStage()) {
+            final int tx = px + 118;
+            final int tw = CRAFT_W - 118 - 5;
+            if (inRect(lx, ly, tx, py + CRAFT_H - 33, tw, 12)) {
+                craftMulti = !craftMulti;
                 return;
             }
         }

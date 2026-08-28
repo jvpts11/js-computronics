@@ -40,7 +40,7 @@ class ComputerBuildTest {
     }
 
     private static CraftingCardSpec craftingCard() {
-        return new CraftingCardSpec(IndustrialTier.T3, PcieGeneration.PCIE_3_0, 1.5, 40);
+        return new CraftingCardSpec(IndustrialTier.T3, PcieGeneration.PCIE_3_0, 1.5, 8, 40);
     }
 
     private static PsuSpec psu(final int watts) {
