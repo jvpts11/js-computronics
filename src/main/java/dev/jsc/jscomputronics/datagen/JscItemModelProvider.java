@@ -122,7 +122,8 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.CD_RW.get());
         basicItem(ComputingModule.DVD_ROM.get());
         basicItem(ComputingModule.DVD_RW.get());
-        basicItem(ComputingModule.USB_FLASH_DRIVE.get());
+        // The USB flash drive uses a hand-authored 3D model (models/item/usb_flash_drive.json), not a flat sprite,
+        // so it is not generated here.
         basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());
         basicItem(ComputingModule.MOTHERBOARD_ATX_P.get());
         basicItem(ComputingModule.CPU_SERVO_2620.get());
