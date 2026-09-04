@@ -8,18 +8,23 @@
 package dev.jsc.jscomputronics.module.computing.os;
 
 /**
- * Classification of a program by how it runs and what OS capability tier it requires.
+ * Classification of a program by how it runs.
  *
- * <p>{@link #APP} programs require {@link OsCapability#FULL_DESKTOP} because they open foreground
- * windows. {@link #SERVICE} programs run headlessly and are therefore usable on any capability
- * tier. {@link #HYBRID} programs have headless logic on any tier but expose a graphical panel only
- * when a full desktop is available.
+ * <p>This is a description of the program's shape, not a gate: what a program can install and run on
+ * is decided by the platforms and hardware minimums it declares (see {@link ProgramSpec} and
+ * {@link OsGating}). Typically an {@link #APP} lists only desktop platforms while a {@link #SERVICE}
+ * lists every platform, but that is the declaration's job, not this enum's.
  */
 public enum ProgramKind {
-    /** Foreground graphical application; requires {@link OsCapability#FULL_DESKTOP}. */
+    /** Foreground graphical application that opens windows (normally declared for desktop platforms). */
     APP,
-    /** Headless background service; runs on any capability tier. */
+    /** Headless background service (normally declared for every platform). */
     SERVICE,
-    /** Headless core on any tier, optional graphical panel on {@link OsCapability#FULL_DESKTOP}. */
-    HYBRID
+    /** Headless core with an optional graphical panel where the platform provides a desktop. */
+    HYBRID,
+    /**
+     * A desktop environment package (KDE Plasma, GNOME, Cinnamon): installing it turns a TTY-only Linux into
+     * a graphical desktop. The matching {@link DesktopEnvironmentDef} describes the chrome it brings.
+     */
+    DESKTOP_ENVIRONMENT
 }

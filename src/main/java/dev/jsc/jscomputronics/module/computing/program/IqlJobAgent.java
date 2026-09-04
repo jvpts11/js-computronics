@@ -46,7 +46,10 @@ public final class IqlJobAgent {
 
     public void tick(final MainframeBlockEntity mainframe, final ServerLevel level) {
         clock++;
-        if (!mainframe.isIqlEngineActive() || clock % EVAL_INTERVAL != 0) {
+        // Either service enables job firing: the IQL Engine (with the NMS) or the Automation Engine
+        // (with the Automation Manager). A player needs only one installed for their jobs to run.
+        if ((!mainframe.isIqlEngineActive() && !mainframe.isAutomationEngineActive())
+                || clock % EVAL_INTERVAL != 0) {
             return;
         }
         final List<IqlSavedObject> jobs = mainframe.iqlCatalog().ofType(IqlDefinition.ObjectType.JOB);

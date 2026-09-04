@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.computing.os.fs;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -63,17 +64,19 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
      * One persisted line: path + extension string + content.
      * The extension is stored as a string so unknown extensions survive round-trips.
      */
-    private record Line(String path, String ext, String content) {
+    private record Line(String path, String ext, String content, long mod) {
         static final Codec<Line> CODEC = RecordCodecBuilder.create(builder -> builder.group(
                 Codec.STRING.fieldOf("path").forGetter(Line::path),
                 Codec.STRING.fieldOf("ext").forGetter(Line::ext),
-                Codec.STRING.fieldOf("content").forGetter(Line::content)
+                Codec.STRING.fieldOf("content").forGetter(Line::content),
+                Codec.LONG.optionalFieldOf("mod", 0L).forGetter(Line::mod)
         ).apply(builder, Line::new));
 
         static final StreamCodec<RegistryFriendlyByteBuf, Line> STREAM_CODEC = StreamCodec.composite(
                 ByteBufCodecs.STRING_UTF8, Line::path,
                 ByteBufCodecs.STRING_UTF8, Line::ext,
                 ByteBufCodecs.STRING_UTF8, Line::content,
+                ByteBufCodecs.VAR_LONG, Line::mod,
                 Line::new);
     }
 
@@ -82,7 +85,7 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
         for (final Line line : lines) {
             // Resolve FileType from the stored extension; fall back to TXT for unknown types.
             final FileType type = FileType.fromExtension(line.ext()).orElse(FileType.TXT);
-            map.put(line.path(), new StoredFile(line.path(), type, line.content()));
+            map.put(line.path(), new StoredFile(line.path(), type, line.content(), line.mod()));
         }
         return new FilesystemContents(map, new LinkedHashSet<>(dirs));
     }
@@ -90,7 +93,7 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
     private static List<Line> toLines(final FilesystemContents contents) {
         final List<Line> lines = new ArrayList<>(contents.files.size());
         contents.files.forEach((path, file) ->
-                lines.add(new Line(path, file.type().extension(), file.content())));
+                lines.add(new Line(path, file.type().extension(), file.content(), file.modified())));
         return lines;
     }
 
@@ -116,13 +119,13 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
     // -------------------------------------------------------------------------
 
     /**
-     * Returns the total disk weight consumed by all stored files, in mB-equivalents. Directories
-     * are free, so they do not contribute.
+     * Returns the total disk weight consumed by all stored files, in mB-equivalents on a disk of
+     * {@code era}. Directories are free, so they do not contribute.
      */
-    public long usedWeight() {
+    public long usedWeight(final HardwareEra era) {
         long sum = 0L;
         for (final StoredFile file : files.values()) {
-            sum += file.weight();
+            sum += file.weight(era);
         }
         return sum;
     }

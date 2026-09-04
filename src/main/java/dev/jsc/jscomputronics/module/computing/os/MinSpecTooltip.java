@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Builds the minimum-requirement tooltip lines for an OS or a program from its registered
- * {@link OsDef} / {@link ProgramDef}. Used by install-media tooltips and the This PC app so the player
+ * {@link OsDef} / {@link ProgramSpec}. Used by install-media tooltips and the This PC app so the player
  * sees what hardware and OS something needs before installing it. Only common types are referenced, so
  * this is safe to call from item tooltips (which run client-side) without a client/server boundary.
  */
@@ -34,20 +34,57 @@ public final class MinSpecTooltip {
             return lines;
         }
         lines.add(line("Needs " + eraLabel(os.minEra()) + " hardware or later"));
-        lines.add(line("Disk footprint: " + (os.footprintItems() * 4L) + " MB"));
+        lines.add(line("Disk footprint: " + os.footprintMb() + " MB"));
         return lines;
     }
 
-    /** The minimum-spec lines for a program: the OS capability tier and OS era it requires. */
+    /** The minimum-spec lines for a program: its OS floor (platform + version) and its hardware minimums. */
     public static List<Component> programMinSpec(final ResourceLocation progId) {
-        final List<Component> lines = new ArrayList<>(2);
-        final ProgramDef prog = progId == null ? null : OsRegistry.getProgram(progId);
+        final List<Component> lines = new ArrayList<>(4);
+        final ProgramSpec prog = progId == null ? null : OsRegistry.getProgram(progId);
         if (prog == null) {
             return lines;
         }
-        lines.add(line("Needs a " + capabilityLabel(prog.minCapability()) + " OS"));
-        lines.add(line("Min OS era: " + eraLabel(prog.minOsEra())));
+        // The OS requirement is the headline the player cares about, so it is highlighted (aqua) after a
+        // muted "Requires" label; the raw hardware minimums follow in grey.
+        lines.add(Component.literal("Requires ").withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(minOsLabel(prog)).withStyle(ChatFormatting.AQUA)));
+        // The era floor sits with the hardware minimums because that is what it is: a machine of an
+        // older generation cannot run it at any clock speed.
+        if (prog.minEra() != dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE) {
+            // Worded exactly like the OS line above: the same requirement must not read as two rules.
+            lines.add(line("Needs " + eraLabel(prog.minEra()) + " hardware or later"));
+        }
+        if (prog.minCpuMhz() > 0) {
+            lines.add(line("CPU " + prog.minCpuMhz() + " MHz+"));
+        }
+        if (prog.minVramMb() > 0) {
+            lines.add(line("VRAM " + prog.minVramMb() + " MB+"));
+        }
+        if (prog.minDiskMb() > 0) {
+            lines.add(line("Disk " + prog.minDiskMb() + " MB free"));
+        }
         return lines;
+    }
+
+    /** The OS floor a program needs: its Frames version when it declares one, otherwise its platforms. */
+    private static String minOsLabel(final ProgramSpec prog) {
+        return switch (prog.minOsRank()) {
+            case 3 -> "Frames 11";
+            case 2 -> "Frames XP or newer";
+            default -> platformsLabel(prog.platforms());
+        };
+    }
+
+    /** A readable, comma-joined list of platform labels in enum order. */
+    public static String platformsLabel(final java.util.Set<Platform> platforms) {
+        final List<String> names = new ArrayList<>(platforms.size());
+        for (final Platform p : Platform.values()) {
+            if (platforms.contains(p)) {
+                names.add(p.label());
+            }
+        }
+        return String.join(", ", names);
     }
 
     private static Component line(final String text) {

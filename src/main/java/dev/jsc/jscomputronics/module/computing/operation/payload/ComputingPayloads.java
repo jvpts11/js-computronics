@@ -14,7 +14,7 @@ import dev.jsc.jscomputronics.common.network.NetworkSystem;
 import dev.jsc.jscomputronics.common.network.ServerNode;
 import dev.jsc.jscomputronics.common.network.SubframeNode;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.os.OsHost;
 import dev.jsc.jscomputronics.module.computing.os.OsDef;
 import dev.jsc.jscomputronics.module.computing.os.OsGating;
 import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
@@ -26,7 +26,6 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.block.part.AbstractBusPart;
@@ -34,10 +33,8 @@ import dev.jsc.jscomputronics.module.computing.menu.AbstractBusMenu;
 import dev.jsc.jscomputronics.module.computing.datacenter.LoadBalancer;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
-import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
 import dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu;
-import dev.jsc.jscomputronics.module.computing.menu.DatacenterStationMenu;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.program.Programs;
@@ -50,6 +47,8 @@ import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
 import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import net.minecraft.network.chat.Component;
+import dev.jsc.jscomputronics.module.computing.operation.DataHandoff;
+import dev.jsc.jscomputronics.module.computing.storage.DataContainers;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;
@@ -62,9 +61,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.FluidUtil;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -91,10 +87,46 @@ public final class ComputingPayloads {
         final PayloadRegistrar registrar = event.registrar("1");
         registrar.playToClient(NetworkSnapshotPayload.TYPE, NetworkSnapshotPayload.STREAM_CODEC,
                 ComputingPayloads::handleSnapshot);
-        registrar.playToServer(RequestNetworkNodesPayload.TYPE, RequestNetworkNodesPayload.STREAM_CODEC,
-                ComputingPayloads::handleRequestNodes);
-        registrar.playToClient(NetworkNodesPayload.TYPE, NetworkNodesPayload.STREAM_CODEC,
-                ComputingPayloads::handleNodes);
+        registrar.playToServer(RackBayPowerPayload.TYPE, RackBayPowerPayload.STREAM_CODEC,
+                ComputingPayloads::handleRackBayPower);
+        registrar.playToServer(MachinePowerPayload.TYPE, MachinePowerPayload.STREAM_CODEC,
+                ComputingPayloads::handleMachinePower);
+        registrar.playToClient(OpenKvmPayload.TYPE, OpenKvmPayload.STREAM_CODEC,
+                ComputingPayloads::handleOpenKvm);
+        registrar.playToServer(RemoteControlPayload.TYPE, RemoteControlPayload.STREAM_CODEC,
+                ComputingPayloads::handleRemoteControl);
+        registrar.playToClient(RemoteHostsPayload.TYPE, RemoteHostsPayload.STREAM_CODEC,
+                ComputingPayloads::handleRemoteHosts);
+        registrar.playBidirectional(DesktopWindowsPayload.TYPE, DesktopWindowsPayload.STREAM_CODEC,
+                new net.neoforged.neoforge.network.handling.DirectionalPayloadHandler<>(
+                        ComputingPayloads::handleDesktopWindowsOnClient,
+                        ComputingPayloads::handleDesktopWindowsOnServer));
+        registrar.playToServer(KvmSelectPayload.TYPE, KvmSelectPayload.STREAM_CODEC,
+                ComputingPayloads::handleKvmSelect);
+        registrar.playToServer(RequestNetworkManagerPayload.TYPE, RequestNetworkManagerPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestNetworkManager);
+        registrar.playToClient(NetworkManagerPayload.TYPE, NetworkManagerPayload.STREAM_CODEC,
+                ComputingPayloads::handleNetworkManager);
+        registrar.playToServer(RequestStorageInsightsPayload.TYPE, RequestStorageInsightsPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestStorageInsights);
+        registrar.playToClient(StorageInsightsPayload.TYPE, StorageInsightsPayload.STREAM_CODEC,
+                ComputingPayloads::handleStorageInsights);
+        registrar.playToServer(RequestItemDetailPayload.TYPE, RequestItemDetailPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestItemDetail);
+        registrar.playToClient(ItemDetailPayload.TYPE, ItemDetailPayload.STREAM_CODEC,
+                ComputingPayloads::handleItemDetail);
+        registrar.playToServer(RequestCraftPlannerPayload.TYPE, RequestCraftPlannerPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestCraftPlanner);
+        registrar.playToClient(CraftPlannerPayload.TYPE, CraftPlannerPayload.STREAM_CODEC,
+                ComputingPayloads::handleCraftPlanner);
+        registrar.playToServer(RequestAutomationPayload.TYPE, RequestAutomationPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestAutomation);
+        registrar.playToClient(AutomationPayload.TYPE, AutomationPayload.STREAM_CODEC,
+                ComputingPayloads::handleAutomation);
+        registrar.playToServer(CreateAutomationJobPayload.TYPE, CreateAutomationJobPayload.STREAM_CODEC,
+                ComputingPayloads::handleCreateAutomationJob);
+        registrar.playToServer(JobActionPayload.TYPE, JobActionPayload.STREAM_CODEC,
+                ComputingPayloads::handleJobAction);
         registrar.playToServer(TerminalSelectPayload.TYPE, TerminalSelectPayload.STREAM_CODEC,
                 ComputingPayloads::handleTerminalSelect);
         registrar.playToServer(TerminalInsertPayload.TYPE, TerminalInsertPayload.STREAM_CODEC,
@@ -127,12 +159,6 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRenameServerRouter);
         registrar.playToServer(SetBusNamePayload.TYPE, SetBusNamePayload.STREAM_CODEC,
                 ComputingPayloads::handleSetBusName);
-        registrar.playToClient(DatacenterSnapshotPayload.TYPE, DatacenterSnapshotPayload.STREAM_CODEC,
-                ComputingPayloads::handleDatacenterSnapshot);
-        registrar.playToServer(DatacenterStationActionPayload.TYPE, DatacenterStationActionPayload.STREAM_CODEC,
-                ComputingPayloads::handleDatacenterAction);
-        registrar.playToServer(DatacenterSelectPayload.TYPE, DatacenterSelectPayload.STREAM_CODEC,
-                ComputingPayloads::handleDatacenterSelect);
         registrar.playToServer(TerminalMaintenancePayload.TYPE, TerminalMaintenancePayload.STREAM_CODEC,
                 ComputingPayloads::handleTerminalMaintenance);
         registrar.playToServer(TerminalDropPayload.TYPE, TerminalDropPayload.STREAM_CODEC,
@@ -165,10 +191,20 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRequestThisPc);
         registrar.playToClient(ThisPcPayload.TYPE, ThisPcPayload.STREAM_CODEC,
                 ComputingPayloads::handleThisPc);
+        registrar.playToServer(EjectMediaPayload.TYPE, EjectMediaPayload.STREAM_CODEC,
+                ComputingPayloads::handleEjectMedia);
+        registrar.playToServer(CopyFilePayload.TYPE, CopyFilePayload.STREAM_CODEC,
+                ComputingPayloads::handleCopyFile);
         registrar.playToServer(InstallFromMediaPayload.TYPE, InstallFromMediaPayload.STREAM_CODEC,
                 ComputingPayloads::handleInstallFromMedia);
         registrar.playToServer(SetDesktopPrefsPayload.TYPE, SetDesktopPrefsPayload.STREAM_CODEC,
                 ComputingPayloads::handleSetDesktopPrefs);
+        registrar.playToServer(RequestSettingsPayload.TYPE, RequestSettingsPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestSettings);
+        registrar.playToServer(SetSettingPayload.TYPE, SetSettingPayload.STREAM_CODEC,
+                ComputingPayloads::handleSetSetting);
+        registrar.playToClient(SettingsSnapshotPayload.TYPE, SettingsSnapshotPayload.STREAM_CODEC,
+                ComputingPayloads::handleSettingsSnapshot);
         registrar.playToServer(SetIconPositionPayload.TYPE, SetIconPositionPayload.STREAM_CODEC,
                 ComputingPayloads::handleSetIconPosition);
         registrar.playToServer(DesktopShellRunPayload.TYPE, DesktopShellRunPayload.STREAM_CODEC,
@@ -236,6 +272,38 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleProcessAction);
         registrar.playToServer(InstallOsPayload.TYPE, InstallOsPayload.STREAM_CODEC,
                 ComputingPayloads::handleInstallOs);
+        // The firmware boot manager: state request/reply, boot/install/boot-order actions, restart into setup.
+        registrar.playToServer(RequestFirmwareStatePayload.TYPE, RequestFirmwareStatePayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestFirmwareState);
+        registrar.playToClient(FirmwareStatePayload.TYPE, FirmwareStatePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    // The same hardware state feeds the setup screen and the POST's device-detection lines.
+                    dev.jsc.jscomputronics.module.computing.client.FirmwareScreen.accept(payload);
+                    dev.jsc.jscomputronics.module.computing.client.BootSequenceScreen.accept(payload);
+                }));
+        registrar.playToServer(FirmwareActionPayload.TYPE, FirmwareActionPayload.STREAM_CODEC,
+                ComputingPayloads::handleFirmwareAction);
+        registrar.playToServer(RequestFirmwarePayload.TYPE, RequestFirmwarePayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestFirmware);
+        // The power-on self-test: the server asks the monitor to play it; the client reports it finished
+        // (or that DEL asked for the setup) and the server opens the boot target.
+        registrar.playToClient(OpenPostPayload.TYPE, OpenPostPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        dev.jsc.jscomputronics.module.computing.block.PostScreenOpener.Holder.open(
+                                payload.host(), payload.monitorPos(),
+                                dev.jsc.jscomputronics.module.computing.os.FirmwareKind.values()[payload.firmwareKind()],
+                                payload.name())));
+        // A finished installer still waiting for its reboot: the monitor comes back to that prompt.
+        registrar.playToClient(OpenInstallDonePayload.TYPE, OpenInstallDonePayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                        dev.jsc.jscomputronics.module.computing.block.InstallDoneScreenOpener.Holder.open(
+                                payload.host(), payload.monitorPos(),
+                                dev.jsc.jscomputronics.module.computing.os.FirmwareKind.values()[payload.firmwareKind()],
+                                payload.osName(), payload.targetLabel(), payload.targetSlot(), payload.failure())));
+        registrar.playToServer(PostCompletePayload.TYPE, PostCompletePayload.STREAM_CODEC,
+                ComputingPayloads::handlePostComplete);
+        registrar.playToServer(UninstallProgramPayload.TYPE, UninstallProgramPayload.STREAM_CODEC,
+                ComputingPayloads::handleUninstallProgram);
         registrar.playToClient(CraftFileListPayload.TYPE, CraftFileListPayload.STREAM_CODEC,
                 ComputingPayloads::handleCraftFileList);
         registrar.playToServer(SaveIqlFilePayload.TYPE, SaveIqlFilePayload.STREAM_CODEC,
@@ -257,6 +325,17 @@ public final class ComputingPayloads {
                 ComputingPayloads::handlePatternEncoderEdit);
         registrar.playToServer(RequestCraftManagerPayload.TYPE, RequestCraftManagerPayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestCraftManager);
+        // The Cluster Manager: the Cluster Management Computer's program asks, acts, and gets a state back.
+        registrar.playToServer(RequestClusterManagerPayload.TYPE, RequestClusterManagerPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestClusterManager);
+        registrar.playToServer(ClusterManagerActionPayload.TYPE, ClusterManagerActionPayload.STREAM_CODEC,
+                ComputingPayloads::handleClusterManagerAction);
+        registrar.playToServer(ClusterMoveOutPayload.TYPE, ClusterMoveOutPayload.STREAM_CODEC,
+                ComputingPayloads::handleClusterMoveOut);
+        registrar.playToServer(ClusterRenamePayload.TYPE, ClusterRenamePayload.STREAM_CODEC,
+                ComputingPayloads::handleClusterRename);
+        registrar.playToClient(ClusterManagerStatePayload.TYPE, ClusterManagerStatePayload.STREAM_CODEC,
+                ComputingPayloads::handleClusterManagerState);
         registrar.playToServer(SetMachineConfigPayload.TYPE, SetMachineConfigPayload.STREAM_CODEC,
                 ComputingPayloads::handleSetMachineConfig);
         registrar.playToClient(CraftManagerStatePayload.TYPE, CraftManagerStatePayload.STREAM_CODEC,
@@ -361,14 +440,46 @@ public final class ComputingPayloads {
                 launchProgram(player, host, menu.monitorPos(), payload.hostPos(), parts[1].trim());
                 return;
             }
-            final var computer = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
-            final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(CLI_WIDTH);
+            // An open ssh session runs the line on the remote machine, in its own shell family — the
+            // local terminal is only the window. Everything else (ssh itself, exit) stays local.
+            final var localComputer =
+                    new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
+            var computer = localComputer;
+            final var session = sshTargetOf(host, level, payload.line());
+            if (session != null) {
+                computer = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                        session, level);
+            }
+            // The shell speaks the installed OS kernel's family (DOS verbs on MC-DOS/Frames, POSIX on Linux), or
+            // the live installer's verbs while a live medium is booted.
+            final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.shellFor(
+                    computer, CLI_WIDTH);
             final var response = shell.run(payload.line(), computer);
             final List<CommandOutputPayload.WireLine> wire = new ArrayList<>(response.lines().size());
             for (final var cliLine : response.lines()) {
                 wire.add(new CommandOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
             }
-            PacketDistributor.sendToPlayer(player, new CommandOutputPayload(response.clearScreen(), wire));
+            final String prompt = computer.prompt();
+            PacketDistributor.sendToPlayer(player, new CommandOutputPayload(response.clearScreen(), prompt, wire));
+            if (computer.firmwareRebootRequested()) {
+                // "reboot --firmware": leave the terminal and enter the boot manager on the same monitor.
+                player.closeContainer();
+                dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openFirmware(
+                        player, level, menu.monitorPos(), payload.hostPos());
+                return;
+            }
+            if (computer.rebootRequested()) {
+                // A plain "reboot": the terminal closes and the POST replays on the same monitor, after
+                // which whatever the boot target now is (a freshly installed OS included) comes up.
+                if (level.getBlockEntity(payload.hostPos())
+                        instanceof dev.jsc.jscomputronics.module.computing.os.OsHost be) {
+                    be.setNeedsPost(true);
+                }
+                player.closeContainer();
+                dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openPost(
+                        player, level, menu.monitorPos(), payload.hostPos());
+                return;
+            }
             // Persist the typed line on the computer so the history survives closing the prompt or Monitor.
             if (host.console() != null && !payload.line().isBlank()) {
                 host.console().pushHistory(payload.line().trim());
@@ -380,7 +491,7 @@ public final class ComputingPayloads {
     private static void launchProgram(final ServerPlayer player,
             final dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host,
             final BlockPos monitorPos, final BlockPos hostPos, final String name) {
-        dev.jsc.jscomputronics.module.computing.program.Program program = null;
+        dev.jsc.jscomputronics.module.computing.os.ProgramSpec program = null;
         for (final var candidate : dev.jsc.jscomputronics.module.computing.program.Programs.all()) {
             if (candidate.commandName().equalsIgnoreCase(name)
                     || candidate.id().getPath().equalsIgnoreCase(name)
@@ -400,22 +511,23 @@ public final class ComputingPayloads {
                     + program.commandName(), OperationRecord.STATUS_FAILED);
             return;
         }
-        // OS-capability gate: a program may require a richer OS than the host runs (e.g. the NMS needs a
-        // full graphical desktop). Null-safe: programs with no declared requirement always pass.
+        // Program run gate: the installed OS platform must be one the program supports, and the computer
+        // must meet its CPU/VRAM minimums. Null-safe: programs with no declared requirement always pass.
         if (player.level() instanceof ServerLevel osLevel
-                && osLevel.getBlockEntity(hostPos) instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity osComputer
-                && !dev.jsc.jscomputronics.module.computing.os.OsRegistry.canHostRun(
-                        osComputer.installedOsId(), program.id())) {
+                && osLevel.getBlockEntity(hostPos) instanceof dev.jsc.jscomputronics.module.computing.os
+                        .OsHost osComputer
+                && !dev.jsc.jscomputronics.module.computing.os.OsRegistry.canRunProgram(
+                        osComputer.installedOsId(), program.id(),
+                        osComputer.maxCpuMhz(), osComputer.totalVramMb())) {
             sendConsoleLine(player, program.commandName()
-                    + " requires a graphical desktop OS (Panes) on this computer", OperationRecord.STATUS_FAILED);
+                    + " cannot run on this computer's OS or hardware", OperationRecord.STATUS_FAILED);
             player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                    "The " + program.commandName() + " needs a graphical desktop OS (Panes) to run."), false);
+                    "The " + program.commandName() + " cannot run on this computer's OS or hardware."), false);
             return;
         }
         if (program.id().equals(dev.jsc.jscomputronics.module.computing.program.Programs.NMS)) {
-            // The NMS is now a desktop window opened from its Panes desktop icon, not a server-side menu.
-            sendConsoleLine(player, "open the NMS from its desktop icon on a Panes computer", -1);
+            // The NMS is now a desktop window opened from its Frames desktop icon, not a server-side menu.
+            sendConsoleLine(player, "open the NMS from its desktop icon on a Frames computer", -1);
             player.displayClientMessage(net.minecraft.network.chat.Component.literal(
                     "Open the NMS from its desktop icon."), false);
         } else {
@@ -433,7 +545,8 @@ public final class ComputingPayloads {
         for (final String line : wrapToConsole(text)) {
             wire.add(new CommandOutputPayload.WireLine(line, style.ordinal()));
         }
-        PacketDistributor.sendToPlayer(player, new CommandOutputPayload(false, wire));
+        // An empty prompt means "keep the current prompt" — this helper does not change the directory.
+        PacketDistributor.sendToPlayer(player, new CommandOutputPayload(false, "", wire));
     }
 
     /** Word-wraps a direct console message to the console width so a long line never overflows the prompt. */
@@ -621,20 +734,56 @@ public final class ComputingPayloads {
         final var console = host.console();
         final List<String> history = console == null ? List.of() : console.history();
         final List<ConsoleInitPayload.WireCommand> commands = new ArrayList<>();
-        for (final var command : dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.all()) {
+        // Tab completion offers the installed shell family's verbs (ls/cat on Linux, dir/type on DOS), or the
+        // live installer's while a live medium is booted.
+        final boolean live = console != null && console.liveInstall() != null;
+        // Completion and hints offer only what this machine can run: a verb another kind of computer owns
+        // (the cluster command outside a Cluster Management Computer) is no command here, and must not be
+        // hinted as one.
+        final var cli = host instanceof net.minecraft.world.level.block.entity.BlockEntity
+                ? new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, player.serverLevel())
+                : null;
+        for (final var command : dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.commandsFor(
+                dev.jsc.jscomputronics.module.computing.program.ServerCliComputer.shellFamilyOf(host), live)) {
             if (commands.size() >= ConsoleInitPayload.MAX_COMMANDS) {
                 break;
             }
+            if (cli != null && !command.available(cli)) {
+                continue;
+            }
             commands.add(new ConsoleInitPayload.WireCommand(command.name(), command.usage()));
         }
-        PacketDistributor.sendToPlayer(player, new ConsoleInitPayload(List.copyOf(history), commands));
+        // The devices Tab can complete for /dev/ arguments (mkfs, mount, grub-install): the disks in slot
+        // order during a live install, or the mounted drives' device names on an installed POSIX system.
+        final List<String> devices = new ArrayList<>();
+        if (live && host instanceof dev.jsc.jscomputronics.module.computing.os
+                .OsHost computer) {
+            for (int i = 0; i < computer.diskSlots(); i++) {
+                if (computer.diskInSlot(i).getItem()
+                        instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem) {
+                    devices.add("sd" + (char) ('a' + i));
+                }
+            }
+        } else if (dev.jsc.jscomputronics.module.computing.program.ServerCliComputer.shellFamilyOf(host)
+                == dev.jsc.jscomputronics.module.computing.os.ShellFamily.POSIX
+                && player.level() instanceof ServerLevel serverLevel) {
+            for (final var mount : new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                    host, serverLevel).mounts()) {
+                if (devices.size() < ConsoleInitPayload.MAX_DEVICES && mount.ready()) {
+                    devices.add(mount.device());
+                }
+            }
+        }
+        PacketDistributor.sendToPlayer(player, new ConsoleInitPayload(
+                ((net.minecraft.world.level.block.entity.BlockEntity) host).getBlockPos(),
+                List.copyOf(history), commands, devices));
     }
 
     private static void handleOpenComputerUi(final OpenComputerUiPayload payload, final IPayloadContext context) {
         context.enqueueWork(() ->
                 // Only the firmware setup is a client-only screen; the desktop opens as a server-side menu.
                 dev.jsc.jscomputronics.module.computing.block.FirmwareScreenOpener.Holder.open(
-                        payload.host(),
+                        payload.host(), payload.monitorPos(),
                         dev.jsc.jscomputronics.module.computing.os.FirmwareKind.values()[payload.firmwareKind()],
                         payload.name()));
     }
@@ -675,8 +824,8 @@ public final class ComputingPayloads {
                 // GUI, never from the running prompt.
                 final dev.jsc.jscomputronics.common.tier.HardwareEra hostEra =
                         player.level().getBlockEntity(payload.hostPos())
-                                instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                        .AbstractComputerBlockEntity host ? host.displayEra() : null;
+                                instanceof dev.jsc.jscomputronics.module.computing.os
+                                        .OsHost host ? host.displayEra() : null;
                 player.openMenu(new net.minecraft.world.SimpleMenuProvider(
                         (windowId, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu(
                                 windowId, inv, payload.monitorPos(), payload.hostPos(), hostEra), title),
@@ -703,8 +852,8 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 // The mountable volumes (drive tree): the system disk, then each linked drive with a medium.
                 if (!computer.systemDisk().isEmpty()
                         && filesystemKindOf(computer)
@@ -717,9 +866,13 @@ public final class ComputingPayloads {
                     if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
                             instanceof MediaReaderBlockEntity reader
                             && !reader.mediaSlot().getStackInSlot(0).isEmpty()) {
+                        // An installer's drive is named for what it installs ("Frames 11 Setup"), so the
+                        // tree says what is in the drive before it is opened.
+                        final net.minecraft.world.item.ItemStack medium = reader.mediaSlot().getStackInSlot(0);
+                        final String fallback = dev.jsc.jscomputronics.module.computing.os.media
+                                .InstallerProjection.facts(medium).map(f -> f.name() + " Setup").orElse("Removable Drive");
                         volumes.add(new DiskFilesPayload.WireVolume("media:" + endpoint,
-                                dev.jsc.jscomputronics.module.computing.os.VolumeLabel.of(
-                                        reader.mediaSlot().getStackInSlot(0), "Removable Drive")));
+                                dev.jsc.jscomputronics.module.computing.os.VolumeLabel.of(medium, fallback)));
                     }
                 }
                 final String reqDir = payload.dir();
@@ -741,8 +894,7 @@ public final class ComputingPayloads {
                         for (final dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.FileEntry e
                                 : dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.list(
                                         disk, reqDir, kind)) {
-                            wire.add(new DiskFilesPayload.WireFile(
-                                    e.path(), e.type().extension(), e.weight(), e.readOnly(), false));
+                            wire.add(wireFile(disk, e, ""));
                         }
                     }
                     // At the root, removable media in linked drives appear as drives to open.
@@ -766,7 +918,7 @@ public final class ComputingPayloads {
     /** Lists a removable medium's files into {@code wire}, paths prefixed {@code media:<readerPos>/}. */
     private static void listMediaInto(final java.util.List<DiskFilesPayload.WireFile> wire,
             final ServerLevel level,
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
             final String reqDir) {
         final net.minecraft.world.item.ItemStack media = mediaStackFor(level, computer, reqDir);
         if (media.isEmpty()) {
@@ -779,15 +931,44 @@ public final class ComputingPayloads {
         final dev.jsc.jscomputronics.module.computing.os.FilesystemKind kind =
                 dev.jsc.jscomputronics.module.computing.os.FilesystemKind.HIERARCHICAL;
         final String prefix = "media:" + readerPos + "/";
+        // An installer shows the disc of its era: setup, readme, manifest and payload, generated from
+        // the medium's stamp the way a disk's .dat files are generated from its storage. It carries no
+        // stored files of its own, so the projection is the whole listing; a data medium lists what it
+        // really holds.
+        for (final dev.jsc.jscomputronics.module.computing.os.fs.InstallerLayout.Entry e
+                : dev.jsc.jscomputronics.module.computing.os.media.InstallerProjection.list(media, subDir)) {
+            wire.add(new DiskFilesPayload.WireFile(prefix + e.path(),
+                    e.directory() ? "" : e.type().extension(), 0L, true, e.directory()));
+        }
         for (final String d : dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.listDirs(
                 media, subDir, kind)) {
             wire.add(new DiskFilesPayload.WireFile(prefix + d, "", 0L, false, true));
         }
         for (final dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.FileEntry e
                 : dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.list(media, subDir, kind)) {
-            wire.add(new DiskFilesPayload.WireFile(
-                    prefix + e.path(), e.type().extension(), e.weight(), e.readOnly(), false));
+            wire.add(wireFile(media, e, prefix));
         }
+    }
+
+    /**
+     * A listed file on the wire. A {@code .dat} row also carries the item it projects and how many are
+     * stored, so the explorer shows the item and its count rather than a file name a player has to decode.
+     */
+    private static DiskFilesPayload.WireFile wireFile(final net.minecraft.world.item.ItemStack volume,
+            final dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.FileEntry e, final String prefix) {
+        String itemId = "";
+        long count = 0L;
+        if (e.type() == dev.jsc.jscomputronics.module.computing.os.fs.FileType.DAT
+                && volume.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem) {
+            final StorageKey key = resolveDatKey(volume, e.path());
+            if (key != null && key.item() != null) {
+                itemId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item()).toString();
+                count = dev.jsc.jscomputronics.module.computing.storage.DriveVolumes.contents(volume)
+                        .items().getOrDefault(key, 0L);
+            }
+        }
+        return new DiskFilesPayload.WireFile(prefix + e.path(), e.type().extension(), e.weight(), e.readOnly(),
+                false, itemId, count);
     }
 
     /**
@@ -795,7 +976,7 @@ public final class ComputingPayloads {
      * in a linked drive, or {@link net.minecraft.world.item.ItemStack#EMPTY} if not reachable.
      */
     private static net.minecraft.world.item.ItemStack mediaStackFor(final ServerLevel level,
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
             final String mediaPath) {
         final String rest = mediaPath.substring("media:".length());
         final int slash = rest.indexOf('/');
@@ -823,7 +1004,7 @@ public final class ComputingPayloads {
 
     /** Re-syncs the reader holding {@code media:<readerPos>} after its medium's filesystem changed. */
     private static void commitMedia(final ServerLevel level,
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
             final String mediaPath) {
         final String rest = mediaPath.substring("media:".length());
         final int slash = rest.indexOf('/');
@@ -848,12 +1029,9 @@ public final class ComputingPayloads {
                 ? fm.format().capacityItems() : 64L;
         final long capWeight = cap
                 * dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
-        final long fsUsed = media.getOrDefault(
-                        dev.jsc.jscomputronics.module.computing.ComputingModule.FILESYSTEM.get(),
-                        dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.EMPTY)
-                .usedWeight();
+        final long fsUsed = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(media);
         // A DATA medium can also hold a stored item/fluid snapshot (MEDIA_DATA); both consume the medium's
-        // capacity, so deduct both, mirroring AbstractComputerBlockEntity.systemDiskFreeWeight (DISK_STORAGE +
+        // capacity, so deduct both, mirroring OsHost.systemDiskFreeWeight (stored items +
         // FILESYSTEM). Ignoring MEDIA_DATA let the player write files past the medium's real capacity.
         final long dataUsed = media.getOrDefault(
                         dev.jsc.jscomputronics.module.computing.ComputingModule.MEDIA_DATA.get(),
@@ -872,31 +1050,45 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             final java.util.List<DiskFilesPayload.WireFile> wire = new java.util.ArrayList<>();
             final String[] prefs = {"", ""};
+            // accent override (0=none), brightness, clock12h (0/1), taskbar centered (1) vs left (0), dark (0/1)
+            final int[] deskPrefs = {0, 100, 0, 1, 0};
             final java.util.List<String> programs = new java.util.ArrayList<>();
             final java.util.List<DesktopFilesPayload.WireIconCell> iconCells = new java.util.ArrayList<>();
             if (context.player() instanceof ServerPlayer player
                     && player.level().getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 final net.minecraft.world.item.ItemStack disk = computer.systemDisk();
                 final dev.jsc.jscomputronics.module.computing.os.FilesystemKind kind =
                         filesystemKindOf(computer);
                 prefs[0] = computer.console().wallpaper();
                 prefs[1] = computer.console().computerName();
-                // Installed programs that open as their own desktop window/menu (vs. the built-in apps).
-                if (computer.console() != null && computer.console().isInstalled(
-                        dev.jsc.jscomputronics.module.computing.program.Programs.NMS.toString())) {
-                    programs.add("nms");
+                deskPrefs[0] = computer.console().settings().accent();
+                deskPrefs[1] = computer.console().settings().brightness();
+                deskPrefs[2] = computer.console().settings().clock12h() ? 1 : 0;
+                deskPrefs[3] = computer.console().settings().taskbarCentered() ? 1 : 0;
+                deskPrefs[4] = computer.console().settings().darkMode() ? 1 : 0;
+                // Installed programs that open as their own desktop window (vs. the always-present built-in
+                // apps). Each is gated by the installed OS, hardware and host scope; the built-in apps are
+                // added on the client, so only installable desktop apps flow through this list.
+                for (final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec
+                        : dev.jsc.jscomputronics.module.computing.os.OsRegistry.programs()) {
+                    final dev.jsc.jscomputronics.module.computing.os.OsDef hostOs = computer.installedOs();
+                    if (spec.installable()
+                            && spec.kind() == dev.jsc.jscomputronics.module.computing.os.ProgramKind.APP
+                            && hostOs != null && spec.platforms().contains(hostOs.platform())
+                            && installedAndAllowed(computer, spec.id())) {
+                        programs.add(spec.id().getPath());
+                    }
                 }
-                if (computer instanceof CraftingComputerBlockEntity && computer.console() != null
-                        && computer.console().isInstalled(Programs.CRAFTING_MANAGER.toString())) {
-                    programs.add("crafting_manager");
-                }
-                // The desktop folder only exists on a hierarchical (desktop OS) disk.
+                // The desktop folder only exists on a hierarchical (desktop OS) disk; a POSIX kernel keeps it
+                // under the home directory, the DOS family under Users/Public.
                 if (!disk.isEmpty()
                         && kind == dev.jsc.jscomputronics.module.computing.os.FilesystemKind.HIERARCHICAL) {
-                    final String desktopDir =
-                            dev.jsc.jscomputronics.module.computing.os.fs.SystemLayout.DESKTOP_DIR;
+                    final dev.jsc.jscomputronics.module.computing.os.OsDef osDef = computer.installedOs();
+                    final String desktopDir = dev.jsc.jscomputronics.module.computing.os.fs.SystemLayout.desktopDirFor(
+                            osDef == null ? null : dev.jsc.jscomputronics.module.computing.os.OsRegistry.getKernel(
+                                    osDef.kernelId()));
                     for (final String d
                             : dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.listDirs(
                                     disk, desktopDir, kind)) {
@@ -931,7 +1123,14 @@ public final class ComputingPayloads {
                     computer.setChanged();
                 }
             }
-            context.reply(new DesktopFilesPayload(wire, prefs[0], prefs[1], programs, iconCells));
+            // The machine's open windows travel with the desktop listing, so the desktop that is opening
+            // restores them from the machine and not from a cache in this client.
+            context.reply(DesktopWindowsPayload.of(payload.hostPos(),
+                    context.player().level().getBlockEntity(payload.hostPos()) instanceof OsHost machine
+                            ? machine.openWindows() : java.util.List.of()));
+            context.reply(new DesktopFilesPayload(wire, prefs[0], prefs[1], programs, iconCells,
+                    new DesktopFilesPayload.Prefs(deskPrefs[0], deskPrefs[1], deskPrefs[2] != 0,
+                            deskPrefs[3] != 0, deskPrefs[4] != 0)));
         });
     }
 
@@ -941,13 +1140,95 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 computer.console().setWallpaper(payload.wallpaper());
                 computer.console().setComputerName(payload.computerName());
                 computer.setChanged();
             }
         });
+    }
+
+    private static void handleRequestSettings(final RequestSettingsPayload payload,
+                                              final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
+                PacketDistributor.sendToPlayer(player, buildSettingsSnapshot(computer, payload.hostPos()));
+            }
+        });
+    }
+
+    private static void handleSetSetting(final SetSettingPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer
+                    && computer instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host) {
+                // Route through the same setConfig the MC-DOS 'config' command uses, so both front-ends
+                // clamp and persist identically.
+                new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level)
+                        .setConfig(payload.key(), payload.value());
+                PacketDistributor.sendToPlayer(player, buildSettingsSnapshot(computer, payload.hostPos()));
+            }
+        });
+    }
+
+    private static void handleSettingsSnapshot(final SettingsSnapshotPayload payload,
+                                               final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            dev.jsc.jscomputronics.module.computing.client.os.SettingsApp.accept(payload);
+            dev.jsc.jscomputronics.module.computing.client.os.SystemMonitorApp.accept(payload);
+        });
+    }
+
+    /** Reads the full Settings snapshot (editable knobs + read-only specs, disks and programs) from a computer. */
+    private static SettingsSnapshotPayload buildSettingsSnapshot(
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
+            final BlockPos pos) {
+        final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState console = computer.console();
+        final dev.jsc.jscomputronics.module.computing.program.ComputerSettings st = console.settings();
+        final ItemStack sysDisk = computer.systemDisk();
+        final int netshare = dev.jsc.jscomputronics.module.computing.item.DiskItem.publicPermille(sysDisk);
+        final int cpuCount = computer.installedCpus();
+        final String cpuLabel = cpuCount + (cpuCount == 1 ? " CPU" : " CPUs");
+        final net.minecraft.resources.ResourceLocation osId = computer.installedOsId();
+        final String osLabel = osId == null ? "none" : osId.getPath();
+        final dev.jsc.jscomputronics.module.computing.os.OsDef os = computer.installedOs();
+        final String platform = os == null ? "-" : os.platform().label();
+        final List<String> installed = new ArrayList<>(console.installed());
+        final List<SettingsSnapshotPayload.DiskUse> disks = new ArrayList<>();
+        final long mbEq = dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
+        for (final ItemStack stack : computer.diskStacks()) {
+            if (!(stack.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem diskItem)) {
+                continue;
+            }
+            // Megabytes follow the disk's own era: what an item costs there is what its usage is worth.
+            final long mbPerItem = diskItem.spec().era().mbPerItem();
+            final long capMb = diskItem.spec().capacityMb();
+            final long storageUsed = dev.jsc.jscomputronics.module.computing.storage.DriveVolumes.usedWeight(stack);
+            final long fsUsed = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(stack);
+            final net.minecraft.resources.ResourceLocation dOsId =
+                    stack.get(dev.jsc.jscomputronics.module.computing.ComputingModule.SYSTEM_OS.get());
+            final dev.jsc.jscomputronics.module.computing.os.OsDef dOs =
+                    dOsId != null ? dev.jsc.jscomputronics.module.computing.os.OsRegistry.getOs(dOsId) : null;
+            final long osReserved = dOs != null ? dOs.footprintItemsOn(diskItem.spec().era()) * mbEq : 0L;
+            final long usedMb = (storageUsed + fsUsed + osReserved) * mbPerItem / mbEq;
+            disks.add(new SettingsSnapshotPayload.DiskUse(
+                    stack.getHoverName().getString(), capMb, usedMb, stack == sysDisk));
+        }
+        return new SettingsSnapshotPayload(pos, console.wallpaper(), console.computerName(),
+                st.accent(), st.clock12h(), st.guiScale(), st.brightness(),
+                String.valueOf(st.defaultSaveDrive()), st.removableAutoOpen(), st.themePreset(),
+                st.taskbarCentered(), st.darkMode(),
+                netshare, cpuLabel, computer.maxCpuMhz(),
+                (int) Math.min(Integer.MAX_VALUE, computer.ramBuffer()), computer.totalVramMb(),
+                osLabel, platform, installed, disks);
     }
 
     /** The last path segment (after the final {@code /}), or the whole path when it has no slash. */
@@ -962,8 +1243,8 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 computer.console().setIconCell(payload.iconKey(), payload.cell());
                 computer.setChanged();
             }
@@ -983,30 +1264,30 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 final net.minecraft.world.item.ItemStack sys = computer.systemDisk();
                 int slot = 0;
                 for (final net.minecraft.world.item.ItemStack stack : computer.diskStacks()) {
                     if (stack.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem diskItem) {
                         final long cap = diskItem.spec().capacityItems();
-                        final long storageW = stack.getOrDefault(
-                                dev.jsc.jscomputronics.module.computing.ComputingModule.DISK_STORAGE.get(),
-                                dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.EMPTY)
-                                .usedWeight();
-                        final long fsW = stack.getOrDefault(
-                                dev.jsc.jscomputronics.module.computing.ComputingModule.FILESYSTEM.get(),
-                                dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.EMPTY)
-                                .usedWeight();
+                        final long storageW =
+                                dev.jsc.jscomputronics.module.computing.storage.DriveVolumes.usedWeight(stack);
+                        final long fsW = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(stack);
                         final net.minecraft.resources.ResourceLocation osId =
                                 stack.get(dev.jsc.jscomputronics.module.computing.ComputingModule.SYSTEM_OS.get());
                         final dev.jsc.jscomputronics.module.computing.os.OsDef os =
                                 osId != null ? dev.jsc.jscomputronics.module.computing.os.OsRegistry.getOs(osId) : null;
-                        final long osItems = os != null ? os.footprintItems() : 0L;
+                        final long osItems = os != null ? os.footprintItemsOn(diskItem.spec().era()) : 0L;
                         final long mbEq = dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
-                        final long usedItems = (storageW + fsW) / mbEq + osItems;
+                        final long storeItems = storageW / mbEq;
+                        final long fileItems = fsW / mbEq;
+                        final long usedItems = storeItems + fileItems + osItems;
+                        // The three shares travel separately, so the disk can show where its space
+                        // actually went instead of one anonymous "used" number.
                         disks.add(new ThisPcPayload.WireDisk(slot, stack.getHoverName().getString(),
-                                cap, usedItems, stack == sys, osId != null ? osId.getPath() : ""));
+                                cap, usedItems, stack == sys, osId != null ? osId.getPath() : "",
+                                osItems, storeItems, fileItems));
                     }
                     slot++;
                 }
@@ -1014,20 +1295,185 @@ public final class ComputingPayloads {
                     if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
                             instanceof dev.jsc.jscomputronics.module.computing.os.media
                                     .MediaReaderBlockEntity reader) {
-                        final net.minecraft.world.item.ItemStack m = reader.mediaSlot().getStackInSlot(0);
-                        final dev.jsc.jscomputronics.module.computing.os.media.MediaKind kind = reader.insertedKind();
-                        final net.minecraft.resources.ResourceLocation pl = reader.insertedPayload();
-                        final boolean installable = kind
-                                == dev.jsc.jscomputronics.module.computing.os.media.MediaKind.PROGRAM_INSTALL
-                                && pl != null && !computer.console().isInstalled(pl.toString());
-                        media.add(new ThisPcPayload.WireMedia(endpoint, reader.driveType().name(),
-                                m.isEmpty() ? "" : m.getHoverName().getString(),
-                                kind != null ? kind.name() : "", pl != null ? pl.getPath() : "", installable));
+                        media.add(mediaRow(computer, payload.hostPos(), endpoint, reader));
                     }
                 }
                 installed.addAll(computer.console().installed());
+                context.reply(new ThisPcPayload(machineCard(level, computer, payload.hostPos()), disks, media, installed));
+                return;
             }
-            context.reply(new ThisPcPayload(disks, media, installed));
+            context.reply(new ThisPcPayload(ThisPcPayload.WireMachine.EMPTY, disks, media, installed));
+        });
+    }
+
+    /** One drive row for This PC: what is in the drive and, for an installer, what it would install. */
+    private static ThisPcPayload.WireMedia mediaRow(
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer, final net.minecraft.core.BlockPos host,
+            final long endpoint, final dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity reader) {
+        final net.minecraft.world.item.ItemStack m = reader.mediaSlot().getStackInSlot(0);
+        final dev.jsc.jscomputronics.module.computing.os.media.MediaKind kind = m.isEmpty() ? null : reader.insertedKind();
+        final net.minecraft.resources.ResourceLocation pl = m.isEmpty() ? null : reader.insertedPayload();
+        String payloadName = "";
+        int payloadYear = 0;
+        String packageId = "";
+        String needs = "";
+        boolean installable = false;
+        if (pl != null && kind == dev.jsc.jscomputronics.module.computing.os.media.MediaKind.PROGRAM_INSTALL) {
+            final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec =
+                    dev.jsc.jscomputronics.module.computing.os.OsRegistry.getProgram(pl);
+            installable = !computer.console().isInstalled(pl.toString());
+            if (spec != null) {
+                payloadName = spec.displayName();
+                payloadYear = dev.jsc.jscomputronics.module.computing.os.Branding.year(spec.era());
+                packageId = spec.commandName();
+                needs = joinPlain(dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip.programMinSpec(pl));
+            }
+        } else if (pl != null && kind == dev.jsc.jscomputronics.module.computing.os.media.MediaKind.OS_INSTALL) {
+            final dev.jsc.jscomputronics.module.computing.os.OsDef os =
+                    dev.jsc.jscomputronics.module.computing.os.OsRegistry.getOs(pl);
+            if (os != null) {
+                payloadName = os.displayName();
+                payloadYear = dev.jsc.jscomputronics.module.computing.os.Branding.osYear(os.displayName(), os.minEra());
+                packageId = os.id().getPath();
+                needs = joinPlain(dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip.osMinSpec(pl));
+            }
+        }
+        final long stored = kind == dev.jsc.jscomputronics.module.computing.os.media.MediaKind.DATA
+                ? reader.insertedData().total() : 0L;
+        final net.minecraft.core.BlockPos at = net.minecraft.core.BlockPos.of(endpoint);
+        final int blocksAway = Math.abs(at.getX() - host.getX()) + Math.abs(at.getY() - host.getY())
+                + Math.abs(at.getZ() - host.getZ());
+        return new ThisPcPayload.WireMedia(endpoint, reader.driveType().name(),
+                m.isEmpty() ? "" : m.getHoverName().getString(), kind != null ? kind.name() : "",
+                pl != null ? pl.getPath() : "", installable, payloadName, payloadYear, packageId, needs,
+                stored, blocksAway);
+    }
+
+    /** The machine card for This PC: what this computer is, in one block of text the client draws. */
+    private static ThisPcPayload.WireMachine machineCard(
+            final ServerLevel level, final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
+            final net.minecraft.core.BlockPos host) {
+        final String kind;
+        if (computer instanceof MainframeBlockEntity) {
+            kind = "Mainframe";
+        } else if (computer instanceof dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity) {
+            kind = "Crafting Computer";
+        } else if (computer instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity) {
+            kind = "Cluster Management Computer";
+        } else if (computer instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity) {
+            kind = "Server";
+        } else {
+            kind = "Personal Computer";
+        }
+        final dev.jsc.jscomputronics.module.computing.os.OsDef os = computer.installedOs();
+        final String osLabel = os == null ? "" : os.displayName();
+        final int osYear = os == null ? 0
+                : dev.jsc.jscomputronics.module.computing.os.Branding.osYear(os.displayName(), os.minEra());
+        final NetworkUuid network = computer.networkUuid();
+        // Hardware by what is seated, read off the parts themselves so every computer type answers
+        // the same way whatever its slot layout.
+        String board = "";
+        String cpu = "";
+        int cpus = 0;
+        int gpus = 0;
+        String psu = "";
+        boolean valid = false;
+        if (computer instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity be) {
+            final net.neoforged.neoforge.items.ItemStackHandler hardware = be.getHardware();
+            for (int i = 0; i < hardware.getSlots(); i++) {
+                final net.minecraft.world.item.ItemStack part = hardware.getStackInSlot(i);
+                if (part.isEmpty()) {
+                    continue;
+                }
+                if (part.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.MotherboardItem) {
+                    board = part.getHoverName().getString();
+                } else if (part.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.CpuItem) {
+                    cpus++;
+                    if (cpu.isEmpty()) {
+                        cpu = part.getHoverName().getString();
+                    }
+                } else if (part.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.GpuItem) {
+                    gpus++;
+                } else if (part.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.PsuItem) {
+                    psu = part.getHoverName().getString();
+                }
+            }
+            valid = be.buildValid();
+        }
+        final int mhz = computer.maxCpuMhz();
+        if (!cpu.isEmpty() && mhz > 0) {
+            cpu = cpu + " · " + (mhz >= 1000 ? String.format(java.util.Locale.ROOT, "%.1f GHz", mhz / 1000.0) : mhz + " MHz");
+        }
+        // Linked peripherals by name, each kind counted once.
+        final java.util.Map<String, Integer> peripherals = new java.util.LinkedHashMap<>();
+        for (final long endpoint : computer.linkedEndpoints()) {
+            final net.minecraft.world.level.block.entity.BlockEntity be =
+                    level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint));
+            final String label;
+            if (be instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity reader) {
+                label = switch (reader.driveType()) {
+                    case FLOPPY_DRIVE -> "Floppy Drive";
+                    case CD_DRIVE -> "CD Drive";
+                    case DVD_DRIVE -> "DVD Drive";
+                    case DOCK_STATION -> "Dock Station";
+                };
+            } else if (be instanceof dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity) {
+                label = "Monitor";
+            } else if (be != null) {
+                label = be.getBlockState().getBlock().getName().getString();
+            } else {
+                continue;
+            }
+            peripherals.merge(label, 1, Integer::sum);
+        }
+        final StringBuilder joined = new StringBuilder();
+        for (final java.util.Map.Entry<String, Integer> e : peripherals.entrySet()) {
+            if (joined.length() > 0) {
+                joined.append(", ");
+            }
+            if (e.getValue() > 1) {
+                joined.append(e.getValue()).append(" × ");
+            }
+            joined.append(e.getKey());
+        }
+        return new ThisPcPayload.WireMachine(computer.customName(), kind,
+                dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip.eraLabel(computer.displayEra()),
+                osLabel, osYear, network == null ? "" : networkLabel(network), board, cpu, cpus,
+                (int) Math.min(Integer.MAX_VALUE, computer.ramBuffer()), computer.totalVramMb(), gpus, psu,
+                valid, joined.toString());
+    }
+
+    private static String joinPlain(final java.util.List<net.minecraft.network.chat.Component> lines) {
+        final StringBuilder sb = new StringBuilder();
+        for (final net.minecraft.network.chat.Component line : lines) {
+            final String text = line.getString().trim();
+            if (text.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(" · ");
+            }
+            sb.append(text);
+        }
+        return sb.length() > 190 ? sb.substring(0, 190) : sb.toString();
+    }
+
+    private static void handleEjectMedia(final EjectMediaPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.os.OsHost computer
+                    && computer.linkedEndpoints().contains(payload.readerPos())
+                    && level.getBlockEntity(net.minecraft.core.BlockPos.of(payload.readerPos()))
+                            instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity reader) {
+                final net.minecraft.world.item.ItemStack ejected = reader.ejectMedia();
+                if (!ejected.isEmpty() && !player.addItem(ejected)) {
+                    final net.minecraft.core.BlockPos at = net.minecraft.core.BlockPos.of(payload.readerPos());
+                    net.minecraft.world.Containers.dropItemStack(level, at.getX() + 0.5, at.getY() + 1.0,
+                            at.getZ() + 0.5, ejected);
+                }
+            }
         });
     }
 
@@ -1042,8 +1488,8 @@ public final class ComputingPayloads {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
                     || !(level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer)) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer)) {
                 return;
             }
             // The drive must be a media reader currently linked to this computer.
@@ -1062,20 +1508,35 @@ public final class ComputingPayloads {
             if (pl == null || computer.installedOs() == null) {
                 return;
             }
-            // OS-capability gate: e.g. the NMS only installs on a full desktop OS (Panes), not MC-DOS/MC-NET.
-            if (!dev.jsc.jscomputronics.module.computing.os.OsRegistry.canHostRun(computer.installedOsId(), pl)) {
+            // Program install gate: the OS platform must be supported and the hardware must meet the
+            // program's CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
+            if (!dev.jsc.jscomputronics.module.computing.os.OsRegistry.canInstallProgram(
+                    computer.installedOsId(), pl,
+                    computer.maxCpuMhz(), computer.totalVramMb(), computer.systemDiskFreeMb())) {
                 player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                        "This program needs a more capable OS (a graphical desktop) than this computer runs."),
+                        "This program's platform or hardware requirements are not met by this computer."),
                         false);
                 return;
             }
-            // Hardware gate: the Crafting Manager installs only on a Crafting Computer. Other programs
-            // (NMS, IQL Engine) carry no machine restriction.
-            if (pl.equals(Programs.CRAFTING_MANAGER)
-                    && !(computer instanceof CraftingComputerBlockEntity)) {
+            // Host gate: a program bound to a specific computer (the Crafting Manager to a Crafting Computer,
+            // the Mainframe services to a Mainframe) installs only there. Driven by the descriptor's host
+            // scope, not a per-program check.
+            final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec =
+                    dev.jsc.jscomputronics.module.computing.os.OsRegistry.getProgram(pl);
+            if (!hostScopeAllows(spec, computer)) {
                 player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                        "The Crafting Manager only installs on a Crafting Computer."), false);
+                        hostScopeMessage(spec)), false);
                 return;
+            }
+            // The Automation Engine is a Mainframe service: installing its floppy on the Mainframe turns the
+            // job agent on.
+            if (pl.equals(Programs.AUTOMATION_ENGINE) && computer instanceof MainframeBlockEntity mainframe) {
+                mainframe.installAutomationEngine();
+            }
+            // The Mirror is a Mainframe service too: its floppy turns the package repository on.
+            if (pl.equals(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", "mirror"))
+                    && computer instanceof MainframeBlockEntity mainframe) {
+                mainframe.installMirror();
             }
             if (computer.console().install(pl.toString())) {
                 computer.setChanged();
@@ -1088,21 +1549,44 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             final java.util.List<DesktopShellOutputPayload.WireLine> wire = new java.util.ArrayList<>();
             boolean clear = false;
+            String prompt = "C:\\>";
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
                             instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host) {
                 final var computer =
                         new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
-                final var shell =
-                        dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(CLI_WIDTH);
+                final var shell = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.shellFor(
+                        computer, CLI_WIDTH);
                 final var response = shell.run(payload.line(), computer);
                 clear = response.clearScreen();
                 for (final var cliLine : response.lines()) {
                     wire.add(new DesktopShellOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
                 }
+                prompt = computer.prompt();
+                // The reboot verbs work from the desktop's terminal window too: the desktop closes and the
+                // monitor either replays the POST (plain reboot) or enters the firmware setup.
+                final BlockPos monitorPos = player.containerMenu
+                        instanceof dev.jsc.jscomputronics.module.computing.menu.DesktopMenu desktop
+                        ? desktop.monitorPos() : null;
+                if (monitorPos != null && computer.firmwareRebootRequested()) {
+                    player.closeContainer();
+                    dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openFirmware(
+                            player, level, monitorPos, payload.hostPos());
+                    return;
+                }
+                if (monitorPos != null && computer.rebootRequested()) {
+                    if (level.getBlockEntity(payload.hostPos()) instanceof dev.jsc.jscomputronics.module
+                            .computing.os.OsHost be) {
+                        be.setNeedsPost(true);
+                    }
+                    player.closeContainer();
+                    dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openPost(
+                            player, level, monitorPos, payload.hostPos());
+                    return;
+                }
             }
-            context.reply(new DesktopShellOutputPayload(clear, wire));
+            context.reply(new DesktopShellOutputPayload(clear, prompt, wire));
         });
     }
 
@@ -1123,8 +1607,8 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 final String path = payload.path();
                 final boolean media = path.startsWith("media:");
                 final net.minecraft.world.item.ItemStack vol =
@@ -1149,12 +1633,13 @@ public final class ComputingPayloads {
                     final long oldWeight = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem
                             .read(vol, real)
                             .map(c -> dev.jsc.jscomputronics.module.computing.os.fs.FsPaths.sizeMbEq(
-                                    c.getBytes(java.nio.charset.StandardCharsets.UTF_8).length))
+                                    c.getBytes(java.nio.charset.StandardCharsets.UTF_8).length,
+                                    dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.eraOf(vol)))
                             .orElse(0L);
                     final long free = media ? mediaFreeWeight(vol) + oldWeight
                             : computer.systemDiskFreeWeight() + oldWeight;
                     final var result = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.write(
-                            vol, real, type, payload.content(), free, kind);
+                            vol, real, type, payload.content(), free, kind, level.getGameTime());
                     switch (result) {
                         case OK -> {
                             if (media) {
@@ -1185,8 +1670,8 @@ public final class ComputingPayloads {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
                     || !(level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer)) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer)) {
                 return;
             }
             final String path = payload.path();
@@ -1214,7 +1699,7 @@ public final class ComputingPayloads {
 
     /** Resolves the filesystem kind of the computer's installed OS, or NONE when absent. */
     private static dev.jsc.jscomputronics.module.computing.os.FilesystemKind filesystemKindOf(
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer) {
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
         final dev.jsc.jscomputronics.module.computing.os.OsDef os = computer.installedOs();
         if (os == null) {
             return dev.jsc.jscomputronics.module.computing.os.FilesystemKind.NONE;
@@ -1227,23 +1712,19 @@ public final class ComputingPayloads {
 
     /**
      * Computes the available free weight on the given disk, mirroring the formula used in
-     * {@link dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity#installOs}:
+     * {@link dev.jsc.jscomputronics.module.computing.os.OsHost#installOs}:
      * capacity minus storage used minus filesystem used minus the OS footprint.
      */
     private static long computeDiskFreeWeight(
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
             final net.minecraft.world.item.ItemStack disk) {
         if (!(disk.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem diskItem)) {
             return 0L;
         }
         final long capacityWeight = diskItem.spec().capacityItems()
                 * dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
-        final long storageUsed = disk.getOrDefault(
-                dev.jsc.jscomputronics.module.computing.ComputingModule.DISK_STORAGE.get(),
-                dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.EMPTY).usedWeight();
-        final long fsUsed = disk.getOrDefault(
-                dev.jsc.jscomputronics.module.computing.ComputingModule.FILESYSTEM.get(),
-                dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.EMPTY).usedWeight();
+        final long storageUsed = dev.jsc.jscomputronics.module.computing.storage.DriveVolumes.usedWeight(disk);
+        final long fsUsed = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(disk);
         final long osReserved = computer.reservedByOs()
                 * dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
         return Math.max(0L, capacityWeight - storageUsed - fsUsed - osReserved);
@@ -1254,8 +1735,8 @@ public final class ComputingPayloads {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
                     || !(level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer)) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer)) {
                 return;
             }
             final String path = payload.path();
@@ -1279,13 +1760,77 @@ public final class ComputingPayloads {
         });
     }
 
+    /**
+     * Copies a file within a volume or across to another one; the source stays. A projected file has no
+     * bytes and is refused by the read; a name already taken gets a numbered copy rather than overwriting.
+     */
+    private static void handleCopyFile(final CopyFilePayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.os.OsHost computer)) {
+                return;
+            }
+            final String src = payload.src();
+            final String destDir = payload.destDir();
+            final boolean srcMedia = src.startsWith("media:");
+            final boolean dstMedia = destDir.startsWith("media:");
+            final net.minecraft.world.item.ItemStack srcVol =
+                    srcMedia ? mediaStackFor(level, computer, src) : computer.systemDisk();
+            final net.minecraft.world.item.ItemStack dstVol =
+                    dstMedia ? mediaStackFor(level, computer, destDir) : computer.systemDisk();
+            if (srcVol.isEmpty() || dstVol.isEmpty()) {
+                return;
+            }
+            final String realSrc = srcMedia ? mediaSubPath(src) : src;
+            final String realDstDir = dstMedia ? mediaSubPath(destDir) : destDir;
+            final var read = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.read(srcVol, realSrc);
+            if (read.isEmpty()) {
+                return;
+            }
+            final String name = realSrc.contains("/") ? realSrc.substring(realSrc.lastIndexOf('/') + 1) : realSrc;
+            final int dot = name.lastIndexOf('.');
+            final String stem = dot > 0 ? name.substring(0, dot) : name;
+            final String ext = dot >= 0 && dot < name.length() - 1
+                    ? name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT) : "";
+            final dev.jsc.jscomputronics.module.computing.os.fs.FileType type =
+                    dev.jsc.jscomputronics.module.computing.os.fs.FileType.fromExtension(ext)
+                            .orElse(dev.jsc.jscomputronics.module.computing.os.fs.FileType.TXT);
+            final dev.jsc.jscomputronics.module.computing.os.FilesystemKind dstKind = dstMedia
+                    ? dev.jsc.jscomputronics.module.computing.os.FilesystemKind.HIERARCHICAL
+                    : filesystemKindOf(computer);
+            // "name - Copy.ext", then "name - Copy (2).ext", the way a desktop names a duplicate.
+            String candidate = name;
+            final String suffix = ext.isEmpty() ? "" : "." + ext;
+            for (int n = 1; n < 100; n++) {
+                final String path = realDstDir.isEmpty() ? candidate : realDstDir + "/" + candidate;
+                if (!dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.exists(dstVol, path)) {
+                    break;
+                }
+                candidate = stem + (n == 1 ? " - Copy" : " - Copy (" + n + ")") + suffix;
+            }
+            final String destPath = realDstDir.isEmpty() ? candidate : realDstDir + "/" + candidate;
+            final long free = dstMedia ? mediaFreeWeight(dstVol) : computer.systemDiskFreeWeight();
+            if (dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.write(
+                    dstVol, destPath, type, read.get(), free, dstKind, level.getGameTime())
+                    == dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.WriteResult.OK) {
+                if (dstMedia) {
+                    commitMedia(level, computer, destDir);
+                } else {
+                    computer.setChanged();
+                }
+            }
+        });
+    }
+
     private static void handleMoveFile(final MoveFilePayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
                     || !(level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer)) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer)) {
                 return;
             }
             final String src = payload.srcPath();
@@ -1336,7 +1881,7 @@ public final class ComputingPayloads {
             final String destPath = realDstDir.isEmpty() ? name : realDstDir + "/" + name;
             final long free = dstMedia ? mediaFreeWeight(dstVol) : computer.systemDiskFreeWeight();
             if (dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.write(
-                    dstVol, destPath, type, read.get(), free, dstKind)
+                    dstVol, destPath, type, read.get(), free, dstKind, level.getGameTime())
                     == dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.WriteResult.OK) {
                 dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.delete(srcVol, realSrc);
                 if (srcMedia) {
@@ -1366,7 +1911,7 @@ public final class ComputingPayloads {
      *   <li>Insert as much as the medium's free capacity allows into its {@code MEDIA_DATA} snapshot; whatever
      *       does not fit is returned to the computer's storage.</li>
      * </ol>
-     * The source {@code .dat} vanishes on its own once the key leaves {@code DISK_STORAGE}, and the item then
+     * The source {@code .dat} vanishes on its own once the key leaves the disk's volume, and the item then
      * shows up under the medium's projection — no second item-movement path, no byte copy.
      */
     private static void handleMediumTransfer(final MediumTransferPayload payload, final IPayloadContext context) {
@@ -1377,8 +1922,8 @@ public final class ComputingPayloads {
             }
             final var host = niHost(player, level, payload.hostPos(), payload.monitorPos());
             if (host == null
-                    || !(host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                            .AbstractComputerBlockEntity computer)) {
+                    || !(host instanceof dev.jsc.jscomputronics.module.computing.os
+                            .OsHost computer)) {
                 return;
             }
             // The destination must be a DATA medium in a linked drive; anything else cannot hold a snapshot.
@@ -1449,7 +1994,7 @@ public final class ComputingPayloads {
 
     /**
      * Resolves a {@code .dat} path back to the {@link StorageKey} it projects, by re-running the deterministic
-     * {@link dev.jsc.jscomputronics.module.computing.os.fs.StorageProjection} over the disk's {@code DISK_STORAGE}
+     * {@link dev.jsc.jscomputronics.module.computing.os.fs.StorageProjection} over the disk's storage volume
      * and matching the requested path. Returns {@code null} when no projected entry matches (e.g. a stale path).
      */
     @org.jetbrains.annotations.Nullable
@@ -1457,9 +2002,8 @@ public final class ComputingPayloads {
         if (disk.isEmpty()) {
             return null;
         }
-        final dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents storage = disk.getOrDefault(
-                dev.jsc.jscomputronics.module.computing.ComputingModule.DISK_STORAGE.get(),
-                dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.EMPTY);
+        final dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents storage =
+                dev.jsc.jscomputronics.module.computing.storage.DriveVolumes.contents(disk);
         // The projection emits one entry per key in iteration order, with the same path each time; pair each
         // emitted path with the storage key at the same position to invert the path back to its key.
         final java.util.List<dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.FileEntry> entries =
@@ -1489,8 +2033,8 @@ public final class ComputingPayloads {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
                     || !(level.getBlockEntity(payload.host())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer)) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer)) {
                 return;
             }
             final String key = payload.volumeKey();
@@ -1530,15 +2074,22 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 final String path = payload.path();
                 final boolean media = path.startsWith("media:");
                 final net.minecraft.world.item.ItemStack vol =
                         media ? mediaStackFor(level, computer, path) : computer.systemDisk();
                 if (!vol.isEmpty()) {
-                    final var read = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem
-                            .read(vol, media ? mediaSubPath(path) : path);
+                    // A projected file on an installer (its readme, manifest or autorun) has no stored
+                    // bytes to read: its text is generated from the medium's stamp.
+                    final java.util.Optional<String> projected = media
+                            ? dev.jsc.jscomputronics.module.computing.os.media.InstallerProjection.text(
+                                    vol, mediaSubPath(path))
+                            : java.util.Optional.empty();
+                    final var read = projected.isPresent() ? projected
+                            : dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem
+                                    .read(vol, media ? mediaSubPath(path) : path);
                     if (read.isPresent()) {
                         content = read.get();
                         exists = true;
@@ -1560,8 +2111,8 @@ public final class ComputingPayloads {
             if (!(context.player() instanceof ServerPlayer player)
                     || !(player.level() instanceof ServerLevel level)
                     || !(level.getBlockEntity(payload.hostPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer)) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer)) {
                 return;
             }
             final String oldPath = payload.oldPath();
@@ -1592,6 +2143,9 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             if (context.player().containerMenu instanceof ComputerTerminalMenu menu) {
                 menu.setCraftCatalog(payload.entries());
+            } else {
+                // The desktop Craft Planner has no container menu; route the catalogue to it.
+                dev.jsc.jscomputronics.module.computing.client.os.CraftPlannerApp.acceptCatalog(payload.entries());
             }
         });
     }
@@ -1904,61 +2458,6 @@ public final class ComputingPayloads {
         });
     }
 
-    private static void handleDatacenterSnapshot(final DatacenterSnapshotPayload payload,
-                                                 final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof DatacenterStationMenu menu) {
-                menu.setSnapshot(payload);
-            }
-        });
-    }
-
-    private static void handleDatacenterAction(final DatacenterStationActionPayload payload,
-                                               final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)
-                    || !(player.containerMenu instanceof DatacenterStationMenu menu)
-                    || !menu.stationPos().equals(payload.stationPos())
-                    || !(player.level() instanceof ServerLevel level)
-                    || !(level.getBlockEntity(payload.stationPos()) instanceof DatacenterStationBlockEntity station)) {
-                return;
-            }
-            switch (payload.action()) {
-                case DatacenterStationActionPayload.ACTION_NEXT_SECTION -> station.bindNext();
-                case DatacenterStationActionPayload.ACTION_CYCLE_BALANCE -> station.cycleLoadBalanceMode();
-                case DatacenterStationActionPayload.ACTION_INSERT_CURSOR -> depositCursor(menu, station, level, false);
-                case DatacenterStationActionPayload.ACTION_INSERT_CURSOR_ONE -> depositCursor(menu, station, level, true);
-                default -> {
-                    // ACTION_REFRESH: just re-send the snapshot below.
-                }
-            }
-            sendDatacenterSnapshot(player, level, station);
-        });
-    }
-
-    private static void depositCursor(final DatacenterStationMenu menu, final DatacenterStationBlockEntity station,
-                                      final ServerLevel level, final boolean single) {
-        final ItemStack cursor = menu.getCarried();
-        if (cursor.isEmpty()) {
-            return;
-        }
-        final List<NodeUuid> servers = station.sectionServers();
-        final List<ServerStore> stores = sectionStores(level, servers);
-        if (stores.isEmpty()) {
-            return;
-        }
-        final StorageKey key = StorageKey.of(cursor);
-        final long want = single ? 1L : cursor.getCount();
-        final long stored = LoadBalancer.insert(stores, key, want, station.loadBalanceMode());
-        if (stored > 0L) {
-            cursor.shrink((int) stored);
-            menu.setCarried(cursor.isEmpty() ? ItemStack.EMPTY : cursor);
-            // The cursor changed outside a normal slot click; without a broadcast the client keeps
-            // showing the old stack (a ghost cursor).
-            menu.broadcastChanges();
-        }
-    }
-
     private static List<ServerStore> sectionStores(final ServerLevel level, final List<NodeUuid> servers) {
         final NetworkSystem system = NetworkSystem.get(level);
         final List<ServerStore> stores = new ArrayList<>();
@@ -1972,123 +2471,150 @@ public final class ComputingPayloads {
         return stores;
     }
 
-    public static void sendDatacenterSnapshot(final ServerPlayer player, final ServerLevel level,
-                                              final DatacenterStationBlockEntity station) {
-        if (player == null || player.isRemoved()) {
-            return;
-        }
-        final List<NodeUuid> servers = station.sectionServers();
-        final List<ServerStore> stores = sectionStores(level, servers);
-
-        final Map<StorageKey, Long> totals = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
-                .ofServers(level, servers).query();
-        final List<NetworkItemEntry> items = new ArrayList<>(Math.min(totals.size(), DatacenterSnapshotPayload.MAX_ITEMS));
-        totals.entrySet().stream().limit(DatacenterSnapshotPayload.MAX_ITEMS)
-                .forEach(e -> items.add(new NetworkItemEntry(e.getKey(), e.getValue())));
-
-        // The "giant computer" view: the section's Servers summed into one machine — storage,
-        // orchestration capacity (CPU) and RAM buffer — plus a per-Server line with its real name.
-        long used = 0L;
-        long total = 0L;
-        long cpu = 0L;
-        long ram = 0L;
-        final NetworkSystem sys = NetworkSystem.get(level);
-        final List<DatacenterSnapshotPayload.ServerLine> lines = new ArrayList<>();
-        for (int i = 0; i < servers.size() && i < DatacenterSnapshotPayload.MAX_SERVERS; i++) {
-            final NodeUuid node = servers.get(i);
-            final ServerStore store = i < stores.size() ? stores.get(i) : null;
-            final long u = store == null ? 0L : store.usedWeight();
-            final long t = store == null ? 0L : store.capacityWeight();
-            used += u;
-            total += t;
-            String name = "srv-" + node.asString().substring(0, 4);
-            final var loc = sys.locationOf(node);
-            if (loc.isPresent()
-                    && level.getBlockEntity(BlockPos.of(loc.get().rackPos())) instanceof ServerRackBlockEntity rack) {
-                final ItemStack stack = rack.getServers().getStackInSlot(loc.get().slot());
-                final var build = dev.jsc.jscomputronics.module.computing.item.ServerItem.build(stack);
-                if (build != null) {
-                    cpu += build.totalCapacity();
-                    ram += build.ramBuffer();
-                }
-                final String custom = dev.jsc.jscomputronics.module.computing.item.ServerItem.customName(stack);
-                if (!custom.isEmpty()) {
-                    name = custom;
-                }
+    private static void handleRackBayPower(final RackBayPowerPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.rackPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                                    .ServerRackBlockEntity rack
+                    // Only a player actually standing at the open rack GUI may flip its switches.
+                    && player.containerMenu
+                            instanceof dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu) {
+                rack.toggleBayPower(payload.slot());
             }
-            lines.add(new DatacenterSnapshotPayload.ServerLine(name, u, t));
-        }
-
-        // Operations in flight on the network's Mainframe (the orchestrator the section runs under).
-        int activeOps = 0;
-        final BlockPos mfPosForOps = station.mainframePos();
-        if (mfPosForOps != null && level.getBlockEntity(mfPosForOps) instanceof MainframeBlockEntity mf) {
-            activeOps = mf.activeOperationRecords().size();
-        }
-
-        // MOVE destinations: the network's computers with local storage (PCs + the Mainframe).
-        final List<DatacenterSnapshotPayload.DestEntry> dests = new ArrayList<>();
-        final NetworkUuid net = station.network();
-        if (net != null) {
-            final NetworkSystem system = NetworkSystem.get(level);
-            for (final var pc : system.personalComputersOf(net)) {
-                if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe
-                        && pcBe.localStorageCapacity() > 0L) {
-                    final String name = pcBe.customName().isEmpty()
-                            ? "PC-" + pc.nodeUuid().asString().substring(0, 4) : pcBe.customName();
-                    dests.add(new DatacenterSnapshotPayload.DestEntry(pc.pos(), name));
-                }
-            }
-            system.mainframePositionOf(net).ifPresent(mfPos -> {
-                if (level.getBlockEntity(BlockPos.of(mfPos))
-                        instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host
-                        && host.localStorageCapacity() > 0L) {
-                    dests.add(new DatacenterSnapshotPayload.DestEntry(mfPos, "Mainframe"));
-                }
-            });
-        }
-
-        PacketDistributor.sendToPlayer(player, new DatacenterSnapshotPayload(
-                station.sectionLabel(), servers.size(), used, total,
-                station.loadBalanceMode().ordinal(), station.availableSections().size(),
-                cpu, ram, activeOps, items, lines, dests));
+        });
     }
 
-    private static void handleDatacenterSelect(final DatacenterSelectPayload payload, final IPayloadContext context) {
+    /**
+     * The machine an open ssh session points at, or null when the line must run locally. {@code ssh}
+     * and {@code exit} always run on the local terminal: one opens the session, the other closes it.
+     * A session whose machine went away (broken, unpowered) is dropped, so the shell falls back home
+     * instead of talking to a ghost.
+     */
+    @org.jetbrains.annotations.Nullable
+    private static dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost sshTargetOf(
+            final dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host,
+            final ServerLevel level, final String line) {
+        final var console = host.console();
+        if (console == null || console.sshTarget() == null) {
+            return null;
+        }
+        final String verb = line.trim().split("\\s+", 2)[0].toLowerCase(java.util.Locale.ROOT);
+        if (verb.equals("ssh") || verb.equals("exit") || verb.equals("logout")) {
+            return null;
+        }
+        final var target = level.getBlockEntity(BlockPos.of(console.sshTarget()));
+        if (target instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost remote
+                && remote.computerRunning()) {
+            return remote;
+        }
+        console.setSshTarget(null);
+        return null;
+    }
+
+    private static void handleRemoteControl(final RemoteControlPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (payload.quantity() <= 0L) {
-                return; // never dispatch a zero/negative pull (a broken or hostile client)
-            }
             if (!(context.player() instanceof ServerPlayer player)
-                    || !(player.containerMenu instanceof DatacenterStationMenu menu)
-                    || !menu.stationPos().equals(payload.stationPos())
                     || !(player.level() instanceof ServerLevel level)
-                    || !(level.getBlockEntity(payload.stationPos()) instanceof DatacenterStationBlockEntity station)) {
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal
+                                    .ComputerTerminalHost host)) {
                 return;
             }
-            final BlockPos mainframePos = station.mainframePos();
-            if (mainframePos == null
-                    || !(level.getBlockEntity(mainframePos) instanceof MainframeBlockEntity mainframe)
-                    || !(level.getBlockEntity(BlockPos.of(payload.destPos()))
-                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost dest)) {
+            final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level);
+            if (payload.action() == RemoteControlPayload.ACTION_LIST) {
+                final List<RemoteHostsPayload.Entry> entries = new ArrayList<>();
+                cli.remoteMachines().forEach((hostname, machine) -> {
+                    if (entries.size() >= RemoteHostsPayload.MAX_HOSTS) {
+                        return;
+                    }
+                    final var remote = new dev.jsc.jscomputronics.module.computing.program
+                            .ServerCliComputer(
+                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) machine,
+                            level);
+                    final var os = machine instanceof dev.jsc.jscomputronics.module.computing.os.OsHost h
+                            ? h.installedOs() : null;
+                    entries.add(new RemoteHostsPayload.Entry(machine.getBlockPos().asLong(), hostname,
+                            remote.type(), os == null ? "" : os.displayName(), remote.running()));
+                });
+                PacketDistributor.sendToPlayer(player, new RemoteHostsPayload(entries));
                 return;
             }
-            // The destination must live on the STATION'S network — the client only ever picks from the
-            // snapshot's list, so any other position is a spoofed packet reaching into a foreign network.
-            final NetworkUuid stationNet = station.network();
-            if (stationNet == null || !stationNet.equals(dest.networkUuid())) {
+            // Take over: put the chosen machine's own session on this monitor, exactly as walking to
+            // it would. Reachability is re-checked here so a stale window cannot reach off-network.
+            final BlockPos target = BlockPos.of(payload.targetPos());
+            final boolean reachable = cli.remoteMachines().values().stream()
+                    .anyMatch(machine -> machine.getBlockPos().equals(target));
+            if (!reachable) {
                 return;
             }
-            final java.util.Set<NodeUuid> sources = new java.util.HashSet<>(station.sectionServers());
-            if (sources.isEmpty()) {
+            // Mark the screen as showing the remote machine BEFORE opening it: every menu validates
+            // through the monitor, and without this the new session is torn down on its first tick
+            // for showing a computer the cable does not link.
+            if (level.getBlockEntity(payload.monitorPos())
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity monitor) {
+                monitor.setRemoteSession(target);
+            }
+            player.closeContainer();
+            dev.jsc.jscomputronics.module.computing.block.MonitorBlock.bootOrPost(
+                    player, level, payload.monitorPos(), target);
+        });
+    }
+
+    private static void handleRemoteHosts(final RemoteHostsPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.RemoteControlApp.accept(payload));
+    }
+
+    private static void handleOpenKvm(final OpenKvmPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.block.KvmScreenOpener.Holder.open(payload));
+    }
+
+    private static void handleKvmSelect(final KvmSelectPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.rackPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                                    .ServerRackBlockEntity rack)) {
                 return;
             }
-            final var op = mainframe.submitNetworkMove(payload.key(), payload.quantity(),
-                    dest.localStorage(), "datacenter", sources);
-            if (op != null) {
-                op.onSettle(() -> sendDatacenterSnapshot(player, level, station));
+            // The switch has to be there for the monitor to address a bay at all.
+            if (rack.computerSlots().size() > 1 && !rack.hasKvmSwitch()) {
+                return;
             }
-            sendDatacenterSnapshot(player, level, station);
+            rack.setActiveChannel(payload.slot());
+            // With the channel set, the rack answers as that machine: start its session.
+            dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openSelectedChannel(
+                    player, level, payload.monitorPos(), payload.rackPos());
+        });
+    }
+
+    private static void handleMachinePower(final MachinePowerPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.os.OsHost computer)) {
+                return;
+            }
+            // The screen closes either way: a machine that just powered off has nothing to show, and
+            // a restart comes back through the power-on self-test like any other cold start.
+            player.closeContainer();
+            switch (payload.action()) {
+                case MachinePowerPayload.ACTION_SHUTDOWN -> computer.setPowered(false);
+                case MachinePowerPayload.ACTION_RESTART -> {
+                    computer.setPowered(false);
+                    computer.setPowered(true);
+                    dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openPost(
+                            player, level, payload.monitorPos(), payload.hostPos());
+                }
+                default -> {
+                    // Logging off leaves the machine running; the screen is already closed.
+                }
+            }
         });
     }
 
@@ -2097,7 +2623,7 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && hasOpenAssemblyFor(player, payload.pcPos())
                     && player.level().getBlockEntity(payload.pcPos())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
                 computer.setCustomName(payload.name());
             }
         });
@@ -2110,6 +2636,8 @@ public final class ComputingPayloads {
         if (player.containerMenu instanceof dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu menu) {
             return menu.computerPos().equals(pos);
         }
+        // A supercomputer node is a rack computer now: it is renamed through the Server assembly GUI
+        // like any other server, so it has no assembly menu of its own to check here.
         return false;
     }
 
@@ -2164,15 +2692,7 @@ public final class ComputingPayloads {
     // Network-operation dispatch — the ONLY way storage is touched. Every request
 
     private static void returnToPlayer(final ServerPlayer player, final ItemStack stack) {
-        if (stack.isEmpty()) {
-            return;
-        }
-        if (player.isRemoved()) {
-            net.minecraft.world.Containers.dropItemStack(player.level(),
-                    player.getX(), player.getY(), player.getZ(), stack);
-        } else {
-            player.getInventory().placeItemBackInInventory(stack);
-        }
+        DataHandoff.returnToPlayer(player, stack);
     }
 
     public static void dispatchQuery(final ServerPlayer player, final PersonalComputerBlockEntity pc) {
@@ -2491,146 +3011,21 @@ public final class ComputingPayloads {
             if (!fromCursor && (idx < menu.storageSlotCount() || idx >= menu.slots.size())) {
                 return;
             }
-            final net.minecraft.world.inventory.Slot slot = fromCursor ? null : menu.getSlot(idx);
-            final ItemStack source = fromCursor ? menu.getCarried() : slot.getItem();
-            if (source.isEmpty()) {
+            final DataHandoff.Source source = fromCursor
+                    ? DataHandoff.cursor(player) : DataHandoff.slot(menu.getSlot(idx), player);
+            // A right-click hands over ONE: one item, or what a held container holds — and a held empty
+            // container over a fluid or chemical entry fills from it instead. Left click and shift-click
+            // deposit the stack as items, the way a chest takes them.
+            final boolean one = idx == TerminalInsertPayload.CURSOR_ONE;
+            final Runnable refresh = () -> sendSnapshot(player, level, net);
+            if (one && payload.entry().isPresent() && DataContainers.canTake(source.get(), payload.entry().get())) {
+                DataHandoff.fillFromNetwork(mainframe, level, net, player, source, payload.entry().get(),
+                        "terminal", refresh);
                 return;
             }
-            // A fluid container (a filled bucket, etc.) deposits its FLUID into the network and leaves
-            // the emptied container — fluid is data too. One container per click.
-            if (depositFluidContainer(mainframe, menu, slot, fromCursor, source, player, level, net)) {
-                return;
-            }
-            // Take the items off the source now ("in flight"); the Operation returns overflow.
-            final ItemStack inFlight;
-            if (idx == TerminalInsertPayload.CURSOR_ONE) {
-                inFlight = source.copyWithCount(1);
-                source.shrink(1);
-                menu.setCarried(source.isEmpty() ? ItemStack.EMPTY : source);
-            } else if (fromCursor) {
-                inFlight = source.copy();
-                menu.setCarried(ItemStack.EMPTY);
-            } else {
-                inFlight = source.copy();
-                slot.set(ItemStack.EMPTY);
-            }
-            menu.broadcastChanges();
-            // Push the held items into the network over ticks; return whatever does not fit (with its
-            // original components) to the player when the Operation settles.
-            final var op = mainframe.submitNetworkInsert(StorageKey.of(inFlight), inFlight.getCount(), "terminal");
-            if (op == null) {
-                // Error path (no live dispatcher): hand the items straight back.
-                player.getInventory().placeItemBackInInventory(inFlight);
-                return;
-            }
-            op.onSettle(() -> {
-                final long leftover = op.leftover();
-                if (leftover > 0L) {
-                    returnToPlayer(player, inFlight.copyWithCount((int) leftover));
-                }
-                sendSnapshot(player, level, net);
-            });
+            DataHandoff.intoNetwork(mainframe, level, net, player, source, one ? 1 : source.get().getCount(),
+                    one, "terminal", refresh);
         });
-    }
-
-    private static boolean depositFluidContainer(final MainframeBlockEntity mainframe,
-            final ComputerTerminalMenu menu, final net.minecraft.world.inventory.Slot slot,
-            final boolean fromCursor, final ItemStack source, final ServerPlayer player,
-            final ServerLevel level, final NetworkUuid network) {
-        final var handler = FluidUtil.getFluidHandler(source.copyWithCount(1));
-        if (handler.isEmpty()) {
-            return false;
-        }
-        final FluidStack drained = handler.get().drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.EXECUTE);
-        if (drained.isEmpty()) {
-            return false; // an empty container is not a fluid to deposit — try the item path
-        }
-        // A fluid container is atomic: only deposit when the network has room for the whole amount, so
-        long freeWeight = 0L;
-        for (final var room : mainframe.networkIndex().freeSpace(level, network)) {
-            freeWeight += room.quantity();
-            if (freeWeight >= drained.getAmount()) {
-                break;
-            }
-        }
-        if (freeWeight < drained.getAmount()) {
-            return true;
-        }
-        final var op = mainframe.submitNetworkInsert(StorageKey.of(drained), drained.getAmount(), "terminal");
-        if (op == null) {
-            return true; // no dispatcher: do nothing, keep the full container in hand
-        }
-        // Remove one container from the source and hand back the emptied one.
-        source.shrink(1);
-        if (fromCursor) {
-            menu.setCarried(source.isEmpty() ? ItemStack.EMPTY : source);
-        } else {
-            slot.set(source.isEmpty() ? ItemStack.EMPTY : source);
-        }
-        menu.broadcastChanges();
-        returnToPlayer(player, handler.get().getContainer());
-        op.onSettle(() -> {
-            final long leftover = op.leftover();
-            if (leftover > 0L) {
-                // The network could not hold it all; hand back a filled container of the remainder.
-                final ItemStack refilled = FluidUtil.getFilledBucket(
-                        drained.copyWithAmount((int) Math.min(leftover, Integer.MAX_VALUE)));
-                if (!refilled.isEmpty()) {
-                    returnToPlayer(player, refilled);
-                }
-            }
-            sendSnapshot(player, level, network);
-        });
-        return true;
-    }
-
-    /**
-     * The Network Interactor's hotbar-source equivalent of {@link #depositFluidContainer}: drains a fluid
-     * container from a player hotbar slot into the network and returns the emptied container. No container
-     * menu (the desktop is a plain Screen), so it edits the player inventory slot directly. Returns
-     * {@code true} when the source IS a fluid container (handled here, do not fall through to the item path).
-     */
-    private static boolean niDepositFluidContainer(final MainframeBlockEntity mainframe,
-            final ServerPlayer player, final int slot, final ItemStack source,
-            final ServerLevel level, final NetworkUuid network) {
-        final var handler = FluidUtil.getFluidHandler(source.copyWithCount(1));
-        if (handler.isEmpty()) {
-            return false;
-        }
-        final FluidStack drained = handler.get().drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.EXECUTE);
-        if (drained.isEmpty()) {
-            return false; // an empty container is not a fluid to deposit — try the item path
-        }
-        // A fluid container is atomic: only deposit when the network has room for the whole amount.
-        long freeWeight = 0L;
-        for (final var room : mainframe.networkIndex().freeSpace(level, network)) {
-            freeWeight += room.quantity();
-            if (freeWeight >= drained.getAmount()) {
-                break;
-            }
-        }
-        if (freeWeight < drained.getAmount()) {
-            return true; // no room for the whole fluid amount; keep the full container in the slot
-        }
-        final var op = mainframe.submitNetworkInsert(StorageKey.of(drained), drained.getAmount(), "ni");
-        if (op == null) {
-            return true; // no dispatcher: keep the full container, never lose it
-        }
-        // Remove one container from the hotbar slot and hand back the emptied one.
-        source.shrink(1);
-        player.getInventory().setItem(slot, source.isEmpty() ? ItemStack.EMPTY : source);
-        returnToPlayer(player, handler.get().getContainer());
-        op.onSettle(() -> {
-            final long leftover = op.leftover();
-            if (leftover > 0L) {
-                final ItemStack refilled = FluidUtil.getFilledBucket(
-                        drained.copyWithAmount((int) Math.min(leftover, Integer.MAX_VALUE)));
-                if (!refilled.isEmpty()) {
-                    returnToPlayer(player, refilled);
-                }
-            }
-        });
-        return true;
     }
 
     private static void handleRequestBreakdown(final RequestServerBreakdownPayload payload,
@@ -2723,8 +3118,8 @@ public final class ComputingPayloads {
             final var op = dest.move()
                     ? mainframe.submitNetworkMove(payload.key(), qty, dest.handler(), dest.label(), sources)
                     : mainframe.submitNetworkSelect(payload.key(), qty, dest.handler(), dest.label(), sources);
-            if (op != null && host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                    .AbstractComputerBlockEntity computer) {
+            if (op != null && host instanceof dev.jsc.jscomputronics.module.computing.os
+                    .OsHost computer) {
                 op.onSettle(() -> sendNetworkInteractor(player, level, computer));
             }
         });
@@ -2804,6 +3199,8 @@ public final class ComputingPayloads {
             } else {
                 dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp
                         .acceptOps(payload.operations());
+                dev.jsc.jscomputronics.module.computing.client.os.NetworkManagerApp
+                        .acceptOpsLog(payload.operations());
             }
         });
     }
@@ -2822,6 +3219,8 @@ public final class ComputingPayloads {
                 menu.setActiveOps(payload.operations());
             } else {
                 dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp
+                        .acceptActiveOps(payload.operations(), payload.scSlotsUsed(), payload.scSlotsTotal());
+                dev.jsc.jscomputronics.module.computing.client.os.NetworkManagerApp
                         .acceptActiveOps(payload.operations(), payload.scSlotsUsed(), payload.scSlotsTotal());
             }
         });
@@ -2911,61 +3310,665 @@ public final class ComputingPayloads {
         return nodes;
     }
 
-    private static void handleRequestNodes(final RequestNetworkNodesPayload payload, final IPayloadContext context) {
+    private static void handleRequestNetworkManager(final RequestNetworkManagerPayload payload,
+                                                    final IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player
-                    && player.containerMenu instanceof MainframeMenu menu
-                    && menu.blockPos().equals(payload.mainframePos())
                     && player.level() instanceof ServerLevel level
-                    && level.getBlockEntity(payload.mainframePos()) instanceof MainframeBlockEntity mf) {
-                PacketDistributor.sendToPlayer(player, collectNodes(level, mf));
+                    && level.getBlockEntity(payload.hostPos()) instanceof MainframeBlockEntity mf) {
+                final NetworkUuid net = mf.networkUuid();
+                final String netId = net != null ? ShortId.of(net.asString()) : "";
+                PacketDistributor.sendToPlayer(player,
+                        new NetworkManagerPayload(payload.hostPos(), netId, collectNodes(level, mf),
+                                collectHardware(level, mf)));
             }
         });
     }
 
-    private static void handleNodes(final NetworkNodesPayload payload, final IPayloadContext context) {
+    private static void handleNetworkManager(final NetworkManagerPayload payload, final IPayloadContext context) {
         context.enqueueWork(() ->
-                dev.jsc.jscomputronics.module.computing.client.NetworkOverviewScreen.open(payload));
+                dev.jsc.jscomputronics.module.computing.client.os.NetworkManagerApp.accept(payload));
     }
 
-    private static NetworkNodesPayload collectNodes(final ServerLevel level, final MainframeBlockEntity mf) {
+    private static List<NetworkNodeInfo> collectNodes(final ServerLevel level, final MainframeBlockEntity mf) {
         final UnitFormatter fmt = UnitFormatter.forCurrentLocale();
         final List<NetworkNodeInfo> nodes = new ArrayList<>();
         final NetworkUuid net = mf.networkUuid();
 
-        nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_MAINFRAME,
-                ShortId.of(mf.nodeUuid().asString()),
-                fmt.compact(mf.capacity(), Unit.IT_PER_TICK),
-                net != null));
+        nodes.add(computerNodeInfo(NetworkNodeInfo.KIND_MAINFRAME, mf, mf.nodeUuid().asString(),
+                fmt.compact(mf.capacity(), Unit.IT_PER_TICK)));
 
         if (net != null) {
             final NetworkSystem system = NetworkSystem.get(level);
             for (final ServerNode server : system.serversOf(net)) {
-                if (nodes.size() >= NetworkNodesPayload.MAX_NODES) {
+                if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
                     break;
                 }
-                nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_SERVER,
-                        ShortId.of(server.nodeUuid().asString()),
-                        fmt.compact(server.storageMB(), Unit.MB), true));
+                nodes.add(serverNodeInfo(level, system, server, fmt));
             }
             for (final SubframeNode subframe : system.subframesOf(net)) {
-                if (nodes.size() >= NetworkNodesPayload.MAX_NODES) {
+                if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
                     break;
                 }
                 nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_SUBFRAME,
-                        ShortId.of(subframe.nodeUuid().asString()),
-                        fmt.compact(subframe.contributedCapacity(), Unit.IT_PER_TICK), true));
+                        ShortId.of(subframe.nodeUuid().asString()), "",
+                        fmt.compact(subframe.contributedCapacity(), Unit.IT_PER_TICK), true,
+                        0, 0, 0L, 0L, NetworkNodeInfo.SHARE_UNKNOWN, ""));
             }
             for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(net)) {
-                if (nodes.size() >= NetworkNodesPayload.MAX_NODES) {
+                if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
                     break;
                 }
-                nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_PC,
-                        ShortId.of(pc.nodeUuid().asString()),
-                        fmt.compact(pc.capacity(), Unit.IT_PER_TICK), true));
+                // A Cluster Management Computer takes a PC's place on the network (same layout, same role
+                // in the topology), but the overview names it for what it is.
+                final int kind = level.getBlockEntity(BlockPos.of(pc.pos()))
+                        instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity
+                        ? NetworkNodeInfo.KIND_CLUSTER_MANAGEMENT : NetworkNodeInfo.KIND_PC;
+                nodes.add(resolveComputerNode(level, kind, pc.nodeUuid().asString(),
+                        pc.pos(), fmt.compact(pc.capacity(), Unit.IT_PER_TICK)));
+            }
+            for (final NetworkSystem.CraftingComputerNode cc : system.craftingComputersOf(net)) {
+                if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
+                    break;
+                }
+                nodes.add(resolveComputerNode(level, NetworkNodeInfo.KIND_CRAFTING, cc.nodeUuid().asString(),
+                        cc.pos(), fmt.compact(cc.capacity(), Unit.IT_PER_TICK)));
+            }
+            for (final NetworkSystem.SupercomputerNode sc : system.supercomputersOf(net)) {
+                if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
+                    break;
+                }
+                // A supercomputer is a whole cluster bridged by an HBW interface (its pos is that interface,
+                // not a single computer). It is on the network whenever its uplink is; it is online — able
+                // to take crafts — only with at least one rated node.
+                final String scName = level.getBlockEntity(BlockPos.of(sc.pos()))
+                        instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity hub
+                        ? hub.customName() : "";
+                nodes.add(new NetworkNodeInfo(NetworkNodeInfo.KIND_SUPERCOMPUTER,
+                        ShortId.of(sc.nodeUuid().asString()), scName, sc.parallelCrafts() + " crafts",
+                        sc.parallelCrafts() > 0, 0, 0, 0L, 0L, NetworkNodeInfo.SHARE_UNKNOWN, ""));
             }
         }
-        return new NetworkNodesPayload(net != null ? ShortId.of(net.asString()) : "", nodes);
+        return nodes;
+    }
+
+    /** Builds an enriched node row from a resolved computer block entity (name, specs, OS, storage share). */
+    private static NetworkNodeInfo computerNodeInfo(final int kind,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost c,
+            final String uuid, final String detail) {
+        final int share = dev.jsc.jscomputronics.module.computing.item.DiskItem.publicPermille(c.systemDisk());
+        // Total capacity is only summed for the Mainframe; a generic computer reports its free space, which is
+        // the "available storage" the tooltip shows, with total left as 0 (unknown).
+        return new NetworkNodeInfo(kind, ShortId.of(uuid), c.customName(), detail, c.isRunning(),
+                c.maxCpuMhz(), c.totalVramMb(), c.systemDiskFreeMb(), 0L,
+                share, osLabelOf(c.installedOsId()));
+    }
+
+    /** Resolves the computer at {@code posLong}; falls back to a bare row if it is not loaded as a computer. */
+    private static NetworkNodeInfo resolveComputerNode(final ServerLevel level, final int kind, final String uuid,
+                                                       final long posLong, final String detail) {
+        if (level.getBlockEntity(BlockPos.of(posLong))
+                instanceof dev.jsc.jscomputronics.module.computing.os.OsHost c) {
+            return computerNodeInfo(kind, c, uuid, detail);
+        }
+        return new NetworkNodeInfo(kind, ShortId.of(uuid), "", detail, false,
+                0, 0, 0L, 0L, NetworkNodeInfo.SHARE_UNKNOWN, "");
+    }
+
+    /** A server lives as a disk in a rack, so it carries a name and storage but no processor/OS of its own. */
+    private static NetworkNodeInfo serverNodeInfo(final ServerLevel level, final NetworkSystem system,
+                                                  final ServerNode server, final UnitFormatter fmt) {
+        final long total = server.storageItems();
+        final long free = system.locationOf(server.nodeUuid())
+                .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
+                        instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
+                        ? rack.getServerStorage(loc.slot()).free() : 0L)
+                .orElse(0L);
+        return new NetworkNodeInfo(NetworkNodeInfo.KIND_SERVER, ShortId.of(server.nodeUuid().asString()),
+                serverLabel(level, server.nodeUuid()), String.format(java.util.Locale.ROOT, "%,d items", total), true,
+                0, 0, free, total, NetworkNodeInfo.SHARE_UNKNOWN, "");
+    }
+
+    /** A short, friendly label for an installed OS id, or {@code none} when no OS is installed. */
+    private static String osLabelOf(final net.minecraft.resources.ResourceLocation osId) {
+        if (osId == null) {
+            return "none";
+        }
+        return switch (osId.getPath()) {
+            case "frames_95" -> "Frames 95";
+            case "frames_xp" -> "Frames XP";
+            case "frames_11" -> "Frames 11";
+            case "mc_dos" -> "MC-DOS";
+            case "mc_net" -> "MC-NET";
+            default -> osId.getPath();
+        };
+    }
+
+    /** Network-wide hardware totals for the Network Manager's Hardware tab. */
+    private static NetworkManagerPayload.Hardware collectHardware(final ServerLevel level,
+                                                                  final MainframeBlockEntity mf) {
+        long storage = mf.localStorageCapacity();
+        final NetworkUuid net = mf.networkUuid();
+        if (net != null) {
+            final NetworkSystem system = NetworkSystem.get(level);
+            for (final ServerNode server : system.serversOf(net)) {
+                storage += server.storageItems();
+            }
+        }
+        return new NetworkManagerPayload.Hardware(
+                mf.orchestrationCapacity(), mf.parallelQueues(), mf.computerRamBuffer(), storage);
+    }
+
+    private static void handleRequestStorageInsights(final RequestStorageInsightsPayload payload,
+                                                     final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level) {
+                final var host = niHost(player, level, payload.host(), payload.monitorPos());
+                if (host != null && host.networkUuid() != null) {
+                    PacketDistributor.sendToPlayer(player, collectStorageInsights(level, host.networkUuid()));
+                }
+            }
+        });
+    }
+
+    private static void handleStorageInsights(final StorageInsightsPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.StorageInsightsApp.accept(payload));
+    }
+
+    private static void handleRequestCraftPlanner(final RequestCraftPlannerPayload payload,
+                                                  final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level) {
+                final var host = niHost(player, level, payload.host(), payload.monitorPos());
+                if (host == null || host.networkUuid() == null) {
+                    return;
+                }
+                if (payload.target().isEmpty()) {
+                    dispatchCraftCatalog(player, host.networkUuid(), level);
+                } else {
+                    PacketDistributor.sendToPlayer(player, collectCraftPlanner(level, host.networkUuid(),
+                            StorageKey.of(payload.target()), Math.max(1, payload.quantity())));
+                }
+            }
+        });
+    }
+
+    private static void handleCraftPlanner(final CraftPlannerPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.CraftPlannerApp.accept(payload));
+    }
+
+    /** Runs the recursive planner for the Craft Planner: feasibility, the ordered stages, and the raw bill. */
+    private static CraftPlannerPayload collectCraftPlanner(final ServerLevel level, final NetworkUuid net,
+                                                           final StorageKey key, final long quantity) {
+        final MainframeBlockEntity mf = resolveMainframe(level, net);
+        if (mf == null) {
+            return new CraftPlannerPayload(key.stack(1), quantity, false, false, 0L, 0L,
+                    List.of(), List.of(), List.of());
+        }
+        final var patterns = mf.networkPatterns();
+        final var machines = mf.networkProcessingPatterns();
+        final Map<StorageKey, Long> stock = mf.networkIndex().snapshot();
+        final var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
+                key, quantity, patterns, machines, stock);
+        if (plan.steps().isEmpty()) {
+            return new CraftPlannerPayload(key.stack(1), quantity, false, false, 0L, 0L,
+                    List.of(), List.of(), List.of());
+        }
+        final long maxFeasible = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.maxFeasible(
+                key, quantity, patterns, machines, stock);
+        final List<CraftPlannerPayload.Stage> stages = new ArrayList<>();
+        for (final var step : plan.steps()) {
+            if (stages.size() >= CraftPlannerPayload.MAX_STAGES) {
+                break;
+            }
+            stages.add(new CraftPlannerPayload.Stage(step.resultName(), step.isMachine(), step.runs(),
+                    step.produced()));
+        }
+        final List<CraftPlanPayload.Row> ingredients = new ArrayList<>();
+        for (final Map.Entry<StorageKey, Long> e : plan.rawConsumption().entrySet()) {
+            if (ingredients.size() >= CraftPlannerPayload.MAX_INGREDIENTS) {
+                break;
+            }
+            ingredients.add(new CraftPlanPayload.Row(e.getKey().stack(1), e.getValue(),
+                    stock.getOrDefault(e.getKey(), 0L)));
+        }
+        final List<CraftPlannerPayload.TreeNode> tree = new ArrayList<>();
+        treeWalk(key, Math.max(1, quantity), 0, patterns, machines, tree, new java.util.HashSet<>());
+        return new CraftPlannerPayload(key.stack(1), quantity, true, plan.feasible(), plan.produced(),
+                maxFeasible, stages, ingredients, tree);
+    }
+
+    /** Recursively expands one recipe path (crafting preferred, then a machine) into a pre-order tree. */
+    private static void treeWalk(final StorageKey key, final long need, final int depth,
+            final List<dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern> patterns,
+            final List<dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern> machines,
+            final List<CraftPlannerPayload.TreeNode> out, final java.util.Set<StorageKey> visiting) {
+        if (out.size() >= CraftPlannerPayload.MAX_TREE || depth > 6) {
+            return;
+        }
+        Map<StorageKey, Long> inputs = null;
+        long perRun = 1;
+        for (final var cp : patterns) {
+            if (StorageKey.of(cp.result()).equals(key)) {
+                inputs = cp.ingredientTotals();
+                perRun = Math.max(1, cp.result().getCount());
+                break;
+            }
+        }
+        if (inputs == null) {
+            for (final var pp : machines) {
+                final var o = pp.primaryOutput();
+                if (o != null && o.key().equals(key)) {
+                    final Map<StorageKey, Long> merged = new java.util.LinkedHashMap<>();
+                    for (final var pi : pp.inputs()) {
+                        merged.merge(pi.key(), pi.amount(), Long::sum);
+                    }
+                    inputs = merged;
+                    perRun = Math.max(1, o.amount());
+                    break;
+                }
+            }
+        }
+        final boolean craftable = inputs != null;
+        out.add(new CraftPlannerPayload.TreeNode(depth, key.stack(1), need, craftable));
+        if (!craftable || !visiting.add(key)) {
+            return;
+        }
+        final long runs = Math.max(1, (need + perRun - 1) / perRun);
+        for (final Map.Entry<StorageKey, Long> e : inputs.entrySet()) {
+            treeWalk(e.getKey(), e.getValue() * runs, depth + 1, patterns, machines, out, visiting);
+        }
+        visiting.remove(key);
+    }
+
+    // --- Automation Manager: the job list, engine status, create, and pause/resume/delete ------------
+
+    private static void handleRequestAutomation(final RequestAutomationPayload payload,
+                                                final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level) {
+                final var host = niHost(player, level, payload.host(), payload.monitorPos());
+                if (host != null && host.networkUuid() != null) {
+                    PacketDistributor.sendToPlayer(player,
+                            buildAutomation(resolveMainframe(level, host.networkUuid())));
+                }
+            }
+        });
+    }
+
+    private static void handleAutomation(final AutomationPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.AutomationManagerApp.accept(payload));
+    }
+
+    private static AutomationPayload buildAutomation(final MainframeBlockEntity mf) {
+        if (mf == null) {
+            return new AutomationPayload(false, "no Mainframe", List.of(), List.of());
+        }
+        final boolean online = mf.isAutomationEngineActive() || mf.isIqlEngineActive();
+        final String label = mf.isAutomationEngineInstalled() ? "Automation Engine"
+                : mf.isIqlEngineInstalled() ? "IQL Engine" : "none";
+        final List<AutomationPayload.JobRow> rows = new ArrayList<>();
+        for (final var job : mf.iqlCatalog().ofType(
+                dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.ObjectType.JOB)) {
+            if (rows.size() >= AutomationPayload.MAX_JOBS) {
+                break;
+            }
+            rows.add(new AutomationPayload.JobRow(job.name(), inferJobType(job.body(), job.triggerKind()),
+                    triggerSummary(job.triggerKind(), job.triggerSpec()), mf.isJobPaused(job.name())));
+        }
+        // The .iql scripts saved on the Mainframe's system disk, so an IQL-Script job can pick one.
+        final List<String> files = new ArrayList<>();
+        final ItemStack sysDisk = mf.systemDisk();
+        if (!sysDisk.isEmpty()) {
+            for (final DiskFilesystem.FileEntry entry
+                    : DiskFilesystem.list(sysDisk, "", filesystemKindOf(mf))) {
+                if (entry.type() == FileType.IQL && files.size() < AutomationPayload.MAX_FILES) {
+                    files.add(entry.path());
+                }
+            }
+        }
+        return new AutomationPayload(online, label, rows, files);
+    }
+
+    private static String inferJobType(final String body,
+            final dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.TriggerKind kind) {
+        final String b = body.trim().toUpperCase(java.util.Locale.ROOT);
+        if (b.startsWith("MOVE")) {
+            return "Periodic Move";
+        }
+        if (b.startsWith("CRAFT")) {
+            return kind == dev.jsc.jscomputronics.module.computing.program.iql
+                    .IqlDefinition.TriggerKind.WHEN ? "Keep Stock" : "Batch Craft";
+        }
+        return "Custom";
+    }
+
+    private static String triggerSummary(
+            final dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.TriggerKind kind,
+            final String spec) {
+        return switch (kind) {
+            case EVERY -> "every " + spec;
+            case WHEN -> spec;
+            default -> "manual";
+        };
+    }
+
+    private static void handleCreateAutomationJob(final CreateAutomationJobPayload payload,
+                                                  final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            final var host = niHost(player, level, payload.host(), payload.monitorPos());
+            if (host == null || host.networkUuid() == null) {
+                return;
+            }
+            final MainframeBlockEntity mf = resolveMainframe(level, host.networkUuid());
+            if (mf == null) {
+                return;
+            }
+            final var def = compileJob(player, mf, payload);
+            if (def != null) {
+                mf.iqlCatalog().put(
+                        dev.jsc.jscomputronics.module.computing.program.iql.IqlSavedObject.from(def));
+                mf.markIqlCatalogChanged();
+                PacketDistributor.sendToPlayer(player, buildAutomation(mf));
+            }
+        });
+    }
+
+    private static dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition compileJob(
+            final ServerPlayer player, final MainframeBlockEntity mf, final CreateAutomationJobPayload p) {
+        final String name = p.name().trim();
+        if (name.isEmpty()) {
+            jobError(player, "Give the job a name.");
+            return null;
+        }
+        final String item = p.item().trim();
+        final long amount = Math.max(1, p.amount());
+        final var type = dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.ObjectType.JOB;
+        final var every = dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.TriggerKind.EVERY;
+        final var when = dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.TriggerKind.WHEN;
+        switch (p.jobType()) {
+            case CreateAutomationJobPayload.TYPE_KEEP_STOCK -> {
+                if (item.isEmpty()) {
+                    jobError(player, "Keep Stock needs an item.");
+                    return null;
+                }
+                return dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.create(
+                        type, name, "CRAFT " + amount + " " + item, when, "qty(" + item + ") < " + amount);
+            }
+            case CreateAutomationJobPayload.TYPE_BATCH_CRAFT -> {
+                if (item.isEmpty() || !validInterval(p.interval())) {
+                    jobError(player, "Batch Craft needs an item and a valid interval (e.g. 30s, 5m).");
+                    return null;
+                }
+                return dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.create(
+                        type, name, "CRAFT " + amount + " " + item, every, p.interval().trim());
+            }
+            case CreateAutomationJobPayload.TYPE_PERIODIC_MOVE -> {
+                final String from = p.from().trim();
+                final String to = p.to().trim();
+                if (from.isEmpty() || to.isEmpty() || !validInterval(p.interval())) {
+                    jobError(player, "Periodic Move needs FROM, TO, and a valid interval (e.g. 30s).");
+                    return null;
+                }
+                final String what = item.isEmpty() ? "*" : amount + " " + item;
+                return dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.create(
+                        type, name, "MOVE " + what + " FROM " + from + " TO " + to, every, p.interval().trim());
+            }
+            case CreateAutomationJobPayload.TYPE_IQL_SCRIPT -> {
+                // The chosen .iql filename rides in the item field; its content becomes the job body.
+                if (item.isEmpty() || !validInterval(p.interval())) {
+                    jobError(player, "An IQL Script job needs a .iql file and a valid interval (e.g. 30s).");
+                    return null;
+                }
+                final ItemStack sysDisk = mf.systemDisk();
+                final var content = sysDisk.isEmpty() ? java.util.Optional.<String>empty()
+                        : DiskFilesystem.read(sysDisk, item);
+                if (content.isEmpty() || content.get().isBlank()) {
+                    jobError(player, "Script not found on the Mainframe disk: " + item);
+                    return null;
+                }
+                return dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.create(
+                        type, name, content.get(), every, p.interval().trim());
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    private static boolean validInterval(final String spec) {
+        try {
+            return dev.jsc.jscomputronics.module.computing.program.iql.IqlDuration.toTicks(spec.trim()) > 0;
+        } catch (final RuntimeException e) {
+            return false;
+        }
+    }
+
+    private static void jobError(final ServerPlayer player, final String message) {
+        player.displayClientMessage(net.minecraft.network.chat.Component.literal(message), false);
+    }
+
+    private static void handleJobAction(final JobActionPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            final var host = niHost(player, level, payload.host(), payload.monitorPos());
+            if (host == null || host.networkUuid() == null) {
+                return;
+            }
+            final MainframeBlockEntity mf = resolveMainframe(level, host.networkUuid());
+            if (mf == null) {
+                return;
+            }
+            switch (payload.action()) {
+                case JobActionPayload.ACTION_PAUSE -> mf.pauseJob(payload.name());
+                case JobActionPayload.ACTION_RESUME -> mf.restartJob(payload.name());
+                case JobActionPayload.ACTION_DELETE -> {
+                    mf.iqlCatalog().remove(
+                            dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.ObjectType.JOB,
+                            payload.name());
+                    mf.markIqlCatalogChanged();
+                }
+                default -> { }
+            }
+            PacketDistributor.sendToPlayer(player, buildAutomation(mf));
+        });
+    }
+
+    /** Builds the Storage Insights dashboard: totals, the biggest and smallest types, and per-server usage. */
+    private static StorageInsightsPayload collectStorageInsights(final ServerLevel level, final NetworkUuid net) {
+        final Map<StorageKey, Long> totals =
+                dev.jsc.jscomputronics.module.computing.operation.NetworkStorage.of(level, net).query();
+        long totalItems = 0;
+        for (final long v : totals.values()) {
+            totalItems += v;
+        }
+        final List<Map.Entry<StorageKey, Long>> sorted = new ArrayList<>(totals.entrySet());
+        sorted.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
+        final List<NetworkItemEntry> top = new ArrayList<>();
+        for (int i = 0; i < sorted.size() && i < StorageInsightsPayload.MAX_TOP; i++) {
+            top.add(new NetworkItemEntry(sorted.get(i).getKey(), sorted.get(i).getValue()));
+        }
+        final List<NetworkItemEntry> low = new ArrayList<>();
+        for (int i = sorted.size() - 1; i >= 0 && low.size() < StorageInsightsPayload.MAX_LOW; i--) {
+            if (sorted.get(i).getValue() > 0) {
+                low.add(new NetworkItemEntry(sorted.get(i).getKey(), sorted.get(i).getValue()));
+            }
+        }
+        final NetworkSystem system = NetworkSystem.get(level);
+        final List<NetworkItemEntry.StorageShare> servers = new ArrayList<>();
+        int serverCount = 0;
+        for (final ServerNode server : system.serversOf(net)) {
+            serverCount++;
+            if (servers.size() >= StorageInsightsPayload.MAX_SERVERS) {
+                continue;
+            }
+            final long used = system.locationOf(server.nodeUuid())
+                    .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
+                            ? rack.getServerStorage(loc.slot()).used() : 0L)
+                    .orElse(0L);
+            servers.add(new NetworkItemEntry.StorageShare(serverLabel(level, server.nodeUuid()), used));
+        }
+        return new StorageInsightsPayload(totalItems, totals.size(), serverCount, top, low, servers);
+    }
+
+    /** Whether {@code progId} is installed on the computer AND runnable on its current OS (version + specs). */
+    private static boolean installedAndAllowed(
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
+            final net.minecraft.resources.ResourceLocation progId) {
+        return computer.console() != null
+                && computer.console().isInstalled(progId.toString())
+                && hostScopeAllows(dev.jsc.jscomputronics.module.computing.os.OsRegistry.getProgram(progId),
+                        computer)
+                && dev.jsc.jscomputronics.module.computing.os.OsRegistry.canRunProgram(
+                        computer.installedOsId(), progId, computer.maxCpuMhz(), computer.totalVramMb());
+    }
+
+    /** Whether a program's host scope permits it on this computer (a null spec places no restriction). */
+    private static boolean hostScopeAllows(
+            final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
+        if (spec == null) {
+            return true;
+        }
+        return switch (spec.hostScope()) {
+            case ANY -> true;
+            case MAINFRAME -> computer
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+            case CRAFTING_COMPUTER -> computer
+                    instanceof CraftingComputerBlockEntity;
+            // A rack answers as the machine it is showing, so scoping to SERVER means "this session
+            // is a rack server", which is exactly where the headless server services belong.
+            case SERVER -> computer
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
+            case CLUSTER_MANAGEMENT_COMPUTER -> computer
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity;
+        };
+    }
+
+    /** The player-facing reason a program's host scope rejected this computer. */
+    private static String hostScopeMessage(final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec) {
+        if (spec == null) {
+            return "This program cannot install on this computer.";
+        }
+        return switch (spec.hostScope()) {
+            case MAINFRAME -> "The " + spec.displayName() + " only installs on a Mainframe.";
+            case CRAFTING_COMPUTER -> "The " + spec.displayName() + " only installs on a Crafting Computer.";
+            case SERVER -> "The " + spec.displayName() + " only installs on a server in a rack.";
+            case CLUSTER_MANAGEMENT_COMPUTER -> "The " + spec.displayName()
+                    + " only installs on a Cluster Management Computer.";
+            default -> "This program cannot install on this computer.";
+        };
+    }
+
+    private static void handleRequestItemDetail(final RequestItemDetailPayload payload,
+                                                final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && !payload.item().isEmpty()) {
+                final var host = niHost(player, level, payload.host(), payload.monitorPos());
+                if (host != null && host.networkUuid() != null) {
+                    PacketDistributor.sendToPlayer(player,
+                            collectItemDetail(level, host.networkUuid(), StorageKey.of(payload.item())));
+                }
+            }
+        });
+    }
+
+    private static void handleItemDetail(final ItemDetailPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.StorageInsightsApp.acceptDetail(payload));
+    }
+
+    /** One item's detail: the network total, where it is stored, what it makes, and which buses filter it. */
+    private static ItemDetailPayload collectItemDetail(final ServerLevel level, final NetworkUuid network,
+                                                       final StorageKey key) {
+        final NetworkSystem system = NetworkSystem.get(level);
+        final long total = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage.of(level, network)
+                .query().getOrDefault(key, 0L);
+
+        // Where it is stored: per server that holds any.
+        final List<NetworkItemEntry.StorageShare> stored = new ArrayList<>();
+        for (final ServerNode server : system.serversOf(network)) {
+            if (stored.size() >= ItemDetailPayload.MAX_STORED) {
+                break;
+            }
+            final long held = system.locationOf(server.nodeUuid())
+                    .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
+                            ? rack.getServerStorage(loc.slot()).count(key) : 0L)
+                    .orElse(0L);
+            if (held > 0) {
+                stored.add(new NetworkItemEntry.StorageShare(serverLabel(level, server.nodeUuid()), held));
+            }
+        }
+
+        // What it makes: the products of any pattern that consumes it as an ingredient.
+        final List<net.minecraft.world.item.ItemStack> uses = new ArrayList<>();
+        final java.util.Set<StorageKey> seen = new java.util.HashSet<>();
+        final MainframeBlockEntity mf = resolveMainframe(level, network);
+        if (mf != null) {
+            for (final var pattern : mf.networkPatterns()) {
+                if (uses.size() >= ItemDetailPayload.MAX_USES) {
+                    break;
+                }
+                if (pattern.ingredientTotals().containsKey(key)) {
+                    final StorageKey rk = StorageKey.of(pattern.result());
+                    if (seen.add(rk)) {
+                        uses.add(pattern.result().copy());
+                    }
+                }
+            }
+            for (final var proc : mf.networkProcessingPatterns()) {
+                if (uses.size() >= ItemDetailPayload.MAX_USES) {
+                    break;
+                }
+                final boolean consumes = proc.inputs().stream().anyMatch(in -> in.key().equals(key));
+                final var out = proc.primaryOutput();
+                if (consumes && out != null && seen.add(out.key())) {
+                    uses.add(out.key().stack(1));
+                }
+            }
+        }
+
+        // Which buses filter it: walk the network's cable positions and read each bus's filter.
+        final List<ItemDetailPayload.BusRef> buses = new ArrayList<>();
+        for (final long posLong : system.connectivity().positionsOf(network)) {
+            if (buses.size() >= ItemDetailPayload.MAX_BUSES) {
+                break;
+            }
+            if (!(level.getBlockEntity(BlockPos.of(posLong))
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable)) {
+                continue;
+            }
+            for (final net.minecraft.core.Direction dir : net.minecraft.core.Direction.values()) {
+                if (cable.getPart(dir)
+                        instanceof dev.jsc.jscomputronics.module.computing.block.part.AbstractBusPart bus
+                        && key.equals(bus.filterKey())) {
+                    buses.add(new ItemDetailPayload.BusRef(bus.name(), busKind(bus.type())));
+                }
+            }
+        }
+        return new ItemDetailPayload(key.stack(1), total, stored, uses, buses);
+    }
+
+    private static String busKind(final dev.jsc.jscomputronics.module.computing.block.part.CablePartType type) {
+        final String name = type.name();
+        return name.charAt(0) + name.substring(1).toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
     }
 
     public static void sendSnapshot(final ServerPlayer player, final ServerLevel level, final NetworkUuid network) {
@@ -2993,8 +3996,8 @@ public final class ComputingPayloads {
                     && player.level() instanceof ServerLevel level
                     && niHost(player, level, payload.host(), payload.monitorPos()) != null
                     && level.getBlockEntity(payload.host())
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .AbstractComputerBlockEntity computer) {
+                            instanceof dev.jsc.jscomputronics.module.computing.os
+                                    .OsHost computer) {
                 sendNetworkInteractor(player, level, computer);
             }
         });
@@ -3002,7 +4005,7 @@ public final class ComputingPayloads {
 
     /** Builds and sends a fresh Network Interactor snapshot (network grid, local grid, status, craft catalog). */
     private static void sendNetworkInteractor(final ServerPlayer player, final ServerLevel level,
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer) {
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
         final dev.jsc.jscomputronics.common.uuid.NetworkUuid network = computer.networkUuid();
         // The whole network's items (Network Storage tab).
         final List<NetworkItemEntry> networkItems = new ArrayList<>();
@@ -3116,23 +4119,23 @@ public final class ComputingPayloads {
                 return;
             }
             final int slot = payload.slot();
-            final ItemStack src = player.getInventory().getItem(slot);
-            if (src.isEmpty()) {
+            if (slot < 0 || slot >= player.getInventory().getContainerSize()) {
                 return;
             }
-            final StorageKey key = StorageKey.of(src);
-            final int amount = src.getCount();
-            if (payload.target() == NiShiftInsertPayload.TARGET_STORAGE) {
-                final long stored = host.localStore().insert(key, amount);
-                if (stored <= 0L) {
-                    return;
-                }
-                src.shrink((int) stored);
-                player.getInventory().setItem(slot, src.isEmpty() ? ItemStack.EMPTY : src);
-                player.containerMenu.broadcastChanges();
-                if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
+            // The whole stack as items, the way a chest takes a shift-click; a bucket goes in as a bucket.
+            final DataHandoff.Source source = DataHandoff.inventory(player, slot);
+            final int amount = source.get().getCount();
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer =
+                    host instanceof dev.jsc.jscomputronics.module.computing.os.OsHost c ? c : null;
+            final Runnable refresh = () -> {
+                if (computer != null) {
                     sendNetworkInteractor(player, level, computer);
+                }
+            };
+            if (payload.target() == NiShiftInsertPayload.TARGET_STORAGE) {
+                if (DataHandoff.intoLocalStore(host.localStore(), player, source, amount, false)
+                        == DataHandoff.Outcome.DEPOSITED) {
+                    refresh.run();
                 }
                 return;
             }
@@ -3144,25 +4147,7 @@ public final class ComputingPayloads {
             if (mainframe == null) {
                 return;
             }
-            final ItemStack inFlight = src.copyWithCount(amount);
-            src.shrink(amount);
-            player.getInventory().setItem(slot, src.isEmpty() ? ItemStack.EMPTY : src);
-            player.containerMenu.broadcastChanges();
-            final var op = mainframe.submitNetworkInsert(key, amount, "ni");
-            if (op == null) {
-                player.getInventory().placeItemBackInInventory(inFlight);
-                return;
-            }
-            op.onSettle(() -> {
-                final long leftover = op.leftover();
-                if (leftover > 0L) {
-                    returnToPlayer(player, inFlight.copyWithCount((int) leftover));
-                }
-                if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
-                    sendNetworkInteractor(player, level, computer);
-                }
-            });
+            DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, false, "ni", refresh);
         });
     }
 
@@ -3186,8 +4171,8 @@ public final class ComputingPayloads {
                     return;
                 }
                 final var op = mainframe.submitNetworkSelect(key, safeAmount, host.localStorage(), "ni");
-                if (op != null && host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
+                if (op != null && host instanceof dev.jsc.jscomputronics.module.computing.os
+                        .OsHost computer) {
                     op.onSettle(() -> sendNetworkInteractor(player, level, computer));
                 }
             } else if (payload.mode() == NiGridClickPayload.MODE_LOCAL_TO_NET) {
@@ -3211,8 +4196,8 @@ public final class ComputingPayloads {
                     if (leftover > 0L) {
                         host.localStore().insert(key, leftover);
                     }
-                    if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                            .AbstractComputerBlockEntity computer) {
+                    if (host instanceof dev.jsc.jscomputronics.module.computing.os
+                            .OsHost computer) {
                         sendNetworkInteractor(player, level, computer);
                     }
                 });
@@ -3239,8 +4224,8 @@ public final class ComputingPayloads {
                         host.localStore().insert(key, remaining);
                     }
                 }
-                if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
+                if (host instanceof dev.jsc.jscomputronics.module.computing.os
+                        .OsHost computer) {
                     sendNetworkInteractor(player, level, computer);
                 }
             }
@@ -3262,27 +4247,30 @@ public final class ComputingPayloads {
             if (host == null) {
                 return;
             }
-            final ItemStack cursor = player.containerMenu.getCarried();
-            if (cursor.isEmpty()) {
-                return;
-            }
-            final int amount = payload.whole() ? cursor.getCount() : 1;
-            final StorageKey key = StorageKey.of(cursor);
-            if (payload.target() == NiDepositPayload.TARGET_STORAGE) {
-                final long stored = host.localStore().insert(key, amount);
-                if (stored <= 0L) {
-                    return;
-                }
-                cursor.shrink((int) stored);
-                player.containerMenu.setCarried(cursor.isEmpty() ? ItemStack.EMPTY : cursor);
-                player.containerMenu.broadcastChanges();
-                if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
+            // Left click deposits the whole stack as items; a right-click hands over ONE: one item, or what a
+            // held container holds — and a held empty container over a fluid or chemical entry fills from it.
+            final DataHandoff.Source source = DataHandoff.cursor(player);
+            final boolean one = !payload.whole();
+            final int amount = one ? 1 : source.get().getCount();
+            final boolean fill = one && payload.entry().isPresent()
+                    && DataContainers.canTake(source.get(), payload.entry().get());
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer =
+                    host instanceof dev.jsc.jscomputronics.module.computing.os.OsHost c ? c : null;
+            final Runnable refresh = () -> {
+                if (computer != null) {
                     sendNetworkInteractor(player, level, computer);
                 }
+            };
+            if (payload.target() == NiDepositPayload.TARGET_STORAGE) {
+                final DataHandoff.Outcome outcome = fill
+                        ? DataHandoff.fillFromLocalStore(host.localStore(), player, source, payload.entry().get())
+                        : DataHandoff.intoLocalStore(host.localStore(), player, source, amount, one);
+                if (outcome == DataHandoff.Outcome.DEPOSITED || outcome == DataHandoff.Outcome.FILLED) {
+                    refresh.run();
+                }
                 return;
             }
-            // Network deposit: push the held items into the network over ticks, returning overflow.
+            // Network: the handoff runs over ticks and the view refreshes when it settles.
             if (host.networkUuid() == null) {
                 return;
             }
@@ -3290,25 +4278,12 @@ public final class ComputingPayloads {
             if (mainframe == null) {
                 return;
             }
-            final ItemStack inFlight = cursor.copyWithCount(amount);
-            cursor.shrink(amount);
-            player.containerMenu.setCarried(cursor.isEmpty() ? ItemStack.EMPTY : cursor);
-            player.containerMenu.broadcastChanges();
-            final var op = mainframe.submitNetworkInsert(key, amount, "ni");
-            if (op == null) {
-                player.getInventory().placeItemBackInInventory(inFlight);
-                return;
+            if (fill) {
+                DataHandoff.fillFromNetwork(mainframe, level, host.networkUuid(), player, source,
+                        payload.entry().get(), "ni", refresh);
+            } else {
+                DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, one, "ni", refresh);
             }
-            op.onSettle(() -> {
-                final long leftover = op.leftover();
-                if (leftover > 0L) {
-                    returnToPlayer(player, inFlight.copyWithCount((int) leftover));
-                }
-                if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
-                    sendNetworkInteractor(player, level, computer);
-                }
-            });
         });
     }
 
@@ -3323,12 +4298,18 @@ public final class ComputingPayloads {
             if (host == null || payload.slot() < 0 || payload.slot() >= 36) {
                 return;
             }
-            final ItemStack src = player.getInventory().getItem(payload.slot());
-            if (src.isEmpty()) {
-                return;
-            }
+            // The whole hotbar stack as items, like a shift-click.
+            final DataHandoff.Source source = DataHandoff.inventory(player, payload.slot());
+            final int amount = source.get().getCount();
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer =
+                    host instanceof dev.jsc.jscomputronics.module.computing.os.OsHost c ? c : null;
+            final Runnable refresh = () -> {
+                if (computer != null) {
+                    sendNetworkInteractor(player, level, computer);
+                }
+            };
             if (payload.mode() == NiHotbarClickPayload.MODE_INV_TO_NET) {
-                // Push the whole hotbar stack into the network; leftover the network cannot hold comes back.
+                // Push the stack into the network; leftover the network cannot hold comes back.
                 if (host.networkUuid() == null) {
                     return;
                 }
@@ -3336,47 +4317,15 @@ public final class ComputingPayloads {
                 if (mainframe == null) {
                     return;
                 }
-                final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer =
-                        host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                .AbstractComputerBlockEntity c ? c : null;
-                // A fluid container deposits its fluid into the network (fluid is data too), like the terminal.
-                if (niDepositFluidContainer(mainframe, player, payload.slot(), src, level, host.networkUuid())) {
-                    if (computer != null) {
-                        sendNetworkInteractor(player, level, computer);
-                    }
-                    return;
-                }
-                final ItemStack taken = src.copy();
-                final StorageKey key = StorageKey.of(taken);
-                player.getInventory().setItem(payload.slot(), ItemStack.EMPTY);
-                final var op = mainframe.submitNetworkInsert(key, taken.getCount(), "ni");
-                if (op == null) {
-                    player.getInventory().setItem(payload.slot(), taken); // no dispatcher: never lose it
-                    player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                if (DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, false,
+                        "ni", refresh) == DataHandoff.Outcome.NO_DISPATCHER) {
+                    player.displayClientMessage(Component.literal(
                             "The network Mainframe needs an OS installed to accept items."), true);
-                    return;
                 }
-                op.onSettle(() -> {
-                    final long leftover = op.leftover();
-                    if (leftover > 0L) {
-                        // Return the exact leftover from the captured stack, preserving its components.
-                        returnToPlayer(player, taken.copyWithCount((int) Math.min(leftover, taken.getCount())));
-                    }
-                    if (computer != null) {
-                        sendNetworkInteractor(player, level, computer);
-                    }
-                });
             } else {
                 // Deposit the hotbar stack into this computer's local storage.
-                final long inserted = host.localStore().insert(StorageKey.of(src), src.getCount());
-                if (inserted > 0L) {
-                    src.shrink((int) inserted);
-                    player.getInventory().setItem(payload.slot(), src.isEmpty() ? ItemStack.EMPTY : src);
-                }
-                if (host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                        .AbstractComputerBlockEntity computer) {
-                    sendNetworkInteractor(player, level, computer);
-                }
+                DataHandoff.intoLocalStore(host.localStore(), player, source, amount, false);
+                refresh.run();
             }
         });
     }
@@ -3398,9 +4347,9 @@ public final class ComputingPayloads {
             }
             // Clamp the client-supplied quantity so a spoofed packet cannot ask the dispatcher for Long.MAX.
             final long safeAmount = Math.max(1L, Math.min(payload.amount(), Integer.MAX_VALUE));
-            final dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity computer =
-                    host instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                            .AbstractComputerBlockEntity c ? c : null;
+            final dev.jsc.jscomputronics.module.computing.os.OsHost computer =
+                    host instanceof dev.jsc.jscomputronics.module.computing.os
+                            .OsHost c ? c : null;
             final Runnable refreshNi = () -> {
                 if (computer != null) {
                     sendNetworkInteractor(player, level, computer);
@@ -3529,6 +4478,322 @@ public final class ComputingPayloads {
 
     // OS install flow — client asks the server to scan linked media readers and install the OS.
 
+    // ---- Firmware boot manager ----
+
+    private static void handleRequestFirmwareState(final RequestFirmwareStatePayload payload,
+                                                   final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos()) instanceof OsHost computer) {
+                PacketDistributor.sendToPlayer(player, buildFirmwareState(level, computer, payload.hostPos()));
+            }
+        });
+    }
+
+    /** Everything the boot manager lists for {@code computer}: disks, linked media, boot order, hardware. */
+    static FirmwareStatePayload buildFirmwareState(final ServerLevel level,
+                                                  final OsHost computer, final BlockPos pos) {
+        final HardwareEra era = computer.displayEra() != null ? computer.displayEra() : HardwareEra.STANDARD;
+        final List<FirmwareStatePayload.Entry> entries = new ArrayList<>();
+        for (int i = 0; i < computer.diskSlots(); i++) {
+            final net.minecraft.world.item.ItemStack disk = computer.diskInSlot(i);
+            if (!(disk.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem)) {
+                continue;
+            }
+            final net.minecraft.resources.ResourceLocation osId =
+                    disk.get(dev.jsc.jscomputronics.module.computing.ComputingModule.SYSTEM_OS.get());
+            final OsDef os = osId == null ? null : OsRegistry.getOs(osId);
+            entries.add(new FirmwareStatePayload.Entry(FirmwareStatePayload.KIND_DISK, i,
+                    os == null ? "" : os.id().toString(),
+                    os == null ? "(no system)" : os.displayName(),
+                    "Disk " + i + ": " + disk.getHoverName().getString(),
+                    os != null, -1));
+        }
+        for (final long endpoint : computer.linkedEndpoints()) {
+            if (!(level.getBlockEntity(BlockPos.of(endpoint)) instanceof MediaReaderBlockEntity reader)) {
+                continue;
+            }
+            final String drive = reader.driveType().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+            final net.minecraft.world.item.ItemStack media = reader.mediaSlot().getStackInSlot(0);
+            if (media.isEmpty()) {
+                entries.add(new FirmwareStatePayload.Entry(FirmwareStatePayload.KIND_MEDIA, endpoint, "",
+                        "(no medium)", drive, false, -1));
+                continue;
+            }
+            final OsDef os = reader.insertedKind() == MediaKind.OS_INSTALL && reader.insertedPayload() != null
+                    ? OsRegistry.getOs(reader.insertedPayload()) : null;
+            if (os == null) {
+                entries.add(new FirmwareStatePayload.Entry(FirmwareStatePayload.KIND_MEDIA, endpoint, "",
+                        media.getHoverName().getString(), drive, false, -1));
+                continue;
+            }
+            final boolean eraOk = OsGating.canInstall(os.minEra(), era);
+            entries.add(new FirmwareStatePayload.Entry(FirmwareStatePayload.KIND_MEDIA, endpoint,
+                    os.id().toString(),
+                    os.displayName() + (os.installMode() == dev.jsc.jscomputronics.module.computing.os.InstallMode.GUIDED
+                            ? " installer" : " (live)"),
+                    drive + (eraOk ? "" : " - " + eraName(os.minEra()) + " era or newer"), eraOk,
+                    os.installMode().ordinal()));
+        }
+        final int cpuMhz = computer.maxCpuMhz();
+        final String cpuLabel = cpuMhz > 0 ? cpuMhz + " MHz" : "not detected";
+        final int ramMb = (int) Math.min(Integer.MAX_VALUE, computer.ramBuffer());
+        return new FirmwareStatePayload(pos, era.ordinal(), cpuLabel, cpuMhz, ramMb, computer.bootDiskSlot(),
+                computer.defaultInstallSlot(), entries, raidInfoOf(level, computer));
+    }
+
+    /**
+     * What the firmware's storage page shows: the controller in this machine's bay, the array it
+     * runs, and what each mode would give. Only a rack server has one — a desk computer's firmware
+     * simply has no storage page.
+     */
+    private static FirmwareStatePayload.RaidInfo raidInfoOf(
+            final ServerLevel level, final dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
+        if (!(computer instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                .ServerRackBlockEntity rack)) {
+            return FirmwareStatePayload.RaidInfo.ABSENT;
+        }
+        final int slot = rack.soleComputerSlot();
+        if (slot < 0 || rack.raidControllerSlot(slot) < 0) {
+            return FirmwareStatePayload.RaidInfo.ABSENT;
+        }
+        final List<Long> sizes = new ArrayList<>();
+        for (final ItemStack drive : rack.claimedDriveStacks(slot)) {
+            if (drive.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem disk) {
+                sizes.add(disk.spec().capacityItems());
+            }
+        }
+        final var modes = dev.jsc.jscomputronics.module.computing.rack.RaidMode.values();
+        final List<Long> capacities = new ArrayList<>(modes.length);
+        for (final var mode : modes) {
+            // NONE presents the drives as they are; the others present the array they would form.
+            capacities.add(mode == dev.jsc.jscomputronics.module.computing.rack.RaidMode.NONE
+                    ? sizes.stream().mapToLong(Long::longValue).sum()
+                    : mode.usableCapacity(sizes));
+        }
+        return new FirmwareStatePayload.RaidInfo(true, rack.raidModeOf(slot).ordinal(),
+                rack.raidMemberCount(slot), sizes.size(), capacities);
+    }
+
+    private static void handleFirmwareAction(final FirmwareActionPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos()) instanceof OsHost computer)) {
+                return;
+            }
+            switch (payload.action()) {
+                case FirmwareActionPayload.ACTION_BOOT_DISK -> {
+                    computer.setBootDiskSlot((int) payload.ref());
+                    computer.setPendingInstallSlot(OsHost.NO_PENDING_INSTALL); // the reboot the installer asked for
+                    if (computer.hasOs()) {
+                        // Booting a disk from the firmware is a restart, so it replays POST like any
+                        // other. Handing straight over to the system skipped the self-test the machine
+                        // has to run, and left the session fixed on whatever it was before.
+                        computer.setNeedsPost(true);
+                        dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openPost(
+                                player, level, payload.monitorPos(), payload.hostPos());
+                        return;
+                    }
+                }
+                case FirmwareActionPayload.ACTION_SET_BOOT -> computer.setBootDiskSlot((int) payload.ref());
+                case FirmwareActionPayload.ACTION_RAID_MODE -> {
+                    final var modes = dev.jsc.jscomputronics.module.computing.rack.RaidMode.values();
+                    final int mode = (int) payload.ref();
+                    if (computer instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                            .ServerRackBlockEntity rack && mode >= 0 && mode < modes.length) {
+                        rack.setRaidMode(rack.soleComputerSlot(), modes[mode]);
+                    }
+                }
+                case FirmwareActionPayload.ACTION_FORMAT -> computer.formatDisk((int) payload.ref());
+                case FirmwareActionPayload.ACTION_INSTALL -> {
+                    final String failure = installFailure(level, computer, payload.ref(), payload.target());
+                    if (failure != null) {
+                        // The client's installer has just played its progress to the end: end it on the
+                        // refusal, not on a "complete" the disk never saw.
+                        final HardwareEra era = computer.displayEra();
+                        final int slot = payload.target();
+                        PacketDistributor.sendToPlayer(player, new OpenInstallDonePayload(payload.hostPos(),
+                                payload.monitorPos(),
+                                dev.jsc.jscomputronics.module.computing.os.FirmwareKind
+                                        .forEra(era != null ? era : HardwareEra.STANDARD).ordinal(),
+                                "", slot < 0 ? "the default disk" : "Disk " + slot, slot, failure));
+                    }
+                }
+                case FirmwareActionPayload.ACTION_BOOT_MEDIA -> {
+                    if (level.getBlockEntity(BlockPos.of(payload.ref())) instanceof MediaReaderBlockEntity reader
+                            && reader.insertedKind() == MediaKind.OS_INSTALL && reader.insertedPayload() != null) {
+                        final OsDef os = OsRegistry.getOs(reader.insertedPayload());
+                        if (os != null && os.installMode()
+                                != dev.jsc.jscomputronics.module.computing.os.InstallMode.GUIDED) {
+                            // A live medium: boot its shell and let the player install the system by hand.
+                            computer.console().startLiveInstall(os.id().getPath().equals("arch")
+                                    ? dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState.Distro.ARCH
+                                    : dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState.Distro.GENTOO);
+                            computer.setChanged();
+                            dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openBootTarget(
+                                    player, level, payload.monitorPos(), payload.hostPos());
+                            return;
+                        } else {
+                            final int target = payload.target() >= 0 ? payload.target() : computer.defaultInstallSlot();
+                            if (installOsFromReader(level, computer, payload.ref(), target)) {
+                                computer.setBootDiskSlot(target);
+                                dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openBootTarget(
+                                        player, level, payload.monitorPos(), payload.hostPos());
+                                return;
+                            }
+                        }
+                    }
+                }
+                default -> {
+                }
+            }
+            PacketDistributor.sendToPlayer(player, buildFirmwareState(level, computer, payload.hostPos()));
+        });
+    }
+
+    /**
+     * Installs the OS from the medium in the reader at {@code readerPos} (or from any linked installer medium
+     * when {@code -1}) onto disk slot {@code targetSlot} ({@code -1} = the default target). Unlike the legacy
+     * no-OS path this allows a second system beside an installed one (dual boot). Returns whether it installed.
+     */
+    public static boolean installOsFromReader(final ServerLevel level, final OsHost computer,
+                                              final long readerPos, final int targetSlot) {
+        return installFailure(level, computer, readerPos, targetSlot) == null;
+    }
+
+    /**
+     * The install behind {@link #installOsFromReader}, telling why it did not happen: {@code null} once the
+     * system is on the disk, otherwise a sentence for the player. The installer screen plays its progress
+     * on the client before the write, so without this a refused install (a system newer than the machine's
+     * era, a live medium, no room on the disk) looked exactly like a finished one.
+     */
+    @Nullable
+    public static String installFailure(final ServerLevel level, final OsHost computer,
+                                        final long readerPos, final int targetSlot) {
+        final HardwareEra hostEra = computer.installedEra() != null ? computer.installedEra() : HardwareEra.STANDARD;
+        String failure = null;
+        for (final long endpoint : computer.linkedEndpoints()) {
+            if (readerPos >= 0 && endpoint != readerPos) {
+                continue;
+            }
+            if (!(level.getBlockEntity(BlockPos.of(endpoint)) instanceof MediaReaderBlockEntity reader)
+                    || reader.insertedKind() != MediaKind.OS_INSTALL || reader.insertedPayload() == null) {
+                continue;
+            }
+            final OsDef def = OsRegistry.getOs(reader.insertedPayload());
+            if (def == null) {
+                failure = "The system on the medium is not known to this machine.";
+                continue;
+            }
+            if (!OsGating.canInstall(def.minEra(), hostEra)) {
+                failure = def.displayName() + " needs " + eraName(def.minEra()) + " era hardware or newer; this machine is "
+                        + eraName(hostEra) + " era.";
+                continue;
+            }
+            // A live/source medium (Arch, Gentoo) never one-click installs: it must be BOOTED and the
+            // system put on the disk by hand through its shell. Only guided installers land here.
+            if (def.installMode() != dev.jsc.jscomputronics.module.computing.os.InstallMode.GUIDED) {
+                failure = def.displayName() + " is put on the disk by hand from its own shell: boot the medium instead.";
+                continue;
+            }
+            if (computer.installOs(def.id(), targetSlot)) {
+                // The files are on the disk, but the machine is still running the installer until it
+                // restarts: remember that, so the monitor comes back to the reboot prompt, not the system.
+                computer.setPendingInstallSlot(targetSlot);
+                return null;
+            }
+            return computer.defaultInstallSlot() < 0
+                    ? "No disk is installed to put " + def.displayName() + " on."
+                    : "The target disk has no room for " + def.displayName() + " ("
+                            + def.footprintMb() + " MB needed).";
+        }
+        return failure != null ? failure : "No installation medium is in a drive linked to this machine.";
+    }
+
+    /** The era as the firmware names it to the player: "Vintage", "Legacy", "Standard" ... */
+    private static String eraName(final HardwareEra era) {
+        final String lower = era.name().toLowerCase(java.util.Locale.ROOT);
+        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+    }
+
+    private static void handleRequestFirmware(final RequestFirmwarePayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos()) instanceof OsHost) {
+                // Leave whatever screen the request came from (the desktop or the terminal) and enter setup.
+                player.closeContainer();
+                dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openFirmware(
+                        player, level, payload.monitorPos(), payload.hostPos());
+            }
+        });
+    }
+
+    private static void handleUninstallProgram(final UninstallProgramPayload payload,
+                                               final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost host) {
+                final String id = payload.programId();
+                final String name = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
+                new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(host, level)
+                        .packageRemove(name);
+            }
+        });
+    }
+
+    /** A player left the monitor: the layout they left behind becomes the machine's. */
+    private static void handleDesktopWindowsOnServer(final DesktopWindowsPayload payload,
+                                                     final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level().getBlockEntity(payload.host()) instanceof OsHost computer
+                    && computer.isRunning()) {
+                // A machine that has since been switched off or restarted keeps its empty desktop: the
+                // layout in flight belongs to a session that no longer exists.
+                if (!computer.needsPost()) {
+                    computer.setOpenWindows(payload.toOpenWindows());
+                }
+            }
+        });
+    }
+
+    /** The desktop is opening: hand it the windows the machine has. */
+    private static void handleDesktopWindowsOnClient(final DesktopWindowsPayload payload,
+                                                     final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen.applyWindows(payload));
+    }
+
+    private static void handlePostComplete(final PostCompletePayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos()) instanceof OsHost computer)) {
+                return;
+            }
+            if (!computer.isRunning()) {
+                return; // powered off mid-POST: the screen just stays dark
+            }
+            computer.setNeedsPost(false);
+            // POST is the moment the machine decides what it is running. Fixing it here is what makes a
+            // freshly installed (or removed) desktop package wait for a restart instead of appearing the
+            // next time the monitor is opened.
+            computer.setBootedDesktopId(computer.installedDesktopId());
+            if (payload.enterSetup()) {
+                dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openFirmware(
+                        player, level, payload.monitorPos(), payload.hostPos());
+            } else {
+                dev.jsc.jscomputronics.module.computing.block.MonitorBlock.openBootTarget(
+                        player, level, payload.monitorPos(), payload.hostPos());
+            }
+        });
+    }
+
     private static void handleInstallOs(final InstallOsPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)
@@ -3543,7 +4808,7 @@ public final class ComputingPayloads {
      * Scans the computer's linked peripheral endpoints for a {@link MediaReaderBlockEntity}
      * holding an OS installer medium. Takes the first match whose OS passes the era gate and
      * whose footprint fits the computer's free storage, then calls
-     * {@link AbstractComputerBlockEntity#installOs(net.minecraft.resources.ResourceLocation)}.
+     * {@link OsHost#installOs(net.minecraft.resources.ResourceLocation)}.
      *
      * <p>The reader must be linked to the computer over the COMPUTING peripheral cable system
      * (same way a monitor links). Only readers that are already auto-linked endpoints are
@@ -3552,7 +4817,7 @@ public final class ComputingPayloads {
      *
      * <p>All gating conditions must be satisfied in order:
      * <ol>
-     *   <li>The computer block entity must be an {@link AbstractComputerBlockEntity} with no OS yet.</li>
+     *   <li>The computer block entity must be an {@link OsHost} with no OS yet.</li>
      *   <li>A linked endpoint must resolve to a {@link MediaReaderBlockEntity} holding a medium
      *       of kind {@link MediaKind#OS_INSTALL} whose payload names a registered {@link OsDef}.</li>
      *   <li>{@link OsGating#canInstall} must accept the OS on the computer's hardware era.</li>
@@ -3564,7 +4829,7 @@ public final class ComputingPayloads {
      * @param computerPos the position of the computer to install the OS onto
      */
     public static void installOsFromLinkedReader(final ServerLevel level, final BlockPos computerPos) {
-        if (!(level.getBlockEntity(computerPos) instanceof AbstractComputerBlockEntity computer)) {
+        if (!(level.getBlockEntity(computerPos) instanceof OsHost computer)) {
             return;
         }
         if (computer.hasOs()) {
@@ -3592,6 +4857,10 @@ public final class ComputingPayloads {
                 continue;
             }
             if (!OsGating.canInstall(def.minEra(), hostEra)) {
+                continue;
+            }
+            // Live/source media (Arch, Gentoo) install only by hand through their booted shell.
+            if (def.installMode() != dev.jsc.jscomputronics.module.computing.os.InstallMode.GUIDED) {
                 continue;
             }
             // installOs checks the footprint against free storage; false means it did not fit.
@@ -3732,6 +5001,451 @@ public final class ComputingPayloads {
             reconcileCraftsFolder(cc, level);
             PacketDistributor.sendToPlayer(player, buildCraftManagerState(cc, level));
         });
+    }
+
+    // ---- the Cluster Manager: the Cluster Management Computer's program ----
+
+    private static void handleRequestClusterManager(final RequestClusterManagerPayload payload,
+                                                     final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc)) {
+                return;
+            }
+            PacketDistributor.sendToPlayer(player, buildClusterManagerState(cmc, level, payload.selKind(), payload.selIndex(), ""));
+        });
+    }
+
+    /** Routes the Cluster Manager state to the open window. */
+    private static void handleClusterManagerState(final ClusterManagerStatePayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jsc.jscomputronics.module.computing.client.os.ClusterManagerApp.accept(payload));
+    }
+
+    private static void handleClusterManagerAction(final ClusterManagerActionPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc)) {
+                return;
+            }
+            final var ref = clusterRef(cmc, payload.kind(), payload.index());
+            String status = "";
+            if (ref == null && payload.action() != ClusterManagerActionPayload.ACTION_REFRESH
+                    && payload.action() != ClusterManagerActionPayload.ACTION_CANCEL_JOB) {
+                status = "select a cluster first";
+            } else {
+                final var node = new dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity
+                        .NodeRef(BlockPos.of(payload.rackPos()), payload.row());
+                status = switch (payload.action()) {
+                    case ClusterManagerActionPayload.ACTION_INSTALL_SYSTEM_ALL -> cmc.startJob(ref,
+                            dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.JobKind.SYSTEM);
+                    case ClusterManagerActionPayload.ACTION_INSTALL_PROGRAM_ALL -> cmc.startJob(ref,
+                            dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.JobKind.PROGRAM);
+                    case ClusterManagerActionPayload.ACTION_INSTALL_SYSTEM_NODE -> cmc.startJob(ref,
+                            dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.JobKind.SYSTEM,
+                            List.of(node));
+                    case ClusterManagerActionPayload.ACTION_INSTALL_PROGRAM_NODE -> cmc.startJob(ref,
+                            dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.JobKind.PROGRAM,
+                            List.of(node));
+                    case ClusterManagerActionPayload.ACTION_POWER_ALL_ON -> cmc.powerAll(ref, true) + " bay(s) switched on";
+                    case ClusterManagerActionPayload.ACTION_POWER_ALL_OFF -> cmc.powerAll(ref, false) + " bay(s) switched off";
+                    case ClusterManagerActionPayload.ACTION_TOGGLE_NODE -> cmc.toggleNode(node.rack(), node.row())
+                            ? "" : "that row is not a node this card reaches";
+                    case ClusterManagerActionPayload.ACTION_CANCEL_JOB -> cmc.cancelJob() ? "job cancelled after the nodes being written" : "";
+                    case ClusterManagerActionPayload.ACTION_CYCLE_BALANCE -> {
+                        if (ref.face() != null && level.getBlockEntity(ref.anchor()) instanceof ServerRouterBlockEntity router) {
+                            router.cycleLoadBalanceMode(ref.face());
+                        }
+                        yield "";
+                    }
+                    case ClusterManagerActionPayload.ACTION_DEPOSIT, ClusterManagerActionPayload.ACTION_DEPOSIT_ONE ->
+                            depositIntoSection(player, cmc, ref, payload.action() == ClusterManagerActionPayload.ACTION_DEPOSIT_ONE);
+                    default -> "";
+                };
+            }
+            PacketDistributor.sendToPlayer(player, buildClusterManagerState(cmc, level, payload.kind(), payload.index(), status));
+        });
+    }
+
+    private static void handleClusterRename(final ClusterRenamePayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc)) {
+                return;
+            }
+            final var ref = clusterRef(cmc, payload.kind(), payload.index());
+            String status = "select a cluster first";
+            if (ref != null) {
+                final String typed = payload.name().strip().replaceAll("\\p{Cntrl}", "");
+                final String name = typed.length() > ClusterRenamePayload.MAX_NAME
+                        ? typed.substring(0, ClusterRenamePayload.MAX_NAME) : typed;
+                if (ref.face() != null && level.getBlockEntity(ref.anchor()) instanceof ServerRouterBlockEntity router) {
+                    router.setSectionName(ref.face(), name);
+                    status = name.isEmpty() ? "section name cleared" : "section renamed to " + name;
+                } else if (ref.face() == null && cmc.supercomputerAt(ref.anchor())
+                        instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity hub) {
+                    hub.setCustomName(name);
+                    status = name.isEmpty() ? "supercomputer name cleared" : "supercomputer renamed to " + name;
+                }
+            }
+            PacketDistributor.sendToPlayer(player, buildClusterManagerState(cmc, level, payload.kind(), payload.index(), status));
+        });
+    }
+
+    private static void handleClusterMoveOut(final ClusterMoveOutPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (payload.quantity() <= 0L
+                    || !(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc)) {
+                return;
+            }
+            final var ref = clusterRef(cmc, ClusterManagerStatePayload.KIND_DATACENTER, payload.index());
+            final NetworkUuid net = cmc.networkUuid();
+            if (ref == null || net == null
+                    || !(level.getBlockEntity(BlockPos.of(payload.destPos())) instanceof ComputerTerminalHost dest)
+                    || !net.equals(dest.networkUuid())) {
+                return; // the destination must be on this machine's own network
+            }
+            final MainframeBlockEntity mainframe = resolveMainframe(level, net);
+            final java.util.Set<NodeUuid> sources = new java.util.HashSet<>();
+            final var section = cmc.sectionAt(ref.anchor(), ref.face());
+            if (mainframe == null || section == null) {
+                return;
+            }
+            sources.addAll(section.section().servers());
+            if (sources.isEmpty()) {
+                return;
+            }
+            final var op = mainframe.submitNetworkMove(payload.key(), payload.quantity(), dest.localStorage(), "cluster", sources);
+            if (op != null) {
+                op.onSettle(() -> PacketDistributor.sendToPlayer(player,
+                        buildClusterManagerState(cmc, level, ClusterManagerStatePayload.KIND_DATACENTER, payload.index(), "")));
+            }
+            PacketDistributor.sendToPlayer(player,
+                    buildClusterManagerState(cmc, level, ClusterManagerStatePayload.KIND_DATACENTER, payload.index(), "moving"));
+        });
+    }
+
+    /** The cluster a (kind, index) pair names in the state's own order, or null. */
+    @org.jetbrains.annotations.Nullable
+    private static dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.ClusterRef clusterRef(
+            final dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc,
+            final int kind, final int index) {
+        if (kind == ClusterManagerStatePayload.KIND_SUPERCOMPUTER) {
+            final var hubs = cmc.supercomputers();
+            return index >= 0 && index < hubs.size()
+                    ? new dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.ClusterRef(
+                            dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SUPERCOMPUTER,
+                            hubs.get(index).getBlockPos(), null)
+                    : null;
+        }
+        if (kind == ClusterManagerStatePayload.KIND_DATACENTER) {
+            final var sections = cmc.datacenterSections();
+            return index >= 0 && index < sections.size()
+                    ? new dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.ClusterRef(
+                            dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SERVER,
+                            sections.get(index).routerPos(), sections.get(index).face())
+                    : null;
+        }
+        return null;
+    }
+
+    /** Puts the stack on the player's cursor into the section's servers, spread by its balance mode. */
+    private static String depositIntoSection(
+            final ServerPlayer player,
+            final dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc,
+            final dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.ClusterRef ref,
+            final boolean single) {
+        final ItemStack cursor = player.containerMenu.getCarried();
+        final var section = cmc.sectionAt(ref.anchor(), ref.face());
+        if (cursor.isEmpty() || section == null || !(player.level() instanceof ServerLevel level)) {
+            return "";
+        }
+        final List<ServerStore> stores = sectionStores(level, section.section().servers());
+        if (stores.isEmpty()) {
+            return "no servers in that section";
+        }
+        final ServerRouterBlockEntity router =
+                level.getBlockEntity(ref.anchor()) instanceof ServerRouterBlockEntity r ? r : null;
+        final dev.jsc.jscomputronics.module.computing.datacenter.LoadBalanceMode mode = router != null
+                ? router.loadBalanceMode(ref.face())
+                : dev.jsc.jscomputronics.module.computing.datacenter.LoadBalanceMode.ROUND_ROBIN;
+        final StorageKey key = StorageKey.of(cursor);
+        final long want = single ? 1L : cursor.getCount();
+        // The rotation lives on the router, so a run of single-item deposits really does move down the row
+        // of servers instead of piling onto the first one every time.
+        final int start = router != null && ref.face() != null ? router.nextBalanceStart(ref.face()) : 0;
+        final long stored = LoadBalancer.insert(stores, key, want, mode, start);
+        if (stored > 0L) {
+            cursor.shrink((int) stored);
+            player.containerMenu.setCarried(cursor.isEmpty() ? ItemStack.EMPTY : cursor);
+            player.containerMenu.broadcastChanges();
+        }
+        return stored > 0L ? "deposited " + stored : "the section has no room";
+    }
+
+    /** Everything the Cluster Manager shows, for one machine and one selected cluster. */
+    public static ClusterManagerStatePayload buildClusterManagerState(
+            final dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc,
+            final ServerLevel level, final int selKind, final int selIndex, final String status) {
+        final var card = cmc.clusterCard();
+        final var systemDisc = cmc.medium(dev.jsc.jscomputronics.module.computing.os.media.MediaKind.OS_INSTALL);
+        final var program = cmc.medium(dev.jsc.jscomputronics.module.computing.os.media.MediaKind.PROGRAM_INSTALL);
+        final var head = new ClusterManagerStatePayload.Head(card != null, card == null ? 0 : card.reach().ordinal(),
+                cmc.parallelLanes(), systemDisc == null ? "" : systemDisc.label(), program == null ? "" : program.label(),
+                status.isEmpty() ? cmc.lastJobSummary() : status);
+        final List<ClusterManagerStatePayload.WireCluster> clusters = new ArrayList<>();
+        final var hubs = cmc.supercomputers();
+        for (int i = 0; i < hubs.size() && clusters.size() < ClusterManagerStatePayload.MAX_CLUSTERS; i++) {
+            final var hub = hubs.get(i);
+            final int nodes = hub.clusterNodes().size();
+            clusters.add(new ClusterManagerStatePayload.WireCluster(ClusterManagerStatePayload.KIND_SUPERCOMPUTER, i,
+                    dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity
+                            .supercomputerName(hub, i),
+                    hub.clusterOnline(), nodes, hub.craftSlotsInUse(), hub.parallelCrafts(), 0,
+                    nodes + " nodes · " + hub.craftSlotsInUse() + "/" + hub.parallelCrafts(),
+                    cmc.reaches(dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SUPERCOMPUTER)));
+        }
+        final var sections = cmc.datacenterSections();
+        for (int i = 0; i < sections.size() && clusters.size() < ClusterManagerStatePayload.MAX_CLUSTERS; i++) {
+            final var ref = sections.get(i);
+            long used = 0L;
+            long total = 0L;
+            for (final ServerStore store : sectionStores(level, ref.section().servers())) {
+                used += store.usedWeight();
+                total += store.capacityWeight();
+            }
+            final int mode = level.getBlockEntity(ref.routerPos()) instanceof ServerRouterBlockEntity router
+                    ? router.loadBalanceMode(ref.face()).ordinal() : 0;
+            clusters.add(new ClusterManagerStatePayload.WireCluster(ClusterManagerStatePayload.KIND_DATACENTER, i,
+                    ref.label(), ref.section().serverCount() > 0, ref.section().serverCount(), used, total, mode,
+                    ref.section().rackCount() + " racks · " + ref.section().serverCount() + " srv",
+                    cmc.reaches(dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SERVER)));
+        }
+        // The selected cluster in detail.
+        ClusterManagerStatePayload.Detail detail = ClusterManagerStatePayload.Detail.none();
+        final List<NetworkItemEntry> items = new ArrayList<>();
+        final List<ClusterManagerStatePayload.WireDest> dests = new ArrayList<>();
+        if (selKind == ClusterManagerStatePayload.KIND_SUPERCOMPUTER && selIndex >= 0 && selIndex < hubs.size()) {
+            final var hub = hubs.get(selIndex);
+            final List<ClusterManagerStatePayload.WireNode> nodes = new ArrayList<>();
+            final java.util.Map<BlockPos, Integer> rackIndex = new java.util.LinkedHashMap<>();
+            final var slots = hub.clusterSlots();
+            int i = 0;
+            for (final var node : hub.clusterNodes()) {
+                if (level.getBlockEntity(node.rack()) instanceof ServerRackBlockEntity rack && nodes.size() < ClusterManagerStatePayload.MAX_NODES) {
+                    final int rIdx = rackIndex.computeIfAbsent(node.rack(), r -> rackIndex.size() + 1);
+                    final ItemStack server = rack.getServers().getStackInSlot(node.row());
+                    final var host = rack.unitHost(node.row());
+                    final var phi = dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity.installedPhi(server);
+                    final int slotIndex = i < slots.size() ? i : -1;
+                    final int code = slotIndex >= 0 ? slots.get(slotIndex).code()
+                            : dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity.SLOT_EMPTY;
+                    nodes.add(new ClusterManagerStatePayload.WireNode(node.rack().asLong(), rIdx, node.row(),
+                            dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.nodeName(rack, node.row()),
+                            osLabel(host), programsLabel(host),
+                            phi == null ? -1 : dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity.modelIndex(phi.spec()),
+                            rack.bayPowerOn(node.row()), slotIndex, code, 0L, 0L,
+                            nodeState(cmc, rack, node.row(), server, host, slotIndex, code)));
+                }
+                i++;
+            }
+            final List<ClusterManagerStatePayload.WireCraft> queue = new ArrayList<>();
+            final NetworkUuid net = hub.networkUuid();
+            final MainframeBlockEntity mainframe = net == null ? null : resolveMainframe(level, net);
+            if (mainframe != null) {
+                final java.util.Map<java.util.UUID, Integer> held = hub.heldSlots();
+                final List<ClusterManagerStatePayload.WireCraft> waiting = new ArrayList<>();
+                for (final var operation : mainframe.liveOperations()) {
+                    if (!(operation instanceof dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation craft)
+                            || craft.isDone()) {
+                        continue;
+                    }
+                    final OperationRecord record = craft.liveRecord();
+                    final String label = record.key().displayName().getString() + " x" + record.requested();
+                    final int held0 = held.getOrDefault(craft.operationId(), 0);
+                    if (held0 > 0) {
+                        queue.add(new ClusterManagerStatePayload.WireCraft(label, craft.requesterLabel(), held0, false));
+                    } else if (record.status() == OperationRecord.STATUS_WAITING && craft.usesSupercomputer(hub.getBlockPos())) {
+                        waiting.add(new ClusterManagerStatePayload.WireCraft(label, craft.requesterLabel(), 0, true));
+                    }
+                }
+                queue.addAll(waiting);
+            }
+            final BlockPos hp = hub.getBlockPos();
+            detail = new ClusterManagerStatePayload.Detail(selKind, selIndex,
+                    dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity
+                            .supercomputerName(hub, selIndex),
+                    "HBW Interface at " + hp.getX() + ", " + hp.getY() + ", " + hp.getZ() + " · " + rackIndex.size()
+                            + " rack" + (rackIndex.size() == 1 ? "" : "s") + " · " + hub.craftSlotsInUse() + "/"
+                            + hub.parallelCrafts() + " crafts",
+                    hub.clusterOnline(), 0, nodes,
+                    queue.size() > ClusterManagerStatePayload.MAX_QUEUE ? queue.subList(0, ClusterManagerStatePayload.MAX_QUEUE) : queue);
+        } else if (selKind == ClusterManagerStatePayload.KIND_DATACENTER && selIndex >= 0 && selIndex < sections.size()) {
+            final var ref = sections.get(selIndex);
+            final NetworkSystem system = NetworkSystem.get(level);
+            final List<ClusterManagerStatePayload.WireNode> nodes = new ArrayList<>();
+            final java.util.Map<BlockPos, Integer> rackIndex = new java.util.LinkedHashMap<>();
+            // Every seated server in the section's cabinets, switched on or off: a bay the manager powered
+            // off has left the network, and must still be listed so the manager can power it back on.
+            for (final long rackLong : ref.section().rackPositions()) {
+                final BlockPos rackPos = BlockPos.of(rackLong);
+                if (!(level.getBlockEntity(rackPos) instanceof ServerRackBlockEntity rack)) {
+                    continue;
+                }
+                final int rIdx = rackIndex.computeIfAbsent(rackPos, r -> rackIndex.size() + 1);
+                for (final int row : rack.computerSlots()) {
+                    if (nodes.size() >= ClusterManagerStatePayload.MAX_NODES) {
+                        break;
+                    }
+                    final var host = rack.unitHost(row);
+                    final ServerStore store = rack.getServerStorage(row);
+                    nodes.add(new ClusterManagerStatePayload.WireNode(rackPos.asLong(), rIdx, row,
+                            dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.nodeName(rack, row),
+                            osLabel(host), programsLabel(host), -1, rack.bayPowerOn(row), -1, 0,
+                            store == null ? 0L : store.usedWeight(), store == null ? 0L : store.capacityWeight(),
+                            nodeState(cmc, rack, row, rack.getServers().getStackInSlot(row), host, -1, -1)));
+                }
+            }
+            final int mode = level.getBlockEntity(ref.routerPos()) instanceof ServerRouterBlockEntity router
+                    ? router.loadBalanceMode(ref.face()).ordinal() : 0;
+            final BlockPos rp = ref.routerPos();
+            detail = new ClusterManagerStatePayload.Detail(selKind, selIndex, ref.label(),
+                    ref.section().rackCount() + " rack" + (ref.section().rackCount() == 1 ? "" : "s") + " · "
+                            + ref.section().serverCount() + " servers @ " + rp.getX() + ", " + rp.getY() + ", " + rp.getZ(),
+                    ref.section().serverCount() > 0, mode, nodes, List.of());
+            // The section's inventory, and where a move-out can go: the network's computers with local storage.
+            final java.util.Map<StorageKey, Long> totals = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
+                    .ofServers(level, ref.section().servers()).query();
+            totals.entrySet().stream().limit(ClusterManagerStatePayload.MAX_ITEMS)
+                    .forEach(e -> items.add(new NetworkItemEntry(e.getKey(), e.getValue())));
+            final NetworkUuid net = cmc.networkUuid();
+            if (net != null) {
+                for (final var pc : system.personalComputersOf(net)) {
+                    if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof ComputerTerminalHost pcHost
+                            && pcHost.localStorageCapacity() > 0L && dests.size() < ClusterManagerStatePayload.MAX_DESTS) {
+                        final String name = level.getBlockEntity(BlockPos.of(pc.pos()))
+                                instanceof dev.jsc.jscomputronics.module.computing.os.OsHost os && !os.customName().isEmpty()
+                                ? os.customName() : "PC-" + pc.nodeUuid().asString().substring(0, 4);
+                        dests.add(new ClusterManagerStatePayload.WireDest(pc.pos(), name));
+                    }
+                }
+                system.mainframePositionOf(net).ifPresent(mfPos -> {
+                    if (level.getBlockEntity(BlockPos.of(mfPos)) instanceof ComputerTerminalHost host
+                            && host.localStorageCapacity() > 0L) {
+                        dests.add(new ClusterManagerStatePayload.WireDest(mfPos, "Mainframe"));
+                    }
+                });
+            }
+        }
+        // The job in flight, if any.
+        ClusterManagerStatePayload.WireJob job = ClusterManagerStatePayload.WireJob.none(cmc.lastJobSummary());
+        final var running = cmc.job();
+        if (running != null) {
+            final List<ClusterManagerStatePayload.WireLane> lanes = new ArrayList<>();
+            for (final var lane : running.lanes()) {
+                if (lanes.size() < ClusterManagerStatePayload.MAX_LANES) {
+                    lanes.add(new ClusterManagerStatePayload.WireLane(lane.name(), lane.permille()));
+                }
+            }
+            final var ref = running.cluster();
+            int clusterIndex = -1;
+            final int clusterKind = ref.kind() == dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SUPERCOMPUTER
+                    ? ClusterManagerStatePayload.KIND_SUPERCOMPUTER : ClusterManagerStatePayload.KIND_DATACENTER;
+            if (clusterKind == ClusterManagerStatePayload.KIND_SUPERCOMPUTER) {
+                for (int i = 0; i < hubs.size(); i++) {
+                    if (hubs.get(i).getBlockPos().equals(ref.anchor())) {
+                        clusterIndex = i;
+                    }
+                }
+            } else {
+                for (int i = 0; i < sections.size(); i++) {
+                    if (sections.get(i).routerPos().equals(ref.anchor()) && sections.get(i).face() == ref.face()) {
+                        clusterIndex = i;
+                    }
+                }
+            }
+            job = new ClusterManagerStatePayload.WireJob(true, running.kind().ordinal(), running.medium().label(),
+                    clusterKind, clusterIndex, running.done(), running.skipped(), running.queued(), running.total(),
+                    running.elapsedTicks(), running.cancelled(), lanes, cmc.lastJobSummary());
+        }
+        return new ClusterManagerStatePayload(head, clusters, detail, job, items, dests);
+    }
+
+    /**
+     * What one machine in a cluster is doing, in the order it matters to the player: a machine that is not
+     * assembled cannot be powered, one with no power cannot be written to, and a supercomputer node without
+     * a working coprocessor holds a slot without contributing to a single craft. Without this the manager
+     * showed the disk and the system but never whether the machine was actually up.
+     */
+    private static int nodeState(
+            final dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity cmc,
+            final ServerRackBlockEntity rack, final int row, final ItemStack server,
+            final dev.jsc.jscomputronics.module.computing.os.OsHost host, final int slotIndex, final int code) {
+        if (dev.jsc.jscomputronics.module.computing.item.ServerItem.build(server) == null) {
+            return ClusterManagerStatePayload.STATE_INCOMPLETE;
+        }
+        if (!rack.bayPowerOn(row)) {
+            return ClusterManagerStatePayload.STATE_BAY_OFF;
+        }
+        final var job = cmc.job();
+        if (job != null) {
+            for (final var lane : job.lanes()) {
+                if (lane.node().row() == row && lane.node().rack().equals(rack.getBlockPos())) {
+                    return ClusterManagerStatePayload.STATE_INSTALLING;
+                }
+            }
+        }
+        if (code >= 0) {   // a supercomputer node: its cluster slot decides whether it counts for anything
+            if (slotIndex < 0) {
+                return ClusterManagerStatePayload.STATE_UNSLOTTED;
+            }
+            if (code == dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity.SLOT_EMPTY) {
+                return ClusterManagerStatePayload.STATE_NO_COPROCESSOR;
+            }
+            if (code == dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity.SLOT_UNDER_RATED) {
+                return ClusterManagerStatePayload.STATE_UNDER_RATED;
+            }
+        }
+        return host.installedOsId() == null ? ClusterManagerStatePayload.STATE_NO_SYSTEM
+                : ClusterManagerStatePayload.STATE_ONLINE;
+    }
+
+    private static String osLabel(final dev.jsc.jscomputronics.module.computing.os.OsHost host) {
+        final net.minecraft.resources.ResourceLocation osId = host.installedOsId();
+        final OsDef os = osId == null ? null : OsRegistry.getOs(osId);
+        return os == null ? "" : os.displayName();
+    }
+
+    private static String programsLabel(final dev.jsc.jscomputronics.module.computing.os.OsHost host) {
+        if (host.console() == null) {
+            return "";
+        }
+        final StringBuilder out = new StringBuilder();
+        for (final String id : host.console().installed()) {
+            final net.minecraft.resources.ResourceLocation rl = net.minecraft.resources.ResourceLocation.tryParse(id);
+            final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec = rl == null ? null : OsRegistry.getProgram(rl);
+            if (spec == null || spec.preinstalled()) {
+                continue;
+            }
+            if (out.length() > 0) {
+                out.append(", ");
+            }
+            out.append(spec.displayName());
+            if (out.length() > 140) {
+                out.append(", ...");
+                break;
+            }
+        }
+        return out.toString();
     }
 
     /** Routes the Crafting Manager state payload to the open {@link dev.jsc.jscomputronics.module.computing.client.os.CraftingManagerApp}. */
@@ -3896,7 +5610,8 @@ public final class ComputingPayloads {
         } else {
             path = fileName;
         }
-        DiskFilesystem.write(disk, path, FileType.CRAFT, content, cc.systemDiskFreeWeight(), kind);
+        DiskFilesystem.write(disk, path, FileType.CRAFT, content, cc.systemDiskFreeWeight(), kind,
+                cc.getLevel() == null ? 0L : cc.getLevel().getGameTime());
     }
 
     /** Deletes a mirrored {@code .craft} from the Crafting Computer's system disk, if present. */
@@ -4008,7 +5723,7 @@ public final class ComputingPayloads {
                 }
                 final long freeWeight = mediaFreeWeightFor(media);
                 DiskFilesystem.write(media, fileName, FileType.CRAFT, content.get(),
-                        freeWeight, FilesystemKind.HIERARCHICAL);
+                        freeWeight, FilesystemKind.HIERARCHICAL, level.getGameTime());
             }
             // Propagate the updated filesystem component to the reader slot.
             final String rest = key.substring("media:".length());
@@ -4133,9 +5848,7 @@ public final class ComputingPayloads {
         }
         final long capWeight = (long) fmt.format().capacityItems()
                 * dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
-        final long fsUsed = media.getOrDefault(
-                dev.jsc.jscomputronics.module.computing.ComputingModule.FILESYSTEM.get(),
-                dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents.EMPTY).usedWeight();
+        final long fsUsed = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(media);
         return Math.max(0L, capWeight - fsUsed);
     }
 
@@ -4178,7 +5891,7 @@ public final class ComputingPayloads {
             final long freeWeight = computeDiskFreeWeight(mainframe, sysDisk);
             final DiskFilesystem.WriteResult result =
                     DiskFilesystem.write(sysDisk, fileName, FileType.IQL, payload.content(),
-                            freeWeight, kind);
+                            freeWeight, kind, mainframe.getLevel() == null ? 0L : mainframe.getLevel().getGameTime());
             final boolean ok = result == DiskFilesystem.WriteResult.OK;
             if (ok) {
                 mainframe.setChanged();
@@ -4310,24 +6023,22 @@ public final class ComputingPayloads {
             if (!fromCursor && (idx < menu.storageSlotCount() || idx >= menu.slots.size())) {
                 return; // a slot source must be a player-inventory menu slot
             }
-            final net.minecraft.world.inventory.Slot slot = fromCursor ? null : menu.getSlot(idx);
-            final ItemStack source = fromCursor ? menu.getCarried() : slot.getItem();
-            if (source.isEmpty()) {
-                return;
-            }
-            final int amount = idx == TerminalLocalDepositPayload.CURSOR_ONE ? 1 : source.getCount();
-            final long stored = host.localStore().insert(StorageKey.of(source), amount);
-            if (stored <= 0L) {
-                return;
-            }
-            source.shrink((int) stored);
-            if (fromCursor) {
-                menu.setCarried(source.isEmpty() ? ItemStack.EMPTY : source);
+            final DataHandoff.Source source = fromCursor
+                    ? DataHandoff.cursor(player) : DataHandoff.slot(menu.getSlot(idx), player);
+            // A right-click hands over ONE: one item, or what a held container holds — and a held empty
+            // container over a fluid or chemical entry fills from the disks instead. Left click and
+            // shift-click deposit the stack as items, the way a chest takes them.
+            final boolean one = idx == TerminalLocalDepositPayload.CURSOR_ONE;
+            final DataHandoff.Outcome outcome;
+            if (one && payload.entry().isPresent() && DataContainers.canTake(source.get(), payload.entry().get())) {
+                outcome = DataHandoff.fillFromLocalStore(host.localStore(), player, source, payload.entry().get());
             } else {
-                slot.set(source.isEmpty() ? ItemStack.EMPTY : source);
+                outcome = DataHandoff.intoLocalStore(host.localStore(), player, source,
+                        one ? 1 : source.get().getCount(), one);
             }
-            menu.broadcastChanges();
-            dispatchLocalSnapshot(player, host);
+            if (outcome == DataHandoff.Outcome.DEPOSITED || outcome == DataHandoff.Outcome.FILLED) {
+                dispatchLocalSnapshot(player, host);
+            }
         });
     }
 }

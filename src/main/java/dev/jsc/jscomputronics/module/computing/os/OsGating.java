@@ -9,17 +9,20 @@ package dev.jsc.jscomputronics.module.computing.os;
 
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 
+import java.util.Set;
+
 /**
  * Pure gating logic for OS installation and program execution.
  *
- * <p>All methods are stateless and operate only on ordinal comparisons between pure enums, so this
- * class compiles and runs in the JUnit test sourceset without any Minecraft dependency.
+ * <p>All methods are stateless and operate only on plain enums and integers, so this class compiles
+ * and runs in the JUnit test sourceset without any Minecraft dependency.
  *
- * <p>Era gating follows the minimum-era / backward-compatibility rule: an OS whose minimum era is X
- * installs on hardware at era X or any later era. Installing a newer-era OS on older hardware is
- * rejected. Program compat follows the same principle: a program whose minimum OS era is Y runs on
- * an OS whose era is Y or higher, provided the OS also satisfies the program's minimum capability
- * tier.
+ * <p>Two independent axes gate the system. <b>OS-onto-hardware</b> install uses the minimum-era rule:
+ * an OS whose minimum era is X installs on hardware at era X or later ({@link #canInstall}).
+ * <b>Program</b> gating uses the OS <em>platform</em> plus raw hardware minimums, not the era: a
+ * program declares the platforms it supports and its minimum CPU clock, VRAM, and (for install) disk
+ * footprint; it runs on an OS whose platform it supports and whose computer meets those hardware
+ * minimums ({@link #canRunProgram}, {@link #canInstallProgram}).
  */
 public final class OsGating {
 
@@ -41,21 +44,44 @@ public final class OsGating {
     }
 
     /**
-     * Returns {@code true} when an OS with the given capability and era can execute a program that
-     * declares the given minimum capability and minimum OS era.
+     * Returns {@code true} when a program may <em>run</em> on the given OS and computer: the OS
+     * platform is one the program supports, and the computer meets the program's minimum CPU clock
+     * and VRAM. Disk space is not re-checked at run time (it was checked at install).
      *
-     * <p>Both conditions must hold simultaneously: the OS capability tier must be at least
-     * {@code progMinCap}, and the OS era must be at least {@code progMinOsEra}.
-     *
-     * @param osCap       the capability tier of the running OS
-     * @param osEra       the hardware era of the OS (its {@code minEra})
-     * @param progMinCap  the minimum capability tier required by the program
-     * @param progMinOsEra the minimum OS era required by the program
-     * @return {@code true} iff both the capability and era requirements are satisfied
+     * @param osPlatform    the platform of the running OS
+     * @param progPlatforms the platforms the program supports
+     * @param cpuMhz        the computer's best CPU clock in MHz (max across installed CPUs)
+     * @param vramMb        the computer's total VRAM in MB (sum across installed GPUs)
+     * @param minCpuMhz     the minimum CPU clock the program requires
+     * @param minVramMb     the minimum VRAM the program requires
+     * @return {@code true} iff the platform and hardware minimums are satisfied
      */
-    public static boolean canRun(OsCapability osCap, HardwareEra osEra,
-                                  OsCapability progMinCap, HardwareEra progMinOsEra) {
-        return osCap.ordinal() >= progMinCap.ordinal()
-                && osEra.ordinal() >= progMinOsEra.ordinal();
+    public static boolean canRunProgram(Platform osPlatform, Set<Platform> progPlatforms,
+                                        int cpuMhz, int vramMb, int minCpuMhz, int minVramMb) {
+        return progPlatforms.contains(osPlatform)
+                && cpuMhz >= minCpuMhz
+                && vramMb >= minVramMb;
+    }
+
+    /**
+     * Returns {@code true} when a program may be <em>installed</em> on the given OS and computer: it
+     * satisfies {@link #canRunProgram} <em>and</em> the system disk has at least the program's disk
+     * footprint free.
+     *
+     * @param osPlatform    the platform of the running OS
+     * @param progPlatforms the platforms the program supports
+     * @param cpuMhz        the computer's best CPU clock in MHz
+     * @param vramMb        the computer's total VRAM in MB
+     * @param freeDiskMb    the free space on the system disk in MB
+     * @param minCpuMhz     the minimum CPU clock the program requires
+     * @param minVramMb     the minimum VRAM the program requires
+     * @param minDiskMb     the disk footprint the program needs free to install
+     * @return {@code true} iff the run requirements and the free-disk requirement are satisfied
+     */
+    public static boolean canInstallProgram(Platform osPlatform, Set<Platform> progPlatforms,
+                                            int cpuMhz, int vramMb, long freeDiskMb,
+                                            int minCpuMhz, int minVramMb, int minDiskMb) {
+        return canRunProgram(osPlatform, progPlatforms, cpuMhz, vramMb, minCpuMhz, minVramMb)
+                && freeDiskMb >= minDiskMb;
     }
 }

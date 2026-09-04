@@ -16,5 +16,8 @@ public enum ExpansionCardKind {
 
     CRAFTING,
 
-    PHI
+    PHI,
+
+    /** A cluster interface: what lets a Cluster Management Computer address racks over the network. */
+    CLUSTER_INTERFACE
 }

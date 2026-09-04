@@ -149,8 +149,7 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
 
     @Override
     protected long moveFromSource(final NodeUuid server, final long planned) {
-        final long moved = tickStorage.selectBreakdown(key, planned, destination, Set.of(server))
-                .getOrDefault(server, 0L);
+        final long moved = tickStorage.pullFrom(server, key, planned, destination);
         if (moved > 0L) {
             // The moved items have left the server, so drop them from the lock: this keeps the
             // catalog from reading as over-locked to other concurrent Operations.

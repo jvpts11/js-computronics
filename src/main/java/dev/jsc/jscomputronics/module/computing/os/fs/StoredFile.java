@@ -7,6 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.fs;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
+
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -22,8 +24,14 @@ import java.nio.charset.StandardCharsets;
  *                for FLAT, or {@code "scripts/daily.iql"} for HIERARCHICAL)
  * @param type    the file type
  * @param content the file's text content encoded as a UTF-8 string
+ * @param modified the world game time (total ticks) the file was last written; {@code 0} means unknown
  */
-public record StoredFile(String path, FileType type, String content) {
+public record StoredFile(String path, FileType type, String content, long modified) {
+
+    /** A file with an unknown modification time (0). */
+    public StoredFile(final String path, final FileType type, final String content) {
+        this(path, type, content, 0L);
+    }
 
     /**
      * Returns the file size in raw bytes (UTF-8 encoding of {@link #content}).
@@ -33,10 +41,10 @@ public record StoredFile(String path, FileType type, String content) {
     }
 
     /**
-     * Returns the disk-space cost in mB-equivalents (1 mB-eq = 4 096 bytes),
-     * rounded up to the nearest block.
+     * Returns the disk-space cost in mB-equivalents on a disk of {@code era}, rounded up to the nearest
+     * block ({@link HardwareEra#bytesPerMbEq()} bytes there).
      */
-    public long weight() {
-        return FsPaths.sizeMbEq(byteSize());
+    public long weight(final HardwareEra era) {
+        return FsPaths.sizeMbEq(byteSize(), era);
     }
 }

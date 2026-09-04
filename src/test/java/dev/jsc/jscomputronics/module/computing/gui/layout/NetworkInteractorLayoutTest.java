@@ -64,6 +64,21 @@ class NetworkInteractorLayoutTest {
     }
 
     @Test
+    void resolve_searchAndSortShareTheHeaderRowWithoutOverlapping() {
+        // The sort button is clicked at these coordinates, not at "the right edge of the content": measuring
+        // it against the whole width put its hit box out over the details panel, and the button did nothing.
+        for (int w = MIN_W; w <= 520; w += 37) {
+            final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(w, MIN_H);
+            assertTrue(z.sortW() > 0, "the sort button needs room at width " + w);
+            assertTrue(z.searchX() + z.searchW() <= z.sortX(),
+                    "search runs into the sort button at width " + w);
+            assertTrue(z.sortX() + z.sortW() <= NetworkInteractorLayout.INSET + NetworkInteractorLayout.LEFT_W,
+                    "the sort button must stay in the left column at width " + w);
+            assertEquals(z.searchY(), z.sortY(), "both sit on the same header row at width " + w);
+        }
+    }
+
+    @Test
     void resolve_inventoryBandIsAlwaysFullyVisibleAtTheMinimum() {
         // At the minimum height the inventory band still sits entirely inside the content, framed and whole.
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(MIN_W, MIN_H);

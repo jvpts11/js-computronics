@@ -23,10 +23,14 @@ class FileTypeTest {
     }
 
     @Test
-    void datIsTheOnlyVirtualProjection() {
-        assertTrue(FileType.DAT.virtualProjection());
+    void virtualProjectionsAreTheDatAndTheInstallerFiles() {
+        // A projection is generated, never stored: the .dat from a disk's storage, and what an
+        // installer shows when opened. Every one of them is also closed to the player's edits.
+        final java.util.Set<FileType> virtual = java.util.EnumSet.of(FileType.DAT, FileType.EXE, FileType.SH,
+                FileType.PKG, FileType.INF, FileType.BIN);
         for (FileType t : FileType.values()) {
-            if (t != FileType.DAT) assertFalse(t.virtualProjection(), t + " must not be virtual");
+            assertEquals(virtual.contains(t), t.virtualProjection(), t + " virtual");
+            if (virtual.contains(t)) assertFalse(t.userEditable(), t + " must not be editable");
         }
     }
 

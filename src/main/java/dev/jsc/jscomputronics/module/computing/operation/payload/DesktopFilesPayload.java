@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: the listing of the desktop folder for the Panes desktop background. Each entry
+ * Server to client: the listing of the desktop folder for the Frames desktop background. Each entry
  * is a {@link DiskFilesPayload.WireFile} (path, extension, weight, read-only and directory flags),
  * rendered as an icon on the desktop. Reuses the Files app's wire type so there is one file model.
  *
@@ -26,11 +26,27 @@ import java.util.List;
  */
 public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String wallpaper,
                                   String computerName, List<String> programs,
-                                  List<WireIconCell> iconCells) implements CustomPacketPayload {
+                                  List<WireIconCell> iconCells, Prefs prefs) implements CustomPacketPayload {
 
     public static final int MAX_FILES = 256;
     public static final int MAX_PROGRAMS = 16;
     public static final int MAX_ICON_CELLS = 256;
+
+    /**
+     * The desktop-relevant per-computer settings the chrome applies: accent override, brightness, clock,
+     * whether the taskbar app strip is centered (a Frames 11 look) or left-aligned, and dark mode.
+     */
+    public record Prefs(int accent, int brightness, boolean clock12h, boolean taskbarCentered, boolean darkMode) {
+
+        public static final StreamCodec<RegistryFriendlyByteBuf, Prefs> STREAM_CODEC =
+                StreamCodec.composite(
+                        ByteBufCodecs.INT, Prefs::accent,
+                        ByteBufCodecs.VAR_INT, Prefs::brightness,
+                        ByteBufCodecs.BOOL, Prefs::clock12h,
+                        ByteBufCodecs.BOOL, Prefs::taskbarCentered,
+                        ByteBufCodecs.BOOL, Prefs::darkMode,
+                        Prefs::new);
+    }
 
     /** One pinned desktop icon: its stable id ({@code app:<label>} / {@code file:<name>}) and packed grid cell. */
     public record WireIconCell(String key, int cell) {
@@ -55,6 +71,7 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
                     DesktopFilesPayload::programs,
                     WireIconCell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_ICON_CELLS)),
                     DesktopFilesPayload::iconCells,
+                    Prefs.STREAM_CODEC, DesktopFilesPayload::prefs,
                     DesktopFilesPayload::new);
 
     @Override

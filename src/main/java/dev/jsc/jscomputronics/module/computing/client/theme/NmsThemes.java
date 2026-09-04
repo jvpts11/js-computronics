@@ -43,7 +43,7 @@ public final class NmsThemes {
 
     /**
      * The Studio skin for the installed OS: the SSMS layout kept, but the palette re-derived from the OS skin so
-     * the Studio follows Panes 95/XP/11 like every other program. The semantic colours (green/amber/red status,
+     * the Studio follows Frames 95/XP/11 like every other program. The semantic colours (green/amber/red status,
      * the editor track) stay fixed; structure and the flat style are unchanged.
      */
     public static EraTheme forOs(final OsSkin skin) {

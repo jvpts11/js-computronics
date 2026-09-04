@@ -92,10 +92,16 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
                 && part.controllerPos() != null
                 && level.getBlockEntity(part.controllerPos()) instanceof MainframeBlockEntity controller) {
             final BlockPos controllerPos = part.controllerPos();
+            // Sneaking anywhere on the cabinet takes its service panel off, the same as on the
+            // controller: a player has no way to tell which of the twelve blocks they are looking at.
+            if (player.isShiftKeyDown()) {
+                controller.toggleServicePanel();
+                return InteractionResult.sidedSuccess(false);
+            }
             serverPlayer.openMenu(
                     new SimpleMenuProvider(
                             (id, inventory, p) -> new MainframeMenu(id, inventory, controller),
-                            Component.translatable("block.jsc.mainframe")),
+                            level.getBlockState(controllerPos).getBlock().getName()),
                     buf -> buf.writeBlockPos(controllerPos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
@@ -113,6 +119,25 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
             controller.dropContentsExternally(serverLevel, part.controllerPos());
         }
         return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    /**
+     * What the middle mouse button picks off a structural block: the Mainframe itself, in its own era.
+     * The whole footprint is drawn as one cabinet, so a player aiming anywhere at it expects to pick the
+     * machine; a part has no item of its own and picking one used to hand back nothing at all.
+     */
+    @Override
+    public net.minecraft.world.item.ItemStack getCloneItemStack(final BlockState state,
+                                                                final net.minecraft.world.phys.HitResult target,
+                                                                final net.minecraft.world.level.LevelReader level,
+                                                                final BlockPos pos, final Player player) {
+        if (level.getBlockEntity(pos) instanceof MainframePartBlockEntity part && part.controllerPos() != null) {
+            final BlockState controller = level.getBlockState(part.controllerPos());
+            if (controller.getBlock() instanceof MainframeBlock) {
+                return new net.minecraft.world.item.ItemStack(controller.getBlock());
+            }
+        }
+        return super.getCloneItemStack(state, target, level, pos, player);
     }
 
     @Override

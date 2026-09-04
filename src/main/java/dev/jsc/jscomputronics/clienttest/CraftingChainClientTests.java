@@ -293,8 +293,8 @@ public final class CraftingChainClientTests {
     private static final BlockPos MONITOR = new BlockPos(6, 2, 2);
     private static final BlockPos PLAYER_AT_DRIVE = new BlockPos(5, 2, 5);
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
-    private static final ResourceLocation PANES_95 =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "panes_95");
+    private static final ResourceLocation FRAMES_95 =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_95");
     private static final String CRAFTING_MANAGER_LAUNCHER = "Crafting Mgr";
 
     /**
@@ -306,10 +306,10 @@ public final class CraftingChainClientTests {
     public static void craftingManager_loadsACraftFromTheFloppyDrive(final ClientTestContext ctx) {
         ctx.thenBuild(0, world -> {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-                    // The computer hosts a monitor (needs a GPU) and boots Panes 95 with the Crafting Manager.
+                    // The computer hosts a monitor (needs a GPU) and boots Frames 95 with the Crafting Manager.
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), PANES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.setBlock(DRIVE, ComputingModule.FLOPPY_DRIVE.get());
@@ -401,7 +401,7 @@ public final class CraftingChainClientTests {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), PANES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
@@ -531,7 +531,7 @@ public final class CraftingChainClientTests {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), PANES_95, Programs.COMMAND_PROMPT);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.COMMAND_PROMPT);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
@@ -630,7 +630,7 @@ public final class CraftingChainClientTests {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), PANES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);

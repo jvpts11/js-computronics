@@ -84,18 +84,29 @@ public final class BootController {
     /**
      * Returns the boot target for the given block entity.
      *
-     * <p>When the entity is an {@link AbstractComputerBlockEntity} the result is derived from
-     * its installed OS state. Any other entity type (or {@code null}) returns
-     * {@link BootTarget#FIRMWARE} as a safe default.
+     * <p>When the entity hosts an operating system the result is derived from its installed OS
+     * state. Any other entity type (or {@code null}) returns {@link BootTarget#FIRMWARE} as a
+     * safe default.
      *
      * @param be the block entity to inspect; may be {@code null}
      * @return the appropriate {@link BootTarget}
      */
     public static BootTarget targetForComputer(@Nullable final BlockEntity be) {
-        if (!(be instanceof AbstractComputerBlockEntity computer)) {
+        if (!(be instanceof dev.jsc.jscomputronics.module.computing.os.OsHost computer)) {
             return BootTarget.FIRMWARE;
         }
+        // A booted live installation medium (the manual Arch / Gentoo install) runs its own shell in the
+        // terminal until the sequence completes, whatever is or is not on the disks.
+        if (computer.console() != null && computer.console().liveInstall() != null) {
+            return BootTarget.TERMINAL_ONLY;
+        }
         final OsDef def = computer.installedOs();
+        // A TTY-only OS boots a desktop only when THIS session booted one. The disk may already carry a
+        // newly installed desktop package, but a running machine does not grow a graphical session on
+        // its own — that waits for the next restart.
+        if (def != null && computer.hasOs() && computer.bootedDesktopId() != null) {
+            return BootTarget.FULL_DESKTOP;
+        }
         return targetFor(computer.hasOs(), def != null ? def.capability() : null);
     }
 }

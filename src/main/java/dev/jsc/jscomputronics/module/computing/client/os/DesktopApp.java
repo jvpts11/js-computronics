@@ -73,6 +73,26 @@ public interface DesktopApp {
         return false;
     }
 
+    /**
+     * Whether this app currently has a modal dialog open. While true and the app's window is focused, the
+     * desktop treats the app as modal: it dims and disables the player-inventory items, suppresses slot
+     * hover, and routes all input to the app so nothing behind the dialog can be clicked. An app draws its
+     * own dialog (over its dimmed content) in {@link #renderContent}.
+     */
+    default boolean modalActive() {
+        return false;
+    }
+
+    /**
+     * Draws this app's modal dialog. The desktop calls this in a late pass, above every item icon and window,
+     * only while {@link #modalActive()} and this is the focused window — so the dialog (and its own dim) sits
+     * IN FRONT of the item icons instead of being pierced by their blit depth. The rectangle is the same
+     * content rectangle passed to {@link #renderContent}.
+     */
+    default void renderModal(GuiGraphics graphics, Font font, int x, int y, int width, int height,
+                             int mouseX, int mouseY) {
+    }
+
     /** Handles a mouse-wheel scroll over this app's window ({@code delta} &gt; 0 is up); true if consumed. */
     default boolean mouseScrolled(double delta) {
         return false;

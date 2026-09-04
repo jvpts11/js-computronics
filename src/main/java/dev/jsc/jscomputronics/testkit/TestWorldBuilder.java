@@ -42,12 +42,33 @@ public final class TestWorldBuilder {
     /** The Network OS id installed on every test Mainframe: the minimal OS that enables orchestration. */
     public static final ResourceLocation NETWORK_OS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_net");
 
+    /** What the base's desktop machines run: a Standard-era system, the same a player would install. */
+    public static final ResourceLocation DESKTOP_OS = ResourceLocation.fromNamespaceAndPath("jsc", "frames_11");
+
     private final ServerLevel level;
     private final UnaryOperator<BlockPos> toAbsolute;
+    /**
+     * Every block this builder wrote. A GameTest builds into an empty arena, but the same scenario built in
+     * a real world lands inside terrain: the caller needs to know exactly which blocks are the base's own so
+     * it can clear the rock from between them and leave a room a player can walk into.
+     */
+    private final java.util.Set<Long> written = new java.util.HashSet<>();
+    private net.minecraft.world.level.levelgen.structure.BoundingBox box;
 
     private TestWorldBuilder(final ServerLevel level, final UnaryOperator<BlockPos> toAbsolute) {
         this.level = level;
         this.toAbsolute = toAbsolute;
+    }
+
+    /** Whether this builder placed the block at the given absolute position. */
+    public boolean wrote(final BlockPos absolute) {
+        return written.contains(absolute.asLong());
+    }
+
+    /** The box every block written so far fits in, or {@code null} when nothing has been placed. */
+    @org.jetbrains.annotations.Nullable
+    public net.minecraft.world.level.levelgen.structure.BoundingBox writtenBox() {
+        return box;
     }
 
     /** A builder whose relative positions are the GameTest arena's, exactly like {@code helper.setBlock}. */
@@ -74,7 +95,33 @@ public final class TestWorldBuilder {
 
     public void setBlock(final BlockPos relative, final BlockState state) {
         // Flag 3 (update neighbours + send to clients) matches what GameTestHelper.setBlock does.
-        level.setBlock(absolute(relative), state, 3);
+        final BlockPos pos = absolute(relative);
+        level.setBlock(pos, state, 3);
+        note(pos);
+    }
+
+    /** Records a position as part of the base, growing the written box to hold it. */
+    public void note(final BlockPos absolute) {
+        written.add(absolute.asLong());
+        final net.minecraft.world.level.levelgen.structure.BoundingBox one =
+                new net.minecraft.world.level.levelgen.structure.BoundingBox(absolute);
+        box = box == null ? one : net.minecraft.world.level.levelgen.structure.BoundingBox.encapsulatingBoxes(
+                java.util.List.of(box, one)).orElse(box);
+    }
+
+    /**
+     * Clears the volume a multiblock is about to claim. In an empty arena this does nothing; in a world it
+     * is the difference between a cabinet forming and a bare controller block sitting in the rock, because
+     * a multiblock refuses to raise its parts into occupied space.
+     */
+    public void clearFor(final Iterable<BlockPos> relativePositions) {
+        for (final BlockPos relative : relativePositions) {
+            final BlockPos pos = absolute(relative);
+            if (!level.getBlockState(pos).isAir()) {
+                level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            }
+            note(pos);
+        }
     }
 
     /**
@@ -126,7 +173,7 @@ public final class TestWorldBuilder {
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
-        // The Network OS needs 512 item-slots of disk; a 500 GB HDD provides 2 000. The disk must be in
+        // The Network OS is 8 MB, one item of a 500 GB HDD's 2 000 at 256 MB the item. The disk must be in
         // place before installOs() so the footprint check passes.
         inv.setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
@@ -156,6 +203,11 @@ public final class TestWorldBuilder {
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
+        // A machine on a real base has a disk with a system on it. Without one the computer powers on into
+        // its firmware with nothing to boot, which is not what the base is meant to demonstrate.
+        hw.setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
+        be.installOs(DESKTOP_OS);
         be.togglePower();
         return be;
     }
@@ -179,15 +231,29 @@ public final class TestWorldBuilder {
                 new ItemStack(ComputingModule.CRAFTING_CARD_T2.get()));
         hw.setStackInSlot(CraftingComputerBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
+        hw.setStackInSlot(CraftingComputerBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
+        be.installOs(DESKTOP_OS);
         be.togglePower();
         return be;
     }
 
-    /** Seeds slot 0 of the rack at {@code relative} with the default server. */
+    /** Seeds slot 0 of the rack at {@code relative} with the default server and its bay drives. */
     public ServerRackBlockEntity seedServer(final BlockPos relative) {
         final ServerRackBlockEntity rack = blockEntity(relative, ServerRackBlockEntity.class);
-        rack.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        mountDefaultServer(rack, 0);
         return rack;
+    }
+
+    /**
+     * Mounts the default server at {@code slot} and slots the default pair of NVMe drives into the
+     * bay it claims — storage lives on the rack's front-panel drives, not on the Server item, so a
+     * fixture that needs network storage must populate the bay too.
+     */
+    public static void mountDefaultServer(final ServerRackBlockEntity rack, final int slot) {
+        rack.getServers().setStackInSlot(slot, ComputingModule.defaultServer());
+        rack.insertDrive(slot, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+        rack.insertDrive(slot, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
     }
 
     /** Places a Server Rack (default orientation) and seeds it with the default server. */

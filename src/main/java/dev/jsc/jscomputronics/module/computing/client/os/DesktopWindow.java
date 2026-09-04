@@ -113,6 +113,23 @@ public final class DesktopWindow {
         return curH;
     }
 
+    /** The floating bounds — where the window sits when it is not maximized — for persisting it. */
+    public int floatX() {
+        return x;
+    }
+
+    public int floatY() {
+        return y;
+    }
+
+    public int floatW() {
+        return w;
+    }
+
+    public int floatH() {
+        return h;
+    }
+
     public boolean minimized() {
         return minimized;
     }
@@ -127,11 +144,19 @@ public final class DesktopWindow {
 
     /** Moves the floating window, clamped so the title bar stays reachable. Ignored while maximized. */
     public void moveTo(final int nx, final int ny, final int maxW, final int maxH) {
+        moveTo(nx, ny, 0, maxW, maxH);
+    }
+
+    /**
+     * Moves the floating window within the work area {@code [minY, maxH)}: the title bar can never slide under
+     * a top panel (GNOME) nor below the bottom edge of the work area. Ignored while maximized.
+     */
+    public void moveTo(final int nx, final int ny, final int minY, final int maxW, final int maxH) {
         if (maximized) {
             return;
         }
         this.x = Math.max(0, Math.min(nx, maxW - w));
-        this.y = Math.max(0, Math.min(ny, maxH - TITLE_H));
+        this.y = Math.max(minY, Math.min(ny, maxH - TITLE_H));
     }
 
     /**
@@ -185,6 +210,11 @@ public final class DesktopWindow {
      * anchored); the result is clamped to the screen bounds and the minimum window size.
      */
     public void applyResize(final double mx, final double my, final int maxW, final int maxH) {
+        applyResize(mx, my, 0, maxW, maxH);
+    }
+
+    /** As {@link #applyResize(double, double, int, int)}, with the work area starting at {@code minY}. */
+    public void applyResize(final double mx, final double my, final int minY, final int maxW, final int maxH) {
         if (maximized || resizeDir == RESIZE_NONE) {
             return;
         }
@@ -206,9 +236,9 @@ public final class DesktopWindow {
         if ((resizeDir & RESIZE_BOTTOM) != 0) {
             b = resizeStartY + resizeStartH + dy;
         }
-        // Keep edges on-screen.
+        // Keep edges inside the work area.
         l = Math.max(0, l);
-        t = Math.max(0, t);
+        t = Math.max(minY, t);
         r = Math.min(maxW, r);
         b = Math.min(maxH, b);
         // Enforce the app's minimum size by pushing the moving edge back, so the content never collapses.
@@ -232,6 +262,25 @@ public final class DesktopWindow {
         this.y = t;
         this.w = r - l;
         this.h = b - t;
+    }
+
+    /**
+     * Snaps this window to an explicit floating rectangle (used by the Frames 11 edge-snap gesture). Leaves
+     * maximize, saving the pre-snap geometry as the restore rectangle so a later un-maximize returns here; the
+     * size is clamped up to the app's minimum so the content never collapses.
+     */
+    public void snapTo(final int nx, final int ny, final int nw, final int nh) {
+        if (maximized) {
+            maximized = false;
+        }
+        restoreX = x;
+        restoreY = y;
+        restoreW = w;
+        restoreH = h;
+        this.x = Math.max(0, nx);
+        this.y = Math.max(0, ny);
+        this.w = Math.max(app.minWidth(), nw);
+        this.h = Math.max(app.minHeight(), nh);
     }
 
     /** Toggles maximize, saving/restoring the floating geometry. */
@@ -258,10 +307,18 @@ public final class DesktopWindow {
      * behind a drag, resize, or maximize (otherwise {@code curX/curY} only update when the window renders).
      */
     public void resolveGeometry(final int screenW, final int screenH, final int taskbarH) {
+        resolveGeometry(screenW, screenH, taskbarH, 0);
+    }
+
+    /**
+     * As {@link #resolveGeometry(int, int, int)}, with {@code workTop} pixels reserved above the work area (a
+     * top panel), so a maximized window starts under it.
+     */
+    public void resolveGeometry(final int screenW, final int screenH, final int taskbarH, final int workTop) {
         // The minimum-size clamp lives in the unit-tested WindowGeometry so it can never silently go missing
         // again (the bug where a stale small geometry squashed the content and clipped the details panel).
         final WindowGeometry.Rect r = WindowGeometry.resolve(x, y, w, h, app.minWidth(), app.minHeight(),
-                maximized, screenW, screenH, taskbarH);
+                maximized, screenW, screenH, taskbarH, workTop);
         curX = r.x();
         curY = r.y();
         curW = r.w();
@@ -274,19 +331,54 @@ public final class DesktopWindow {
         }
     }
 
+    /** Whether this window is the one in front — the one keystrokes go to. */
+    private boolean focused;
+
+    public void setFocused(final boolean value) {
+        this.focused = value;
+    }
+
     public void render(final GuiGraphics g, final Font font, final OsSkin skin,
                        final int mouseX, final int mouseY, final float partialTick,
                        final int screenW, final int screenH, final int taskbarH) {
-        resolveGeometry(screenW, screenH, taskbarH);
+        render(g, font, skin, mouseX, mouseY, partialTick, screenW, screenH, taskbarH, 0);
+    }
+
+    /** As {@link #render(GuiGraphics, Font, OsSkin, int, int, float, int, int, int)}, with a top panel reserve. */
+    public void render(final GuiGraphics g, final Font font, final OsSkin skin,
+                       final int mouseX, final int mouseY, final float partialTick,
+                       final int screenW, final int screenH, final int taskbarH, final int workTop) {
+        resolveGeometry(screenW, screenH, taskbarH, workTop);
         final int wx = curX;
         final int wy = curY;
         final int ww = curW;
         final int wh = curH;
 
-        // Frame (border + body) and title bar, both shaped and corner-rounded by the installed OS's skin.
+        // A soft drop shadow lifts the window off the wallpaper, then the frame (border + body) and title bar,
+        // both shaped and corner-rounded by the installed OS's skin. A maximized window fills the desktop, so
+        // it casts no shadow.
+        if (!maximized) {
+            skin.windowShadow(g, wx, wy, ww, wh);
+        }
         skin.windowFrame(g, wx, wy, ww, wh);
-        skin.titleBar(g, wx, wy, ww, TITLE_H);
-        g.drawString(font, app.title(), wx + 4, wy + 3, skin.titleText(), skin.textShadow());
+        skin.titleBar(g, wx, wy, ww, TITLE_H, focused);
+        // Where the title sits is part of the skin's identity, not a constant: the GNOME form centres it,
+        // and the title is clamped short of the controls so a long one never runs under them.
+        final String title = app.title();
+        final int titleX = skin.titleCentered()
+                ? Math.max(wx + 4, Math.min(wx + (ww - font.width(title)) / 2, minX() - font.width(title) - 4))
+                : wx + 4;
+        g.drawString(font, title, titleX, wy + 3,
+                focused ? skin.titleText() : 0xFF5B6674, focused && skin.textShadow());
+        // The focused window also carries an accent outline, so "which one am I typing into" reads
+        // at a glance even when several windows overlap.
+        if (focused) {
+            final int accent = skin.accent();
+            g.fill(wx, wy, wx + ww, wy + 1, accent);
+            g.fill(wx, wy + wh - 1, wx + ww, wy + wh, accent);
+            g.fill(wx, wy, wx + 1, wy + wh, accent);
+            g.fill(wx + ww - 1, wy, wx + ww, wy + wh, accent);
+        }
 
         // Title-bar controls: minimize, maximize/restore, close (left to right), drawn in the skin's shape.
         final int by = wy + 2;
@@ -296,10 +388,21 @@ public final class DesktopWindow {
                 maximized ? OsSkin.Control.RESTORE : OsSkin.Control.MAXIMIZE, hover == 2, pressedBtn == 2);
         skin.windowControl(g, font, closeX(), by, BTN, BTN, OsSkin.Control.CLOSE, hover == 3, pressedBtn == 3);
 
-        // Body content, drawn in the OS skin (the app keeps the skin if it has been migrated to it).
+        // Body content, drawn in the OS skin (the app keeps the skin if it has been migrated to it). Clip it
+        // to the inner rect so nothing an app draws leaks past the frame when the window is resized smaller.
+        // enableScissor ignores the pose in 1.21.1, so compensate for the desktop's translate.
+        final int cx = wx + 4;
+        final int cy = wy + TITLE_H + 4;
+        final int cw = ww - 8;
+        final int ch = wh - TITLE_H - 8;
+        final org.joml.Matrix4f mat = g.pose().last().pose();
+        final dev.jsc.jscomputronics.common.gui.layout.WindowGeometry.Rect clip =
+                dev.jsc.jscomputronics.common.gui.layout.WindowGeometry.scissor(
+                        (int) mat.m30(), (int) mat.m31(), cx, cy, cx + cw, cy + ch);
+        g.enableScissor(clip.x(), clip.y(), clip.x() + clip.w(), clip.y() + clip.h());
         app.applySkin(skin);
-        app.renderContent(g, font, wx + 4, wy + TITLE_H + 4, ww - 8, wh - TITLE_H - 8,
-                mouseX, mouseY, partialTick);
+        app.renderContent(g, font, cx, cy, cw, ch, mouseX, mouseY, partialTick);
+        g.disableScissor();
 
         // Resize grip (floating windows only).
         if (!maximized) {

@@ -20,7 +20,7 @@ public record DatacenterSection(
         Direction face,
         Set<Long> rackPositions,
         List<NodeUuid> servers,
-        long totalStorageMB
+        long totalStorageItems
 ) {
 
     public int rackCount() {

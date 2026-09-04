@@ -39,6 +39,24 @@ public final class SystemLayout {
             "Users/Public/Documents"
     );
 
+    /** The directory a POSIX (Linux) system shows as the desktop once a desktop environment is installed. */
+    public static final String POSIX_DESKTOP_DIR = "home/player/Desktop";
+
+    /** The ordered system tree a POSIX (Linux) OS lays down on install (parents before children). */
+    private static final List<String> POSIX_DIRECTORIES = List.of(
+            "bin",
+            "etc",
+            "home",
+            "home/player",
+            "home/player/Desktop",
+            "home/player/Documents",
+            "media",
+            "tmp",
+            "usr",
+            "usr/bin",
+            "var"
+    );
+
     /**
      * Returns the system directories the given capability provisions on install.
      *
@@ -47,5 +65,24 @@ public final class SystemLayout {
      */
     public static List<String> directoriesFor(final OsCapability capability) {
         return capability == OsCapability.FULL_DESKTOP ? DESKTOP_DIRECTORIES : List.of();
+    }
+
+    /** The desktop folder for an OS: the Unix home desktop on a POSIX kernel, the Windows-style one otherwise. */
+    public static String desktopDirFor(final dev.jsc.jscomputronics.module.computing.os.KernelDef kernel) {
+        return kernel != null && kernel.shellFamily() == dev.jsc.jscomputronics.module.computing.os.ShellFamily.POSIX
+                ? POSIX_DESKTOP_DIR : DESKTOP_DIR;
+    }
+
+    /**
+     * Returns the system directories an OS provisions on install, by its kernel's shell family: a POSIX
+     * kernel lays down the Unix tree regardless of capability (a Linux TTY still has /home and /etc), a DOS
+     * kernel follows the capability rule above.
+     */
+    public static List<String> directoriesFor(final dev.jsc.jscomputronics.module.computing.os.OsDef os,
+                                              final dev.jsc.jscomputronics.module.computing.os.KernelDef kernel) {
+        if (kernel != null && kernel.shellFamily() == dev.jsc.jscomputronics.module.computing.os.ShellFamily.POSIX) {
+            return POSIX_DIRECTORIES;
+        }
+        return directoriesFor(os.capability());
     }
 }

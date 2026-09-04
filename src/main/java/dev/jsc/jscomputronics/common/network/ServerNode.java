@@ -13,19 +13,20 @@ import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import java.util.Objects;
 
 /**
- * Snapshot of a Server item operating inside a Server Rack.
+ * Snapshot of a Server item operating inside a Server Rack. Its storage is counted in items, the unit every
+ * disk shares whatever era it was made for; megabytes differ by era and stay a display concern.
  */
 public record ServerNode(
         NodeUuid nodeUuid,
         NetworkUuid networkUuid,
-        long storageMB
+        long storageItems
 ) implements ServiceNode{
     public ServerNode {
         Objects.requireNonNull(nodeUuid, "nodeUuid must not be null");
         Objects.requireNonNull(networkUuid, "networkUuid must not be null");
-        if (storageMB < 0) {
+        if (storageItems < 0) {
             throw new IllegalArgumentException(
-                    "storageMB must be >= 0; got " + storageMB);
+                    "storageItems must be >= 0; got " + storageItems);
         }
     }
 

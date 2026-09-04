@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.fs;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
 import org.junit.jupiter.api.Test;
 
@@ -17,11 +18,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FsPathsTest {
 
     @Test
-    void sizeMbEq_roundsUpToFourKilobyteUnits() {
-        assertEquals(0L, FsPaths.sizeMbEq(0));
-        assertEquals(1L, FsPaths.sizeMbEq(1));
-        assertEquals(1L, FsPaths.sizeMbEq(4096));
-        assertEquals(2L, FsPaths.sizeMbEq(4097));
+    void sizeMbEq_roundsUpToTheErasBlock() {
+        // A standard disk's block is 268 435 bytes; a vintage one's is 1 048, so the same file weighs more there.
+        assertEquals(0L, FsPaths.sizeMbEq(0, HardwareEra.STANDARD));
+        assertEquals(1L, FsPaths.sizeMbEq(1, HardwareEra.STANDARD));
+        assertEquals(1L, FsPaths.sizeMbEq(268_435, HardwareEra.STANDARD));
+        assertEquals(2L, FsPaths.sizeMbEq(268_436, HardwareEra.STANDARD));
+        assertEquals(1L, FsPaths.sizeMbEq(1_048, HardwareEra.VINTAGE));
+        assertEquals(2L, FsPaths.sizeMbEq(1_049, HardwareEra.VINTAGE));
+        assertEquals(3L, FsPaths.sizeMbEq(3_000, HardwareEra.VINTAGE));
+        assertEquals(1L, FsPaths.sizeMbEq(3_000, HardwareEra.STANDARD));
     }
 
     @Test

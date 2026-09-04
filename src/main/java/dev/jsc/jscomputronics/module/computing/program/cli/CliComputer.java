@@ -109,6 +109,11 @@ public interface CliComputer {
     OpResult execute(dev.jsc.jscomputronics.module.computing.program.iql.IqlOperation operation);
 
     /** Controls the network's IQL Engine service: {@code install}/{@code start}/{@code stop}/{@code status}. */
+    /** The block entity behind this shell, for commands that exist on one kind of machine only. */
+    default Object hostBlock() {
+        return null;
+    }
+
     default OpResult engineControl(final String action) {
         return OpResult.fail("the IQL Engine can only be controlled from a networked computer");
     }
@@ -121,6 +126,173 @@ public interface CliComputer {
     /** Whether the network's IQL Engine is installed — gates the Engine's own commands in the prompt. */
     default boolean iqlEngineInstalled() {
         return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Terminal session (DOS navigation)
+    // -------------------------------------------------------------------------
+
+    /**
+     * This terminal session's current drive and directory, used by the DOS command line to resolve relative paths
+     * and to draw the {@code C:\DIR>} prompt. Defaults to the boot drive's root; the server persists it per terminal.
+     */
+    default DosPath.Location currentLocation() {
+        return DosPath.Location.root('C');
+    }
+
+    /** The command-syntax family of the installed OS's kernel; DOS when nothing says otherwise. */
+    default dev.jsc.jscomputronics.module.computing.os.ShellFamily shellFamily() {
+        return dev.jsc.jscomputronics.module.computing.os.ShellFamily.DOS;
+    }
+
+    /** The prompt to show for the current location, in the installed shell's style ({@code C:\>} by default). */
+    default String prompt() {
+        return currentLocation().dosPath() + ">";
+    }
+
+    /** This computer's host name as a POSIX shell shows it (its name, or the OS id when unnamed). */
+    default String hostname() {
+        return "computer";
+    }
+
+    /** One mounted drive for {@code df}: its letter, device name, capacity/free space, and whether a medium is present. */
+    record MountInfo(char drive, String device, long capacityMbEq, long freeMbEq, boolean ready) {
+    }
+
+    /** Every drive the shell can see (the system disk first), for {@code df}; empty when there is no OS. */
+    default List<MountInfo> mounts() {
+        return List.of();
+    }
+
+    /**
+     * Everything {@code screenfetch} shows about this machine: the distribution and its id (picks the
+     * ASCII logo), kernel line, host and shell, the desktop environment (or the TTY), the hardware, disk
+     * usage, installed package count and the world's uptime in ticks.
+     */
+    record SystemInfo(String distroId, String os, String kernel, String hostname, String shell,
+                      String desktop, String cpu, int ramMb, long diskUsedMb, long diskTotalMb,
+                      int packages, long uptimeTicks) {
+    }
+
+    /** The system information for {@code screenfetch}, or null when no OS is installed. */
+    default SystemInfo systemInfo() {
+        return null;
+    }
+
+    /** Whether the program with the given id is present on this computer (installed, or a service flag). */
+    default boolean hasProgram(final net.minecraft.resources.ResourceLocation id) {
+        return false;
+    }
+
+    // ---- packages (Linux package managers over the network mirror) ----
+
+    /** The installed OS's package manager; {@code NONE} on media-installed platforms. */
+    default dev.jsc.jscomputronics.module.computing.os.PackageManagerKind packageManager() {
+        return dev.jsc.jscomputronics.module.computing.os.PackageManagerKind.NONE;
+    }
+
+    /** One package the mirror offers: its name, description, and whether this computer already has it. */
+    record PackageInfo(String name, String description, boolean installed, boolean building) {
+    }
+
+    /** The packages the network mirror offers this computer (empty when no mirror is reachable). */
+    default List<PackageInfo> packagesAvailable() {
+        return List.of();
+    }
+
+    /**
+     * Installs the named package from the network mirror: resolves it, checks the OS/hardware gates, and
+     * installs it (or, for a source-based manager, starts the build). The message reads like the package
+     * manager's own output; a missing mirror is the classic "could not resolve" failure.
+     */
+    default OpResult packageInstall(final String name) {
+        return OpResult.fail("could not resolve mirror://");
+    }
+
+    /**
+     * Removes the named installed program (a package manager's remove verb, or the DOS-family
+     * {@code uninstall} command). Mainframe services turn their agent off; a removed desktop
+     * environment drops the computer back to the TTY on its next boot.
+     */
+    default OpResult packageRemove(final String name) {
+        return OpResult.fail("unable to locate package " + name);
+    }
+
+    /**
+     * Brings every installed package up to the current build. Packages installed before a mod update
+     * carry the version they were installed at, so this is what reconciles a repository that moved on
+     * without the machine — it never installs anything new.
+     */
+    default OpResult packageUpdate() {
+        return OpResult.fail("could not resolve mirror://");
+    }
+
+    /**
+     * Formats the drive with the given letter: erases the installed system, every file, and the item
+     * storage on it. Refuses the drive the running system lives on.
+     */
+    default OpResult formatDrive(final char letter) {
+        return OpResult.fail("format: drive not found");
+    }
+
+    /** Whether a network mirror is reachable from this computer right now. */
+    default boolean mirrorReachable() {
+        return false;
+    }
+
+    /** Controls the Mirror service on the network's Mainframe: {@code install|status}. */
+    default OpResult mirrorControl(final String action) {
+        return OpResult.fail("the network has no Mainframe");
+    }
+
+    /** Source builds still compiling on this computer: program id to ticks remaining. */
+    default java.util.Map<String, Long> buildsRemaining() {
+        return java.util.Map.of();
+    }
+
+    /**
+     * One notice per source build that finished since the shell last asked (returned once, then forgotten):
+     * a build completes while the player is elsewhere, so the shell prints these ahead of the next command.
+     */
+    default java.util.List<String> drainBuildNotices() {
+        return java.util.List.of();
+    }
+
+    // ---- live installation media (the manual Arch / Gentoo installs) ----
+
+    /** The live installation in progress on this computer, or null when it booted a real OS. */
+    default dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState liveInstall() {
+        return null;
+    }
+
+    /**
+     * Runs one live-installer line against the install state. The message carries the tool's output lines
+     * (newline-separated); when the sequence completes, the host installs the system and ends the session.
+     */
+    default OpResult liveRun(final String line) {
+        return OpResult.fail("no live medium is booted");
+    }
+
+    /** Asks the host to restart into its firmware setup once this command finishes (the {@code reboot --firmware} verb). */
+    default void requestFirmwareReboot() {
+    }
+
+    /** Whether a command asked for a restart into the firmware during this run. */
+    default boolean firmwareRebootRequested() {
+        return false;
+    }
+
+    /** Asks the host to restart once this command finishes: the monitor replays the POST, then boots. */
+    default void requestReboot() {
+    }
+
+    /** Whether a command asked for a plain restart during this run. */
+    default boolean rebootRequested() {
+        return false;
+    }
+
+    /** Sets the session's current drive and directory (used by {@code cd} and drive changes). */
+    default void setCurrentLocation(final DosPath.Location location) {
     }
 
     // -------------------------------------------------------------------------
@@ -191,8 +363,119 @@ public interface CliComputer {
         return FsResult.noOs();
     }
 
-    /** One directory entry returned by {@link #listDisk}. */
-    record FsEntry(String path, String ext, long weightMbEq, boolean readOnly) {}
+    /**
+     * Changes the shell's current directory. {@code input} is a DOS path relative to the current
+     * location (or absolute); implementations resolve it, verify the target directory exists, and
+     * persist the new location. A blank input or {@code \} means the drive root.
+     *
+     * @param input the DOS path to change to
+     * @return a confirmation, or a failure when the path does not exist
+     */
+    default FsResult changeDir(final String input) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * Switches the shell's current drive to {@code drive}, restoring that drive's remembered current
+     * directory. Fails when the drive letter is not mapped to any installed disk or linked medium.
+     *
+     * @param drive the drive letter (case-insensitive)
+     * @return a confirmation, or a failure when the drive does not exist or is not ready
+     */
+    default FsResult changeDrive(final char drive) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * The current per-computer settings as {@code key   value} lines, for the {@code config} command
+     * to print. An empty list means this computer has no settings store.
+     *
+     * @return the settings summary lines, oldest-first
+     */
+    default java.util.List<String> configSummary() {
+        return java.util.List.of();
+    }
+
+    /**
+     * Changes one setting (the computer name, the network share, or a value owned by the settings
+     * store), clamping as needed. Returns a confirmation or a failure describing the problem.
+     *
+     * @param key   the setting key (case-insensitive; e.g. {@code name}, {@code netshare}, {@code clock})
+     * @param value the raw value
+     * @return the outcome of the change
+     */
+    default OpResult setConfig(final String key, final String value) {
+        return OpResult.fail("this computer has no settings store");
+    }
+
+    /**
+     * Creates a directory. {@code path} is a DOS path relative to the current location (or absolute).
+     *
+     * @param path the directory to create
+     * @return a confirmation, or a failure message
+     */
+    default FsResult makeDir(final String path) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * Removes a directory and everything under it. {@code path} is a DOS path relative to the current
+     * location (or absolute).
+     *
+     * @param path the directory to remove
+     * @return a confirmation, or a failure message
+     */
+    default FsResult removeDir(final String path) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * Copies a file (or directory subtree) from {@code src} to {@code dest}. Both are DOS paths
+     * relative to the current location (or absolute).
+     *
+     * @param src  the source path
+     * @param dest the destination path
+     * @return a confirmation, or a failure message
+     */
+    default FsResult copyPath(final String src, final String dest) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * Moves a file (or directory subtree) into the directory {@code destDir}. Both are DOS paths
+     * relative to the current location (or absolute).
+     *
+     * @param src     the source path
+     * @param destDir the destination directory
+     * @return a confirmation, or a failure message
+     */
+    default FsResult movePath(final String src, final String destDir) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * Renames a file or directory {@code src} to the new leaf name {@code newName} (kept in the same
+     * parent directory). {@code src} is a DOS path relative to the current location (or absolute).
+     *
+     * @param src     the source path
+     * @param newName the new leaf name
+     * @return a confirmation, or a failure message
+     */
+    default FsResult renamePath(final String src, final String newName) {
+        return FsResult.noOs();
+    }
+
+    /**
+     * One entry returned by {@link #listDisk}: a file or a subdirectory of the listed directory.
+     *
+     * @param name     the entry's leaf name (a file name with its extension, or a directory name)
+     * @param ext      the file extension without the dot, or {@code ""} for a directory
+     * @param weightMbEq the file's disk weight in mB-equivalents ({@code 0} for a directory)
+     * @param readOnly true if the entry cannot be written or deleted via the shell
+     * @param isDir    true if this entry is a subdirectory rather than a file
+     * @param modified the world game time the file was last written; {@code 0} means unknown
+     */
+    record FsEntry(String name, String ext, long weightMbEq, boolean readOnly, boolean isDir, long modified) {}
 
     /**
      * The result of a filesystem operation: either a success carrying optional entries + an optional
@@ -253,6 +536,48 @@ public interface CliComputer {
     /** Counts that describe the network at a glance. */
     record NetSummary(boolean linked, int servers, int personalComputers, int subframes,
                       int indexedTypes, boolean mainframePresent) {
+    }
+
+    // ---- Remote shells ---------------------------------------------------------------------------
+
+    /** Every machine on this network a remote shell could reach, by host name. */
+    default List<RemoteHost> reachableHosts() {
+        return List.of();
+    }
+
+    /**
+     * Opens a remote shell on {@code hostname}: from here on the session's commands run on that
+     * machine until it is closed. Same network means access — authentication arrives with the
+     * security module.
+     */
+    default OpResult sshConnect(final String hostname) {
+        return OpResult.fail("ssh: not supported on this computer");
+    }
+
+    /** Closes the remote shell and returns to the local one; fails when there is no session. */
+    default OpResult sshDisconnect() {
+        return OpResult.fail("exit: not connected");
+    }
+
+    /** The host name of the machine this session is connected to, or {@code ""} when local. */
+    default String sshSession() {
+        return "";
+    }
+
+    /**
+     * One machine a remote shell can reach. A machine can be addressed by any of these: the host
+     * name it answers to, the name its owner gave it, or the head of its node id — whichever the
+     * player has in front of them.
+     *
+     * @param hostname the shell host name (what the remote prompt shows)
+     * @param name     the player-given machine name, or {@code ""} when unnamed
+     * @param nodeId   the short node identifier
+     * @param os       the operating system it runs, or {@code ""} when it has none
+     * @param type     the kind of machine (Mainframe, Server, Personal Computer, ...)
+     * @param running  whether it is powered on right now
+     */
+    record RemoteHost(String hostname, String name, String nodeId, String os, String type,
+                      boolean running) {
     }
 
     /** A line in a storage listing: a name, a quantity, and an optional detail (e.g. where the item lives). */

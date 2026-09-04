@@ -36,21 +36,13 @@ public abstract class AbstractAssemblyScreen<T extends AbstractContainerMenu> ex
         nameBox = new EditBox(font, leftPos + x, topPos + y, width, 11, Component.literal("Name"));
         nameBox.setBordered(false);
         nameBox.setMaxLength(maxLength);
-        // The field colors itself with the resolved era skin, not the bound static, since it is built in init()
-        // outside a render pass; containerTick keeps it in step when a board swap changes the era.
-        nameBox.setTextColor(theme.text());
+        // The rename field sits on a dark header strip in every era, so its text is a fixed white — the
+        // era's own text colour goes dark on the Legacy strip and the name becomes unreadable.
+        nameBox.setTextColor(0xFFFFFFFF);
         nameBox.setHint(hint);
         nameBox.setValue(initialValue);
         nameBox.setResponder(responder);
         addRenderableWidget(nameBox);
-    }
-
-    @Override
-    protected void containerTick() {
-        super.containerTick();
-        if (nameBox != null) {
-            nameBox.setTextColor(theme.text());
-        }
     }
 
     @Override

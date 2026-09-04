@@ -1,19 +1,16 @@
 {
   "variants": {
     "facing=east": {
-      "model": "jsc:block/mainframe",
-      "y": 90
+      "model": "jsc:block/mainframe_cabinet"
     },
     "facing=north": {
-      "model": "jsc:block/mainframe"
+      "model": "jsc:block/mainframe_cabinet"
     },
     "facing=south": {
-      "model": "jsc:block/mainframe",
-      "y": 180
+      "model": "jsc:block/mainframe_cabinet"
     },
     "facing=west": {
-      "model": "jsc:block/mainframe",
-      "y": 270
+      "model": "jsc:block/mainframe_cabinet"
     }
   }
 }

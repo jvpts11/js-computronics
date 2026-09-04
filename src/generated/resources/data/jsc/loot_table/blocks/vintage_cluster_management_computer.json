@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "jsc:vintage_cluster_management_computer"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "jsc:blocks/vintage_cluster_management_computer"
+}

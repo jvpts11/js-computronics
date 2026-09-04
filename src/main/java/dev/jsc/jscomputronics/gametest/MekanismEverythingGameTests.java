@@ -11,7 +11,6 @@ import com.mojang.logging.LogUtils;
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
 import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
@@ -82,21 +81,15 @@ public final class MekanismEverythingGameTests {
     private static void placeSupercomputer(final GameTestHelper helper, final BlockPos hub, final int nodes) {
         helper.setBlock(hub, ComputingModule.HBW_INTERFACE.get());
         for (int i = 1; i <= nodes; i++) {
-            final BlockPos pos = hub.east(i);
-            helper.setBlock(pos, ComputingModule.SUPERCOMPUTER_NODE.get());
-            if (helper.getBlockEntity(pos) instanceof SupercomputerNodeBlockEntity node) {
-                final var hw = node.getHardware();
-                hw.setStackInSlot(SupercomputerNodeBlockEntity.MOTHERBOARD_SLOT,
-                        new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
-                hw.setStackInSlot(SupercomputerNodeBlockEntity.CPU_SLOT,
-                        new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-                hw.setStackInSlot(SupercomputerNodeBlockEntity.RAM_SLOTS_START,
-                        new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-                hw.setStackInSlot(SupercomputerNodeBlockEntity.PHI_SLOT,
-                        new ItemStack(ComputingModule.PHI_5100.get()));
-                hw.setStackInSlot(SupercomputerNodeBlockEntity.PSU_SLOT,
-                        new ItemStack(ComputingModule.PSU_650G.get()));
-                node.togglePower();
+            // A cable run east of the hub with one Supercomputer Rack beside each cable block, each
+            // seating a ready node; racks are leaves on the fabric, so they sit beside the run.
+            final BlockPos cable = hub.east(i);
+            helper.setBlock(cable, ComputingModule.HPC_CABLE.get());
+            final BlockPos rackPos = cable.above(); // the row in front belongs to the rig's machines
+            helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
+            if (helper.getBlockEntity(rackPos)
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack) {
+                rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
             }
         }
     }

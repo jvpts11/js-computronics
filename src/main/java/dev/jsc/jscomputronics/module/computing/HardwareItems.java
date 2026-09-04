@@ -160,12 +160,12 @@ public final class HardwareItems {
                     CpuSocket.SOCKET_7, 2, Set.of(RamGeneration.SIMM, RamGeneration.EDO), 16,
                     PcieGeneration.PCI, 10, 8, 8));
 
-    // Vintage spinning disks: MFM/IDE rotating platters (20 MB and 100 MB). Tiny capacity by design —
-    // these are the floor of the storage ladder, appropriate for single-digit MHz CPUs.
+    // Vintage spinning disks: MFM/IDE rotating platters of 20 MB and 100 MB. Tiny by design — the floor of
+    // the storage ladder — and honest: at 16 bits an item costs 1 MB, so they hold 20 and 100 items.
     public static final DeferredItem<DiskItem> DISK_TRENCH_20M =
-            disk("disk_vaultis_trench_20m", new DiskSpec(StorageTier.HDD, 80L, 5));
+            disk("disk_vaultis_trench_20m", new DiskSpec(StorageTier.HDD, HardwareEra.VINTAGE, 20L, 5));
     public static final DeferredItem<DiskItem> DISK_TRENCH_100M =
-            disk("disk_vaultis_trench_100m", new DiskSpec(StorageTier.HDD, 400L, 6));
+            disk("disk_vaultis_trench_100m", new DiskSpec(StorageTier.HDD, HardwareEra.VINTAGE, 100L, 6));
 
     // ==========================================================================================
     //  LEGACY — AGP/PCIe 1.0 buses, SDRAM/DDR/DDR2 RAM, first multi-core CPUs
@@ -252,14 +252,15 @@ public final class HardwareItems {
             board("motherboard_mtx_legacy", new MotherboardSpec(FormFactor.MTX, HardwareEra.LEGACY,
                     CpuSocket.SOCKET_940, 4, Set.of(RamGeneration.DDR2), 24, PcieGeneration.PCIE_1_0, 8, 6, 8));
 
-    // Legacy rotating and early solid-state disks: IDE HDDs (4 GB and 20 GB) and the first affordable
-    // SATA SSD (64 GB). Capacity sits between vintage and the standard 500 GB / 1 TB floor.
+    // Legacy rotating and early solid-state disks: IDE HDDs of 4 GB and 20 GB and the first affordable
+    // SATA SSD of 64 GB. At 32 bits an item costs 16 MB, so they hold 256, 1 280 and 4 096 items —
+    // between vintage and the standard 500 GB / 1 TB floor.
     public static final DeferredItem<DiskItem> DISK_LINK_IDE_4G =
-            disk("disk_vaultis_link_ide_4g", new DiskSpec(StorageTier.HDD, 640L, 7));
+            disk("disk_vaultis_link_ide_4g", new DiskSpec(StorageTier.HDD, HardwareEra.LEGACY, 256L, 7));
     public static final DeferredItem<DiskItem> DISK_LINK_IDE_20G =
-            disk("disk_vaultis_link_ide_20g", new DiskSpec(StorageTier.HDD, 1280L, 8));
+            disk("disk_vaultis_link_ide_20g", new DiskSpec(StorageTier.HDD, HardwareEra.LEGACY, 1280L, 8));
     public static final DeferredItem<DiskItem> DISK_LINK_SATA_SSD_64G =
-            disk("disk_vaultis_link_sata_ssd_64g", new DiskSpec(StorageTier.SSD, 768L, 3));
+            disk("disk_vaultis_link_sata_ssd_64g", new DiskSpec(StorageTier.SSD, HardwareEra.LEGACY, 4096L, 3));
 
     // ==========================================================================================
     //  STANDARD — completion of the partially-registered set (PCIe 2.0/3.0, DDR3)

@@ -259,10 +259,11 @@ public final class NetworkSystem {
         return java.util.List.copyOf(list);
     }
 
-    public long totalStorageOf(NetworkUuid networkUuid) {
+    /** The storage of every server on the network, in items, as the racks registered it. */
+    public long totalStorageItemsOf(NetworkUuid networkUuid) {
         long total = 0L;
         for (var server : serversOf(networkUuid)) {
-            total += server.storageMB();
+            total += server.storageItems();
         }
         return total;
     }

@@ -15,7 +15,6 @@ import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlock
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
@@ -92,23 +91,23 @@ public final class MekanismParallelLoadGameTests {
         return new CraftingPattern(grid, new ItemStack(Items.OAK_PLANKS, 4));
     }
 
-    private static final BlockPos NODE = HUB.east();
+    private static final BlockPos CABLE = HUB.east();
+    private static final BlockPos NODE_RACK = CABLE.above(); // the row in front belongs to the rig
 
-    /** Builds the cluster hub + one node with a Phi, ready to power; leaves the node OFF. */
+    /** Builds the hub, a cable, and one Supercomputer Rack seating a node with a Phi; leaves its bay OFF. */
     private static void placeClusterOffline(final TestWorldBuilder world) {
         world.setBlock(HUB, ComputingModule.HBW_INTERFACE.get());
-        world.setBlock(NODE, ComputingModule.SUPERCOMPUTER_NODE.get());
-        final SupercomputerNodeBlockEntity node = world.blockEntity(NODE, SupercomputerNodeBlockEntity.class);
-        final var hw = node.getHardware();
-        hw.setStackInSlot(SupercomputerNodeBlockEntity.MOTHERBOARD_SLOT, new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
-        hw.setStackInSlot(SupercomputerNodeBlockEntity.CPU_SLOT, new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-        hw.setStackInSlot(SupercomputerNodeBlockEntity.RAM_SLOTS_START, new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.setStackInSlot(SupercomputerNodeBlockEntity.PHI_SLOT, new ItemStack(ComputingModule.PHI_5100.get()));
-        hw.setStackInSlot(SupercomputerNodeBlockEntity.PSU_SLOT, new ItemStack(ComputingModule.PSU_650G.get()));
+        world.setBlock(CABLE, ComputingModule.HPC_CABLE.get());
+        world.setBlock(NODE_RACK, ComputingModule.SUPERCOMPUTER_RACK.get());
+        final var rack = world.blockEntity(NODE_RACK,
+                dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity.class);
+        rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
+        rack.toggleBayPower(0); // bays start on; the offline fixture wants the node dark
     }
 
     private static void powerCluster(final TestWorldBuilder world) {
-        world.blockEntity(NODE, SupercomputerNodeBlockEntity.class).togglePower();
+        world.blockEntity(NODE_RACK,
+                dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity.class).toggleBayPower(0);
     }
 
     private static void placeCluster(final TestWorldBuilder world) {

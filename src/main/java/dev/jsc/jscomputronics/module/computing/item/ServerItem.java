@@ -28,12 +28,49 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A Server: a complete computer in item form.
+ * A Server: a complete computer in item form. Since the racks rework the item carries no drives — a
+ * server's disks live in the rack's front-panel hotswap slots (its chassis decides how many it cables),
+ * so storage moves with the bay, never with this item.
  */
-public class ServerItem extends Item {
+public class ServerItem extends Item
+        implements dev.jsc.jscomputronics.module.computing.rack.MountableRackUnit {
+
+    private final dev.jsc.jscomputronics.module.computing.rack.RackChassis chassis;
+
+    @Override
+    public int heightU() {
+        return chassis.heightU();
+    }
+
+    @Override
+    public int driveSlots() {
+        return chassis.driveSlots();
+    }
+
+    @Override
+    public int gadgetSlots() {
+        return chassis.gadgetSlots();
+    }
 
     public ServerItem(final Properties properties) {
+        this(properties, dev.jsc.jscomputronics.module.computing.rack.RackChassis.SERVER);
+    }
+
+    public ServerItem(final Properties properties,
+                      final dev.jsc.jscomputronics.module.computing.rack.RackChassis chassis) {
         super(properties.stacksTo(1));
+        this.chassis = chassis;
+    }
+
+    /** The physical chassis of this server type: its rack-unit height and front-slot budgets. */
+    public dev.jsc.jscomputronics.module.computing.rack.RackChassis chassis() {
+        return chassis;
+    }
+
+    /** The chassis of a stack, or null when the stack is not a server. */
+    @Nullable
+    public static dev.jsc.jscomputronics.module.computing.rack.RackChassis chassisOf(final ItemStack stack) {
+        return stack.getItem() instanceof ServerItem server ? server.chassis() : null;
     }
 
     @Override
@@ -49,11 +86,6 @@ public class ServerItem extends Item {
         }
         return net.minecraft.world.InteractionResultHolder.sidedSuccess(
                 player.getItemInHand(hand), level.isClientSide());
-    }
-
-    public static dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents storage(final ItemStack stack) {
-        return stack.getOrDefault(ComputingModule.SERVER_STORAGE.get(),
-                dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents.EMPTY);
     }
 
     public static ItemContainerContents hardware(final ItemStack stack) {
@@ -111,20 +143,15 @@ public class ServerItem extends Item {
         return new ComputerBuild(board, cpus, pcieCards, rams, psu, disks);
     }
 
-    public static long storageMb(final ItemStack stack) {
-        final ComputerBuild b = build(stack);
-        return b == null ? 0L : b.storageMb();
-    }
-
     @Override
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
-        final long stored = storage(stack).total();
-        final ComputerBuild assembled = build(stack);
-        final long capacity = assembled == null ? 0L : assembled.totalStorageItems();
         tooltip.add(Component.translatable("item.jsc.server.tooltip")
                 .withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal(stored + " / " + capacity + " items stored")
+        HardwareTooltip.appendEra(tooltip, chassis.era());
+        // Drives (and therefore stored data) belong to the rack bay, not to this item.
+        tooltip.add(Component.literal(chassis.heightU() + "U - " + chassis.driveSlots()
+                + " drive + " + chassis.gadgetSlots() + " gadget bays in the rack")
                 .withStyle(ChatFormatting.DARK_GRAY));
         final UUID uuid = nodeUuid(stack);
         if (uuid != null) {

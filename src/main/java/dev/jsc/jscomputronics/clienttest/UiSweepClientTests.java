@@ -8,10 +8,9 @@
 package dev.jsc.jscomputronics.clienttest;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.client.ClusterManagementComputerScreen;
 import dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen;
 import dev.jsc.jscomputronics.module.computing.client.ServerRackScreen;
-import dev.jsc.jscomputronics.module.computing.client.SupercomputerConsoleScreen;
-import dev.jsc.jscomputronics.module.computing.client.SupercomputerNodeScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -34,7 +33,7 @@ public final class UiSweepClientTests {
 
     private static final BlockPos RACK = new BlockPos(2, 2, 2);
     private static final BlockPos SWITCH = new BlockPos(5, 2, 2);
-    private static final BlockPos CONSOLE = new BlockPos(8, 2, 2);
+    private static final BlockPos CLUSTER_MANAGER = new BlockPos(8, 2, 2);
     private static final BlockPos NODE = new BlockPos(11, 2, 2);
 
     /** Right-clicks {@code block}, waits for {@code screen}, screenshots it, asserts it stays open, then closes. */
@@ -55,12 +54,12 @@ public final class UiSweepClientTests {
         ctx.thenBuild(0, world -> {
             world.setBlock(RACK, ComputingModule.SERVER_RACK.get());
             world.setBlock(SWITCH, ComputingModule.CRAFTING_SWITCH.get());
-            world.setBlock(CONSOLE, ComputingModule.SUPERCOMPUTER_CONSOLE.get());
-            world.setBlock(NODE, ComputingModule.SUPERCOMPUTER_NODE.get());
+            world.setBlock(CLUSTER_MANAGER, ComputingModule.CLUSTER_MANAGEMENT_COMPUTER.get());
+            world.setBlock(NODE, ComputingModule.SUPERCOMPUTER_RACK.get());
         });
         open(ctx, RACK, ServerRackScreen.class, "server-rack");
         open(ctx, SWITCH, CraftingSwitchScreen.class, "crafting-switch");
-        open(ctx, CONSOLE, SupercomputerConsoleScreen.class, "supercomputer-console");
-        open(ctx, NODE, SupercomputerNodeScreen.class, "supercomputer-node");
+        open(ctx, CLUSTER_MANAGER, ClusterManagementComputerScreen.class, "cluster-management-computer");
+        open(ctx, NODE, ServerRackScreen.class, "supercomputer-rack");
     }
 }

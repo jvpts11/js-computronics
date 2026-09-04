@@ -57,7 +57,9 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
 
     private static final double MONITOR_REACH = 16.0;
 
-    private static final int DATA_COUNT = 31;
+    private static final int DATA_COUNT = 33;
+    private static final int DATA_INDEX_HEALTH = 31;
+    private static final int DATA_INDEX_HEALTH_TYPES = 32;
     private static final int DATA_USABLE_SLOTS = 18;
     private static final int DATA_CRAFT_COMPUTERS = 29;
     // The host's board-derived hardware-era ordinal (or -1 when no board), synced so the client can skin the
@@ -211,6 +213,8 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
                 final dev.jsc.jscomputronics.common.tier.HardwareEra era = host.displayEra();
                 yield era == null ? -1 : era.ordinal();
             }
+            case DATA_INDEX_HEALTH -> host.indexHealthState();
+            case DATA_INDEX_HEALTH_TYPES -> host.indexHealthTypeCount();
             default -> 0;
         };
     }
@@ -548,6 +552,18 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         return data.get(26);
     }
 
+    /** The index's health state, as an {@code IndexHealth.State} ordinal. */
+    public dev.jsc.jscomputronics.common.operation.index.IndexHealth.State indexHealth() {
+        final var states = dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.values();
+        final int ordinal = data.get(DATA_INDEX_HEALTH);
+        return ordinal >= 0 && ordinal < states.length ? states[ordinal] : states[0];
+    }
+
+    /** How many item types the index has flagged. */
+    public int indexHealthTypes() {
+        return data.get(DATA_INDEX_HEALTH_TYPES);
+    }
+
     public long networkStorageUsed() {
         return data.get(27);
     }
@@ -599,10 +615,12 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         if (!(level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor)) {
             return false;
         }
-        final BlockPos owner = monitor.ownerPos();
-        return owner != null && owner.equals(hostPos)
+        // Either the cable links this machine, or a Remote Control session put it on the screen.
+        return monitor.shows(hostPos)
                 && player.distanceToSqr(monitorPos.getX() + 0.5, monitorPos.getY() + 0.5,
-                monitorPos.getZ() + 0.5) <= MONITOR_REACH * MONITOR_REACH;
+                monitorPos.getZ() + 0.5) <= MONITOR_REACH * MONITOR_REACH
+                // The network GUI dies with its machine (power off, system disk pulled).
+                && CommandPromptMenu.sessionAlive(level, hostPos);
     }
 
     @Override

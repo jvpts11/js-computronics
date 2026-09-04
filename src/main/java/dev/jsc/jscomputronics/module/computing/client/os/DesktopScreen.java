@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The FULL_DESKTOP shell: a windowed desktop environment that a graphical OS (Panes 95 / XP / 11)
+ * The FULL_DESKTOP shell: a windowed desktop environment that a graphical OS (Frames 95 / XP / 11)
  * boots into. It renders inside a centred window (the monitor's screen) over the dimmed game, never
  * full-screen. The visual chrome is chosen per OS id; this is the shared window-manager engine all
  * three desktop OSes drive (one engine, distinct chrome + program gating).
@@ -54,10 +54,28 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private final BlockPos monitorPos;
     private final ResourceLocation osId;
     private final DesktopTheme theme;
-    private final OsSkin skin;
+    private OsSkin skin;
+    /** Per-computer accent override (0 = skin default), brightness, and clock format, from the settings. */
+    private int desktopAccent;
+    private int desktopBrightness = 100;
+    private boolean desktopClock12h;
+    /** Frames 11 taskbar layout: centered app strip (default) or left-aligned next to Start. */
+    private boolean desktopTaskbarCentered = true;
+    /** Frames 11 dark theme: darkens the window chrome (via the skin) and the Start menu. */
+    private boolean desktopDarkMode;
     private final List<DesktopWindow> windows = new ArrayList<>();
     private final List<Launcher> launchers = new ArrayList<>();
     private final List<String> installedPrograms = new ArrayList<>();
+
+    // --- Per-OS memory/process model: each open program is a process that costs RAM. The OS itself reserves
+    // an overhead; the RAM the computer has (minus that) caps how many programs run at once. A cooperative
+    // kernel (Frames 95) is fragile and crashes when overloaded; a preemptive one (XP/11) just refuses. ---
+    private int installedRam;
+    private static final int PROC_RAM = 48;
+    private static final int MAX_WINDOWS_CAP = 16;
+    /** True while the cooperative OS is showing its crash screen; the desktop reboots to an empty session after. */
+    private boolean crashing;
+    private long crashUntil;
 
     /**
      * Open windows kept per-computer across leaving and re-entering the Monitor in the same session.
@@ -65,17 +83,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * does not grow this map without limit.
      */
     private static final int MAX_SAVED_DESKTOPS = 16;
-    private static final java.util.Map<BlockPos, java.util.List<SavedWin>> SAVED_WINDOWS =
+
+    // The live app instances kept per computer while its Monitor is left, so re-entering restores each
+    // program's in-progress session (terminal scrollback, an unsaved query) instead of a fresh window.
+    private static final java.util.Map<BlockPos, java.util.Map<String, DesktopApp>> SAVED_APPS =
             new java.util.LinkedHashMap<>(16, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(
-                        final java.util.Map.Entry<BlockPos, java.util.List<SavedWin>> eldest) {
+                        final java.util.Map.Entry<BlockPos, java.util.Map<String, DesktopApp>> eldest) {
                     return size() > MAX_SAVED_DESKTOPS;
                 }
             };
-
-    private record SavedWin(String key, boolean minimized, boolean maximized) {
-    }
 
     /** Apps a running window asked to launch (e.g. Files opening the Editor); drained by the active desktop. */
     private static final java.util.List<String> PENDING_OPEN = new java.util.ArrayList<>();
@@ -83,6 +101,54 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** Lets a running app request another program be opened on the desktop. */
     public static void requestOpen(final String key) {
         PENDING_OPEN.add(key);
+    }
+
+    /**
+     * A pending open of the explorer at a given folder, kept apart from a plain program key by a separator no
+     * program id can contain.
+     */
+    private static final String OPEN_FILES_AT = "Files\0";
+
+    /** Lets a running app open the explorer already navigated to {@code dir} (a drive, a folder). */
+    public static void requestOpenFiles(final String dir) {
+        PENDING_OPEN.add(OPEN_FILES_AT + dir);
+    }
+
+    /** The launcher labels the active desktop can open (built-in apps plus installed programs). */
+    public static java.util.List<String> openableLabels() {
+        return active != null ? active.launcherLabels() : java.util.List.of();
+    }
+
+    /**
+     * Applies an accent/brightness change to the live desktop immediately, so a change in the Settings
+     * app shows on the chrome without waiting for the next desktop refresh.
+     *
+     * @param accent     the accent override ({@code 0} = skin default)
+     * @param brightness the screen brightness 0..100
+     */
+    public static void applyLivePrefs(final int accent, final int brightness, final boolean clock12h,
+                                      final String wallpaper, final boolean taskbarCentered,
+                                      final boolean darkMode) {
+        if (active != null) {
+            active.desktopAccent = accent;
+            active.desktopBrightness = brightness;
+            active.desktopClock12h = clock12h;
+            active.desktopWallpaper = wallpaper == null ? "" : wallpaper;
+            active.desktopTaskbarCentered = taskbarCentered;
+            active.desktopDarkMode = darkMode;
+            active.rebuildSkin();
+        }
+    }
+
+    /** Rebuilds the skin from the current accent + dark-mode prefs (dark applies only to the flat Frames 11). */
+    private void rebuildSkin() {
+        // The host's era picks the desktop's period look: a Linux desktop on Legacy hardware wears
+        // its own era, instead of a modern flat theme on a machine from another decade.
+        OsSkin base = OsSkin.forDesktop(desktopId, era());
+        if (desktopDarkMode) {
+            base = base.darkVariant();
+        }
+        this.skin = base.withAccent(desktopAccent);
     }
 
     /**
@@ -96,12 +162,31 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
     }
 
+    /**
+     * Raises the error for a refused action on an installer's own files: they are generated from the
+     * medium's stamp, so there is nothing to rename, copy off, delete or overwrite.
+     */
+    public static void showInstallerLockedError() {
+        if (active != null) {
+            active.showError("Error", "This file is part of the installer and cannot be changed, copied or deleted."
+                    + " Run the setup program to install it.");
+        }
+    }
+
     /** Opens a modal error dialog with the given title and message over this desktop. */
     void showError(final String title, final String message) {
         this.popup = new DesktopPopup(title, message, this.font);
     }
 
     private boolean startOpen;
+    /** The Frames 11 Start search box: when non-empty, the pinned grid is replaced by a filtered result list. */
+    private final StringBuilder startSearch = new StringBuilder();
+    /** Local cursor cached each frame, so menus drawn later in the frame can highlight the hovered entry. */
+    private int hoverX;
+    private int hoverY;
+    /** Programs pinned to the right "places" column of the Frames XP Start menu (drawn there, not on the left). */
+    private static final java.util.Set<String> XP_PLACES =
+            java.util.Set.of("This PC", "Files", "Settings", "Network");
     private int selectedIcon = -1;
     private long iconClickAt;
     @org.jetbrains.annotations.Nullable
@@ -155,6 +240,40 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     // Drag-and-drop of a desktop icon (a file/folder, or a program launcher) — onto a folder, an open
     // explorer, or a free grid cell.
+    // Rubber-band selection: dragging on empty wallpaper sweeps a rectangle and selects every icon
+    // it touches. Every desktop does this, and without it there was no way to act on more than one
+    // icon at a time.
+    private boolean bandActive;
+    private double bandStartX;
+    private double bandStartY;
+    private double bandX;
+    private double bandY;
+    private final java.util.Set<Integer> selectedIcons = new java.util.LinkedHashSet<>();
+
+    /** The band's rectangle in desktop coordinates: {x, y, w, h}. */
+    private int[] bandRect() {
+        final int bx = (int) Math.min(bandStartX, bandX);
+        final int by = (int) Math.min(bandStartY, bandY);
+        return new int[]{bx, by, (int) Math.abs(bandX - bandStartX), (int) Math.abs(bandY - bandStartY)};
+    }
+
+    /** Selects every desktop icon whose cell the band currently touches. */
+    private void updateBandSelection() {
+        selectedIcons.clear();
+        final int[] r = bandRect();
+        final int perCol = iconsPerColumn(sh());
+        final int[] slotCells = computeSlotCells(perCol);
+        final int total = Math.min(slotCells.length, launchers.size() + desktopItems.size());
+        for (int i = 0; i < total; i++) {
+            final int ix = iconXForCell(slotCells[i]);
+            final int iy = iconYForCell(slotCells[i]);
+            // The icon's clickable cell, the same box the hover highlight uses.
+            if (ix - 3 < r[0] + r[2] && ix + 27 > r[0] && iy - 2 < r[1] + r[3] && iy + 32 > r[1]) {
+                selectedIcons.add(i);
+            }
+        }
+    }
+
     private int deskDragSlot = -1; // global icon slot being dragged, or -1
     private boolean deskDragging;
     private double deskDragX;
@@ -172,12 +291,89 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private String deskPendingRename; // enter rename on this name once the next listing arrives
 
     private static final int TASKBAR_H = 24;
+
+    // The work area (icons, windows, drops) is the desktop minus its panel. Every panel style but GNOME puts
+    // the panel at the bottom; GNOME's top bar reserves the top TASKBAR_H pixels instead, so icons start and
+    // windows clamp/maximize below it rather than sliding under it.
+
+    /**
+     * Whether this desktop wears its period chrome. Derived from the skin's form, which the era already
+     * decided, so the panel and the windows can never disagree about which decade they are in.
+     */
+    private boolean periodPanel() {
+        return skin.form() == OsSkin.Form.KDE2 || skin.form() == OsSkin.Form.GNOME1;
+    }
+
+    /**
+     * The icon set to draw program icons from. A period desktop asks for its own artwork first and falls
+     * back to that desktop's modern icons, so a Legacy KDE still looks like KDE even before period icons
+     * are drawn for it.
+     */
+    private String iconSet() {
+        return periodPanel()
+                ? desktopId.getPath() + ProgramIcons.PERIOD_SUFFIX
+                : desktopId.getPath();
+    }
+
+    /**
+     * Whether the panel sits at the top. Only the modern GNOME shell does that: the GNOME of the Legacy
+     * era put its panel at the bottom, and its top bar ("Activities") did not exist for another decade.
+     */
+    private boolean topPanel() {
+        return is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.GNOME) && !periodPanel();
+    }
+
+    /** The first desktop-local row of the work area. */
+    private int workTop() {
+        return topPanel() ? TASKBAR_H : 0;
+    }
+
+    /** One past the last desktop-local row of the work area (the bottom panel's top, or the screen bottom). */
+    private int workBottom() {
+        return topPanel() ? sh() : sh() - TASKBAR_H;
+    }
+
+    /** The pixels reserved for a bottom panel (none under GNOME's top bar). */
+    private int bottomReserve() {
+        return topPanel() ? 0 : TASKBAR_H;
+    }
+
     // Windows 11 taskbar: each centered item (Start + one per open window) occupies this slot.
     private static final int WIN11_SLOT = 22;
     private static final int WIN11_ICON = 16;
     private static final int MENU_W = 130;
     private static final int BAND_W = 22;
     private static final int MENU_ITEM_H = 18;
+    // Frames XP Start: a two-column panel (programs left, system "places" right) with a header and a footer band.
+    private static final int XP_MENU_W = 202;
+    private static final int XP_HEADER_H = 20;
+    private static final int XP_FOOTER_H = 18;
+    private static final int XP_ROW_H = 16;
+    private static final int XP_LEFT_W = 120;
+    // Frames 11 Start: a compact floating panel with a search box, a pinned-app grid, and a footer power button.
+    // Kept small (5 columns, tight tiles) so even a Mainframe's full app set fits above the taskbar.
+    private static final int W11_MENU_W = 172;
+    private static final int W11_COLS = 5;
+    private static final int W11_TILE_W = 32;
+    private static final int W11_TILE_H = 30;
+    private static final int W11_SEARCH_H = 14;
+    private static final int W11_FOOTER_H = 18;
+    // KDE Plasma: a Kickoff-style launcher (places column left, app list right, search on top, session footer).
+    private static final int KDE_MENU_W = 214;
+    private static final int KDE_SIDE_W = 74;
+    private static final int KDE_HEADER_H = 26;
+    private static final int KDE_ROW_H = 16;
+    private static final int KDE_FOOTER_H = 16;
+    // Cinnamon: the Mint menu (favourites rail, categories, app list with a search box).
+    private static final int CIN_MENU_W = 236;
+    private static final int CIN_RAIL_W = 30;
+    private static final int CIN_CATS_W = 84;
+    private static final int CIN_HEADER_H = 22;
+    private static final int CIN_ROW_H = 16;
+    // GNOME: the Activities overview (search, workspace strip, app grid).
+    private static final int GN_COLS = 6;
+    private static final int GN_TILE_W = 40;
+    private static final int GN_TILE_H = 34;
     private static final int ICON_PITCH_Y = 42;
     private static final int ICON_PITCH_X = 46;
     private static final String[] DESK_CTX_ICON = {"Open", "Rename", "Delete"};
@@ -188,19 +384,131 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** A desktop/start-menu entry that opens an app when clicked. */
     // A launcher either opens a built-in app window (factory) or runs a custom action (e.g. open the
     // NMS, which is a server-side menu rather than a desktop window). Exactly one is non-null.
-    private record Launcher(String label, java.util.function.Supplier<DesktopApp> factory, Runnable action) {
-        Launcher(final String label, final java.util.function.Supplier<DesktopApp> factory) {
-            this(label, factory, null);
-        }
+    /** A desktop launcher: its display label, the program id (icon + identity), and the window factory. */
+    private record Launcher(String label, net.minecraft.resources.ResourceLocation programId,
+                            java.util.function.Supplier<DesktopApp> factory) {
     }
+
+    /** The desktop environment drawn: the OS's bundled one (Frames) or the Linux package installed. */
+    private final ResourceLocation desktopId;
+    /** The desktop environment's descriptor (chrome family, bundled apps, native names); null if unknown. */
+    @org.jetbrains.annotations.Nullable
+    private final dev.jsc.jscomputronics.module.computing.os.DesktopEnvironmentDef chrome;
+    /** The chrome family drawn (panel placement, launcher menu, window behaviour). */
+    private final dev.jsc.jscomputronics.module.computing.os.PanelStyle panel;
+    /** The on-disk desktop folder (Users/Public/Desktop on the DOS family, home/player/Desktop on POSIX). */
+    private final String desktopDir;
 
     public DesktopScreen(final DesktopMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
         this.host = menu.hostPos();
         this.monitorPos = menu.monitorPos();
         this.osId = menu.osId();
-        this.theme = DesktopTheme.forOs(osId);
-        this.skin = OsSkin.forOs(osId);
+        this.desktopId = menu.desktopId();
+        this.installedRam = menu.ramBuffer();
+        this.chrome = dev.jsc.jscomputronics.module.computing.os.OsRegistry.getDesktop(desktopId);
+        this.panel = chrome != null ? chrome.panelStyle() : switch (desktopId.getPath()) {
+            case "frames_xp" -> dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_XP;
+            case "frames_11" -> dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11;
+            default -> dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_95;
+        };
+        final dev.jsc.jscomputronics.module.computing.os.OsDef os =
+                dev.jsc.jscomputronics.module.computing.os.OsRegistry.getOs(osId);
+        this.desktopDir = SystemLayout.desktopDirFor(os == null ? null
+                : dev.jsc.jscomputronics.module.computing.os.OsRegistry.getKernel(os.kernelId()));
+        this.theme = DesktopTheme.forDesktop(desktopId);
+        // A provisional skin: rebuildSkin() refines it with the host's era once the level is reachable.
+        this.skin = OsSkin.forDesktop(desktopId);
+    }
+
+    private boolean is(final dev.jsc.jscomputronics.module.computing.os.PanelStyle style) {
+        return panel == style;
+    }
+
+    /** A Linux desktop environment (bottom-panel KDE/Cinnamon or top-bar GNOME), as opposed to a Frames edition. */
+    private boolean linuxDesktop() {
+        return is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.KDE)
+                || is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.GNOME)
+                || is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.CINNAMON);
+    }
+
+    /** The desktop environment's display name, for the Start band and menus. */
+    private String desktopName() {
+        return chrome != null ? chrome.displayName() : desktopId.getPath();
+    }
+
+    /** RAM the desktop itself reserves: a heavier, more modern desktop eats more, leaving less for programs. */
+    private int osOverhead() {
+        return switch (desktopId.getPath()) {
+            case "frames_95" -> 16;
+            case "frames_xp" -> 64;
+            case "frames_11" -> 256;
+            case "kde_plasma" -> 224;
+            case "gnome" -> 256;
+            case "cinnamon" -> 160;
+            default -> 32;
+        };
+    }
+
+    /** The number of programs this computer can run at once, from its RAM minus the OS overhead. */
+    private int maxWindows() {
+        final int usable = installedRam - osOverhead();
+        return Math.max(2, Math.min(MAX_WINDOWS_CAP, usable / PROC_RAM + 1));
+    }
+
+    /** A cooperative kernel (Frames 95) has no memory protection: overloading it crashes the whole desktop. */
+    private boolean isCooperative() {
+        return osId.getPath().equals("frames_95");
+    }
+
+    /** Whether another program window may open now; otherwise a preemptive OS refuses and a cooperative one crashes. */
+    private boolean allowOpen() {
+        if (crashing) {
+            return false;
+        }
+        if (windows.size() < maxWindows()) {
+            return true;
+        }
+        if (isCooperative()) {
+            crashing = true;
+            crashUntil = System.currentTimeMillis() + 4200;
+        } else {
+            showError("Out of memory", "This computer cannot run more programs at once. "
+                    + "Close one, or install more RAM.");
+        }
+        return false;
+    }
+
+    /** Reboots after a crash: the session is lost (windows and their saved state), back to an empty desktop. */
+    private void reboot() {
+        crashing = false;
+        windows.clear();
+        SAVED_APPS.remove(host);
+        startOpen = false;
+        popup = null;
+    }
+
+    /** The cooperative-kernel crash screen: a classic blue fatal-error page, drawn in desktop-local coords. */
+    private void renderCrash(final GuiGraphics g, final int sw, final int sh) {
+        g.fill(0, 0, sw, sh, 0xFF0000AA);
+        final int cy = sh / 3;
+        final String head = " Frames ";
+        final int hw = font.width(head) + 6;
+        g.fill((sw - hw) / 2, cy - 2, (sw + hw) / 2, cy + 10, 0xFFAAAAAA);
+        g.drawString(font, head, (sw - font.width(head)) / 2, cy, 0xFF0000AA, false);
+        final String[] lines = {
+            "A fatal exception has occurred.",
+            "This computer ran out of memory with too many",
+            "programs open, and the system became unstable.",
+            "",
+            "The cooperative kernel cannot recover.",
+            "Rebooting...",
+        };
+        int ly = cy + 20;
+        for (final String s : lines) {
+            g.drawString(font, s, (sw - font.width(s)) / 2, ly, 0xFFFFFFFF, false);
+            ly += 11;
+        }
     }
 
     // The on-screen monitor "screen" rectangle: a centred window, not the whole game viewport. The extra slack
@@ -258,11 +566,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Screen coordinates of the Start button's centre. */
     public int startButtonX() {
-        return ox() + (osId.getPath().equals("panes_11") ? 4 + WIN11_SLOT / 2 : 30);
+        return ox() + (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11) ? 4 + WIN11_SLOT / 2 : 30);
     }
 
     public int startButtonY() {
-        return oy() + sh() - TASKBAR_H / 2;
+        // GNOME's "Activities" launcher lives in the top bar; every other panel sits at the bottom.
+        return oy() + (topPanel() ? TASKBAR_H / 2 : sh() - TASKBAR_H / 2);
     }
 
     /** Screen coordinates of the centre of the {@code index}-th Start menu entry (valid while it is open). */
@@ -278,7 +587,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** The host computer's hardware era, read from its block entity so the monitor frame matches the chassis. */
     private HardwareEra era() {
         final Minecraft mc = Minecraft.getInstance();
-        if (mc.level != null && mc.level.getBlockEntity(host) instanceof AbstractComputerBlockEntity be) {
+        if (mc.level != null && mc.level.getBlockEntity(host)
+                instanceof dev.jsc.jscomputronics.module.computing.os.OsHost be) {
             return be.displayEra();
         }
         return HardwareEra.STANDARD;
@@ -292,7 +602,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         final long t = mc.level.getDayTime() % 24000L;
         final int totalMin = (int) (((t + 6000L) % 24000L) * 3L / 50L);
-        return String.format(java.util.Locale.ROOT, "%02d:%02d", totalMin / 60, totalMin % 60);
+        final int hour24 = totalMin / 60;
+        final int minute = totalMin % 60;
+        if (desktopClock12h) {
+            final int h12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+            return String.format(java.util.Locale.ROOT, "%d:%02d %s", h12, minute, hour24 < 12 ? "AM" : "PM");
+        }
+        return String.format(java.util.Locale.ROOT, "%02d:%02d", hour24, minute);
     }
 
     /**
@@ -317,47 +633,184 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         this.titleLabelX = -10000;
         this.inventoryLabelY = -10000;
 
+        // Resolve the era skin before the first frame. The panel's placement now follows the skin (a
+        // period desktop panels at the bottom), so waiting for the desktop payload to arrive would draw
+        // one frame with the panel on the wrong edge and then jump.
+        rebuildSkin();
+
         buildLaunchers();
 
         // Restore the windows that were open when this computer's Monitor was last left.
-        final java.util.List<SavedWin> saved = SAVED_WINDOWS.get(host);
-        if (saved != null && windows.isEmpty()) {
-            for (final SavedWin sw : saved) {
-                final DesktopApp app = factoryFor(sw.key());
-                if (app != null) {
-                    openApp(sw.key(), app);
-                    final DesktopWindow w = windows.get(windows.size() - 1);
-                    w.setMinimized(sw.minimized());
-                    w.setMaximized(sw.maximized());
-                }
-            }
-        }
+        // The open windows are the machine's, not this client's: they arrive from the server with the
+        // desktop listing requested below, and are restored in applyWindows. The app instances kept per
+        // computer (SAVED_APPS) are only the programs' insides — scrollback, an unsaved query — and are
+        // reattached to the restored windows when they are still around.
 
         // Become the active desktop and fetch the desktop-folder listing for the background icons.
         active = this;
         requestDesktop();
     }
 
-    /** (Re)builds the launcher rail: the built-in apps plus any installed program that has its own window. */
+    /**
+     * Restores the windows the machine has open, once, when the server hands them over. Later refreshes
+     * of the desktop listing send the same payload again and must not open everything a second time.
+     */
+    public static void applyWindows(
+            final dev.jsc.jscomputronics.module.computing.operation.payload.DesktopWindowsPayload payload) {
+        final DesktopScreen screen = active;
+        if (screen == null || !screen.host.equals(payload.host()) || screen.windowsRestored) {
+            return;
+        }
+        screen.windowsRestored = true;
+        if (!screen.windows.isEmpty()) {
+            return; // the player already opened something before the layout arrived; keep theirs
+        }
+        final java.util.Map<String, DesktopApp> savedApps = SAVED_APPS.get(screen.host);
+        for (final dev.jsc.jscomputronics.module.computing.os.OpenWindow ow : payload.toOpenWindows()) {
+            DesktopApp app = savedApps != null ? savedApps.get(ow.key()) : null;
+            if (app == null) {
+                app = screen.factoryFor(ow.key());
+            }
+            if (app == null) {
+                continue; // a program that is no longer installed simply does not come back
+            }
+            app.applySkin(screen.skin);
+            final DesktopWindow w = new DesktopWindow(app, ow.key(), ow.x(), ow.y(), ow.w(), ow.h());
+            // Clamp into the current work area: the monitor may be a different size from the one the
+            // layout was left on, and a title bar off-screen is a window nobody can reach.
+            w.moveTo(ow.x(), ow.y(), screen.workTop(), screen.sw(), screen.workBottom());
+            w.setMinimized(ow.minimized());
+            w.setMaximized(ow.maximized());
+            screen.windows.add(w);
+        }
+    }
+
+    /** Whether the machine's window layout has been applied to this desktop instance. */
+    private boolean windowsRestored;
+
+    /**
+     * Set when this desktop is closing because the player shut the machine down or restarted it, so the
+     * layout is NOT handed back to the machine on the way out: the server has just cleared it, and a
+     * late arrival would resurrect windows on a machine that is off or rebooting.
+     */
+    private boolean powerCycling;
+
+    /** The current windows as the machine should remember them: floating bounds plus their state. */
+    private java.util.List<dev.jsc.jscomputronics.module.computing.os.OpenWindow> snapshotWindows() {
+        final java.util.List<dev.jsc.jscomputronics.module.computing.os.OpenWindow> out =
+                new java.util.ArrayList<>(windows.size());
+        for (final DesktopWindow w : windows) {
+            out.add(new dev.jsc.jscomputronics.module.computing.os.OpenWindow(
+                    w.appKey(), w.floatX(), w.floatY(), w.floatW(), w.floatH(), w.minimized(), w.maximized()));
+        }
+        return out;
+    }
+
+    /**
+     * (Re)builds the launcher rail from the single program registry: every registered Frames app that opens a
+     * window and is present on this computer. A pre-installed app is gated here by its host scope and OS rank
+     * (e.g. the Network Manager on the Mainframe, Frames XP or newer); an installed app is gated on the server
+     * (its id already sits in {@link #installedPrograms} only when it passed). No more per-program branches.
+     */
     private void buildLaunchers() {
         launchers.clear();
-        launchers.add(new Launcher("Network", () -> new NetworkInteractorApp(host, monitorPos)));
-        launchers.add(new Launcher("This PC", () -> new ThisPcApp(host)));
-        launchers.add(new Launcher("Files", () -> new FilesApp(host, osId.getPath(), "", monitorPos)));
-        launchers.add(new Launcher("Editor", () -> new EditorApp(host)));
-        launchers.add(new Launcher("Terminal", () -> new ShellApp(host)));
-        if (installedPrograms.contains("nms")) {
-            launchers.add(new Launcher("NMS",
-                    () -> new dev.jsc.jscomputronics.module.computing.client.NmsApp(host, monitorPos)));
+        final boolean isMainframe = hostIs(
+                dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity.class);
+        final boolean isCraftingComputer = hostIs(
+                dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity.class);
+        // A rack shows the desktop of the server mounted in it, so a rack host IS a server session.
+        final boolean isServer = hostIs(
+                dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity.class);
+        final boolean isClusterManager = hostIs(
+                dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity.class);
+        final int rank = dev.jsc.jscomputronics.module.computing.os.OsRegistry.osVersionRank(osId);
+        final dev.jsc.jscomputronics.module.computing.os.OsDef os =
+                dev.jsc.jscomputronics.module.computing.os.OsRegistry.getOs(osId);
+        final dev.jsc.jscomputronics.module.computing.os.Platform platform =
+                os != null ? os.platform() : dev.jsc.jscomputronics.module.computing.os.Platform.FRAMES;
+        for (final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec
+                : dev.jsc.jscomputronics.module.computing.os.OsRegistry.programs()) {
+            if (spec.kind() != dev.jsc.jscomputronics.module.computing.os.ProgramKind.APP
+                    || !spec.platforms().contains(platform)
+                    || !ProgramClient.hasWindow(spec.id())) {
+                continue;
+            }
+            if (spec.preinstalled()) {
+                // Built-in apps are present when the desktop environment bundles them; gate by host and OS version.
+                if (chrome != null && !chrome.bundles(spec.id())) {
+                    continue;
+                }
+                if (!hostScopeAllows(spec.hostScope(), isMainframe, isCraftingComputer, isServer, isClusterManager)) {
+                    continue;
+                }
+                if (rank != 0 && rank < spec.minOsRank()) {
+                    continue;
+                }
+            } else if (!installedPrograms.contains(spec.id().getPath())) {
+                continue; // installed apps: the server already gated them into installedPrograms
+            }
+            final ProgramClient.DesktopAppFactory factory = ProgramClient.factory(spec.id());
+            // Apps receive the desktop id (their skin/icon key); the Frames editions' id equals their OS id.
+            launchers.add(new Launcher(launcherLabel(spec), spec.id(),
+                    () -> factory.create(host, monitorPos, desktopId)));
         }
-        if (installedPrograms.contains("crafting_manager")) {
-            launchers.add(new Launcher("Crafting Mgr", () -> new CraftingManagerApp(host)));
+    }
+
+    /** The program id for an open window's app key (its launcher label), for the taskbar icon; generic if none. */
+    private net.minecraft.resources.ResourceLocation programIdForLabel(final String label) {
+        for (final Launcher l : launchers) {
+            if (l.label().equals(label)) {
+                return l.programId();
+            }
         }
+        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", "generic");
+    }
+
+    /** Whether the linked host computer's block entity is (an instance of) {@code type}. */
+    private boolean hostIs(final Class<?> type) {
+        return Minecraft.getInstance().level != null
+                && type.isInstance(Minecraft.getInstance().level.getBlockEntity(host));
+    }
+
+    /** Whether a program's host scope permits it on this computer. */
+    private static boolean hostScopeAllows(final dev.jsc.jscomputronics.module.computing.os.HostScope scope,
+                                           final boolean isMainframe, final boolean isCraftingComputer,
+                                           final boolean isServer, final boolean isClusterManager) {
+        return switch (scope) {
+            case ANY -> true;
+            case MAINFRAME -> isMainframe;
+            case CRAFTING_COMPUTER -> isCraftingComputer;
+            case SERVER -> isServer;
+            case CLUSTER_MANAGEMENT_COMPUTER -> isClusterManager;
+        };
+    }
+
+    /**
+     * The rail label for a program: the desktop environment's native name for it (Dolphin, Konsole, Nautilus...),
+     * its own display name otherwise; the shell reads "Megashell" on Frames 11.
+     */
+    private String launcherLabel(final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec) {
+        if (spec.id().getPath().equals("command_prompt")
+                && is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11)) {
+            return "Megashell";
+        }
+        return chrome != null ? chrome.nameOf(spec) : spec.displayName();
     }
 
     /** Requests the desktop folder's files so they can be drawn as background icons. */
     private void requestDesktop() {
         PacketDistributor.sendToServer(new RequestDesktopFilesPayload(host));
+    }
+
+    /**
+     * Refreshes the open desktop's server-derived state (installed programs included), so a program
+     * installed or removed while the desktop is up gets its launcher without closing the monitor. Called
+     * after any action that can change the installed set (a shell command, an install disc, Settings).
+     */
+    public static void refreshActive() {
+        if (active != null) {
+            active.requestDesktop();
+        }
     }
 
     /** Routes a desktop-folder listing reply to the active desktop. */
@@ -369,17 +822,22 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         active.desktopItems.addAll(payload.files());
         active.desktopWallpaper = payload.wallpaper();
         active.computerName = payload.computerName();
+        active.desktopAccent = payload.prefs().accent();
+        active.desktopBrightness = payload.prefs().brightness();
+        active.desktopClock12h = payload.prefs().clock12h();
+        active.desktopTaskbarCentered = payload.prefs().taskbarCentered();
+        active.desktopDarkMode = payload.prefs().darkMode();
+        active.rebuildSkin();
         active.iconCells.clear();
         for (final DesktopFilesPayload.WireIconCell cell : payload.iconCells()) {
             active.iconCells.put(cell.key(), cell.cell());
         }
-        // Refresh the installed-program launchers (e.g. the NMS appears after it is installed).
-        final boolean hadNms = active.installedPrograms.contains("nms");
-        final boolean hadCraftingMgr = active.installedPrograms.contains("crafting_manager");
+        // Refresh the installed-program launchers whenever the installed set changes, so ANY installable
+        // program (NMS, Minesweeper, Storage Insights, ...) gets its launcher the moment it is installed.
+        final java.util.Set<String> before = new java.util.HashSet<>(active.installedPrograms);
         active.installedPrograms.clear();
         active.installedPrograms.addAll(payload.programs());
-        if (active.installedPrograms.contains("nms") != hadNms
-                || active.installedPrograms.contains("crafting_manager") != hadCraftingMgr) {
+        if (!before.equals(new java.util.HashSet<>(active.installedPrograms))) {
             active.buildLaunchers();
         }
         // Enter rename on a freshly created item once it appears in the listing.
@@ -402,8 +860,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // Drain any cross-app open requests (e.g. Files asked to launch the Editor).
         if (!PENDING_OPEN.isEmpty()) {
             for (final String key : PENDING_OPEN) {
+                if (key.startsWith(OPEN_FILES_AT)) {
+                    // This PC asked for a drive or a folder to be opened in the explorer.
+                    if (allowOpen()) {
+                        openApp("Files", new FilesApp(host, desktopId.getPath(),
+                                key.substring(OPEN_FILES_AT.length()), monitorPos));
+                    }
+                    continue;
+                }
                 final DesktopApp app = factoryFor(key);
-                if (app != null) {
+                if (app != null && allowOpen()) {
                     openApp(key, app);
                 }
             }
@@ -418,6 +884,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int oy = oy();
         final int lmx = mouseX - ox;
         final int lmy = mouseY - oy;
+        // Cache the local cursor so the Start-menu draw (called deeper in this frame) can highlight the hovered row.
+        this.hoverX = lmx;
+        this.hoverY = lmy;
         final HardwareEra eraNow = era();
 
         // The host computer's hardware-era monitor frame wraps the desktop glass, then translate so the desktop
@@ -427,7 +896,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         g.pose().translate(ox, oy, 0);
         g.enableScissor(ox, oy, ox + sw, oy + sh);
 
-        WallpaperPainter.paint(g, sw, sh, osId, eraNow, desktopWallpaper);
+        WallpaperPainter.paint(g, sw, sh, desktopId, eraNow, desktopWallpaper);
+
+        // A cooperative OS that ran out of memory shows its crash screen, then reboots to an empty session.
+        if (crashing) {
+            if (System.currentTimeMillis() >= crashUntil) {
+                reboot();
+            } else {
+                renderCrash(g, sw, sh);
+                g.disableScissor();
+                g.pose().popPose();
+                return;
+            }
+        }
 
         // Desktop icons: program launchers first, then the desktop folder's files and folders, laid
         // out in columns (top-down, then left-to-right) like a Windows desktop. Each icon's cell comes
@@ -435,10 +916,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int total = launchers.size() + desktopItems.size();
         final int perCol = iconsPerColumn(sh);
         final int[] slotCells = computeSlotCells(perCol);
-        // While the Start menu is open, hide any icon (and its label) that would sit under it, so the
-        // text never bleeds through the menu panel.
-        final int startMenuTop = startOpen ? (sh - TASKBAR_H) - startMenuHeight() : Integer.MAX_VALUE;
         final int deskDropTarget = deskDragging ? iconSlotAt(deskDragX, deskDragY, perCol) : -1;
+        // The selected icon's full, wrapped label is drawn last (after every icon) so it sits on top of the
+        // icon below it instead of being clipped by it.
+        String selLabelText = null;
+        int selLabelX = 0;
+        int selLabelY = 0;
         // Each desktop layer draws at its own strictly-increasing Z (DesktopZ): the depth buffer keeps a back
         // layer behind a front one, so a back layer's batched text (an icon label) can never paint over a
         // front layer (an open window). Flushing the text batch between layers does not work — g.flush() is a
@@ -448,10 +931,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         for (int i = 0; i < total; i++) {
             final int ix = iconXForCell(slotCells[i]);
             final int iy = iconYForCell(slotCells[i]);
-            if (startOpen && ix >= startMenuX() - 2 && ix < startMenuX() + MENU_W + 2 && iy + 34 > startMenuTop) {
-                continue;
-            }
-            if (i == selectedIcon) {
+            // Icons draw at DesktopZ.ICONS and the Start menu at DesktopZ.MENU, so the menu covers them via the
+            // depth buffer — the icons behind it stay drawn (they must not vanish) and just sit under the panel.
+            if (i == selectedIcon || selectedIcons.contains(i)) {
                 g.fill(ix - 3, iy - 2, ix + 27, iy + 32, 0x66000080);
             } else if (lmx >= ix - 3 && lmx < ix + 27 && lmy >= iy - 2 && lmy < iy + 32 && !deskDragging) {
                 // Hover feedback so the player sees which icon the cursor is over.
@@ -469,7 +951,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             final String label;
             if (i < launchers.size()) {
-                ProgramIcons.draw(g, ix, iy, 24, 22, launchers.get(i).label(), osId.getPath());
+                ProgramIcons.draw(g, ix, iy, 24, 22, launchers.get(i).programId(), iconSet());
                 label = launchers.get(i).label();
             } else {
                 final int di = i - launchers.size();
@@ -477,21 +959,45 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 drawDesktopIcon(g, ix, iy, f);
                 label = di == deskRenaming ? deskRenameBuf + "_" + deskRenameExt : baseName(f.path());
             }
-            // Centered, trimmed label under the icon so it stays in its cell and never sprawls.
-            final String lbl = trim(label, 9);
-            g.drawString(font, lbl, ix + 12 - font.width(lbl) / 2, iy + 24,
-                    theme.iconText(), theme.textShadow());
+            if (i == selectedIcon) {
+                // Defer the full label to a pass after every icon so nothing overdraws it.
+                selLabelText = label;
+                selLabelX = ix;
+                selLabelY = iy;
+            } else {
+                // Centered, trimmed label under the icon so it stays in its cell and never sprawls.
+                final String lbl = trim(label, 9);
+                g.drawString(font, lbl, ix + 12 - font.width(lbl) / 2, iy + 24,
+                        theme.iconText(), theme.textShadow());
+            }
         }
-        g.pose().popPose();
-
-        g.pose().pushPose();
-        g.pose().translate(0, 0, DesktopZ.WINDOWS);
-        for (final DesktopWindow w : windows) {
-            if (!w.minimized()) {
-                w.render(g, font, skin, lmx, lmy, partialTick, sw, sh, TASKBAR_H);
+        // Windows-style: the selected icon reveals its full name, wrapped, on a selection background.
+        if (selLabelText != null) {
+            int ly = selLabelY + 24;
+            for (final String line : wrapLabel(selLabelText, 74)) {
+                final int lw = font.width(line);
+                final int lcx = selLabelX + 12 - lw / 2;
+                g.fill(lcx - 2, ly - 1, lcx + lw + 2, ly + font.lineHeight, 0xE0000080);
+                g.drawString(font, line, lcx, ly, 0xFFFFFFFF, false);
+                ly += font.lineHeight;
             }
         }
         g.pose().popPose();
+
+        // Each window draws in a depth band of its own: an item is a model standing well in front of the pose
+        // it is drawn at, so windows sharing one depth painted their items over each other (see DesktopItems).
+        final DesktopWindow front = frontWindow();
+        for (int i = 0; i < windows.size(); i++) {
+            final DesktopWindow w = windows.get(i);
+            if (w.minimized()) {
+                continue;
+            }
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.windowZ(i, windows.size()));
+            w.setFocused(w == front);
+            w.render(g, font, skin, lmx, lmy, partialTick, sw, sh, bottomReserve(), workTop());
+            g.pose().popPose();
+        }
 
         // Real container-slot items for the focused Network Interactor window's inventory zone, over the
         // window the app already drew the slot backgrounds for.
@@ -504,22 +1010,28 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         g.pose().translate(0, 0, DesktopZ.TASKBAR);
 
         final int tbY = sh - TASKBAR_H;
-        final String osp = osId.getPath();
-        if (osp.equals("panes_11")) {
+        final String osp = desktopId.getPath();
+        if (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11)) {
             // Windows 11 taskbar: dark bar, centered Start + app icons with an active indicator, clock right.
             renderWin11Taskbar(g, tbY, sw, lmx, lmy);
+        } else if (periodPanel()) {
+            renderPeriodPanel(g, tbY, sw, sh, lmx, lmy);
+        } else if (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.GNOME)) {
+            renderGnomeTopBar(g, sw, lmx, lmy);
+        } else if (linuxDesktop()) {
+            renderLinuxPanel(g, tbY, sw, sh, lmx, lmy);
         } else {
             // Taskbar background — 95 bevelled grey, XP Luna gradient.
-            if (osp.equals("panes_xp")) {
+            if (osp.equals("frames_xp")) {
                 g.fillGradient(0, tbY, sw, sh, 0xFF4A86D4, 0xFF1C4D9C);
                 g.fill(0, tbY, sw, tbY + 1, 0xFF8FBCEC);
             } else {
                 g.fill(0, tbY, sw, sh, theme.taskbar());
                 g.fill(0, tbY, sw, tbY + 1, 0xFFFFFFFF);
             }
-            // Start button — distinct per Panes version, each with its own glyph.
+            // Start button — distinct per Frames version, each with its own glyph.
             final int sbW = 54;
-            if (osp.equals("panes_xp")) {
+            if (osp.equals("frames_xp")) {
                 // Glossy green orb with a highlighted top half.
                 g.fillGradient(4, tbY + 2, 4 + sbW, sh - 2, 0xFF8FDB78, 0xFF1F7A22);
                 g.fill(6, tbY + 3, 4 + sbW - 2, tbY + 9, 0x4DFFFFFF);
@@ -542,19 +1054,22 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     break;
                 }
                 taskButton(g, bx, tbY + 3, 84, TASKBAR_H - 6, osp);
-                g.drawString(font, trim(w.app().title(), 12), bx + 5, tbY + 8, theme.startText(), theme.textShadow());
+                // No shadow: the taskbar button name sits on a solid button, where a shadow only muddies it
+                // (a dark blob behind the dark 95 text, a halo behind the light XP text).
+                g.drawString(font, trim(w.app().title(), 12), bx + 5, tbY + 8, theme.startText(), false);
                 bx += 88;
             }
             final String clock = clockText();
             final int clkW = font.width(clock) + 8;
             final int clkX = sw - clkW - 2;
-            if (osp.equals("panes_95")) {
+            if (osp.equals("frames_95")) {
                 g.fill(clkX, tbY + 3, sw - 2, sh - 3, theme.taskbar());
                 bevel(g, clkX, tbY + 3, clkW, TASKBAR_H - 6, 0xFF808080, 0xFFFFFFFF); // sunken tray
-            } else if (osp.equals("panes_xp")) {
+            } else if (osp.equals("frames_xp")) {
                 g.fill(clkX, tbY + 2, sw, sh - 2, 0xFF2C5FA8);
             }
-            g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), theme.textShadow());
+            g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), false);
+            drawProcMeter(g, clkX - 6, tbY + 8, theme.startText());
         }
         g.pose().popPose(); // close the TASKBAR layer
 
@@ -587,6 +1102,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(cx + 26, cy - 2, cx + 27, cy + 32, 0x804C84F0);
             }
             // Drag ghost: a label trailing the cursor for the icon being moved.
+            // (the rubber band is drawn below, outside the icon-drag branch)
             if (deskDragSlot < total) {
                 final String label = deskDragSlot < launchers.size()
                         ? launchers.get(deskDragSlot).label()
@@ -596,6 +1112,20 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(gx, gy, gx + font.width(label) + 6, gy + 12, 0xD0303848);
                 g.drawString(font, label, gx + 3, gy + 2, 0xFFFFFFFF, false);
             }
+            g.pose().popPose();
+        }
+
+        // The rubber band, over the wallpaper and its icons: a translucent fill with a solid outline,
+        // the way every desktop draws one.
+        if (bandActive) {
+            final int[] r = bandRect();
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.ICONS + 1);
+            g.fill(r[0], r[1], r[0] + r[2], r[1] + r[3], 0x334C84F0);
+            g.fill(r[0], r[1], r[0] + r[2], r[1] + 1, 0xCC4C84F0);
+            g.fill(r[0], r[1] + r[3] - 1, r[0] + r[2], r[1] + r[3], 0xCC4C84F0);
+            g.fill(r[0], r[1], r[0] + 1, r[1] + r[3], 0xCC4C84F0);
+            g.fill(r[0] + r[2] - 1, r[1], r[0] + r[2], r[1] + r[3], 0xCC4C84F0);
             g.pose().popPose();
         }
 
@@ -617,12 +1147,47 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         renderCarried(g, lmx, lmy);
         g.pose().popPose();
 
+        // Brightness: a per-computer dim over the whole surface (100 = none, 0 = deeply dimmed), below any popup.
+        if (desktopBrightness < 100) {
+            final int alpha = Math.min(210, (100 - desktopBrightness) * 21 / 10);
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.POPUP - 1);
+            g.fill(0, 0, sw, sh, alpha << 24);
+            g.pose().popPose();
+        }
+
+        // A focused app's modal dialog renders here, above every item icon and window, so the dialog and its
+        // own dim cover and darken the icons instead of them piercing through at their blit depth.
+        final DesktopWindow modalWin = frontWindow();
+        if (modalWin != null && modalWin.app().modalActive()) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.POPUP);
+            modalWin.app().renderModal(g, font,
+                    modalWin.x() + 4, modalWin.y() + DesktopWindow.TITLE_H + 4,
+                    modalWin.width() - 8, modalWin.height() - DesktopWindow.TITLE_H - 8, lmx, lmy);
+            g.pose().popPose();
+        }
+
         // A modal error dialog sits over the whole desktop: dim the surface, then draw it on top.
         if (popup != null) {
             g.pose().pushPose();
             g.pose().translate(0, 0, DesktopZ.POPUP);
             g.fill(0, 0, sw, sh, 0x80000000);
             popup.render(g, font, sw, sh, lmx, lmy);
+            g.pose().popPose();
+        }
+        // The power dialog rides at the same height: it is the one choice that ends the session.
+        if (powerOpen) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.POPUP);
+            renderPowerDialog(g, sw, sh, lmx, lmy);
+            g.pose().popPose();
+        }
+        // The taskbar's own menu sits above the windows it acts on.
+        if (taskMenuIndex >= 0) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.POPUP);
+            renderTaskMenu(g, lmx, lmy);
             g.pose().popPose();
         }
         g.pose().popPose(); // close the (ox, oy) desktop-origin translate
@@ -635,6 +1200,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     private int iconsPerColumn(final int sh) {
+        // The work area is the screen minus one panel band, wherever that panel sits.
         return Math.max(1, (sh - TASKBAR_H - 12) / ICON_PITCH_Y);
     }
 
@@ -665,8 +1231,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return 10 + DesktopIconLayout.col(packedCell) * ICON_PITCH_X;
     }
 
-    private static int iconYForCell(final int packedCell) {
-        return 10 + DesktopIconLayout.row(packedCell) * ICON_PITCH_Y;
+    private int iconYForCell(final int packedCell) {
+        return workTop() + 10 + DesktopIconLayout.row(packedCell) * ICON_PITCH_Y;
     }
 
     /** The desktop icon slot under a desktop-local point, or {@code -1} for the empty background. */
@@ -683,10 +1249,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     /** The packed grid cell ({@code col << 16 | row}) under a desktop-local point, clamped to the grid. */
-    private static int cellAt(final double mx, final double my, final int perCol) {
+    private int cellAt(final double mx, final double my, final int perCol) {
         final int col = Math.max(0, (int) Math.floor((mx - (10 - ICON_PITCH_X / 2.0)) / ICON_PITCH_X));
         final int row = Math.max(0, Math.min(perCol - 1,
-                (int) Math.floor((my - (10 - ICON_PITCH_Y / 2.0)) / ICON_PITCH_Y)));
+                (int) Math.floor((my - workTop() - (10 - ICON_PITCH_Y / 2.0)) / ICON_PITCH_Y)));
         return DesktopIconLayout.pack(col, row);
     }
 
@@ -743,7 +1309,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
         // (3) Drop on the bare wallpaper: pin the icon to the grid cell under the cursor and persist it,
         // unless that cell already holds another icon (so two icons never stack on the same spot).
-        if (dy < sh() - TASKBAR_H && overWallpaper(dx, dy)) {
+        if (dy >= workTop() && dy < workBottom() && overWallpaper(dx, dy)) {
             final int cell = cellAt(dx, dy, perCol);
             final int[] cells = computeSlotCells(perCol);
             for (int i = 0; i < cells.length; i++) {
@@ -802,8 +1368,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
         // Dropped on the bare wallpaper: move it into the desktop folder.
-        if (dy < sh() - TASKBAR_H && overWallpaper(dx, dy)) {
-            moveExplorerFile(origin, null, dragged, SystemLayout.DESKTOP_DIR);
+        if (dy >= workTop() && dy < workBottom() && overWallpaper(dx, dy)) {
+            moveExplorerFile(origin, null, dragged, desktopDir);
             origin.cancelDrag();
             return true;
         }
@@ -844,7 +1410,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         final DiskFilesPayload.WireFile f = desktopItems.get(di);
         if (f.directory()) {
-            openApp("Files", new FilesApp(host, osId.getPath(), f.path(), monitorPos));
+            openApp("Files", new FilesApp(host, desktopId.getPath(), f.path(), monitorPos));
         } else if (!f.readOnly()) {
             openApp("Editor", new EditorApp(host));
             PacketDistributor.sendToServer(new RequestFileContentPayload(host, f.path()));
@@ -948,7 +1514,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final DiskFilesPayload.WireFile f = desktopItems.get(deskRenaming);
             final String oldPath = f.path();
             final String newName = deskRenameBuf.toString().trim() + deskRenameExt;
-            final String newPath = SystemLayout.DESKTOP_DIR + "/" + newName;
+            final String newPath = desktopDir + "/" + newName;
             if (!deskRenameBuf.toString().trim().isEmpty() && !newPath.equals(oldPath)) {
                 PacketDistributor.sendToServer(new RenameFilePayload(host, oldPath, newPath));
                 requestDesktop();
@@ -973,14 +1539,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private void newDeskFile() {
         final String name = uniqueDeskName("New File", ".txt");
         deskPendingRename = name;
-        PacketDistributor.sendToServer(new SaveFilePayload(host, SystemLayout.DESKTOP_DIR + "/" + name, ""));
+        PacketDistributor.sendToServer(new SaveFilePayload(host, desktopDir + "/" + name, ""));
         requestDesktop();
     }
 
     private void newDeskFolder() {
         final String name = uniqueDeskName("New Folder", "");
         deskPendingRename = name;
-        PacketDistributor.sendToServer(new MkdirPayload(host, SystemLayout.DESKTOP_DIR + "/" + name));
+        PacketDistributor.sendToServer(new MkdirPayload(host, desktopDir + "/" + name));
         requestDesktop();
     }
 
@@ -1039,18 +1605,136 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return slash >= 0 && slash < path.length() - 1 ? path.substring(slash + 1) : path;
     }
 
+    /** The overall width of the Start menu panel, which differs per Frames version. */
+    private int startMenuW() {
+        if (periodPanel()) {
+            return MENU_W; // the period launcher is a narrow list, whatever its desktop does today
+        }
+        return switch (panel) {
+            case FRAMES_XP -> XP_MENU_W;
+            case FRAMES_11 -> W11_MENU_W;
+            case KDE -> KDE_MENU_W;
+            case GNOME -> sw();
+            case CINNAMON -> CIN_MENU_W;
+            default -> MENU_W;
+        };
+    }
+
     private int startMenuHeight() {
-        return launchers.size() * MENU_ITEM_H + 6 + MENU_ITEM_H + 8;
+        if (periodPanel()) {
+            // A period launcher is a small program list, not a Plasma menu and not a full-screen
+            // overview: it is sized by its own contents, like the classic launcher it is.
+            return Math.max(4, launchers.size()) * MENU_ITEM_H + 8;
+        }
+        switch (panel) {
+            case KDE -> {
+                return KDE_HEADER_H + Math.max(6, launchers.size()) * KDE_ROW_H + KDE_FOOTER_H + 8;
+            }
+            case GNOME -> {
+                return sh() - TASKBAR_H; // the overview covers the whole desktop below the top bar
+            }
+            case CINNAMON -> {
+                return CIN_HEADER_H + Math.max(5, launchers.size()) * CIN_ROW_H + 10;
+            }
+            default -> {
+            }
+        }
+        return switch (desktopId.getPath()) {
+            // Two columns: the taller of programs (left) and places (right) sets the body height.
+            case "frames_xp" -> {
+                final int rows = Math.max(xpLeftLaunchers().size(), xpRightLaunchers().size());
+                yield XP_HEADER_H + rows * XP_ROW_H + XP_FOOTER_H + 6;
+            }
+            // A pinned grid sized to the full app set (so the panel does not resize as the search filters it).
+            // Layout: 6 top pad + search + 5 + 9 (Pinned label) + rows + 5 + footer + 5 bottom pad.
+            case "frames_11" -> {
+                final int gridRows = Math.max(1, (launchers.size() + W11_COLS - 1) / W11_COLS);
+                yield 6 + W11_SEARCH_H + 5 + 9 + gridRows * W11_TILE_H + 5 + W11_FOOTER_H + 5;
+            }
+            default -> launchers.size() * MENU_ITEM_H + 6 + MENU_ITEM_H + 8;
+        };
     }
 
-    /** The left edge of the CENTERED app-icon strip on the Windows 11 taskbar (the Start button sits left). */
+    /**
+     * The left edge of the app-icon strip on the Windows 11 taskbar: right after the Start button, so the whole
+     * [Start + apps] group moves together with the taskbar alignment. Single source for render and hit-test.
+     */
     private int win11AppsX(final int sw) {
-        return (sw - windows.size() * WIN11_SLOT) / 2;
+        return win11StartX(sw) + WIN11_SLOT;
     }
 
-    /** The Start menu's left edge: pinned to the left on every Panes version, including Panes 11. */
+    /**
+     * The Frames 11 Start button's left edge. Centered mode places it as the leftmost of the centered
+     * [Start + open apps] group (so the whole group is centered); left mode pins it to the corner. This is
+     * why the taskbar-alignment setting actually moves the Start button.
+     */
+    private int win11StartX(final int sw) {
+        if (!desktopTaskbarCentered) {
+            return 4;
+        }
+        final int group = (windows.size() + 1) * WIN11_SLOT;
+        return Math.max(4, (sw - group) / 2);
+    }
+
+    /** The Start menu's left edge: left-pinned on 95/XP; on Frames 11 it opens over the Start button (clamped). */
     private int startMenuX() {
+        if (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11)) {
+            final int w = startMenuW();
+            final int startCenter = win11StartX(sw()) + WIN11_SLOT / 2;
+            return Math.max(4, Math.min(sw() - w - 4, startCenter - w / 2));
+        }
+        if (topPanel()) {
+            return 0; // the Activities overview spans the desktop
+        }
         return 4;
+    }
+
+    /** The Start menu's top edge for the given taskbar top: flush on 95/XP, floating with a gap on Frames 11. */
+    private int startMenuY(final int tbY) {
+        if (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11)) {
+            return Math.max(2, tbY - startMenuHeight() - 6); // float above the taskbar, but never off the top
+        }
+        if (topPanel()) {
+            return TASKBAR_H; // the overview hangs below the top bar
+        }
+        return tbY - startMenuHeight();
+    }
+
+    /** The launchers shown in the XP left "programs" column: everything that is not a fixed system place. */
+    private List<Launcher> xpLeftLaunchers() {
+        final List<Launcher> out = new ArrayList<>();
+        for (final Launcher l : launchers) {
+            if (!XP_PLACES.contains(l.label())) {
+                out.add(l);
+            }
+        }
+        return out;
+    }
+
+    /** The launchers shown in the XP right "places" column: the fixed system entries, in launcher order. */
+    private List<Launcher> xpRightLaunchers() {
+        final List<Launcher> out = new ArrayList<>();
+        for (final Launcher l : launchers) {
+            if (XP_PLACES.contains(l.label())) {
+                out.add(l);
+            }
+        }
+        return out;
+    }
+
+    /** The launchers matching the Frames 11 Start search box (all of them when the box is empty). */
+    private List<Launcher> w11Filtered() {
+        final String q = startSearch.toString().toLowerCase(java.util.Locale.ROOT).trim();
+        if (q.isEmpty()) {
+            return launchers;
+        }
+        final List<Launcher> out = new ArrayList<>();
+        for (final Launcher l : launchers) {
+            if (l.label().toLowerCase(java.util.Locale.ROOT).contains(q)) {
+                out.add(l);
+            }
+        }
+        return out;
     }
 
     /**
@@ -1065,9 +1749,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
         final int iconY = tbY + (TASKBAR_H - WIN11_ICON) / 2;
 
-        // Start: pinned to the LEFT corner (aligned with the Start menu, which opens on the left), with a hover
-        // highlight — the four-pane blue logo, no text.
-        final int startX = 4;
+        // Start: follows the taskbar alignment (centered as the leftmost of the centered group, or left corner),
+        // with a hover highlight — the four-pane blue logo, no text.
+        final int startX = win11StartX(sw);
         if (lmx >= startX && lmx < startX + WIN11_SLOT && lmy >= tbY) {
             g.fill(startX, tbY + 2, startX + WIN11_SLOT, bottom - 2, 0x18FFFFFF);
         }
@@ -1085,7 +1769,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(ix + 1, tbY + 2, ix + WIN11_SLOT - 1, bottom - 2, active ? 0x26FFFFFF : 0x18FFFFFF);
             }
             ProgramIcons.draw(g, ix + (WIN11_SLOT - WIN11_ICON) / 2, iconY, WIN11_ICON, WIN11_ICON - 2,
-                    w.appKey(), "panes_11");
+                    programIdForLabel(w.appKey()), "frames_11");
             final int cx = ix + WIN11_SLOT / 2;
             if (active) {
                 g.fill(cx - 6, bottom - 2, cx + 6, bottom - 1, 0xFF4C84F0); // wide pill = focused
@@ -1096,6 +1780,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
         final String clock = clockText();
         g.drawString(font, clock, sw - font.width(clock) - 8, tbY + 8, 0xFFE6E8EC, false);
+        drawProcMeter(g, sw - font.width(clock) - 14, tbY + 8, 0xFF9AA3B2);
+    }
+
+    /** Draws the "open programs / limit" meter right-aligned ending at {@code rightX}: amber then red near the cap. */
+    private void drawProcMeter(final GuiGraphics g, final int rightX, final int y, final int normalColor) {
+        final int max = maxWindows();
+        final String procs = windows.size() + "/" + max;
+        final int color = windows.size() >= max ? 0xFFE06A6A
+                : windows.size() >= max - 1 ? 0xFFE0A020 : normalColor;
+        g.drawString(font, procs, rightX - font.width(procs), y, color, false);
     }
 
     /** The Windows 11 Start glyph: four solid blue panes with a thin gap. */
@@ -1111,8 +1805,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private void taskButton(final GuiGraphics g, final int x, final int y, final int w, final int h,
                             final String osp) {
         switch (osp) {
-            case "panes_xp" -> g.fillGradient(x, y, x + w, y + h, 0xFF5B95DD, 0xFF2C5FA8);
-            case "panes_11" -> g.fill(x, y, x + w, y + h, 0xFFE3E5EE);
+            case "frames_xp" -> g.fillGradient(x, y, x + w, y + h, 0xFF5B95DD, 0xFF2C5FA8);
+            case "frames_11" -> g.fill(x, y, x + w, y + h, 0xFFE3E5EE);
             default -> {
                 g.fill(x, y, x + w, y + h, theme.taskButton());
                 bevel(g, x, y, w, h, 0xFFFFFFFF, 0xFF808080);
@@ -1130,14 +1824,66 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     private String osBandLabel() {
-        return switch (osId.getPath()) {
-            case "panes_xp" -> "Panes XP";
-            case "panes_11" -> "Panes 11";
-            default -> "Panes 95";
-        };
+        return desktopName();
     }
 
+    /**
+     * Draws the Start menu. Each Frames version has its OWN layout, not just its own palette: 95 is the
+     * classic side-band vertical list, XP is a two-column programs/places panel, and 11 is a centered
+     * floating panel with a search box and a pinned-app grid.
+     */
     private void renderStartMenu(final GuiGraphics g, final int tbY) {
+        if (periodPanel()) {
+            // A period desktop had a plain vertical launcher, not a modern Plasma menu and certainly not
+            // the GNOME overview, which belongs to a shell released a decade later.
+            renderStartMenuPeriod(g, tbY);
+            return;
+        }
+        switch (panel) {
+            case FRAMES_XP -> renderStartMenuXp(g, tbY);
+            case FRAMES_11 -> renderStartMenu11(g, tbY);
+            case KDE -> renderStartMenuKde(g, tbY);
+            case GNOME -> renderOverviewGnome(g);
+            case CINNAMON -> renderStartMenuCinnamon(g, tbY);
+            default -> renderStartMenu95(g, tbY);
+        }
+    }
+
+    /**
+     * The launcher of a Legacy-era Unix desktop: a raised panel with a coloured side band carrying the
+     * desktop's name and one vertical list of programs. Drawn from the skin's own primitives, so it
+     * carries the same relief as that skin's windows and panel instead of the modern flat chrome.
+     */
+    private void renderStartMenuPeriod(final GuiGraphics g, final int tbY) {
+        final int x = startMenuX();
+        final int h = startMenuHeight();
+        final int w = startMenuW();
+        final int y = tbY - h;
+        skin.panel(g, x, y, w, h);
+
+        // Side band with the desktop's name, rotated, the way the launchers of that period carried it.
+        g.fill(x + 2, y + 2, x + 2 + BAND_W, y + h - 2, skin.accent());
+        g.pose().pushPose();
+        g.pose().translate(x + BAND_W - 3, y + h - 8, 0);
+        g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-90));
+        g.drawString(font, desktopName(), 0, 0, 0xFFFFFFFF, false);
+        g.pose().popPose();
+
+        final int itemX = x + BAND_W + 6;
+        int my = y + 4;
+        for (final Launcher l : launchers) {
+            final boolean hov = hoverY >= my && hoverY < my + MENU_ITEM_H
+                    && hoverX >= itemX && hoverX < x + w;
+            skin.listRow(g, itemX, my, x + w - 4 - itemX, MENU_ITEM_H, hov, false);
+            ProgramIcons.draw(g, itemX + 2, my + 1, 14, 14, programIdForLabel(l.label()), iconSet());
+            g.drawString(font, l.label(), itemX + 20, my + 4,
+                    hov ? skin.listRowText(true) : skin.text(), false);
+            my += MENU_ITEM_H;
+        }
+    }
+
+    /** Frames 95: the classic Start menu with a rotated OS-name side band and a single vertical program list. */
+    private void renderStartMenu95(final GuiGraphics g, final int tbY) {
         final int x = startMenuX();
         final int h = startMenuHeight();
         final int y = tbY - h;
@@ -1157,8 +1903,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int itemX = x + BAND_W + 4;
         int my = y + 4;
         for (final Launcher l : launchers) {
-            ProgramIcons.draw(g, itemX, my, 16, 14, l.label(), osId.getPath());
-            g.drawString(font, l.label(), itemX + 20, my + 3, theme.menuText(), false);
+            final boolean hov = hoverY >= my && hoverY < my + MENU_ITEM_H && hoverX >= itemX && hoverX < x + MENU_W;
+            if (hov) {
+                g.fill(itemX, my, x + MENU_W - 2, my + MENU_ITEM_H, theme.titleActive());
+            }
+            ProgramIcons.draw(g, itemX, my, 16, 14, l.programId(), iconSet());
+            g.drawString(font, l.label(), itemX + 20, my + 3, hov ? 0xFFFFFFFF : theme.menuText(), false);
             my += MENU_ITEM_H;
         }
         // Separator, then Shut Down.
@@ -1170,8 +1920,911 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         g.drawString(font, "Shut Down", itemX + 20, my + 3, theme.menuText(), false);
     }
 
+    /** Whether the open launcher has a live search box (Frames 11's Start, GNOME's Activities overview). */
+    private boolean searchableStart() {
+        // The period launcher is a plain program list with no search field, so it is not searchable
+        // even though the modern GNOME shell it replaces is.
+        return is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11)
+                || (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.GNOME) && !periodPanel());
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Linux desktop environments: panels
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * The KDE Plasma / Cinnamon bottom panel: a dark bar with the launcher button on the left, one task button
+     * per open window (icon + title, accent underline when focused) at the same 88px pitch the classic taskbar
+     * uses (so the shared click handling applies), and the clock and process meter on the right.
+     */
+    private void renderLinuxPanel(final GuiGraphics g, final int tbY, final int sw, final int sh,
+                                  final int lmx, final int lmy) {
+        final boolean kde = is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.KDE);
+        g.fill(0, tbY, sw, sh, theme.taskbar());
+        g.fill(0, tbY, sw, tbY + 1, theme.taskbarEdge());
+        // Launcher button.
+        final boolean startHot = startOpen || (lmx >= 4 && lmx <= 58 && lmy >= tbY);
+        if (startHot) {
+            g.fill(4, tbY + 2, 58, sh - 2, 0x22FFFFFF);
+        }
+        if (kde) {
+            g.fill(8, tbY + 5, 22, tbY + 19, theme.startButton());
+            g.drawString(font, "K", 12, tbY + 8, 0xFFFFFFFF, false);
+            g.drawString(font, "Apps", 26, tbY + 8, theme.startText(), false);
+        } else {
+            g.fill(8, tbY + 5, 22, tbY + 19, theme.startButton());
+            g.fill(11, tbY + 8, 19, tbY + 16, 0xFFFFFFFF);
+            g.fill(13, tbY + 10, 17, tbY + 14, theme.startButton());
+            g.drawString(font, "Menu", 26, tbY + 8, theme.startText(), false);
+        }
+        // Task buttons.
+        int bx = 64;
+        final int taskRight = sw - 38;
+        final DesktopWindow front = frontWindow();
+        for (final DesktopWindow w : windows) {
+            if (bx + 84 > taskRight) {
+                break;
+            }
+            final boolean active = w == front && !w.minimized();
+            g.fill(bx, tbY + 3, bx + 84, sh - 3, active ? 0x30FFFFFF : theme.taskButton());
+            if (active) {
+                g.fill(bx, sh - 4, bx + 84, sh - 3, theme.startButton());
+            }
+            ProgramIcons.draw(g, bx + 3, tbY + 4, 16, 16, programIdForLabel(w.appKey()), iconSet());
+            g.drawString(font, trim(w.app().title(), 10), bx + 22, tbY + 8, theme.startText(), false);
+            bx += 88;
+        }
+        final String clock = clockText();
+        g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), false);
+        drawProcMeter(g, sw - font.width(clock) - 12, tbY + 8, theme.startText());
+    }
+
+    /**
+     * The panel of a Legacy-era Unix desktop, at the bottom for both KDE and GNOME. It is drawn entirely
+     * out of the skin's own primitives — a raised launcher stud, raised task buttons, a sunken clock —
+     * so the panel is made of the same relief the windows are, instead of the flat modern band.
+     */
+    private void renderPeriodPanel(final GuiGraphics g, final int tbY, final int sw, final int sh,
+                                   final int lmx, final int lmy) {
+        final boolean kde = skin.form() == OsSkin.Form.KDE2;
+        skin.statusBar(g, 0, tbY, sw, TASKBAR_H);
+
+        // Launcher: KDE's K, GNOME's footprint. Both are a raised square stud, not a wide Start slab.
+        final boolean startHot = startOpen || (lmx >= 4 && lmx <= 58 && lmy >= tbY);
+        skin.button(g, font, 4, tbY + 3, 54, TASKBAR_H - 6, kde ? "K  Apps" : "▲  Menu",
+                startHot, startOpen, false);
+
+        // Task buttons: pressed when that window is the one in front, exactly as a period panel showed it.
+        // The 64/88 origin and pitch are the ones the taskbar click handler already tests against, so the
+        // button a player sees and the button they hit are the same rectangle.
+        int bx = 64;
+        final int taskRight = sw - 38;
+        final DesktopWindow front = frontWindow();
+        for (final DesktopWindow w : windows) {
+            if (bx + 84 > taskRight) {
+                break;
+            }
+            final boolean active = w == front && !w.minimized();
+            final boolean hot = lmx >= bx && lmx <= bx + 84 && lmy >= tbY;
+            skin.button(g, font, bx, tbY + 3, 84, TASKBAR_H - 6, "", hot, active, false);
+            ProgramIcons.draw(g, bx + 3, tbY + 5, 12, 12, programIdForLabel(w.appKey()), iconSet());
+            g.drawString(font, trim(w.app().title(), 9), bx + 19, tbY + 8 + (active ? 1 : 0),
+                    skin.text(), false);
+            bx += 88;
+        }
+
+        // A sunken clock well on the right: the period panels all recessed the clock rather than
+        // floating the text on the band.
+        final String clock = clockText();
+        final int cw = font.width(clock) + 8;
+        skin.field(g, sw - cw - 3, tbY + 4, cw, TASKBAR_H - 8, false);
+        g.drawString(font, clock, sw - cw + 1, tbY + 8, skin.text(), false);
+    }
+
+    /**
+     * The GNOME top bar: "Activities" on the left (lit while the overview is open), the clock centered, and the
+     * process meter on the right. It occupies the top {@code TASKBAR_H} pixels.
+     */
+    private void renderGnomeTopBar(final GuiGraphics g, final int sw, final int lmx, final int lmy) {
+        g.fill(0, 0, sw, TASKBAR_H, theme.taskbar());
+        g.fill(0, TASKBAR_H - 1, sw, TASKBAR_H, theme.taskbarEdge());
+        final boolean hot = startOpen || (lmx < 64 && lmy < TASKBAR_H);
+        if (hot) {
+            g.fill(4, 3, 62, TASKBAR_H - 3, 0x22FFFFFF);
+        }
+        g.drawString(font, "Activities", 8, 8, theme.startText(), false);
+        final String clock = clockText();
+        g.drawString(font, clock, (sw - font.width(clock)) / 2, 8, theme.startText(), false);
+        drawProcMeter(g, sw - 12, 8, theme.startText());
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Linux desktop environments: launchers
+    // ---------------------------------------------------------------------------------------------
+
+    /** KDE Plasma's Kickoff: a dark two-pane launcher with a places column, an app list and a session footer. */
+    private void renderStartMenuKde(final GuiGraphics g, final int tbY) {
+        final int x = startMenuX();
+        final int w = KDE_MENU_W;
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        g.fill(x + 2, y + 3, x + w + 2, y + h + 3, 0x40000000);
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF1B1E24);
+        g.fill(x, y, x + w, y + h, 0xFF31363B);
+        // Header: the user and the search hint.
+        g.fill(x + 6, y + 6, x + 20, y + 20, theme.startButton());
+        g.drawString(font, hostAccountLabel(), x + 26, y + 6, 0xFFEFF0F1, false);
+        g.drawString(font, "Type to search...", x + 26, y + 15, 0xFF8A9199, false);
+        // Side column: places.
+        final int bodyTop = y + KDE_HEADER_H;
+        final int bodyBot = y + h - KDE_FOOTER_H;
+        g.fill(x, bodyTop, x + KDE_SIDE_W, bodyBot, 0xFF232629);
+        final String[] places = {"Favorites", "All Apps", "System", "Utilities"};
+        for (int i = 0; i < places.length; i++) {
+            final int py = bodyTop + 4 + i * 14;
+            if (i == 0) {
+                g.fill(x, py - 2, x + KDE_SIDE_W, py + 10, theme.startButton());
+            }
+            g.drawString(font, places[i], x + 8, py, i == 0 ? 0xFFFFFFFF : 0xFFBDC3C7, false);
+        }
+        // App list.
+        int my = bodyTop + 4;
+        final int listX = x + KDE_SIDE_W + 4;
+        final int listW = w - KDE_SIDE_W - 8;
+        for (final Launcher l : launchers) {
+            final boolean hov = hoverY >= my && hoverY < my + KDE_ROW_H && hoverX >= listX && hoverX < listX + listW;
+            if (hov) {
+                g.fill(listX, my, listX + listW, my + KDE_ROW_H, 0x443DAEE9);
+            }
+            ProgramIcons.draw(g, listX + 2, my, 16, KDE_ROW_H, l.programId(), iconSet());
+            g.drawString(font, trim(l.label(), 18), listX + 22, my + 4, 0xFFEFF0F1, false);
+            my += KDE_ROW_H;
+        }
+        // Footer: session actions.
+        g.fill(x, bodyBot, x + w, y + h, 0xFF232629);
+        g.drawString(font, "Sleep", x + 8, bodyBot + 4, 0xFF8A9199, false);
+        final String off = "Shut Down";
+        final int offX = x + w - font.width(off) - 8;
+        final boolean offHov = hoverY >= bodyBot && hoverX >= offX - 4 && hoverX < x + w;
+        g.drawString(font, off, offX, bodyBot + 4, offHov ? 0xFFFFFFFF : 0xFFBDC3C7, false);
+    }
+
+    private boolean handleStartClickKde(final int mx, final int my, final int tbY) {
+        final int x = startMenuX();
+        final int w = KDE_MENU_W;
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        if (mx < x || mx > x + w || my < y || my > y + h) {
+            return false;
+        }
+        final int bodyTop = y + KDE_HEADER_H;
+        final int bodyBot = y + h - KDE_FOOTER_H;
+        if (my >= bodyBot) {
+            if (mx >= x + w - font.width("Shut Down") - 12) {
+                openPowerDialog();
+                closeStart();
+            }
+            return true;
+        }
+        if (my >= bodyTop && mx >= x + KDE_SIDE_W + 4) {
+            final int row = (my - (bodyTop + 4)) / KDE_ROW_H;
+            if (row >= 0 && row < launchers.size()) {
+                runLauncher(launchers.get(row));
+                closeStart();
+            }
+        }
+        return true;
+    }
+
+    /**
+     * GNOME's Activities overview: a translucent layer over the desktop with a search box, a workspace strip,
+     * the app grid (or the search results) and a dash of the first few apps along the bottom.
+     */
+    private void renderOverviewGnome(final GuiGraphics g) {
+        final int sw = sw();
+        final int sh = sh();
+        final int top = TASKBAR_H;
+        g.fill(0, top, sw, sh, 0xD00F0F14);
+        // Search box.
+        final int fieldW = Math.min(180, sw - 40);
+        final int fieldX = (sw - fieldW) / 2;
+        final int fieldY = top + 8;
+        g.fill(fieldX, fieldY, fieldX + fieldW, fieldY + 14, 0x33FFFFFF);
+        final String q = startSearch.toString();
+        if (q.isEmpty()) {
+            final String hint = "Type to search";
+            g.drawString(font, hint, fieldX + (fieldW - font.width(hint)) / 2, fieldY + 3, 0xFFB8BBC8, false);
+        } else {
+            g.drawString(font, trim(q, (fieldW - 8) / 6), fieldX + 6, fieldY + 3, 0xFFFFFFFF, false);
+        }
+        final List<Launcher> filtered = w11Filtered();
+        int contentTop = fieldY + 22;
+        if (q.isEmpty()) {
+            // Workspace strip: the current workspace (with a hint of the open windows) and an empty one.
+            final int wsW = Math.min(90, (sw - 40) / 2);
+            final int wsX = (sw - (wsW * 2 + 10)) / 2;
+            g.fill(wsX, contentTop, wsX + wsW, contentTop + 34, 0x33FFFFFF);
+            outline(g, wsX, contentTop, wsW, 34, 0xFFFFFFFF);
+            if (!windows.isEmpty()) {
+                g.fill(wsX + 8, contentTop + 8, wsX + wsW - 8, contentTop + 26, 0xFFF6F5F4);
+            }
+            g.fill(wsX + wsW + 10, contentTop, wsX + wsW * 2 + 10, contentTop + 34, 0x22FFFFFF);
+            contentTop += 42;
+            // App grid.
+            final int gridX = (sw - GN_COLS * GN_TILE_W) / 2;
+            for (int i = 0; i < filtered.size(); i++) {
+                final int col = i % GN_COLS;
+                final int row = i / GN_COLS;
+                final int tx = gridX + col * GN_TILE_W;
+                final int ty = contentTop + row * GN_TILE_H;
+                if (ty + GN_TILE_H > sh - 26) {
+                    break;
+                }
+                final Launcher l = filtered.get(i);
+                if (hoverX >= tx && hoverX < tx + GN_TILE_W && hoverY >= ty && hoverY < ty + GN_TILE_H) {
+                    g.fill(tx + 2, ty, tx + GN_TILE_W - 2, ty + GN_TILE_H - 2, 0x33FFFFFF);
+                }
+                ProgramIcons.draw(g, tx + (GN_TILE_W - 16) / 2, ty + 3, 16, 16, l.programId(), iconSet());
+                String label = l.label();
+                while (label.length() > 3 && font.width(label) > GN_TILE_W - 2) {
+                    label = label.substring(0, label.length() - 1);
+                }
+                g.drawString(font, label, tx + (GN_TILE_W - font.width(label)) / 2, ty + 22, 0xFFFFFFFF, false);
+            }
+            // Dash: the first apps as a pill along the bottom.
+            final int dashN = Math.min(5, launchers.size());
+            final int dashW = dashN * 22 + 8;
+            final int dashX = (sw - dashW) / 2;
+            final int dashY = sh - 24;
+            g.fill(dashX, dashY, dashX + dashW, dashY + 20, 0x66000000);
+            for (int i = 0; i < dashN; i++) {
+                ProgramIcons.draw(g, dashX + 4 + i * 22 + 3, dashY + 2, 16, 16, launchers.get(i).programId(),
+                        iconSet());
+            }
+        } else {
+            g.drawString(font, filtered.isEmpty() ? "No results" : "Applications", fieldX, contentTop, 0xFFB8BBC8, false);
+            int my = contentTop + 12;
+            for (final Launcher l : filtered) {
+                if (hoverY >= my && hoverY < my + 16 && hoverX >= fieldX && hoverX < fieldX + fieldW) {
+                    g.fill(fieldX, my, fieldX + fieldW, my + 16, 0x33FFFFFF);
+                }
+                ProgramIcons.draw(g, fieldX + 2, my, 16, 16, l.programId(), iconSet());
+                g.drawString(font, l.label(), fieldX + 22, my + 4, 0xFFFFFFFF, false);
+                my += 16;
+            }
+        }
+    }
+
+    private boolean handleOverviewClickGnome(final int mx, final int my) {
+        final int sw = sw();
+        final int sh = sh();
+        final int top = TASKBAR_H;
+        if (my < top) {
+            return false; // the top bar handles its own clicks
+        }
+        final int fieldW = Math.min(180, sw - 40);
+        final int fieldX = (sw - fieldW) / 2;
+        final int fieldY = top + 8;
+        final List<Launcher> filtered = w11Filtered();
+        if (startSearch.length() > 0) {
+            int ry = fieldY + 22 + 12;
+            for (final Launcher l : filtered) {
+                if (my >= ry && my < ry + 16 && mx >= fieldX && mx < fieldX + fieldW) {
+                    runLauncher(l);
+                    closeStart();
+                    return true;
+                }
+                ry += 16;
+            }
+            if (my >= fieldY && my < fieldY + 14) {
+                return true;
+            }
+            closeStart();
+            return true;
+        }
+        final int gridTop = fieldY + 22 + 42;
+        final int gridX = (sw - GN_COLS * GN_TILE_W) / 2;
+        if (my >= gridTop && mx >= gridX && mx < gridX + GN_COLS * GN_TILE_W) {
+            final int col = (mx - gridX) / GN_TILE_W;
+            final int row = (my - gridTop) / GN_TILE_H;
+            final int idx = row * GN_COLS + col;
+            if (idx >= 0 && idx < filtered.size() && gridTop + (row + 1) * GN_TILE_H <= sh - 26) {
+                runLauncher(filtered.get(idx));
+                closeStart();
+                return true;
+            }
+        }
+        final int dashN = Math.min(5, launchers.size());
+        final int dashW = dashN * 22 + 8;
+        final int dashX = (sw - dashW) / 2;
+        final int dashY = sh - 24;
+        if (my >= dashY && my < dashY + 20 && mx >= dashX && mx < dashX + dashW) {
+            final int idx = (mx - dashX - 4) / 22;
+            if (idx >= 0 && idx < dashN) {
+                runLauncher(launchers.get(idx));
+                closeStart();
+            }
+            return true;
+        }
+        if (my >= fieldY && my < fieldY + 14) {
+            return true; // the search box keeps the overview open
+        }
+        closeStart(); // clicking the overview backdrop leaves it, as GNOME does
+        return true;
+    }
+
+    /** Cinnamon's Mint menu: a favourites rail, a categories column and the app list with a search hint. */
+    private void renderStartMenuCinnamon(final GuiGraphics g, final int tbY) {
+        final int x = startMenuX();
+        final int w = CIN_MENU_W;
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        g.fill(x + 2, y + 3, x + w + 2, y + h + 3, 0x40000000);
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF1F1F1F);
+        g.fill(x, y, x + w, y + h, 0xFF2F2F2F);
+        // Favourites rail: the first apps as icons.
+        g.fill(x, y, x + CIN_RAIL_W, y + h, 0xFF262626);
+        final int favN = Math.min(4, launchers.size());
+        for (int i = 0; i < favN; i++) {
+            final int fy = y + 8 + i * 22;
+            if (hoverX >= x && hoverX < x + CIN_RAIL_W && hoverY >= fy - 3 && hoverY < fy + 19) {
+                g.fill(x + 2, fy - 3, x + CIN_RAIL_W - 2, fy + 19, 0x3369B03B);
+            }
+            ProgramIcons.draw(g, x + (CIN_RAIL_W - 16) / 2, fy, 16, 16, launchers.get(i).programId(),
+                    iconSet());
+        }
+        // Categories.
+        final int catsX = x + CIN_RAIL_W;
+        g.fill(catsX + CIN_CATS_W - 1, y, catsX + CIN_CATS_W, y + h, 0xFF3A3A3A);
+        final String[] cats = {"All", "Accessories", "Office", "System", "Preferences"};
+        for (int i = 0; i < cats.length; i++) {
+            final int cy = y + CIN_HEADER_H + i * 14;
+            if (i == 0) {
+                g.fill(catsX, cy - 2, catsX + CIN_CATS_W - 1, cy + 10, theme.startButton());
+            }
+            g.drawString(font, cats[i], catsX + 8, cy, i == 0 ? 0xFFFFFFFF : 0xFFBDBDBD, false);
+        }
+        // Search hint + app list.
+        final int listX = catsX + CIN_CATS_W + 4;
+        final int listW = x + w - listX - 4;
+        g.fill(listX, y + 5, listX + listW, y + 17, 0xFF222222);
+        outline(g, listX, y + 5, listW, 12, 0xFF444444);
+        g.drawString(font, "Search", listX + 4, y + 7, 0xFF9A9A9A, false);
+        int my = y + CIN_HEADER_H;
+        for (final Launcher l : launchers) {
+            final boolean hov = hoverY >= my && hoverY < my + CIN_ROW_H && hoverX >= listX && hoverX < listX + listW;
+            if (hov) {
+                g.fill(listX, my, listX + listW, my + CIN_ROW_H, 0x3369B03B);
+            }
+            ProgramIcons.draw(g, listX + 2, my, 16, CIN_ROW_H, l.programId(), iconSet());
+            g.drawString(font, trim(l.label(), 16), listX + 22, my + 4, 0xFFE8E8E8, false);
+            my += CIN_ROW_H;
+        }
+    }
+
+    private boolean handleStartClickCinnamon(final int mx, final int my, final int tbY) {
+        final int x = startMenuX();
+        final int w = CIN_MENU_W;
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        if (mx < x || mx > x + w || my < y || my > y + h) {
+            return false;
+        }
+        if (mx < x + CIN_RAIL_W) {
+            final int favN = Math.min(4, launchers.size());
+            for (int i = 0; i < favN; i++) {
+                final int fy = y + 8 + i * 22;
+                if (my >= fy - 3 && my < fy + 19) {
+                    runLauncher(launchers.get(i));
+                    closeStart();
+                    return true;
+                }
+            }
+            return true;
+        }
+        final int listX = x + CIN_RAIL_W + CIN_CATS_W + 4;
+        if (mx >= listX && my >= y + CIN_HEADER_H) {
+            final int row = (my - (y + CIN_HEADER_H)) / CIN_ROW_H;
+            if (row >= 0 && row < launchers.size()) {
+                runLauncher(launchers.get(row));
+                closeStart();
+            }
+        }
+        return true;
+    }
+
+    /** Frames XP: a two-column panel — programs on the left, system places on the right — with header/footer bands. */
+    private void renderStartMenuXp(final GuiGraphics g, final int tbY) {
+        final int x = startMenuX();
+        final int w = XP_MENU_W;
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        // Panel with a thin border.
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF13315F);
+        g.fill(x, y, x + w, y + h, theme.menuBg());
+        // Header band: a blue gradient with the OS name, like the XP user header.
+        g.fillGradient(x, y, x + w, y + XP_HEADER_H, 0xFF3B7BD4, 0xFF1E4E9E);
+        g.drawString(font, osBandLabel(), x + 6, y + (XP_HEADER_H - 8) / 2, 0xFFFFFFFF, true);
+        // Body: left programs column over white, right places column over a tinted panel.
+        final int bodyTop = y + XP_HEADER_H;
+        final int bodyBot = y + h - XP_FOOTER_H;
+        final int split = x + XP_LEFT_W;
+        g.fill(x, bodyTop, split, bodyBot, 0xFFFFFFFF);
+        g.fill(split, bodyTop, x + w, bodyBot, 0xFFDCE7F6);
+        g.fill(split, bodyTop, split + 1, bodyBot, 0xFFB6C6E0);
+        drawXpColumn(g, xpLeftLaunchers(), x + 3, bodyTop + 3, XP_LEFT_W - 6, theme.menuText());
+        drawXpColumn(g, xpRightLaunchers(), split + 3, bodyTop + 3, w - XP_LEFT_W - 6, 0xFF1A3A70);
+        // Footer band with a Turn Off entry (mirrors the header gradient).
+        final int footY = bodyBot;
+        g.fillGradient(x, footY, x + w, y + h, 0xFF3B7BD4, 0xFF1E4E9E);
+        final int offX = x + w - 74;
+        final boolean offHov = hoverY >= footY && hoverX >= offX && hoverX < x + w - 4;
+        if (offHov) {
+            g.fill(offX - 2, footY + 2, x + w - 3, y + h - 2, 0x33FFFFFF);
+        }
+        g.fill(offX, footY + 5, offX + 8, footY + 13, 0xFFE24C4C);
+        g.fill(offX + 3, footY + 3, offX + 5, footY + 9, 0xFFFFFFFF);
+        g.drawString(font, "Turn Off", offX + 12, footY + (XP_FOOTER_H - 8) / 2, 0xFFFFFFFF, true);
+    }
+
+    /** Draws one XP Start column as an icon+label list, with a hover highlight on the row under the cursor. */
+    private void drawXpColumn(final GuiGraphics g, final List<Launcher> items, final int colX, final int colY,
+                              final int colW, final int textColor) {
+        int my = colY;
+        for (final Launcher l : items) {
+            if (hoverY >= my && hoverY < my + XP_ROW_H && hoverX >= colX && hoverX < colX + colW) {
+                g.fill(colX, my, colX + colW, my + XP_ROW_H, 0x333B7BD4);
+            }
+            ProgramIcons.draw(g, colX + 1, my, 14, 12, l.programId(), iconSet());
+            g.drawString(font, trim(l.label(), (colW - 20) / 6), colX + 18, my + 4, textColor, false);
+            my += XP_ROW_H;
+        }
+    }
+
+    /** Frames 11: a centered floating panel with a search box, a pinned-app grid, and a footer power button. */
+    private void renderStartMenu11(final GuiGraphics g, final int tbY) {
+        final int x = startMenuX();
+        final int w = W11_MENU_W;
+        final int h = startMenuHeight();
+        final int y = startMenuY(tbY);
+        // The Start panel follows the window skin, so dark mode darkens it along with every program.
+        final int panelBg = skin.windowBg();
+        final int panelText = skin.text();
+        final int panelDim = skin.dim();
+        final int panelEdge = skin.edge();
+        final int panelHover = skin.listHover();
+        // Soft drop shadow, then the panel with a hairline border.
+        g.fill(x + 2, y + 3, x + w + 2, y + h + 3, 0x40000000);
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, skin.windowBorder());
+        g.fill(x, y, x + w, y + h, panelBg);
+        // Search box.
+        final int fieldX = x + 6;
+        final int fieldW = w - 12;
+        final int fieldY = y + 6;
+        g.fill(fieldX, fieldY, fieldX + fieldW, fieldY + W11_SEARCH_H, skin.fieldBg());
+        outline(g, fieldX, fieldY, fieldW, W11_SEARCH_H, panelEdge);
+        // Magnifier glyph.
+        outline(g, fieldX + 4, fieldY + 3, 5, 5, panelDim);
+        g.fill(fieldX + 8, fieldY + 7, fieldX + 10, fieldY + 9, panelDim);
+        final String q = startSearch.toString();
+        if (q.isEmpty()) {
+            g.drawString(font, "Type here to search", fieldX + 13, fieldY + 3, panelDim, false);
+        } else {
+            g.drawString(font, trim(q, (fieldW - 16) / 6), fieldX + 13, fieldY + 3, panelText, false);
+        }
+        final int contentTop = fieldY + W11_SEARCH_H + 5;
+        final List<Launcher> filtered = w11Filtered();
+        if (q.isEmpty()) {
+            // Pinned label + the app grid.
+            g.drawString(font, "Pinned", x + 8, contentTop, panelDim, false);
+            final int gridTop = contentTop + 9;
+            final int gridX = x + (w - W11_COLS * W11_TILE_W) / 2;
+            for (int i = 0; i < filtered.size(); i++) {
+                final int col = i % W11_COLS;
+                final int row = i / W11_COLS;
+                final int tx = gridX + col * W11_TILE_W;
+                final int ty = gridTop + row * W11_TILE_H;
+                drawW11Tile(g, filtered.get(i), tx, ty, panelText, panelHover, panelEdge);
+            }
+        } else {
+            // Search results as a vertical list.
+            g.drawString(font, filtered.isEmpty() ? "No results" : "Best match", x + 8, contentTop, panelDim, false);
+            int my = contentTop + 11;
+            final int rowW = w - 12;
+            for (final Launcher l : filtered) {
+                if (hoverY >= my && hoverY < my + 15 && hoverX >= x + 6 && hoverX < x + 6 + rowW) {
+                    g.fill(x + 6, my, x + 6 + rowW, my + 15, panelHover);
+                }
+                ProgramIcons.draw(g, x + 8, my + 1, 13, 12, l.programId(), iconSet());
+                g.drawString(font, l.label(), x + 24, my + 4, panelText, false);
+                my += 15;
+            }
+        }
+        // Footer: a separator, an account label on the left, and a power button on the right.
+        final int footY = y + h - W11_FOOTER_H;
+        g.fill(x + 8, footY, x + w - 8, footY + 1, panelEdge);
+        g.drawString(font, hostAccountLabel(), x + 12, footY + (W11_FOOTER_H - 8) / 2, panelText, false);
+        final int pwX = x + w - 22;
+        final int pwY = footY + (W11_FOOTER_H - 12) / 2;
+        final boolean pwHov = hoverX >= pwX - 2 && hoverX < pwX + 14 && hoverY >= footY;
+        if (pwHov) {
+            g.fill(pwX - 3, footY + 2, pwX + 15, footY + W11_FOOTER_H - 2, panelHover);
+        }
+        outline(g, pwX, pwY, 12, 12, panelText);
+        g.fill(pwX + 5, pwY - 1, pwX + 7, pwY + 6, panelText); // power stem
+    }
+
+    /** Draws one Frames 11 pinned tile: an icon over a centered label, with a hover background. */
+    private void drawW11Tile(final GuiGraphics g, final Launcher l, final int tx, final int ty,
+                             final int labelColor, final int hoverBg, final int hoverEdge) {
+        if (hoverX >= tx && hoverX < tx + W11_TILE_W && hoverY >= ty && hoverY < ty + W11_TILE_H) {
+            g.fill(tx + 1, ty + 1, tx + W11_TILE_W - 1, ty + W11_TILE_H - 1, hoverBg);
+            outline(g, tx + 1, ty + 1, W11_TILE_W - 2, W11_TILE_H - 2, hoverEdge);
+        }
+        ProgramIcons.draw(g, tx + (W11_TILE_W - 16) / 2, ty + 3, 16, 14, l.programId(), iconSet());
+        // Truncate the label to the tile width by dropping characters (no ellipsis, which would be wider).
+        String label = l.label();
+        while (label.length() > 3 && font.width(label) > W11_TILE_W - 2) {
+            label = label.substring(0, label.length() - 1);
+        }
+        g.drawString(font, label, tx + (W11_TILE_W - font.width(label)) / 2, ty + 20, labelColor, false);
+    }
+
+    /** A short account line for the Frames 11 Start footer: the computer's name, or a generic label. */
+    private String hostAccountLabel() {
+        return (computerName == null || computerName.isBlank()) ? "Local account" : trim(computerName, 22);
+    }
+
+    /** A thin one-pixel rectangle outline used by the Frames 11 Start panel. */
+    private static void outline(final GuiGraphics g, final int x, final int y, final int w, final int h,
+                               final int color) {
+        g.fill(x, y, x + w, y + 1, color);
+        g.fill(x, y + h - 1, x + w, y + h, color);
+        g.fill(x, y, x + 1, y + h, color);
+        g.fill(x + w - 1, y, x + w, y + h, color);
+    }
+
+    /** Closes the Start menu and clears any Frames 11 search text so it reopens fresh. */
+    private void closeStart() {
+        startOpen = false;
+        startSearch.setLength(0);
+    }
+
+    // ---- Power ------------------------------------------------------------------------------------
+    //
+    // Shutting down used to close the window and leave the machine running — the computer stayed on
+    // the network with everything still open. The three real choices now live in one dialog, and each
+    // one reaches the machine.
+
+    private static final int POWER_W = 190;
+    private static final int POWER_ROW_H = 20;
+    private static final String[][] POWER_CHOICES = {
+            {"Shut down", "the machine powers off"},
+            {"Restart", "power-cycle, back at the POST"},
+            {"Log off", "leave the screen, keep it running"},
+    };
+
+    private boolean powerOpen;
+    // The desktop surface the dialog was centred on, so the click test lands where it was drawn.
+    private int powerSurfaceW;
+    private int powerSurfaceH;
+
+    // ---- Taskbar context menu ---------------------------------------------------------------------
+
+    private static final int TASK_MENU_W = 118;
+    private static final int TASK_MENU_ROW_H = 12;
+    private static final String[] TASK_MENU_ITEMS = {
+            "Bring to front", "Minimize", "Maximize", "Minimize others", "Close",
+    };
+
+    /** The taskbar entry whose menu is open, or -1. */
+    private int taskMenuIndex = -1;
+    private int taskMenuX;
+    private int taskMenuY;
+
+    private int taskMenuHeight() {
+        return 4 + TASK_MENU_ITEMS.length * TASK_MENU_ROW_H;
+    }
+
+    /** Draws the taskbar's context menu; returns false when none is open. */
+    private boolean renderTaskMenu(final GuiGraphics g, final int mouseX, final int mouseY) {
+        if (taskMenuIndex < 0 || taskMenuIndex >= windows.size()) {
+            taskMenuIndex = -1;
+            return false;
+        }
+        final int x = taskMenuX;
+        final int y = taskMenuY - taskMenuHeight();
+        skin.windowShadow(g, x, y, TASK_MENU_W, taskMenuHeight());
+        skin.panel(g, x, y, TASK_MENU_W, taskMenuHeight());
+        for (int i = 0; i < TASK_MENU_ITEMS.length; i++) {
+            final int rowY = y + 2 + i * TASK_MENU_ROW_H;
+            final boolean hovered = mouseX >= x + 2 && mouseX < x + TASK_MENU_W - 2
+                    && mouseY >= rowY && mouseY < rowY + TASK_MENU_ROW_H;
+            if (hovered) {
+                g.fill(x + 2, rowY, x + TASK_MENU_W - 2, rowY + TASK_MENU_ROW_H, skin.listHover());
+            }
+            final boolean destructive = i == TASK_MENU_ITEMS.length - 1;
+            g.drawString(font, TASK_MENU_ITEMS[i], x + 8, rowY + 2,
+                    destructive ? 0xFFC04A3E : skin.text(), false);
+        }
+        return true;
+    }
+
+    /** Handles a click while the taskbar menu is open; returns whether it consumed the click. */
+    private boolean clickTaskMenu(final double mouseXAbs, final double mouseYAbs) {
+        if (taskMenuIndex < 0) {
+            return false;
+        }
+        final int index = taskMenuIndex;
+        taskMenuIndex = -1;
+        if (index >= windows.size()) {
+            return true;
+        }
+        final double mouseX = mouseXAbs - ox();
+        final double mouseY = mouseYAbs - oy();
+        final int x = taskMenuX;
+        final int y = taskMenuY - taskMenuHeight();
+        for (int i = 0; i < TASK_MENU_ITEMS.length; i++) {
+            final int rowY = y + 2 + i * TASK_MENU_ROW_H;
+            if (mouseX < x + 2 || mouseX >= x + TASK_MENU_W - 2
+                    || mouseY < rowY || mouseY >= rowY + TASK_MENU_ROW_H) {
+                continue;
+            }
+            final DesktopWindow w = windows.get(index);
+            switch (i) {
+                case 0 -> {
+                    w.setMinimized(false);
+                    bringToFront(index);
+                }
+                case 1 -> w.setMinimized(true);
+                case 2 -> {
+                    w.setMinimized(false);
+                    w.setMaximized(!w.maximized());
+                    bringToFront(index);
+                }
+                case 3 -> {
+                    for (final DesktopWindow other : windows) {
+                        other.setMinimized(other != w);
+                    }
+                    w.setMinimized(false);
+                }
+                default -> windows.remove(index);
+            }
+            return true;
+        }
+        return true; // a click outside the menu just dismisses it
+    }
+
+    private void openPowerDialog() {
+        powerOpen = true;
+    }
+
+    private int powerHeight() {
+        return 22 + POWER_CHOICES.length * POWER_ROW_H;
+    }
+
+    private int powerX() {
+        return (powerSurfaceW - POWER_W) / 2;
+    }
+
+    private int powerY() {
+        return (powerSurfaceH - powerHeight()) / 2;
+    }
+
+    /** Draws the power dialog over the desktop; returns false when it is not open. */
+    private boolean renderPowerDialog(final GuiGraphics g, final int surfaceW, final int surfaceH,
+                                      final int mouseX, final int mouseY) {
+        if (!powerOpen) {
+            return false;
+        }
+        powerSurfaceW = surfaceW;
+        powerSurfaceH = surfaceH;
+        final int x = powerX();
+        final int y = powerY();
+        g.fill(0, 0, surfaceW, surfaceH, 0x99000000);
+        skin.windowShadow(g, x, y, POWER_W, powerHeight());
+        skin.windowFrame(g, x, y, POWER_W, powerHeight());
+        skin.titleBar(g, x, y, POWER_W, 14);
+        g.drawString(font, "Power", x + 6, y + 3, skin.titleText(), false);
+        for (int i = 0; i < POWER_CHOICES.length; i++) {
+            final int rowY = y + 18 + i * POWER_ROW_H;
+            final boolean hovered = mouseX >= x + 4 && mouseX < x + POWER_W - 4
+                    && mouseY >= rowY && mouseY < rowY + POWER_ROW_H - 2;
+            if (hovered) {
+                g.fill(x + 4, rowY, x + POWER_W - 4, rowY + POWER_ROW_H - 2, skin.listHover());
+            }
+            g.drawString(font, POWER_CHOICES[i][0], x + 12, rowY + 2, skin.text(), false);
+            g.drawString(font, POWER_CHOICES[i][1], x + 12, rowY + 11, skin.dim(), false);
+        }
+        return true;
+    }
+
+    /**
+     * Handles a click while the power dialog is up; returns whether it consumed the click. The
+     * coordinates come in absolute and are moved into the desktop's own space, where it was drawn.
+     */
+    private boolean clickPowerDialog(final double mouseXAbs, final double mouseYAbs) {
+        if (!powerOpen) {
+            return false;
+        }
+        final double mouseX = mouseXAbs - ox();
+        final double mouseY = mouseYAbs - oy();
+        final int x = powerX();
+        final int y = powerY();
+        for (int i = 0; i < POWER_CHOICES.length; i++) {
+            final int rowY = y + 18 + i * POWER_ROW_H;
+            if (mouseX >= x + 4 && mouseX < x + POWER_W - 4
+                    && mouseY >= rowY && mouseY < rowY + POWER_ROW_H - 2) {
+                // The machine is going down or restarting: the desktop closing after this must not
+                // hand its windows back to a machine whose session has just ended.
+                powerCycling = true;
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new dev.jsc.jscomputronics.module.computing.operation.payload
+                                .MachinePowerPayload(host, monitorPos, i));
+                powerOpen = false;
+                return true;
+            }
+        }
+        // A click anywhere else dismisses it: no accidental shutdowns.
+        powerOpen = false;
+        return true;
+    }
+
+    /** Toggles the Start menu open/closed, always opening with an empty search box. */
+    private void toggleStart() {
+        if (startOpen) {
+            closeStart();
+        } else {
+            startOpen = true;
+            startSearch.setLength(0);
+        }
+    }
+
+    /**
+     * Resolves a click inside the (version-specific) Start menu. Returns true when the click landed on the
+     * panel (and was acted on or absorbed); false when it fell outside, so the caller closes the menu.
+     */
+    private boolean handleStartMenuClick(final int mx, final int my, final int tbY) {
+        if (periodPanel()) {
+            return handleStartClickPeriod(mx, my, tbY);
+        }
+        return switch (panel) {
+            case FRAMES_XP -> handleStartClickXp(mx, my, tbY);
+            case FRAMES_11 -> handleStartClick11(mx, my, tbY);
+            case KDE -> handleStartClickKde(mx, my, tbY);
+            case GNOME -> handleOverviewClickGnome(mx, my);
+            case CINNAMON -> handleStartClickCinnamon(mx, my, tbY);
+            default -> handleStartClick95(mx, my, tbY);
+        };
+    }
+
+    /**
+     * Clicks in the period launcher. The rows are laid out from the same origin and pitch the renderer
+     * uses, so what the player sees and what they hit are one list.
+     */
+    private boolean handleStartClickPeriod(final int mx, final int my, final int tbY) {
+        final int x = startMenuX();
+        final int w = startMenuW();
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        if (mx < x || mx > x + w || my < y || my > y + h) {
+            return false;
+        }
+        final int idx = (int) Math.floor((my - (y + 4)) / (double) MENU_ITEM_H);
+        if (idx >= 0 && idx < launchers.size()) {
+            runLauncher(launchers.get(idx));
+        }
+        closeStart();
+        return true;
+    }
+
+    private boolean handleStartClick95(final int mx, final int my, final int tbY) {
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        if (mx < startMenuX() || mx > startMenuX() + MENU_W || my < y || my > y + h) {
+            return false;
+        }
+        final int itemsTop = y + 4;
+        final int idx = (int) Math.floor((my - itemsTop) / (double) MENU_ITEM_H);
+        if (idx >= 0 && idx < launchers.size()) {
+            runLauncher(launchers.get(idx));
+        } else {
+            final int shutY = itemsTop + launchers.size() * MENU_ITEM_H + 6;
+            if (my >= shutY && my <= shutY + MENU_ITEM_H) {
+                openPowerDialog();
+            }
+        }
+        closeStart();
+        return true;
+    }
+
+    private boolean handleStartClickXp(final int mx, final int my, final int tbY) {
+        final int x = startMenuX();
+        final int w = XP_MENU_W;
+        final int h = startMenuHeight();
+        final int y = tbY - h;
+        if (mx < x || mx > x + w || my < y || my > y + h) {
+            return false;
+        }
+        final int bodyTop = y + XP_HEADER_H;
+        final int bodyBot = y + h - XP_FOOTER_H;
+        final int split = x + XP_LEFT_W;
+        if (my >= bodyTop && my < bodyBot) {
+            final int row = (my - (bodyTop + 3)) / XP_ROW_H;
+            final List<Launcher> col = mx < split ? xpLeftLaunchers() : xpRightLaunchers();
+            if (row >= 0 && row < col.size()) {
+                runLauncher(col.get(row));
+            }
+        } else if (my >= bodyBot) {
+            // The footer's Turn Off button occupies the right side of the band.
+            if (mx >= x + w - 76) {
+                openPowerDialog();
+            }
+        }
+        closeStart();
+        return true;
+    }
+
+    private boolean handleStartClick11(final int mx, final int my, final int tbY) {
+        final int x = startMenuX();
+        final int w = W11_MENU_W;
+        final int h = startMenuHeight();
+        final int y = startMenuY(tbY);
+        if (mx < x || mx > x + w || my < y || my > y + h) {
+            return false;
+        }
+        // Footer power button (right side): shut the computer down.
+        final int footY = y + h - W11_FOOTER_H;
+        if (my >= footY) {
+            if (mx >= x + w - 24) {
+                openPowerDialog();
+                closeStart();
+            }
+            return true; // clicks elsewhere in the footer are absorbed, keeping the menu open
+        }
+        final int contentTop = y + 6 + W11_SEARCH_H + 5;
+        final List<Launcher> filtered = w11Filtered();
+        if (startSearch.length() > 0) {
+            // Result list rows.
+            int ry = contentTop + 11;
+            for (final Launcher l : filtered) {
+                if (my >= ry && my < ry + 15) {
+                    runLauncher(l);
+                    closeStart();
+                    return true;
+                }
+                ry += 15;
+            }
+            return true; // absorb clicks on the search box / empty space
+        }
+        // Pinned grid tiles.
+        final int gridTop = contentTop + 9;
+        final int gridX = x + (w - W11_COLS * W11_TILE_W) / 2;
+        if (my >= gridTop && mx >= gridX) {
+            final int col = (mx - gridX) / W11_TILE_W;
+            final int row = (my - gridTop) / W11_TILE_H;
+            if (col >= 0 && col < W11_COLS) {
+                final int idx = row * W11_COLS + col;
+                if (idx >= 0 && idx < filtered.size()) {
+                    runLauncher(filtered.get(idx));
+                    closeStart();
+                    return true;
+                }
+            }
+        }
+        return true; // clicks on the search box or padding keep the menu open
+    }
+
     @Override
     public boolean mouseClicked(final double mouseXAbs, final double mouseYAbs, final int button) {
+        if (crashing) {
+            return true; // the crash screen swallows input until the reboot completes
+        }
+        // The power dialog is modal: it decides the fate of the whole machine, so nothing behind it
+        // takes the click. An open taskbar menu takes the next click the same way.
+        if (clickPowerDialog(mouseXAbs, mouseYAbs) || clickTaskMenu(mouseXAbs, mouseYAbs)) {
+            return true;
+        }
         // A modal dialog swallows every click; only its OK button dismisses it.
         if (popup != null) {
             if (popup.okClicked(mouseXAbs - ox(), mouseYAbs - oy())) {
@@ -1179,14 +2832,33 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             return true;
         }
+        // An app-level modal dialog isolates its window: route the click to it and to nothing behind it
+        // (inventory slots, other windows, the taskbar), just like the desktop popup above.
+        if (focusModal()) {
+            final DesktopWindow f = frontWindow();
+            if (f != null) {
+                f.app().mouseClicked(f, mouseXAbs - ox(), mouseYAbs - oy(), button);
+            }
+            return true;
+        }
         final double mouseX = mouseXAbs - ox();
         final double mouseY = mouseYAbs - oy();
         final int tbY = sh() - TASKBAR_H;
 
+        // GNOME: the top bar's Activities corner toggles the overview; the rest of the bar is inert.
+        // Only while the bar IS at the top: a period GNOME panels at the bottom, and swallowing clicks
+        // along the top edge there ate the title bars of every window parked up there.
+        if (topPanel() && mouseY < TASKBAR_H) {
+            if (mouseX < 64) {
+                toggleStart();
+            }
+            return true;
+        }
         // Windows 11 taskbar: Start sits left, the app icons are centered, so they have their own hit test.
-        if (osId.getPath().equals("panes_11") && mouseY >= tbY) {
-            if (mouseX >= 4 && mouseX < 4 + WIN11_SLOT) {
-                startOpen = !startOpen;
+        if (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11) && mouseY >= tbY) {
+            final int startX = win11StartX(sw());
+            if (mouseX >= startX && mouseX < startX + WIN11_SLOT) {
+                toggleStart();
                 return true;
             }
             final int appsX = win11AppsX(sw());
@@ -1206,25 +2878,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
 
         if (mouseY >= tbY + 3 && mouseX >= 4 && mouseX <= 58) {
-            startOpen = !startOpen;
+            toggleStart();
             return true;
         }
         if (startOpen) {
-            final int h = startMenuHeight();
-            final int y = tbY - h;
-            if (mouseX >= startMenuX() && mouseX <= startMenuX() + MENU_W && mouseY >= y && mouseY <= y + h) {
-                final int itemsTop = y + 4;
-                final int idx = (int) Math.floor((mouseY - itemsTop) / (double) MENU_ITEM_H);
-                if (idx >= 0 && idx < launchers.size()) {
-                    runLauncher(launchers.get(idx));
-                    startOpen = false;
-                } else {
-                    final int shutY = itemsTop + launchers.size() * MENU_ITEM_H + 6;
-                    if (mouseY >= shutY && mouseY <= shutY + MENU_ITEM_H) {
-                        onClose();
-                    }
-                }
-                startOpen = false;
+            if (handleStartMenuClick((int) mouseX, (int) mouseY, tbY)) {
                 return true;
             }
             startOpen = false;
@@ -1235,6 +2893,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int idx = (int) ((mouseX - 64) / 88);
             final int bxStart = 64 + idx * 88;
             if (idx >= 0 && idx < windows.size() && mouseX <= bxStart + 84 && bxStart + 84 <= sw() - 38) {
+                // Right-click opens the window's own menu, so a program can be closed without first
+                // going to it — the thing every taskbar does and this one did not.
+                if (button == 1) {
+                    taskMenuIndex = idx;
+                    taskMenuX = bxStart;
+                    taskMenuY = tbY + 3;
+                    return true;
+                }
                 final DesktopWindow w = windows.get(idx);
                 if (w.minimized()) {
                     w.setMinimized(false);
@@ -1298,14 +2964,20 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     if (!ni.hasPopup() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
                         return super.mouseClicked(mouseXAbs, mouseYAbs, button);
                     }
-                    // A held stack dropped on the item grid deposits into the network (Network tab) or local
-                    // storage (Storage tab) — the desktop owns the cursor, so it routes the deposit here.
+                    // A held stack dropped on the item grid goes to the network (Network tab) or local storage
+                    // (Storage tab) — the desktop owns the cursor, so it routes the handoff here. Left = the
+                    // whole stack as items; right = one, or what a held container holds; and a held empty
+                    // container right-clicked on a fluid or chemical entry fills from it, so the entry under
+                    // the cursor travels with a right-click.
                     if (!ni.hasPopup() && !menu.getCarried().isEmpty() && (button == 0 || button == 1)) {
-                        final int target = ni.cursorDepositTarget(mouseX - (w.x() + 4), mouseY - (w.y() + 18));
+                        final double lx = mouseX - (w.x() + 4);
+                        final double ly = mouseY - (w.y() + 18);
+                        final int target = ni.cursorDepositTarget(lx, ly);
                         if (target >= 0) {
                             PacketDistributor.sendToServer(
                                     new dev.jsc.jscomputronics.module.computing.operation.payload
-                                            .NiDepositPayload(host, monitorPos, target, button == 0));
+                                            .NiDepositPayload(host, monitorPos, target, button == 0,
+                                            button == 1 ? ni.cursorDepositEntry(lx, ly) : java.util.Optional.empty()));
                             return true;
                         }
                     }
@@ -1363,10 +3035,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
         selectedIcon = -1;
+        selectedIcons.clear();
         // A click on empty desktop while holding a stack would make the vanilla container throw the item to the
         // world (no slot under the cursor). Swallow it so nothing is ever dropped by clicking the wallpaper.
         if (!menu.getCarried().isEmpty()) {
             return true;
+        }
+        // Pressing on bare wallpaper starts a rubber band; the drag handler grows it from here.
+        if (button == 0 && mouseY >= workTop() && mouseY < workBottom() && overWallpaper(mouseX, mouseY)) {
+            bandActive = true;
+            bandStartX = mouseX;
+            bandStartY = mouseY;
+            bandX = mouseX;
+            bandY = mouseY;
         }
         return super.mouseClicked(mouseXAbs, mouseYAbs, button);
     }
@@ -1379,11 +3060,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         if (dragging != null) {
             dragging.moveTo((int) (mouseXAbs - ox()) - dragOffsetX, (int) (mouseYAbs - oy()) - dragOffsetY,
-                    sw(), sh() - TASKBAR_H);
+                    workTop(), sw(), workBottom());
             return true;
         }
         if (resizing != null) {
-            resizing.applyResize(mouseXAbs - ox(), mouseYAbs - oy(), sw(), sh() - TASKBAR_H);
+            resizing.applyResize(mouseXAbs - ox(), mouseYAbs - oy(), workTop(), sw(), workBottom());
             return true;
         }
         // Dragging a desktop icon across the desktop, once the cursor has left the click dead zone.
@@ -1395,6 +3076,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                         || Math.abs(deskDragY - deskDragStartY) > DRAG_THRESHOLD)) {
                 deskDragging = true;
             }
+            return true;
+        }
+        // Sweeping the wallpaper: extend the band and reselect what it now covers.
+        if (bandActive) {
+            bandX = mouseXAbs - ox();
+            bandY = mouseYAbs - oy();
+            updateBandSelection();
             return true;
         }
         // No window drag/resize in progress. While the front Network Interactor holds a stack on the cursor,
@@ -1413,6 +3101,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     @Override
     public boolean mouseReleased(final double mouseX, final double mouseY, final int button) {
         if (popup != null) {
+            return true;
+        }
+        // Letting go ends the sweep; whatever it covered stays selected.
+        if (bandActive) {
+            bandActive = false;
             return true;
         }
         // A title-bar button was pressed on mousedown; fire its action only if released over the same
@@ -1456,6 +3149,22 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 w.app().mouseReleased(w, mouseX - ox(), mouseY - oy(), button);
             }
         }
+        // Frames 11 edge snapping: releasing a dragged window against a screen edge tiles it (top = maximize,
+        // left/right = that half). A modern-OS gesture the earlier editions do not have.
+        if (dragging != null && (is(dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_11) || linuxDesktop())) {
+            final int lx = (int) (mouseX - ox());
+            final int ly = (int) (mouseY - oy());
+            final int top = workTop();
+            final int workH = workBottom() - top;
+            final int halfW = sw() / 2;
+            if (ly <= top + 4) {
+                dragging.setMaximized(true);
+            } else if (lx <= 4) {
+                dragging.snapTo(0, top, halfW, workH);
+            } else if (lx >= sw() - 4) {
+                dragging.snapTo(halfW, top, sw() - halfW, workH);
+            }
+        }
         dragging = null;
         resizing = null;
         return super.mouseReleased(mouseX, mouseY, button);
@@ -1469,6 +3178,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // A desktop-icon rename captures typing before any window.
         if (deskRenaming >= 0 && c >= 32 && c != 127 && c != '/' && c != '\\' && deskRenameBuf.length() < 64) {
             deskRenameBuf.append(c);
+            return true;
+        }
+        // The Frames 11 Start search box captures typing while it is open (it is always focused when shown).
+        if (startOpen && searchableStart() && c >= 32 && c != 127 && startSearch.length() < 24) {
+            startSearch.append(c);
             return true;
         }
         final DesktopWindow w = frontWindow();
@@ -1502,6 +3216,34 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 }
             }
             return true;
+        }
+        // While the Start menu is open it owns the keyboard: Escape closes it, and on Frames 11 the search box
+        // takes Backspace (edit) and Enter (launch the top result). This runs before ESC reaches the desktop.
+        if (startOpen) {
+            if (key == 256) { // Escape
+                closeStart();
+                return true;
+            }
+            if (searchableStart()) {
+                if (key == 259) { // Backspace
+                    if (startSearch.length() > 0) {
+                        startSearch.deleteCharAt(startSearch.length() - 1);
+                    }
+                    return true;
+                }
+                if ((key == 257 || key == 335) && startSearch.length() > 0) { // Enter launches the first result
+                    final List<Launcher> hits = w11Filtered();
+                    if (!hits.isEmpty()) {
+                        runLauncher(hits.get(0));
+                        closeStart();
+                    }
+                    return true;
+                }
+                // Swallow every other key so the open search box owns the keyboard: this stops a background
+                // window from eating letters and stops the inventory key from closing the desktop. charTyped
+                // is a separate GLFW event, so typed characters still reach the search box below.
+                return true;
+            }
         }
         // The front window's app gets first refusal on keys, except ESC which always closes the desktop.
         final DesktopWindow w = frontWindow();
@@ -1537,6 +3279,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
         return null;
+    }
+
+    /** Whether the front (focused) window's app has a modal dialog open — the desktop then disables everything behind it. */
+    private boolean focusModal() {
+        final DesktopWindow f = frontWindow();
+        return f != null && f.app().modalActive();
     }
 
     /**
@@ -1614,7 +3362,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // Resolve the window's rectangle for this frame first, so slot positions never lag a frame behind a
         // drag, resize, or maximize (curX/curY are otherwise only refreshed when the window itself renders).
-        w.resolveGeometry(sw(), sh(), TASKBAR_H);
+        w.resolveGeometry(sw(), sh(), bottomReserve(), workTop());
         // The focused Network Interactor is the one that should receive network snapshots and console output,
         // so point the static routing at it whenever it is in front (matters when two windows are open).
         app.markActive();
@@ -1645,6 +3393,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!menu.slotsActive()) {
             return;
         }
+        // A modal dialog in the focused app disables the inventory: still draw the items (the dialog's dim
+        // darkens them) but give no hover highlight and no click target.
+        final boolean modal = focusModal();
         // lmx/lmy and the slot coordinates are both desktop-local (already inside the ox/oy translate).
         // Draw the items directly at the local slot coordinates: delegating to the inherited renderSlot would
         // add leftPos/topPos a second time (leftPos==ox()), double-offsetting the icons from their backgrounds.
@@ -1654,10 +3405,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             final net.minecraft.world.item.ItemStack stack = slot.getItem();
             if (!stack.isEmpty()) {
-                g.renderItem(stack, slot.x, slot.y);
-                g.renderItemDecorations(font, stack, slot.x, slot.y);
+                DesktopItems.item(g, stack, slot.x, slot.y);
+                DesktopItems.count(g, font, stack, slot.x, slot.y);
             }
-            if (lmx >= slot.x && lmx < slot.x + 16 && lmy >= slot.y && lmy < slot.y + 16) {
+            if (!modal && lmx >= slot.x && lmx < slot.x + 16 && lmy >= slot.y && lmy < slot.y + 16) {
                 hoveredSlot = slot;
                 g.fill(slot.x, slot.y, slot.x + 16, slot.y + 16, 0x80FFFFFF);
             }
@@ -1699,12 +3450,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private void openApp(final String key, final DesktopApp app) {
         // Open at the default size, clamped to the screen — but never below the app's minimum while the
         // screen still has room for it, so the content opens laid out (not collapsed) on a small monitor.
+        final int top = workTop();
+        final int workH = workBottom() - top;
         final int availW = sw() - 16;
-        final int availH = sh() - TASKBAR_H - 16;
+        final int availH = workH - 16;
         final int w = availW >= app.minWidth() ? Math.min(app.defaultWidth(), availW) : availW;
         final int h = availH >= app.minHeight() ? Math.min(app.defaultHeight(), availH) : availH;
         final int x = Math.max(48, (sw() - w) / 2 + windows.size() * 12);
-        final int y = Math.max(6, (sh() - TASKBAR_H - h) / 2 + windows.size() * 12);
+        final int y = Math.max(top + 6, top + (workH - h) / 2 + windows.size() * 12);
         windows.add(new DesktopWindow(app, key, x, y, w, h));
     }
 
@@ -1721,9 +3474,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Starts a launcher: a built-in app opens a window; an action-based one (e.g. the NMS) runs its action. */
     private void runLauncher(final Launcher l) {
-        if (l.action() != null) {
-            l.action().run();
-        } else {
+        if (allowOpen()) {
             openApp(l.label(), l.factory().get());
         }
     }
@@ -1738,17 +3489,49 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return s.length() <= max ? s : s.substring(0, max - 1) + "...";
     }
 
+    /** Word-wraps a label to {@code maxW} pixels, capped at three lines, for a selected desktop icon. */
+    private java.util.List<String> wrapLabel(final String s, final int maxW) {
+        final java.util.List<String> out = new java.util.ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (final String word : s.split(" ")) {
+            final String cand = cur.length() == 0 ? word : cur + " " + word;
+            if (cur.length() == 0 || font.width(cand) <= maxW) {
+                cur = new StringBuilder(cand);
+            } else {
+                out.add(cur.toString());
+                cur = new StringBuilder(word);
+            }
+        }
+        if (cur.length() > 0) {
+            out.add(cur.toString());
+        }
+        while (out.size() > 3) {
+            out.remove(out.size() - 1);
+        }
+        return out;
+    }
+
     @Override
     public void removed() {
-        // Remember which programs were open so re-entering the Monitor restores them instead of a blank desktop.
-        final java.util.List<SavedWin> save = new java.util.ArrayList<>();
-        for (final DesktopWindow w : windows) {
-            save.add(new SavedWin(w.appKey(), w.minimized(), w.maximized()));
+        // The layout goes to the machine: the windows the player leaves behind are what the machine
+        // has open, for whoever looks next and after the game is closed. Not when the desktop is closing
+        // because the machine is going down — that layout belongs to a session that just ended, and the
+        // server has already cleared it.
+        if (!powerCycling) {
+            PacketDistributor.sendToServer(
+                    dev.jsc.jscomputronics.module.computing.operation.payload.DesktopWindowsPayload.of(
+                            host, snapshotWindows()));
         }
-        if (save.isEmpty()) {
-            SAVED_WINDOWS.remove(host);
+        // The programs' insides stay in this client as a convenience, keyed by the same launcher keys the
+        // machine's layout uses, so a restored window picks its session back up when it is still here.
+        final java.util.Map<String, DesktopApp> apps = new java.util.LinkedHashMap<>();
+        for (final DesktopWindow w : windows) {
+            apps.put(w.appKey(), w.app());
+        }
+        if (apps.isEmpty()) {
+            SAVED_APPS.remove(host);
         } else {
-            SAVED_WINDOWS.put(host, save);
+            SAVED_APPS.put(host, apps);
         }
         if (active == this) {
             active = null;

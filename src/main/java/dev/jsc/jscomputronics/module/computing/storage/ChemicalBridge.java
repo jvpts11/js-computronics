@@ -44,6 +44,14 @@ public interface ChemicalBridge {
         return Optional.empty();
     }
 
+    /**
+     * The chemical port of an item that carries chemicals (a tank item), if it has one. The port reads and
+     * writes {@code stack} itself, so a caller hands it the very stack it means to empty or refill.
+     */
+    default Optional<ChemicalPort> itemPortFor(final ItemStack stack) {
+        return Optional.empty();
+    }
+
     /** A chemical and an amount in millibuckets, as a recipe viewer lists them. */
     record ChemicalAmount(ResourceLocation chemical, long amount) {
     }

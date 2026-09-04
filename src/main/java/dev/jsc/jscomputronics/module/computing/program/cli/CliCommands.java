@@ -36,6 +36,41 @@ public final class CliCommands {
         return commands;
     }
 
+    /**
+     * The command set for a shell family: the DOS verbs (plus registered extras) for {@code DOS}, or the
+     * shared network/program verbs plus the POSIX file verbs (plus extras) for {@code POSIX}.
+     */
+    public static synchronized List<CliCommand> commandsFor(
+            final dev.jsc.jscomputronics.module.computing.os.ShellFamily family) {
+        if (family == dev.jsc.jscomputronics.module.computing.os.ShellFamily.POSIX) {
+            final List<CliCommand> commands = new ArrayList<>(BuiltinCommands.shared());
+            commands.addAll(PosixCommands.all());
+            commands.addAll(EXTRA);
+            return commands;
+        }
+        return all();
+    }
+
+    /** A shell speaking the given family's command set. */
+    public static CliShell newShell(final dev.jsc.jscomputronics.module.computing.os.ShellFamily family,
+                                    final int width) {
+        return new CliShell(commandsFor(family), width);
+    }
+
+    /** The shell for a computer: the live installer's verbs while a live medium is booted, else its OS family's. */
+    public static CliShell shellFor(final CliComputer computer, final int width) {
+        if (computer.liveInstall() != null) {
+            return new CliShell(LiveInstallCommands.all(), width);
+        }
+        return newShell(computer.shellFamily(), width);
+    }
+
+    /** The command list a computer's terminal offers for completion: live verbs, or its family's set. */
+    public static List<CliCommand> commandsFor(final dev.jsc.jscomputronics.module.computing.os.ShellFamily family,
+                                               final boolean live) {
+        return live ? LiveInstallCommands.all() : commandsFor(family);
+    }
+
     /** A fresh shell over the current command set, sized to a console {@code width} in characters. */
     public static CliShell newShell(final int width) {
         return new CliShell(all(), width);

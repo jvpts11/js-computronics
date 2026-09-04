@@ -48,7 +48,17 @@ public final class JSComputronicsAPI {
      *
      * @param def the program descriptor to register; must not be {@code null}
      */
-    public static void registerProgram(ProgramDef def) {
+    public static void registerProgram(ProgramSpec def) {
         OsRegistry.registerProgram(def);
+    }
+
+    /**
+     * Registers a desktop environment so a Linux computer can install it as a package and boot into its
+     * chrome, or an OS can bundle it.
+     *
+     * @param def the desktop environment descriptor to register; must not be {@code null}
+     */
+    public static void registerDesktopEnvironment(DesktopEnvironmentDef def) {
+        OsRegistry.registerDesktop(def);
     }
 }

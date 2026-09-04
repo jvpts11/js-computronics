@@ -44,7 +44,7 @@ class ServerNodeTest {
     void zeroStorage_isAllowed() {
         // A Server with no disks installed is valid (just won't store anything).
         ServerNode server = new ServerNode(nodeUuid(), networkUuid(), 0L);
-        assertEquals(0L, server.storageMB());
+        assertEquals(0L, server.storageItems());
     }
 
     @Test

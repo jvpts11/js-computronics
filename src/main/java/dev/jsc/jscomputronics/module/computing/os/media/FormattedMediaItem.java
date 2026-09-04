@@ -69,21 +69,58 @@ public class FormattedMediaItem extends MediaItem {
         final ResourceLocation payload = MediaItem.payload(stack);
         switch (MediaItem.kind(stack)) {
             case OS_INSTALL -> {
+                final dev.jsc.jscomputronics.module.computing.os.OsDef os =
+                        payload == null ? null : dev.jsc.jscomputronics.module.computing.os.OsRegistry.getOs(payload);
                 if (payload != null) {
                     tooltip.add(Component.translatable("os.jsc." + payload.getPath())
-                            .withStyle(ChatFormatting.AQUA));
-                    tooltip.add(Component.literal("Operating system installer")
-                            .withStyle(ChatFormatting.DARK_GRAY));
+                            .withStyle(ChatFormatting.AQUA)
+                            .append(os == null ? Component.empty() : Component.literal("  "
+                                    + dev.jsc.jscomputronics.module.computing.os.Branding.SOFTWARE_HOUSE + " · "
+                                    + dev.jsc.jscomputronics.module.computing.os.Branding.osYear(os.displayName(), os.minEra()))
+                                    .withStyle(ChatFormatting.GRAY)));
+                    tooltip.add(Component.literal("Bootable installer" + (os == null ? "" : " · "
+                            + dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip.eraLabel(os.minEra()) + " era"))
+                            .withStyle(ChatFormatting.GREEN));
                     tooltip.addAll(dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip.osMinSpec(payload));
+                    // The id a shell or a manifest names it by, so a stick on a shelf is enough to know it.
+                    tooltip.add(Component.literal("Package: " + payload.getPath()).withStyle(ChatFormatting.GOLD));
+                    tooltip.add(Component.literal(insertHint(format) + ", then install from the firmware or This PC.")
+                            .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
                 } else {
                     tooltip.add(Component.literal("blank · no files").withStyle(ChatFormatting.DARK_GRAY));
                 }
             }
             case PROGRAM_INSTALL -> {
                 if (payload != null) {
-                    tooltip.add(Component.literal(payload.getPath()).withStyle(ChatFormatting.GOLD));
-                    tooltip.add(Component.literal("Program installer").withStyle(ChatFormatting.DARK_GRAY));
+                    final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec =
+                            dev.jsc.jscomputronics.module.computing.os.OsRegistry.getProgram(payload);
+                    // Lead with the program's friendly, translated name, then the year it was written.
+                    tooltip.add(Component.translatable("program.jsc." + payload.getPath())
+                            .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
+                            .append(spec == null ? Component.empty() : Component.literal("  "
+                                    + dev.jsc.jscomputronics.module.computing.os.Branding.year(spec.era()))
+                                    .withStyle(ChatFormatting.GRAY)));
+                    tooltip.add(Component.literal(spec != null
+                            && spec.kind() == dev.jsc.jscomputronics.module.computing.os.ProgramKind.SERVICE
+                            ? "Service disc" : "Program disc").withStyle(ChatFormatting.YELLOW));
+                    // What it actually does, so a disc is not just a name on a shelf.
+                    tooltip.add(Component.translatable("program.jsc." + payload.getPath() + ".desc")
+                            .withStyle(ChatFormatting.GRAY));
                     tooltip.addAll(dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip.programMinSpec(payload));
+                    if (spec != null) {
+                        // The package id and the command that installs it: the only other place to learn
+                        // either was the Mirror's listing on a Mainframe.
+                        tooltip.add(Component.literal("Package: " + spec.commandName()).withStyle(ChatFormatting.GOLD));
+                        tooltip.add(Component.literal(String.join(" · ", installCommands(spec)))
+                                .withStyle(ChatFormatting.DARK_GRAY));
+                    }
+                    tooltip.add(Component.literal(insertHint(format) + ": run "
+                            + (spec != null && spec.platforms().equals(java.util.Set.of(
+                                    dev.jsc.jscomputronics.module.computing.os.Platform.LINUX))
+                                    ? "install.sh" : (format == MediaFormat.FLOPPY || format == MediaFormat.CD
+                                            ? "SETUP.EXE" : "setup.exe"))
+                            + ", or Install from This PC.")
+                            .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC));
                 } else {
                     tooltip.add(Component.literal("blank · no files").withStyle(ChatFormatting.DARK_GRAY));
                 }
@@ -99,5 +136,32 @@ public class FormattedMediaItem extends MediaItem {
             }
         }
         super.appendHoverText(stack, context, tooltip, flag);
+    }
+
+    /** Where this medium goes, in the drive's own name: a stick is plugged, a disc is inserted. */
+    private static String insertHint(final MediaFormat format) {
+        return (format == MediaFormat.USB ? "Plug into a linked " : "Insert in a linked ")
+                + InstallMedia.readerName(format);
+    }
+
+    /**
+     * The package-manager commands that install {@code spec}, one per platform family it runs on: the
+     * Frames manager first, then the Linux form. A program with no platform that has a manager gets none.
+     */
+    public static List<String> installCommands(final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec) {
+        final List<String> commands = new java.util.ArrayList<>(2);
+        if (spec.platforms().contains(dev.jsc.jscomputronics.module.computing.os.Platform.FRAMES)) {
+            commands.add(command(dev.jsc.jscomputronics.module.computing.os.PackageManagerKind.PCKMGR, spec));
+        }
+        if (spec.platforms().contains(dev.jsc.jscomputronics.module.computing.os.Platform.LINUX)) {
+            commands.add(command(dev.jsc.jscomputronics.module.computing.os.PackageManagerKind.APT, spec));
+        }
+        return commands;
+    }
+
+    private static String command(final dev.jsc.jscomputronics.module.computing.os.PackageManagerKind manager,
+                                  final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec) {
+        final String verb = manager.installVerb();
+        return manager.command() + (verb.isEmpty() ? " " : " " + verb + " ") + spec.commandName();
     }
 }

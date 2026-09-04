@@ -32,5 +32,6 @@ public class RamItem extends SpecItem<RamSpec> {
                 spec.bufferItems() + " items buffer  -  " + spec.generation())
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal(spec.tdpWatts() + " W").withStyle(ChatFormatting.DARK_GRAY));
+        HardwareTooltip.appendEra(tooltip, spec.era());
     }
 }

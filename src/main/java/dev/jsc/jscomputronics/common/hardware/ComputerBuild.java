@@ -46,6 +46,31 @@ public record ComputerBuild(MotherboardSpec motherboard,
         return out;
     }
 
+    /**
+     * The graphics memory this machine can actually use, in MB. A card newer than the slot it sits in
+     * still works, but only at the older slot's bandwidth, so it delivers a fraction of what it holds:
+     * a modern card in an ancient board runs, and runs badly, which is the honest outcome.
+     *
+     * <p>This is the single place the sum is computed, so every caller sees the same number.
+     */
+    public int effectiveVramMb() {
+        double sum = 0;
+        for (final GpuSpec gpu : gpus()) {
+            sum += gpu.vramMb() * gpu.bus().bandwidthFactorIn(motherboard.pcieGeneration());
+        }
+        return (int) Math.round(sum);
+    }
+
+    /** Whether any card is seated in a slot older than itself, and so held below its rated speed. */
+    public boolean hasBandwidthLimitedCard() {
+        for (final ExpansionCardSpec card : pcieCards) {
+            if (card.bus().bandwidthFactorIn(motherboard.pcieGeneration()) < 1.0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<ExpansionCardSpec> cardsOfKind(final ExpansionCardKind kind) {
         final List<ExpansionCardSpec> out = new ArrayList<>();
         for (final ExpansionCardSpec card : pcieCards) {
@@ -108,7 +133,11 @@ public record ComputerBuild(MotherboardSpec motherboard,
     }
 
     public long storageMb() {
-        return totalStorageItems() * DiskSpec.MB_PER_ITEM;
+        long sum = 0L;
+        for (final DiskSpec disk : disks) {
+            sum += disk.capacityMb();
+        }
+        return sum;
     }
 
     public int powerDraw() {

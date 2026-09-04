@@ -64,6 +64,14 @@ final class MekanismChemicalBridge implements ChemicalBridge {
     }
 
     @Override
+    public Optional<ChemicalPort> itemPortFor(final ItemStack stack) {
+        // Mekanism's item handlers are backed by the stack's own data components, so the port writes straight
+        // into the stack it was made for.
+        final IChemicalHandler handler = stack.getCapability(ITEM_CHEMICAL_HANDLER);
+        return handler == null ? Optional.empty() : Optional.of(new HandlerPort(handler));
+    }
+
+    @Override
     public Optional<ResourceLocation> chemicalOf(final ItemStack stack) {
         final IChemicalHandler handler = stack.getCapability(ITEM_CHEMICAL_HANDLER);
         if (handler == null) {

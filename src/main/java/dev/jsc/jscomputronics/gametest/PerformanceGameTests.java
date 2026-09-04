@@ -15,6 +15,7 @@ import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity
 import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jsc.jscomputronics.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -100,7 +101,7 @@ public final class PerformanceGameTests {
         if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
             throw new IllegalStateException("no server rack placed for benchmark");
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         return rackBe;
     }
 
@@ -251,7 +252,7 @@ public final class PerformanceGameTests {
             helper.fail("no rack for craft bench");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         // A deep chain: chain[i] is crafted from 2x chain[i+1]; only the leaf is stocked, so a CRAFT of the
         // top item forces the planner to expand the entire tree (the hot path) instead of finding it in stock.

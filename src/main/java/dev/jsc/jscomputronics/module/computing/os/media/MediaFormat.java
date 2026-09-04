@@ -7,6 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.media;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
+
 /**
  * The physical format of a medium, independent of the {@link MediaKind content} it carries.
  *
@@ -43,5 +45,14 @@ public enum MediaFormat {
      */
     public int capacityItems() {
         return capacityItems;
+    }
+
+    /** The hardware era the format belongs to, which decides what a file's bytes weigh on it. */
+    public HardwareEra era() {
+        return switch (this) {
+            case FLOPPY -> HardwareEra.VINTAGE;
+            case CD -> HardwareEra.LEGACY;
+            case DVD, USB -> HardwareEra.STANDARD;
+        };
     }
 }

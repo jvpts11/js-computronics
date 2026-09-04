@@ -26,7 +26,7 @@ import java.util.Set;
  * {@code .dat} extension is appended, and collisions are resolved with a numeric suffix (e.g.
  * {@code iron_ingot_2.dat}).
  *
- * <p>{@code .dat} entries are never persisted; they are generated on-demand from {@code DISK_STORAGE}
+ * <p>{@code .dat} entries are never persisted; they are generated on-demand from the disk's storage volume
  * each time {@link DiskFilesystem#list} is called. Items leave storage only via the Network
  * Interactor — the filesystem API cannot write or delete {@code .dat} entries.
  */

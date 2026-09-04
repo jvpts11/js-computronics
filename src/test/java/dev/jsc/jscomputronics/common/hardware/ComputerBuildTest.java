@@ -48,7 +48,7 @@ class ComputerBuildTest {
     }
 
     private static DiskSpec disk(final StorageTier tier, final long capacityItems, final int tdp) {
-        return new DiskSpec(tier, capacityItems, tdp);
+        return new DiskSpec(tier, dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD, capacityItems, tdp);
     }
 
     @Test

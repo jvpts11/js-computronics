@@ -49,6 +49,24 @@ class WindowGeometryTest {
     }
 
     @Test
+    void resolve_maximizedStartsBelowATopPanel() {
+        // A GNOME-style desktop reserves its bar at the top and nothing at the bottom: the maximized window
+        // starts under the bar and runs to the bottom edge.
+        final WindowGeometry.Rect r = WindowGeometry.resolve(10, 20, 200, 100, 313, 158, true, 800, 600, 0, 24);
+        assertEquals(0, r.x());
+        assertEquals(24, r.y(), "maximized top is the top panel's bottom edge");
+        assertEquals(800, r.w());
+        assertEquals(576, r.h(), "maximized height is the desktop minus the top panel");
+    }
+
+    @Test
+    void resolve_maximizedFitsBetweenTopAndBottomReserves() {
+        final WindowGeometry.Rect r = WindowGeometry.resolve(0, 0, 10, 10, 10, 10, true, 800, 600, 24, 24);
+        assertEquals(24, r.y());
+        assertEquals(552, r.h(), "both reserves are subtracted");
+    }
+
+    @Test
     void scissor_addsThePoseTranslationToTheLocalRectangle() {
         // GuiGraphics.enableScissor ignores the pose, so a desktop app MUST add the pose translation to its
         // window-local scissor coords or the clip is offset from the drawn content — the bug that clipped the

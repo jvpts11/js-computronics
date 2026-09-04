@@ -23,6 +23,46 @@ public enum HardwareEra {
     EXA,
     SINGULARITY;
 
+    /** The word size of the era's processors; what an item costs on the era's disks follows from it. */
+    public int bits() {
+        return switch (this) {
+            case VINTAGE -> 16;
+            case LEGACY -> 32;
+            default -> 64;
+        };
+    }
+
+    /**
+     * The megabytes one item — or a bucket of fluid, which weighs the same — takes on a disk of this era: a
+     * wider word makes a bigger record. Older hardware therefore packs more into the same megabytes, which
+     * is how a 20 MB vintage drive holds anything at all, and a 500 GB standard one holds 2 000 items.
+     */
+    public long mbPerItem() {
+        return switch (this) {
+            case VINTAGE -> 1L;
+            case LEGACY -> 16L;
+            default -> 256L;
+        };
+    }
+
+    /** How many items a size in megabytes costs on this era's disks, rounded up: a system image, say. */
+    public long itemsFor(final long mb) {
+        if (mb <= 0L) {
+            return 0L;
+        }
+        final long per = mbPerItem();
+        return (mb + per - 1L) / per;
+    }
+
+    /**
+     * The bytes one thousandth of an item weighs on this era's disks — an item weighs 1 000 of those
+     * units, the same unit a millibucket of fluid weighs one of. A file of N bytes costs
+     * {@code ceil(N / bytesPerMbEq())} of them.
+     */
+    public long bytesPerMbEq() {
+        return mbPerItem() * 1024L * 1024L / 1000L;
+    }
+
     public HardwareEra next() {
         return this == SINGULARITY ? SINGULARITY : values()[ordinal() + 1];
     }

@@ -125,9 +125,50 @@ public class MediaReaderBlock extends HorizontalDirectionalBlock implements Enti
                 heldStack.shrink(1);
                 return ItemInteractionResult.SUCCESS;
             }
+            // The drive reads this format but the slot is taken. Say so, or the click looks ignored.
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    "The drive already holds a disc - sneak-click to eject it."), true);
+            return ItemInteractionResult.SUCCESS;
         }
 
+        // A refused disc must say why. A silent click is indistinguishable from a broken block, and a
+        // player holding a DVD at a CD drive has no other way to learn the difference.
+        if (heldStack.getItem() instanceof MediaItem) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    "This " + driveName(reader) + " cannot read that disc."), true);
+            return ItemInteractionResult.SUCCESS;
+        }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+    }
+
+    /** A readable name for this drive, for the message a refused disc gets. */
+    private static String driveName(final MediaReaderBlockEntity reader) {
+        return switch (reader.driveType()) {
+            case FLOPPY_DRIVE -> "floppy drive";
+            case CD_DRIVE -> "CD drive";
+            case DVD_DRIVE -> "DVD drive";
+            case DOCK_STATION -> "dock station";
+        };
+    }
+
+    /**
+     * The Dock Station is a low hub on the desk, not a cube: 14 wide, 10 deep and a hand tall, with the
+     * stick standing out of its front when one is docked. Its shape follows the model so a player can
+     * stand things on it and walk past the stick; the disc drives stay full blocks.
+     */
+    private static final net.minecraft.world.phys.shapes.VoxelShape DOCK_NORTH_SOUTH =
+            Block.box(1, 0, 3, 15, 6.5, 13);
+    private static final net.minecraft.world.phys.shapes.VoxelShape DOCK_EAST_WEST =
+            Block.box(3, 0, 1, 13, 6.5, 15);
+
+    @Override
+    protected net.minecraft.world.phys.shapes.VoxelShape getShape(
+            final BlockState state, final net.minecraft.world.level.BlockGetter level, final BlockPos pos,
+            final net.minecraft.world.phys.shapes.CollisionContext context) {
+        if (driveType != MediaDriveType.DOCK_STATION) {
+            return net.minecraft.world.phys.shapes.Shapes.block();
+        }
+        return state.getValue(FACING).getAxis() == Direction.Axis.Z ? DOCK_NORTH_SOUTH : DOCK_EAST_WEST;
     }
 
     @Override

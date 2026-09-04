@@ -47,7 +47,8 @@ import java.util.Set;
  * The Mainframe BlockEntity: the binding that turns installed hardware item stacks into a {@link ComputerBuild} and exposes the powered state, capacity and parallel-queue count. Unlike the passive computers it shares a base with, the Mainframe OWNS and orchestrates a data network rather than reading one from a cable.
  */
 public class MainframeBlockEntity extends AbstractComputerBlockEntity
-        implements dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost {
+        implements dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost,
+        software.bernie.geckolib.animatable.GeoBlockEntity {
 
     @Override
     public java.util.Set<Long> occupiedPositions(final long ownerPos) {
@@ -77,6 +78,192 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             GPU_SLOTS_START, GPU_SLOTS, PSU_SLOT, DISK_SLOTS_START, DISK_SLOTS, TOTAL_SLOTS);
 
     public static final int STORAGE_SLOTS = 27;
+
+    // ---- the cabinet as one model: what the renderer needs to know ----
+    //
+    // The Mainframe is drawn as a single GeckoLib cabinet by its controller, with a bone per installed
+    // part. The client copy of a computer only carries its name (the hardware handler is deliberately
+    // not synced), so the visual state travels as three small numbers in the block update: which
+    // hardware slots are filled, which disks carry a system, and the machine's own condition.
+
+    private static final int FLAG_RUNNING = 1;
+    private static final int FLAG_BUILD_VALID = 2;
+    private static final int FLAG_NETWORKED = 4;
+    private static final int FLAG_PANEL_OFF = 8;
+
+    private static final software.bernie.geckolib.animation.RawAnimation WORK =
+            software.bernie.geckolib.animation.RawAnimation.begin().thenLoop("animation.mainframe.work");
+
+    private final software.bernie.geckolib.animatable.instance.AnimatableInstanceCache geckoCache =
+            software.bernie.geckolib.util.GeckoLibUtil.createInstanceCache(this);
+
+    private int clientHardwareMask;
+    private int clientDiskSystemMask;
+    private int clientFlags;
+
+    /** The service panel taken off, showing the card bay and everything seated in it. */
+    private boolean servicePanelOff;
+
+    /** The last visual state pushed to clients, so a tick only sends a packet when something changed. */
+    private long sentVisuals = -1L;
+
+    @Override
+    public void registerControllers(
+            final software.bernie.geckolib.animation.AnimatableManager.ControllerRegistrar controllers) {
+        // The roof fans and the tape reels turn while the machine is up; every other visual (installed
+        // hardware, the lamps, the panel) is bone visibility set by the renderer, not animation.
+        controllers.add(new software.bernie.geckolib.animation.AnimationController<>(this, "work", 0,
+                state -> visualRunning() ? state.setAndContinue(WORK)
+                        : software.bernie.geckolib.animation.PlayState.STOP));
+    }
+
+    @Override
+    public software.bernie.geckolib.animatable.instance.AnimatableInstanceCache getAnimatableInstanceCache() {
+        return geckoCache;
+    }
+
+    /** The era of this cabinet, read from its block; it picks the model and the atlas. */
+    public dev.jsc.jscomputronics.common.tier.HardwareEra mainframeEra() {
+        return getBlockState().getBlock()
+                instanceof dev.jsc.jscomputronics.module.computing.block.MainframeBlock mainframe
+                ? mainframe.era() : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    }
+
+    /** Whether hardware slot {@code slot} holds a part, on either side. */
+    public boolean hardwareInstalled(final int slot) {
+        if (slot < 0 || slot >= TOTAL_SLOTS) {
+            return false;
+        }
+        if (level != null && level.isClientSide()) {
+            return (clientHardwareMask & (1 << slot)) != 0;
+        }
+        return !getHardware().getStackInSlot(slot).isEmpty();
+    }
+
+    /** Whether the disk in bay {@code bay} carries a system, which is what lights its lamp. */
+    public boolean diskCarriesSystem(final int bay) {
+        if (bay < 0 || bay >= DISK_SLOTS) {
+            return false;
+        }
+        if (level != null && level.isClientSide()) {
+            return (clientDiskSystemMask & (1 << bay)) != 0;
+        }
+        return dev.jsc.jscomputronics.module.computing.os.OsDisks.hasSystem(
+                getHardware().getStackInSlot(DISK_SLOTS_START + bay));
+    }
+
+    public boolean visualRunning() {
+        return level != null && level.isClientSide() ? (clientFlags & FLAG_RUNNING) != 0 : isRunning();
+    }
+
+    public boolean visualBuildValid() {
+        return level != null && level.isClientSide() ? (clientFlags & FLAG_BUILD_VALID) != 0 : buildValid();
+    }
+
+    public boolean visualNetworked() {
+        return level != null && level.isClientSide() ? (clientFlags & FLAG_NETWORKED) != 0 : networkUuid() != null;
+    }
+
+    public boolean servicePanelOff() {
+        return level != null && level.isClientSide() ? (clientFlags & FLAG_PANEL_OFF) != 0 : servicePanelOff;
+    }
+
+    /** Takes the service panel off the card bay or puts it back. */
+    public void toggleServicePanel() {
+        servicePanelOff = !servicePanelOff;
+        setChanged();
+        syncVisuals();
+    }
+
+    /** Everything the renderer reads, packed so a tick can tell at a glance whether it moved. */
+    private long visualState() {
+        int hardware = 0;
+        for (int slot = 0; slot < TOTAL_SLOTS; slot++) {
+            if (!getHardware().getStackInSlot(slot).isEmpty()) {
+                hardware |= 1 << slot;
+            }
+        }
+        int systems = 0;
+        for (int bay = 0; bay < DISK_SLOTS; bay++) {
+            if (dev.jsc.jscomputronics.module.computing.os.OsDisks.hasSystem(
+                    getHardware().getStackInSlot(DISK_SLOTS_START + bay))) {
+                systems |= 1 << bay;
+            }
+        }
+        int flags = 0;
+        flags |= isRunning() ? FLAG_RUNNING : 0;
+        flags |= buildValid() ? FLAG_BUILD_VALID : 0;
+        flags |= networkUuid() != null ? FLAG_NETWORKED : 0;
+        flags |= servicePanelOff ? FLAG_PANEL_OFF : 0;
+        return ((long) hardware << 8) | ((long) systems << 4) | flags;
+    }
+
+    /**
+     * Pushes the cabinet's look to watching clients when it changed. Called every server tick rather
+     * than from each place that installs a part or flips the power, so no path can leave the model
+     * showing hardware that is no longer there.
+     */
+    private void syncVisualsIfChanged() {
+        final long state = visualState();
+        if (state != sentVisuals) {
+            sentVisuals = state;
+            syncVisuals();
+        }
+    }
+
+    public void syncVisuals() {
+        if (level != null && !level.isClientSide()) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(),
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
+    }
+
+    /** The whole 3 x 2 x 2 footprint: the renderer draws the cabinet from this block alone. */
+    public net.minecraft.world.phys.AABB renderBox() {
+        final BlockState state = getBlockState();
+        if (!state.hasProperty(HorizontalDirectionalBlock.FACING)) {
+            return new net.minecraft.world.phys.AABB(worldPosition);
+        }
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(worldPosition);
+        for (final BlockPos part : MainframeStructure.allPositions(
+                worldPosition, state.getValue(HorizontalDirectionalBlock.FACING))) {
+            box = box.minmax(new net.minecraft.world.phys.AABB(part));
+        }
+        return box;
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
+        final CompoundTag tag = super.getUpdateTag(registries);
+        final long state = visualState();
+        tag.putInt("VisualHardware", (int) (state >>> 8));
+        tag.putInt("VisualSystems", (int) ((state >>> 4) & 0xF));
+        tag.putInt("VisualFlags", (int) (state & 0xF));
+        return tag;
+    }
+
+    @Override
+    public void onDataPacket(final net.minecraft.network.Connection connection,
+                             final net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket packet,
+                             final HolderLookup.Provider registries) {
+        super.onDataPacket(connection, packet, registries);
+        final CompoundTag tag = packet.getTag();
+        if (tag != null) {
+            clientHardwareMask = tag.getInt("VisualHardware");
+            clientDiskSystemMask = tag.getInt("VisualSystems");
+            clientFlags = tag.getInt("VisualFlags");
+        }
+    }
+
+    @Override
+    public void handleUpdateTag(final CompoundTag tag, final HolderLookup.Provider registries) {
+        // A chunk arriving carries the same three numbers as a live update; without this the cabinet
+        // would render empty until something changed and pushed a packet.
+        super.handleUpdateTag(tag, registries);
+        clientHardwareMask = tag.getInt("VisualHardware");
+        clientDiskSystemMask = tag.getInt("VisualSystems");
+        clientFlags = tag.getInt("VisualFlags");
+    }
 
     private boolean networkConflict;
     private boolean failoverEnabled;
@@ -109,6 +296,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             new dev.jsc.jscomputronics.module.computing.program.iql.IqlCatalog();
     private boolean iqlEngineInstalled;
     private boolean iqlEngineRunning = true;
+    /**
+     * The Automation Engine: a second service that, like the IQL Engine, lets the job agent fire the saved
+     * jobs. Installing it lets the Automation Manager run jobs without the full IQL Engine / NMS stack.
+     */
+    private boolean automationEngineInstalled;
     private final dev.jsc.jscomputronics.module.computing.program.IqlJobAgent iqlJobAgent =
             new dev.jsc.jscomputronics.module.computing.program.IqlJobAgent();
     /** Jobs the player paused from the Processes tab (lowercased names); a paused job never fires. */
@@ -192,6 +384,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public static void serverTick(final Level level, final BlockPos pos,
                                   final BlockState state, final MainframeBlockEntity be) {
         if (level instanceof ServerLevel serverLevel) {
+            be.tickBuildProgress(serverLevel);
+            // Before tick(), which returns early on a powered-down machine: a cabinet that was just
+            // switched off still has to put its lamps out on the client.
+            be.syncVisualsIfChanged();
             be.tick(serverLevel);
         }
     }
@@ -1319,6 +1515,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 && proc.isNested());
     }
 
+    /** The operations in flight right now, for views that need the live objects rather than the log. */
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.NetworkOperation> liveOperations() {
+        return java.util.List.copyOf(activeOperations);
+    }
+
     public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord> recentOperations() {
         return java.util.List.copyOf(operationLog);
     }
@@ -1494,6 +1695,16 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     @Override
+    public int indexHealthState() {
+        return networkIndex.health().state().ordinal();
+    }
+
+    @Override
+    public int indexHealthTypeCount() {
+        return networkIndex.health().affectedTypes().size();
+    }
+
+    @Override
     public long networkStorageUsed() {
         return networkIndex.usedWeight()
                 / dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
@@ -1504,8 +1715,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         if (networkUuid == null || !(level instanceof ServerLevel serverLevel)) {
             return 0L;
         }
-        return NetworkSystem.get(serverLevel).totalStorageOf(networkUuid)
-                / dev.jsc.jscomputronics.common.hardware.DiskSpec.MB_PER_ITEM;
+        // Counted in items as the racks registered them: what a megabyte holds differs by era, an item does not.
+        return NetworkSystem.get(serverLevel).totalStorageItemsOf(networkUuid);
     }
 
     public static final int DATA_RUNNING = 0;
@@ -1594,6 +1805,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         // Hardware (under the "Inventory" key), ManualOn, AutoStart, NodeUuid, LinkedMonitors and
         // Console are loaded by the base; only the Mainframe-only state is restored here.
         failoverEnabled = tag.getBoolean("Failover");
+        servicePanelOff = tag.getBoolean("ServicePanelOff");
         // Persist the standby role + countdown so a reload mid-promotion does not reset the timer (which
         // could, with frequent chunk cycling, stop a standby from ever promoting).
         if (tag.contains("FailoverRole")) {
@@ -1620,6 +1832,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         iqlEngineInstalled = tag.getBoolean("IqlEngineInstalled");
         iqlEngineRunning = !tag.contains("IqlEngineRunning") || tag.getBoolean("IqlEngineRunning");
+        automationEngineInstalled = tag.getBoolean("AutomationEngineInstalled");
+        mirrorInstalled = tag.getBoolean("MirrorInstalled");
         iqlCatalog.clear();
         final net.minecraft.nbt.ListTag catalog = tag.getList("IqlCatalog", net.minecraft.nbt.Tag.TAG_COMPOUND);
         for (int i = 0; i < catalog.size(); i++) {
@@ -1643,6 +1857,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Override
     protected void saveExtra(final CompoundTag tag, final HolderLookup.Provider registries) {
         tag.putBoolean("Failover", failoverEnabled);
+        tag.putBoolean("ServicePanelOff", servicePanelOff);
         tag.putString("FailoverRole", failoverRole.name());
         tag.putInt("FailoverWaitTicks", failoverWaitTicks);
         if (nativeNetworkUuid != null) {
@@ -1676,6 +1891,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         tag.putBoolean("IqlEngineInstalled", iqlEngineInstalled);
         tag.putBoolean("IqlEngineRunning", iqlEngineRunning);
+        tag.putBoolean("AutomationEngineInstalled", automationEngineInstalled);
+        tag.putBoolean("MirrorInstalled", mirrorInstalled);
         if (!iqlCatalog.isEmpty()) {
             final net.minecraft.nbt.ListTag catalog = new net.minecraft.nbt.ListTag();
             for (final dev.jsc.jscomputronics.module.computing.program.iql.IqlSavedObject object : iqlCatalog.all()) {
@@ -1739,6 +1956,87 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         iqlEngineRunning = running;
         setChanged();
         return true;
+    }
+
+    public boolean isAutomationEngineInstalled() {
+        return automationEngineInstalled;
+    }
+
+    /** Active when installed and the Mainframe is powered; enables the job agent like the IQL Engine does. */
+    public boolean isAutomationEngineActive() {
+        return automationEngineInstalled && isRunning();
+    }
+
+    /** Installs the Automation Engine on the Mainframe; returns false if it was already installed. */
+    public boolean installAutomationEngine() {
+        if (automationEngineInstalled) {
+            return false;
+        }
+        automationEngineInstalled = true;
+        setChanged();
+        return true;
+    }
+
+    // The Mirror: the package repository service every Linux computer on the network installs from.
+    private boolean mirrorInstalled;
+
+    public boolean isMirrorInstalled() {
+        return mirrorInstalled;
+    }
+
+    /** Whether the Mirror serves packages: installed and the Mainframe is running. */
+    public boolean isMirrorActive() {
+        return mirrorInstalled && isRunning();
+    }
+
+    /** Installs the Mirror service on the Mainframe; returns false if it was already installed. */
+    public boolean installMirror() {
+        if (mirrorInstalled) {
+            return false;
+        }
+        mirrorInstalled = true;
+        setChanged();
+        return true;
+    }
+
+    /** Removes the Mirror service; returns false if it was not installed. */
+    public boolean uninstallMirror() {
+        if (!mirrorInstalled) {
+            return false;
+        }
+        mirrorInstalled = false;
+        setChanged();
+        return true;
+    }
+
+    /** Removes the IQL Engine service (stopping it); returns false if it was not installed. */
+    public boolean uninstallIqlEngine() {
+        if (!iqlEngineInstalled) {
+            return false;
+        }
+        iqlEngineInstalled = false;
+        iqlEngineRunning = false;
+        setChanged();
+        return true;
+    }
+
+    /** Removes the Automation Engine service; returns false if it was not installed. */
+    public boolean uninstallAutomationEngine() {
+        if (!automationEngineInstalled) {
+            return false;
+        }
+        automationEngineInstalled = false;
+        setChanged();
+        return true;
+    }
+
+    @Override
+    protected void onSystemErased() {
+        super.onSystemErased();
+        // The services were software on the formatted disk: a wiped Mainframe serves nothing any more.
+        uninstallMirror();
+        uninstallIqlEngine();
+        uninstallAutomationEngine();
     }
 
     public void markIqlCatalogChanged() {

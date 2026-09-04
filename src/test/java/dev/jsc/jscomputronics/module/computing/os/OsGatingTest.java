@@ -10,6 +10,8 @@ package dev.jsc.jscomputronics.module.computing.os;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,47 +60,59 @@ class OsGatingTest {
     }
 
     // -------------------------------------------------------------------------
-    // canRun — capability + era gating
+    // canRunProgram / canInstallProgram — platform + hardware gating
     // -------------------------------------------------------------------------
 
     @Test
-    void canRun_rejectsFullDesktopProgramOnNetworkGuiOs() {
-        // An OS with NETWORK_GUI capability cannot run an APP that requires FULL_DESKTOP.
-        assertFalse(OsGating.canRun(
-                OsCapability.NETWORK_GUI, HardwareEra.VINTAGE,
-                OsCapability.FULL_DESKTOP, HardwareEra.VINTAGE));
+    void canRunProgram_rejectsProgramOnUnsupportedPlatform() {
+        // A Frames-only program is refused on the MC-DOS platform, however powerful the hardware.
+        assertFalse(OsGating.canRunProgram(Platform.MC_DOS, Set.of(Platform.FRAMES), 9999, 9999, 0, 0));
     }
 
     @Test
-    void canRun_acceptsFullDesktopProgramOnFullDesktopOs() {
-        // An OS with FULL_DESKTOP capability can run a FULL_DESKTOP-requiring program.
-        assertTrue(OsGating.canRun(
-                OsCapability.FULL_DESKTOP, HardwareEra.STANDARD,
-                OsCapability.FULL_DESKTOP, HardwareEra.STANDARD));
+    void canRunProgram_acceptsProgramOnSupportedPlatform() {
+        assertTrue(OsGating.canRunProgram(Platform.FRAMES, Set.of(Platform.FRAMES), 9999, 9999, 0, 0));
     }
 
     @Test
-    void canRun_rejectsWhenOsEraIsBelowProgramMinOsEra() {
-        // Even if capability is sufficient, a program requiring a newer OS era is rejected.
-        assertFalse(OsGating.canRun(
-                OsCapability.FULL_DESKTOP, HardwareEra.VINTAGE,
-                OsCapability.TERMINAL_ONLY, HardwareEra.LEGACY));
+    void canRunProgram_rejectsWhenCpuBelowMinimum() {
+        assertFalse(OsGating.canRunProgram(Platform.FRAMES, Set.of(Platform.FRAMES), 1000, 512, 2000, 0));
     }
 
     @Test
-    void canRun_acceptsTerminalProgramOnHigherCapabilityOs() {
-        // An OS with FULL_DESKTOP capability can run a TERMINAL_ONLY-requiring program.
-        assertTrue(OsGating.canRun(
-                OsCapability.FULL_DESKTOP, HardwareEra.STANDARD,
-                OsCapability.TERMINAL_ONLY, HardwareEra.VINTAGE));
+    void canRunProgram_rejectsWhenVramBelowMinimum() {
+        assertFalse(OsGating.canRunProgram(Platform.FRAMES, Set.of(Platform.FRAMES), 3000, 128, 0, 256));
     }
 
     @Test
-    void canRun_acceptsServiceProgramOnMinimalOs() {
-        // A SERVICE program with TERMINAL_ONLY / VINTAGE min runs on any OS.
-        assertTrue(OsGating.canRun(
-                OsCapability.TERMINAL_ONLY, HardwareEra.VINTAGE,
-                OsCapability.TERMINAL_ONLY, HardwareEra.VINTAGE));
+    void canRunProgram_acceptsWhenPlatformAndHardwareMeetMinimums() {
+        assertTrue(OsGating.canRunProgram(Platform.FRAMES, Set.of(Platform.FRAMES), 3000, 512, 2000, 256));
+    }
+
+    @Test
+    void canRunProgram_acceptsMultiPlatformServiceOnAnyMember() {
+        final Set<Platform> all = Set.of(Platform.MC_DOS, Platform.MC_NET, Platform.FRAMES);
+        assertTrue(OsGating.canRunProgram(Platform.MC_DOS, all, 1, 0, 0, 0));
+        assertTrue(OsGating.canRunProgram(Platform.FRAMES, all, 1, 0, 0, 0));
+    }
+
+    @Test
+    void canInstallProgram_rejectsWhenFreeDiskBelowFootprint() {
+        // Run requirements met, but not enough free disk for the footprint.
+        assertFalse(OsGating.canInstallProgram(Platform.FRAMES, Set.of(Platform.FRAMES),
+                3000, 512, 100L, 0, 0, 256));
+    }
+
+    @Test
+    void canInstallProgram_acceptsWhenFreeDiskMeetsFootprint() {
+        assertTrue(OsGating.canInstallProgram(Platform.FRAMES, Set.of(Platform.FRAMES),
+                3000, 512, 1024L, 0, 0, 256));
+    }
+
+    @Test
+    void canInstallProgram_rejectsOnUnsupportedPlatformEvenWithAmpleDisk() {
+        assertFalse(OsGating.canInstallProgram(Platform.MC_DOS, Set.of(Platform.FRAMES),
+                9999, 9999, 100000L, 0, 0, 256));
     }
 
     // -------------------------------------------------------------------------

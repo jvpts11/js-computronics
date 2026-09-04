@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * Server to client: the styled output of one Command Prompt line, plus whether the console should be cleared before printing it (the {@code clear} command). Each line carries its text and a style ordinal the client maps to a colour.
  */
-public record CommandOutputPayload(boolean clear, List<WireLine> lines) implements CustomPacketPayload {
+public record CommandOutputPayload(boolean clear, String prompt, List<WireLine> lines) implements CustomPacketPayload {
 
     public static final int MAX_LINES = 256;
 
@@ -28,6 +28,7 @@ public record CommandOutputPayload(boolean clear, List<WireLine> lines) implemen
     public static final StreamCodec<RegistryFriendlyByteBuf, CommandOutputPayload> STREAM_CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.BOOL, CommandOutputPayload::clear,
+                    ByteBufCodecs.stringUtf8(256), CommandOutputPayload::prompt,
                     WireLine.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_LINES)), CommandOutputPayload::lines,
                     CommandOutputPayload::new);
 

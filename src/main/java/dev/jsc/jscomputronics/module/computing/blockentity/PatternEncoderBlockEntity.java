@@ -15,7 +15,6 @@ import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
 import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
 import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
 import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
-import dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents;
 import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
 import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
@@ -522,7 +521,7 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         final long freeWeight = mediaFreeWeight(mediaStack);
         final DiskFilesystem.WriteResult result = DiskFilesystem.write(
                 mediaStack, unique + ".craft", FileType.CRAFT, content,
-                freeWeight, FilesystemKind.HIERARCHICAL);
+                freeWeight, FilesystemKind.HIERARCHICAL, getLevel() == null ? 0L : getLevel().getGameTime());
         if (result == DiskFilesystem.WriteResult.OK) {
             media.setStackInSlot(0, mediaStack);
             setChanged();
@@ -575,9 +574,8 @@ public class PatternEncoderBlockEntity extends BlockEntity {
             return 0L;
         }
         final long capWeight = (long) fmt.format().capacityItems() * StorageKey.MB_EQ_PER_ITEM;
-        final FilesystemContents fs = mediaStack.getOrDefault(
-                ComputingModule.FILESYSTEM.get(), FilesystemContents.EMPTY);
-        return Math.max(0L, capWeight - fs.usedWeight());
+        return Math.max(0L, capWeight
+                - dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(mediaStack));
     }
 
     private List<ItemStack> gridCells() {

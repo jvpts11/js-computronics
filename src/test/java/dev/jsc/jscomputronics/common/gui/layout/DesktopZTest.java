@@ -85,14 +85,18 @@ class DesktopZTest {
         assertEquals(400, DesktopZ.TOOLTIP);
     }
 
+    /** Constants that describe how a layer is drawn rather than naming a layer of its own. */
+    private static final Set<String> NOT_A_LAYER = Set.of(
+            "ITEM_DEPTH", "WINDOW_STEP", "WINDOW_BANDS", "ITEM_LIFT", "DECORATION_LIFT", "BAND_ITEM", "BAND_COUNT");
+
     @Test
     void everyDepthConstant_appearsExactlyOnceInOrdered() throws IllegalAccessException {
-        // Reflection guard: every public Z constant (all but ITEM_DEPTH) must be in ordered() exactly once, so
-        // a newly added layer can never be drawn at an unmanaged depth — the exact way this bug kept returning.
+        // Reflection guard: every public layer constant must be in ordered() exactly once, so a newly added
+        // layer can never be drawn at an unmanaged depth — the exact way this bug kept returning.
         final List<Integer> ordered = Arrays.stream(DesktopZ.ordered()).boxed().toList();
         for (final Field f : DesktopZ.class.getDeclaredFields()) {
             if (f.getType() == int.class && Modifier.isStatic(f.getModifiers())
-                    && !f.getName().equals("ITEM_DEPTH")) {
+                    && !NOT_A_LAYER.contains(f.getName())) {
                 final int value = f.getInt(null);
                 assertEquals(1, Collections.frequency(ordered, value),
                         "Z constant " + f.getName() + " (=" + value + ") must appear exactly once in ordered()");
@@ -105,11 +109,70 @@ class DesktopZTest {
         int constants = 0;
         for (final Field f : DesktopZ.class.getDeclaredFields()) {
             if (f.getType() == int.class && Modifier.isStatic(f.getModifiers())
-                    && !f.getName().equals("ITEM_DEPTH")) {
+                    && !NOT_A_LAYER.contains(f.getName())) {
                 constants++;
             }
         }
         assertEquals(constants, DesktopZ.ordered().length, "ordered() must list every layer constant and no more");
+    }
+
+    @Test
+    void windowZ_givesEachWindowItsOwnBandFrontMostLast() {
+        final int count = DesktopZ.WINDOW_BANDS;
+        for (int i = 1; i < count; i++) {
+            assertTrue(DesktopZ.windowZ(i, count) > DesktopZ.windowZ(i - 1, count),
+                    "window " + i + " must sit in front of the one behind it");
+            assertEquals(DesktopZ.WINDOW_STEP, DesktopZ.windowZ(i, count) - DesktopZ.windowZ(i - 1, count),
+                    "each window band is one WINDOW_STEP deep");
+        }
+        assertEquals(DesktopZ.WINDOWS, DesktopZ.windowZ(0, 1), "a lone window sits at the base of the band");
+    }
+
+    @Test
+    void windowZ_keepsTheFrontWindowInFrontWhenBandsRunOut() {
+        // More windows than bands: the oldest share the back-most band, and the front one still gets the front.
+        final int count = DesktopZ.WINDOW_BANDS + 4;
+        assertEquals(DesktopZ.WINDOWS, DesktopZ.windowZ(0, count), "the oldest window falls back to the base band");
+        assertEquals(DesktopZ.WINDOWS, DesktopZ.windowZ(4, count), "so does every window sharing it");
+        assertEquals(DesktopZ.windowsTop() - DesktopZ.WINDOW_STEP, DesktopZ.windowZ(count - 1, count),
+                "the front-most window always gets the front-most band");
+    }
+
+    @Test
+    void windowBands_fitUnderTheInventoryLayer() {
+        // A window's items and their counts live inside its band; the whole stack of bands must stay behind
+        // the inventory band, or a back window's item would paint over the focused window's real slots.
+        assertTrue(DesktopZ.windowsTop() <= DesktopZ.INVENTORY,
+                "window bands reach z=" + DesktopZ.windowsTop() + ", past the inventory layer at "
+                        + DesktopZ.INVENTORY);
+        assertTrue(DesktopZ.BAND_COUNT < DesktopZ.WINDOW_STEP,
+                "an item count must fit inside its own window's band");
+        assertTrue(DesktopZ.BAND_ITEM < DesktopZ.BAND_COUNT, "the count is drawn in front of the model");
+    }
+
+    @Test
+    void inWindowItems_landInTheirOwnBandNotInFrontOfTheDesktop() {
+        // The offsets cancel the lift GuiGraphics applies internally, which is the whole point: an item drawn
+        // at a window's Z must end up near that window, not ITEM_LIFT in front of every window.
+        assertEquals(DesktopZ.BAND_ITEM, DesktopZ.itemOffset() + DesktopZ.ITEM_LIFT);
+        assertEquals(DesktopZ.BAND_COUNT, DesktopZ.countOffset() + DesktopZ.DECORATION_LIFT);
+        final int backItem = DesktopZ.windowZ(0, 2) + DesktopZ.BAND_COUNT;
+        assertTrue(backItem < DesktopZ.windowZ(1, 2),
+                "a background window's item and count must stay behind the window in front of it");
+    }
+
+    @Test
+    void inventoryItems_stayBehindTheTaskbarAndTooltips() {
+        final int top = DesktopZ.INVENTORY + DesktopZ.BAND_COUNT;
+        assertTrue(top < DesktopZ.TASKBAR, "inventory items must not poke through the taskbar");
+        assertTrue(top < DesktopZ.TOOLTIP, "a tooltip must cover the item count it belongs to");
+    }
+
+    @Test
+    void carriedItem_ridesAboveEveryOtherLayer() {
+        // The cursor stack is the one item drawn at the raw depth: it must clear even a modal dialog.
+        assertTrue(DesktopZ.CURSOR + DesktopZ.ITEM_LIFT > DesktopZ.POPUP,
+                "the carried stack must render over a modal popup");
     }
 
     @Test

@@ -7,9 +7,12 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.fs;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents;
+import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
+import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
 import net.minecraft.world.item.ItemStack;
 
 import java.nio.charset.StandardCharsets;
@@ -33,6 +36,26 @@ import java.util.Set;
  */
 public final class DiskFilesystem {
 
+    /**
+     * The hardware era a volume was made for, which decides what its files' bytes weigh: a drive's own era,
+     * a medium's format era, and the standard era for anything else.
+     */
+    public static HardwareEra eraOf(final ItemStack volume) {
+        if (volume.getItem() instanceof DiskItem disk) {
+            return disk.spec().era();
+        }
+        if (volume.getItem() instanceof FormattedMediaItem medium) {
+            return medium.format().era();
+        }
+        return HardwareEra.STANDARD;
+    }
+
+    /** The weight of every file on {@code volume}, in mB-equivalents at the volume's own era. */
+    public static long filesWeight(final ItemStack volume) {
+        return volume.getOrDefault(ComputingModule.FILESYSTEM.get(), FilesystemContents.EMPTY)
+                .usedWeight(eraOf(volume));
+    }
+
     private DiskFilesystem() {
     }
 
@@ -49,8 +72,15 @@ public final class DiskFilesystem {
      * @param type     the file type
      * @param weight   space consumed on disk in mB-equivalents
      * @param readOnly true if the entry cannot be written or deleted via this API
+     * @param modified the world game time (total ticks) the file was last written; {@code 0} means unknown
      */
-    public record FileEntry(String path, FileType type, long weight, boolean readOnly) {}
+    public record FileEntry(String path, FileType type, long weight, boolean readOnly, long modified) {
+
+        /** A file entry with an unknown modification time (0), e.g. a virtual {@code .dat} projection. */
+        public FileEntry(final String path, final FileType type, final long weight, final boolean readOnly) {
+            this(path, type, weight, readOnly, 0L);
+        }
+    }
 
     // -------------------------------------------------------------------------
     // WriteResult
@@ -90,7 +120,7 @@ public final class DiskFilesystem {
      *             equals {@code dir} are included.</li>
      *       </ul>
      *   </li>
-     *   <li>Read-only {@code .dat} projection from the disk's {@code DISK_STORAGE} component:
+     *   <li>Read-only {@code .dat} projection of the disk's storage volume (its stored items):
      *       <ul>
      *         <li>In {@link FilesystemKind#FLAT} mode, {@code .dat} entries are placed at the root.</li>
      *         <li>In {@link FilesystemKind#HIERARCHICAL} mode, {@code .dat} entries are placed
@@ -114,30 +144,27 @@ public final class DiskFilesystem {
 
         final FilesystemContents fs = disk.getOrDefault(
                 ComputingModule.FILESYSTEM.get(), FilesystemContents.EMPTY);
+        final HardwareEra era = eraOf(disk);
 
         final List<FileEntry> result = new ArrayList<>();
 
         if (kind == FilesystemKind.FLAT) {
             // All real files live at the root; dir is ignored.
             for (final StoredFile file : fs.files().values()) {
-                result.add(new FileEntry(file.path(), file.type(), file.weight(), false));
+                result.add(new FileEntry(file.path(), file.type(), file.weight(era), false, file.modified()));
             }
             // .dat projection also at root for FLAT.
-            final ServerStorageContents storage = disk.getOrDefault(
-                    ComputingModule.DISK_STORAGE.get(), ServerStorageContents.EMPTY);
-            result.addAll(StorageProjection.project(storage));
+            result.addAll(StorageProjection.project(DriveVolumes.contents(disk)));
         } else {
             // HIERARCHICAL: include real files whose parent dir matches.
             for (final StoredFile file : fs.files().values()) {
                 if (dir.equals(FsPaths.parentDir(file.path()))) {
-                    result.add(new FileEntry(file.path(), file.type(), file.weight(), false));
+                    result.add(new FileEntry(file.path(), file.type(), file.weight(era), false, file.modified()));
                 }
             }
             // .dat projection lives under "Storage/"; include only when dir == "Storage".
             if ("Storage".equals(dir)) {
-                final ServerStorageContents storage = disk.getOrDefault(
-                        ComputingModule.DISK_STORAGE.get(), ServerStorageContents.EMPTY);
-                result.addAll(StorageProjection.project(storage));
+                result.addAll(StorageProjection.project(DriveVolumes.contents(disk)));
             }
         }
 
@@ -203,20 +230,31 @@ public final class DiskFilesystem {
     public static WriteResult write(final ItemStack disk, final String path, final FileType type,
                                     final String content, final long freeWeight,
                                     final FilesystemKind kind) {
+        return write(disk, path, type, content, freeWeight, kind, 0L);
+    }
+
+    /**
+     * As {@link #write(ItemStack, String, FileType, String, long, FilesystemKind)}, but stamps the file's
+     * modification time with {@code now} (the world game time in ticks). The caller supplies the time so this
+     * class stays free of Minecraft's world; pass {@code 0} for an unknown time.
+     */
+    public static WriteResult write(final ItemStack disk, final String path, final FileType type,
+                                    final String content, final long freeWeight,
+                                    final FilesystemKind kind, final long now) {
         if (!FsPaths.isValidPath(path, kind)) {
             return WriteResult.INVALID_PATH;
         }
-        if (type.virtualProjection()) {
+        if (type.virtualProjection() || installerLocked(disk)) {
             return WriteResult.READ_ONLY;
         }
         final int byteCount = content.getBytes(StandardCharsets.UTF_8).length;
-        final long cost = FsPaths.sizeMbEq(byteCount);
+        final long cost = FsPaths.sizeMbEq(byteCount, eraOf(disk));
         if (cost > freeWeight) {
             return WriteResult.DISK_FULL;
         }
         final FilesystemContents current = disk.getOrDefault(
                 ComputingModule.FILESYSTEM.get(), FilesystemContents.EMPTY);
-        final FilesystemContents updated = current.with(new StoredFile(path, type, content));
+        final FilesystemContents updated = current.with(new StoredFile(path, type, content, now));
         disk.set(ComputingModule.FILESYSTEM.get(), updated);
         return WriteResult.OK;
     }
@@ -236,7 +274,25 @@ public final class DiskFilesystem {
      * @param path the full path of the file to delete
      * @return true if the file was found and removed; false otherwise
      */
+    /**
+     * Whether {@code volume} is an install medium: a stamp on blank media whose whole listing is a
+     * projection. Nothing is ever written to, removed from or moved on one, so a setup disc can neither
+     * be damaged nor turned into a place to hide files.
+     */
+    static boolean installerLocked(final ItemStack volume) {
+        if (!(volume.getItem() instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaItem)) {
+            return false;
+        }
+        final dev.jsc.jscomputronics.module.computing.os.media.MediaKind kind =
+                dev.jsc.jscomputronics.module.computing.os.media.MediaItem.kind(volume);
+        return kind != dev.jsc.jscomputronics.module.computing.os.media.MediaKind.DATA
+                && dev.jsc.jscomputronics.module.computing.os.media.MediaItem.payload(volume) != null;
+    }
+
     public static boolean delete(final ItemStack disk, final String path) {
+        if (installerLocked(disk)) {
+            return false;
+        }
         final FilesystemContents fs = disk.getOrDefault(
                 ComputingModule.FILESYSTEM.get(), FilesystemContents.EMPTY);
         final StoredFile file = fs.files().get(path);
@@ -286,7 +342,7 @@ public final class DiskFilesystem {
      * @return true if the directory was created
      */
     public static boolean mkdir(final ItemStack disk, final String path, final FilesystemKind kind) {
-        if (kind != FilesystemKind.HIERARCHICAL || !FsPaths.isValidPath(path, kind)) {
+        if (kind != FilesystemKind.HIERARCHICAL || !FsPaths.isValidPath(path, kind) || installerLocked(disk)) {
             return false;
         }
         final FilesystemContents fs = disk.getOrDefault(
@@ -339,16 +395,12 @@ public final class DiskFilesystem {
                 dirs.add(prefix + remainder.substring(0, slash));
             }
         }
-        // Virtual "Storage" directory: the .dat projection of DISK_STORAGE lives under "Storage/"
-        // (see list()), but those entries come from DISK_STORAGE, not the FILESYSTEM component, so
+        // Virtual "Storage" directory: the .dat projection of the storage volume lives under "Storage/"
+        // (see list()), but those entries come from the volume, not the FILESYSTEM component, so
         // nothing else implies a "Storage" parent here. Surface it at the root when the disk holds
         // stored items, so the Files app drive tree can reach the projected .dat files.
-        if (dir.isEmpty()) {
-            final ServerStorageContents storage = disk.getOrDefault(
-                    ComputingModule.DISK_STORAGE.get(), ServerStorageContents.EMPTY);
-            if (!storage.items().isEmpty()) {
-                dirs.add("Storage");
-            }
+        if (dir.isEmpty() && !DriveVolumes.peek(disk).isEmpty()) {
+            dirs.add("Storage");
         }
         return List.copyOf(dirs);
     }
@@ -415,7 +467,7 @@ public final class DiskFilesystem {
      */
     public static boolean move(final ItemStack disk, final String src, final String destDir,
                                final FilesystemKind kind) {
-        return relocate(disk, src, FsPaths.join(destDir, FsPaths.fileName(src)), kind);
+        return !installerLocked(disk) && relocate(disk, src, FsPaths.join(destDir, FsPaths.fileName(src)), kind);
     }
 
     /**
@@ -431,7 +483,7 @@ public final class DiskFilesystem {
      */
     public static boolean rename(final ItemStack disk, final String src, final String dest,
                                  final FilesystemKind kind) {
-        return relocate(disk, src, dest, kind);
+        return !installerLocked(disk) && relocate(disk, src, dest, kind);
     }
 
     /**
@@ -460,7 +512,7 @@ public final class DiskFilesystem {
                 return false;
             }
             disk.set(ComputingModule.FILESYSTEM.get(),
-                    fs.without(src).with(new StoredFile(dest, file.type(), file.content())));
+                    fs.without(src).with(new StoredFile(dest, file.type(), file.content(), file.modified())));
             return true;
         }
 
@@ -491,7 +543,72 @@ public final class DiskFilesystem {
             if (FsPaths.isUnder(src, f)) {
                 final StoredFile sf = fs.files().get(f);
                 updated = updated.without(f)
-                        .with(new StoredFile(dest + f.substring(src.length()), sf.type(), sf.content()));
+                        .with(new StoredFile(dest + f.substring(src.length()), sf.type(), sf.content(), sf.modified()));
+            }
+        }
+        disk.set(ComputingModule.FILESYSTEM.get(), updated);
+        return true;
+    }
+
+    /**
+     * Copies a file or a whole directory subtree from {@code src} to {@code dest}, leaving the source in place.
+     * {@code freeWeight} is the disk's remaining space; the caller computes it (this class stays disk-spec-free).
+     * Returns {@code false} without mutation when the kind is not hierarchical, the destination path is invalid,
+     * the source is missing or a read-only projection, the destination is already occupied, the copy would place
+     * a directory inside itself, or the copied weight would exceed {@code freeWeight}.
+     */
+    public static boolean copy(final ItemStack disk, final String src, final String dest,
+                               final long freeWeight, final FilesystemKind kind) {
+        if (kind != FilesystemKind.HIERARCHICAL || dest.equals(src) || !FsPaths.isValidPath(dest, kind)) {
+            return false;
+        }
+        final FilesystemContents fs = disk.getOrDefault(
+                ComputingModule.FILESYSTEM.get(), FilesystemContents.EMPTY);
+
+        // File: duplicate the single stored file at the new path.
+        final StoredFile file = fs.files().get(src);
+        if (file != null) {
+            if (file.type().virtualProjection() || fs.files().containsKey(dest)) {
+                return false;
+            }
+            if (file.weight(eraOf(disk)) > freeWeight) {
+                return false;
+            }
+            disk.set(ComputingModule.FILESYSTEM.get(),
+                    fs.with(new StoredFile(dest, file.type(), file.content(), file.modified())));
+            return true;
+        }
+
+        // Directory: duplicate the whole subtree under a new root.
+        final boolean isDir = fs.hasDir(src)
+                || fs.files().keySet().stream().anyMatch(p -> FsPaths.isUnder(src, p));
+        if (!isDir || FsPaths.isUnder(src, dest)) {
+            return false;
+        }
+        if (fs.hasDir(dest) || fs.files().containsKey(dest)
+                || fs.files().keySet().stream().anyMatch(p -> FsPaths.isUnder(dest, p))) {
+            return false;
+        }
+        long added = 0;
+        final HardwareEra era = eraOf(disk);
+        for (final String f : fs.files().keySet()) {
+            if (FsPaths.isUnder(src, f)) {
+                added += fs.files().get(f).weight(era);
+            }
+        }
+        if (added > freeWeight) {
+            return false;
+        }
+        FilesystemContents updated = fs.withDir(dest);
+        for (final String d : new ArrayList<>(fs.directories())) {
+            if (d.equals(src) || FsPaths.isUnder(src, d)) {
+                updated = updated.withDir(dest + d.substring(src.length()));
+            }
+        }
+        for (final String f : new ArrayList<>(fs.files().keySet())) {
+            if (FsPaths.isUnder(src, f)) {
+                final StoredFile sf = fs.files().get(f);
+                updated = updated.with(new StoredFile(dest + f.substring(src.length()), sf.type(), sf.content(), sf.modified()));
             }
         }
         disk.set(ComputingModule.FILESYSTEM.get(), updated);

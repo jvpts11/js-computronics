@@ -20,7 +20,7 @@ import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
 import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
 import dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents;
 import dev.jsc.jscomputronics.module.computing.os.fs.StoredFile;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents;
+import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -257,14 +257,14 @@ public final class OsFilesystemGameTests {
     // -------------------------------------------------------------------------
 
     /**
-     * A disk whose DISK_STORAGE holds two StorageKeys must surface two read-only .dat entries in
+     * A disk whose storage volume holds two StorageKeys must surface two read-only .dat entries in
      * list(); read() on a .dat path must return empty; delete() on a .dat path must return false.
      */
     @GameTest(template = ARENA)
     public static void fs_datProjectionMirrorsStorageReadOnly(final GameTestHelper helper) {
         final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
 
-        // Build a DISK_STORAGE with two distinct StorageKeys.
+        // Fill the disk's volume with two distinct StorageKeys.
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         final StorageKey iron = StorageKey.of(Items.IRON_INGOT);
         final long cobbleQty = 500L;
@@ -272,7 +272,7 @@ public final class OsFilesystemGameTests {
         final Map<StorageKey, Long> map = new LinkedHashMap<>();
         map.put(cobble, cobbleQty);
         map.put(iron, ironQty);
-        disk.set(ComputingModule.DISK_STORAGE.get(), new ServerStorageContents(map));
+        DriveVolumes.write(disk, map);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
@@ -283,7 +283,7 @@ public final class OsFilesystemGameTests {
                             .filter(e -> e.type() == FileType.DAT)
                             .count();
                     helper.assertTrue(datCount == 2L,
-                            "expected 2 .dat entries from DISK_STORAGE; got: " + datCount);
+                            "expected 2 .dat entries from the storage volume; got: " + datCount);
 
                     // All .dat entries must be read-only.
                     final boolean allReadOnly = entries.stream()
@@ -332,7 +332,7 @@ public final class OsFilesystemGameTests {
     }
 
     // -------------------------------------------------------------------------
-    // Real directories (hierarchical filesystem — the Panes desktop)
+    // Real directories (hierarchical filesystem — the Frames desktop)
     // -------------------------------------------------------------------------
 
     /**
@@ -467,28 +467,77 @@ public final class OsFilesystemGameTests {
 
     /**
      * A program runs only on an OS that meets its declared capability and era: the NMS needs a full desktop
-     * (Panes), the IQL Engine service runs anywhere, an unregistered program is unrestricted, and a gated
+     * (Frames), the IQL Engine service runs anywhere, an unregistered program is unrestricted, and a gated
      * program is refused when no OS is installed.
      */
     @GameTest(template = ARENA)
     public static void os_programGatingHonorsCapability(final GameTestHelper helper) {
         final ResourceLocation nms = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");
         final ResourceLocation iql = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "iqlengine");
-        final ResourceLocation panes95 = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "panes_95");
+        final ResourceLocation frames95 = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_95");
+        final ResourceLocation framesXp = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
         final ResourceLocation mcDos = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
         final ResourceLocation unknown =
                 ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "no_such_program");
 
-        helper.assertTrue(OsRegistry.canHostRun(panes95, nms),
-                "the NMS must run on a Panes (full-desktop) OS");
-        helper.assertFalse(OsRegistry.canHostRun(mcDos, nms),
-                "the NMS must be refused on MC-DOS (terminal-only)");
-        helper.assertTrue(OsRegistry.canHostRun(mcDos, iql),
-                "the IQL Engine (a service) must run on any OS tier");
-        helper.assertFalse(OsRegistry.canHostRun(null, nms),
+        // Ample hardware, so only the platform and OS-version gates decide the outcome here.
+        final int cpu = 9999;
+        final int vram = 9999;
+        helper.assertFalse(OsRegistry.canRunProgram(frames95, nms, cpu, vram),
+                "the NMS needs Frames XP or newer, so Frames 95 must refuse it");
+        helper.assertTrue(OsRegistry.canRunProgram(framesXp, nms, cpu, vram),
+                "the NMS must run on Frames XP");
+        helper.assertFalse(OsRegistry.canRunProgram(mcDos, nms, cpu, vram),
+                "the NMS must be refused on MC-DOS (wrong platform)");
+        helper.assertTrue(OsRegistry.canRunProgram(mcDos, iql, cpu, vram),
+                "the IQL Engine (a headless service) still runs on a non-Frames Mainframe");
+        helper.assertFalse(OsRegistry.canRunProgram(null, nms, cpu, vram),
                 "a gated program must be refused when no OS is installed");
-        helper.assertTrue(OsRegistry.canHostRun(mcDos, unknown),
+        helper.assertTrue(OsRegistry.canRunProgram(mcDos, unknown, cpu, vram),
                 "an unregistered program declares no requirement and must pass");
+        // The 11-only Automation Manager: refused on Frames XP, allowed on Frames 11.
+        final ResourceLocation frames11 = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_11");
+        final ResourceLocation autoMgr =
+                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "automation_manager");
+        helper.assertFalse(OsRegistry.canRunProgram(framesXp, autoMgr, cpu, vram),
+                "the Automation Manager needs Frames 11, so Frames XP must refuse it");
+        helper.assertTrue(OsRegistry.canRunProgram(frames11, autoMgr, cpu, vram),
+                "the Automation Manager must run on Frames 11");
+        helper.succeed();
+    }
+
+    /**
+     * The single program registry is well-formed: every built-in program is registered, and each carries a
+     * usable command name, display name and at least one platform. This guards the descriptor list against a
+     * registration mistake (an empty field, a program that never reached the registry).
+     */
+    @GameTest(template = ARENA)
+    public static void programs_registryIsWellFormed(final GameTestHelper helper) {
+        final var builtins = dev.jsc.jscomputronics.module.computing.os.OsBootstrap.builtinPrograms();
+        helper.assertTrue(!builtins.isEmpty(), "the built-in program list must not be empty");
+        for (final var spec : builtins) {
+            helper.assertTrue(OsRegistry.getProgram(spec.id()) == spec,
+                    "program " + spec.id() + " must be registered in the registry");
+            helper.assertTrue(!spec.commandName().isBlank(), "program " + spec.id() + " needs a command name");
+            helper.assertTrue(!spec.displayName().isBlank(), "program " + spec.id() + " needs a display name");
+            helper.assertTrue(!spec.platforms().isEmpty(), "program " + spec.id() + " needs a platform");
+        }
+        // A known program resolves, and its title key follows the vanilla convention.
+        final ResourceLocation nms = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");
+        helper.assertTrue(OsRegistry.getProgram(nms) != null, "the NMS must be registered");
+        helper.assertTrue(OsRegistry.getProgram(nms).titleKey().equals("program.jsc.nms"),
+                "the title key must be program.jsc.nms");
+
+        // The OS registry is well-formed too: every built-in OS is registered with a display name and a
+        // kernel that itself exists, so its lang key and install disc derive cleanly.
+        final var oses = dev.jsc.jscomputronics.module.computing.os.OsBootstrap.builtinOses();
+        helper.assertTrue(!oses.isEmpty(), "the built-in OS list must not be empty");
+        for (final var os : oses) {
+            helper.assertTrue(OsRegistry.getOs(os.id()) == os, "OS " + os.id() + " must be registered");
+            helper.assertTrue(!os.displayName().isBlank(), "OS " + os.id() + " needs a display name");
+            helper.assertTrue(OsRegistry.getKernel(os.kernelId()) != null,
+                    "OS " + os.id() + " references kernel " + os.kernelId() + " which must be registered");
+        }
         helper.succeed();
     }
 
@@ -539,12 +588,12 @@ public final class OsFilesystemGameTests {
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
         mainframe.togglePower();
 
-        final ResourceLocation panesXp =
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "panes_xp");
+        final ResourceLocation framesXp =
+                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    helper.assertTrue(mainframe.installOs(panesXp), "installOs(panes_xp) must succeed");
+                    helper.assertTrue(mainframe.installOs(framesXp), "installOs(frames_xp) must succeed");
                     final ItemStack disk = mainframe.systemDisk();
                     helper.assertFalse(disk.isEmpty(), "system disk must be present");
                     final FilesystemContents fs = disk.get(ComputingModule.FILESYSTEM.get());
@@ -678,11 +727,11 @@ public final class OsFilesystemGameTests {
     public static void fs_datCannotBeMovedBetweenFolders(final GameTestHelper helper) {
         final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
 
-        // A DISK_STORAGE key projects exactly one read-only .dat at the root.
+        // A stored key projects exactly one read-only .dat at the root.
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         final Map<StorageKey, Long> map = new LinkedHashMap<>();
         map.put(cobble, 64L);
-        disk.set(ComputingModule.DISK_STORAGE.get(), new ServerStorageContents(map));
+        DriveVolumes.write(disk, map);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {

@@ -58,6 +58,12 @@ repositories {
         name = 'Tterrag'
         url = 'https://maven.tterrag.com/'
     }
+    // GeckoLib — shipped dependency: large block models (the racks) with bones and animation.
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+        content { includeGroupByRegex 'software\\.bernie.*' }
+    }
 }
 
 base {
@@ -170,7 +176,9 @@ dependencies {
     // ============================================================
     // Mod-loaded dependencies — included in the released JAR
     // ============================================================
-    // (none yet — added per-feature as modules are implemented)
+    // GeckoLib: bone-based block models and animation. The Server Rack and Supercomputer Rack are one
+    // model each, rendered by a GeckoLib block-entity renderer that shows the seated units per row.
+    implementation "software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
 
     // ============================================================
     // Dev-runtime mods — present in runClient/runServer for

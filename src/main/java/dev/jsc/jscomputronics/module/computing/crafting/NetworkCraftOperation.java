@@ -576,14 +576,48 @@ public final class NetworkCraftOperation implements PersistentOperation {
     @org.jetbrains.annotations.Nullable
     private dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity
             findRunningSupercomputer() {
+        final List<dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity> online =
+                new java.util.ArrayList<>();
         for (final BlockPos pos : supercomputers) {
             if (level.getBlockEntity(pos)
                     instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity sc
                     && sc.clusterOnline()) {
-                return sc;
+                online.add(sc);
             }
         }
-        return null;
+        return chooseLeastLoaded(online);
+    }
+
+    /**
+     * The supercomputer a craft should ask for slots: the online one with the most room. Every
+     * supercomputer runs its own queue, so a craft must never sit waiting on a full one while another
+     * has free slots — taking the first online one did exactly that, and a second supercomputer on the
+     * network never received work. When none has room, the first is returned so the craft waits in
+     * line there and its next re-claim lands wherever slots free up first.
+     */
+    @org.jetbrains.annotations.Nullable
+    public static dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity chooseLeastLoaded(
+            final List<dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity> online) {
+        dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity best = null;
+        long bestFree = -1;
+        for (final dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity sc : online) {
+            final long free = sc.parallelCrafts() - sc.craftSlotsInUse();
+            if (free > bestFree) {
+                best = sc;
+                bestFree = free;
+            }
+        }
+        return best;
+    }
+
+    /** Who asked for this craft, as shown in the queues that list it. */
+    public String requesterLabel() {
+        return requesterLabel;
+    }
+
+    /** Whether this craft may run on the supercomputer whose interface sits at {@code hub}. */
+    public boolean usesSupercomputer(final BlockPos hub) {
+        return supercomputers.contains(hub);
     }
 
     /**

@@ -20,7 +20,7 @@ import java.util.List;
  * to wipe its scrollback first (the {@code cls} command); each {@link WireLine} is a text line plus the
  * ordinal of its CLI style for colouring.
  */
-public record DesktopShellOutputPayload(boolean clear, List<WireLine> lines) implements CustomPacketPayload {
+public record DesktopShellOutputPayload(boolean clear, String prompt, List<WireLine> lines) implements CustomPacketPayload {
 
     public static final int MAX_LINES = 256;
 
@@ -30,6 +30,7 @@ public record DesktopShellOutputPayload(boolean clear, List<WireLine> lines) imp
     public static final StreamCodec<RegistryFriendlyByteBuf, DesktopShellOutputPayload> STREAM_CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.BOOL, DesktopShellOutputPayload::clear,
+                    ByteBufCodecs.stringUtf8(256), DesktopShellOutputPayload::prompt,
                     WireLine.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_LINES)), DesktopShellOutputPayload::lines,
                     DesktopShellOutputPayload::new);
 

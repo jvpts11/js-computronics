@@ -14,7 +14,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: the Panes desktop wants the listing of its desktop folder
+ * Client to server: the Frames desktop wants the listing of its desktop folder
  * ({@code Users/Public/Desktop}) on the system disk of the computer at {@code hostPos}. The server
  * replies with a {@link DesktopFilesPayload}. This is a separate channel from the Files app's
  * {@link RequestDiskFilesPayload} so the two listings do not collide.

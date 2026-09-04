@@ -13,7 +13,7 @@ import net.minecraft.world.inventory.Slot;
 import java.util.function.BooleanSupplier;
 
 /**
- * A player-inventory slot the Panes desktop shows inside a Network Interactor window. The slot follows the
+ * A player-inventory slot the Frames desktop shows inside a Network Interactor window. The slot follows the
  * focused window: the screen rewrites its {@code x}/{@code y} every tick to the window's inventory zone, and
  * gates it through {@link #isActive()} so the slot only renders and accepts clicks while that window is the
  * front, non-minimized one. The vanilla container handles the actual item movement (cursor, drag, shift-click)

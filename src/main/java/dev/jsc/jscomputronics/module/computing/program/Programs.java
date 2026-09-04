@@ -8,16 +8,18 @@
 package dev.jsc.jscomputronics.module.computing.program;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.module.computing.program.cli.CliComputer;
+import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
+import dev.jsc.jscomputronics.module.computing.os.ProgramSpec;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * The open registry of programs. The Command Prompt is built in and pre-installed on every computer; an add-on registers its own program with {@link #register} from its setup. Listing is the only thing the registry does here — how a program opens is wired on the client.
+ * Well-known program ids and a thin CLI-facing view over the single program registry
+ * ({@link OsRegistry}). The descriptors themselves — platforms, hardware minimums, host scope, display
+ * name — live on {@link ProgramSpec} and are registered once through the addon API, so there is no longer
+ * a second, parallel program store here. These constants are just the ids the mod's own code refers to.
  */
 public final class Programs {
 
@@ -35,53 +37,56 @@ public final class Programs {
 
     /**
      * The Crafting Manager: the desktop app that moves {@code .craft} recipe files between removable
-     * media and a Crafting Computer's recipe store. It installs only on a Crafting Computer (the
-     * install is rejected elsewhere) and needs a Crafting Card to actually run its actions.
+     * media and a Crafting Computer's recipe store. It installs only on a Crafting Computer and needs a
+     * Crafting Card to run its actions.
      */
     public static final ResourceLocation CRAFTING_MANAGER =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "crafting_manager");
 
-    private static final Map<ResourceLocation, Program> REGISTERED = new LinkedHashMap<>();
+    /** Cluster Manager: the Cluster Management Computer's front for every cluster on its network. */
+    public static final ResourceLocation CLUSTER_MANAGER =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "cluster_manager");
 
-    static {
-        register(new Program(COMMAND_PROMPT, "cmd", "program.jsc.command_prompt", true));
-        register(new Program(NMS, "nms", "program.jsc.nms", false));
-        register(new Program(IQL_ENGINE, "iqlengine", "program.jsc.iqlengine", false));
-        register(new Program(CRAFTING_MANAGER, "craftmgr", "program.jsc.crafting_manager", false));
-    }
+    /** Minesweeper: the classic game, installed by the player like any other add-on. */
+    public static final ResourceLocation MINESWEEPER =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "minesweeper");
+
+    /** Storage Insights: a dashboard over the network's contents (totals, top types, low stock). */
+    public static final ResourceLocation STORAGE_INSIGHTS =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "storage_insights");
+
+    /** Craft Planner: previews a craft's stages and ingredient bill before the player commits to it. */
+    public static final ResourceLocation CRAFT_PLANNER =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "craft_planner");
+
+    /** The Automation Engine: a Mainframe service (like the IQL Engine) that runs the saved jobs. */
+    public static final ResourceLocation AUTOMATION_ENGINE =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "automation_engine");
+
+    /** The Automation Manager: the desktop front-end that creates and manages jobs for the Engine. */
+    public static final ResourceLocation AUTOMATION_MANAGER =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "automation_manager");
 
     private Programs() {
     }
 
-    /** Adds a program. Safe to call from any mod's setup; a duplicate id is ignored. */
-    public static synchronized void register(final Program program) {
-        REGISTERED.putIfAbsent(program.id(), program);
+    /** The descriptor registered under {@code id}, or {@code null} when none is. */
+    public static ProgramSpec get(final ResourceLocation id) {
+        return id == null ? null : OsRegistry.getProgram(id);
     }
 
-    public static synchronized Program get(final ResourceLocation id) {
-        return REGISTERED.get(id);
+    /** Every registered program descriptor. */
+    public static List<ProgramSpec> all() {
+        return List.copyOf(OsRegistry.programs());
     }
 
-    public static synchronized List<Program> all() {
-        return List.copyOf(REGISTERED.values());
-    }
-
-    /** The programs every computer ships with. */
-    public static synchronized List<Program> installed() {
-        final List<Program> out = new ArrayList<>();
-        for (final Program program : REGISTERED.values()) {
+    /** The programs every computer ships with (no install step). */
+    public static List<ProgramSpec> installed() {
+        final List<ProgramSpec> out = new ArrayList<>();
+        for (final ProgramSpec program : OsRegistry.programs()) {
             if (program.preinstalled()) {
                 out.add(program);
             }
-        }
-        return out;
-    }
-
-    /** The pre-installed programs as the Minecraft-free rows the {@code programs} command prints. */
-    public static List<CliComputer.ProgramInfo> installedInfo() {
-        final List<CliComputer.ProgramInfo> out = new ArrayList<>();
-        for (final Program program : installed()) {
-            out.add(new CliComputer.ProgramInfo(program.commandName(), program.id().toString()));
         }
         return out;
     }

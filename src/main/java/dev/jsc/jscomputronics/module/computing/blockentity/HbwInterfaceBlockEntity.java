@@ -13,8 +13,12 @@ import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.common.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
-import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock;
 import dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem;
+import dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler;
+import dev.jsc.jscomputronics.module.computing.item.ServerItem;
+import dev.jsc.jscomputronics.module.computing.rack.RackChassis;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -44,14 +48,29 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     public static final int SLOT_OK_BASE = 4;
 
     /**
-     * One surveyed cluster slot: the node position and what it contributes.
+     * One surveyed cluster slot: the rack the node sits in, its row, and what it contributes.
      */
-    public record ClusterSlot(BlockPos node, int code, long crafts) {
+    public record ClusterSlot(BlockPos node, int row, int code, long crafts) {
+    }
+
+    /** A node found on the fabric: the cabinet it is mounted in and the unit row it occupies. */
+    public record NodeRef(BlockPos rack, int row) {
+    }
+
+    // Every node on the fabric, in slot order — including those past the six rated slots. The rated
+    // slots decide crafting; this full list is what a console needs to install and control them all.
+    private List<NodeRef> nodes = List.of();
+
+    /** All nodes seated on this fabric, rack by rack, top unit first; the first six are the rated slots. */
+    public List<NodeRef> clusterNodes() {
+        return nodes;
     }
 
     private NodeUuid nodeUuid;
     private NetworkUuid networkUuid;
     private NetworkUuid registeredNetwork;
+    // The player's name for the cluster; empty means the manager numbers it (SC-1, SC-2 ...).
+    private String customName = "";
 
     private List<ClusterSlot> slots = List.of();
     private int unslottedNodes;
@@ -74,12 +93,12 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     private void tickCluster(final ServerLevel serverLevel) {
         survey(serverLevel);
         final NetworkSystem system = NetworkSystem.get(serverLevel);
-        NetworkUuid resolved = null;
-        if (parallelCrafts > 0) {
-            final long cable = adjacentHbwCable(serverLevel);
-            resolved = cable == Long.MIN_VALUE ? null
-                    : system.connectivity().networkOf(cable).orElse(null);
-        }
+        // The interface is on the network whenever its uplink cable is, crafts or no crafts: a cluster with
+        // no rated node still shows up in the Cluster Manager, where the player can see what it lacks.
+        // Crafting itself still waits for clusterOnline().
+        final long cable = adjacentHbwCable(serverLevel);
+        final NetworkUuid resolved = cable == Long.MIN_VALUE ? null
+                : system.connectivity().networkOf(cable).orElse(null);
         if (registeredNetwork != null && !registeredNetwork.equals(resolved)) {
             system.unregisterSupercomputer(registeredNetwork, nodeUuid());
             registeredNetwork = null;
@@ -93,7 +112,7 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     }
 
     private void survey(final ServerLevel serverLevel) {
-        final List<BlockPos> discovered = new ArrayList<>();
+        final List<NodeRef> discovered = new ArrayList<>();
         final Set<BlockPos> seenControllers = new HashSet<>();
         final Set<BlockPos> visited = new HashSet<>();
         final ArrayDeque<BlockPos> queue = new ArrayDeque<>();
@@ -108,24 +127,26 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
                     continue;
                 }
                 final BlockState state = serverLevel.getBlockState(neighbor);
-                // The fabric: HPC cables plus the node towers themselves.
+                // The fabric is the high-compute cable only. A cabinet is a leaf on it, not a conduit.
                 if (state.getBlock() instanceof DataCableBlock cable
                         && cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.HPC) {
                     queue.add(neighbor);
                     continue;
                 }
-                BlockPos controller = null;
-                if (state.getBlock() instanceof SupercomputerNodeBlock) {
-                    controller = neighbor;
-                } else if (state.getBlock()
-                        instanceof dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock) {
-                    controller = dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock
-                            .controllerOf(serverLevel, neighbor);
-                }
-                if (controller != null) {
-                    queue.add(neighbor);
-                    if (seenControllers.add(controller)) {
-                        discovered.add(controller);
+                // A Supercomputer Rack on the fabric: every node mounted in it, in rack order, is a
+                // candidate slot. Cabinets are taken in discovery order, so slot numbering is stable
+                // for a given build and does not shuffle between surveys.
+                final ServerRackBlockEntity rack = cabinetAt(serverLevel, neighbor);
+                if (rack != null && rack.rackType() == RackChassis.RackType.SUPERCOMPUTER
+                        && seenControllers.add(rack.getBlockPos())) {
+                    // The cabinet's link light: this survey already walks the whole fabric every tick, so
+                    // the cabinet is told here rather than walking it again itself.
+                    rack.noteFabricUplink(serverLevel.getGameTime(), networkUuid != null);
+                    for (final int row : rack.computerSlots()) {
+                        if (ServerItem.chassisOf(rack.getServers().getStackInSlot(row))
+                                == RackChassis.SUPERCOMPUTER_NODE) {
+                            discovered.add(new NodeRef(rack.getBlockPos(), row));
+                        }
                     }
                 }
             }
@@ -133,31 +154,64 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
         final List<ClusterSlot> surveyed = new ArrayList<>(PhiCoprocessorSpec.SLOT_COUNT);
         long budget = 0;
         for (int i = 0; i < Math.min(discovered.size(), PhiCoprocessorSpec.SLOT_COUNT); i++) {
-            final BlockPos node = discovered.get(i);
+            final NodeRef node = discovered.get(i);
             int code = SLOT_EMPTY;
             long crafts = 0;
-            if (serverLevel.getBlockEntity(node) instanceof SupercomputerNodeBlockEntity nodeBe) {
-                final PhiCoprocessorItem phi = nodeBe.installedPhi();
+            if (serverLevel.getBlockEntity(node.rack()) instanceof ServerRackBlockEntity rack) {
+                final ItemStack server = rack.getServers().getStackInSlot(node.row());
+                final PhiCoprocessorItem phi = installedPhi(server);
                 if (phi == null) {
                     code = SLOT_EMPTY;
                 } else if (!phi.spec().fitsSlot(i)) {
                     code = SLOT_UNDER_RATED;
-                } else if (!nodeBe.isRunning()) {
-                    code = SLOT_OFFLINE; // a node is a real computer: assembled + powered, or inert
+                } else if (!rack.bayPowerOn(node.row()) || ServerItem.build(server) == null) {
+                    code = SLOT_OFFLINE; // a node is a real computer: assembled + its bay switched on, or inert
                 } else {
                     code = SLOT_OK_BASE + modelIndex(phi.spec());
                     crafts = PhiCoprocessorSpec.craftsForSlot(i);
                     budget += crafts;
                 }
             }
-            surveyed.add(new ClusterSlot(node, code, crafts));
+            surveyed.add(new ClusterSlot(node.rack(), node.row(), code, crafts));
         }
         this.slots = List.copyOf(surveyed);
+        this.nodes = List.copyOf(discovered);
         this.unslottedNodes = Math.max(0, discovered.size() - PhiCoprocessorSpec.SLOT_COUNT);
         this.parallelCrafts = budget;
     }
 
-    private static int modelIndex(final PhiCoprocessorSpec spec) {
+    /** The rack a block belongs to — the controller itself or any part of the cabinet — or null. */
+    @Nullable
+    private static ServerRackBlockEntity cabinetAt(final ServerLevel level, final BlockPos pos) {
+        final BlockEntity be = level.getBlockEntity(pos);
+        if (be instanceof ServerRackBlockEntity rack) {
+            return rack;
+        }
+        if (be instanceof ServerRackPartBlockEntity part && part.controllerPos() != null
+                && level.getBlockEntity(part.controllerPos()) instanceof ServerRackBlockEntity rack) {
+            return rack;
+        }
+        return null;
+    }
+
+    /**
+     * The crafting co-processor seated in a node's expansion slot, or null. A node's hardware is a data
+     * component whose container is only as long as what was written to it, so the slot range is
+     * checked against the container's real size rather than indexed blindly.
+     */
+    @Nullable
+    public static PhiCoprocessorItem installedPhi(final ItemStack server) {
+        final ItemContainerContents parts = ServerItem.hardware(server);
+        final int end = Math.min(parts.getSlots(), ServerHardwareHandler.GPU_START + ServerHardwareHandler.GPU);
+        for (int slot = ServerHardwareHandler.GPU_START; slot < end; slot++) {
+            if (parts.getStackInSlot(slot).getItem() instanceof PhiCoprocessorItem phi) {
+                return phi;
+            }
+        }
+        return null;
+    }
+
+    public static int modelIndex(final PhiCoprocessorSpec spec) {
         return switch (spec.maxSlot()) {
             case 2 -> 0;
             case 3 -> 1;
@@ -236,6 +290,11 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
         return activeCraftSlots.containsKey(operationId) || acquireCraftSlots(operationId, 1) > 0;
     }
 
+    /** The crafts holding slots here right now, by operation id, for the console's queue view. */
+    public java.util.Map<UUID, Integer> heldSlots() {
+        return java.util.Map.copyOf(activeCraftSlots);
+    }
+
     public void releaseCraftSlot(final UUID operationId) {
         activeCraftSlots.remove(operationId);
     }
@@ -257,12 +316,22 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
         }
     }
 
+    public String customName() {
+        return customName;
+    }
+
+    public void setCustomName(@Nullable final String name) {
+        this.customName = name == null ? "" : name;
+        setChanged();
+    }
+
     @Override
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         if (tag.hasUUID("NodeUuid")) {
             nodeUuid = new NodeUuid(tag.getUUID("NodeUuid"));
         }
+        customName = tag.getString("CustomName");
     }
 
     @Override
@@ -270,6 +339,9 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
         super.saveAdditional(tag, registries);
         if (nodeUuid != null) {
             tag.putUUID("NodeUuid", nodeUuid.value());
+        }
+        if (!customName.isEmpty()) {
+            tag.putString("CustomName", customName);
         }
     }
 }

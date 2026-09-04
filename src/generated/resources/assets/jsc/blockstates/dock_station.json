@@ -5,21 +5,21 @@
       "y": 90
     },
     "facing=east,loaded=true": {
-      "model": "jsc:block/dock_station_active",
+      "model": "jsc:block/dock_station_docked",
       "y": 90
     },
     "facing=north,loaded=false": {
       "model": "jsc:block/dock_station"
     },
     "facing=north,loaded=true": {
-      "model": "jsc:block/dock_station_active"
+      "model": "jsc:block/dock_station_docked"
     },
     "facing=south,loaded=false": {
       "model": "jsc:block/dock_station",
       "y": 180
     },
     "facing=south,loaded=true": {
-      "model": "jsc:block/dock_station_active",
+      "model": "jsc:block/dock_station_docked",
       "y": 180
     },
     "facing=west,loaded=false": {
@@ -27,7 +27,7 @@
       "y": 270
     },
     "facing=west,loaded=true": {
-      "model": "jsc:block/dock_station_active",
+      "model": "jsc:block/dock_station_docked",
       "y": 270
     }
   }

@@ -78,6 +78,21 @@ class StorageAllocatorTest {
     }
 
     @Test
+    void allocate_prefersACachedBayOverAFasterRawTier() {
+        // A cached HDD bay answers in 7 ticks; a bare SSD needs 3, so the SSD still wins...
+        final Allocation ssdWins = StorageAllocator.allocate(List.of(
+                new ItemLocation(A, StorageTier.HDD, 100, 7),
+                new ItemLocation(B, StorageTier.SSD, 100)), 100);
+        assertEquals(100L, ssdWins.perServer().get(B));
+
+        // ...but a cache in front of an SSD bay beats a bare SSD elsewhere.
+        final Allocation cachedWins = StorageAllocator.allocate(List.of(
+                new ItemLocation(A, StorageTier.SSD, 100, 2),
+                new ItemLocation(B, StorageTier.SSD, 100)), 100);
+        assertEquals(100L, cachedWins.perServer().get(A));
+    }
+
+    @Test
     void allocate_emptyForZeroDemand() {
         final Allocation plan = StorageAllocator.allocate(List.of(
                 new ItemLocation(A, StorageTier.NVME, 100)), 0);

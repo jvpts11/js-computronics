@@ -64,6 +64,23 @@ public final class ChemicalBridges {
         return Optional.empty();
     }
 
+    /**
+     * The chemical port of an item that carries chemicals, from the first bridge that recognises it. The port
+     * edits {@code stack} in place.
+     */
+    public static Optional<ChemicalPort> itemPortFor(final ItemStack stack) {
+        if (stack.isEmpty()) {
+            return Optional.empty();
+        }
+        for (final ChemicalBridge bridge : BRIDGES) {
+            final Optional<ChemicalPort> port = bridge.itemPortFor(stack);
+            if (port.isPresent()) {
+                return port;
+            }
+        }
+        return Optional.empty();
+    }
+
     /** The chemical a recipe viewer's ingredient object stands for, from the first bridge that recognises it. */
     public static Optional<ChemicalBridge.ChemicalAmount> chemicalIngredient(final Object ingredient) {
         for (final ChemicalBridge bridge : BRIDGES) {

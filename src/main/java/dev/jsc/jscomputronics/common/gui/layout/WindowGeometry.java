@@ -43,8 +43,19 @@ public final class WindowGeometry {
     public static Rect resolve(final int x, final int y, final int w, final int h,
                                final int minW, final int minH, final boolean maximized,
                                final int screenW, final int screenH, final int taskbarH) {
+        return resolve(x, y, w, h, minW, minH, maximized, screenW, screenH, taskbarH, 0);
+    }
+
+    /**
+     * As {@link #resolve(int, int, int, int, int, int, boolean, int, int, int)}, for a desktop whose panel may
+     * sit at the top: {@code workTop} pixels are reserved above the work area (a GNOME top bar) and
+     * {@code taskbarH} below it (a bottom taskbar), so a maximized window fills exactly the band between them.
+     */
+    public static Rect resolve(final int x, final int y, final int w, final int h,
+                               final int minW, final int minH, final boolean maximized,
+                               final int screenW, final int screenH, final int taskbarH, final int workTop) {
         if (maximized) {
-            return new Rect(0, 0, screenW, Math.max(0, screenH - taskbarH));
+            return new Rect(0, workTop, screenW, Math.max(0, screenH - taskbarH - workTop));
         }
         return new Rect(x, y, Math.max(w, minW), Math.max(h, minH));
     }

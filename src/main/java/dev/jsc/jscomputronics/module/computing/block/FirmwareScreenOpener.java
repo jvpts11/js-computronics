@@ -30,7 +30,7 @@ public interface FirmwareScreenOpener {
      * @param kind        the firmware variant matching the computer's hardware era
      * @param machineName the localised display name of the machine
      */
-    void open(BlockPos pos, FirmwareKind kind, String machineName);
+    void open(BlockPos pos, BlockPos monitorPos, FirmwareKind kind, String machineName);
 
     // ─── Static holder ────────────────────────────────────────────────────────
 
@@ -48,9 +48,10 @@ public interface FirmwareScreenOpener {
         }
 
         /** Opens the firmware screen if the client-side opener is registered; no-op otherwise. */
-        public static void open(final BlockPos pos, final FirmwareKind kind, final String machineName) {
+        public static void open(final BlockPos pos, final BlockPos monitorPos, final FirmwareKind kind,
+                                final String machineName) {
             if (instance != null) {
-                instance.open(pos, kind, machineName);
+                instance.open(pos, monitorPos, kind, machineName);
             }
         }
     }

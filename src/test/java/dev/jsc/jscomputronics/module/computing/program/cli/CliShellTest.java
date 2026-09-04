@@ -77,9 +77,30 @@ class CliShellTest {
     }
 
     @Test
-    void run_clearSetsTheClearFlag() {
-        assertTrue(shell.run("clear", computer).clearScreen());
+    void run_clsSetsTheClearFlag() {
+        assertTrue(shell.run("cls", computer).clearScreen());
         assertFalse(shell.run("echo x", computer).clearScreen());
+    }
+
+    @Test
+    void run_bareDriveQualifierIsHandledAsADriveSwitch() {
+        // "D:" must be routed to the drive switch, not reported as an unknown command.
+        final CliShell.Response response = shell.run("D:", computer);
+        assertFalse(response.lines().stream().anyMatch(l -> l.text().contains("command not found")),
+                "a bare drive qualifier must not be treated as an unknown command");
+    }
+
+    @Test
+    void run_unixAliasesAreNotRegistered() {
+        // The shell uses DOS syntax; the old Unix aliases must not resolve to any command.
+        for (final String unix : List.of("ls", "cat", "rm", "clear", "man", "ps", "locate")) {
+            assertTrue(shell.find(unix) == null, unix + " must not be a registered command or alias");
+        }
+        // The DOS verbs must be present.
+        for (final String dos : List.of("dir", "cd", "cls", "type", "del", "mkdir", "md",
+                "rmdir", "rd", "copy", "move", "ren")) {
+            assertFalse(shell.find(dos) == null, dos + " must be a registered command");
+        }
     }
 
     @Test

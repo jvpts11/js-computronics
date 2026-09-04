@@ -35,7 +35,7 @@ import java.util.List;
 
 /**
  * The Mekanism build as the player drives it: with the alloy machine patterns and the frame recipe in the Recipe
- * ROM, one request — from the Network Interactor's Crafting tab on the Panes desktop, or typed at the MC-DOS
+ * ROM, one request — from the Network Interactor's Crafting tab on the Frames desktop, or typed at the MC-DOS
  * Command Prompt — must plan the whole tree, run the infuser three times over through its buses and finish on
  * the bench with Fusion Reactor Frames.
  */
@@ -51,7 +51,7 @@ public final class MekanismClientTests {
     private static final BlockPos MONITOR = new BlockPos(6, 2, 2);
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
     private static final String NETWORK_LAUNCHER = "Network";
-    private static final ResourceLocation PANES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "panes_95");
+    private static final ResourceLocation FRAMES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "frames_95");
     private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_dos");
     private static final ResourceLocation INFUSER = MekanismRig.mek("metallurgic_infuser");
     private static final ResourceLocation ALLOY_INFUSED = MekanismRig.mek("alloy_infused");
@@ -93,7 +93,7 @@ public final class MekanismClientTests {
                     final TestWorldBuilder.CraftingNetwork net = MekanismRig.place(world, INFUSER);
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), PANES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
@@ -232,8 +232,10 @@ public final class MekanismClientTests {
                 .thenScreenshot(2, "mc-dos-prompt")
                 .then(2, () -> ctx.type("operation craft 4 " + FRAME))
                 .then(1, () -> ctx.key(GLFW.GLFW_KEY_ENTER))
-                .thenWaitUntil(() -> ctx.screen(CommandPromptScreen.class).scrollbackText().stream().anyMatch(l -> l.contains("CRAFT queued")),
-                        SCREEN_WAIT, "the prompt to confirm the queued craft")
+                .thenWaitUntil(() -> {
+                    final CommandPromptScreen<?> screen = ctx.screen(CommandPromptScreen.class);
+                    return screen.scrollbackText().stream().anyMatch(l -> l.contains("CRAFT queued"));
+                }, SCREEN_WAIT, "the prompt to confirm the queued craft")
                 .thenScreenshot(2, "mc-dos-craft-queued")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT)

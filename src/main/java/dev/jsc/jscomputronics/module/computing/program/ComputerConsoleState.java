@@ -32,6 +32,12 @@ public final class ComputerConsoleState {
     private final Set<String> installed = new LinkedHashSet<>();
     private String wallpaper = "";
     private String computerName = "";
+    private final ComputerSettings settings = new ComputerSettings();
+
+    /** The per-computer settings owned by the Settings app and the {@code config} command. */
+    public ComputerSettings settings() {
+        return settings;
+    }
 
     /**
      * Free-positioned desktop icon cells, keyed by the icon's stable id ({@code app:<label>} for a program
@@ -71,8 +77,127 @@ public final class ComputerConsoleState {
         return installed.add(programId);
     }
 
+    // The mod version each installed package was built against. A mod update leaves packages behind
+    // their new build, which is what `pckmgr update` exists to reconcile — the same way a real
+    // package manager reconciles a repository that moved on without you.
+    private final Map<String, String> installedVersions = new LinkedHashMap<>();
+
+    /** The version a package was installed at, or {@code ""} when it predates version tracking. */
+    public String installedVersion(final String programId) {
+        return installedVersions.getOrDefault(programId, "");
+    }
+
+    public void setInstalledVersion(final String programId, final String version) {
+        if (version == null || version.isBlank()) {
+            installedVersions.remove(programId);
+        } else {
+            installedVersions.put(programId, version);
+        }
+    }
+
+    /** Every installed package whose recorded version is not {@code current}. */
+    public java.util.List<String> outdatedPackages(final String current) {
+        final java.util.List<String> out = new java.util.ArrayList<>();
+        for (final String id : installed) {
+            if (!current.equals(installedVersions.get(id))) {
+                out.add(id);
+            }
+        }
+        return out;
+    }
+
     public boolean uninstall(final String programId) {
         return installed.remove(programId);
+    }
+
+    // A live installation medium booted on this computer (the manual Arch / Gentoo install), until it reboots
+    // into the installed system. Persisted so a half-done install survives a reload.
+    private dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState liveInstall;
+
+    /** The live installation in progress, or null when the computer is not booted from a live medium. */
+    public dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState liveInstall() {
+        return liveInstall;
+    }
+
+    /** Boots a live medium: starts a fresh manual installation of the given distribution. */
+    public void startLiveInstall(final dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState.Distro distro) {
+        this.liveInstall = new dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState(distro);
+    }
+
+    /** Ends the live session (the install completed, or the medium was abandoned). */
+    public void clearLiveInstall() {
+        this.liveInstall = null;
+    }
+
+    // Packages a source-based package manager (emerge) is still compiling: program id -> the game tick at
+    // which the build finishes and the program becomes installed. Settled lazily by the shell on the next
+    // command, so no per-tick agent is needed.
+    private final Map<String, Long> pendingBuilds = new LinkedHashMap<>();
+
+    /** Starts (or restarts) a source build of {@code programId} that completes at game tick {@code readyAtTick}. */
+    public void startBuild(final String programId, final long readyAtTick) {
+        pendingBuilds.put(programId, readyAtTick);
+    }
+
+    /** As {@link #startBuild(String, long)}, also recording the build's full duration for progress lines. */
+    public void startBuild(final String programId, final long readyAtTick, final long totalTicks) {
+        pendingBuilds.put(programId, readyAtTick);
+        buildTotals.put(programId, totalTicks);
+    }
+
+    // The full duration of each running build, so the console can print percentage progress. Persisted
+    // beside the completion ticks; entries leave with their build.
+    private final Map<String, Long> buildTotals = new LinkedHashMap<>();
+
+    /** The full duration in ticks of a running build, or 0 when unknown. */
+    public long buildTotal(final String programId) {
+        return buildTotals.getOrDefault(programId, 0L);
+    }
+
+    /** Cancels a build still compiling; returns whether one was pending. */
+    public boolean cancelBuild(final String programId) {
+        buildTotals.remove(programId);
+        return pendingBuilds.remove(programId) != null;
+    }
+
+    /** The builds still compiling: program id to completion tick. */
+    public Map<String, Long> pendingBuilds() {
+        return java.util.Collections.unmodifiableMap(pendingBuilds);
+    }
+
+    /**
+     * Moves every build whose completion tick has passed into the installed set, returning the ids that
+     * just finished (in start order). Each finished id is also queued for {@link #drainFinishedBuilds()},
+     * so the shell can announce it on the player's next command even though the build settled silently.
+     */
+    public java.util.List<String> settleBuilds(final long nowTick) {
+        final java.util.List<String> done = new java.util.ArrayList<>();
+        final java.util.Iterator<Map.Entry<String, Long>> it = pendingBuilds.entrySet().iterator();
+        while (it.hasNext()) {
+            final Map.Entry<String, Long> e = it.next();
+            if (e.getValue() <= nowTick) {
+                installed.add(e.getKey());
+                done.add(e.getKey());
+                finishedBuilds.add(e.getKey());
+                buildTotals.remove(e.getKey());
+                it.remove();
+            }
+        }
+        return done;
+    }
+
+    // Builds that finished but have not been announced to the player yet (persisted, so a build that
+    // completes while the world is unloaded is still reported the next time the shell is used).
+    private final java.util.List<String> finishedBuilds = new java.util.ArrayList<>();
+
+    /** Returns and clears the finished-but-unannounced build ids, in completion order. */
+    public java.util.List<String> drainFinishedBuilds() {
+        if (finishedBuilds.isEmpty()) {
+            return java.util.List.of();
+        }
+        final java.util.List<String> out = java.util.List.copyOf(finishedBuilds);
+        finishedBuilds.clear();
+        return out;
     }
 
     /** The chosen desktop wallpaper id ({@code ""} means the OS default). */
@@ -91,6 +216,68 @@ public final class ComputerConsoleState {
 
     public void setComputerName(final String name) {
         this.computerName = name == null ? "" : name;
+    }
+
+    // The machine this session is currently ssh'd into, as a packed block position, or null when the
+    // shell is local. In memory like the rest of the session: closing the terminal drops the remote
+    // shell, exactly as hanging up a real one does.
+    private Long sshTarget;
+
+    /** The packed position of the machine this session is connected to, or null when local. */
+    @org.jetbrains.annotations.Nullable
+    public Long sshTarget() {
+        return sshTarget;
+    }
+
+    public void setSshTarget(@org.jetbrains.annotations.Nullable final Long packedPos) {
+        this.sshTarget = packedPos;
+    }
+
+    // The command line's current drive and per-drive current directory (a DOS-style session). Kept in memory:
+    // like closing a real terminal, it resets to the boot drive's root when the computer reloads. Each drive
+    // remembers its own directory, so switching back to a drive returns to where you left it.
+    private char terminalDrive = 'C';
+    private final Map<Character, String> terminalDirs = new LinkedHashMap<>();
+
+    /** The terminal session's current drive letter (upper-cased). */
+    public char terminalDrive() {
+        return terminalDrive;
+    }
+
+    /** The current directory of the current drive as a {@code '/'}-separated storage path; {@code ""} is the root. */
+    public String terminalDir() {
+        return terminalDirs.getOrDefault(terminalDrive, "");
+    }
+
+    /** Whether the session has explicitly set a directory on the current drive (false = fresh session). */
+    public boolean hasTerminalLocation() {
+        return terminalDirs.containsKey(terminalDrive);
+    }
+
+    /** Switches the current drive, restoring that drive's remembered directory. */
+    public void setTerminalDrive(final char drive) {
+        this.terminalDrive = Character.toUpperCase(drive);
+    }
+
+    /**
+     * Erases everything the software layer remembered, because the disk it conceptually lived on was just
+     * formatted: command history, the terminal session's location, installed programs, and any builds. The
+     * next system starts from a genuinely clean console.
+     */
+    public void wipeSoftware() {
+        history.clear();
+        terminalDirs.clear();
+        terminalDrive = 'C';
+        installed.clear();
+        pendingBuilds.clear();
+        buildTotals.clear();
+        finishedBuilds.clear();
+    }
+
+    /** Sets the current drive and stores that drive's current directory. */
+    public void setTerminalLocation(final char drive, final String dir) {
+        this.terminalDrive = Character.toUpperCase(drive);
+        this.terminalDirs.put(this.terminalDrive, dir == null ? "" : dir);
     }
 
     /** Packs a desktop grid column and row into a single value for {@link #iconCells}. */
@@ -134,6 +321,31 @@ public final class ComputerConsoleState {
             installedTag.add(StringTag.valueOf(id));
         }
         tag.put("Installed", installedTag);
+        if (!installedVersions.isEmpty()) {
+            final CompoundTag versions = new CompoundTag();
+            installedVersions.forEach(versions::putString);
+            tag.put("InstalledVersions", versions);
+        }
+        if (!pendingBuilds.isEmpty()) {
+            final CompoundTag builds = new CompoundTag();
+            pendingBuilds.forEach(builds::putLong);
+            tag.put("PendingBuilds", builds);
+        }
+        if (!buildTotals.isEmpty()) {
+            final CompoundTag totals = new CompoundTag();
+            buildTotals.forEach(totals::putLong);
+            tag.put("BuildTotals", totals);
+        }
+        if (!finishedBuilds.isEmpty()) {
+            final ListTag finished = new ListTag();
+            for (final String id : finishedBuilds) {
+                finished.add(StringTag.valueOf(id));
+            }
+            tag.put("FinishedBuilds", finished);
+        }
+        if (liveInstall != null) {
+            tag.putString("LiveInstall", liveInstall.serialize());
+        }
         if (!wallpaper.isEmpty()) {
             tag.putString("Wallpaper", wallpaper);
         }
@@ -150,6 +362,32 @@ public final class ComputerConsoleState {
             }
             tag.put("IconCells", cells);
         }
+        final CompoundTag s = new CompoundTag();
+        s.putInt("Accent", settings.accent());
+        s.putBoolean("Clock12h", settings.clock12h());
+        s.putInt("GuiScale", settings.guiScale());
+        s.putInt("Brightness", settings.brightness());
+        s.putString("SaveDrive", String.valueOf(settings.defaultSaveDrive()));
+        s.putBoolean("RemovableAutoOpen", settings.removableAutoOpen());
+        s.putBoolean("TaskbarCentered", settings.taskbarCentered());
+        s.putBoolean("DarkMode", settings.darkMode());
+        if (!settings.themePreset().isEmpty()) {
+            s.putString("Theme", settings.themePreset());
+        }
+        if (!settings.defaultApps().isEmpty()) {
+            final CompoundTag apps = new CompoundTag();
+            settings.defaultApps().forEach(apps::putString);
+            s.put("DefaultApps", apps);
+        }
+        tag.put("Settings", s);
+    }
+
+    /**
+     * Resets every field to its empty value. Defined as loading an empty tag so it can never drift from
+     * {@link #load}: a field added there is reset here for free.
+     */
+    public void clear() {
+        load(new CompoundTag());
     }
 
     public void load(final CompoundTag tag) {
@@ -165,6 +403,35 @@ public final class ComputerConsoleState {
         for (final Tag entry : tag.getList("Installed", Tag.TAG_STRING)) {
             installed.add(entry.getAsString());
         }
+        installedVersions.clear();
+        if (tag.contains("InstalledVersions")) {
+            final CompoundTag versions = tag.getCompound("InstalledVersions");
+            for (final String id : versions.getAllKeys()) {
+                installedVersions.put(id, versions.getString(id));
+            }
+        }
+        liveInstall = tag.contains("LiveInstall")
+                ? dev.jsc.jscomputronics.module.computing.program.install.LiveInstallState.deserialize(
+                        tag.getString("LiveInstall"))
+                : null;
+        pendingBuilds.clear();
+        if (tag.contains("PendingBuilds")) {
+            final CompoundTag builds = tag.getCompound("PendingBuilds");
+            for (final String id : builds.getAllKeys()) {
+                pendingBuilds.put(id, builds.getLong(id));
+            }
+        }
+        buildTotals.clear();
+        if (tag.contains("BuildTotals")) {
+            final CompoundTag totals = tag.getCompound("BuildTotals");
+            for (final String id : totals.getAllKeys()) {
+                buildTotals.put(id, totals.getLong(id));
+            }
+        }
+        finishedBuilds.clear();
+        for (final Tag entry : tag.getList("FinishedBuilds", Tag.TAG_STRING)) {
+            finishedBuilds.add(entry.getAsString());
+        }
         wallpaper = tag.getString("Wallpaper");
         computerName = tag.getString("ComputerName");
         iconCells.clear();
@@ -175,5 +442,24 @@ public final class ComputerConsoleState {
                 iconCells.put(key, c.getInt("Cell"));
             }
         }
+        final CompoundTag s = tag.getCompound("Settings");
+        settings.setAccent(s.getInt("Accent"));
+        settings.setClock12h(s.getBoolean("Clock12h"));
+        settings.setGuiScale(s.getInt("GuiScale"));
+        settings.setBrightness(s.contains("Brightness") ? s.getInt("Brightness") : 100);
+        final String saveDrive = s.getString("SaveDrive");
+        if (!saveDrive.isEmpty()) {
+            settings.setDefaultSaveDrive(saveDrive.charAt(0));
+        }
+        settings.setRemovableAutoOpen(!s.contains("RemovableAutoOpen") || s.getBoolean("RemovableAutoOpen"));
+        settings.setTaskbarCentered(!s.contains("TaskbarCentered") || s.getBoolean("TaskbarCentered"));
+        settings.setDarkMode(s.getBoolean("DarkMode"));
+        settings.setThemePreset(s.getString("Theme"));
+        final Map<String, String> apps = new LinkedHashMap<>();
+        final CompoundTag appsTag = s.getCompound("DefaultApps");
+        for (final String key : appsTag.getAllKeys()) {
+            apps.put(key, appsTag.getString(key));
+        }
+        settings.putDefaultApps(apps);
     }
 }

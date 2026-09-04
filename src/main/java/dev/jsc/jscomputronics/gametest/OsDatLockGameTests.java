@@ -18,7 +18,7 @@ import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
 import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents;
+import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -58,7 +58,7 @@ public final class OsDatLockGameTests {
         final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
         final Map<StorageKey, Long> map = new LinkedHashMap<>();
         map.put(StorageKey.of(Items.IRON_INGOT), 7L);
-        disk.set(ComputingModule.DISK_STORAGE.get(), new ServerStorageContents(map));
+        DriveVolumes.write(disk, map);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
@@ -158,7 +158,7 @@ public final class OsDatLockGameTests {
                     helper.assertFalse(sysDisk.isEmpty(), "the system disk must be present");
                     final Map<StorageKey, Long> seed = new LinkedHashMap<>();
                     seed.put(key, startQty);
-                    sysDisk.set(ComputingModule.DISK_STORAGE.get(), new ServerStorageContents(seed));
+                    DriveVolumes.write(sysDisk, seed);
 
                     // Resolve the .dat path the projection emits, then invert it back to the StorageKey.
                     final String datPath = DiskFilesystem.list(sysDisk, "", FilesystemKind.FLAT).stream()

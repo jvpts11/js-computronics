@@ -12,8 +12,6 @@ import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
-import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock;
-import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.PackOutput;
@@ -72,8 +70,7 @@ public final class JscLootTableProvider extends LootTableProvider {
 
         private static boolean manuallyDropped(final Block block) {
             return block instanceof MainframeBlock || block instanceof MainframePartBlock
-                    || block instanceof ServerRackBlock || block instanceof ServerRackPartBlock
-                    || block instanceof SupercomputerNodeBlock || block instanceof SupercomputerNodePartBlock;
+                    || block instanceof ServerRackBlock || block instanceof ServerRackPartBlock;
         }
     }
 }

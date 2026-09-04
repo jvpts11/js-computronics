@@ -37,7 +37,7 @@ import java.util.Locale;
 /**
  * The Network Management Studio as a desktop window (a {@link DesktopApp}): an in-world clone of SQL
  * Server Management Studio with an Object Explorer, a query editor, a results/messages grid and a status
- * bar. It opens from the Panes desktop NMS icon and closes back to the desktop like any other window.
+ * bar. It opens from the Frames desktop NMS icon and closes back to the desktop like any other window.
  *
  * <p>It carries its own light SSMS skin ({@link NmsThemes}) rather than the host's era OS skin — a program
  * has its own identity. The {@link NmsLayout} constants give the fixed internal geometry; the explorer

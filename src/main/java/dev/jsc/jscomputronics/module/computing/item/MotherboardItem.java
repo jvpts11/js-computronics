@@ -44,11 +44,15 @@ public class MotherboardItem extends SpecItem<MotherboardSpec> {
                 .sorted(Comparator.comparingInt(RamGeneration::ordinal))
                 .map(RamGeneration::name)
                 .collect(Collectors.joining(" / "));
-        final String slotFamily = spec.pcieGeneration().busFamily().label();
+        // The board is where a build succeeds or fails, so it spells out exactly what its slots take:
+        // the socket, the memory generations, and the bus version cards are held to.
         tooltip.add(Component.literal(
                 spec.cpuSlots() + "x " + spec.socket().name() + "  |  "
                         + spec.ramSlots() + " RAM (" + ramTypes + ")  |  "
-                        + spec.pcieSlots() + " " + slotFamily)
+                        + spec.pcieSlots() + "x " + spec.pcieGeneration())
                 .withStyle(ChatFormatting.GRAY));
+        HardwareTooltip.appendEra(tooltip, spec.era());
+        tooltip.add(Component.literal("Seats parts of its own era only")
+                .withStyle(ChatFormatting.DARK_GRAY));
     }
 }

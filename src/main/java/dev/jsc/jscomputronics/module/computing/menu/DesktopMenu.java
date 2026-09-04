@@ -18,7 +18,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * The server-side menu the Panes desktop opens on. It carries the bound monitor and host positions plus
+ * The server-side menu the Frames desktop opens on. It carries the bound monitor and host positions plus
  * the installed OS id and the machine name, so the client can rebuild the desktop shell. Being a real
  * menu (rather than a client-only screen) gives the desktop a synchronised carried cursor and lets the
  * inventory slots a window shows be true container slots — the basis for drag, shift-click and moving
@@ -44,6 +44,8 @@ public class DesktopMenu extends AbstractContainerMenu {
     private final BlockPos hostPos;
     private final ResourceLocation osId;
     private final String name;
+    /** The host computer's RAM buffer, so the desktop can model per-OS process/memory limits. */
+    private final int ramBuffer;
 
     /** Whether the 36 inventory slots are live this frame (true only while a Network Interactor window is focused). */
     private boolean slotsActive;
@@ -53,14 +55,26 @@ public class DesktopMenu extends AbstractContainerMenu {
     private int laidOutVpTop = Integer.MIN_VALUE;
     private int laidOutVpBottom = Integer.MIN_VALUE;
 
+    // The desktop environment the screen draws (the OS's bundled one, or the Linux package installed).
+    private final ResourceLocation desktopId;
+
     public DesktopMenu(final int containerId, final Inventory playerInventory, final BlockPos monitorPos,
-                       final BlockPos hostPos, final ResourceLocation osId, final String name) {
+                       final BlockPos hostPos, final ResourceLocation osId, final String name,
+                       final int ramBuffer) {
+        this(containerId, playerInventory, monitorPos, hostPos, osId, osId, name, ramBuffer);
+    }
+
+    public DesktopMenu(final int containerId, final Inventory playerInventory, final BlockPos monitorPos,
+                       final BlockPos hostPos, final ResourceLocation osId, final ResourceLocation desktopId,
+                       final String name, final int ramBuffer) {
         super(ComputingModule.DESKTOP_MENU.get(), containerId);
         this.playerInventory = playerInventory;
         this.monitorPos = monitorPos;
         this.hostPos = hostPos;
         this.osId = osId;
+        this.desktopId = desktopId == null ? osId : desktopId;
         this.name = name;
+        this.ramBuffer = ramBuffer;
         // The player's 36 inventory slots in vanilla order: 27 main (indices 9-35) then 9 hotbar (0-8). The
         // x/y are placeholders — the client recreates them with real positions when a window shows them
         // (Slot.x/y are final in 1.21.1, so following a moving window means rebuilding the slot at the new spot).
@@ -130,17 +144,39 @@ public class DesktopMenu extends AbstractContainerMenu {
         final BlockPos monitor = buf.readBlockPos();
         final BlockPos host = buf.readBlockPos();
         final ResourceLocation os = buf.readResourceLocation();
+        final ResourceLocation desktop = buf.readResourceLocation();
         final String machineName = buf.readUtf();
-        return new DesktopMenu(containerId, playerInventory, monitor, host, os, machineName);
+        final int ram = buf.readVarInt();
+        return new DesktopMenu(containerId, playerInventory, monitor, host, os, desktop, machineName, ram);
     }
 
-    /** Writes the open buffer the client reconstructs from: the two positions, the OS id, and the machine name. */
+    /** Writes the open buffer the client reconstructs from: the positions, the OS id, the name, and the RAM. */
     public static void writeOpenBuffer(final RegistryFriendlyByteBuf buf, final BlockPos monitorPos,
-                                       final BlockPos hostPos, final ResourceLocation osId, final String name) {
+                                       final BlockPos hostPos, final ResourceLocation osId, final String name,
+                                       final int ramBuffer) {
+        writeOpenBuffer(buf, monitorPos, hostPos, osId, osId, name, ramBuffer);
+    }
+
+    /** The full open buffer: positions, OS id, desktop environment id, name, RAM. */
+    public static void writeOpenBuffer(final RegistryFriendlyByteBuf buf, final BlockPos monitorPos,
+                                       final BlockPos hostPos, final ResourceLocation osId,
+                                       final ResourceLocation desktopId, final String name, final int ramBuffer) {
         buf.writeBlockPos(monitorPos);
         buf.writeBlockPos(hostPos);
         buf.writeResourceLocation(osId);
+        buf.writeResourceLocation(desktopId == null ? osId : desktopId);
         buf.writeUtf(name);
+        buf.writeVarInt(ramBuffer);
+    }
+
+    /** The desktop environment the screen draws (equals the OS id for the Frames editions). */
+    public ResourceLocation desktopId() {
+        return desktopId;
+    }
+
+    /** The host computer's RAM buffer (the desktop's per-OS memory model uses it). */
+    public int ramBuffer() {
+        return ramBuffer;
     }
 
     public BlockPos monitorPos() {
@@ -174,9 +210,12 @@ public class DesktopMenu extends AbstractContainerMenu {
         if (!(player.level().getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor)) {
             return false;
         }
-        final BlockPos owner = monitor.ownerPos();
-        return owner != null && owner.equals(hostPos)
+        // The screen may be showing this machine because it is cabled to it, or because a Remote
+        // Control session put it there.
+        return monitor.shows(hostPos)
                 && player.distanceToSqr(monitorPos.getX() + 0.5, monitorPos.getY() + 0.5,
-                monitorPos.getZ() + 0.5) <= 64.0;
+                monitorPos.getZ() + 0.5) <= 64.0
+                // The desktop dies with its machine: powering off or pulling the system disk closes it.
+                && CommandPromptMenu.sessionAlive(player.level(), hostPos);
     }
 }

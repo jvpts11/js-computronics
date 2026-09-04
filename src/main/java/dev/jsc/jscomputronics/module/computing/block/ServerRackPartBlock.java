@@ -12,7 +12,6 @@ import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity;
-import dev.jsc.jscomputronics.module.computing.item.ServerItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -43,6 +42,12 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
     public static final BooleanProperty TOP = BooleanProperty.create("top");
 
     public static final BooleanProperty FRONT = BooleanProperty.create("front");
+    /**
+     * Whether this part belongs to a Supercomputer Rack. The parts are one shared block, and a model
+     * cannot ask the controller what cabinet it is, so the controller stamps the cabinet type on each
+     * part it raises — that is what lets the whole cabinet wear one livery, not just its base block.
+     */
+    public static final BooleanProperty COMPUTE = BooleanProperty.create("compute");
 
     public static final net.minecraft.world.level.block.state.properties.DirectionProperty FACING =
             net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING;
@@ -52,8 +57,15 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
         registerDefaultState(stateDefinition.any()
                 .setValue(TOP, false)
                 .setValue(FRONT, false)
+                .setValue(COMPUTE, false)
                 .setValue(FACING, net.minecraft.core.Direction.NORTH)
                 .setValue(ServerRackBlock.BAYS, 0));
+    }
+
+    /** A part is collision and a link back to the controller; the cabinet model is drawn from there. */
+    @Override
+    protected net.minecraft.world.level.block.RenderShape getRenderShape(final BlockState state) {
+        return net.minecraft.world.level.block.RenderShape.INVISIBLE;
     }
 
     @Override
@@ -67,8 +79,17 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
     }
 
     @Override
+    public boolean connectsOnFace(final BlockState state, final net.minecraft.core.Direction face,
+                                  final DataTier tier) {
+        // A compute cabinet is on the high-compute fabric only; a server cabinet takes every data tier but
+        // that one. The cable's rendered nub and the cabinet's own link follow this same rule, so a data
+        // cable on a supercomputer cabinet neither shows a connection nor makes one.
+        return state.getValue(COMPUTE) == (tier == DataTier.HPC);
+    }
+
+    @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(TOP, FRONT, FACING, ServerRackBlock.BAYS);
+        builder.add(TOP, FRONT, COMPUTE, FACING, ServerRackBlock.BAYS);
     }
 
     @Nullable
@@ -88,15 +109,11 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
         if (level.isClientSide()) {
             return ItemInteractionResult.sidedSuccess(true);
         }
-        final ServerRackBlockEntity rack = controllerOf(level, pos);
-        if (rack != null && stack.getItem() instanceof ServerItem) {
-            final var servers = rack.getServers();
-            for (int i = 0; i < servers.getSlots(); i++) {
-                if (servers.getStackInSlot(i).isEmpty()) {
-                    servers.setStackInSlot(i, stack.split(1));
-                    return ItemInteractionResult.sidedSuccess(false);
-                }
-            }
+        if (level.getBlockEntity(pos) instanceof ServerRackPartBlockEntity part
+                && part.controllerPos() != null
+                && level.getBlockEntity(part.controllerPos()) instanceof ServerRackBlockEntity rack) {
+            // The part knows its cabinet; the row under the crosshair is resolved against the controller.
+            return ServerRackBlock.mountFromHand(rack, part.controllerPos(), pos, stack, player, hit);
         }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
@@ -111,10 +128,28 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
             final BlockPos controllerPos = part.controllerPos();
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new dev.jsc.jscomputronics.module.computing.menu.ServerRackMenu(id, inv, rack),
-                    Component.translatable("block.jsc.server_rack")),
+                    // The cabinet names itself; every era and the compute cabinet have their own.
+                    rack.getBlockState().getBlock().getName()),
                     buf -> buf.writeBlockPos(controllerPos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
+    }
+
+    /**
+     * A part has no item of its own, so the middle mouse button used to pick nothing at all from eleven of
+     * the cabinet's twelve blocks. It answers with what the cabinet would: the machine under the crosshair,
+     * or the cabinet itself.
+     */
+    @Override
+    public ItemStack getCloneItemStack(final BlockState state, final net.minecraft.world.phys.HitResult target,
+                                       final net.minecraft.world.level.LevelReader level, final BlockPos pos,
+                                       final Player player) {
+        if (level.getBlockEntity(pos) instanceof ServerRackPartBlockEntity part && part.controllerPos() != null
+                && level.getBlockEntity(part.controllerPos()) instanceof ServerRackBlockEntity rack
+                && rack.getBlockState().getBlock() instanceof ServerRackBlock cabinet) {
+            return ServerRackBlock.pickFrom(rack, part.controllerPos(), pos, target, cabinet.blockItem());
+        }
+        return super.getCloneItemStack(state, target, level, pos, player);
     }
 
     @Override

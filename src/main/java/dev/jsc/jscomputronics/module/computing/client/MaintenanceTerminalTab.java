@@ -20,6 +20,9 @@ final class MaintenanceTerminalTab extends AbstractTerminalTab {
     private static final int MNT_TILE_ROW2_Y = 56;
     private static final int MNT_TILE_H = 22;
     private static final int MNT_ACTIONS_Y = 82;
+    // The health strip takes the ACTIONS caption's line when the index needs attention: the state of
+    // the index is worth more than a decorative label, and the layout below stays where it was.
+    private static final int MNT_HEALTH_H = 10;
     private static final int MNT_BTN_ROW1_Y = 94;
     private static final int MNT_BTN_REINDEX_Y = 112;
     private static final int MNT_BTN_DROP_Y = 130;
@@ -42,6 +45,14 @@ final class MaintenanceTerminalTab extends AbstractTerminalTab {
                 g.fill(tx, ty, tx + tileW, ty + 1, LINE());
             }
         }
+        final var health = menu.indexHealth();
+        if (health != dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.OK) {
+            final int stripY = cy + MNT_ACTIONS_Y - 1;
+            final int base = health == dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.FRAGMENTED
+                    ? 0xFF7A3A14 : 0xFF6E5A16;
+            g.fill(cx, stripY, cx + cw, stripY + MNT_HEALTH_H, base);
+            g.fill(cx, stripY, cx + cw, stripY + 1, 0x55FFFFFF);
+        }
         final int halfW = (cw - 4) / 2;
         maintBtnBg(g, mouseX, mouseY, cx, cy + MNT_BTN_ROW1_Y, halfW, 0xFF1C6F86, 0xFF2A93AE);
         maintBtnBg(g, mouseX, mouseY, cx + halfW + 4, cy + MNT_BTN_ROW1_Y, halfW, 0xFF1C6F86, 0xFF2A93AE);
@@ -60,7 +71,21 @@ final class MaintenanceTerminalTab extends AbstractTerminalTab {
         final long total = menu.networkStorageTotal();
         tile(g, cx + tileW + 4, cy + MNT_TILE_ROW2_Y, "STORAGE",
                 total <= 0 ? "0" : fmt(used) + "/" + fmt(total), "");
-        g.drawString(font(), "ACTIONS", cx, cy + MNT_ACTIONS_Y, DIM(), false);
+        final var health = menu.indexHealth();
+        if (health == dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.OK) {
+            g.drawString(font(), "ACTIONS", cx, cy + MNT_ACTIONS_Y, DIM(), false);
+        } else {
+            // Name the state, how many item types are in doubt, and the run that settles it.
+            final int types = menu.indexHealthTypes();
+            final String action = health
+                    == dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.FRAGMENTED
+                    ? "VACUUM" : "REINDEX";
+            g.drawString(font(), health.name() + " - " + types + " item type"
+                    + (types == 1 ? "" : "s") + " affected", cx + 2, cy + MNT_ACTIONS_Y, 0xFFFFFFFF, false);
+            final String hint = "run " + action;
+            g.drawString(font(), hint, cx + cw - 2 - font().width(hint), cy + MNT_ACTIONS_Y,
+                    0xFFFFE0A0, false);
+        }
         final int halfW = (cw - 4) / 2;
         g.drawCenteredString(font(), "ANALYZE", cx + halfW / 2, cy + MNT_BTN_ROW1_Y + 4, 0xFFFFFFFF);
         g.drawCenteredString(font(), "VACUUM", cx + halfW + 4 + halfW / 2, cy + MNT_BTN_ROW1_Y + 4, 0xFFFFFFFF);

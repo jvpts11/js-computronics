@@ -36,7 +36,7 @@ class NetworkSystemServerRegistryTest {
     @Test
     void emptyRegistry_returnsZeroTotalStorage() {
         NetworkSystem ns = new NetworkSystem();
-        assertEquals(0L, ns.totalStorageOf(net()));
+        assertEquals(0L, ns.totalStorageItemsOf(net()));
     }
 
     @Test
@@ -77,8 +77,8 @@ class NetworkSystemServerRegistryTest {
 
         assertEquals(1, ns.serversOf(netA).size());
         assertEquals(1, ns.serversOf(netB).size());
-        assertEquals(1024L, ns.serversOf(netA).get(0).storageMB());
-        assertEquals(2048L, ns.serversOf(netB).get(0).storageMB());
+        assertEquals(1024L, ns.serversOf(netA).get(0).storageItems());
+        assertEquals(2048L, ns.serversOf(netB).get(0).storageItems());
     }
 
     @Test
@@ -89,7 +89,7 @@ class NetworkSystemServerRegistryTest {
         ns.registerServer(new ServerNode(node(), networkUuid, 2048L));
         ns.registerServer(new ServerNode(node(), networkUuid, 4096L));
 
-        assertEquals(7168L, ns.totalStorageOf(networkUuid));
+        assertEquals(7168L, ns.totalStorageItemsOf(networkUuid));
     }
 
     @Test
@@ -100,8 +100,8 @@ class NetworkSystemServerRegistryTest {
         ns.registerServer(new ServerNode(node(), netA, 1024L));
         ns.registerServer(new ServerNode(node(), netB, 2048L));
 
-        assertEquals(1024L, ns.totalStorageOf(netA));
-        assertEquals(2048L, ns.totalStorageOf(netB));
+        assertEquals(1024L, ns.totalStorageItemsOf(netA));
+        assertEquals(2048L, ns.totalStorageItemsOf(netB));
     }
 
     @Test
@@ -130,6 +130,6 @@ class NetworkSystemServerRegistryTest {
         ns.clear();
 
         assertTrue(ns.serversOf(networkUuid).isEmpty());
-        assertEquals(0L, ns.totalStorageOf(networkUuid));
+        assertEquals(0L, ns.totalStorageItemsOf(networkUuid));
     }
 }

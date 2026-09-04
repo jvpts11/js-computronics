@@ -267,7 +267,7 @@ public final class CraftingGameTests {
         final Network net = buildCraftingNetwork(helper);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    net.rack.getServers().setStackInSlot(1, ComputingModule.defaultServer());
+                    TestWorldBuilder.mountDefaultServer(net.rack, 1);
                     net.cc.loadPattern(planksPattern(4));
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -319,11 +319,11 @@ public final class CraftingGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    // One server per bay block now: slot 0 = controller, slot 1 = second column,
-                    // slot 2 = the block above the controller.
+                    // Each visual bay block covers two rack-unit rows (bay b = rows 2b and 2b+1),
+                    // so servers in U0, U2 and U4 light the controller, second column and upper bay.
                     rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
-                    rackBe.getServers().setStackInSlot(1, ComputingModule.defaultServer());
                     rackBe.getServers().setStackInSlot(2, ComputingModule.defaultServer());
+                    rackBe.getServers().setStackInSlot(4, ComputingModule.defaultServer());
                 })
                 .thenExecuteAfter(SETTLE, () -> {
                     final var bays = dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS;
@@ -339,7 +339,7 @@ public final class CraftingGameTests {
                                     .bayBlockPos(rack, facing, 0, 1));
                     helper.assertTrue(helper.getBlockState(upper).getValue(bays) == 3,
                             "the upper bay lights up for its server");
-                    rackBe.getServers().setStackInSlot(1, ItemStack.EMPTY);
+                    rackBe.getServers().setStackInSlot(2, ItemStack.EMPTY);
                 })
                 .thenExecuteAfter(SETTLE, () -> {
                     final var bays = dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS;
@@ -377,15 +377,6 @@ public final class CraftingGameTests {
                                     == dev.jsc.jscomputronics.module.computing.blockentity
                                     .HbwInterfaceBlockEntity.SLOT_UNDER_RATED,
                             "a 5100 in slot 3 is flagged under-rated, never crashes");
-                    // The console finds the interface through the node chain.
-                    final BlockPos consolePos = new BlockPos(6, 2, 2);
-                    helper.setBlock(consolePos, ComputingModule.SUPERCOMPUTER_CONSOLE.get());
-                    if (helper.getBlockEntity(consolePos)
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                                    .SupercomputerConsoleBlockEntity console) {
-                        helper.assertTrue(console.findInterface() == be,
-                                "the console walks the nodes to the interface");
-                    }
                 })
                 .thenSucceed();
     }
@@ -508,31 +499,23 @@ public final class CraftingGameTests {
         return ccBe;
     }
 
+    /**
+     * A cluster the way a player wires one: the HBW Interface, a run of high-compute cable east of it,
+     * and one Supercomputer Rack hanging off each cable block, each rack seating one node. Racks are
+     * leaves on the fabric, so they sit beside the cable run rather than in it.
+     */
     private static void placeCluster(final GameTestHelper helper, final BlockPos hub, final int nodes) {
         helper.setBlock(hub, ComputingModule.HBW_INTERFACE.get());
         for (int i = 1; i <= nodes; i++) {
-            final BlockPos pos = hub.east(i);
-            helper.setBlock(pos, ComputingModule.SUPERCOMPUTER_NODE.get());
-            if (helper.getBlockEntity(pos)
-                    instanceof dev.jsc.jscomputronics.module.computing.blockentity
-                            .SupercomputerNodeBlockEntity node) {
-                final var hw = node.getHardware();
-                hw.setStackInSlot(dev.jsc.jscomputronics.module.computing.blockentity
-                        .SupercomputerNodeBlockEntity.MOTHERBOARD_SLOT,
-                        new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
-                hw.setStackInSlot(dev.jsc.jscomputronics.module.computing.blockentity
-                        .SupercomputerNodeBlockEntity.CPU_SLOT,
-                        new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-                hw.setStackInSlot(dev.jsc.jscomputronics.module.computing.blockentity
-                        .SupercomputerNodeBlockEntity.RAM_SLOTS_START,
-                        new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-                hw.setStackInSlot(dev.jsc.jscomputronics.module.computing.blockentity
-                        .SupercomputerNodeBlockEntity.PHI_SLOT,
-                        new ItemStack(ComputingModule.PHI_5100.get()));
-                hw.setStackInSlot(dev.jsc.jscomputronics.module.computing.blockentity
-                        .SupercomputerNodeBlockEntity.PSU_SLOT,
-                        new ItemStack(ComputingModule.PSU_650G.get()));
-                node.togglePower();
+            final BlockPos cable = hub.east(i);
+            helper.setBlock(cable, ComputingModule.HPC_CABLE.get());
+            // Above the cable, not beside it: the fixtures' computers and cables occupy the row in
+            // front, and a rack dropped there would overwrite them.
+            final BlockPos rackPos = cable.above();
+            helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
+            if (helper.getBlockEntity(rackPos)
+                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack) {
+                rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
             }
         }
     }

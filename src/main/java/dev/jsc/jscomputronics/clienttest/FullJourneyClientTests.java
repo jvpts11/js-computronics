@@ -90,7 +90,7 @@ public final class FullJourneyClientTests {
     private static final BlockPos ENCODER = new BlockPos(10, 2, 5);
 
     private static final ResourceLocation NETWORK_OS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_net");
-    private static final ResourceLocation PANES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "panes_95");
+    private static final ResourceLocation FRAMES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "frames_95");
 
     // Assembly GUI slot centres (window-relative): the Mainframe and Crafting Computer share the left column.
     private static final int MOBO_X = 16;
@@ -114,9 +114,12 @@ public final class FullJourneyClientTests {
     private static final int CC_HOTBAR_Y = CraftingComputerLayout.INV_Y + 58 + 8;
     private static final int CC_POWER_X = CraftingComputerLayout.POWER_X + CraftingComputerLayout.COL_R_W / 2;
     private static final int CC_POWER_Y = CraftingComputerLayout.POWER_Y + CraftingComputerLayout.BTN_H / 2;
-    private static final int RACK_SLOT_X = 20;
-    private static final int RACK_SLOT_Y = 79;
-    private static final int RACK_HOTBAR_Y = 148 + 58 + 8;
+    private static final int RACK_SLOT_X = dev.jsc.jscomputronics.module.computing.gui.layout
+            .ServerRackLayout.SERVER_X + 8;
+    private static final int RACK_SLOT_Y = dev.jsc.jscomputronics.module.computing.gui.layout
+            .ServerRackLayout.ROW_Y0 + 8;
+    private static final int RACK_HOTBAR_Y = dev.jsc.jscomputronics.module.computing.gui.layout
+            .ServerRackLayout.HOTBAR_Y + 8;
     private static final int FURNACE_FUEL_X = 64;
     private static final int FURNACE_FUEL_Y = 61;
     private static final int FURNACE_HOTBAR_Y = 150;
@@ -256,7 +259,15 @@ public final class FullJourneyClientTests {
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT)
                 .thenWaitUntilServer(level -> rack(ctx, level) != null && !rack(ctx, level).getServers().getStackInSlot(0).isEmpty(),
-                        SCREEN_WAIT, "the server to sit in the rack", level -> "rack=" + rack(ctx, level));
+                        SCREEN_WAIT, "the server to sit in the rack", level -> "rack=" + rack(ctx, level))
+                // Storage lives on the rack's front-panel bay drives now, and the interim rack GUI has
+                // no hotswap slots yet, so the drives go in server-side; the rack GUI rework will make
+                // this a player action.
+                .thenServer(SETTLE, level -> {
+                    final var rackBe = rack(ctx, level);
+                    rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+                    rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
+                });
 
         // ---- 5. Assemble the Crafting Computer (card + GPU) and power it on.
         ctx.thenGive(0, new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()), new ItemStack(ComputingModule.CPU_ASCENT_965.get()),
@@ -281,9 +292,9 @@ public final class FullJourneyClientTests {
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
 
-        // ---- 6. Panes 95 from a CD through the firmware on the Crafting Computer's monitor, then reboot.
+        // ---- 6. Frames 95 from a CD through the firmware on the Crafting Computer's monitor, then reboot.
         ctx.thenGive(0, new ItemStack(ComputingModule.CD_DRIVE.get()), new ItemStack(ComputingModule.MONITOR.get()),
-                        installer(new ItemStack(ComputingModule.CD_ROM.get()), MediaKind.OS_INSTALL, PANES_95))
+                        installer(new ItemStack(ComputingModule.CD_ROM.get()), MediaKind.OS_INSTALL, FRAMES_95))
                 .thenTeleport(SETTLE, new BlockPos(9, 2, 2), Direction.WEST)
                 .then(SETTLE, () -> ctx.selectHotbar(0))
                 .thenPlace(1, CC_CD_DRIVE)
@@ -294,7 +305,7 @@ public final class FullJourneyClientTests {
                 .thenPlace(1, CC_MONITOR)
                 .thenWaitUntilServer(level -> reader(ctx, level, CC_CD_DRIVE).ownerPos() != null
                                 && !reader(ctx, level, CC_CD_DRIVE).mediaSlot().getStackInSlot(0).isEmpty(),
-                        SCREEN_WAIT, "the CD drive to link to the Crafting Computer and hold the Panes 95 disc",
+                        SCREEN_WAIT, "the CD drive to link to the Crafting Computer and hold the Frames 95 disc",
                         level -> "owner=" + reader(ctx, level, CC_CD_DRIVE).ownerPos())
                 .then(2, () -> ctx.selectHotbar(8))
                 .thenRightClick(SETTLE, CC_MONITOR)
@@ -305,7 +316,7 @@ public final class FullJourneyClientTests {
                     ctx.click(install[0], install[1]);
                 })
                 .thenWaitUntilServer(level -> cc(ctx, level).hasOs(), SCREEN_WAIT,
-                        "the firmware to install Panes 95 from the linked CD drive", level -> "hasOs=" + cc(ctx, level).hasOs())
+                        "the firmware to install Frames 95 from the linked CD drive", level -> "hasOs=" + cc(ctx, level).hasOs())
                 .thenAwaitNoScreen(SCREEN_WAIT)
                 .thenTeleport(SETTLE, new BlockPos(7, 2, 0), Direction.SOUTH)
                 .thenRightClick(SETTLE, CRAFTING_COMPUTER)
@@ -314,7 +325,7 @@ public final class FullJourneyClientTests {
                 .thenWaitUntilServer(level -> !cc(ctx, level).isRunning(), SCREEN_WAIT, "the Crafting Computer to power off",
                         level -> "running=" + cc(ctx, level).isRunning())
                 .then(SETTLE, () -> ctx.clickGui(CC_POWER_X, CC_POWER_Y))
-                .thenWaitUntilServer(level -> cc(ctx, level).isRunning(), SCREEN_WAIT, "the Crafting Computer to boot Panes 95",
+                .thenWaitUntilServer(level -> cc(ctx, level).isRunning(), SCREEN_WAIT, "the Crafting Computer to boot Frames 95",
                         level -> "running=" + cc(ctx, level).isRunning())
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
@@ -336,7 +347,7 @@ public final class FullJourneyClientTests {
                 .then(SETTLE, () -> ctx.selectHotbar(8))
                 .thenRightClick(1, CC_MONITOR)
                 .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
-                .thenScreenshot(SETTLE, "07-panes-desktop")
+                .thenScreenshot(SETTLE, "07-frames-desktop")
                 .then(0, () -> launch(ctx, "This PC"))
                 .thenWaitUntil(() -> app(ctx, "This PC", ThisPcApp.class) != null
                                 && firstInstallable(app(ctx, "This PC", ThisPcApp.class)) >= 0,

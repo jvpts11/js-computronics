@@ -25,6 +25,26 @@ public final class BuiltinCommands {
     }
 
     /** Every built-in command, in the order they appear in {@code help}. */
+    /** The DOS-only verbs: everything else in {@link #all()} is shared with the POSIX shell. */
+    private static final java.util.Set<String> DOS_ONLY = java.util.Set.of(
+            "cls", "dir", "cd", "type", "del", "write", "run", "mkdir", "rmdir", "copy", "move", "ren",
+            // The POSIX shell formats with mkfs and removes packages through its package manager.
+            "format", "uninstall",
+            // pckmgr is the Frames package manager: a Linux distribution keeps apt/dnf/pacman/emerge,
+            // and offering both on the same shell would be two doors to one room.
+            "pckmgr");
+
+    /** The verbs both shell families share (network, programs, config, maintenance); no DOS file verbs. */
+    public static List<CliCommand> shared() {
+        final List<CliCommand> out = new java.util.ArrayList<>();
+        for (final CliCommand command : all()) {
+            if (!DOS_ONLY.contains(command.name())) {
+                out.add(command);
+            }
+        }
+        return out;
+    }
+
     public static List<CliCommand> all() {
         return List.of(
                 new Help(),
@@ -41,6 +61,9 @@ public final class BuiltinCommands {
                 new Ops(),
                 new Operation(),
                 new Devices(),
+                new Ssh(),
+                new Exit(),
+                new Pckmgr(),
                 new ProgramsList(),
                 new Install(),
                 new Store(),
@@ -49,11 +72,23 @@ public final class BuiltinCommands {
                 new Maint("analyze", "analyze"),
                 new Maint("reindex", "reindex"),
                 new Maint("vacuum", "vacuum"),
+                new Config(),
+                new Reboot(),
+                new ClusterCommand(),
+                new MirrorCommand(),
+                new Uninstall(),
+                new Format(),
                 new Dir(),
+                new Cd(),
                 new Type(),
                 new Del(),
                 new Write(),
-                new Run());
+                new Run(),
+                new Mkdir(),
+                new Rmdir(),
+                new Copy(),
+                new Move(),
+                new Ren());
     }
 
     private static String group(final long n) {
@@ -68,7 +103,7 @@ public final class BuiltinCommands {
         }
 
         @Override public List<String> aliases() {
-            return List.of("?", "man", "commands");
+            return List.of("?", "commands");
         }
 
         @Override public String summary() {
@@ -106,11 +141,7 @@ public final class BuiltinCommands {
 
     static final class Clear implements CliCommand, CliShell.ClearMarker {
         @Override public String name() {
-            return "clear";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("cls");
+            return "cls";
         }
 
         @Override public String summary() {
@@ -199,6 +230,190 @@ public final class BuiltinCommands {
         }
     }
 
+    /**
+     * A remote shell on another machine of the same network — the route that makes a headless rack
+     * server administrable from any terminal. {@code ssh} with no argument lists what is reachable;
+     * {@code exit} on a connected session comes back to the local shell.
+     */
+    static final class Ssh implements CliCommand {
+        @Override public String name() {
+            return "ssh";
+        }
+
+        @Override public String summary() {
+            return "open a shell on another computer of this network";
+        }
+
+        @Override public String usage() {
+            return "ssh [hostname]";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            final CliComputer computer = ctx.computer();
+            if (!ctx.hasArgs()) {
+                final List<CliComputer.RemoteHost> hosts = computer.reachableHosts();
+                if (hosts.isEmpty()) {
+                    ctx.out().error("ssh: no other computers reachable on this network");
+                    return;
+                }
+                ctx.out().line("Reachable hosts:");
+                for (final CliComputer.RemoteHost host : hosts) {
+                    // Name what the player can actually type: the host name, the machine's own name
+                    // and its node id all address it.
+                    final StringBuilder detail = new StringBuilder();
+                    if (!host.name().isEmpty() && !host.name().equalsIgnoreCase(host.hostname())) {
+                        detail.append('"').append(host.name()).append("\"  ");
+                    }
+                    detail.append("node ").append(host.nodeId()).append("  ").append(host.type());
+                    if (!host.os().isEmpty()) {
+                        detail.append("  ").append(host.os());
+                    }
+                    if (!host.running()) {
+                        detail.append("  (offline)");
+                    }
+                    ctx.out().row("  " + host.hostname(), detail.toString());
+                }
+                ctx.out().line("");
+                ctx.out().line("ssh <host name | machine name | node | os> to connect; exit to come back.");
+                return;
+            }
+            final CliComputer.OpResult result = computer.sshConnect(ctx.arg(0));
+            if (result.ok()) {
+                ctx.out().ok(result.message());
+            } else {
+                ctx.out().error(result.message());
+            }
+        }
+    }
+
+    /**
+     * The package manager every Frames edition ships with: one verb set over the network Mirror, so a
+     * player who never touches a Linux distribution still installs, removes, searches and updates
+     * software the same way. Linux distributions keep their own managers (apt, dnf, pacman, emerge);
+     * this is the Frames-side equivalent, and it speaks to the same Mirror.
+     */
+    static final class Pckmgr implements CliCommand {
+        @Override public String name() {
+            return "pckmgr";
+        }
+
+        @Override public String summary() {
+            return "install, remove, search and update packages from the network mirror";
+        }
+
+        @Override public String usage() {
+            return "pckmgr install|remove|search|list|update [name]";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            final CliComputer computer = ctx.computer();
+            final String verb = ctx.hasArgs() ? ctx.arg(0).toLowerCase(Locale.ROOT) : "";
+            switch (verb) {
+                case "install" -> requireName(ctx, computer::packageInstall);
+                case "remove", "uninstall" -> requireName(ctx, computer::packageRemove);
+                case "update", "upgrade" -> report(ctx, computer.packageUpdate());
+                // search always looks at the whole shelf; list shows this computer's packages unless
+                // --available asks for everything the mirror offers.
+                case "search" -> listPackages(ctx, ctx.argCount() > 1 ? ctx.arg(1) : "", false);
+                case "list" -> {
+                    final String flag = ctx.argCount() > 1 ? ctx.arg(1) : "";
+                    // A mistyped flag must say so: silently listing something else is how a typo
+                    // becomes "the feature is broken".
+                    if (!flag.isEmpty() && !flag.equalsIgnoreCase("--available")) {
+                        ctx.out().error("pckmgr list: unknown option " + flag + " (did you mean --available?)");
+                    } else {
+                        listPackages(ctx, "", flag.isEmpty());
+                    }
+                }
+                default -> {
+                    ctx.out().error("usage: " + usage());
+                    ctx.out().line("  install <name>   fetch and set up a package");
+                    ctx.out().line("  remove <name>    uninstall a package");
+                    ctx.out().line("  search [text]    find packages the mirror offers");
+                    ctx.out().line("  list [--available]  installed packages, or everything on offer");
+                    ctx.out().line("  update           bring installed packages to the current build");
+                }
+            }
+        }
+
+        private static void requireName(final CliContext ctx,
+                                        final java.util.function.Function<String, CliComputer.OpResult> action) {
+            if (ctx.argCount() < 2) {
+                ctx.out().error("pckmgr: this verb needs a package name");
+                return;
+            }
+            report(ctx, action.apply(ctx.arg(1)));
+        }
+
+        private static void report(final CliContext ctx, final CliComputer.OpResult result) {
+            if (result.ok()) {
+                ctx.out().ok(result.message());
+            } else {
+                ctx.out().error(result.message());
+            }
+        }
+
+        /**
+         * Lists packages from the mirror, marking what this computer already has.
+         *
+         * @param filter        matches name or description; empty matches everything
+         * @param onlyInstalled true for plain {@code list} (this computer's packages), false for
+         *                      {@code search} and {@code list --available} (the whole shelf)
+         */
+        private static void listPackages(final CliContext ctx, final String filter,
+                                         final boolean onlyInstalled) {
+            final List<CliComputer.PackageInfo> packages = ctx.computer().packagesAvailable();
+            if (packages.isEmpty()) {
+                ctx.out().error("could not resolve mirror:// - no package source reachable");
+                return;
+            }
+            final String needle = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
+            int shown = 0;
+            for (final CliComputer.PackageInfo info : packages) {
+                if (onlyInstalled && !info.installed()) {
+                    continue;
+                }
+                if (!needle.isEmpty() && !info.name().toLowerCase(Locale.ROOT).contains(needle)
+                        && !info.description().toLowerCase(Locale.ROOT).contains(needle)) {
+                    continue;
+                }
+                final String state = info.building() ? "building"
+                        : info.installed() ? "installed" : "available";
+                ctx.out().row("  " + info.name() + "  [" + state + "]", info.description());
+                shown++;
+            }
+            if (shown == 0) {
+                ctx.out().line(onlyInstalled ? "No packages installed."
+                        : needle.isEmpty() ? "The mirror offers nothing for this computer."
+                                : "No package matches " + filter + ".");
+            }
+        }
+    }
+
+    /** Leaves a remote shell. With no session open there is nothing to leave but the window. */
+    static final class Exit implements CliCommand {
+        @Override public String name() {
+            return "exit";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("logout");
+        }
+
+        @Override public String summary() {
+            return "close the remote shell and return to this computer";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            final CliComputer.OpResult result = ctx.computer().sshDisconnect();
+            if (result.ok()) {
+                ctx.out().ok(result.message());
+            } else {
+                ctx.out().error(result.message());
+            }
+        }
+    }
+
     static final class Net implements CliCommand {
         @Override public String name() {
             return "net";
@@ -282,10 +497,6 @@ public final class BuiltinCommands {
     static final class Find implements CliCommand {
         @Override public String name() {
             return "find";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("locate");
         }
 
         @Override public String summary() {
@@ -406,7 +617,7 @@ public final class BuiltinCommands {
         }
 
         @Override public List<String> aliases() {
-            return List.of("jobs", "ps");
+            return List.of("jobs");
         }
 
         @Override public String summary() {
@@ -503,6 +714,67 @@ public final class BuiltinCommands {
         }
     }
 
+    static final class Uninstall implements CliCommand {
+        @Override public String name() {
+            return "uninstall";
+        }
+
+        @Override public String summary() {
+            return "remove an installed program from this computer";
+        }
+
+        @Override public String usage() {
+            return "<program-id>";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: uninstall <program-id>   (see 'programs')");
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().packageRemove(ctx.arg(0));
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    static final class Format implements CliCommand {
+        @Override public String name() {
+            return "format";
+        }
+
+        @Override public String summary() {
+            return "erase everything on a drive";
+        }
+
+        @Override public String usage() {
+            return "<drive>: [/y]";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: format <drive>: [/y]");
+                return;
+            }
+            final String arg = ctx.arg(0).toUpperCase(Locale.ROOT);
+            if (arg.isEmpty() || !Character.isLetter(arg.charAt(0))) {
+                ctx.out().error("format: invalid drive: " + ctx.arg(0));
+                return;
+            }
+            final char drive = arg.charAt(0);
+            // The real format asks before destroying a volume; a stateless shell asks for the /y flag.
+            final boolean confirmed = ctx.argCount() > 1 && ctx.arg(1).equalsIgnoreCase("/y");
+            if (!confirmed) {
+                ctx.out().styled("WARNING: ALL DATA ON DRIVE " + drive + ": WILL BE LOST!", CliStyle.ERROR);
+                ctx.out().dim("Run 'format " + drive + ": /y' to proceed.");
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().formatDrive(drive);
+            for (final String line : result.message().split("\n", -1)) {
+                ctx.out().styled(line, result.ok() ? CliStyle.OK : CliStyle.ERROR);
+            }
+        }
+    }
+
     static final class Store implements CliCommand {
         @Override public String name() {
             return "store";
@@ -518,7 +790,7 @@ public final class BuiltinCommands {
 
         @Override public void run(final CliContext ctx) {
             boolean any = false;
-            for (final dev.jsc.jscomputronics.module.computing.program.Program program
+            for (final dev.jsc.jscomputronics.module.computing.os.ProgramSpec program
                     : dev.jsc.jscomputronics.module.computing.program.Programs.all()) {
                 if (program.preinstalled()) {
                     continue;
@@ -562,10 +834,6 @@ public final class BuiltinCommands {
     static final class Services implements CliCommand {
         @Override public String name() {
             return "services";
-        }
-
-        @Override public List<String> aliases() {
-            return List.of("ps");
         }
 
         @Override public String summary() {
@@ -617,35 +885,107 @@ public final class BuiltinCommands {
      * Lists the files on the system disk. Each entry shows the file name, its size in mB-equivalents,
      * and a {@code [RO]} marker for read-only {@code .dat} projection entries.
      */
+    /**
+     * Restarts the computer. With {@code --firmware} the restart lands in the firmware setup (the boot
+     * manager) instead of the installed OS, which is how the player reaches it once a system is installed.
+     */
+    /** Installs or reports the Mirror, the Mainframe's package repository the Linux package managers use. */
+    static final class MirrorCommand implements CliCommand {
+        @Override public String name() { return "mirror"; }
+
+        @Override public String summary() { return "install or check the Mirror package service on the Mainframe"; }
+
+        @Override public String usage() { return "install|status"; }
+
+        @Override public void run(final CliContext ctx) {
+            final CliComputer.OpResult result = ctx.computer().mirrorControl(ctx.hasArgs() ? ctx.arg(0) : "status");
+            if (result.ok()) {
+                ctx.out().ok(result.message());
+            } else {
+                ctx.out().error(result.message());
+            }
+        }
+    }
+
+    static final class Reboot implements CliCommand {
+        @Override public String name() { return "reboot"; }
+
+        @Override public List<String> aliases() { return List.of("restart"); }
+
+        @Override public String summary() { return "restart the computer (--firmware: into the firmware setup)"; }
+
+        @Override public String usage() { return "[--firmware]"; }
+
+        @Override public void run(final CliContext ctx) {
+            final boolean firmware = ctx.hasArgs() && ctx.arg(0).equals("--firmware");
+            if (firmware) {
+                ctx.out().dim("Restarting into the firmware setup ...");
+                ctx.computer().requestFirmwareReboot();
+            } else {
+                ctx.out().dim("The system is going down for reboot NOW!");
+                ctx.computer().requestReboot();
+            }
+        }
+    }
+
     static final class Dir implements CliCommand {
         @Override public String name() { return "dir"; }
 
-        @Override public List<String> aliases() { return List.of("ls"); }
-
-        @Override public String summary() { return "list files on the system disk"; }
+        @Override public String summary() { return "list the contents of a directory"; }
 
         @Override public String usage() { return "[directory]"; }
 
         @Override public void run(final CliContext ctx) {
-            final String dir = ctx.hasArgs() ? ctx.arg(0) : "";
+            final String dir = ctx.hasArgs() ? ctx.rest(0) : "";
             final CliComputer.FsResult result = ctx.computer().listDisk(dir);
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
             }
+            ctx.out().accent(" Directory of "
+                    + DosPath.resolve(ctx.computer().currentLocation(), dir).dosPath());
+            ctx.out().blank();
             final List<CliComputer.FsEntry> entries = result.entries();
             if (entries.isEmpty()) {
-                ctx.out().dim("(no files)");
+                ctx.out().dim("File Not Found");
                 return;
             }
+            int dirs = 0;
+            int files = 0;
+            long bytes = 0L;
             for (final CliComputer.FsEntry entry : entries) {
-                final String label = entry.path() + "." + entry.ext()
-                        + (entry.readOnly() ? "  [RO]" : "");
-                ctx.out().row(label, entry.weightMbEq() + " mB");
+                final String stamp = formatStamp(entry.modified());
+                if (entry.isDir()) {
+                    dirs++;
+                    ctx.out().row(entry.name() + "  <DIR>", stamp);
+                } else {
+                    files++;
+                    bytes += entry.weightMbEq();
+                    final String label = entry.name() + (entry.readOnly() ? "  [RO]" : "");
+                    ctx.out().row(label, group(entry.weightMbEq()) + " mB   " + stamp);
+                }
             }
             ctx.out().blank();
-            ctx.out().dim(entries.size() + (entries.size() == 1 ? " file" : " files"));
+            ctx.out().dim(group(files) + " File(s), " + group(dirs) + " Dir(s), "
+                    + group(bytes) + " mB");
         }
+    }
+
+    /**
+     * Formats a file's world-time stamp (total ticks) as an in-game day and clock, e.g.
+     * {@code "Day 12  08:15"}. A stamp of {@code 0} (unknown, e.g. a virtual .dat projection or a
+     * file written before timestamps existed) renders as a short placeholder.
+     */
+    private static String formatStamp(final long ticks) {
+        if (ticks <= 0L) {
+            return "  --  ";
+        }
+        final long day = ticks / 24_000L;
+        final long timeOfDay = ticks % 24_000L;
+        // Minecraft tick 0 is 06:00; each in-game hour is 1000 ticks.
+        final long hour = ((timeOfDay / 1000L) + 6L) % 24L;
+        final long minute = (timeOfDay % 1000L) * 60L / 1000L;
+        return String.format(Locale.ROOT, "Day %d  %02d:%02d", day, hour, minute);
     }
 
     /**
@@ -654,8 +994,6 @@ public final class BuiltinCommands {
      */
     static final class Type implements CliCommand {
         @Override public String name() { return "type"; }
-
-        @Override public List<String> aliases() { return List.of("cat"); }
 
         @Override public String summary() { return "print the content of a file"; }
 
@@ -690,7 +1028,7 @@ public final class BuiltinCommands {
     static final class Del implements CliCommand {
         @Override public String name() { return "del"; }
 
-        @Override public List<String> aliases() { return List.of("rm"); }
+        @Override public List<String> aliases() { return List.of("erase"); }
 
         @Override public String summary() { return "delete a file from the system disk"; }
 
@@ -764,6 +1102,172 @@ public final class BuiltinCommands {
                 ctx.out().styled(op.message(), op.ok() ? CliStyle.OK : CliStyle.ERROR);
             } else {
                 ctx.out().styled(result.message(), CliStyle.OK);
+            }
+        }
+    }
+
+    /**
+     * Shows or changes the current directory. With no argument it prints the current path (DOS
+     * behaviour); with a path it changes to that directory relative to the current one.
+     */
+    static final class Cd implements CliCommand {
+        @Override public String name() { return "cd"; }
+
+        @Override public List<String> aliases() { return List.of("chdir"); }
+
+        @Override public String summary() { return "show or change the current directory"; }
+
+        @Override public String usage() { return "[directory]"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().line(ctx.computer().currentLocation().dosPath());
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().changeDir(ctx.rest(0));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+            }
+        }
+    }
+
+    /** Creates a directory on the current drive. */
+    static final class Mkdir implements CliCommand {
+        @Override public String name() { return "mkdir"; }
+
+        @Override public List<String> aliases() { return List.of("md"); }
+
+        @Override public String summary() { return "create a directory"; }
+
+        @Override public String usage() { return "<directory>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: mkdir <directory>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().makeDir(ctx.rest(0));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+            }
+        }
+    }
+
+    /** Removes an empty directory from the current drive. */
+    static final class Rmdir implements CliCommand {
+        @Override public String name() { return "rmdir"; }
+
+        @Override public List<String> aliases() { return List.of("rd"); }
+
+        @Override public String summary() { return "remove an empty directory"; }
+
+        @Override public String usage() { return "<directory>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: rmdir <directory>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().removeDir(ctx.rest(0));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+            }
+        }
+    }
+
+    /** Copies a file (or directory subtree) to a new location. */
+    static final class Copy implements CliCommand {
+        @Override public String name() { return "copy"; }
+
+        @Override public String summary() { return "copy a file to another location"; }
+
+        @Override public String usage() { return "<source> <destination>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (ctx.argCount() < 2) {
+                ctx.out().error("usage: copy <source> <destination>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().copyPath(ctx.arg(0), ctx.arg(1));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            ctx.out().styled(result.message(), CliStyle.OK);
+        }
+    }
+
+    /** Moves a file (or directory subtree) into another directory. */
+    static final class Move implements CliCommand {
+        @Override public String name() { return "move"; }
+
+        @Override public String summary() { return "move a file into another directory"; }
+
+        @Override public String usage() { return "<source> <directory>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (ctx.argCount() < 2) {
+                ctx.out().error("usage: move <source> <directory>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().movePath(ctx.arg(0), ctx.arg(1));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
+                return;
+            }
+            ctx.out().styled(result.message(), CliStyle.OK);
+        }
+    }
+
+    /** Shows or changes this computer's settings — the MC-DOS front-end for the Settings app. */
+    static final class Config implements CliCommand {
+        @Override public String name() { return "config"; }
+
+        @Override public String summary() { return "show or change this computer's settings"; }
+
+        @Override public String usage() { return "[key] [value]"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                final List<String> lines = ctx.computer().configSummary();
+                if (lines.isEmpty()) {
+                    ctx.out().error("this computer has no settings store");
+                    return;
+                }
+                ctx.out().header("settings");
+                for (final String line : lines) {
+                    ctx.out().line(line);
+                }
+                ctx.out().dim("'config <key> <value>' to change one");
+                return;
+            }
+            if (ctx.argCount() < 2) {
+                ctx.out().error("usage: config <key> <value>  (or 'config' to list)");
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().setConfig(ctx.arg(0), ctx.rest(1));
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
+        }
+    }
+
+    /** Renames a file or directory in place. */
+    static final class Ren implements CliCommand {
+        @Override public String name() { return "ren"; }
+
+        @Override public List<String> aliases() { return List.of("rename"); }
+
+        @Override public String summary() { return "rename a file or directory"; }
+
+        @Override public String usage() { return "<file> <new name>"; }
+
+        @Override public void run(final CliContext ctx) {
+            if (ctx.argCount() < 2) {
+                ctx.out().error("usage: ren <file> <new name>");
+                return;
+            }
+            final CliComputer.FsResult result = ctx.computer().renamePath(ctx.arg(0), ctx.arg(1));
+            if (!result.ok()) {
+                ctx.out().error(result.message());
             }
         }
     }

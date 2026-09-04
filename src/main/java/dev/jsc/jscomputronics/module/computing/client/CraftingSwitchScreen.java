@@ -163,6 +163,30 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
         return s.length() <= maxChars ? s : s.substring(0, maxChars - 1) + "…";
     }
 
+    @Override
+    public boolean keyPressed(final int key, final int scan, final int mods) {
+        // While the name field has focus, route typing to it and never let a key (e.g. the inventory key
+        // 'E') reach the screen and close the GUI. ESC just unfocuses the field.
+        if (nameBox != null && nameBox.isFocused()) {
+            if (key == 256) {
+                nameBox.setFocused(false);
+                setFocused(null);
+                return true;
+            }
+            nameBox.keyPressed(key, scan, mods);
+            return true;
+        }
+        return super.keyPressed(key, scan, mods);
+    }
+
+    @Override
+    public boolean charTyped(final char c, final int mods) {
+        if (nameBox != null && nameBox.isFocused()) {
+            return nameBox.charTyped(c, mods);
+        }
+        return super.charTyped(c, mods);
+    }
+
     private void onNameChanged(final String name) {
         final CraftingSwitchBlockEntity be = blockEntity();
         if (be == null) {

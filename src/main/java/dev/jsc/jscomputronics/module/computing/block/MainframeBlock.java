@@ -163,11 +163,18 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
         // (the same one its parts open). All software (firmware, OS) is used on a linked monitor.
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof MainframeBlockEntity mainframe) {
+            // Sneaking takes the service panel off the card bay (or puts it back): the processors,
+            // memory and cards are only ever seen through that opening.
+            if (player.isShiftKeyDown()) {
+                mainframe.toggleServicePanel();
+                return InteractionResult.sidedSuccess(false);
+            }
             serverPlayer.openMenu(
                     new SimpleMenuProvider(
                             (id, inventory, p) -> new dev.jsc.jscomputronics.module.computing.menu.MainframeMenu(
                                     id, inventory, mainframe),
-                            Component.translatable("block.jsc.mainframe")),
+                            // Each era is its own machine and carries its own name in the GUI header.
+                            state.getBlock().getName()),
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());

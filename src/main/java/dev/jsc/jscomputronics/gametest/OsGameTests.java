@@ -12,7 +12,6 @@ import dev.jsc.jscomputronics.common.hardware.DiskSize;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
 import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
@@ -76,7 +75,7 @@ public final class OsGameTests {
                             "installedOsId() must equal jsc:mc_net");
 
                     // Storage capacity must drop by exactly the OS footprint.
-                    final long footprint = mainframe.installedOs().footprintItems();
+                    final long footprint = mainframe.reservedByOs();
                     final long capacityAfter = mainframe.storageItems();
                     helper.assertTrue(capacityAfter == capacityBefore - footprint,
                             "storageItems() must drop by the OS footprint (" + footprint
@@ -215,18 +214,19 @@ public final class OsGameTests {
     }
 
     /**
-     * Category-B appliances (Datacenter Station, Server Router) are firmware-only infrastructure;
-     * they extend plain {@link net.minecraft.world.level.block.entity.BlockEntity}, not
-     * AbstractComputerBlockEntity, so they have no OS slot and never route through hasOs() or
-     * BootController. This test places a Datacenter Station and verifies it functions without any OS
-     * installed, confirming the firmware-only classification at runtime.
+     * Category-B appliances (the Server Router, the cluster switches) are firmware-only
+     * infrastructure; they extend plain {@link net.minecraft.world.level.block.entity.BlockEntity},
+     * not AbstractComputerBlockEntity, so they have no OS slot and never route through hasOs() or
+     * BootController. The Cluster Management Computer is the counter-example: it manages the racks
+     * but is a full computer, with a system of its own. This test places both and checks the
+     * classification at runtime.
      */
     @GameTest(template = ARENA)
     public static void os_categoryBApplianceNeedsNoOs(final GameTestHelper helper) {
         final BlockPos mainframePos = new BlockPos(1, 2, 2);
         final BlockPos cablePos = new BlockPos(2, 2, 2);
         final BlockPos routerPos = new BlockPos(3, 2, 2);
-        final BlockPos stationPos = new BlockPos(4, 2, 2);
+        final BlockPos managerPos = new BlockPos(5, 2, 2);
 
         // Place a running Mainframe WITH an OS (the standard test setup).
         final MainframeBlockEntity mainframe =
@@ -238,19 +238,24 @@ public final class OsGameTests {
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                         Direction.EAST));
 
-        // Place a Datacenter Station (Category B — no OS concept).
-        helper.setBlock(stationPos, ComputingModule.DATACENTER_STATION.get());
+        // Place a Cluster Management Computer (Category A — a computer that runs a system).
+        helper.setBlock(managerPos, ComputingModule.CLUSTER_MANAGEMENT_COMPUTER.get());
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // Verify the Datacenter Station block entity is present and is NOT an AbstractComputerBlockEntity.
-                    final var stationBe = helper.getBlockEntity(stationPos);
-                    helper.assertTrue(stationBe instanceof DatacenterStationBlockEntity,
-                            "DatacenterStation must create a DatacenterStationBlockEntity");
+                    final var routerBe = helper.getBlockEntity(routerPos);
+                    helper.assertTrue(routerBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                                    .ServerRouterBlockEntity,
+                            "the Server Router must create a ServerRouterBlockEntity");
                     helper.assertFalse(
-                            stationBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                            routerBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
                                     .AbstractComputerBlockEntity,
-                            "DatacenterStation must NOT extend AbstractComputerBlockEntity");
+                            "the Server Router must NOT extend AbstractComputerBlockEntity");
+                    final var managerBe = helper.getBlockEntity(managerPos);
+                    helper.assertTrue(
+                            managerBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                                    .AbstractComputerBlockEntity,
+                            "the Cluster Management Computer is a computer: it extends AbstractComputerBlockEntity");
 
                     // The Mainframe still owns its network — the appliance does not interfere.
                     helper.assertTrue(mainframe.networkUuid() != null,

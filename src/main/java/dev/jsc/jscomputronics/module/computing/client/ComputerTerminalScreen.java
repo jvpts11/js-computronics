@@ -1466,17 +1466,22 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             searchBox.setFocused(false);
         }
-        // Deposit: holding a stack and clicking the grid or deposit bar inserts it into the network
-        // (Network tab) or the computer's local storage (Storage tab) — left = whole stack, right = one.
+        // Holding a stack and clicking the grid or deposit bar hands it to the network (Network tab) or the
+        // computer's local storage (Storage tab): left = the whole stack as items, right = one — one item, or
+        // what a held container holds; and a held empty container right-clicked on a fluid or chemical
+        // entry fills from it, so the entry under the cursor travels with a right-click.
         if (isGridTab() && !menu.getCarried().isEmpty()
                 && (button == 0 || button == 1)
                 && (overDepositBar(mouseX, mouseY) || overNetworkGrid(mouseX, mouseY))) {
+            final java.util.Optional<dev.jsc.jscomputronics.module.computing.storage.StorageKey> entry = button == 1
+                    ? java.util.Optional.ofNullable(networkItemAt((int) mouseX, (int) mouseY)).map(NetworkItemEntry::key)
+                    : java.util.Optional.empty();
             if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
                 PacketDistributor.sendToServer(new TerminalLocalDepositPayload(menu.monitorPos(), menu.hostPos(),
-                        button == 1 ? TerminalLocalDepositPayload.CURSOR_ONE : TerminalLocalDepositPayload.CURSOR));
+                        button == 1 ? TerminalLocalDepositPayload.CURSOR_ONE : TerminalLocalDepositPayload.CURSOR, entry));
             } else {
                 PacketDistributor.sendToServer(new TerminalInsertPayload(menu.monitorPos(), menu.hostPos(),
-                        button == 1 ? TerminalInsertPayload.CURSOR_ONE : TerminalInsertPayload.CURSOR));
+                        button == 1 ? TerminalInsertPayload.CURSOR_ONE : TerminalInsertPayload.CURSOR, entry));
             }
             return true;
         }
@@ -1641,10 +1646,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 && slot != null && slot.hasItem() && slot.index >= menu.storageSlotCount()) {
             if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
                 PacketDistributor.sendToServer(new TerminalLocalDepositPayload(
-                        menu.monitorPos(), menu.hostPos(), slot.index));
+                        menu.monitorPos(), menu.hostPos(), slot.index, java.util.Optional.empty()));
             } else {
                 PacketDistributor.sendToServer(new TerminalInsertPayload(
-                        menu.monitorPos(), menu.hostPos(), slot.index));
+                        menu.monitorPos(), menu.hostPos(), slot.index, java.util.Optional.empty()));
             }
             return;
         }

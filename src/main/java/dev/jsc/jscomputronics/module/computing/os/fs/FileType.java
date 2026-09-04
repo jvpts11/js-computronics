@@ -47,7 +47,19 @@ public enum FileType {
     CRAFT("craft", false, false),
 
     /** Virtual read-only projection of a disk's item/fluid storage; never persisted. */
-    DAT("dat", false, true);
+    DAT("dat", false, true),
+    // What an install medium shows when opened: generated from its payload the way DAT is generated
+    // from a disk's storage, never stored, never a player's to create, copy or delete.
+    /** A setup program a player runs to install what the medium carries. */
+    EXE("exe", false, true),
+    /** The same on a Linux medium. */
+    SH("sh", false, true),
+    /** The package manifest: name, package id, requirements and the install commands. */
+    PKG("pkg", false, true),
+    /** Setup information beside the installer, the way a disc of the era carried it. */
+    INF("inf", false, true),
+    /** Opaque installer payload (a cabinet, an image, a kernel): listed, never opened. */
+    BIN("bin", false, true);
 
     private final String extension;
     private final boolean userEditable;

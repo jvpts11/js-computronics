@@ -34,7 +34,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * The Network Interactor desktop window: the graphical face of the data network for a Panes computer,
+ * The Network Interactor desktop window: the graphical face of the data network for a Frames computer,
  * with the same capabilities as the MC-NET terminal — extract from the network into local storage,
  * withdraw local storage into the inventory, deposit/insert from the player's hotbar, and request
  * crafts — addressing the host by position. The player's full inventory is shown in the window as real
@@ -64,7 +64,7 @@ public final class NetworkInteractorApp implements DesktopApp {
     private static final int INV_PAD = NetworkInteractorLayout.INV_PAD;
 
     // The skin of the OS this program runs on, handed in each frame by the window manager. Every colour below
-    // is re-derived from it in applySkin, so the whole program follows the installed OS (Panes 95/XP/11).
+    // is re-derived from it in applySkin, so the whole program follows the installed OS (Frames 95/XP/11).
     private OsSkin skin = OsSkin.fallback();
     private int PANEL = 0xFFFFFFFF;
     private int FIELD = 0xFFF1F4F9;
@@ -92,7 +92,10 @@ public final class NetworkInteractorApp implements DesktopApp {
     private int serverCount;
 
     private final StringBuilder search = new StringBuilder();
-    private boolean sortByCount;
+    /** How the grid is ordered: 0 by name, 1 most stored first, 2 least stored first. */
+    private int sortMode;
+    private static final int SORT_MODES = 3;
+    private static final String[] SORT_LABELS = {"A-Z", "MOST", "LEAST"};
     private boolean searchFocus;
     /** Top visible item row of the grid; the grid scrolls its items (not its pixels) when more rows exist. */
     private int gridScroll;
@@ -430,7 +433,13 @@ public final class NetworkInteractorApp implements DesktopApp {
             renderGridScrollbar(g, x + width - 3, gridTop, z.gridH(), maxScroll);
         }
 
-        // Request/storage quantity dialog, over everything.
+    }
+
+    @Override
+    public void renderModal(final GuiGraphics g, final Font font, final int x, final int y,
+                            final int width, final int height, final int mouseX, final int mouseY) {
+        // The desktop draws this in a late pass above every item icon, so the dialog's own dim covers and
+        // darkens the grid/craft/inventory icons instead of them piercing through at their blit depth.
         if (popupEntry != null) {
             renderPopup(g, font, x, y, width, height, mouseX, mouseY);
         }
@@ -464,11 +473,11 @@ public final class NetworkInteractorApp implements DesktopApp {
         g.fill(px, py, px + POPUP_W, py + 1, BAND_HI);
 
         // Header: icon + name + availability, with an ADV toggle (Network popup only).
-        g.renderItem(popupEntry.icon(), px + 4, py + 4);
+        DesktopItems.data(g, font, popupEntry.key(), px + 4, py + 4, null);
         final int nameW = popupStorage ? POPUP_W - 30 : POPUP_W - 64;
-        g.drawString(font, trimTo(font, popupEntry.icon().getHoverName().getString(), nameW),
+        g.drawString(font, trimTo(font, popupEntry.name().getString(), nameW),
                 px + 24, py + 5, TEXT, false);
-        g.drawString(font, formatCount(popupEntry.total()) + " available", px + 24, py + 15, DIM, false);
+        g.drawString(font, amount(popupEntry.key(), popupEntry.total()) + " available", px + 24, py + 15, DIM, false);
         if (!popupStorage) {
             final int advX = px + POPUP_W - 34;
             drawButton(g, font, advX, py + 4, 30, 11, "Adv",
@@ -573,7 +582,9 @@ public final class NetworkInteractorApp implements DesktopApp {
                 search.length() == 0 && !searchFocus ? DIM : TEXT, false);
         final int qx = x + z.sortX();
         skin.field(g, qx, sy, z.sortW(), SEARCH_H, false);
-        g.drawString(font, sortByCount ? "Qty" : "Sort", qx + 4, sy + 3, TEXT, false);
+        // The button always names the order it is in, so the player can see the mode without clicking it.
+        final String label = SORT_LABELS[sortMode];
+        g.drawString(font, label, qx + (z.sortW() - font.width(label)) / 2, sy + 3, TEXT, false);
     }
 
     private void renderGridScrollbar(final GuiGraphics g, final int sbX, final int sbY, final int sbH,
@@ -657,22 +668,25 @@ public final class NetworkInteractorApp implements DesktopApp {
             g.disableScissor();
             return;
         }
-        final net.minecraft.world.item.ItemStack stack = e.icon();
-        final net.minecraft.resources.ResourceLocation id =
-                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
-        g.renderItem(stack, px, py);
-        smallText(g, font, trimTo(font, stack.getHoverName().getString(), scaledWidth(dw - 28)), px + 20, py, TEXT);
+        final dev.jsc.jscomputronics.module.computing.storage.StorageKey key = e.key();
+        final net.minecraft.world.item.ItemStack stack = e.icon(); // empty for a fluid or a chemical
+        final net.minecraft.resources.ResourceLocation id = dataId(key);
+        DesktopItems.data(g, font, key, px, py, null);
+        smallText(g, font, trimTo(font, e.name().getString(), scaledWidth(dw - 28)), px + 20, py, TEXT);
         smallText(g, font, trimTo(font, modName(id.getNamespace()), scaledWidth(dw - 28)), px + 20, py + 9, 0xFF2F6AC6);
         py += 22;
         py = detail(g, font, px, py, dw, "ID", id.toString());
-        py = detail(g, font, px, py, dw, "WEIGHT", dataLabel(e.total()));
-        if (stack.isDamageableItem()) {
+        py = detail(g, font, px, py, dw, "KIND", key.isItem() ? "Item" : key.isFluid() ? "Fluid" : "Chemical");
+        py = detail(g, font, px, py, dw, "WEIGHT", dataLabel(key.weight(e.total())));
+        if (key.isItem() && stack.isDamageableItem()) {
             py = detail(g, font, px, py, dw, "DURABILITY",
                     (stack.getMaxDamage() - stack.getDamageValue()) + " / " + stack.getMaxDamage());
         }
         py = detailList(g, font, px, py, dw, "STORED", storedLines(e));
-        py = detailList(g, font, px, py, dw, "TAGS", itemTags(stack));
-        detailList(g, font, px, py, dw, "COMPONENTS", componentNames(stack));
+        if (key.isItem()) {
+            py = detailList(g, font, px, py, dw, "TAGS", itemTags(stack));
+            detailList(g, font, px, py, dw, "COMPONENTS", componentNames(stack));
+        }
         g.disableScissor();
     }
 
@@ -680,11 +694,11 @@ public final class NetworkInteractorApp implements DesktopApp {
      *  network-total line when no per-server breakdown was sent (e.g. the Local Storage tab). */
     private java.util.List<String> storedLines(final NetworkItemEntry e) {
         if (e.shares().isEmpty()) {
-            return java.util.List.of(formatCount(e.total()) + " on the network");
+            return java.util.List.of(amount(e.key(), e.total()) + " on the network");
         }
         final java.util.List<String> out = new java.util.ArrayList<>();
         for (final NetworkItemEntry.StorageShare s : e.shares()) {
-            out.add(s.label() + ": " + formatCount(s.qty()));
+            out.add(s.label() + ": " + amount(e.key(), s.qty()));
         }
         return out;
     }
@@ -838,7 +852,7 @@ public final class NetworkInteractorApp implements DesktopApp {
                 final int cy = gridTop + r * CELL;
                 g.fill(cx, cy, cx + CELL - 2, cy + CELL - 2, FIELD);
                 outline(g, cx, cy, CELL - 2, CELL - 2);
-                g.renderItem(e.result(), cx + 1, cy + 1);
+                DesktopItems.item(g, e.result(), cx + 1, cy + 1);
                 // Availability dot (green/amber/red), top-right.
                 final int dot = switch (e.availability()) {
                     case CraftCatalogPayload.DOT_GREEN -> 0xFF3CC75A;
@@ -877,10 +891,8 @@ public final class NetworkInteractorApp implements DesktopApp {
                 final int cy = gridTop + r * CELL;
                 g.fill(cx, cy, cx + CELL - 2, cy + CELL - 2, FIELD);
                 outline(g, cx, cy, CELL - 2, CELL - 2);
-                g.renderItem(e.icon(), cx + 1, cy + 1);
-                // renderItemDecorations draws the count at the item's blit depth, so it stays IN FRONT of the
-                // icon (a plain drawString draws under the item and the icon hides it); keep the k-formatted total.
-                g.renderItemDecorations(font, e.icon(), cx + 1, cy + 1, formatCount(e.total()));
+                // The count rides just in front of the model, both inside this window's depth band.
+                DesktopItems.data(g, font, e.key(), cx + 1, cy + 1, formatCount(e.total()));
                 // Same hover highlight as a real inventory slot — every item cell gets it.
                 if (mouseX >= cx && mouseX < cx + CELL - 2 && mouseY >= cy && mouseY < cy + CELL - 2) {
                     g.fill(cx, cy, cx + CELL - 2, cy + CELL - 2, 0x80FFFFFF);
@@ -973,7 +985,7 @@ public final class NetworkInteractorApp implements DesktopApp {
             return;
         }
         final var op = all.get(opSelected);
-        g.renderItem(op.icon(), px, py);
+        DesktopItems.data(g, font, op.key(), px, py, null);
         smallText(g, font, trimTo(font, op.name().getString(), scaledWidth(dw - 28)), px + 20, py + 1, TEXT);
         smallText(g, font, opTypeLabel(op.type()), px + 20, py + 10, opTypeColor(op.type()));
         py += 22;
@@ -1024,27 +1036,13 @@ public final class NetworkInteractorApp implements DesktopApp {
     }
 
     private static String opTypeLabel(final byte type) {
-        return switch (type) {
-            case 0 -> "SELECT";
-            case 1 -> "INSERT";
-            case 2 -> "DELETE";
-            case 3 -> "MOVE";
-            case 4 -> "ANALYZE";
-            case 5 -> "REINDEX";
-            case 6 -> "VACUUM";
-            case 7 -> "DROP";
-            case 8 -> "CRAFT";
-            default -> "OP";
-        };
+        return dev.jsc.jscomputronics.module.computing.program.OperationPalette.labelFor(type);
     }
 
     private static int opTypeColor(final byte type) {
-        return switch (type) {
-            case 1, 8 -> 0xFF2E8B45; // INSERT / CRAFT — green-ish
-            case 2, 7 -> 0xFFB23A3A; // DELETE / DROP — red-ish
-            case 3 -> 0xFF2F6AC6;    // MOVE — blue
-            default -> 0xFF6A5ACD;   // SELECT / maintenance — purple-ish
-        };
+        // Shared with the Network Manager and the network terminal, so an Operation type reads the same colour
+        // everywhere.
+        return dev.jsc.jscomputronics.module.computing.program.OperationPalette.colorFor(type);
     }
 
     private static String opStatusShort(final byte status) {
@@ -1134,8 +1132,10 @@ public final class NetworkInteractorApp implements DesktopApp {
                 out.add(e);
             }
         }
-        if (sortByCount) {
-            out.sort((a, b) -> Long.compare(b.total(), a.total()));
+        switch (sortMode) {
+            case 1 -> out.sort((a, b) -> Long.compare(b.total(), a.total()));
+            case 2 -> out.sort((a, b) -> Long.compare(a.total(), b.total()));
+            default -> out.sort((a, b) -> a.name().getString().compareToIgnoreCase(b.name().getString()));
         }
         return out;
     }
@@ -1185,13 +1185,16 @@ public final class NetworkInteractorApp implements DesktopApp {
             return;
         }
 
-        // Search field / sort toggle (grid + crafting tabs).
+        // Search field / sort button (grid + crafting tabs). Both hit boxes come from the same zones the
+        // header draws them at: measured against the whole content width instead, the sort button sat out
+        // over the details panel and clicking the button itself did nothing.
         if ((tab == TAB_NETWORK || tab == TAB_LOCAL || tab == TAB_CRAFTING)
                 && ly >= bodyTopLocal() && ly < bodyTopLocal() + SEARCH_H) {
-            if (lx >= contentW - 50) {
-                sortByCount = !sortByCount;
+            final NetworkInteractorLayout.Zones z = zones();
+            if (lx >= z.sortX() && lx < z.sortX() + z.sortW()) {
+                sortMode = (sortMode + 1) % SORT_MODES;
                 searchFocus = false;
-            } else if (lx >= 4 && lx < contentW - 56) {
+            } else if (lx >= z.searchX() && lx < z.searchX() + z.searchW()) {
                 searchFocus = true;
             }
             return;
@@ -1225,6 +1228,20 @@ public final class NetworkInteractorApp implements DesktopApp {
         return -1;
     }
 
+    /**
+     * The grid entry under the cursor on a grid tab — the data a held empty container would fill with on a
+     * right-click — or empty when the click is not on an entry.
+     */
+    public java.util.Optional<dev.jsc.jscomputronics.module.computing.storage.StorageKey> cursorDepositEntry(
+            final double lx, final double ly) {
+        if (tab != TAB_NETWORK && tab != TAB_LOCAL) {
+            return java.util.Optional.empty();
+        }
+        final int idx = gridIndexAt(lx, ly);
+        final List<NetworkItemEntry> items = filtered(tab == TAB_NETWORK ? networkItems : localItems);
+        return idx >= 0 && idx < items.size() ? java.util.Optional.of(items.get(idx).key()) : java.util.Optional.empty();
+    }
+
     private void gridBodyClick(final double lx, final double ly, final int button) {
         final int idx = gridIndexAt(lx, ly);
         if (idx < 0) {
@@ -1242,7 +1259,7 @@ public final class NetworkInteractorApp implements DesktopApp {
         popupEntry = e;
         popupStorage = storage;
         // Default to one stack, clamped to what is available.
-        popupQty = Math.max(1L, Math.min(e.total(), Math.max(1, e.icon().getMaxStackSize())));
+        popupQty = Math.max(1L, Math.min(e.total(), e.key().batch()));
         popupAdvanced = false;
         popupDeselected.clear();
         popupDestIndex = 0;
@@ -1262,6 +1279,11 @@ public final class NetworkInteractorApp implements DesktopApp {
     /** Whether any modal dialog (request/storage or craft) is open — the desktop routes all clicks to the app then. */
     public boolean hasPopup() {
         return popupEntry != null || craftPopup != null;
+    }
+
+    @Override
+    public boolean modalActive() {
+        return hasPopup();
     }
 
     /**
@@ -1445,7 +1467,7 @@ public final class NetworkInteractorApp implements DesktopApp {
         g.fill(px, py, px + CRAFT_W, py + CRAFT_H, PANEL);
         g.fill(px, py, px + CRAFT_W, py + 1, skin.accent());
 
-        g.renderItem(craftPopup.result(), px + 4, py + 3);
+        DesktopItems.item(g, craftPopup.result(), px + 4, py + 3);
         g.drawString(font, "Craft " + trimTo(font, craftPopup.result().getHoverName().getString(), CRAFT_W - 40),
                 px + 24, py + 6, TEXT, false);
 
@@ -1468,7 +1490,7 @@ public final class NetworkInteractorApp implements DesktopApp {
             final int shown = Math.min(5, craftPlan.rows().size());
             for (int i = 0; i < shown; i++) {
                 final var row = craftPlan.rows().get(i);
-                g.renderItem(row.item(), px + 4, ry - 2);
+                DesktopItems.item(g, row.item(), px + 4, ry - 2);
                 smallText(g, font, trimTo(font, row.item().getHoverName().getString(), scaledWidth(96)),
                         px + 22, ry, TEXT);
                 final String counts = formatCount(row.have()) + " / " + formatCount(row.need());
@@ -1565,7 +1587,7 @@ public final class NetworkInteractorApp implements DesktopApp {
                 final NetworkItemEntry e = items.get(idx);
                 g.renderComponentTooltip(font, java.util.List.of(
                         e.name(),
-                        net.minecraft.network.chat.Component.literal(e.total() + " items")
+                        net.minecraft.network.chat.Component.literal(amountLabel(e.key(), e.total()))
                                 .withStyle(net.minecraft.ChatFormatting.GRAY)),
                         mouseX, mouseY);
             }
@@ -1720,8 +1742,33 @@ public final class NetworkInteractorApp implements DesktopApp {
     }
 
     /** One item-equivalent is 4 MB of data; show the network usage in those data units. */
-    private static String dataLabel(final long items) {
-        final long mb = items * 4L;
+    /** A short amount with its unit where the unit is not obvious: items by the count, data by the millibucket. */
+    private static String amount(final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long n) {
+        return key.isItem() ? formatCount(n) : formatCount(n) + " mB";
+    }
+
+    /** The exact amount with its unit, for a tooltip. */
+    private static String amountLabel(final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long n) {
+        return key.isItem()
+                ? String.format(Locale.ROOT, "%,d item%s", n, n == 1L ? "" : "s")
+                : String.format(Locale.ROOT, "%,d mB", n);
+    }
+
+    /** The registry id of the data behind a key: the item's, the fluid's, or the chemical's. */
+    private static net.minecraft.resources.ResourceLocation dataId(
+            final dev.jsc.jscomputronics.module.computing.storage.StorageKey key) {
+        if (key.isFluid()) {
+            return net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(key.fluidPrototype().getFluid());
+        }
+        if (key.isChemical()) {
+            return java.util.Objects.requireNonNull(key.chemicalId());
+        }
+        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(key.item());
+    }
+
+    /** The data a weight amounts to, at 4 MB the item (1 000 mB-eq): a bucket of fluid weighs as much as an item. */
+    private static String dataLabel(final long weight) {
+        final long mb = weight * 4L / dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
         if (mb < 1024L) {
             return mb + " MB";
         }
@@ -1854,6 +1901,12 @@ public final class NetworkInteractorApp implements DesktopApp {
             case WARN -> 0xFFF0B23A;
             case INFO -> 0xFF2AA7E0;
             case DIM -> 0xFF7D8A9C;
+            // The extended palette: brand-tinted terminal colors (screenfetch logos and the like).
+            case ORANGE -> 0xFFE95420;
+            case MAGENTA -> 0xFFE0447C;
+            case BLUE -> 0xFF5A8FD6;
+            case CYAN -> 0xFF2FA6E8;
+            case PURPLE -> 0xFF9E8FD6;
             default -> 0xFFCDD6E2;
         };
     }

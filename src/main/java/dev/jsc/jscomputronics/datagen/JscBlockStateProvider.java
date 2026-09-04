@@ -66,65 +66,18 @@ public class JscBlockStateProvider extends BlockStateProvider {
         pipeCable(ComputingModule.CRAFTING_CABLE.get(), "crafting_cable");
         pipeCable(ComputingModule.PERIPHERAL_CABLE.get(), "peripheral_cable");
 
-        // The Mainframe is a 3x2x2 server rack. The controller carries the control
-        // panel on its front, casing on the sides, a ventilation grille on top.
-        final ModelFile mainframeModel = models().orientable(
-                "mainframe",
-                modLoc("block/mainframe_side"),
-                modLoc("block/mainframe_front"),
-                modLoc("block/mainframe_top"));
-        horizontalBlock(ComputingModule.MAINFRAME.get(), mainframeModel);
-
-        // Earlier-era Mainframes: same orientable controller model, era-specific faces. The shared
-        // multiblock parts keep their casing; only the controller carries the era skin.
-        final ModelFile vintageMainframeModel = models().orientable(
-                "vintage_mainframe",
-                modLoc("block/vintage_mainframe_side"),
-                modLoc("block/vintage_mainframe_front"),
-                modLoc("block/vintage_mainframe_top"));
-        horizontalBlock(ComputingModule.VINTAGE_MAINFRAME.get(), vintageMainframeModel);
-
-        final ModelFile legacyMainframeModel = models().orientable(
-                "legacy_mainframe",
-                modLoc("block/legacy_mainframe_side"),
-                modLoc("block/legacy_mainframe_front"),
-                modLoc("block/legacy_mainframe_top"));
-        horizontalBlock(ComputingModule.LEGACY_MAINFRAME.get(), legacyMainframeModel);
-
-        // Parts inherit the controller's era so the whole footprint wears one skin. The central column
-        // wears the lit data-spine (front) face; the side columns wear the casing (side) face. One
-        // casing/core model pair per era, selected by the part's ERA and CORE properties.
-        final ModelFile partCasing = models().cubeColumn(
-                "mainframe_part", modLoc("block/mainframe_panel"), modLoc("block/mainframe_top"));
-        final ModelFile partCore = models().cubeColumn(
-                "mainframe_part_core", modLoc("block/mainframe_core"), modLoc("block/mainframe_top"));
-        final ModelFile vintagePartCasing = models().cubeColumn(
-                "vintage_mainframe_part",
-                modLoc("block/vintage_mainframe_side"), modLoc("block/vintage_mainframe_top"));
-        final ModelFile vintagePartCore = models().cubeColumn(
-                "vintage_mainframe_part_core",
-                modLoc("block/vintage_mainframe_front"), modLoc("block/vintage_mainframe_top"));
-        final ModelFile legacyPartCasing = models().cubeColumn(
-                "legacy_mainframe_part",
-                modLoc("block/legacy_mainframe_side"), modLoc("block/legacy_mainframe_top"));
-        final ModelFile legacyPartCore = models().cubeColumn(
-                "legacy_mainframe_part_core",
-                modLoc("block/legacy_mainframe_front"), modLoc("block/legacy_mainframe_top"));
-        getVariantBuilder(ComputingModule.MAINFRAME_PART.get()).forAllStates(state -> {
-            final boolean core = state.getValue(
-                    dev.jsc.jscomputronics.module.computing.block.MainframePartBlock.CORE);
-            final dev.jsc.jscomputronics.common.tier.HardwareEra era =
-                    dev.jsc.jscomputronics.common.tier.HardwareEra.fromLevel(state.getValue(
-                            dev.jsc.jscomputronics.module.computing.block.MainframePartBlock.ERA));
-            final ModelFile model = switch (era) {
-                case VINTAGE -> core ? vintagePartCore : vintagePartCasing;
-                case LEGACY -> core ? legacyPartCore : legacyPartCasing;
-                default -> core ? partCore : partCasing;
-            };
-            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                    .modelFile(model)
-                    .build();
-        });
+        // Mainframes: 3x2x2 cabinets drawn as ONE model each by the controller's block-entity renderer,
+        // one model per era. The twelve blocks themselves are invisible; the only model they need
+        // carries the particle texture for breaking effects.
+        final ModelFile mainframeInvisible = models().getBuilder("mainframe_cabinet")
+                .texture("particle", modLoc("block/mainframe_particle"));
+        for (final net.minecraft.world.level.block.Block cabinet : java.util.List.of(
+                ComputingModule.MAINFRAME.get(), ComputingModule.VINTAGE_MAINFRAME.get(),
+                ComputingModule.LEGACY_MAINFRAME.get(), ComputingModule.MAINFRAME_PART.get())) {
+            getVariantBuilder(cabinet).forAllStates(state ->
+                    net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                            .modelFile(mainframeInvisible).build());
+        }
 
         // Routers: the facing carries the status/port panel; the other faces are casing.
         final ModelFile personalRouterModel = models().orientable(
@@ -146,11 +99,6 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 .texture("particle", modLoc("block/server_router_side"));
         horizontalBlock(ComputingModule.SERVER_ROUTER.get(), serverRouterModel);
 
-        // Datacenter Station: a hand-written element model (pedestal + tilted console
-        // screen) shipped in main resources; the blockstate only rotates it.
-        horizontalBlock(ComputingModule.DATACENTER_STATION.get(),
-                models().getExistingFile(modLoc("block/datacenter_station")));
-
         // Tank: glass walls in a metal casing frame, so it reads as a containment vessel rather than a
         // solid block.
         simpleBlock(ComputingModule.TANK.get(), models()
@@ -161,40 +109,21 @@ public class JscBlockStateProvider extends BlockStateProvider {
         simpleBlock(ComputingModule.CRAFTING_SWITCH.get(),
                 models().cubeAll("crafting_switch", modLoc("block/crafting_switch")));
 
-        // Server Rack: a 2x3x2 multiblock cabinet. The four front bay blocks each show their
-        // populated or empty bay model.
-        final ModelFile[] rackBays = new ModelFile[4];
-        for (int bays = 0; bays < 4; bays++) {
-            rackBays[bays] = models().getExistingFile(modLoc("block/server_rack_bays_" + bays));
+        // Server Racks and the Supercomputer Rack: 2x3x2 cabinets drawn as ONE model each by the
+        // controller's block-entity renderer. The blocks themselves are invisible; the only model they
+        // need carries the particle texture for breaking effects.
+        final ModelFile rackInvisible = models().getBuilder("rack")
+                .texture("particle", modLoc("block/rack_particle"));
+        for (final net.minecraft.world.level.block.Block cabinet : java.util.List.of(
+                ComputingModule.SERVER_RACK.get(), ComputingModule.LEGACY_SERVER_RACK.get(),
+                ComputingModule.VINTAGE_SERVER_RACK.get(), ComputingModule.SUPERCOMPUTER_RACK.get())) {
+            getVariantBuilder(cabinet).forAllStates(state ->
+                    net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                            .modelFile(rackInvisible).build());
         }
-        final ModelFile rackHeader = models().cubeColumn(
-                "server_rack_part", modLoc("block/server_rack_upper"), modLoc("block/server_rack_top"));
-        final ModelFile rackCasing = models().cubeColumn(
-                "server_rack_casing", modLoc("block/server_rack_side"), modLoc("block/server_rack_top"));
-
-        getVariantBuilder(ComputingModule.SERVER_RACK.get()).forAllStates(state ->
+        getVariantBuilder(ComputingModule.SERVER_RACK_PART.get()).forAllStates(state ->
                 net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(rackBays[state.getValue(
-                                dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS)])
-                        .rotationY(rearYRot(state.getValue(
-                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)))
-                        .build());
-        getVariantBuilder(ComputingModule.SERVER_RACK_PART.get()).forAllStates(state -> {
-            if (state.getValue(dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.TOP)) {
-                return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(rackHeader).build();
-            }
-            if (!state.getValue(dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.FRONT)) {
-                return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(rackCasing).build();
-            }
-            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                    .modelFile(rackBays[state.getValue(
-                            dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS)])
-                    .rotationY(rearYRot(state.getValue(
-                            dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock.FACING)))
-                    .build();
-        });
+                        .modelFile(rackInvisible).build());
 
         final ModelFile personalComputerModel = models().orientable(
                 "personal_computer",
@@ -240,47 +169,27 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/legacy_crafting_computer_top"));
         horizontalBlock(ComputingModule.LEGACY_CRAFTING_COMPUTER.get(), legacyCraftingComputerModel);
 
+        // Cluster Management Computers: the same orientable case per era, in their own liveries.
+        horizontalBlock(ComputingModule.CLUSTER_MANAGEMENT_COMPUTER.get(), models().orientable(
+                "cluster_management_computer",
+                modLoc("block/cluster_management_computer_side"),
+                modLoc("block/cluster_management_computer_front"),
+                modLoc("block/cluster_management_computer_top")));
+        horizontalBlock(ComputingModule.VINTAGE_CLUSTER_MANAGEMENT_COMPUTER.get(), models().orientable(
+                "vintage_cluster_management_computer",
+                modLoc("block/vintage_cluster_management_computer_side"),
+                modLoc("block/vintage_cluster_management_computer_front"),
+                modLoc("block/vintage_cluster_management_computer_top")));
+        horizontalBlock(ComputingModule.LEGACY_CLUSTER_MANAGEMENT_COMPUTER.get(), models().orientable(
+                "legacy_cluster_management_computer",
+                modLoc("block/legacy_cluster_management_computer_side"),
+                modLoc("block/legacy_cluster_management_computer_front"),
+                modLoc("block/legacy_cluster_management_computer_top")));
+
         // Supercomputer cluster: the node is a rack-sized cabinet whose front lights up while it
         // runs; the HBW Interface is the uplink; the console is a hand-written kiosk model.
-        final ModelFile nodeFront = models().orientable(
-                "supercomputer_node",
-                modLoc("block/supercomputer_node_side"),
-                modLoc("block/supercomputer_node_front"),
-                modLoc("block/supercomputer_node_top"));
-        final ModelFile nodeFrontFilled = models().orientable(
-                "supercomputer_node_filled",
-                modLoc("block/supercomputer_node_side"),
-                modLoc("block/supercomputer_node_front_filled"),
-                modLoc("block/supercomputer_node_top"));
-        final ModelFile nodePlain = models().cubeColumn(
-                "supercomputer_node_plain",
-                modLoc("block/supercomputer_node_side"),
-                modLoc("block/supercomputer_node_top"));
-        getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE.get()).forAllStates(state ->
-                net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                        .modelFile(state.getValue(
-                                dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock.FILLED)
-                                ? nodeFrontFilled : nodeFront)
-                        .rotationY(rearYRot(state.getValue(
-                                net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)))
-                        .build());
-        getVariantBuilder(ComputingModule.SUPERCOMPUTER_NODE_PART.get()).forAllStates(state -> {
-            final boolean front = state.getValue(
-                    dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FRONT);
-            final boolean filled = state.getValue(
-                    dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FILLED);
-            return net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
-                    .modelFile(front ? (filled ? nodeFrontFilled : nodeFront) : nodePlain)
-                    .rotationY(rearYRot(state.getValue(
-                            dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock.FACING)))
-                    .build();
-        });
-
         simpleBlock(ComputingModule.HBW_INTERFACE.get(), models().cubeColumn(
                 "hbw_interface", modLoc("block/hbw_interface_side"), modLoc("block/hbw_interface_top")));
-
-        horizontalBlock(ComputingModule.SUPERCOMPUTER_CONSOLE.get(),
-                models().getExistingFile(modLoc("block/supercomputer_console")));
 
         // Pattern Encoder and Reader share the workstation casing; the front face tells them apart.
         final ModelFile patternEncoderModel = models().orientable(
@@ -310,12 +219,12 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/dvd_drive_casing"), modLoc("block/dvd_drive_active"), modLoc("block/dvd_drive_casing"));
         horizontalBlock(ComputingModule.DVD_DRIVE.get(),
                 s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? dvdActive : dvdIdle);
-        final ModelFile dockIdle = models().orientable("dock_station",
-                modLoc("block/dock_station_casing"), modLoc("block/dock_station_front"), modLoc("block/dock_station_casing"));
-        final ModelFile dockActive = models().orientable("dock_station_active",
-                modLoc("block/dock_station_casing"), modLoc("block/dock_station_active"), modLoc("block/dock_station_casing"));
+        // The Dock Station is a low hub on the desk, not a cube: two hand-authored element models, the
+        // empty hub and the hub with the flash drive standing out of its port, picked by LOADED.
+        final ModelFile dockIdle = models().getExistingFile(modLoc("block/dock_station"));
+        final ModelFile dockDocked = models().getExistingFile(modLoc("block/dock_station_docked"));
         horizontalBlock(ComputingModule.DOCK_STATION.get(),
-                s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? dockActive : dockIdle);
+                s -> s.getValue(dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock.LOADED) ? dockDocked : dockIdle);
 
         // Monitor: a screen on the front, casing on the other faces. The screen has
         final ModelFile monitorOff = models().orientable(

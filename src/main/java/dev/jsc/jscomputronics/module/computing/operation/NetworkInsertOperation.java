@@ -55,6 +55,7 @@ public final class NetworkInsertOperation extends AbstractTransferOperation {
             }
         }
         final Allocation plan = StorageAllocator.allocate(free, demand);
+        index.reserveRoom(plan.perServer(), unitWeight);
         plan.perServer().forEach((server, quantity) ->
                 addSource(server, quantity, tiers.getOrDefault(server, StorageTier.HDD),
                         ramLatencies.getOrDefault(server, 0), scheduler));

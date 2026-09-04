@@ -39,6 +39,54 @@ public final class OsMediaGameTests {
     private static final String ARENA = "empty";
     private static final int SETTLE = 4;
 
+    /**
+     * Every drive takes the media it is built for and refuses the rest, and a disc that a drive accepts
+     * actually lands in its slot. A drive that will not take its own format is a dead end for the player.
+     */
+    @GameTest(template = ARENA)
+    public static void drives_acceptTheirOwnFormatsAndRefuseTheOthers(final GameTestHelper helper) {
+        final BlockPos dvdPos = new BlockPos(2, 2, 2);
+        final BlockPos cdPos = new BlockPos(4, 2, 2);
+        final BlockPos floppyPos = new BlockPos(6, 2, 2);
+        helper.setBlock(dvdPos, ComputingModule.DVD_DRIVE.get());
+        helper.setBlock(cdPos, ComputingModule.CD_DRIVE.get());
+        helper.setBlock(floppyPos, ComputingModule.FLOPPY_DRIVE.get());
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    if (!(helper.getBlockEntity(dvdPos) instanceof MediaReaderBlockEntity dvd)
+                            || !(helper.getBlockEntity(cdPos) instanceof MediaReaderBlockEntity cd)
+                            || !(helper.getBlockEntity(floppyPos) instanceof MediaReaderBlockEntity floppy)) {
+                        throw new IllegalStateException("a drive is missing its block entity");
+                    }
+                    final ItemStack dvdRom = new ItemStack(ComputingModule.DVD_ROM.get());
+                    final ItemStack cdRom = new ItemStack(ComputingModule.CD_ROM.get());
+                    final ItemStack disk = new ItemStack(ComputingModule.FLOPPY_DISK.get());
+
+                    helper.assertTrue(dvd.acceptsMedia(dvdRom), "a DVD drive must accept a DVD");
+                    helper.assertTrue(dvd.acceptsMedia(cdRom), "a DVD drive also reads CDs");
+                    helper.assertTrue(!dvd.acceptsMedia(disk), "a DVD drive must refuse a floppy");
+                    helper.assertTrue(!cd.acceptsMedia(dvdRom), "a CD drive cannot read a DVD");
+                    helper.assertTrue(cd.acceptsMedia(cdRom), "a CD drive must accept a CD");
+                    helper.assertTrue(floppy.acceptsMedia(disk), "a floppy drive must accept a floppy");
+
+                    // The disc a player actually holds is an installer off the creative tab, not a blank
+                    // one: it carries a kind and a payload. Those components must not change acceptance.
+                    final ItemStack installer = new ItemStack(ComputingModule.DVD_ROM.get());
+                    MediaItem.setKind(installer, MediaKind.PROGRAM_INSTALL);
+                    MediaItem.setPayload(installer,
+                            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "kde_plasma"));
+                    helper.assertTrue(dvd.acceptsMedia(installer),
+                            "a DVD drive must accept a program installer pressed on a DVD");
+
+                    // Accepting is not enough: the disc has to end up in the slot.
+                    helper.assertTrue(dvd.insertMedia(installer.copyWithCount(1)).isEmpty(),
+                            "inserting a DVD into a DVD drive must consume the disc");
+                    helper.assertTrue(dvd.insertedKind() == MediaKind.PROGRAM_INSTALL,
+                            "the inserted installer must be readable from the slot afterwards");
+                })
+                .thenSucceed();
+    }
+
     @GameTest(template = ARENA)
     public static void os_mediaReaderHoldsInstaller(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);

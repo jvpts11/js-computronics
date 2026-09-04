@@ -65,6 +65,10 @@ public class ServerRouterBlockEntity extends BlockEntity {
 
     private String customName = "";
     private final Map<Direction, LoadBalanceMode> loadBalanceModes = new EnumMap<>(Direction.class);
+    // Player-given section names by face, shown by the Cluster Manager instead of "Router · EAST".
+    private final Map<Direction, String> sectionNames = new EnumMap<>(Direction.class);
+    // Where the next spreading write on each face starts, so round-robin actually takes turns.
+    private final Map<Direction, Integer> balanceCursors = new EnumMap<>(Direction.class);
 
     @Nullable
     private NetworkUuid registeredNetwork;
@@ -195,7 +199,7 @@ public class ServerRouterBlockEntity extends BlockEntity {
                 final var location = system.locationOf(server.nodeUuid());
                 if (location.isPresent() && scan.rackControllers.contains(location.get().rackPos())) {
                     servers.add(server.nodeUuid());
-                    storage += server.storageMB();
+                    storage += server.storageItems();
                 }
             }
             found.add(new DatacenterSection(face, new LinkedHashSet<>(scan.rackControllers), servers, storage));
@@ -231,10 +235,19 @@ public class ServerRouterBlockEntity extends BlockEntity {
             final BlockPos cable = BlockPos.of(cablePos);
             for (final Direction direction : Direction.values()) {
                 final BlockEntity neighbor = level.getBlockEntity(cable.relative(direction));
+                // A datacenter is made of Server Racks. A Supercomputer Rack lives on the compute fabric
+                // behind its HBW Interface and is never a section member, even if the branch walk
+                // happens to reach it through that fabric.
                 if (neighbor instanceof ServerRackBlockEntity rack) {
-                    racks.add(rack.getBlockPos().asLong());
+                    if (rack.rackType() != dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SUPERCOMPUTER) {
+                        racks.add(rack.getBlockPos().asLong());
+                    }
                 } else if (neighbor instanceof ServerRackPartBlockEntity part && part.controllerPos() != null) {
-                    racks.add(part.controllerPos().asLong());
+                    if (level.getBlockEntity(part.controllerPos()) instanceof ServerRackBlockEntity controller
+                            && controller.rackType()
+                                    != dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SUPERCOMPUTER) {
+                        racks.add(part.controllerPos().asLong());
+                    }
                 } else if (neighbor instanceof MainframeBlockEntity || neighbor instanceof MainframePartBlockEntity) {
                     hasMainframe = true;
                 }
@@ -311,6 +324,31 @@ public class ServerRouterBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /**
+     * Which server a spreading write on {@code face} should start from, advancing the rotation by one.
+     * Kept per face and written with the router, so successive writes really do take turns.
+     */
+    public int nextBalanceStart(final Direction face) {
+        final int start = balanceCursors.getOrDefault(face, 0);
+        balanceCursors.put(face, start == Integer.MAX_VALUE ? 0 : start + 1);
+        setChanged();
+        return start;
+    }
+
+    /** The player's name for the section on {@code face}, or empty when it goes by the router and face. */
+    public String sectionName(final Direction face) {
+        return sectionNames.getOrDefault(face, "");
+    }
+
+    public void setSectionName(final Direction face, @Nullable final String name) {
+        if (name == null || name.isEmpty()) {
+            sectionNames.remove(face);
+        } else {
+            sectionNames.put(face, name);
+        }
+        setChanged();
+    }
+
     public List<DatacenterSection> sections() {
         return sections;
     }
@@ -358,6 +396,16 @@ public class ServerRouterBlockEntity extends BlockEntity {
         if (!customName.isEmpty()) {
             tag.putString("CustomName", customName);
         }
+        final CompoundTag names = new CompoundTag();
+        sectionNames.forEach((face, name) -> names.putString(face.getName(), name));
+        if (!names.isEmpty()) {
+            tag.put("SectionNames", names);
+        }
+        final CompoundTag cursors = new CompoundTag();
+        balanceCursors.forEach((face, cursor) -> cursors.putInt(face.getName(), cursor));
+        if (!cursors.isEmpty()) {
+            tag.put("BalanceCursors", cursors);
+        }
         final CompoundTag modes = new CompoundTag();
         for (final Map.Entry<Direction, LoadBalanceMode> entry : loadBalanceModes.entrySet()) {
             modes.putByte(entry.getKey().getName(), (byte) entry.getValue().ordinal());
@@ -371,6 +419,24 @@ public class ServerRouterBlockEntity extends BlockEntity {
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         customName = tag.getString("CustomName");
+        sectionNames.clear();
+        if (tag.contains("SectionNames")) {
+            final CompoundTag names = tag.getCompound("SectionNames");
+            for (final Direction direction : Direction.values()) {
+                if (names.contains(direction.getName())) {
+                    sectionNames.put(direction, names.getString(direction.getName()));
+                }
+            }
+        }
+        balanceCursors.clear();
+        if (tag.contains("BalanceCursors")) {
+            final CompoundTag cursors = tag.getCompound("BalanceCursors");
+            for (final Direction direction : Direction.values()) {
+                if (cursors.contains(direction.getName())) {
+                    balanceCursors.put(direction, cursors.getInt(direction.getName()));
+                }
+            }
+        }
         loadBalanceModes.clear();
         if (tag.contains("LoadBalance")) {
             final CompoundTag modes = tag.getCompound("LoadBalance");

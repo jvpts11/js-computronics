@@ -14,10 +14,11 @@ import dev.jsc.jscomputronics.module.computing.gui.layout.BusLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingSwitchLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.ComputerTerminalLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.PatternEncoderLayout;
+import dev.jsc.jscomputronics.module.computing.gui.layout.ClusterManagementComputerLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingComputerLayout;
-import dev.jsc.jscomputronics.module.computing.gui.layout.DatacenterStationLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.NetworkInteractorLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.NmsLayout;
+import dev.jsc.jscomputronics.module.computing.gui.layout.ServerRackLayout;
 import dev.jsc.jscomputronics.module.computing.gui.layout.ServerRouterLayout;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -45,9 +46,9 @@ class LayoutAuditTest {
 
     /** Layout classes that produce a {@link GuiLayout} and are exercised by {@link #cases()}. */
     private static final Set<String> COVERED = Set.of(
-            "BusLayout", "CraftingComputerLayout", "DatacenterStationLayout", "NmsLayout",
+            "BusLayout", "ClusterManagementComputerLayout", "CraftingComputerLayout", "NmsLayout",
             "ComputerTerminalLayout", "ServerRouterLayout", "NetworkInteractorLayout",
-            "CraftingSwitchLayout", "PatternEncoderLayout");
+            "CraftingSwitchLayout", "PatternEncoderLayout", "ServerRackLayout", "FilesLayout", "ThisPcLayout");
 
     private record AuditCase(String label, GuiLayout layout, boolean fixedSize) {
     }
@@ -58,11 +59,40 @@ class LayoutAuditTest {
         c.add(new AuditCase("BusLayout", BusLayout.layout(), true));
         c.add(new AuditCase("CraftingSwitchLayout", CraftingSwitchLayout.layout(), true));
         c.add(new AuditCase("PatternEncoderLayout(processing)", PatternEncoderLayout.processing(), true));
+        c.add(new AuditCase("ClusterManagementComputerLayout", ClusterManagementComputerLayout.layout(), true));
         c.add(new AuditCase("CraftingComputerLayout", CraftingComputerLayout.layout(), true));
-        c.add(new AuditCase("DatacenterStationLayout", DatacenterStationLayout.layout(), true));
         c.add(new AuditCase("NmsLayout", NmsLayout.layout(), true));
+        c.add(new AuditCase("ServerRackLayout", ServerRackLayout.layout(), true));
         c.add(new AuditCase("ComputerTerminalLayout(mainframe)", ComputerTerminalLayout.layout(true), true));
         c.add(new AuditCase("ComputerTerminalLayout(pc)", ComputerTerminalLayout.layout(false), true));
+        // The explorer and This PC are resizable desktop windows: audit the smallest, the default and a
+        // maximised size, plus the row and grid geometry that depend on the width alone.
+        for (final int[] size : new int[][]{
+                {dev.jsc.jscomputronics.module.computing.gui.layout.FilesLayout.MIN_W,
+                        dev.jsc.jscomputronics.module.computing.gui.layout.FilesLayout.MIN_H},
+                {dev.jsc.jscomputronics.module.computing.gui.layout.FilesLayout.DEFAULT_W,
+                        dev.jsc.jscomputronics.module.computing.gui.layout.FilesLayout.DEFAULT_H},
+                {420, 300}}) {
+            c.add(new AuditCase("FilesLayout(" + size[0] + "x" + size[1] + ")",
+                    dev.jsc.jscomputronics.module.computing.gui.layout.FilesLayout.layout(size[0], size[1]), false));
+            c.add(new AuditCase("FilesLayout.columns(" + size[0] + ")",
+                    dev.jsc.jscomputronics.module.computing.gui.layout.FilesLayout.columns(size[0]), false));
+        }
+        for (final int[] size : new int[][]{
+                {dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.MIN_W,
+                        dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.MIN_H},
+                {dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.DEFAULT_W,
+                        dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.DEFAULT_H},
+                {420, 300}}) {
+            c.add(new AuditCase("ThisPcLayout(" + size[0] + "x" + size[1] + ")",
+                    dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.layout(size[0], size[1]), false));
+            for (int buttons = 0; buttons <= 3; buttons++) {
+                c.add(new AuditCase("ThisPcLayout.driveRow(" + size[0] + "," + buttons + ")",
+                        dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.driveRow(size[0], buttons), false));
+            }
+            c.add(new AuditCase("ThisPcLayout.programGrid(" + size[0] + ")",
+                    dev.jsc.jscomputronics.module.computing.gui.layout.ThisPcLayout.programGrid(size[0], 7), false));
+        }
         // The Server Router tiles one section per output face; audit every count up to the maximum.
         for (int s = 0; s <= ServerRouterLayout.MAX_SECTIONS; s++) {
             c.add(new AuditCase("ServerRouterLayout(" + s + ")", ServerRouterLayout.layout(s), true));

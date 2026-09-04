@@ -41,6 +41,17 @@ public final class NetworkIndex {
     private final Map<StorageKey, List<ItemLocation>> catalog = new LinkedHashMap<>();
     private final StorageLockTable<StorageKey> locks = new StorageLockTable<>();
     private final Map<NodeUuid, Long> indexedModCounts = new LinkedHashMap<>();
+    // What the index is currently worth trusting, so hot events and ghost rows stop being invisible.
+    private final dev.jsc.jscomputronics.common.operation.index.IndexHealth health =
+            new dev.jsc.jscomputronics.common.operation.index.IndexHealth();
+
+    /** How much read latency the Predictive Cache service saves its bay, in percent. */
+    private static final int PREDICTIVE_CACHE_CUT_PERCENT = 15;
+
+    /** The index's own health: what a hot event left unconfirmed and what a mass removal orphaned. */
+    public dev.jsc.jscomputronics.common.operation.index.IndexHealth health() {
+        return health;
+    }
     // Player-issued holds: one reservation per item type, kept alive until an explicit unlock so that
     // every other Operation contending for that type WAITs. Distinct from the per-Operation locks above
     // (those are keyed by the Operation's id and freed when it settles).
@@ -52,6 +63,7 @@ public final class NetworkIndex {
     public void rebuild(final ServerLevel level, final NetworkUuid network) {
         catalog.clear();
         indexedModCounts.clear();
+        health.onFullRebuild(); // a rebuild from scratch settles every doubt the index carried
         if (network == null) {
             return;
         }
@@ -117,6 +129,15 @@ public final class NetworkIndex {
         if (dirty.isEmpty() && gone.isEmpty()) {
             return; // nothing changed — the whole pass cost only counter comparisons
         }
+        // A node that left the network takes rows with it: those types were pointing at storage that
+        // is no longer there, which is exactly what a vacuum exists to sweep up.
+        for (final NodeUuid node : gone) {
+            final List<String> orphaned = typesHeldBy(node);
+            if (!orphaned.isEmpty()) {
+                health.markGhosts(orphaned, "srv-"
+                        + node.asString().substring(0, Math.min(6, node.asString().length())));
+            }
+        }
         final java.util.Set<NodeUuid> stale = new java.util.HashSet<>(dirty);
         stale.addAll(gone);
         dropServers(stale);
@@ -168,7 +189,33 @@ public final class NetworkIndex {
             }
         }
         indexedModCounts.keySet().retainAll(registered);
+        health.onVacuum(); // the ghost rows are gone, and with them the doubt they carried
         return freed;
+    }
+
+    /** The item types the catalog currently attributes to one node, as registry-id strings. */
+    private List<String> typesHeldBy(final NodeUuid node) {
+        final List<String> types = new ArrayList<>();
+        catalog.forEach((key, rows) -> {
+            for (final ItemLocation row : rows) {
+                if (row.server().equals(node) && row.quantity() > 0L) {
+                    types.add(key.toString());
+                    return;
+                }
+            }
+        });
+        return types;
+    }
+
+    /**
+     * A hot event on a bay (a drive pulled out from under a running machine) left the catalog's
+     * rows for that machine unconfirmed: they are flagged until a reindex re-reads the bay.
+     */
+    public void markBayHotPull(final NodeUuid server, final String label) {
+        final List<String> affected = typesHeldBy(server);
+        if (!affected.isEmpty()) {
+            health.markStale(affected, label);
+        }
     }
 
     private void dropServers(final java.util.Set<NodeUuid> servers) {
@@ -184,10 +231,23 @@ public final class NetworkIndex {
 
     private void indexServer(final ServerRackBlockEntity rack, final int slot, final NodeUuid server) {
         final StorageTier tier = tierOf(rack, slot);
+        // Caching serves reads ahead of the drives, so the index records the latency the query
+        // actually pays rather than the raw disk's. The Cache Card is hardware in the bay's gadget
+        // slot; the Predictive Cache is software staging the hot items in RAM. They stack, because
+        // one shortens the fetch and the other avoids it.
+        int cut = 0;
+        if (rack.hasCacheCard(slot)) {
+            cut += dev.jsc.jscomputronics.module.computing.item.RackGadgetItem.CACHE_LATENCY_CUT_PERCENT;
+        }
+        if (rack.hasService(slot, "predictive_cache")) {
+            cut += PREDICTIVE_CACHE_CUT_PERCENT;
+        }
+        final int latency = cut <= 0 ? tier.latencyTicks()
+                : Math.max(1, tier.latencyTicks() * Math.max(0, 100 - cut) / 100);
         rack.getServerStorage(slot).view().forEach((key, quantity) -> {
             if (quantity > 0L) {
                 catalog.computeIfAbsent(key, k -> new ArrayList<>())
-                        .add(new ItemLocation(server, tier, quantity));
+                        .add(new ItemLocation(server, tier, quantity, latency));
             }
         });
     }
@@ -216,21 +276,24 @@ public final class NetworkIndex {
         if (stack.getItem() instanceof ServerItem) {
             final ComputerBuild build = ServerItem.build(stack);
             if (build != null) {
-                return Math.min(build.totalCapacity(), build.ramBuffer());
+                // A cabinet over its thermal budget slows every machine in it, so the throughput a
+                // server can promise the network drops with it.
+                return rack.throttled(Math.min(build.totalCapacity(), build.ramBuffer()));
             }
         }
         return Long.MAX_VALUE;
     }
 
     private static StorageTier tierOf(final ServerRackBlockEntity rack, final int slot) {
-        final ItemStack stack = rack.getServers().getStackInSlot(slot);
-        if (stack.getItem() instanceof ServerItem) {
-            final ComputerBuild build = ServerItem.build(stack);
-            if (build != null) {
-                return build.fastestDiskTier();
+        // A server's drives live in the rack's front-panel bays, so its access tier is the fastest
+        // drive the unit claims there — the Server item itself carries no disks.
+        StorageTier fastest = StorageTier.HDD;
+        for (final ItemStack drive : rack.claimedDriveStacks(slot)) {
+            if (drive.getItem() instanceof dev.jsc.jscomputronics.module.computing.item.DiskItem disk) {
+                fastest = fastest.faster(disk.spec().tier());
             }
         }
-        return StorageTier.HDD;
+        return fastest;
     }
 
     /** Returns the best (lowest) RAM staging latency in ticks for the server. Zero if unresolvable. */
@@ -287,23 +350,48 @@ public final class NetworkIndex {
         return out;
     }
 
+    // The room every server has, measured once per tick: walking every cabinet costs a few
+    // microseconds a server, and a busy base builds dozens of INSERTs a tick. Each INSERT reserves what
+    // it plans to write, so the ones after it in the same tick see the room that is really left.
+    private long roomTick = Long.MIN_VALUE;
+    private final Map<NodeUuid, ItemLocation> room = new LinkedHashMap<>();
+
     public List<ItemLocation> freeSpace(final ServerLevel level, final NetworkUuid network) {
-        final List<ItemLocation> out = new ArrayList<>();
         if (network == null) {
-            return out;
+            return new ArrayList<>();
         }
-        final NetworkSystem system = NetworkSystem.get(level);
-        for (final ServerNode server : system.serversOf(network)) {
-            system.locationOf(server.nodeUuid()).ifPresent(loc -> {
-                if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
-                    final long freeWeight = rack.getServerStorage(loc.slot()).freeWeight();
-                    if (freeWeight > 0L) {
-                        out.add(new ItemLocation(server.nodeUuid(), tierOf(rack, loc.slot()), freeWeight));
+        if (roomTick != level.getGameTime()) {
+            roomTick = level.getGameTime();
+            room.clear();
+            final NetworkSystem system = NetworkSystem.get(level);
+            for (final ServerNode server : system.serversOf(network)) {
+                system.locationOf(server.nodeUuid()).ifPresent(loc -> {
+                    if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+                        final long freeWeight = rack.getServerStorage(loc.slot()).freeWeight();
+                        if (freeWeight > 0L) {
+                            room.put(server.nodeUuid(), new ItemLocation(server.nodeUuid(), tierOf(rack, loc.slot()), freeWeight));
+                        }
                     }
-                }
-            });
+                });
+            }
+        }
+        final List<ItemLocation> out = new ArrayList<>(room.size());
+        for (final ItemLocation location : room.values()) {
+            if (location.quantity() > 0L) {
+                out.add(location);
+            }
         }
         return out;
+    }
+
+    /** Takes the weight an INSERT is about to write out of this tick's free-space picture. */
+    public void reserveRoom(final Map<NodeUuid, Long> perServer, final long unitWeight) {
+        perServer.forEach((server, quantity) -> {
+            final ItemLocation location = room.get(server);
+            if (location != null) {
+                room.put(server, location.withQuantity(Math.max(0L, location.quantity() - quantity * unitWeight)));
+            }
+        });
     }
 
     public Map<StorageKey, Long> snapshot() {

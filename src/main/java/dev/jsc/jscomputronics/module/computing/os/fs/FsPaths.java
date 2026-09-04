@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.fs;
 
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
 
 /**
@@ -23,17 +24,20 @@ public final class FsPaths {
     }
 
     /**
-     * Converts a byte count into mB-equivalents (1 mB-eq = 4 096 bytes), rounding up.
+     * Converts a byte count into mB-equivalents on a disk of {@code era}, rounding up: one mB-eq is
+     * {@link HardwareEra#bytesPerMbEq()} bytes there, so the same file weighs more on older hardware.
      * Zero bytes map to zero mB-eq.
      *
      * @param bytes the raw byte count (must be &ge; 0)
-     * @return the ceiling of {@code bytes / 4096}
+     * @param era   the era of the disk the file sits on
+     * @return the ceiling of {@code bytes / era.bytesPerMbEq()}
      */
-    public static long sizeMbEq(final int bytes) {
+    public static long sizeMbEq(final int bytes, final HardwareEra era) {
         if (bytes <= 0) {
             return 0L;
         }
-        return (bytes + 4095L) / 4096L;
+        final long block = era.bytesPerMbEq();
+        return (bytes + block - 1L) / block;
     }
 
     /**
