@@ -26,12 +26,20 @@ public final class HardwareTooltip {
     private HardwareTooltip() {
     }
 
-    /** Appends the component's hardware generation, the axis that decides what fits with what. */
+    /**
+     * Appends the component's hardware generation, the axis that decides what fits with what, in the
+     * colour of that generation's screens so the era reads before the word does.
+     */
     public static void appendEra(final List<Component> tooltip, final HardwareEra era) {
         if (era == null) {
             return;
         }
-        tooltip.add(Component.literal(label(era) + " era").withStyle(ChatFormatting.DARK_AQUA));
+        tooltip.add(eraName(era, label(era) + " era"));
+    }
+
+    /** {@code text} in the colour of {@code era}'s screens: the one styling every era mention shares. */
+    public static Component eraName(final HardwareEra era, final String text) {
+        return Component.literal(text).withStyle(style -> style.withColor(era.screenColor()));
     }
 
     /** An era name in title case: {@code LEGACY} reads as "Legacy". */

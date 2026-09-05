@@ -139,8 +139,8 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
                 push("640K base memory", CliStyle.DIM);
                 push("", CliStyle.PLAIN);
             } else {
-                push(dev.jsc.jscomputronics.module.computing.os.Branding.SOFTWARE_HOUSE + " Shell v1.0",
-                        CliStyle.ACCENT);
+                push(dev.jsc.jscomputronics.module.computing.os.Branding.houseOf(menu.osLabel()).name()
+                        + " Shell v1.0", CliStyle.ACCENT);
                 push("type 'help' for commands, TAB to complete", CliStyle.DIM);
                 push("", CliStyle.PLAIN);
             }

@@ -198,7 +198,8 @@ public final class ThisPcApp implements DesktopApp {
         final String kindLine = m.name().isEmpty() ? m.era() + " era" : m.kind() + " · " + m.era() + " era";
         g.drawString(font, trim(font, kindLine, textMax), tx, y + 12, skin.dim(), false);
         final String system = m.osLabel().isEmpty() ? "No system installed"
-                : m.osLabel() + " · " + dev.jsc.jscomputronics.module.computing.os.Branding.SOFTWARE_HOUSE + " " + m.osYear();
+                : m.osLabel() + " · " + dev.jsc.jscomputronics.module.computing.os.Branding.houseOf(m.osLabel()).name()
+                        + " " + m.osYear();
         final String net = m.networkLabel().isEmpty() ? "not on a network" : "network " + m.networkLabel();
         g.drawString(font, trim(font, system + " · " + net, textMax), tx, y + 21,
                 m.osLabel().isEmpty() ? AMBER : skin.dim(), false);

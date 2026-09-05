@@ -75,7 +75,7 @@ public class FormattedMediaItem extends MediaItem {
                     tooltip.add(Component.translatable("os.jsc." + payload.getPath())
                             .withStyle(ChatFormatting.AQUA)
                             .append(os == null ? Component.empty() : Component.literal("  "
-                                    + dev.jsc.jscomputronics.module.computing.os.Branding.SOFTWARE_HOUSE + " · "
+                                    + os.house().name() + " · "
                                     + dev.jsc.jscomputronics.module.computing.os.Branding.osYear(os.displayName(), os.minEra()))
                                     .withStyle(ChatFormatting.GRAY)));
                     tooltip.add(Component.literal("Bootable installer" + (os == null ? "" : " · "
@@ -94,11 +94,13 @@ public class FormattedMediaItem extends MediaItem {
                 if (payload != null) {
                     final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec =
                             dev.jsc.jscomputronics.module.computing.os.OsRegistry.getProgram(payload);
-                    // Lead with the program's friendly, translated name, then the year it was written.
+                    // Lead with the program's friendly, translated name, then its house and the year it was
+                    // written. A disc of a bundled program has no shipper to lean on, so it says Midsoft.
                     tooltip.add(Component.translatable("program.jsc." + payload.getPath())
                             .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
                             .append(spec == null ? Component.empty() : Component.literal("  "
-                                    + dev.jsc.jscomputronics.module.computing.os.Branding.year(spec.era()))
+                                    + spec.houseOr(dev.jsc.jscomputronics.module.computing.os.SoftwareHouse.MIDSOFT).name()
+                                    + " · " + dev.jsc.jscomputronics.module.computing.os.Branding.year(spec.era()))
                                     .withStyle(ChatFormatting.GRAY)));
                     tooltip.add(Component.literal(spec != null
                             && spec.kind() == dev.jsc.jscomputronics.module.computing.os.ProgramKind.SERVICE

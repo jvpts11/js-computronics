@@ -10,6 +10,7 @@ package dev.jsc.jscomputronics.module.computing.os;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
@@ -33,9 +34,16 @@ public final class MinSpecTooltip {
         if (os == null) {
             return lines;
         }
-        lines.add(line("Needs " + eraLabel(os.minEra()) + " hardware or later"));
+        lines.add(needsEra(os.minEra()));
         lines.add(line("Disk footprint: " + os.footprintMb() + " MB"));
         return lines;
+    }
+
+    /** "Needs X hardware or later", with the era in the colour every hardware tooltip gives it. */
+    private static Component needsEra(final HardwareEra era) {
+        return line("Needs ")
+                .append(dev.jsc.jscomputronics.module.computing.item.HardwareTooltip.eraName(era, eraLabel(era)))
+                .append(line(" hardware or later"));
     }
 
     /** The minimum-spec lines for a program: its OS floor (platform + version) and its hardware minimums. */
@@ -53,7 +61,7 @@ public final class MinSpecTooltip {
         // older generation cannot run it at any clock speed.
         if (prog.minEra() != dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE) {
             // Worded exactly like the OS line above: the same requirement must not read as two rules.
-            lines.add(line("Needs " + eraLabel(prog.minEra()) + " hardware or later"));
+            lines.add(needsEra(prog.minEra()));
         }
         if (prog.minCpuMhz() > 0) {
             lines.add(line("CPU " + prog.minCpuMhz() + " MHz+"));
@@ -87,7 +95,7 @@ public final class MinSpecTooltip {
         return String.join(", ", names);
     }
 
-    private static Component line(final String text) {
+    private static MutableComponent line(final String text) {
         return Component.literal(text).withStyle(ChatFormatting.DARK_GRAY);
     }
 

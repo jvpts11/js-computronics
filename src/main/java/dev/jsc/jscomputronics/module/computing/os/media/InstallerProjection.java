@@ -99,7 +99,7 @@ public final class InstallerProjection {
         final boolean linux = os.platform() == Platform.LINUX;
         return new InstallerLayout.Facts(
                 os.displayName(), os.id().getPath(), os.id().getPath(), true, false, linux,
-                Branding.osYear(os.displayName(), os.minEra()), Branding.SOFTWARE_HOUSE,
+                Branding.osYear(os.displayName(), os.minEra()), os.house().name(),
                 Component.translatable("os.jsc." + os.id().getPath() + ".desc").getString()
                         .replace("os.jsc." + os.id().getPath() + ".desc", ""),
                 plain(MinSpecTooltip.osMinSpec(os.id())), os.platform().label(), "any computer",
@@ -110,7 +110,9 @@ public final class InstallerProjection {
         final boolean linux = spec.platforms().equals(java.util.Set.of(Platform.LINUX));
         return new InstallerLayout.Facts(
                 spec.displayName(), spec.commandName(), spec.id().getPath(), false,
-                spec.kind() == ProgramKind.SERVICE, linux, Branding.year(spec.era()), Branding.SOFTWARE_HOUSE,
+                spec.kind() == ProgramKind.SERVICE, linux, Branding.year(spec.era()),
+                // A disc of a bundled program has no shipper to be credited to, so it says Midsoft.
+                spec.houseOr(dev.jsc.jscomputronics.module.computing.os.SoftwareHouse.MIDSOFT).name(),
                 Component.translatable("program.jsc." + spec.id().getPath() + ".desc").getString()
                         .replace("program.jsc." + spec.id().getPath() + ".desc", ""),
                 plain(MinSpecTooltip.programMinSpec(spec.id())),

@@ -42,6 +42,8 @@ import java.util.Set;
  * @param minEra       the oldest hardware generation that may install it (a gate)
  * @param era          the generation the software was written in: what it ships on and the year on its
  *                     banner, never a gate; a 2010s tool can still run on 2000s hardware if minEra allows
+ * @param house        who wrote it, or {@link SoftwareHouse#BUNDLED} for a program credited to whichever
+ *                     system or desktop ships it
  */
 public record ProgramSpec(
         ResourceLocation id,
@@ -57,7 +59,8 @@ public record ProgramSpec(
         HostScope hostScope,
         ResourceLocation iconId,
         dev.jsc.jscomputronics.common.tier.HardwareEra minEra,
-        dev.jsc.jscomputronics.common.tier.HardwareEra era
+        dev.jsc.jscomputronics.common.tier.HardwareEra era,
+        SoftwareHouse house
 ) {
 
     public static final Codec<ProgramSpec> CODEC = RecordCodecBuilder.create(inst -> inst.group(
@@ -81,7 +84,8 @@ public record ProgramSpec(
             // Absent means "derive it from the OS rank", which the compact constructor does.
             enumCodec(dev.jsc.jscomputronics.common.tier.HardwareEra.class)
                     .optionalFieldOf("era", null)
-                    .forGetter(ProgramSpec::era)
+                    .forGetter(ProgramSpec::era),
+            SoftwareHouse.CODEC.optionalFieldOf("house", SoftwareHouse.BUNDLED).forGetter(ProgramSpec::house)
     ).apply(inst, ProgramSpec::new));
 
     /**
@@ -113,6 +117,9 @@ public record ProgramSpec(
         if (era == null) {
             era = eraFromRank(minOsRank);
         }
+        if (house == null) {
+            house = SoftwareHouse.BUNDLED;
+        }
         platforms = Set.copyOf(platforms);
     }
 
@@ -139,7 +146,8 @@ public record ProgramSpec(
                                  final boolean preinstalled, final Set<Platform> platforms, final int minDiskMb,
                                  final ProgramKind kind, final int minOsRank, final HostScope hostScope) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, 0, 0, minDiskMb,
-                kind, minOsRank, hostScope, id, dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE, null);
+                kind, minOsRank, hostScope, id, dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE, null,
+                SoftwareHouse.BUNDLED);
     }
 
     /**
@@ -149,7 +157,7 @@ public record ProgramSpec(
      */
     public ProgramSpec withMinEra(final dev.jsc.jscomputronics.common.tier.HardwareEra oldest) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
-                minDiskMb, kind, minOsRank, hostScope, iconId, oldest, era);
+                minDiskMb, kind, minOsRank, hostScope, iconId, oldest, era, house);
     }
 
     /**
@@ -158,7 +166,18 @@ public record ProgramSpec(
      */
     public ProgramSpec withEra(final dev.jsc.jscomputronics.common.tier.HardwareEra generation) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
-                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, generation);
+                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, generation, house);
+    }
+
+    /** The same program, credited to {@code maker}: the name on its disc, its banner and its about line. */
+    public ProgramSpec withHouse(final SoftwareHouse maker) {
+        return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
+                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, era, maker);
+    }
+
+    /** Who to credit where the program is shown: its own house, or {@code shipper} when it is bundled. */
+    public SoftwareHouse houseOr(final SoftwareHouse shipper) {
+        return house.or(shipper);
     }
 
     /** The translation key for this program's display name, in vanilla {@code program.<ns>.<path>} form. */

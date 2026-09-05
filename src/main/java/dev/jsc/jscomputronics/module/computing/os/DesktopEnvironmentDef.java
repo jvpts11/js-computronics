@@ -27,13 +27,15 @@ import java.util.Map;
  * @param panelStyle       the chrome family the desktop screen draws
  * @param bundledPrograms  the pre-installed program ids this desktop shows launchers for, in rail order
  * @param nativeNames      per-program display-name overrides under this desktop (missing = the program's own)
+ * @param house            who makes this desktop, and so who is credited for the programs it bundles
  */
 public record DesktopEnvironmentDef(
         ResourceLocation id,
         String displayName,
         PanelStyle panelStyle,
         List<ResourceLocation> bundledPrograms,
-        Map<ResourceLocation, String> nativeNames
+        Map<ResourceLocation, String> nativeNames,
+        SoftwareHouse house
 ) {
 
     public DesktopEnvironmentDef {
@@ -42,11 +44,22 @@ public record DesktopEnvironmentDef(
         }
         bundledPrograms = List.copyOf(bundledPrograms);
         nativeNames = Map.copyOf(nativeNames);
+        if (house == null) {
+            house = SoftwareHouse.MIDSOFT;
+        }
     }
 
     /** The name a program shows under this desktop: its native name here, else its own display name. */
     public String nameOf(final ProgramSpec program) {
         return nativeNames.getOrDefault(program.id(), program.displayName());
+    }
+
+    /**
+     * Who a program is credited to under this desktop: its own house, or this desktop's for a bundled one.
+     * Files is the KDE Guild's on Plasma and Midsoft's on Frames; the Network Interactor stays JSC's anywhere.
+     */
+    public SoftwareHouse houseOf(final ProgramSpec program) {
+        return program.houseOr(house);
     }
 
     /** Whether this desktop shows a launcher for the given pre-installed program. */

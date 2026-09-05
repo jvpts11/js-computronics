@@ -43,6 +43,7 @@ import java.util.Optional;
  * @param installMode    how booting this OS's medium installs it (guided, or the real manual steps)
  * @param bundledDesktop the desktop environment this OS ships with, if any (the Frames editions bundle their
  *                       own; a Linux distribution boots to a TTY until one is installed)
+ * @param house          who wrote it: the name on its banner, its copyright line and its install disc
  */
 public record OsDef(
         ResourceLocation id,
@@ -56,7 +57,8 @@ public record OsDef(
         String shellId,
         PackageManagerKind packageManager,
         InstallMode installMode,
-        Optional<ResourceLocation> bundledDesktop
+        Optional<ResourceLocation> bundledDesktop,
+        SoftwareHouse house
 ) {
 
     public static final Codec<OsDef> CODEC = RecordCodecBuilder.create(inst -> inst.group(
@@ -73,7 +75,8 @@ public record OsDef(
                     .forGetter(OsDef::packageManager),
             enumCodec(InstallMode.class).optionalFieldOf("install_mode", InstallMode.GUIDED)
                     .forGetter(OsDef::installMode),
-            ResourceLocation.CODEC.optionalFieldOf("bundled_desktop").forGetter(OsDef::bundledDesktop)
+            ResourceLocation.CODEC.optionalFieldOf("bundled_desktop").forGetter(OsDef::bundledDesktop),
+            SoftwareHouse.CODEC.optionalFieldOf("house", SoftwareHouse.MIDSOFT).forGetter(OsDef::house)
     ).apply(inst, OsDef::new));
 
     /**
@@ -83,25 +86,29 @@ public record OsDef(
     public static OsDef mediaInstalled(final ResourceLocation id, final OsCapability capability,
                                        final HardwareEra minEra, final ResourceLocation kernelId,
                                        final int footprintMb, final Platform platform,
-                                       final String displayName, final Optional<ResourceLocation> bundledDesktop) {
+                                       final String displayName, final Optional<ResourceLocation> bundledDesktop,
+                                       final SoftwareHouse house) {
         // A Frames edition ships pckmgr; anything else installed from media (MC-NET, MC-DOS) still
         // takes its programs from a disc in a linked drive.
         return new OsDef(id, capability, minEra, kernelId, footprintMb, Optional.empty(), platform,
                 displayName, "cmd",
                 platform == Platform.FRAMES ? PackageManagerKind.PCKMGR : PackageManagerKind.NONE,
-                InstallMode.GUIDED, bundledDesktop);
+                InstallMode.GUIDED, bundledDesktop, house);
     }
 
     /** A Linux distribution: TTY capability on the Linux kernel, no bundled desktop, installable from the Legacy era. */
     public static OsDef linuxDistro(final ResourceLocation id, final int footprintMb, final String displayName,
                                     final String shellId, final PackageManagerKind packageManager,
-                                    final InstallMode installMode) {
+                                    final InstallMode installMode, final SoftwareHouse house) {
         return new OsDef(id, OsCapability.TERMINAL_ONLY, HardwareEra.LEGACY,
                 ResourceLocation.fromNamespaceAndPath("jsc", "linux"), footprintMb, Optional.empty(),
-                Platform.LINUX, displayName, shellId, packageManager, installMode, Optional.empty());
+                Platform.LINUX, displayName, shellId, packageManager, installMode, Optional.empty(), house);
     }
 
     public OsDef {
+        if (house == null) {
+            house = SoftwareHouse.MIDSOFT;
+        }
         if (displayName == null || displayName.isBlank()) {
             displayName = id.getPath();
         }

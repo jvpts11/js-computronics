@@ -17,14 +17,11 @@ import java.util.Map;
  * <p>Every firmware banner and system greeting used to carry the same present-day line, so a machine
  * built from parts three decades old booted claiming a copyright from this year. A banner is one of the
  * few places the fiction states its own age out loud, so it says the year that machine's era belongs to
- * and names the house that wrote its software.
+ * and names the house that wrote its software, which each system carries as its {@link SoftwareHouse}.
  *
  * <p>Pure text and numbers, no rendering, so a screen on either firmware can share it.
  */
 public final class Branding {
-
-    /** The software house: the systems and the desktop line are all its work. */
-    public static final String SOFTWARE_HOUSE = "Midsoft";
 
     /** The hardware house: the machines, their boards, and the firmware that posts them. */
     public static final String HARDWARE_HOUSE = "JSC Technologies";
@@ -87,8 +84,23 @@ public final class Branding {
         return "Copyright (C) " + year(era) + " " + HARDWARE_HOUSE;
     }
 
+    /**
+     * The house of the system that prints itself as {@code osName}. Screens carry the system's name, not its
+     * definition, so the lookup goes by the name the registry knows; an unknown name falls back to the house
+     * that writes the Frames line, which is what every banner said before systems named their makers.
+     */
+    public static SoftwareHouse houseOf(final String osName) {
+        final String wanted = osName == null ? "" : osName.trim();
+        for (final OsDef os : OsRegistry.oses()) {
+            if (os.displayName().equals(wanted)) {
+                return os.house();
+            }
+        }
+        return SoftwareHouse.MIDSOFT;
+    }
+
     /** The copyright line a system prints under its own name. */
     public static String systemCopyright(final String osName, final HardwareEra era) {
-        return "(C) " + osYear(osName, era) + " " + SOFTWARE_HOUSE + " Corp.";
+        return "(C) " + osYear(osName, era) + " " + houseOf(osName).legalName();
     }
 }

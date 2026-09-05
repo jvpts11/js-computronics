@@ -60,6 +60,7 @@ public class DiskItem extends SpecItem<DiskSpec> {
         tooltip.add(Component.literal(DiskSpec.sizeLabel(spec.capacityMb()) + " drive  -  " + spec.era().bits()
                 + "-bit: " + spec.era().mbPerItem() + " MB per item").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal(DiskUsage.capacityLine(spec.capacityItems())).withStyle(ChatFormatting.GRAY));
+        HardwareTooltip.appendEra(tooltip, spec.era());
         tooltip.add(Component.literal(
                 spec.tier() + "  -  " + spec.tier().latencyTicks() + "t latency  -  "
                         + spec.tier().speedMultiplier() + "x speed")

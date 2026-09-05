@@ -23,6 +23,23 @@ public enum HardwareEra {
     EXA,
     SINGULARITY;
 
+    /**
+     * The colour an era's screens are remembered by, as an RGB int for a tooltip: the green phosphor of a
+     * CRT terminal for Vintage, the blue of the Legacy desktop's chrome, the accent blue of the Standard
+     * desktop, and a colder cast for each generation past that. A part's era reads at a glance, before
+     * the word does, which is what a player sorting a chest of boards and chips needs.
+     */
+    public int screenColor() {
+        return switch (this) {
+            case VINTAGE -> 0x33FF33;
+            case LEGACY -> 0x245EDC;
+            case STANDARD -> 0x0078D4;
+            case ADVANCED -> 0x9B59FF;
+            case EXA -> 0x00E5FF;
+            case SINGULARITY -> 0xF2F2F2;
+        };
+    }
+
     /** The word size of the era's processors; what an item costs on the era's disks follows from it. */
     public int bits() {
         return switch (this) {
