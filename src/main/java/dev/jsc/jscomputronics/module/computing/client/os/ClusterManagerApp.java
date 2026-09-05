@@ -106,6 +106,12 @@ public final class ClusterManagerApp implements DesktopApp {
         PacketDistributor.sendToServer(new RequestClusterManagerPayload(host, tab, selIndex));
     }
 
+    @Override
+    public void onRestored() {
+        active = this;
+        request();
+    }
+
     private void act(final int action) {
         PacketDistributor.sendToServer(ClusterManagerActionPayload.bulk(host, action, tab, selIndex));
     }

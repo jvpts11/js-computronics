@@ -71,6 +71,12 @@ public final class SettingsApp implements DesktopApp {
         PacketDistributor.sendToServer(new RequestSettingsPayload(host));
     }
 
+    @Override
+    public void onRestored() {
+        active = this;
+        PacketDistributor.sendToServer(new RequestSettingsPayload(host));
+    }
+
     /** Routes a settings snapshot reply to the open Settings window. */
     public static void accept(final SettingsSnapshotPayload payload) {
         if (active != null && active.host.equals(payload.hostPos())) {

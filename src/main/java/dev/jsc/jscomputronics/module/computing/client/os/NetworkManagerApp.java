@@ -140,6 +140,13 @@ public final class NetworkManagerApp implements DesktopApp {
         PacketDistributor.sendToServer(new RequestNiOperationsPayload(host, monitorPos));
     }
 
+    @Override
+    public void onRestored() {
+        active = this;
+        PacketDistributor.sendToServer(new RequestNetworkManagerPayload(host));
+        requestOps();
+    }
+
     @Override public String title() {
         return "Network Manager";
     }

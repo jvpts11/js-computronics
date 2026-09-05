@@ -83,6 +83,14 @@ public final class CraftPlannerApp implements DesktopApp {
         }
     }
 
+    @Override
+    public void onRestored() {
+        active = this;
+        // The catalog may have grown (recipes loaded meanwhile) and the plan's stock may have moved.
+        PacketDistributor.sendToServer(new RequestCraftPlannerPayload(host, monitorPos, ItemStack.EMPTY, 0));
+        requestPlan();
+    }
+
     @Override public String title() {
         return "Craft Planner";
     }

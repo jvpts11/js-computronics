@@ -17,8 +17,8 @@ import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
  */
 public final class FsPaths {
 
-    /** Maximum length (in characters) for a single file or directory name segment. */
-    static final int MAX_NAME_LENGTH = 64;
+    /** Maximum length (in characters) for a single file or directory name segment: what a wire field carrying one must fit. */
+    public static final int MAX_NAME_LENGTH = 64;
 
     private FsPaths() {
     }

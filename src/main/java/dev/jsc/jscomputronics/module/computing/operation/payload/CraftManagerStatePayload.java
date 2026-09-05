@@ -96,7 +96,8 @@ public record CraftManagerStatePayload(
     private record FileName(String value) {
         static final StreamCodec<RegistryFriendlyByteBuf, FileName> STREAM_CODEC =
                 StreamCodec.composite(
-                        ByteBufCodecs.stringUtf8(42), FileName::value,
+                        ByteBufCodecs.stringUtf8(dev.jsc.jscomputronics.module.computing.os.fs.FsPaths.MAX_NAME_LENGTH),
+                        FileName::value,
                         FileName::new);
     }
 

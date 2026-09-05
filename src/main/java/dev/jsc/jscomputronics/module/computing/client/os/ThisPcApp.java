@@ -94,6 +94,12 @@ public final class ThisPcApp implements DesktopApp {
     }
 
     @Override
+    public void onRestored() {
+        active = this;
+        request();
+    }
+
+    @Override
     public String title() {
         return title;
     }

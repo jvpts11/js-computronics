@@ -324,6 +324,22 @@ public final class DiskFilesystem {
         return fs.files().containsKey(path);
     }
 
+    /**
+     * The path a new file of {@code content} should take so nothing already on the disk is overwritten:
+     * {@code base + extension} when that path is free or already holds this very content, else the first of
+     * {@code base_2}, {@code base_3}, ... that is. A write replaces a same-path file silently, and a recipe
+     * named after its result would otherwise erase another recipe for the same result.
+     */
+    public static String uniquePath(final ItemStack disk, final String base, final String extension,
+                                    final String content) {
+        String candidate = base + extension;
+        int n = 2;
+        while (exists(disk, candidate) && !read(disk, candidate).map(content::equals).orElse(false)) {
+            candidate = base + "_" + n++ + extension;
+        }
+        return candidate;
+    }
+
     // -------------------------------------------------------------------------
     // mkdir
     // -------------------------------------------------------------------------

@@ -250,6 +250,12 @@ public final class FilesApp implements DesktopApp {
 
     // ---- navigation ------------------------------------------------------------------------
 
+    @Override
+    public void onRestored() {
+        active = this;
+        request(dir); // the folder may have gained or lost files while the window was away
+    }
+
     private void request(final String target) {
         this.dir = target;
         this.selected = -1;

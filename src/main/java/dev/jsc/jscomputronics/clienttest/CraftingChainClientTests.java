@@ -381,6 +381,76 @@ public final class CraftingChainClientTests {
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }
 
+    /**
+     * Opens the Crafting Manager while the drive is still empty, leaves the monitor, puts the floppy in and
+     * comes back: the restored window must list the disc's .craft on its own. A window's program instance
+     * outlives the screen it was opened on, so a state asked for only when the program started stayed blank
+     * for good, and a disc inserted afterwards was never seen.
+     */
+    @ClientTest(timeoutTicks = 1800)
+    public static void craftingManager_seesADiscInsertedAfterItsWindowOpened(final ClientTestContext ctx) {
+        ctx.thenBuild(0, world -> {
+                    final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
+                    net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
+                            new ItemStack(ComputingModule.GPU_HD_7970.get()));
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
+                    net.cc().togglePower();
+                    net.cc().togglePower();
+                    world.setBlock(DRIVE, ComputingModule.FLOPPY_DRIVE.get());
+                    world.placeMonitor(MONITOR, Direction.EAST);
+                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
+                    final PatternEncoderBlockEntity encoder = world.blockEntity(ENCODER, PatternEncoderBlockEntity.class);
+                    encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
+                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
+                    if (!encoder.writePattern()) {
+                        throw new IllegalStateException("could not author the .craft for the test");
+                    }
+                    final ItemStack floppy = encoder.media().getStackInSlot(0);
+                    encoder.media().setStackInSlot(0, ItemStack.EMPTY);
+                    ctx.give(0, floppy);
+                })
+                // The manager first, with nothing in the drive.
+                .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(CRAFTING_MANAGER_LAUNCHER),
+                        SCREEN_WAIT, "the Crafting Manager to be listed as installed")
+                .then(0, () -> {
+                    final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
+                    ctx.click(desktop.startButtonX(), desktop.startButtonY());
+                })
+                .then(1, () -> {
+                    final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
+                    final int item = desktop.launcherLabels().indexOf(CRAFTING_MANAGER_LAUNCHER);
+                    ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(item));
+                })
+                .thenWaitUntil(() -> craftingManager(ctx) != null && craftingManager(ctx).isLoaded(),
+                        SCREEN_WAIT, "the Crafting Manager window with its state")
+                .thenAssert(0, () -> craftingManager(ctx).mediaFiles().isEmpty(),
+                        "nothing is listed while the drive is empty")
+                // Leave the monitor, put the floppy in the drive, come back.
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT)
+                .thenTeleport(SETTLE, PLAYER_AT_DRIVE, Direction.NORTH)
+                .then(SETTLE, () -> {
+                    ctx.selectHotbar(0);
+                    ctx.rightClick(DRIVE);
+                })
+                .thenServer(SETTLE, level -> ctx.assertTrue(
+                        drive(ctx, level).mediaSlot().getStackInSlot(0).is(ComputingModule.FLOPPY_DISK.get()),
+                        "right-clicking the drive with the floppy must insert it"))
+                .thenTeleport(0, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenWaitUntil(() -> craftingManager(ctx) != null, SCREEN_WAIT,
+                        "the Crafting Manager window to come back with the desktop")
+                .thenWaitUntil(() -> !craftingManager(ctx).mediaFiles().isEmpty(), SCREEN_WAIT,
+                        "the restored window to list the floppy's .craft on its own")
+                .thenScreenshot(2, "crafting-manager-refreshed")
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT);
+    }
+
     private static final BlockPos MAINFRAME = new BlockPos(1, 2, 2);
     private static final BlockPos CRAFTING_CABLE = new BlockPos(5, 2, 3);
     private static final BlockPos SWITCH = new BlockPos(5, 2, 4);

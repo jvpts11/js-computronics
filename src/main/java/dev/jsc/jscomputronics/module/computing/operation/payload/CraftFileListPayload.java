@@ -29,8 +29,11 @@ public record CraftFileListPayload(List<String> files) implements CustomPacketPa
     /** Maximum number of file entries sent in one payload. */
     public static final int MAX_FILES = 64;
 
-    /** Maximum characters per file name (32 base + ".craft" + safety margin). */
-    private static final int MAX_NAME = 42;
+    /**
+     * Maximum characters per file name: the filesystem's own limit, since a player can rename a {@code .craft}
+     * to anything the explorer accepts and a name over the wire cap would disconnect them on the next listing.
+     */
+    private static final int MAX_NAME = dev.jsc.jscomputronics.module.computing.os.fs.FsPaths.MAX_NAME_LENGTH;
 
     public static final CustomPacketPayload.Type<CraftFileListPayload> TYPE =
             new CustomPacketPayload.Type<>(

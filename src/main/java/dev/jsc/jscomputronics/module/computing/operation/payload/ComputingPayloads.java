@@ -4916,7 +4916,10 @@ public final class ComputingPayloads {
                 DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL);
         final List<String> names = new ArrayList<>();
         for (final DiskFilesystem.FileEntry e : entries) {
-            if (e.type() == FileType.CRAFT && names.size() < CraftFileListPayload.MAX_FILES) {
+            // A name the wire cannot carry would disconnect the player on every listing; the filesystem's own
+            // name limit is the cap, so this only guards against a path the filesystem should never hold.
+            if (e.type() == FileType.CRAFT && names.size() < CraftFileListPayload.MAX_FILES
+                    && e.path().length() <= dev.jsc.jscomputronics.module.computing.os.fs.FsPaths.MAX_NAME_LENGTH) {
                 names.add(e.path());
             }
         }
@@ -5646,7 +5649,7 @@ public final class ComputingPayloads {
             final List<CraftingPattern> rom = cc.romPatterns();
             for (final int idx : payload.romIndices()) {
                 final java.util.Optional<String> content;
-                final String fileName;
+                final String base;
                 if (idx >= CraftManagerStatePayload.MACHINE_ROM_BASE) {
                     // A machine recipe: serialize it back to its typed .craft form.
                     final int mi = idx - CraftManagerStatePayload.MACHINE_ROM_BASE;
@@ -5663,19 +5666,21 @@ public final class ComputingPayloads {
                         continue;
                     }
                     final var resultKey = r.resultKey();
-                    fileName = sanitizeFileBase(resultKey == null ? "recipe"
-                            : resultKey.displayName().getString()) + ".craft";
+                    base = sanitizeFileBase(resultKey == null ? "recipe" : resultKey.displayName().getString());
                 } else {
                     if (idx < 0 || idx >= rom.size()) {
                         continue;
                     }
                     final CraftingPattern pattern = rom.get(idx);
                     content = CraftFile.serialize(pattern, level.registryAccess());
-                    fileName = craftFileNameFor(pattern.result()) + ".craft";
+                    base = craftFileNameFor(pattern.result());
                 }
                 if (content.isEmpty()) {
                     continue;
                 }
+                // A recipe already on the disc under this name is never overwritten: a different one gets the
+                // next free suffix, the same one is simply there already. The encoder writes by the same rule.
+                final String fileName = DiskFilesystem.uniquePath(media, base, ".craft", content.get());
                 final long freeWeight = mediaFreeWeightFor(media);
                 DiskFilesystem.write(media, fileName, FileType.CRAFT, content.get(),
                         freeWeight, FilesystemKind.HIERARCHICAL, level.getGameTime());
@@ -5697,12 +5702,13 @@ public final class ComputingPayloads {
     }
 
     /**
-     * Builds a full {@link CraftManagerStatePayload} for {@code cc}: finds the first linked drive
-     * with writable removable media, lists its {@code .craft} files, and annotates each ROM
-     * pattern with whether a matching file already exists on the medium.
+     * Builds a full {@link CraftManagerStatePayload} for {@code cc}: picks the linked drive whose writable
+     * removable medium holds {@code .craft} files (or, when none does, the first one holding writable
+     * media, so a download still has a target), lists that medium's files, and annotates each ROM pattern
+     * with whether a matching file already exists on it.
      */
-    private static CraftManagerStatePayload buildCraftManagerState(final CraftingComputerBlockEntity cc,
-                                                                    final ServerLevel level) {
+    public static CraftManagerStatePayload buildCraftManagerState(final CraftingComputerBlockEntity cc,
+                                                                   final ServerLevel level) {
         return buildCraftManagerState(cc, level, "");
     }
 
@@ -5712,17 +5718,25 @@ public final class ComputingPayloads {
         String mediaLabel = "";
         List<String> mediaFiles = List.of();
 
-        // Find the first linked drive that holds writable removable media.
+        // A computer commonly has more than one drive linked (a floppy drive, a DVD drive, a dock), and the
+        // one with a blank medium in it may well come first: the disc the player just wrote is the one they
+        // mean, wherever it sits.
         for (final long endpoint : cc.linkedEndpoints()) {
             if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
                     instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity reader) {
                 final ItemStack m = reader.mediaSlot().getStackInSlot(0);
-                if (!m.isEmpty()
-                        && m.getItem() instanceof dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem fmt
-                        && fmt.writable()) {
+                if (m.isEmpty()
+                        || !(m.getItem() instanceof dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem fmt)
+                        || !fmt.writable()) {
+                    continue;
+                }
+                final List<String> files = craftFileListFromMedia(m).files();
+                if (mediaVolumeKey.isEmpty() || !files.isEmpty()) {
                     mediaVolumeKey = "media:" + endpoint;
-                    mediaLabel = dev.jsc.jscomputronics.module.computing.os.VolumeLabel.of(m, "Removable Drive");
-                    mediaFiles = craftFileListFromMedia(m).files();
+                    mediaLabel = wire(dev.jsc.jscomputronics.module.computing.os.VolumeLabel.of(m, "Removable Drive"), 64);
+                    mediaFiles = files;
+                }
+                if (!files.isEmpty()) {
                     break;
                 }
             }
@@ -5733,7 +5747,9 @@ public final class ComputingPayloads {
         final List<CraftingPattern> rom = cc.romPatterns();
         for (int i = 0; i < rom.size() && i < CraftManagerStatePayload.MAX_ROM_ENTRIES; i++) {
             final CraftingPattern p = rom.get(i);
-            final String name = p.result().getHoverName().getString();
+            // Every string below is cut to its wire field: a result renamed to a long name or a modded machine
+            // with a long id must never make the state impossible to send.
+            final String name = wire(p.result().getHoverName().getString(), 64);
             final String fileName = craftFileNameFor(p.result()) + ".craft";
             romEntries.add(new CraftManagerStatePayload.WireRomEntry(i, name, mediaFileSet.contains(fileName)));
         }
@@ -5746,7 +5762,7 @@ public final class ComputingPayloads {
             final var r = machineRecipes.get(i);
             final var key = r.resultKey();
             final String base = key == null ? "recipe" : key.displayName().getString();
-            final String name = base + (r.multi().isPresent() ? " [multi]" : " [machine]");
+            final String name = wire(base + (r.multi().isPresent() ? " [multi]" : " [machine]"), 64);
             romEntries.add(new CraftManagerStatePayload.WireRomEntry(
                     CraftManagerStatePayload.MACHINE_ROM_BASE + i, name, false));
         }
@@ -5771,10 +5787,16 @@ public final class ComputingPayloads {
             final String label = !dm.name().isBlank() ? dm.name()
                     : face + "(" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ() + ")";
             machines.add(new CraftManagerStatePayload.WireMachine(
-                    machineKey, typeKey, label, perMachine.locked(), perMachine.feedMax(), typeMaxJobs));
+                    wire(machineKey, 64), wire(typeKey, 48), wire(label, 80),
+                    perMachine.locked(), perMachine.feedMax(), typeMaxJobs));
         }
         return new CraftManagerStatePayload(mediaVolumeKey, mediaLabel, mediaFiles, romEntries,
-                cc.craftingCardFactor() > 0.0, status, machines);
+                cc.craftingCardFactor() > 0.0, wire(status, 96), machines);
+    }
+
+    /** Cuts {@code s} to the {@code max} characters its wire field carries: sending more disconnects the player. */
+    private static String wire(final String s, final int max) {
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     /** Derives a safe file base-name from the result {@link ItemStack}'s registry path. */

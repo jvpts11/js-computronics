@@ -510,17 +510,12 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         if (!(mediaStack.getItem() instanceof FormattedMediaItem)) {
             return false;
         }
-        // Never overwrite an existing craft silently: the filesystem replaces same-path files, and a second
-        // pattern with the same result name (or another multi-stage) would erase the first. Suffix instead.
-        String unique = fileName;
-        int n = 2;
-        while (DiskFilesystem.exists(mediaStack, unique + ".craft")
-                && !DiskFilesystem.read(mediaStack, unique + ".craft").map(content::equals).orElse(false)) {
-            unique = fileName + "_" + n++;
-        }
+        // Never overwrite an existing craft silently: a second pattern with the same result name (or another
+        // multi-stage) would erase the first. The filesystem hands out the next free suffix instead.
+        final String path = DiskFilesystem.uniquePath(mediaStack, fileName, ".craft", content);
         final long freeWeight = mediaFreeWeight(mediaStack);
         final DiskFilesystem.WriteResult result = DiskFilesystem.write(
-                mediaStack, unique + ".craft", FileType.CRAFT, content,
+                mediaStack, path, FileType.CRAFT, content,
                 freeWeight, FilesystemKind.HIERARCHICAL, getLevel() == null ? 0L : getLevel().getGameTime());
         if (result == DiskFilesystem.WriteResult.OK) {
             media.setStackInSlot(0, mediaStack);

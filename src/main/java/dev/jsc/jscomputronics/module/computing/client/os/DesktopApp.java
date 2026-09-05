@@ -45,6 +45,15 @@ public interface DesktopApp {
     }
 
     /**
+     * Called when this app's window comes back with the machine's layout on a desktop entered again: the
+     * instance outlived the screen it was created on, so whatever it fetched from the server when it started
+     * may be stale (a disc put in a drive, a recipe loaded, a job finished in the meantime). An app that shows
+     * server state re-asks for it here and claims itself as the live instance its replies are routed to.
+     */
+    default void onRestored() {
+    }
+
+    /**
      * Renders the app's content within the inner rectangle (already offset past the title bar and
      * the window border).
      */

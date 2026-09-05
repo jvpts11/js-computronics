@@ -96,10 +96,27 @@ public final class CraftingManagerApp implements DesktopApp {
     private int lastW;
     private int lastH;
 
+    // Frames since the state was last asked for. The window outlives the screen it was opened on (a machine's
+    // open windows come back with their program instances when the monitor is entered again), so the state
+    // is re-asked for while the window is shown, not only when it is created: a disc put in the drive after
+    // the window opened must show up on its own.
+    private int refreshFrames;
+    private static final int REFRESH_EVERY_FRAMES = 40;
+
     public CraftingManagerApp(final BlockPos host) {
         this.host = host;
         active = this;
+        request();
+    }
+
+    private void request() {
         PacketDistributor.sendToServer(new RequestCraftManagerPayload(host));
+    }
+
+    @Override
+    public void onRestored() {
+        active = this;
+        request();
     }
 
     /** Delivers a state refresh from the server to the open window. */
@@ -123,6 +140,9 @@ public final class CraftingManagerApp implements DesktopApp {
 
     @Override
     public void applySkin(final OsSkin osSkin) {
+        // Runs each frame for the window being drawn: with two Crafting Computers open in turn, the replies
+        // must reach the window on screen, not the instance created last.
+        active = this;
         this.skin = osSkin;
         this.PANEL = osSkin.windowBg();
         this.EDGE = osSkin.edge();
@@ -165,6 +185,10 @@ public final class CraftingManagerApp implements DesktopApp {
         lastY = y;
         lastW = width;
         lastH = height;
+        if (++refreshFrames >= REFRESH_EVERY_FRAMES) {
+            refreshFrames = 0;
+            request();
+        }
 
         g.fill(x, y, x + width, y + height, PANEL);
         outline(g, x, y, width, height);

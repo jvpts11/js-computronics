@@ -82,6 +82,12 @@ public final class StorageInsightsApp implements DesktopApp {
         PacketDistributor.sendToServer(new RequestStorageInsightsPayload(host, monitorPos));
     }
 
+    @Override
+    public void onRestored() {
+        active = this;
+        request();
+    }
+
     @Override public String title() {
         return "Storage Insights";
     }

@@ -71,6 +71,12 @@ public final class AutomationManagerApp implements DesktopApp {
         PacketDistributor.sendToServer(new RequestAutomationPayload(host, monitorPos));
     }
 
+    @Override
+    public void onRestored() {
+        active = this;
+        request();
+    }
+
     @Override public String title() {
         return "Automation Manager";
     }

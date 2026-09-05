@@ -678,6 +678,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final java.util.Map<String, DesktopApp> savedApps = SAVED_APPS.get(screen.host);
         for (final dev.jsc.jscomputronics.module.computing.os.OpenWindow ow : payload.toOpenWindows()) {
             DesktopApp app = savedApps != null ? savedApps.get(ow.key()) : null;
+            final boolean restored = app != null;
             if (app == null) {
                 app = screen.factoryFor(ow.key());
             }
@@ -685,6 +686,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 continue; // a program that is no longer installed simply does not come back
             }
             app.applySkin(screen.skin);
+            if (restored) {
+                app.onRestored(); // a kept instance re-asks the server for what may have changed meanwhile
+            }
             final DesktopWindow w = new DesktopWindow(app, ow.key(), ow.x(), ow.y(), ow.w(), ow.h());
             // Clamp into the current work area: the monitor may be a different size from the one the
             // layout was left on, and a title bar off-screen is a window nobody can reach.
