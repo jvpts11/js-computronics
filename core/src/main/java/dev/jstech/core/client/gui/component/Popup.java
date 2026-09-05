@@ -25,8 +25,9 @@ public class Popup extends Panel {
     private static final int MARGIN = 16;
 
     private final Supplier<String> title;
-    private final int preferredWidth;
-    private final int preferredHeight;
+    private int preferredWidth;
+    private int preferredHeight;
+    private int dim = 0x88000000;
     private Consumer<Popup> layouter = popup -> { };
     private Runnable onClose = () -> { };
     private boolean closeOnOutsideClick = true;
@@ -46,6 +47,24 @@ public class Popup extends Panel {
     public Popup setLayouter(final Consumer<Popup> value) {
         layouter = value;
         return this;
+    }
+
+    /** The size the popup takes when the content rectangle allows it; a popup that grows sets it again. */
+    public Popup setPreferredSize(final int width, final int height) {
+        preferredWidth = width;
+        preferredHeight = height;
+        return this;
+    }
+
+    /** The colour laid over the content behind the popup. */
+    public Popup setDim(final int argb) {
+        dim = argb;
+        return this;
+    }
+
+    /** The title drawn at the top-left, empty when the popup draws its own header. */
+    public String title() {
+        return title.get();
     }
 
     public Popup setOnClose(final Runnable action) {
@@ -81,15 +100,24 @@ public class Popup extends Panel {
     }
 
     /**
-     * Dims the content rectangle and draws the popup centred in it, no wider or taller than the rectangle
-     * allows. The caller decides when: an open popup is drawn in the program's modal pass.
+     * Centres the popup in the content rectangle, no wider or taller than the rectangle allows, and lays its
+     * children out. Called on every modal render, and worth calling right after {@link #open()} so a click
+     * that arrives before the first frame already finds the controls in place.
      */
-    public void renderIn(final GuiGraphics g, final UiContext ctx, final int cx, final int cy, final int cw, final int ch) {
+    public void placeIn(final int cx, final int cy, final int cw, final int ch) {
         final int pw = Math.min(cw - MARGIN, preferredWidth);
         final int ph = Math.min(ch - MARGIN, preferredHeight);
         setBounds(cx + (cw - pw) / 2, cy + (ch - ph) / 2, pw, ph);
         layouter.accept(this);
-        g.fill(cx, cy, cx + cw, cy + ch, 0x88000000);
+    }
+
+    /**
+     * Dims the content rectangle and draws the popup centred in it. The caller decides when: an open popup is
+     * drawn in the program's modal pass.
+     */
+    public void renderIn(final GuiGraphics g, final UiContext ctx, final int cx, final int cy, final int cw, final int ch) {
+        placeIn(cx, cy, cw, ch);
+        g.fill(cx, cy, cx + cw, cy + ch, dim);
         render(g, ctx);
     }
 
@@ -97,12 +125,20 @@ public class Popup extends Panel {
     public void render(final GuiGraphics g, final UiContext ctx) {
         ctx.skin().windowFrame(g, x(), y(), width(), height());
         g.fill(x() + 1, y() + 1, right() - 1, bottom() - 1, ctx.skin().windowBg());
-        g.drawString(ctx.font(), title.get(), x() + TITLE_X, y() + TITLE_Y, ctx.skin().text(), false);
+        final String text = title.get();
+        if (!text.isEmpty()) {
+            g.drawString(ctx.font(), text, x() + TITLE_X, y() + TITLE_Y, ctx.skin().text(), false);
+        }
         super.render(g, ctx);
     }
 
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
+        if (width() == 0 || height() == 0) {
+            // Not laid out yet (opened this very tick): the click can be placed nowhere, and it is not a
+            // click outside either.
+            return true;
+        }
         if (!contains(mx, my)) {
             if (closeOnOutsideClick) {
                 close();

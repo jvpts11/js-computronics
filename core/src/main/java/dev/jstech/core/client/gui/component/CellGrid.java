@@ -36,11 +36,13 @@ public final class CellGrid extends UiComponent {
     /** Which side of the grid the scroll cues sit on. */
     public enum Cues { NONE, LEFT, RIGHT }
 
-    private final int columns;
-    private final int visibleRows;
+    private int columns;
+    private int visibleRows;
     private final int cell;
     private int totalRows;
     private int scroll;
+    private int inset;
+    private int cellCount = Integer.MAX_VALUE;
     private CellRenderer renderer = (g, ctx, index, x, y, size, hovered) -> { };
     private CellClick onClick = (index, button, shift) -> { };
     private IntPredicate marked = index -> false;
@@ -52,6 +54,42 @@ public final class CellGrid extends UiComponent {
         this.visibleRows = Math.max(1, visibleRows);
         this.totalRows = Math.max(this.visibleRows, totalRows);
         this.cell = Math.max(1, cell);
+    }
+
+    /** Pixels left empty at the right and bottom of every cell, so the wells sit apart like inventory slots. */
+    public CellGrid setInset(final int value) {
+        inset = Math.max(0, Math.min(cell - 1, value));
+        return this;
+    }
+
+    /** How many cells hold something: the ones past that are neither drawn nor clickable. */
+    public CellGrid setCellCount(final int value) {
+        cellCount = Math.max(0, value);
+        return this;
+    }
+
+    public CellGrid setColumns(final int value) {
+        columns = Math.max(1, value);
+        return this;
+    }
+
+    public CellGrid setVisibleRows(final int value) {
+        visibleRows = Math.max(1, value);
+        totalRows = Math.max(visibleRows, totalRows);
+        return this;
+    }
+
+    public int visibleRows() {
+        return visibleRows;
+    }
+
+    public int totalRows() {
+        return totalRows;
+    }
+
+    /** The largest scroll that still keeps the last row in view. */
+    public int maxScroll() {
+        return Math.max(0, totalRows - visibleRows);
     }
 
     public CellGrid setRenderer(final CellRenderer value) {
@@ -110,7 +148,7 @@ public final class CellGrid extends UiComponent {
         if (index < 0 || row < 0 || row >= visibleRows) {
             return null;
         }
-        return new int[] {x() + (index % columns) * cell, y() + row * cell, cell, cell};
+        return new int[] {x() + (index % columns) * cell, y() + row * cell, cell - inset, cell - inset};
     }
 
     /** The centre of cell {@code index} as laid out now, where a test clicks it; the grid's centre if hidden. */
@@ -119,31 +157,36 @@ public final class CellGrid extends UiComponent {
         return r == null ? center() : new int[] {r[0] + cell / 2, r[1] + cell / 2};
     }
 
-    /** The index of the cell under the point, or -1 outside the grid. */
+    /** The index of the cell under the point, or -1 outside the grid or past the last cell that holds something. */
     public int cellAt(final double mx, final double my) {
         if (!contains(mx, my)) {
             return -1;
         }
         final int col = (int) (mx - x()) / cell;
         final int row = (int) (my - y()) / cell;
-        return (scroll + row) * columns + col;
+        final int index = (scroll + row) * columns + col;
+        return index < cellCount ? index : -1;
     }
 
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
         setScroll(scroll);
+        final int size = cell - inset;
         for (int row = 0; row < visibleRows; row++) {
             for (int col = 0; col < columns; col++) {
                 final int index = (scroll + row) * columns + col;
+                if (index >= cellCount) {
+                    break;
+                }
                 final int cx = x() + col * cell;
                 final int cy = y() + row * cell;
-                final boolean hovered = enabled() && ctx.over(cx, cy, cell, cell);
-                g.fill(cx, cy, cx + cell, cy + cell, ctx.skin().fieldBg());
-                Draw.outline(g, cx, cy, cell, cell, marked.test(index) ? ctx.skin().accent() : ctx.skin().edge());
+                final boolean hovered = enabled() && ctx.over(cx, cy, size, size);
+                g.fill(cx, cy, cx + size, cy + size, ctx.skin().fieldBg());
+                Draw.outline(g, cx, cy, size, size, marked.test(index) ? ctx.skin().accent() : ctx.skin().edge());
                 if (hovered) {
-                    g.fill(cx + 1, cy + 1, cx + cell - 1, cy + cell - 1, ctx.skin().listHover());
+                    g.fill(cx + 1, cy + 1, cx + size - 1, cy + size - 1, ctx.skin().listHover());
                 }
-                renderer.render(g, ctx, index, cx, cy, cell, hovered);
+                renderer.render(g, ctx, index, cx, cy, size, hovered);
             }
         }
         if (cues != Cues.NONE) {
@@ -172,7 +215,12 @@ public final class CellGrid extends UiComponent {
         if (totalRows <= visibleRows) {
             return false;
         }
-        setScroll(scroll + (delta > 0 ? -1 : 1));
+        scrollBy(delta > 0 ? -1 : 1);
         return true;
+    }
+
+    /** Scrolls by {@code rows}, kept inside the range. */
+    public void scrollBy(final int rows) {
+        setScroll(scroll + rows);
     }
 }

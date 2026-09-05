@@ -13,7 +13,8 @@ import java.util.List;
 import java.util.function.IntConsumer;
 
 /**
- * A row of tabs of equal width, one of them selected, with the skin's separator under the row.
+ * A row of tabs, one of them selected, with the skin's separator under the row. The tabs share the width
+ * equally, or each takes what its label needs when {@link #fitToLabels} is set.
  */
 public final class TabStrip extends UiComponent {
 
@@ -21,9 +22,18 @@ public final class TabStrip extends UiComponent {
     private int selected;
     private IntConsumer onSelect = i -> { };
     private boolean underline = true;
+    private int labelPadding = -1;
+    /** The widths of the tabs as last drawn; equal shares until the first frame measures the labels. */
+    private int[] widths = new int[0];
 
     public TabStrip(final List<String> labels) {
         this.labels = List.copyOf(labels);
+    }
+
+    /** Gives each tab the width of its label plus {@code padding}, instead of an equal share of the strip. */
+    public TabStrip fitToLabels(final int padding) {
+        labelPadding = Math.max(0, padding);
+        return this;
     }
 
     public TabStrip setOnSelect(final IntConsumer action) {
@@ -51,21 +61,39 @@ public final class TabStrip extends UiComponent {
         return labels.size();
     }
 
-    private int tabWidth() {
+    /** The width of tab {@code index} as laid out now. */
+    private int tabWidth(final int index) {
+        if (labelPadding >= 0 && index < widths.length) {
+            return widths[index];
+        }
         return Math.max(1, width() / Math.max(1, labels.size()));
+    }
+
+    /** The left edge of tab {@code index} as laid out now. */
+    private int tabX(final int index) {
+        int tx = x();
+        for (int i = 0; i < index; i++) {
+            tx += tabWidth(i);
+        }
+        return tx;
     }
 
     /** The centre of tab {@code index}, where a test clicks it. */
     public int[] tabCenter(final int index) {
-        final int tw = tabWidth();
-        return new int[] {x() + index * tw + tw / 2, y() + height() / 2};
+        return new int[] {tabX(index) + tabWidth(index) / 2, y() + height() / 2};
     }
 
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
-        final int tw = tabWidth();
+        if (labelPadding >= 0) {
+            final int[] measured = new int[labels.size()];
+            for (int i = 0; i < labels.size(); i++) {
+                measured[i] = ctx.font().width(labels.get(i)) + labelPadding;
+            }
+            widths = measured;
+        }
         for (int i = 0; i < labels.size(); i++) {
-            ctx.skin().tab(g, ctx.font(), x() + i * tw, y(), tw, height(), labels.get(i), i == selected);
+            ctx.skin().tab(g, ctx.font(), tabX(i), y(), tabWidth(i), height(), labels.get(i), i == selected);
         }
         if (underline) {
             g.fill(x(), y() + height() - 1, x() + width(), y() + height(), ctx.skin().edge());
@@ -74,7 +102,13 @@ public final class TabStrip extends UiComponent {
 
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
-        final int index = Math.min(labels.size() - 1, Math.max(0, (int) (mx - x()) / tabWidth()));
+        int index = labels.size() - 1;
+        for (int i = 0; i < labels.size(); i++) {
+            if (mx < tabX(i) + tabWidth(i)) {
+                index = i;
+                break;
+            }
+        }
         if (index != selected) {
             selected = index;
             onSelect.accept(index);

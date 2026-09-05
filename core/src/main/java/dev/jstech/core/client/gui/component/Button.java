@@ -21,6 +21,7 @@ public final class Button extends UiComponent {
     private Runnable onPress;
     private boolean primary;
     private boolean pressed;
+    private float labelScale = 1f;
 
     public Button(final String label, final Runnable onPress) {
         this(() -> label, onPress);
@@ -56,9 +57,25 @@ public final class Button extends UiComponent {
         return this;
     }
 
+    /** Draws the label smaller than the font, for a dense row of buttons; {@code 1} is the font's own size. */
+    public Button setLabelScale(final float scale) {
+        labelScale = scale;
+        return this;
+    }
+
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
-        ctx.skin().button(g, ctx.font(), x(), y(), width(), height(), label.get(), hovered(ctx), pressed, primary);
+        final String text = label.get();
+        if (labelScale == 1f) {
+            ctx.skin().button(g, ctx.font(), x(), y(), width(), height(), text, hovered(ctx), pressed, primary);
+        } else {
+            // The skin draws the face; the scaled label is centred on it by hand.
+            ctx.skin().button(g, ctx.font(), x(), y(), width(), height(), "", hovered(ctx), pressed, primary);
+            final int tw = Math.round(ctx.font().width(text) * labelScale);
+            final int th = Math.round(7 * labelScale);
+            Texts.scaled(g, ctx.font(), text, x() + (width() - tw) / 2, y() + (height() - th) / 2 + (pressed ? 1 : 0),
+                    labelScale, ctx.skin().text());
+        }
         if (!enabled()) {
             Draw.disabled(g, x(), y(), width(), height());
         }

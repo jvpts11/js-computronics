@@ -29,6 +29,7 @@ public class TextField extends UiComponent {
     private Consumer<String> onCommit;
     @Nullable
     private Runnable onEdit;
+    private boolean revertOnEscape = true;
 
     public TextField(final int maxLength) {
         state = new TextEditState(maxLength);
@@ -71,6 +72,12 @@ public class TextField extends UiComponent {
     /** Fires on every keystroke, for a field that filters something as it is typed. */
     public TextField setOnEdit(final Runnable action) {
         onEdit = action;
+        return this;
+    }
+
+    /** Whether Escape drops the edits before giving the keyboard up; a filter keeps them. */
+    public TextField setRevertOnEscape(final boolean value) {
+        revertOnEscape = value;
         return this;
     }
 
@@ -126,8 +133,10 @@ public class TextField extends UiComponent {
             }
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_TAB -> blur();
             case GLFW.GLFW_KEY_ESCAPE -> {
-                state.revert();
-                edited();
+                if (revertOnEscape) {
+                    state.revert();
+                    edited();
+                }
                 blur();
             }
             default -> {

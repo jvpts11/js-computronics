@@ -29,6 +29,7 @@ public final class Label extends UiComponent {
     private Align align = Align.LEFT;
     @Nullable
     private IntSupplier color;
+    private float scale = 1f;
 
     public Label(final String text) {
         this(() -> text, Tone.TEXT);
@@ -89,6 +90,12 @@ public final class Label extends UiComponent {
         return this;
     }
 
+    /** Draws the text smaller than the font, for a dense panel; {@code 1} is the font's own size. */
+    public Label setScale(final float value) {
+        scale = value;
+        return this;
+    }
+
     /** The colour the label draws in right now. */
     public int color(final UiContext ctx) {
         if (color != null) {
@@ -106,15 +113,20 @@ public final class Label extends UiComponent {
 
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
-        final String shown = Texts.clip(ctx.font(), text.get(), width());
-        final int tw = ctx.font().width(shown);
+        final String shown = Texts.clip(ctx.font(), text.get(), (int) (width() / scale));
+        final int tw = Math.round(ctx.font().width(shown) * scale);
         final int tx = switch (align) {
             case CENTER -> x() + (width() - tw) / 2;
             case RIGHT -> x() + width() - tw;
             default -> x();
         };
         // A label the height of a line sits on its y; a taller one centres its text vertically.
-        final int ty = height() <= ctx.font().lineHeight ? y() : y() + (height() - ctx.font().lineHeight + 2) / 2;
-        g.drawString(ctx.font(), shown, tx, ty, color(ctx), false);
+        final int lineHeight = Math.round(ctx.font().lineHeight * scale);
+        final int ty = height() <= lineHeight ? y() : y() + (height() - lineHeight + 2) / 2;
+        if (scale == 1f) {
+            g.drawString(ctx.font(), shown, tx, ty, color(ctx), false);
+        } else {
+            Texts.scaled(g, ctx.font(), shown, tx, ty, scale, color(ctx));
+        }
     }
 }

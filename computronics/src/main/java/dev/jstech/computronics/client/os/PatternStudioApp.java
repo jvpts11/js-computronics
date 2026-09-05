@@ -658,6 +658,7 @@ public final class PatternStudioApp implements InventoryBandApp {
             amountCell = index;
             amount.setAmount(cell.cell().amount());
             amountPopup.open();
+            amountPopup.placeIn(lastX, lastY, lastW, lastH);
         } else if (button == 1) {
             if (output && cell != null) {
                 send(PatternStudioEditPayload.number(host, monitorPos, PatternStudioEditPayload.PROC_SET_CHANCE,
@@ -1007,6 +1008,7 @@ public final class PatternStudioApp implements InventoryBandApp {
         machineSearch.reset();
         machineList.setScroll(0);
         machinePicker.open();
+        machinePicker.placeIn(lastX, lastY, lastW, lastH);
         machinePicker.focus(machineSearch);
     }
 

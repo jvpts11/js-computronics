@@ -18,6 +18,8 @@ public final class SearchField extends TextField {
     public SearchField(final int maxLength) {
         super(maxLength);
         setPlaceholder("Search");
+        // Escape only puts the keyboard down; the filter typed so far stays.
+        setRevertOnEscape(false);
     }
 
     /** The text to filter by right now. */
