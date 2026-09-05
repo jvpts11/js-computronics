@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
+import dev.jstech.core.client.gui.skin.Skin;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +16,8 @@ import net.minecraft.resources.ResourceLocation;
  * The one drawing framework every desktop program paints through, so a program looks like the OS it runs on
  * rather than carrying its own hardcoded chrome. A skin is resolved from the installed OS id ({@code frames_95
  * / frames_xp / frames_11}). Each skin is a <em>distinct design</em>, not a recolour of one layout: every skin
- * holds its own palette and its own {@link Form} shape language, faithful to the approved style guide.
+ * holds its own palette and its own {@link Form} shape language, faithful to the approved style guide. It is
+ * the core's {@link Skin}, so the core's components paint through it as well.
  *
  * <ul>
  *   <li>{@link Form#BEVEL} (Frames 95) — raised/sunken 3D bevels, solid navy title, grey chrome, square.</li>
@@ -25,7 +27,7 @@ import net.minecraft.resources.ResourceLocation;
  *       all four window corners gently rounded.</li>
  * </ul>
  */
-public final class OsSkin {
+public final class OsSkin implements Skin {
 
     /**
      * The shape language a skin draws its primitives in. A period Unix desktop is not the Frames 95
@@ -255,18 +257,22 @@ public final class OsSkin {
         return form;
     }
 
+    @Override
     public int accent() {
         return accent;
     }
 
+    @Override
     public int text() {
         return text;
     }
 
+    @Override
     public int dim() {
         return dim;
     }
 
+    @Override
     public int windowBg() {
         return windowBg;
     }
@@ -284,16 +290,19 @@ public final class OsSkin {
     }
 
     /** The fill of a content panel (grey 95 / cream XP / white 11). */
+    @Override
     public int panelBg() {
         return panelFill();
     }
 
     /** The fill of a text field. */
+    @Override
     public int fieldBg() {
         return fieldBg;
     }
 
     /** A 1px border/separator colour for panels and bands, per skin. */
+    @Override
     public int edge() {
         return switch (form) {
             case BEVEL -> 0xFF808080;
@@ -305,6 +314,7 @@ public final class OsSkin {
     }
 
     /** The hover-row background. */
+    @Override
     public int listHover() {
         return listHoverBg;
     }
@@ -315,6 +325,7 @@ public final class OsSkin {
      * The window body background and 1px outer border, with the skin's per-corner rounding (XP rounds only the
      * top; 11 rounds all four; 95 none). Rounded corner pixels are left unpainted, so they show what is behind.
      */
+    @Override
     public void windowFrame(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         final int t = frameThickness();
         roundedRect(g, x - t, y - t, w + t * 2, h + t * 2, windowBorder, topRadius, bottomRadius);
@@ -480,6 +491,7 @@ public final class OsSkin {
     // ---- widgets (used by the programs' content) ----
 
     /** A group panel/box: sunken bevel (95), soft border (XP), or hairline (11). */
+    @Override
     public void panel(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         g.fill(x, y, x + w, y + h, panelFill());
         switch (form) {
@@ -492,6 +504,7 @@ public final class OsSkin {
     }
 
     /** A push button, optionally the primary/default one, with a pressed state. */
+    @Override
     public void button(final GuiGraphics g, final Font font, final int x, final int y, final int w, final int h,
                        final String label, final boolean hovered, final boolean pressed, final boolean primary) {
         switch (form) {
@@ -539,6 +552,7 @@ public final class OsSkin {
     }
 
     /** A text input field. */
+    @Override
     public void field(final GuiGraphics g, final int x, final int y, final int w, final int h,
                       final boolean focused) {
         g.fill(x, y, x + w, y + h, fieldBg);
@@ -555,6 +569,7 @@ public final class OsSkin {
     }
 
     /** A tab in a tab strip. */
+    @Override
     public void tab(final GuiGraphics g, final Font font, final int x, final int y, final int w, final int h,
                     final String label, final boolean active) {
         switch (form) {
@@ -599,6 +614,7 @@ public final class OsSkin {
     }
 
     /** A list/grid row background for the hover and selection states. */
+    @Override
     public void listRow(final GuiGraphics g, final int x, final int y, final int w, final int h,
                         final boolean hovered, final boolean selected) {
         if (selected) {
@@ -612,11 +628,13 @@ public final class OsSkin {
     }
 
     /** The text colour for a list row, given its selection state. */
+    @Override
     public int listRowText(final boolean selected) {
         return selected ? listSelectText : text;
     }
 
     /** A scrollbar thumb. */
+    @Override
     public void scrollThumb(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         switch (form) {
             case BEVEL -> {
@@ -640,6 +658,7 @@ public final class OsSkin {
     }
 
     /** A status/footer bar background. */
+    @Override
     public void statusBar(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         switch (form) {
             case BEVEL -> {
