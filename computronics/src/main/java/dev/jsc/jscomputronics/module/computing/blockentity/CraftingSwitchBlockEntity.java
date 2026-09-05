@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
-import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jstech.core.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
@@ -287,7 +287,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
                     final var machineBlock = level.getBlockState(machinePos).getBlock();
                     // Network hardware is never a machine, even when a bus happens to point at it.
                     if (machineBlock instanceof DataCableBlock
-                            || machineBlock instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable
+                            || machineBlock instanceof dev.jstech.core.network.DataNetworkConnectable
                             || !declared.add(machinePos) || level.getBlockEntity(machinePos) == null) {
                         continue;
                     }

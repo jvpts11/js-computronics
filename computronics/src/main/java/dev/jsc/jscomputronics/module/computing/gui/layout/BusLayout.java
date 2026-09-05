@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.gui.layout;
 
-import dev.jsc.jscomputronics.common.gui.layout.GuiLayout;
+import dev.jstech.core.gui.layout.GuiLayout;
 
 /**
  * Pure layout shared by the Export Bus and Import Bus screens: every drawn element's position and size, with

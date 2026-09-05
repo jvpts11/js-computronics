@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.HardwareItems;
 import dev.jsc.jscomputronics.module.computing.os.MinSpecTooltip;
 import net.minecraft.gametest.framework.GameTest;

@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.gui.layout;
 
-import dev.jsc.jscomputronics.common.gui.layout.GuiLayout;
+import dev.jstech.core.gui.layout.GuiLayout;
 
 /**
  * The vertical layout of the Pattern Studio window: the tab strip, the editor, the player's inventory band

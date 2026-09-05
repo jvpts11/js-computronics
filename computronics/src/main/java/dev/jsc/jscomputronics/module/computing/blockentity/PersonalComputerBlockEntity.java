@@ -9,8 +9,8 @@ package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.PersonalComputerBlock;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
@@ -89,10 +89,10 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
      * The era this PC belongs to, read from its block. Defaults to Standard for any block that is not a
      * {@link PersonalComputerBlock} (which never happens in practice, but keeps the read total).
      */
-    private dev.jsc.jscomputronics.common.tier.HardwareEra blockEra() {
+    private dev.jstech.core.tier.HardwareEra blockEra() {
         return getBlockState().getBlock() instanceof PersonalComputerBlock pc
                 ? pc.era()
-                : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     @Override
@@ -105,7 +105,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
     }
 
     @Override
-    protected dev.jsc.jscomputronics.common.tier.HardwareEra requiredBoardEra() {
+    protected dev.jstech.core.tier.HardwareEra requiredBoardEra() {
         // A PC accepts only a board of its own era, so a Legacy and a Standard ATX board are not
         // interchangeable: each installs in its matching machine alone.
         return blockEra();

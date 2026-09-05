@@ -7,8 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.network.FailoverRole;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.network.FailoverRole;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
 import net.minecraft.client.gui.GuiGraphics;

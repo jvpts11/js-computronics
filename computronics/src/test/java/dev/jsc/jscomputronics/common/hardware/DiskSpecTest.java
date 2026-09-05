@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.common.hardware;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

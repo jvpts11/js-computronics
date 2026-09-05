@@ -8,8 +8,8 @@
 package dev.jsc.jscomputronics.module.computing.client.os;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import dev.jsc.jscomputronics.common.gui.layout.DesktopZ;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.gui.layout.DesktopZ;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.client.MonitorFrame;
 import dev.jsc.jscomputronics.module.computing.client.theme.MonitorFrameStyle;

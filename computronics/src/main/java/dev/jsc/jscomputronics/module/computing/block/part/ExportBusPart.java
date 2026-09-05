@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.block.part;
 
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;

@@ -8,11 +8,11 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
-import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
-import dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
+import dev.jstech.core.multiblock.MultiblockGeometry;
+import dev.jstech.core.multiblock.MultiblockPatternGeometry;
+import dev.jstech.core.util.BlockDrops;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -41,14 +41,14 @@ import java.util.List;
  * The Mainframe — the network's orchestrator.
  */
 public class MainframeBlock extends AbstractMultiblockControllerBlock
-        implements dev.jsc.jscomputronics.common.network.DataNetworkConnectable,
-        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable, EraChassisBlock {
+        implements dev.jstech.core.network.DataNetworkConnectable,
+        dev.jstech.core.peripheral.PeripheralConnectable, EraChassisBlock {
 
     public static final MapCodec<MainframeBlock> CODEC = simpleCodec(MainframeBlock::new);
 
     @Override
-    public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType peripheralType() {
-        return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    public dev.jstech.core.peripheral.PeripheralCableType peripheralType() {
+        return dev.jstech.core.peripheral.PeripheralCableType.COMPUTING;
     }
 
     public MainframeBlock(final Properties properties) {
@@ -59,15 +59,15 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     /**
      * The hardware era this Mainframe belongs to. It selects the block's skin and gates which MTX board
      * installs — only a board of this same era is accepted and counted in the build. The base is
-     * {@link dev.jsc.jscomputronics.common.tier.HardwareEra#STANDARD}; the Vintage and Legacy variants
+     * {@link dev.jstech.core.tier.HardwareEra#STANDARD}; the Vintage and Legacy variants
      * override it.
      */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
-        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    public dev.jstech.core.tier.HardwareEra era() {
+        return dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     @Override
-    public dev.jsc.jscomputronics.common.tier.HardwareEra chassisEra() {
+    public dev.jstech.core.tier.HardwareEra chassisEra() {
         return era();
     }
 
@@ -85,10 +85,10 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     }
 
     @Override
-    public java.util.Set<dev.jsc.jscomputronics.common.network.DataTier> acceptedCableTiers() {
+    public java.util.Set<dev.jstech.core.network.DataTier> acceptedCableTiers() {
         // The Mainframe sits on the HBW backbone; it never takes an Ethernet
         // access link directly (a Personal Router bridges that).
-        return java.util.Set.of(dev.jsc.jscomputronics.common.network.DataTier.T2_HBW);
+        return java.util.Set.of(dev.jstech.core.network.DataTier.T2_HBW);
     }
 
     @Override
@@ -115,10 +115,10 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     protected BlockState partStateFor(final BlockPos controller, final Direction facing,
                                       final BlockPos part, final BlockState controllerState) {
         // Stamp the controller's era onto every structural part so the whole footprint wears one skin.
-        final dev.jsc.jscomputronics.common.tier.HardwareEra era =
+        final dev.jstech.core.tier.HardwareEra era =
                 controllerState.getBlock() instanceof MainframeBlock mf
                         ? mf.era()
-                        : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                        : dev.jstech.core.tier.HardwareEra.STANDARD;
         return ComputingModule.MAINFRAME_PART.get().defaultBlockState()
                 .setValue(FACING, facing)
                 .setValue(MainframePartBlock.CORE,

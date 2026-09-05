@@ -10,7 +10,7 @@ package dev.jsc.jscomputronics.gametest;
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.hardware.DiskSize;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
+import dev.jstech.core.network.NetworkSystem;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.HardwareItems;
 import dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity;

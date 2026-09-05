@@ -10,11 +10,11 @@ package dev.jsc.jscomputronics.gametest;
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.common.hardware.DiskSize;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.network.FailoverRole;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.persistence.NetworkRegistrySavedData;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
+import dev.jstech.core.network.FailoverRole;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.persistence.NetworkRegistrySavedData;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuidState;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
@@ -3162,8 +3162,8 @@ public final class NetworkGameTests {
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                         net.minecraft.core.Direction.NORTH));
         final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pc);
-        final dev.jsc.jscomputronics.common.network.DataNetworkConnectable block =
-                (dev.jsc.jscomputronics.common.network.DataNetworkConnectable) state.getBlock();
+        final dev.jstech.core.network.DataNetworkConnectable block =
+                (dev.jstech.core.network.DataNetworkConnectable) state.getBlock();
         // A north-facing computer's rear is south: only that face takes a cable.
         helper.assertTrue(block.connectsOnFace(state, net.minecraft.core.Direction.SOUTH),
                 "the rear (south) face must accept a cable");
@@ -3177,7 +3177,7 @@ public final class NetworkGameTests {
         final BlockPos mf = new BlockPos(4, 2, 2);
         helper.setBlock(mf, ComputingModule.MAINFRAME.get());
         final net.minecraft.world.level.block.state.BlockState mfState = helper.getBlockState(mf);
-        if (mfState.getBlock() instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable mainframe) {
+        if (mfState.getBlock() instanceof dev.jstech.core.network.DataNetworkConnectable mainframe) {
             helper.assertTrue(mainframe.connectsOnFace(mfState, net.minecraft.core.Direction.EAST),
                     "the Mainframe accepts a cable on any face");
             helper.assertTrue(mainframe.connectsOnFace(mfState, net.minecraft.core.Direction.UP),

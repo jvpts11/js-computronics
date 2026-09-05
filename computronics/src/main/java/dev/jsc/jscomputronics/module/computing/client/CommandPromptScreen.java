@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.CommandPromptMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.CommandOutputPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ConsoleInitPayload;
@@ -381,7 +381,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         // A Vintage machine draws on a green-phosphor tube, which has ONE colour: every style comes out
         // as that green, brighter or dimmer, so an error still reads as an error without being red.
         final int color = terminalColor(style);
-        return screenEra() == HardwareEra.VINTAGE ? dev.jsc.jscomputronics.common.gui.Phosphor.green(color) : color;
+        return screenEra() == HardwareEra.VINTAGE ? dev.jstech.core.gui.Phosphor.green(color) : color;
     }
 
     /** The colour a style has on a monitor that can show colour. */

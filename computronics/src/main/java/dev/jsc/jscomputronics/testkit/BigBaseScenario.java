@@ -9,7 +9,7 @@ package dev.jsc.jscomputronics.testkit;
 
 import dev.jsc.jscomputronics.common.hardware.DiskSize;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
+import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.HardwareItems;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;

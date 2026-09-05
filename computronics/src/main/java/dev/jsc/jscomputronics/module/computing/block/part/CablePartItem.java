@@ -85,7 +85,7 @@ public class CablePartItem extends Item {
         // the crafting buses are inert), so a mismatched mount is refused with a hint instead.
         final boolean craftingPart = type == CablePartType.INPUT || type == CablePartType.RECEIVING;
         final boolean craftingCable =
-                cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.CRAFTING;
+                cable.tier() == dev.jstech.core.network.DataTier.CRAFTING;
         if (craftingPart != craftingCable) {
             if (!level.isClientSide() && context.getPlayer() != null) {
                 context.getPlayer().displayClientMessage(net.minecraft.network.chat.Component.literal(

@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 /** The Legacy era's Cluster Management Computer: grey box, green bar graph, BNC and serial ports. */
 public class LegacyClusterManagementComputerBlock extends ClusterManagementComputerBlock {

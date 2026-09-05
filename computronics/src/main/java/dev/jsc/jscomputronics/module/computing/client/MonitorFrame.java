@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.client.theme.MonitorFrameStyle;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;

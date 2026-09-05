@@ -8,8 +8,8 @@
 package dev.jsc.jscomputronics.module.industrial.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.util.BlockDrops;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.blockentity.ElectricFurnaceBlockEntity;
 import dev.jsc.jscomputronics.module.industrial.menu.ElectricFurnaceMenu;

@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jstech.core.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.rack.RackChassis;
 
 import java.util.EnumSet;

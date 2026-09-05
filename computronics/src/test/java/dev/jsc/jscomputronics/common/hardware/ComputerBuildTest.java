@@ -7,8 +7,8 @@
  */
 package dev.jsc.jscomputronics.common.hardware;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.tier.IndustrialTier;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.tier.IndustrialTier;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -48,7 +48,7 @@ class ComputerBuildTest {
     }
 
     private static DiskSpec disk(final StorageTier tier, final long capacityItems, final int tdp) {
-        return new DiskSpec(tier, dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD, capacityItems, tdp);
+        return new DiskSpec(tier, dev.jstech.core.tier.HardwareEra.STANDARD, capacityItems, tdp);
     }
 
     @Test

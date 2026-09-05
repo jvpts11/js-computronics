@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.common.hardware;
 
-import dev.jsc.jscomputronics.common.tier.IndustrialTier;
+import dev.jstech.core.tier.IndustrialTier;
 
 import java.util.Objects;
 

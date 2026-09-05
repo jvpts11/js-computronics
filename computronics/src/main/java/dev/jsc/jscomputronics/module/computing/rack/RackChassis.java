@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.rack;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 /**
  * The chassis a rack-mounted computer is built in: how many rack units it spends, what the rack's

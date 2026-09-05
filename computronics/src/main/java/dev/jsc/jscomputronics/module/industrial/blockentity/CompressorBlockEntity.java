@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.industrial.blockentity;
 
-import dev.jsc.jscomputronics.common.util.FieldContainerData;
+import dev.jstech.core.util.FieldContainerData;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.recipe.CompressingRecipe;
 import net.minecraft.core.BlockPos;

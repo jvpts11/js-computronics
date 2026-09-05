@@ -101,7 +101,7 @@ public class ClusterManagementComputerMenu extends AbstractComputerMenu {
     }
 
     @Nullable
-    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+    public dev.jstech.core.tier.HardwareEra hardwareEra() {
         return blockEntity.displayEra();
     }
 

@@ -9,7 +9,7 @@ package dev.jsc.jscomputronics.module.computing.client.theme;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.jsc.jscomputronics.common.gui.ColorContrast;
+import dev.jstech.core.gui.ColorContrast;
 import org.junit.jupiter.api.Test;
 
 /**

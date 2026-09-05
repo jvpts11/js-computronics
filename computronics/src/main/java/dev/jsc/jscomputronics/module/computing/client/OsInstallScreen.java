@@ -265,7 +265,7 @@ public final class OsInstallScreen extends Screen {
     }
 
     private static int green(final int color) {
-        return dev.jsc.jscomputronics.common.gui.Phosphor.green(color);
+        return dev.jstech.core.gui.Phosphor.green(color);
     }
 
     /** The three firmware looks, so the installer matches the machine it is installing onto. */

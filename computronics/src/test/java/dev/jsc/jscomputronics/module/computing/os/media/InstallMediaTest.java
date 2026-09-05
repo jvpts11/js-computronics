@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.media;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.os.ProgramKind;
 import org.junit.jupiter.api.Test;
 

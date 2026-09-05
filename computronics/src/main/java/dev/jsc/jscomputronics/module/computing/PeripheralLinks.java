@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing;
 
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralEndpoint;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralLinkValidator;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralEndpoint;
+import dev.jstech.core.peripheral.PeripheralLinkValidator;
+import dev.jstech.core.peripheral.PeripheralOwner;
 import dev.jsc.jscomputronics.module.computing.block.PeripheralCableBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import net.minecraft.core.BlockPos;

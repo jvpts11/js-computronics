@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.block.SupercomputerRackBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import net.minecraft.resources.ResourceLocation;

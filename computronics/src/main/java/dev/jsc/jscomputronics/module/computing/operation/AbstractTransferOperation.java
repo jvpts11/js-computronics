@@ -8,13 +8,13 @@
 package dev.jsc.jscomputronics.module.computing.operation;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
-import dev.jsc.jscomputronics.common.operation.exec.EqualShare;
-import dev.jsc.jscomputronics.common.operation.exec.OperationProgress;
-import dev.jsc.jscomputronics.common.operation.exec.TransferState;
-import dev.jsc.jscomputronics.common.util.ShortId;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.operation.LatencyScheduler;
+import dev.jstech.core.operation.exec.EqualShare;
+import dev.jstech.core.operation.exec.OperationProgress;
+import dev.jstech.core.operation.exec.TransferState;
+import dev.jstech.core.util.ShortId;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.server.level.ServerLevel;

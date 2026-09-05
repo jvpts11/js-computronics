@@ -7,9 +7,9 @@
  */
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
-import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
-import dev.jsc.jscomputronics.common.network.NetworkBridge;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
+import dev.jstech.core.network.ConnectivityIndex;
+import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.NetworkSystem;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import net.minecraft.core.BlockPos;

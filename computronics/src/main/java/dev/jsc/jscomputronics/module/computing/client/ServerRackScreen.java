@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.client;
 
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.client.theme.EraTheme;
 import dev.jsc.jscomputronics.module.computing.client.theme.EraThemes;
 import dev.jsc.jscomputronics.module.computing.gui.layout.ServerRackLayout;

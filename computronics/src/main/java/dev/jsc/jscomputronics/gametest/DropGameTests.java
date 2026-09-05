@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
+import dev.jstech.core.util.BlockDrops;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
 import net.minecraft.core.BlockPos;

@@ -18,7 +18,7 @@ import dev.jsc.jscomputronics.common.hardware.PsuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamGeneration;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import dev.jsc.jscomputronics.module.computing.item.GpuItem;

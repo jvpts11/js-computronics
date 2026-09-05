@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation;
 
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.network.ServerNode;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.network.ServerNode;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;

@@ -9,20 +9,20 @@ package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
-import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.network.FailoverRole;
-import dev.jsc.jscomputronics.common.network.MainframeNode;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.operation.OperationDispatch;
-import dev.jsc.jscomputronics.common.operation.OperationPriority;
-import dev.jsc.jscomputronics.common.operation.OperationTask;
-import dev.jsc.jscomputronics.common.operation.SelfTestOperationTask;
-import dev.jsc.jscomputronics.common.persistence.NetworkRegistrySavedData;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuidState;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.network.ConnectivityIndex;
+import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.network.FailoverRole;
+import dev.jstech.core.network.MainframeNode;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.operation.OperationDispatch;
+import dev.jstech.core.operation.OperationPriority;
+import dev.jstech.core.operation.OperationTask;
+import dev.jstech.core.operation.SelfTestOperationTask;
+import dev.jstech.core.persistence.NetworkRegistrySavedData;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuidState;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
@@ -123,10 +123,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     /** The era of this cabinet, read from its block; it picks the model and the atlas. */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra mainframeEra() {
+    public dev.jstech.core.tier.HardwareEra mainframeEra() {
         return getBlockState().getBlock()
                 instanceof dev.jsc.jscomputronics.module.computing.block.MainframeBlock mainframe
-                ? mainframe.era() : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                ? mainframe.era() : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     /** Whether hardware slot {@code slot} holds a part, on either side. */
@@ -328,15 +328,15 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * installable nor counted in the build.
      */
     @Override
-    protected dev.jsc.jscomputronics.common.tier.HardwareEra requiredBoardEra() {
+    protected dev.jstech.core.tier.HardwareEra requiredBoardEra() {
         return blockEra();
     }
 
-    private dev.jsc.jscomputronics.common.tier.HardwareEra blockEra() {
+    private dev.jstech.core.tier.HardwareEra blockEra() {
         return getBlockState().getBlock()
                 instanceof dev.jsc.jscomputronics.module.computing.block.MainframeBlock mf
                 ? mf.era()
-                : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     // Slot validity is governed by the inherited instance isValidForSlot, which the acceptedFormFactors
@@ -857,7 +857,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
             final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
-            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+            final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_SELECT, sources);
     }
@@ -866,7 +866,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkSelect(
             final net.minecraft.world.item.Item item, final long demand,
             final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
-            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+            final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         return submitNetworkSelect(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item),
                 demand, destination, destinationLabel, sources);
     }
@@ -875,7 +875,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation submitNetworkMove(
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
             final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
-            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+            final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.TYPE_MOVE, sources);
     }
@@ -901,7 +901,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             final dev.jsc.jscomputronics.module.computing.storage.StorageKey key, final long demand,
             final dev.jsc.jscomputronics.module.computing.storage.DataSink destination, final String destinationLabel,
             final byte recordType,
-            final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+            final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         // A SELECT/MOVE/DELETE also needs the dispatcher; without an OS the Operation would never tick and would
         // just pile up in activeOperations. Refuse it so callers no-op cleanly instead of accumulating dead work.
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
@@ -944,7 +944,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             return java.util.List.of();
         }
         final java.util.List<net.minecraft.core.BlockPos> positions = new java.util.ArrayList<>();
-        for (final var node : dev.jsc.jscomputronics.common.network.NetworkSystem.get(serverLevel)
+        for (final var node : dev.jstech.core.network.NetworkSystem.get(serverLevel)
                 .craftingComputersOf(networkUuid())) {
             positions.add(net.minecraft.core.BlockPos.of(node.pos()));
         }
@@ -956,7 +956,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             return java.util.List.of();
         }
         final java.util.List<net.minecraft.core.BlockPos> positions = new java.util.ArrayList<>();
-        for (final var node : dev.jsc.jscomputronics.common.network.NetworkSystem.get(serverLevel)
+        for (final var node : dev.jstech.core.network.NetworkSystem.get(serverLevel)
                 .supercomputersOf(networkUuid())) {
             positions.add(net.minecraft.core.BlockPos.of(node.pos()));
         }
@@ -1234,7 +1234,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     public long lockType(final dev.jsc.jscomputronics.module.computing.storage.StorageKey key,
                          final long demand,
-                         @Nullable final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources) {
+                         @Nullable final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         if (!isRunning() || networkUuid() == null) {
             return 0L;
         }

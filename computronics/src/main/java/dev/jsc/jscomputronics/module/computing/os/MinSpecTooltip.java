@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -59,7 +59,7 @@ public final class MinSpecTooltip {
                 .append(Component.literal(minOsLabel(prog)).withStyle(ChatFormatting.AQUA)));
         // The era floor sits with the hardware minimums because that is what it is: a machine of an
         // older generation cannot run it at any clock speed.
-        if (prog.minEra() != dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE) {
+        if (prog.minEra() != dev.jstech.core.tier.HardwareEra.VINTAGE) {
             // Worded exactly like the OS line above: the same requirement must not read as two rules.
             lines.add(needsEra(prog.minEra()));
         }

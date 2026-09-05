@@ -8,9 +8,9 @@
 package dev.jsc.jscomputronics.common.registry;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.material.MaterialForm;
-import dev.jsc.jscomputronics.common.material.MaterialItems;
-import dev.jsc.jscomputronics.common.material.ModMaterial;
+import dev.jstech.core.material.MaterialForm;
+import dev.jstech.core.material.MaterialItems;
+import dev.jstech.core.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;

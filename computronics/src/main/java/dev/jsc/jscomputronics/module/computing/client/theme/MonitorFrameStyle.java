@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client.theme;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 /**
  * The look of the physical monitor frame a software screen is shown inside, chosen by the host computer's

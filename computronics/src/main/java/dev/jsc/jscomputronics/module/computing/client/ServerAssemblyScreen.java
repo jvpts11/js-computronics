@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.format.Unit;
-import dev.jsc.jscomputronics.common.format.UnitFormatter;
+import dev.jstech.core.format.Unit;
+import dev.jstech.core.format.UnitFormatter;
 import dev.jsc.jscomputronics.common.hardware.ComputerBuild;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler;
 import dev.jsc.jscomputronics.module.computing.menu.ServerAssemblyMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenameServerPayload;

@@ -13,8 +13,8 @@ import dev.jsc.jscomputronics.common.hardware.CraftingCardSpec;
 import dev.jsc.jscomputronics.common.hardware.ExpansionCardKind;
 import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -63,7 +63,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
     }
 
     @Override
-    protected dev.jsc.jscomputronics.common.tier.HardwareEra requiredBoardEra() {
+    protected dev.jstech.core.tier.HardwareEra requiredBoardEra() {
         // A Crafting Computer accepts only a board of its own era, so a Legacy and a Standard ATX board
         // are not interchangeable: each installs in its matching machine alone.
         return blockEra();
@@ -74,11 +74,11 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
      * is not a {@link dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock} (never happens in
      * practice, but keeps the read total).
      */
-    private dev.jsc.jscomputronics.common.tier.HardwareEra blockEra() {
+    private dev.jstech.core.tier.HardwareEra blockEra() {
         return getBlockState().getBlock()
                 instanceof dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock cc
                 ? cc.era()
-                : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     public static void serverTick(final Level level, final BlockPos pos,
@@ -268,7 +268,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
             }
             if (level.getBlockState(current).getBlock()
                     instanceof dev.jsc.jscomputronics.module.computing.block.DataCableBlock cable
-                    && cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.CRAFTING) {
+                    && cable.tier() == dev.jstech.core.network.DataTier.CRAFTING) {
                 for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.values()) {
                     final net.minecraft.core.BlockPos nb = current.relative(d);
                     if (visited.add(nb)) {

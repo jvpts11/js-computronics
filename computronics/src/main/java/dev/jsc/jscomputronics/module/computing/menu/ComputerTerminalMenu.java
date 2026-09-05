@@ -210,7 +210,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
             case 28 -> clampInt(host.networkStorageTotal());
             case DATA_CRAFT_COMPUTERS -> craftComputerCount();
             case DATA_ERA -> {
-                final dev.jsc.jscomputronics.common.tier.HardwareEra era = host.displayEra();
+                final dev.jstech.core.tier.HardwareEra era = host.displayEra();
                 yield era == null ? -1 : era.ordinal();
             }
             case DATA_INDEX_HEALTH -> host.indexHealthState();
@@ -223,7 +223,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         if (host == null || host.networkUuid() == null || !(level instanceof ServerLevel serverLevel)) {
             return 0;
         }
-        return dev.jsc.jscomputronics.common.network.NetworkSystem.get(serverLevel)
+        return dev.jstech.core.network.NetworkSystem.get(serverLevel)
                 .craftingComputersOf(host.networkUuid()).size();
     }
 
@@ -602,10 +602,10 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
 
     /** The host computer's board-derived hardware era for the GUI skin, or {@code null} (STANDARD) when none. */
     @Nullable
-    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+    public dev.jstech.core.tier.HardwareEra hardwareEra() {
         final int ordinal = data.get(DATA_ERA);
-        final dev.jsc.jscomputronics.common.tier.HardwareEra[] values =
-                dev.jsc.jscomputronics.common.tier.HardwareEra.values();
+        final dev.jstech.core.tier.HardwareEra[] values =
+                dev.jstech.core.tier.HardwareEra.values();
         return ordinal >= 0 && ordinal < values.length ? values[ordinal] : null;
     }
 

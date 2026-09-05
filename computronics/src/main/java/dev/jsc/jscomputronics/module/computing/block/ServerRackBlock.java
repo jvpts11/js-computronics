@@ -8,13 +8,13 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock;
-import dev.jsc.jscomputronics.common.multiblock.MultiblockGeometry;
-import dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry;
-import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
+import dev.jstech.core.multiblock.MultiblockGeometry;
+import dev.jstech.core.multiblock.MultiblockPatternGeometry;
+import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.util.BlockDrops;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.item.ServerItem;
@@ -83,8 +83,8 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
      * The era of the cabinet. A cabinet seats servers of its own era or earlier, so a Standard rack
      * takes everything and a Vintage rack takes only Vintage servers.
      */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
-        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    public dev.jstech.core.tier.HardwareEra era() {
+        return dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     /**

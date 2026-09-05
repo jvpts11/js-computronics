@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.gui.layout;
 
-import dev.jsc.jscomputronics.common.gui.layout.GuiLayout;
+import dev.jstech.core.gui.layout.GuiLayout;
 
 /**
  * Pure, Minecraft-free layout for the Network Interactor window, so both the app (which draws the grid, the

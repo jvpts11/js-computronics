@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.os.OpenWindow;
 import dev.jsc.jscomputronics.module.computing.os.OsDef;
 import dev.jsc.jscomputronics.module.computing.os.OsHost;

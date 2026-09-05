@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.industrial;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.material.MaterialItems;
+import dev.jstech.core.material.MaterialItems;
 import dev.jsc.jscomputronics.module.industrial.block.CoalGeneratorBlock;
 import dev.jsc.jscomputronics.module.industrial.block.CompressorBlock;
 import dev.jsc.jscomputronics.module.industrial.block.ElectricFurnaceBlock;

@@ -8,8 +8,8 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.core.BlockPos;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;

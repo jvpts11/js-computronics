@@ -7,8 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.os;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
  * it, so every access route (a directly linked monitor, a KVM channel, ssh, remote control)
  * converges on one pipeline instead of duplicating it per machine shape.
  */
-public interface OsHost extends dev.jsc.jscomputronics.common.peripheral.PeripheralOwner {
+public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
 
     /** Whether the machine is powered on with a valid build. */
     boolean isRunning();
@@ -137,7 +137,7 @@ public interface OsHost extends dev.jsc.jscomputronics.common.peripheral.Periphe
 
     /** The network this machine currently belongs to, or null when unlinked. */
     @Nullable
-    dev.jsc.jscomputronics.common.uuid.NetworkUuid networkUuid();
+    dev.jstech.core.uuid.NetworkUuid networkUuid();
 
     /** The player-given machine name, or an empty string. */
     String customName();

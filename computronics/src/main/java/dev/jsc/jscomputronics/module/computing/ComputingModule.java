@@ -20,9 +20,9 @@ import dev.jsc.jscomputronics.common.hardware.PsuSpec;
 import dev.jsc.jscomputronics.common.hardware.RamGeneration;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.tier.IndustrialTier;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.tier.IndustrialTier;
 import dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
@@ -779,7 +779,7 @@ public final class ComputingModule {
                 final String id = "disk_" + tier.name().toLowerCase(java.util.Locale.ROOT) + "_" + size.id();
                 final DeferredItem<DiskItem> item = ITEMS.register(id, () -> new DiskItem(
                         new Item.Properties(),
-                        new DiskSpec(tier, dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD,
+                        new DiskSpec(tier, dev.jstech.core.tier.HardwareEra.STANDARD,
                                 size.capacityItems(), tier.tdpWatts())));
                 disks.add(new DiskEntry(tier, size, item));
             }

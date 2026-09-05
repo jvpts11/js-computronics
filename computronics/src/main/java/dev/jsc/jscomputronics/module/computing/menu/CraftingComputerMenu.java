@@ -96,7 +96,7 @@ public class CraftingComputerMenu extends AbstractComputerMenu {
     }
 
     @org.jetbrains.annotations.Nullable
-    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+    public dev.jstech.core.tier.HardwareEra hardwareEra() {
         return blockEntity.displayEra();
     }
 

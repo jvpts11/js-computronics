@@ -8,21 +8,21 @@
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.format.Unit;
-import dev.jsc.jscomputronics.common.format.UnitFormatter;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.network.ServerNode;
-import dev.jsc.jscomputronics.common.network.SubframeNode;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.format.Unit;
+import dev.jstech.core.format.UnitFormatter;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.network.ServerNode;
+import dev.jstech.core.network.SubframeNode;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.os.OsHost;
 import dev.jsc.jscomputronics.module.computing.os.OsDef;
 import dev.jsc.jscomputronics.module.computing.os.OsGating;
 import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
-import dev.jsc.jscomputronics.common.util.ShortId;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.util.ShortId;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
@@ -567,7 +567,7 @@ public final class ComputingPayloads {
         if (hostPos.distToCenterSqr(p) <= 64.0) {
             return true;
         }
-        if (host instanceof dev.jsc.jscomputronics.common.peripheral.PeripheralOwner owner) {
+        if (host instanceof dev.jstech.core.peripheral.PeripheralOwner owner) {
             for (final long endpoint : owner.linkedEndpoints()) {
                 if (net.minecraft.core.BlockPos.of(endpoint).distToCenterSqr(p) <= 64.0) {
                     return true;
@@ -702,7 +702,7 @@ public final class ComputingPayloads {
     }
 
     private static String networkLabel(final NetworkUuid net) {
-        return "jsc-net-" + dev.jsc.jscomputronics.common.util.ShortId.of(net.asString());
+        return "jsc-net-" + dev.jstech.core.util.ShortId.of(net.asString());
     }
 
     private static void handleRequestConsoleInit(final RequestConsoleInitPayload payload,
@@ -798,7 +798,7 @@ public final class ComputingPayloads {
             // so a player near any monitor cannot open a program bound to a foreign computer.
             final boolean nearMonitor = player.distanceToSqr(
                     net.minecraft.world.phys.Vec3.atCenterOf(payload.monitorPos())) <= 64.0
-                    && terminalHost instanceof dev.jsc.jscomputronics.common.peripheral.PeripheralOwner owner
+                    && terminalHost instanceof dev.jstech.core.peripheral.PeripheralOwner owner
                     && owner.linkedEndpoints().contains(payload.monitorPos().asLong());
             if (!viaTerminal && !nearMonitor) {
                 return;
@@ -811,7 +811,7 @@ public final class ComputingPayloads {
                 // The host's board-derived era drives the prompt's GUI skin; capture it at open time. It is
                 // not re-synced afterwards because the board is only swapped in the computer's own assembly
                 // GUI, never from the running prompt.
-                final dev.jsc.jscomputronics.common.tier.HardwareEra hostEra =
+                final dev.jstech.core.tier.HardwareEra hostEra =
                         player.level().getBlockEntity(payload.hostPos())
                                 instanceof dev.jsc.jscomputronics.module.computing.os
                                         .OsHost host ? host.displayEra() : null;
@@ -2691,7 +2691,7 @@ public final class ComputingPayloads {
     public static void dispatchQuery(final ServerPlayer player, final PersonalComputerBlockEntity pc) {
         dispatch(player, pc, (level, net, mf) -> mf.submitOperation(
                 new dev.jsc.jscomputronics.module.computing.operation.NetworkQueryOperationTask(level, net, player),
-                dev.jsc.jscomputronics.common.operation.OperationPriority.MEDIUM));
+                dev.jstech.core.operation.OperationPriority.MEDIUM));
     }
 
     @FunctionalInterface
@@ -2855,7 +2855,7 @@ public final class ComputingPayloads {
         if (mainframe != null) {
             mainframe.submitOperation(
                     new dev.jsc.jscomputronics.module.computing.operation.NetworkQueryOperationTask(level, net, player),
-                    dev.jsc.jscomputronics.common.operation.OperationPriority.MEDIUM);
+                    dev.jstech.core.operation.OperationPriority.MEDIUM);
         }
     }
 
@@ -3282,7 +3282,7 @@ public final class ComputingPayloads {
 
     public static String serverLabel(final ServerLevel level, final NodeUuid node) {
         final String fallback = "SRV-" + ShortId.of(node.asString());
-        return dev.jsc.jscomputronics.common.network.NetworkSystem.get(level).locationOf(node)
+        return dev.jstech.core.network.NetworkSystem.get(level).locationOf(node)
                 .map(loc -> level.getBlockEntity(net.minecraft.core.BlockPos.of(loc.rackPos()))
                         instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack
                         ? rack.getServers().getStackInSlot(loc.slot()) : ItemStack.EMPTY)
@@ -3999,13 +3999,13 @@ public final class ComputingPayloads {
     /** Builds and sends a fresh Network Interactor snapshot (network grid, local grid, status, craft catalog). */
     private static void sendNetworkInteractor(final ServerPlayer player, final ServerLevel level,
             final dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
-        final dev.jsc.jscomputronics.common.uuid.NetworkUuid network = computer.networkUuid();
+        final dev.jstech.core.uuid.NetworkUuid network = computer.networkUuid();
         // The whole network's items (Network Storage tab).
         final List<NetworkItemEntry> networkItems = new ArrayList<>();
         long usedItems = 0L;
         if (network != null) {
-            final dev.jsc.jscomputronics.common.network.NetworkSystem system =
-                    dev.jsc.jscomputronics.common.network.NetworkSystem.get(level);
+            final dev.jstech.core.network.NetworkSystem system =
+                    dev.jstech.core.network.NetworkSystem.get(level);
             final dev.jsc.jscomputronics.module.computing.operation.NetworkStorage storage =
                     dev.jsc.jscomputronics.module.computing.operation.NetworkStorage.of(level, network);
             final Map<dev.jsc.jscomputronics.module.computing.storage.StorageKey, Long> totals = storage.query();
@@ -4045,8 +4045,8 @@ public final class ComputingPayloads {
 
     /** A human label for a storage node in the details panel's per-server breakdown — a server's rack position
      *  and slot, or a generic label for a published Personal Computer (which has no rack location). */
-    private static String serverLabel(final dev.jsc.jscomputronics.common.network.NetworkSystem system,
-                                      final dev.jsc.jscomputronics.common.uuid.NodeUuid node) {
+    private static String serverLabel(final dev.jstech.core.network.NetworkSystem system,
+                                      final dev.jstech.core.uuid.NodeUuid node) {
         return system.locationOf(node)
                 .map(loc -> {
                     final net.minecraft.core.BlockPos p = net.minecraft.core.BlockPos.of(loc.rackPos());
@@ -4070,7 +4070,7 @@ public final class ComputingPayloads {
         }
         // Anti-spoof: the monitor must actually be a linked peripheral of this host, so a player near any
         // monitor cannot drive a foreign computer by sending that computer's position as the host.
-        if (!(host instanceof dev.jsc.jscomputronics.common.peripheral.PeripheralOwner owner)
+        if (!(host instanceof dev.jstech.core.peripheral.PeripheralOwner owner)
                 || !owner.linkedEndpoints().contains(monitorPos.asLong())) {
             return null;
         }

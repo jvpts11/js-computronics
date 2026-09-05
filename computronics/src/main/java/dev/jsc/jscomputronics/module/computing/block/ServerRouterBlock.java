@@ -8,10 +8,10 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
-import dev.jsc.jscomputronics.common.network.NetworkBridge;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu;

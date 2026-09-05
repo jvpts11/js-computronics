@@ -7,13 +7,13 @@
  */
 package dev.jsc.jscomputronics.module.computing.os;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.SubscribeEvent;
 
-import static dev.jsc.jscomputronics.common.tier.HardwareEra.LEGACY;
-import static dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
-import static dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE;
+import static dev.jstech.core.tier.HardwareEra.LEGACY;
+import static dev.jstech.core.tier.HardwareEra.STANDARD;
+import static dev.jstech.core.tier.HardwareEra.VINTAGE;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 

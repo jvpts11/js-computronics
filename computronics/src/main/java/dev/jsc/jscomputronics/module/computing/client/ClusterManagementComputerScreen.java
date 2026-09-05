@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.gui.layout.ClusterManagementComputerLayout;
 import dev.jsc.jscomputronics.module.computing.menu.ClusterManagementComputerMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;

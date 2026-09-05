@@ -8,13 +8,13 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.util.BlockDrops;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.ClusterManagementComputerBlockEntity;
 import net.minecraft.core.BlockPos;

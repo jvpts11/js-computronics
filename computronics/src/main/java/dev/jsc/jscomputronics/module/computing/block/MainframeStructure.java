@@ -7,8 +7,8 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
-import dev.jsc.jscomputronics.common.multiblock.BlockMatcher;
-import dev.jsc.jscomputronics.common.multiblock.MultiblockPattern;
+import dev.jstech.core.multiblock.BlockMatcher;
+import dev.jstech.core.multiblock.MultiblockPattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
@@ -36,7 +36,7 @@ public final class MainframeStructure {
 
     /**
      * Declarative description of the Mainframe footprint, used by
-     * {@link dev.jsc.jscomputronics.common.multiblock.MultiblockPatternGeometry} to compute
+     * {@link dev.jstech.core.multiblock.MultiblockPatternGeometry} to compute
      * world positions for any of the four horizontal orientations.
      */
     public static final MultiblockPattern PATTERN = MultiblockPattern.builder("mainframe")

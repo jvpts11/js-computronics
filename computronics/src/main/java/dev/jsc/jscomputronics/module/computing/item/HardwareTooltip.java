@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.item;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 

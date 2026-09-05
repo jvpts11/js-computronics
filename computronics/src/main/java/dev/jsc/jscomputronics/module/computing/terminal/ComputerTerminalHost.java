@@ -27,7 +27,7 @@ public interface ComputerTerminalHost {
     int networkServerCount();
 
     @org.jetbrains.annotations.Nullable
-    dev.jsc.jscomputronics.common.uuid.NetworkUuid networkUuid();
+    dev.jstech.core.uuid.NetworkUuid networkUuid();
 
     int installedCpus();
 
@@ -116,7 +116,7 @@ public interface ComputerTerminalHost {
      * computer overrides this with its installed era; a host with no board reports {@code null}.
      */
     @org.jetbrains.annotations.Nullable
-    default dev.jsc.jscomputronics.common.tier.HardwareEra installedEra() {
+    default dev.jstech.core.tier.HardwareEra installedEra() {
         return null;
     }
 
@@ -126,7 +126,7 @@ public interface ComputerTerminalHost {
      * fixed era overrides this to report that chassis era even when no board is installed.
      */
     @org.jetbrains.annotations.Nullable
-    default dev.jsc.jscomputronics.common.tier.HardwareEra displayEra() {
+    default dev.jstech.core.tier.HardwareEra displayEra() {
         return installedEra();
     }
 

@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
-import dev.jsc.jscomputronics.common.network.ServerNode;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
+import dev.jstech.core.network.ServerNode;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
@@ -52,7 +52,7 @@ import java.util.UUID;
  * components), never by the Server item.
  */
 public class ServerRackBlockEntity extends BlockEntity
-        implements dev.jsc.jscomputronics.common.peripheral.PeripheralOwnerSupport,
+        implements dev.jstech.core.peripheral.PeripheralOwnerSupport,
         dev.jsc.jscomputronics.module.computing.os.OsHost,
         dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost,
         software.bernie.geckolib.animatable.GeoBlockEntity {
@@ -105,10 +105,10 @@ public class ServerRackBlockEntity extends BlockEntity
     }
 
     /** The era of this cabinet, read from its block. */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra rackEra() {
+    public dev.jstech.core.tier.HardwareEra rackEra() {
         return getBlockState().getBlock()
                 instanceof dev.jsc.jscomputronics.module.computing.block.ServerRackBlock rack
-                ? rack.era() : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                ? rack.era() : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     /** What row {@code slot} holds, as a unit code, on either side. */
@@ -1000,7 +1000,7 @@ public class ServerRackBlockEntity extends BlockEntity
                 continue; // a face internal to the cabinet (the front layer's rear)
             }
             if (level.getBlockState(neighbor).getBlock() instanceof DataCableBlock cable
-                    && cable.tier() != dev.jsc.jscomputronics.common.network.DataTier.HPC) {
+                    && cable.tier() != dev.jstech.core.network.DataTier.HPC) {
                 cables.add(neighbor.asLong());
             }
         }
@@ -1599,14 +1599,14 @@ public class ServerRackBlockEntity extends BlockEntity
     }
 
     /** The era a disk was made for — what an item and a system cost on it; standard for no disk. */
-    private static dev.jsc.jscomputronics.common.tier.HardwareEra diskEra(final ItemStack disk) {
+    private static dev.jstech.core.tier.HardwareEra diskEra(final ItemStack disk) {
         return disk.getItem() instanceof DiskItem item
-                ? item.spec().era() : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+                ? item.spec().era() : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     @Override
     @org.jetbrains.annotations.Nullable
-    public dev.jsc.jscomputronics.common.tier.HardwareEra installedEra() {
+    public dev.jstech.core.tier.HardwareEra installedEra() {
         final int mobo = dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.MOBO;
         final net.minecraft.world.item.component.ItemContainerContents parts =
                 ServerItem.hardware(soleServerStack());
@@ -1622,7 +1622,7 @@ public class ServerRackBlockEntity extends BlockEntity
 
     @Override
     @org.jetbrains.annotations.Nullable
-    public dev.jsc.jscomputronics.common.tier.HardwareEra displayEra() {
+    public dev.jstech.core.tier.HardwareEra displayEra() {
         // The client copy of a rack holds no mounted servers, so the era has to travel to it: screens
         // that dress themselves by era (the boot sequence, the terminal bezel) render client-side.
         if (level != null && level.isClientSide()) {
@@ -1878,14 +1878,14 @@ public class ServerRackBlockEntity extends BlockEntity
     // The era of the machine the monitor is currently showing, as last received from the server. Only
     // ever written on the client; the server always answers from the mounted hardware itself.
     @org.jetbrains.annotations.Nullable
-    private dev.jsc.jscomputronics.common.tier.HardwareEra clientEra;
+    private dev.jstech.core.tier.HardwareEra clientEra;
 
     @Override
     public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
         final CompoundTag tag = super.getUpdateTag(registries);
         // Only the active channel's era travels. Sending the mounted stacks would put every server's
         // full build on the wire on every block update, for one enum the screens need.
-        final dev.jsc.jscomputronics.common.tier.HardwareEra era = installedEra();
+        final dev.jstech.core.tier.HardwareEra era = installedEra();
         tag.putInt("DisplayEra", era == null ? -1 : era.ordinal());
         // The cabinet model: one byte per row says what is seated there, the mask says which bays are
         // off, and the panel flag whether the supercomputer's livery is on. Enough to draw it all.
@@ -1913,8 +1913,8 @@ public class ServerRackBlockEntity extends BlockEntity
         // over the client copy and reset the transient rack state to its defaults.
         final CompoundTag tag = packet.getTag();
         final int ordinal = tag != null ? tag.getInt("DisplayEra") : -1;
-        final dev.jsc.jscomputronics.common.tier.HardwareEra[] eras =
-                dev.jsc.jscomputronics.common.tier.HardwareEra.values();
+        final dev.jstech.core.tier.HardwareEra[] eras =
+                dev.jstech.core.tier.HardwareEra.values();
         clientEra = ordinal >= 0 && ordinal < eras.length ? eras[ordinal] : null;
         if (tag != null) {
             applyVisualTag(tag);

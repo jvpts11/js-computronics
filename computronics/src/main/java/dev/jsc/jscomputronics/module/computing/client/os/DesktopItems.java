@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client.os;
 
-import dev.jsc.jscomputronics.common.gui.layout.DesktopZ;
+import dev.jstech.core.gui.layout.DesktopZ;
 import dev.jsc.jscomputronics.module.computing.client.ChemicalSprite;
 import dev.jsc.jscomputronics.module.computing.client.FluidSprite;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;

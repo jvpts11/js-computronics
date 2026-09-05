@@ -8,6 +8,7 @@
 package dev.jstech.core;
 
 import com.mojang.logging.LogUtils;
+import dev.jstech.core.registry.JscAttachments;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -26,5 +27,7 @@ public final class JsCore {
 
     public JsCore(final IEventBus modEventBus, final ModContainer modContainer) {
         LOGGER.info("J's Core {} loaded.", modContainer.getModInfo().getVersion());
+        // The data network lives on the level and the chunks as attachments the core owns.
+        JscAttachments.register(modEventBus);
     }
 }

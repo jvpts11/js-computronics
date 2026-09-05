@@ -10,9 +10,9 @@ package dev.jsc.jscomputronics.module.computing.block;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.part.AbstractBusPart;
 import dev.jsc.jscomputronics.module.computing.block.part.CablePart;
@@ -117,7 +117,7 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         }
         // The cable only shows a connection where the device actually accepts a cable on that face
         // (a computer accepts one on its rear only), so the rendered nub never lies about connectivity.
-        return neighbor instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable device
+        return neighbor instanceof dev.jstech.core.network.DataNetworkConnectable device
                 && device.acceptedCableTiers().contains(this.tier)
                 && device.connectsOnFace(neighborState, direction.getOpposite(), this.tier);
     }

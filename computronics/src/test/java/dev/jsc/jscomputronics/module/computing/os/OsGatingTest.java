@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;

@@ -8,8 +8,8 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
-import dev.jsc.jscomputronics.common.network.DataTier;
+import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.DataTier;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -160,7 +160,7 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
                 && level.getBlockEntity(pos) instanceof ServerRackPartBlockEntity part
                 && part.controllerPos() != null
                 && level.getBlockState(part.controllerPos()).getBlock()
-                        instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock controller) {
+                        instanceof dev.jstech.core.multiblock.AbstractMultiblockControllerBlock controller) {
             controller.dropContentsExternally(serverLevel, part.controllerPos());
         }
         return super.playerWillDestroy(level, pos, state, player);
@@ -176,7 +176,7 @@ public class ServerRackPartBlock extends Block implements EntityBlock, RearFacin
             // so the whole cabinet dissolves. (Re-entrant calls are guarded.)
             final BlockState controller = level.getBlockState(part.controllerPos());
             if (controller.getBlock()
-                    instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock owner) {
+                    instanceof dev.jstech.core.multiblock.AbstractMultiblockControllerBlock owner) {
                 owner.dissolve(serverLevel, part.controllerPos(),
                         controller.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING));
             }

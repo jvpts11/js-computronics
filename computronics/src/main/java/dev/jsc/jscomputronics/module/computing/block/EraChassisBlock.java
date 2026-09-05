@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 /**
  * A computer block whose hardware era is fixed by its chassis rather than by the board installed in it. Per-era

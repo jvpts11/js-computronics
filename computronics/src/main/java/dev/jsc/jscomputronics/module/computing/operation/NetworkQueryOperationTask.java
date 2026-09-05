@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation;
 
-import dev.jsc.jscomputronics.common.operation.OperationContext;
-import dev.jsc.jscomputronics.common.operation.OperationResult;
-import dev.jsc.jscomputronics.common.operation.OperationTask;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.operation.OperationContext;
+import dev.jstech.core.operation.OperationResult;
+import dev.jstech.core.operation.OperationTask;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;

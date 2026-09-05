@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 /**
  * The firmware variant shown when a computer has no operating system installed.

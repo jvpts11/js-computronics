@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.gui.layout;
 
-import dev.jsc.jscomputronics.common.gui.layout.GuiLayout;
+import dev.jstech.core.gui.layout.GuiLayout;
 
 /**
  * The geometry of the This PC window, in desktop units: a machine card, then a scrolling page of

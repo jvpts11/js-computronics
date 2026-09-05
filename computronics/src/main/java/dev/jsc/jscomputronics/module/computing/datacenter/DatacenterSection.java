@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.datacenter;
 
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import net.minecraft.core.Direction;
 
 import java.util.List;

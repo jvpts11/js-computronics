@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.common.hardware;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 import java.util.Objects;
 import java.util.Set;

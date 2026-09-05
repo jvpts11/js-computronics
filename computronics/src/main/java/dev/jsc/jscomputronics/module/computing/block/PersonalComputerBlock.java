@@ -8,10 +8,10 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.util.BlockDrops;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -38,15 +38,15 @@ import org.jetbrains.annotations.Nullable;
  */
 public class PersonalComputerBlock extends HorizontalDirectionalBlock
         implements EntityBlock, RearFacingDataPort, EraChassisBlock,
-        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
+        dev.jstech.core.peripheral.PeripheralConnectable {
 
     @Override
-    public dev.jsc.jscomputronics.common.peripheral.PeripheralCableType peripheralType() {
-        return dev.jsc.jscomputronics.common.peripheral.PeripheralCableType.COMPUTING;
+    public dev.jstech.core.peripheral.PeripheralCableType peripheralType() {
+        return dev.jstech.core.peripheral.PeripheralCableType.COMPUTING;
     }
 
     @Override
-    public dev.jsc.jscomputronics.common.tier.HardwareEra chassisEra() {
+    public dev.jstech.core.tier.HardwareEra chassisEra() {
         return era();
     }
 
@@ -62,8 +62,8 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
      * consumer board the machine accepts: only a board of this era (and of the era's form factor) installs.
      * The base block is the Standard era; the Vintage and Legacy variants override this.
      */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
-        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    public dev.jstech.core.tier.HardwareEra era() {
+        return dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     @Override

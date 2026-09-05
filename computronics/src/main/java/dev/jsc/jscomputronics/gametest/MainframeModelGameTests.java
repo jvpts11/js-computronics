@@ -132,9 +132,9 @@ public final class MainframeModelGameTests {
         final MainframeBlockEntity legacy = place(helper, new BlockPos(1, 2, 5), ComputingModule.LEGACY_MAINFRAME.get());
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    helper.assertTrue(standard.mainframeEra() == dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD
-                                    && vintage.mainframeEra() == dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE
-                                    && legacy.mainframeEra() == dev.jsc.jscomputronics.common.tier.HardwareEra.LEGACY,
+                    helper.assertTrue(standard.mainframeEra() == dev.jstech.core.tier.HardwareEra.STANDARD
+                                    && vintage.mainframeEra() == dev.jstech.core.tier.HardwareEra.VINTAGE
+                                    && legacy.mainframeEra() == dev.jstech.core.tier.HardwareEra.LEGACY,
                             "each cabinet reports its own era, which picks its model and atlas");
                     // The cabinet is three wide, two tall and two deep; culling by the controller's own
                     // block would blink the whole machine out as the player walks past it.

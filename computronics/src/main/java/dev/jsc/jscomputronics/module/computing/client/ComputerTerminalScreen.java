@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.LocalStorageSnapshotPayload;
 import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry;

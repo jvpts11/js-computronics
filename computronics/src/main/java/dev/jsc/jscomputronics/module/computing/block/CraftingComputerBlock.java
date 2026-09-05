@@ -8,12 +8,12 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.RearFacingDataPort;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
-import dev.jsc.jscomputronics.common.util.BlockDrops;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.util.BlockDrops;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -48,12 +48,12 @@ public class CraftingComputerBlock extends HorizontalDirectionalBlock
      * board the machine accepts: only a board of this era (and of the era's form factor) installs. The
      * base block is the Standard era; the Vintage and Legacy variants override this.
      */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
-        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    public dev.jstech.core.tier.HardwareEra era() {
+        return dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
     @Override
-    public dev.jsc.jscomputronics.common.tier.HardwareEra chassisEra() {
+    public dev.jstech.core.tier.HardwareEra chassisEra() {
         return era();
     }
 

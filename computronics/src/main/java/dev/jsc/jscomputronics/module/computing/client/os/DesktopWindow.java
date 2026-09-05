@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client.os;
 
-import dev.jsc.jscomputronics.common.gui.layout.WindowGeometry;
+import dev.jstech.core.gui.layout.WindowGeometry;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -396,8 +396,8 @@ public final class DesktopWindow {
         final int cw = ww - 8;
         final int ch = wh - TITLE_H - 8;
         final org.joml.Matrix4f mat = g.pose().last().pose();
-        final dev.jsc.jscomputronics.common.gui.layout.WindowGeometry.Rect clip =
-                dev.jsc.jscomputronics.common.gui.layout.WindowGeometry.scissor(
+        final dev.jstech.core.gui.layout.WindowGeometry.Rect clip =
+                dev.jstech.core.gui.layout.WindowGeometry.scissor(
                         (int) mat.m30(), (int) mat.m31(), cx, cy, cx + cw, cy + ch);
         g.enableScissor(clip.x(), clip.y(), clip.x() + clip.w(), clip.y() + clip.h());
         app.applySkin(skin);

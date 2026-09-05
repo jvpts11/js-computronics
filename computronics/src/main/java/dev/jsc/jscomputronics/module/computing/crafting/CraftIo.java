@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.crafting;
 
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;

@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingComputerLayout;
 import dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu;
 import dev.jsc.jscomputronics.module.computing.operation.payload.RenamePcPayload;

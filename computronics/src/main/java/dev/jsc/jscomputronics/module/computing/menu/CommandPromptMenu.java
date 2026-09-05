@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.menu;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
 import net.minecraft.core.BlockPos;

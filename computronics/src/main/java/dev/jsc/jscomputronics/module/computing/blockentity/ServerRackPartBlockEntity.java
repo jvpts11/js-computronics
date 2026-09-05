@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jstech.core.multiblock.MultiblockPartBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 

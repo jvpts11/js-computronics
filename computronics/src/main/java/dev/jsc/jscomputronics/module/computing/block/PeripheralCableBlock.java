@@ -8,8 +8,8 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralConnectable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;

@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.common.hardware;
 
-import dev.jsc.jscomputronics.common.tier.IndustrialTier;
+import dev.jstech.core.tier.IndustrialTier;
 
 /**
  * A crafting co-processor for the Supercomputer's six dedicated slots.

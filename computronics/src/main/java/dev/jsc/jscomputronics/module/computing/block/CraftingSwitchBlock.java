@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.block;
 
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -26,16 +26,16 @@ import org.jetbrains.annotations.Nullable;
  * discovers the computer over the crafting cable.
  */
 public class CraftingSwitchBlock extends Block
-        implements EntityBlock, dev.jsc.jscomputronics.common.network.DataNetworkConnectable {
+        implements EntityBlock, dev.jstech.core.network.DataNetworkConnectable {
 
     public CraftingSwitchBlock(final Properties properties) {
         super(properties);
     }
 
     @Override
-    public java.util.Set<dev.jsc.jscomputronics.common.network.DataTier> acceptedCableTiers() {
+    public java.util.Set<dev.jstech.core.network.DataTier> acceptedCableTiers() {
         // Only the crafting cable attaches (on any face); the switch is not a data-network device.
-        return java.util.Set.of(dev.jsc.jscomputronics.common.network.DataTier.CRAFTING);
+        return java.util.Set.of(dev.jstech.core.network.DataTier.CRAFTING);
     }
 
     @Override

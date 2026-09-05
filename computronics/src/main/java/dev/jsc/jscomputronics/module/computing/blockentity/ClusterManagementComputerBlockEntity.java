@@ -13,9 +13,9 @@ import dev.jsc.jscomputronics.common.hardware.ExpansionCardKind;
 import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
 import dev.jsc.jscomputronics.common.hardware.PcieGeneration;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.ClusterManagementComputerBlock;
 import dev.jsc.jscomputronics.module.computing.datacenter.DatacenterSection;
@@ -235,7 +235,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         final long now = serverLevel.getGameTime();
         final boolean refresh = now != routersRefreshedAt;
         routersRefreshedAt = now;
-        for (final dev.jsc.jscomputronics.common.network.ServerRouterElement router : system.routersOf(networkUuid())) {
+        for (final dev.jstech.core.network.ServerRouterElement router : system.routersOf(networkUuid())) {
             if (serverLevel.getBlockEntity(BlockPos.of(router.pos())) instanceof ServerRouterBlockEntity routerBe) {
                 if (refresh) {
                     routerBe.recomputeNow();

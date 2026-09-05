@@ -8,8 +8,8 @@
 package dev.jsc.jscomputronics.common.hardware;
 
 import dev.jsc.jscomputronics.common.hardware.ClusterInterfaceCardSpec.Reach;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.tier.IndustrialTier;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.tier.IndustrialTier;
 import dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType;
 import org.junit.jupiter.api.Test;
 

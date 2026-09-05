@@ -102,7 +102,7 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
     }
 
     @org.jetbrains.annotations.Nullable
-    public dev.jsc.jscomputronics.common.tier.HardwareEra hardwareEra() {
+    public dev.jstech.core.tier.HardwareEra hardwareEra() {
         final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = currentBuild();
         return build == null ? null : build.motherboard().era();
     }

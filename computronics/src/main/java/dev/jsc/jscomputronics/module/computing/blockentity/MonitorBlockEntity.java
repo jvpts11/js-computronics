@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralEndpoint;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralLinkValidator;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralEndpoint;
+import dev.jstech.core.peripheral.PeripheralLinkValidator;
+import dev.jstech.core.peripheral.PeripheralOwner;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
 import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;

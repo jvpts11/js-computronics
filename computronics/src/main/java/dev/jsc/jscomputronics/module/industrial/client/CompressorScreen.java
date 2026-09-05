@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.industrial.client;
 
-import dev.jsc.jscomputronics.client.gui.screen.AbstractMachineScreen;
+import dev.jstech.core.client.gui.screen.AbstractMachineScreen;
 import dev.jsc.jscomputronics.module.industrial.menu.CompressorMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;

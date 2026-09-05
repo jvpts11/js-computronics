@@ -9,7 +9,7 @@ package dev.jsc.jscomputronics.module.computing.os;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Locale;

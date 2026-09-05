@@ -8,11 +8,11 @@
 package dev.jsc.jscomputronics.module.computing.operation;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.operation.LatencyScheduler;
+import dev.jstech.core.operation.LatencyScheduler;
 import dev.jsc.jscomputronics.common.operation.index.Allocation;
 import dev.jsc.jscomputronics.common.operation.index.ItemLocation;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;

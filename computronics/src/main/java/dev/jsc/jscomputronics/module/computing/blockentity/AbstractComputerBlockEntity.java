@@ -13,13 +13,13 @@ import dev.jsc.jscomputronics.common.hardware.DiskSpec;
 import dev.jsc.jscomputronics.common.hardware.ExpansionCardSpec;
 import dev.jsc.jscomputronics.common.hardware.FormFactor;
 import dev.jsc.jscomputronics.common.hardware.RamSpec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralOwnerSupport;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.peripheral.PeripheralOwnerSupport;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.item.CpuItem;
@@ -1025,14 +1025,14 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
 
     /**
      * The faces on which this computer will accept a data cable, derived from the block's
-     * {@link dev.jsc.jscomputronics.common.network.DataNetworkConnectable#connectsOnFace} so the
+     * {@link dev.jstech.core.network.DataNetworkConnectable#connectsOnFace} so the
      * device's attachment and the cable's rendered connection always agree. A standalone computer
      * reports only its rear; the Mainframe (a separate block entity) and the cluster nodes keep every
      * face.
      */
     protected java.util.List<Direction> cableSearchFaces() {
         final BlockState state = getBlockState();
-        if (state.getBlock() instanceof dev.jsc.jscomputronics.common.network.DataNetworkConnectable device) {
+        if (state.getBlock() instanceof dev.jstech.core.network.DataNetworkConnectable device) {
             final java.util.List<Direction> faces = new java.util.ArrayList<>(Direction.values().length);
             for (final Direction direction : Direction.values()) {
                 if (device.connectsOnFace(state, direction)) {

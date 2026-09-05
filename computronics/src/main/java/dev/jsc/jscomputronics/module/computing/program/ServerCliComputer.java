@@ -7,10 +7,10 @@
  */
 package dev.jsc.jscomputronics.module.computing.program;
 
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.util.ShortId;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.util.ShortId;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.os.OsHost;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
@@ -165,7 +165,7 @@ public final class ServerCliComputer implements CliComputer {
                 candidates.add(be);
             }
         }
-        for (final dev.jsc.jscomputronics.common.network.ServerNode server : system.serversOf(network)) {
+        for (final dev.jstech.core.network.ServerNode server : system.serversOf(network)) {
             system.locationOf(server.nodeUuid()).ifPresent(loc -> {
                 if (level.getBlockEntity(net.minecraft.core.BlockPos.of(loc.rackPos()))
                         instanceof dev.jsc.jscomputronics.module.computing.blockentity
@@ -380,7 +380,7 @@ public final class ServerCliComputer implements CliComputer {
         if (mainframe(net) != null) {
             out.add(new StoredItem("Mainframe", 1L));
         }
-        for (final dev.jsc.jscomputronics.common.network.ServerNode server : system.serversOf(net)) {
+        for (final dev.jstech.core.network.ServerNode server : system.serversOf(net)) {
             if (out.size() >= limit) {
                 break;
             }
@@ -391,14 +391,14 @@ public final class ServerCliComputer implements CliComputer {
                 break;
             }
             out.add(new StoredItem("PC-"
-                    + dev.jsc.jscomputronics.common.util.ShortId.of(pc.nodeUuid().asString()) + " (pc)", 1L));
+                    + dev.jstech.core.util.ShortId.of(pc.nodeUuid().asString()) + " (pc)", 1L));
         }
         for (final var cc : system.craftingComputersOf(net)) {
             if (out.size() >= limit) {
                 break;
             }
             out.add(new StoredItem("CC-"
-                    + dev.jsc.jscomputronics.common.util.ShortId.of(cc.nodeUuid().asString()) + " (crafting)", 1L));
+                    + dev.jstech.core.util.ShortId.of(cc.nodeUuid().asString()) + " (crafting)", 1L));
         }
         return out;
     }
@@ -427,7 +427,7 @@ public final class ServerCliComputer implements CliComputer {
             return List.of();
         }
         final List<StoredItem> out = new ArrayList<>();
-        for (final dev.jsc.jscomputronics.common.network.ServerNode srv
+        for (final dev.jstech.core.network.ServerNode srv
                 : NetworkSystem.get(level).serversOf(net)) {
             final long used = NetworkStorage.ofServers(level, java.util.List.of(srv.nodeUuid()))
                     .query().values().stream().mapToLong(Long::longValue).sum();
@@ -643,7 +643,7 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public List<String> peripherals() {
-        if (hostBlock instanceof dev.jsc.jscomputronics.common.peripheral.PeripheralOwnerSupport owner) {
+        if (hostBlock instanceof dev.jstech.core.peripheral.PeripheralOwnerSupport owner) {
             final List<String> rows = new ArrayList<>();
             for (final long endpoint : owner.peripheralEndpoints()) {
                 final BlockPos pos = BlockPos.of(endpoint);
@@ -761,12 +761,12 @@ public final class ServerCliComputer implements CliComputer {
      */
     @org.jetbrains.annotations.Nullable
     private OpResult eraGate(final dev.jsc.jscomputronics.module.computing.os.ProgramSpec spec) {
-        if (spec.minEra() == dev.jsc.jscomputronics.common.tier.HardwareEra.VINTAGE) {
+        if (spec.minEra() == dev.jstech.core.tier.HardwareEra.VINTAGE) {
             return null; // no requirement
         }
         // displayEra, not installedEra: a Vintage or Legacy chassis IS that generation whatever board
         // sits in it, and that chassis is the only way a machine of an older era exists right now.
-        final dev.jsc.jscomputronics.common.tier.HardwareEra era =
+        final dev.jstech.core.tier.HardwareEra era =
                 hostBlock instanceof OsHost computer ? computer.displayEra() : null;
         if (era != null && dev.jsc.jscomputronics.module.computing.os.OsGating.canInstall(spec.minEra(), era)) {
             return null;
@@ -1096,7 +1096,7 @@ public final class ServerCliComputer implements CliComputer {
         if (name == null || name.isBlank()) {
             return null;
         }
-        for (final dev.jsc.jscomputronics.common.network.ServerNode server
+        for (final dev.jstech.core.network.ServerNode server
                 : NetworkSystem.get(level).serversOf(net)) {
             if (ComputingPayloads.serverLabel(level, server.nodeUuid()).equalsIgnoreCase(name)) {
                 return server.nodeUuid();

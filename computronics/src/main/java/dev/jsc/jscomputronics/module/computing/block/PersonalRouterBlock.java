@@ -8,9 +8,9 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
-import dev.jsc.jscomputronics.common.network.NetworkBridge;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
+import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.NetworkSystem;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalRouterBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -52,10 +52,10 @@ public class PersonalRouterBlock extends net.minecraft.world.level.block.Horizon
     }
 
     @Override
-    public java.util.Set<dev.jsc.jscomputronics.common.network.DataTier> acceptedCableTiers() {
+    public java.util.Set<dev.jstech.core.network.DataTier> acceptedCableTiers() {
         // The Personal Router bridges exactly the two access/backbone tiers it converts between.
-        return java.util.Set.of(dev.jsc.jscomputronics.common.network.DataTier.T1_ETHERNET,
-                dev.jsc.jscomputronics.common.network.DataTier.T2_HBW);
+        return java.util.Set.of(dev.jstech.core.network.DataTier.T1_ETHERNET,
+                dev.jstech.core.network.DataTier.T2_HBW);
     }
 
     @Override

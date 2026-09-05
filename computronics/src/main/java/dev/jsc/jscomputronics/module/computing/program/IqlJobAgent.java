@@ -15,7 +15,7 @@ import dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition;
 import dev.jsc.jscomputronics.module.computing.program.iql.IqlDuration;
 import dev.jsc.jscomputronics.module.computing.program.iql.IqlSavedObject;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;

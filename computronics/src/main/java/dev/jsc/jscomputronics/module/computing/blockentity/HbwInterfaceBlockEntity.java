@@ -8,9 +8,9 @@
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.common.hardware.PhiCoprocessorSpec;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.item.PhiCoprocessorItem;
@@ -129,7 +129,7 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
                 final BlockState state = serverLevel.getBlockState(neighbor);
                 // The fabric is the high-compute cable only. A cabinet is a leaf on it, not a conduit.
                 if (state.getBlock() instanceof DataCableBlock cable
-                        && cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.HPC) {
+                        && cable.tier() == dev.jstech.core.network.DataTier.HPC) {
                     queue.add(neighbor);
                     continue;
                 }
@@ -224,7 +224,7 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
         for (final Direction direction : Direction.values()) {
             final BlockPos neighbor = worldPosition.relative(direction);
             if (serverLevel.getBlockState(neighbor).getBlock() instanceof DataCableBlock cable
-                    && cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.T2_HBW) {
+                    && cable.tier() == dev.jstech.core.network.DataTier.T2_HBW) {
                 return neighbor.asLong();
             }
         }

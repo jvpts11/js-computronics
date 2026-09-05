@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.common.operation.index;
 
 import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.uuid.NodeUuid;
 
 import java.util.Objects;
 

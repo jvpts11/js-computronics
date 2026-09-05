@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.os.media;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 
 /**
  * The physical format of a medium, independent of the {@link MediaKind content} it carries.

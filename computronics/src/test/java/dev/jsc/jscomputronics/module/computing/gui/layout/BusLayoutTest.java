@@ -9,7 +9,7 @@ package dev.jsc.jscomputronics.module.computing.gui.layout;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.jsc.jscomputronics.common.gui.layout.GuiLayout;
+import dev.jstech.core.gui.layout.GuiLayout;
 import org.junit.jupiter.api.Test;
 
 class BusLayoutTest {

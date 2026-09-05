@@ -8,14 +8,14 @@
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.network.ConnectivityIndex;
-import dev.jsc.jscomputronics.common.network.NetworkBridge;
-import dev.jsc.jscomputronics.common.network.NetworkSystem;
-import dev.jsc.jscomputronics.common.network.ServerNode;
-import dev.jsc.jscomputronics.common.network.ServerRouterElement;
-import dev.jsc.jscomputronics.common.tier.IndustrialTier;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.common.uuid.NodeUuid;
+import dev.jstech.core.network.ConnectivityIndex;
+import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.NetworkSystem;
+import dev.jstech.core.network.ServerNode;
+import dev.jstech.core.network.ServerRouterElement;
+import dev.jstech.core.tier.IndustrialTier;
+import dev.jstech.core.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NodeUuid;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
 import dev.jsc.jscomputronics.module.computing.datacenter.DatacenterSection;

@@ -69,7 +69,7 @@ public class ServerRackMenu extends AbstractComputerMenu {
     }
 
     /** The cabinet's era, so its screen wears that decade's materials rather than one look for all three. */
-    public dev.jsc.jscomputronics.common.tier.HardwareEra rackEra() {
+    public dev.jstech.core.tier.HardwareEra rackEra() {
         return rack.rackEra();
     }
 

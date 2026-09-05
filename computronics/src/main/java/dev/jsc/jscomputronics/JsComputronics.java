@@ -8,8 +8,7 @@
 package dev.jsc.jscomputronics;
 
 import com.mojang.logging.LogUtils;
-import dev.jsc.jscomputronics.common.config.JscConfigBridge;
-import dev.jsc.jscomputronics.common.registry.JscAttachments;
+import dev.jstech.core.config.JscConfigBridge;
 import dev.jsc.jscomputronics.common.registry.JscCreativeModeTabs;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
@@ -39,7 +38,6 @@ public class JsComputronics {
         IndustrialModule.register(modEventBus);
         ComputingModule.register(modEventBus);
         JscCreativeModeTabs.register(modEventBus);
-        JscAttachments.register(modEventBus);
 
         // Soft integrations: each one checks for its mod and stays a no-op without it.
         dev.jsc.jscomputronics.integration.mekanism.MekanismIntegration.bootstrap();

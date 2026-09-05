@@ -181,8 +181,8 @@ public final class OsSkin {
      * and requires a Standard machine, so it has no older self to wear.
      */
     public static OsSkin forDesktop(final ResourceLocation desktopId,
-                                    final dev.jsc.jscomputronics.common.tier.HardwareEra era) {
-        if (era != null && era.ordinal() <= dev.jsc.jscomputronics.common.tier.HardwareEra.LEGACY.ordinal()) {
+                                    final dev.jstech.core.tier.HardwareEra era) {
+        if (era != null && era.ordinal() <= dev.jstech.core.tier.HardwareEra.LEGACY.ordinal()) {
             switch (desktopId.getPath()) {
                 case "kde_plasma":
                     return KDE_PLASMA_LEGACY;

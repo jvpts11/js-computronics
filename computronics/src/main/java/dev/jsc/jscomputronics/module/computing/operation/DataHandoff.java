@@ -8,7 +8,7 @@
 package dev.jsc.jscomputronics.module.computing.operation;
 
 import dev.jsc.jscomputronics.common.operation.index.ItemLocation;
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.storage.DataContainers;
 import dev.jsc.jscomputronics.module.computing.storage.DataSink;

@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client.os;
 
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 

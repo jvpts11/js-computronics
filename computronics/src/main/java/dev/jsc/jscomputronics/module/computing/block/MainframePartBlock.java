@@ -8,11 +8,11 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
-import dev.jsc.jscomputronics.common.network.DataTier;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
+import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.DataTier;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
@@ -115,7 +115,7 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
                 && level.getBlockEntity(pos) instanceof MainframePartBlockEntity part
                 && part.controllerPos() != null
                 && level.getBlockState(part.controllerPos()).getBlock()
-                        instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock controller) {
+                        instanceof dev.jstech.core.multiblock.AbstractMultiblockControllerBlock controller) {
             controller.dropContentsExternally(serverLevel, part.controllerPos());
         }
         return super.playerWillDestroy(level, pos, state, player);
@@ -147,7 +147,7 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
                 && level.getBlockEntity(pos) instanceof MainframePartBlockEntity part
                 && part.controllerPos() != null
                 && level.getBlockState(part.controllerPos()).getBlock()
-                        instanceof dev.jsc.jscomputronics.common.multiblock.AbstractMultiblockControllerBlock controller) {
+                        instanceof dev.jstech.core.multiblock.AbstractMultiblockControllerBlock controller) {
             controller.dissolve(serverLevel, part.controllerPos(), state.getValue(FACING));
         }
         super.onRemove(state, level, pos, newState, movedByPiston);

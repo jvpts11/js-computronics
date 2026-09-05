@@ -8,11 +8,11 @@
 package dev.jsc.jscomputronics.module.computing.block;
 
 import com.mojang.serialization.MapCodec;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
-import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
-import dev.jsc.jscomputronics.common.tier.HardwareEra;
-import dev.jsc.jscomputronics.common.util.BlockEntityTickers;
+import dev.jstech.core.peripheral.PeripheralCableType;
+import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.PeripheralOwner;
+import dev.jstech.core.tier.HardwareEra;
+import dev.jstech.core.util.BlockEntityTickers;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
 import dev.jsc.jscomputronics.module.computing.os.OsHost;

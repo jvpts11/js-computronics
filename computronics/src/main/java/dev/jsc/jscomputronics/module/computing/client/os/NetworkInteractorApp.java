@@ -642,8 +642,8 @@ public final class NetworkInteractorApp implements InventoryBandApp {
      */
     private static void pushScissor(final GuiGraphics g, final int x1, final int y1, final int x2, final int y2) {
         final org.joml.Matrix4f m = g.pose().last().pose();
-        final dev.jsc.jscomputronics.common.gui.layout.WindowGeometry.Rect r =
-                dev.jsc.jscomputronics.common.gui.layout.WindowGeometry.scissor(
+        final dev.jstech.core.gui.layout.WindowGeometry.Rect r =
+                dev.jstech.core.gui.layout.WindowGeometry.scissor(
                         (int) m.m30(), (int) m.m31(), x1, y1, x2, y2);
         g.enableScissor(r.x(), r.y(), r.x() + r.w(), r.y() + r.h());
     }

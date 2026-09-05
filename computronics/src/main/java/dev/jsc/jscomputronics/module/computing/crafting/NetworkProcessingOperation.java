@@ -7,7 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.crafting;
 
-import dev.jsc.jscomputronics.common.uuid.NetworkUuid;
+import dev.jstech.core.uuid.NetworkUuid;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.PersistentOperation;
