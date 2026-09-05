@@ -89,6 +89,8 @@ public class PersonalComputerBlock extends HorizontalDirectionalBlock
     @Override
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
+        // The computer block is hardware only: clicking it always opens the hardware-assembly GUI.
+        // All software (firmware, OS) is used on a linked monitor, never on the computer block.
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof PersonalComputerBlockEntity computer) {
             serverPlayer.openMenu(

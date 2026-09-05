@@ -32,8 +32,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
@@ -102,26 +100,14 @@ public class DataCableBlockEntity extends BlockEntity {
                 .orElse(null);
     }
 
-    @Nullable
-    public IItemHandler neighborHandler(final Direction face) {
-        final ServerLevel serverLevel = serverLevel();
-        if (serverLevel == null) {
-            return null;
-        }
-        return serverLevel.getCapability(Capabilities.ItemHandler.BLOCK,
-                worldPosition.relative(face), face.getOpposite());
-    }
-
     public dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort neighborPort(final Direction face) {
         final ServerLevel serverLevel = serverLevel();
         if (serverLevel == null) {
             return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(null, null);
         }
-        final net.minecraft.core.BlockPos at = worldPosition.relative(face);
-        final Direction side = face.getOpposite();
-        return new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(
-                serverLevel.getCapability(Capabilities.ItemHandler.BLOCK, at, side),
-                serverLevel.getCapability(Capabilities.FluidHandler.BLOCK, at, side));
+        // Every kind of data the faced block holds: a bus moves whatever is there.
+        return dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort.at(
+                serverLevel, worldPosition.relative(face), face.getOpposite());
     }
 
     // Part hosting

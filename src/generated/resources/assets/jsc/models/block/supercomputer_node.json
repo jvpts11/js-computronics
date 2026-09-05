@@ -1,8 +1,0 @@
-{
-  "parent": "minecraft:block/orientable",
-  "textures": {
-    "front": "jsc:block/supercomputer_node_front",
-    "side": "jsc:block/supercomputer_node_side",
-    "top": "jsc:block/supercomputer_node_top"
-  }
-}

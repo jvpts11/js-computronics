@@ -44,8 +44,11 @@ public final class JscGameTestStructureProvider implements DataProvider {
 
     @Override
     public CompletableFuture<?> run(final CachedOutput cache) {
-        // One arena is enough for the network tests: a 9x6x9 box with a floor.
-        return write(cache, "empty", emptyArena(9, 6, 9));
+        // "empty" is the 9x6x9 box the correctness tests run in; "bench" is a large arena for the
+        // performance benchmarks that build a physically huge network (hundreds of ticking cables).
+        return CompletableFuture.allOf(
+                write(cache, "empty", emptyArena(9, 6, 9)),
+                write(cache, "bench", emptyArena(48, 8, 48)));
     }
 
     // SHA-1 is the digest the vanilla datagen cache keys files by; it is a cache

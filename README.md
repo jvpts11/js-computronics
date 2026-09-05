@@ -30,6 +30,10 @@ Java 21. The jar ends up in `build/libs`. For development: `runClient`, `runData
 
 Solo project. Lots of placeholder art, recipes missing, numbers not final. I want the core loop to be fun before putting out builds. If you find something broken or have ideas, open an issue.
 
+## Contributing
+
+Read [docs/CODE_STYLE.md](docs/CODE_STYLE.md) before opening a pull request. If you work with an AI assistant, read [AI_POLICY.md](AI_POLICY.md) first: it says what is welcome, what a pull request must state, and what gets rejected.
+
 ## License
 
 [LGPL-3.0-only](LICENSE) - © jvpts11

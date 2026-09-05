@@ -35,5 +35,9 @@ public class CpuItem extends SpecItem<CpuSpec> {
                 spec.orchestrationCapacity() + " it/t  -  " + spec.tdpWatts() + " W")
                 .withStyle(ChatFormatting.DARK_GRAY));
         tooltip.add(Component.literal("Socket " + spec.socket()).withStyle(ChatFormatting.DARK_GRAY));
+        // The word size is what an item costs on the era's disks; the player can read the ladder off the chip.
+        tooltip.add(Component.literal(spec.era().bits() + "-bit architecture  -  "
+                + spec.era().mbPerItem() + " MB per item").withStyle(ChatFormatting.DARK_GRAY));
+        HardwareTooltip.appendEra(tooltip, spec.era());
     }
 }

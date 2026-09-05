@@ -12,6 +12,7 @@ import dev.jsc.jscomputronics.common.network.DataNetworkConnectable;
 import dev.jsc.jscomputronics.common.network.DataTier;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
 import dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframePartBlockEntity;
 import dev.jsc.jscomputronics.module.computing.menu.MainframeMenu;
@@ -31,6 +32,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,9 +53,19 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
 
     public static final BooleanProperty CORE = BooleanProperty.create("core");
 
+    // The part inherits its controller's hardware era so the whole footprint wears one skin. The value
+    // is the era's level() ordinal (0=Vintage, 1=Legacy, 2=Standard) — only the eras that actually have
+    // a Mainframe controller. Storing the ordinal keeps the Minecraft-aware property type out of the
+    // pure HardwareEra enum; consumers map it back with HardwareEra.fromLevel(int).
+    public static final IntegerProperty ERA = IntegerProperty.create(
+            "era", HardwareEra.VINTAGE.level(), HardwareEra.STANDARD.level());
+
     public MainframePartBlock(final Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(CORE, false));
+        registerDefaultState(stateDefinition.any()
+                .setValue(FACING, Direction.NORTH)
+                .setValue(CORE, false)
+                .setValue(ERA, HardwareEra.STANDARD.level()));
     }
 
     @Override
@@ -69,7 +81,7 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
 
     @Override
     protected void createBlockStateDefinition(final StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, CORE);
+        builder.add(FACING, CORE, ERA);
     }
 
     @Override
@@ -80,10 +92,16 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
                 && part.controllerPos() != null
                 && level.getBlockEntity(part.controllerPos()) instanceof MainframeBlockEntity controller) {
             final BlockPos controllerPos = part.controllerPos();
+            // Sneaking anywhere on the cabinet takes its service panel off, the same as on the
+            // controller: a player has no way to tell which of the twelve blocks they are looking at.
+            if (player.isShiftKeyDown()) {
+                controller.toggleServicePanel();
+                return InteractionResult.sidedSuccess(false);
+            }
             serverPlayer.openMenu(
                     new SimpleMenuProvider(
                             (id, inventory, p) -> new MainframeMenu(id, inventory, controller),
-                            Component.translatable("block.jsc.mainframe")),
+                            level.getBlockState(controllerPos).getBlock().getName()),
                     buf -> buf.writeBlockPos(controllerPos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());
@@ -101,6 +119,25 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
             controller.dropContentsExternally(serverLevel, part.controllerPos());
         }
         return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    /**
+     * What the middle mouse button picks off a structural block: the Mainframe itself, in its own era.
+     * The whole footprint is drawn as one cabinet, so a player aiming anywhere at it expects to pick the
+     * machine; a part has no item of its own and picking one used to hand back nothing at all.
+     */
+    @Override
+    public net.minecraft.world.item.ItemStack getCloneItemStack(final BlockState state,
+                                                                final net.minecraft.world.phys.HitResult target,
+                                                                final net.minecraft.world.level.LevelReader level,
+                                                                final BlockPos pos, final Player player) {
+        if (level.getBlockEntity(pos) instanceof MainframePartBlockEntity part && part.controllerPos() != null) {
+            final BlockState controller = level.getBlockState(part.controllerPos());
+            if (controller.getBlock() instanceof MainframeBlock) {
+                return new net.minecraft.world.item.ItemStack(controller.getBlock());
+            }
+        }
+        return super.getCloneItemStack(state, target, level, pos, player);
     }
 
     @Override

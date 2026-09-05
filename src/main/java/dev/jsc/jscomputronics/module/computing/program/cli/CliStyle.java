@@ -19,5 +19,13 @@ public enum CliStyle {
     INFO,
     DIM,
     ACCENT,
-    HEADER
+    HEADER,
+    // The terminal's extended palette (appended so wire ordinals stay stable): brand-tinted colors a
+    // program can paint with, the way a real terminal exposes its 16-color set. screenfetch keys each
+    // distribution's logo to one of these.
+    ORANGE,
+    MAGENTA,
+    BLUE,
+    CYAN,
+    PURPLE
 }

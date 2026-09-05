@@ -33,4 +33,17 @@ public interface DataNetworkConnectable {
     default boolean connectsOnFace(final BlockState state, final Direction face) {
         return true;
     }
+
+    /**
+     * Tier-aware variant the cable itself asks: some devices accept different cable families on different
+     * faces (a Crafting Computer takes the data cable on its rear only, but the crafting cable on any face).
+     * Defaults to the face-only rule so existing devices are unaffected.
+     *
+     * @param state the device's current block state (carries its facing)
+     * @param face  the face of THIS block that the cable touches
+     * @param tier  the tier of the touching cable
+     */
+    default boolean connectsOnFace(final BlockState state, final Direction face, final DataTier tier) {
+        return connectsOnFace(state, face);
+    }
 }

@@ -1,0 +1,26 @@
+{
+  "criteria": {
+    "boot_any_os": {
+      "trigger": "jsc:os_first_boot"
+    }
+  },
+  "display": {
+    "background": "minecraft:textures/block/deepslate_tiles.png",
+    "description": {
+      "translate": "advancements.jsc.computing.root.description"
+    },
+    "icon": {
+      "count": 1,
+      "id": "jsc:mainframe"
+    },
+    "title": {
+      "translate": "advancements.jsc.computing.root.title"
+    }
+  },
+  "requirements": [
+    [
+      "boot_any_os"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

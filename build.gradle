@@ -35,7 +35,10 @@ repositories {
     maven {
         name = 'ModMaven'
         url = 'https://modmaven.dev/'
-        content { includeGroup 'mekanism' }
+        content {
+            includeGroup 'mekanism'
+            includeGroup 'appeng'
+        }
     }
 
     // BlameJared — JEI, present in the dev client for recipe lookups while testing autocrafting.
@@ -43,6 +46,23 @@ repositories {
         name = 'BlameJared'
         url = 'https://maven.blamejared.com'
         content { includeGroup 'mezz.jei' }
+    }
+
+    // Create + its libraries (Flywheel, Ponder) — dev-runtime only, heavy kinetic tick load for stress testing.
+    maven {
+        name = 'CreateMod'
+        url = 'https://maven.createmod.net/'
+    }
+    // Registrate — Create's registration library.
+    maven {
+        name = 'Tterrag'
+        url = 'https://maven.tterrag.com/'
+    }
+    // GeckoLib — shipped dependency: large block models (the racks) with bones and animation.
+    maven {
+        name = 'GeckoLib'
+        url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+        content { includeGroupByRegex 'software\\.bernie.*' }
     }
 }
 
@@ -73,6 +93,26 @@ neoForge {
 
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        // Client tests: real client windows that create a test world, drive the screens with synthetic
+        // input, take screenshots and write run/clienttests/shard-<i>/clienttests/report.txt. The suite is
+        // split round-robin over `clientShards` windows (default 4) so shards can run side by side:
+        //   .\gradlew.bat runClientTests0   (one shard)   -PclientShards=6 to change the split.
+        def clientShards = (providers.gradleProperty('clientShards').getOrElse('4')) as int
+        (0..<clientShards).each { shard ->
+            create("clientTests${shard}") {
+                client()
+                gameDirectory = project.file("run/clienttests/shard-${shard}")
+                // 640 tall so the GUI (scale 2) shows the full 256-pixel monitor glass a player gets.
+                programArguments.addAll '--width', '960', '--height', '640'
+                systemProperty 'jsc.clienttests', 'true'
+                systemProperty 'jsc.clienttests.shard', "${shard}"
+                systemProperty 'jsc.clienttests.shards', "${clientShards}"
+                // -PctOnly=<substring> runs only the client tests whose name contains it (case-insensitive),
+                // so a single test can be driven without stealing the mouse for the whole suite.
+                systemProperty 'jsc.clienttests.only', (providers.gradleProperty('ctOnly').getOrElse(''))
+            }
         }
 
         server {
@@ -137,13 +177,26 @@ dependencies {
     // ============================================================
     // Mod-loaded dependencies — included in the released JAR
     // ============================================================
-    // (none yet — added per-feature as modules are implemented)
+    // GeckoLib: bone-based block models and animation. The Server Rack and Supercomputer Rack are one
+    // model each, rendered by a GeckoLib block-entity renderer that shows the seated units per row.
+    implementation "software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
 
     // ============================================================
     // Dev-runtime mods — present in runClient/runServer for
     // integration testing only; never a published dependency.
     // ============================================================
     localRuntime "mekanism:Mekanism:${mekanism_version}"
+    // Mekanism Generators: the Fusion Reactor and its parts are the target of the big autocrafting battery.
+    localRuntime "mekanism:Mekanism:${mekanism_version}:generators"
+    // Mekanism API, compile-only: the chemical bridge adapter compiles against it but the mod never loads a
+    // Mekanism class unless Mekanism is present (soft dependency, guarded at runtime).
+    compileOnly "mekanism:Mekanism:${mekanism_version}:api"
+    // Applied Energistics 2 — dev-runtime only, a second network to prove ours coexists with it.
+    localRuntime "appeng:appliedenergistics2:${ae2_version}"
+    // Create — dev-runtime, sustained tick load. TEMPORARILY DISABLED: its transitive dep
+    // com.tterrag.registrate:Registrate:MC1.21-1.3.0+67 does not resolve from the createmod/tterrag mavens;
+    // it needs the correct Registrate maven (or a local jar). Re-enable once that's sorted.
+    // localRuntime "com.simibubi.create:create-1.21.1:${create_version}"
     // JEI: API jar for compiling plugins (IModPlugin, IRecipeTransferHandler, etc.).
     // The full runtime jar is localRuntime only — never published as a hard dependency.
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"

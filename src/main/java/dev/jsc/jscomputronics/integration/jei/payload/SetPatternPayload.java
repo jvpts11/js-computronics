@@ -19,23 +19,24 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 /**
- * Client-to-server payload that writes a 9-cell ingredient list into the
- * ghost grid of the Pattern Encoder the player currently has open.
- *
- * Sent by the JEI recipe-transfer handler when the player clicks "+" on a
- * crafting recipe.  The server validates that the player's open menu
- * corresponds to the indicated block position before applying any changes.
+ * Client to server: a crafting recipe the player transferred from the recipe viewer, as the nine cells of the
+ * Pattern Studio's bench on the computer at {@code host} (seen from the monitor at {@code monitorPos}), and the
+ * recipe's id so the server can mark the cells whose ingredient is a tag.
  */
-public record SetPatternPayload(BlockPos pos, List<ItemStack> grid)
+public record SetPatternPayload(BlockPos host, BlockPos monitorPos, List<ItemStack> grid, String recipeId)
         implements CustomPacketPayload {
 
     public static final Type<SetPatternPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "set_pattern"));
 
+    public static final int MAX_ID = 128;
+
     public static final StreamCodec<RegistryFriendlyByteBuf, SetPatternPayload> STREAM_CODEC =
             StreamCodec.composite(
-                    BlockPos.STREAM_CODEC, SetPatternPayload::pos,
-                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list()), SetPatternPayload::grid,
+                    BlockPos.STREAM_CODEC, SetPatternPayload::host,
+                    BlockPos.STREAM_CODEC, SetPatternPayload::monitorPos,
+                    ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list(16)), SetPatternPayload::grid,
+                    ByteBufCodecs.stringUtf8(MAX_ID), SetPatternPayload::recipeId,
                     SetPatternPayload::new);
 
     @Override

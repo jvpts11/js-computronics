@@ -101,4 +101,30 @@ class PcieGenerationTest {
     void compatibleWith_isaInPcieSlot_incompatible() {
         assertFalse(PcieGeneration.ISA.compatibleWith(PcieGeneration.PCIE_3_0));
     }
+
+    @Test
+    void bandwidthFactorIn_cardInItsOwnSlot_isFullSpeed() {
+        assertEquals(1.0, PcieGeneration.PCIE_3_0.bandwidthFactorIn(PcieGeneration.PCIE_3_0));
+    }
+
+    @Test
+    void bandwidthFactorIn_olderCardInNewerSlot_isFullSpeed() {
+        assertEquals(1.0, PcieGeneration.PCIE_1_0.bandwidthFactorIn(PcieGeneration.PCIE_3_0));
+    }
+
+    @Test
+    void bandwidthFactorIn_oneGenerationBehind_isHalfSpeed() {
+        assertEquals(0.5, PcieGeneration.PCIE_3_0.bandwidthFactorIn(PcieGeneration.PCIE_2_0));
+    }
+
+    @Test
+    void bandwidthFactorIn_twoGenerationsBehind_isQuarterSpeed() {
+        assertEquals(0.25, PcieGeneration.PCIE_3_0.bandwidthFactorIn(PcieGeneration.PCIE_1_0));
+    }
+
+    @Test
+    void bandwidthFactorIn_farBehind_stopsAtTheFloor() {
+        // An extreme mismatch stays slow rather than becoming worthless.
+        assertEquals(0.125, PcieGeneration.PCIE_6_0.bandwidthFactorIn(PcieGeneration.PCIE_1_0));
+    }
 }

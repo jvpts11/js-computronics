@@ -87,6 +87,19 @@ public interface ComputerTerminalHost {
         return 0;
     }
 
+    /**
+     * The storage index's health as an {@link dev.jsc.jscomputronics.common.operation.index.IndexHealth.State}
+     * ordinal, so the terminal can show a permanent status strip. Hosts that own no index report OK.
+     */
+    default int indexHealthState() {
+        return dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.OK.ordinal();
+    }
+
+    /** How many item types the index has flagged as unconfirmed or orphaned. */
+    default int indexHealthTypeCount() {
+        return 0;
+    }
+
     default long networkStorageUsed() {
         return 0L;
     }

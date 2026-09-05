@@ -28,30 +28,26 @@ public final class NetworkSystem {
 
     private final java.util.Map<NetworkUuid, Long> mainframePosByNetwork = new java.util.HashMap<>();
 
-    private final java.util.Map<NetworkUuid, List<SubframeNode>> subframesByNetwork = new java.util.HashMap<>();
+    private final NodeRegistry<NodeUuid, SubframeNode> subframes = new NodeRegistry<>();
 
-    private final java.util.Map<NetworkUuid, java.util.List<ServerNode>> serversByNetwork = new java.util.HashMap<>();
+    private final NodeRegistry<NodeUuid, ServerNode> servers = new NodeRegistry<>();
 
     private final java.util.Map<NodeUuid, ServerLocation> serverLocations = new java.util.HashMap<>();
 
-    private final java.util.Map<NetworkUuid, java.util.List<PersonalComputerNode>> pcsByNetwork =
-            new java.util.HashMap<>();
+    private final NodeRegistry<NodeUuid, PersonalComputerNode> personalComputers = new NodeRegistry<>();
 
-    private final java.util.Map<NetworkUuid, java.util.List<CraftingComputerNode>> craftingComputersByNetwork =
-            new java.util.HashMap<>();
+    private final NodeRegistry<NodeUuid, CraftingComputerNode> craftingComputers = new NodeRegistry<>();
 
-    private final java.util.Map<NetworkUuid, java.util.List<SupercomputerNode>> supercomputersByNetwork =
-            new java.util.HashMap<>();
+    private final NodeRegistry<NodeUuid, SupercomputerNode> supercomputers = new NodeRegistry<>();
 
-    private final java.util.Map<NetworkUuid, java.util.List<ServerRouterElement>> routersByNetwork =
-            new java.util.HashMap<>();
+    private final NodeRegistry<Long, ServerRouterElement> routers = new NodeRegistry<>();
 
     // Every per-network / per-node registry, collected so clear() resets them all together and a newly
-    // added map can never be left out again (crafting and supercomputer nodes once were).
+    // added one can never be left out again (crafting and supercomputer nodes once were).
     private final List<java.util.Map<?, ?>> registries = List.of(
-            mainframesByNetwork, mainframePosByNetwork, subframesByNetwork, serversByNetwork,
-            serverLocations, pcsByNetwork, craftingComputersByNetwork, supercomputersByNetwork,
-            routersByNetwork);
+            mainframesByNetwork, mainframePosByNetwork, serverLocations);
+    private final List<NodeRegistry<?, ?>> nodeRegistries = List.of(
+            subframes, servers, personalComputers, craftingComputers, supercomputers, routers);
 
     /**
      * A Personal Computer attached to a network: a Category-C node that issues, but never orchestrates, Operations.
@@ -122,9 +118,12 @@ public final class NetworkSystem {
 
     public void registerSubframe(SubframeNode subframe) {
         java.util.Objects.requireNonNull(subframe, "subframe must not be null");
-        subframesByNetwork
-                .computeIfAbsent(subframe.networkUuid(), k -> new java.util.ArrayList<>())
-                .add(subframe);
+        // Idempotent by node UUID: a Subframe re-registering each tick from tickNode() never duplicates.
+        subframes.register(subframe.networkUuid(), subframe.nodeUuid(), subframe);
+    }
+
+    public void unregisterSubframe(NetworkUuid network, NodeUuid node) {
+        subframes.unregister(network, node);
     }
 
     public Optional<MainframeNode> mainframeOf(NetworkUuid networkUuid) {
@@ -132,21 +131,14 @@ public final class NetworkSystem {
     }
 
     public List<SubframeNode> subframesOf(NetworkUuid networkUuid) {
-        var list = subframesByNetwork.get(networkUuid);
-        if (list == null) {
-            return List.of();
-        }
-        return List.copyOf(list);
+        return subframes.of(networkUuid);
     }
 
     public void registerServer(ServerNode server) {
         java.util.Objects.requireNonNull(server, "server must not be null");
-        final java.util.List<ServerNode> list =
-                serversByNetwork.computeIfAbsent(server.networkUuid(), k -> new java.util.ArrayList<>());
-        // Idempotent by node UUID: replace any existing snapshot of the same
-        // Server so a Rack re-registering each tick never duplicates entries.
-        list.removeIf(s -> s.nodeUuid().equals(server.nodeUuid()));
-        list.add(server);
+        // Idempotent by node UUID: a Rack re-registering each tick never duplicates, and an unchanged
+        // snapshot leaves every reader's list untouched.
+        servers.register(server.networkUuid(), server.nodeUuid(), server);
     }
 
     public void registerServer(ServerNode server, long rackPos, int slot) {
@@ -160,96 +152,57 @@ public final class NetworkSystem {
 
     public void registerPersonalComputer(PersonalComputerNode pc) {
         java.util.Objects.requireNonNull(pc, "pc must not be null");
-        final java.util.List<PersonalComputerNode> list =
-                pcsByNetwork.computeIfAbsent(pc.networkUuid(), k -> new java.util.ArrayList<>());
-        list.removeIf(p -> p.nodeUuid().equals(pc.nodeUuid()));
-        list.add(pc);
+        personalComputers.register(pc.networkUuid(), pc.nodeUuid(), pc);
     }
 
     public void unregisterPersonalComputer(NetworkUuid network, NodeUuid node) {
-        final java.util.List<PersonalComputerNode> list = pcsByNetwork.get(network);
-        if (list != null) {
-            list.removeIf(p -> p.nodeUuid().equals(node));
-            if (list.isEmpty()) {
-                pcsByNetwork.remove(network);
-            }
-        }
+        personalComputers.unregister(network, node);
     }
 
     public java.util.List<PersonalComputerNode> personalComputersOf(NetworkUuid networkUuid) {
-        final var list = pcsByNetwork.get(networkUuid);
-        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+        return personalComputers.of(networkUuid);
     }
 
     public void registerCraftingComputer(CraftingComputerNode computer) {
         java.util.Objects.requireNonNull(computer, "computer must not be null");
-        final java.util.List<CraftingComputerNode> list =
-                craftingComputersByNetwork.computeIfAbsent(computer.networkUuid(), k -> new java.util.ArrayList<>());
-        list.removeIf(c -> c.nodeUuid().equals(computer.nodeUuid()));
-        list.add(computer);
+        craftingComputers.register(computer.networkUuid(), computer.nodeUuid(), computer);
     }
 
     public void unregisterCraftingComputer(NetworkUuid network, NodeUuid node) {
-        final java.util.List<CraftingComputerNode> list = craftingComputersByNetwork.get(network);
-        if (list != null) {
-            list.removeIf(c -> c.nodeUuid().equals(node));
-            if (list.isEmpty()) {
-                craftingComputersByNetwork.remove(network);
-            }
-        }
+        craftingComputers.unregister(network, node);
     }
 
     public java.util.List<CraftingComputerNode> craftingComputersOf(NetworkUuid networkUuid) {
-        final var list = craftingComputersByNetwork.get(networkUuid);
-        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+        return craftingComputers.of(networkUuid);
     }
 
     public void registerSupercomputer(SupercomputerNode supercomputer) {
         java.util.Objects.requireNonNull(supercomputer, "supercomputer must not be null");
-        final java.util.List<SupercomputerNode> list = supercomputersByNetwork
-                .computeIfAbsent(supercomputer.networkUuid(), k -> new java.util.ArrayList<>());
-        list.removeIf(s -> s.nodeUuid().equals(supercomputer.nodeUuid()));
-        list.add(supercomputer);
+        supercomputers.register(supercomputer.networkUuid(), supercomputer.nodeUuid(), supercomputer);
     }
 
     public void unregisterSupercomputer(NetworkUuid network, NodeUuid node) {
-        final java.util.List<SupercomputerNode> list = supercomputersByNetwork.get(network);
-        if (list != null) {
-            list.removeIf(s -> s.nodeUuid().equals(node));
-            if (list.isEmpty()) {
-                supercomputersByNetwork.remove(network);
-            }
-        }
+        supercomputers.unregister(network, node);
     }
 
     public java.util.List<SupercomputerNode> supercomputersOf(NetworkUuid networkUuid) {
-        final var list = supercomputersByNetwork.get(networkUuid);
-        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+        return supercomputers.of(networkUuid);
     }
 
     public void unregisterServer(NetworkUuid network, NodeUuid node) {
-        final java.util.List<ServerNode> list = serversByNetwork.get(network);
-        if (list != null) {
-            list.removeIf(s -> s.nodeUuid().equals(node));
-            if (list.isEmpty()) {
-                serversByNetwork.remove(network);
-            }
-        }
+        servers.unregister(network, node);
         serverLocations.remove(node);
     }
 
     public java.util.List<ServerNode> serversOf(NetworkUuid networkUuid) {
-        var list = serversByNetwork.get(networkUuid);
-        if (list == null) {
-            return java.util.List.of();
-        }
-        return java.util.List.copyOf(list);
+        return servers.of(networkUuid);
     }
 
-    public long totalStorageOf(NetworkUuid networkUuid) {
+    /** The storage of every server on the network, in items, as the racks registered it. */
+    public long totalStorageItemsOf(NetworkUuid networkUuid) {
         long total = 0L;
         for (var server : serversOf(networkUuid)) {
-            total += server.storageMB();
+            total += server.storageItems();
         }
         return total;
     }
@@ -268,25 +221,15 @@ public final class NetworkSystem {
 
     public void registerRouter(final ServerRouterElement router) {
         java.util.Objects.requireNonNull(router, "router must not be null");
-        final java.util.List<ServerRouterElement> list =
-                routersByNetwork.computeIfAbsent(router.networkUuid(), k -> new java.util.ArrayList<>());
-        list.removeIf(r -> r.pos() == router.pos());
-        list.add(router);
+        routers.register(router.networkUuid(), router.pos(), router);
     }
 
     public void unregisterRouter(final NetworkUuid network, final long pos) {
-        final java.util.List<ServerRouterElement> list = routersByNetwork.get(network);
-        if (list != null) {
-            list.removeIf(r -> r.pos() == pos);
-            if (list.isEmpty()) {
-                routersByNetwork.remove(network);
-            }
-        }
+        routers.unregister(network, pos);
     }
 
     public java.util.List<ServerRouterElement> routersOf(final NetworkUuid networkUuid) {
-        final var list = routersByNetwork.get(networkUuid);
-        return list == null ? java.util.List.of() : java.util.List.copyOf(list);
+        return routers.of(networkUuid);
     }
 
     // Phase 1+ stubs — depend on runtime topology / BlockEntities
@@ -306,5 +249,6 @@ public final class NetworkSystem {
     public void clear() {
         connectivity.clear();
         registries.forEach(java.util.Map::clear);
+        nodeRegistries.forEach(NodeRegistry::clear);
     }
 }

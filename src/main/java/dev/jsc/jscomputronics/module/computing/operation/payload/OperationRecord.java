@@ -150,6 +150,16 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
             moveList.add(m);
         }
         tag.put("moves", moveList);
+        final ListTag subList = new ListTag();
+        for (final SubRow row : subs) {
+            final CompoundTag s = new CompoundTag();
+            s.putString("server", row.server());
+            s.putLong("planned", row.planned());
+            s.putLong("moved", row.moved());
+            s.putByte("state", row.state());
+            subList.add(s);
+        }
+        tag.put("subs", subList);
         return tag;
     }
 
@@ -163,7 +173,13 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
             final CompoundTag m = moveList.getCompound(i);
             moves.add(new MoveRow(m.getString("from"), m.getLong("qty"), m.getString("to")));
         }
+        final List<SubRow> subs = new ArrayList<>();
+        final ListTag subList = tag.getList("subs", Tag.TAG_COMPOUND);
+        for (int i = 0; i < subList.size(); i++) {
+            final CompoundTag s = subList.getCompound(i);
+            subs.add(new SubRow(s.getString("server"), s.getLong("planned"), s.getLong("moved"), s.getByte("state")));
+        }
         return new OperationRecord(tag.getByte("type"), key, tag.getLong("requested"),
-                tag.getLong("moved"), tag.getByte("status"), List.copyOf(moves));
+                tag.getLong("moved"), tag.getByte("status"), List.copyOf(moves), List.copyOf(subs));
     }
 }

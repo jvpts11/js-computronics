@@ -1,208 +1,388 @@
 {
   "variants": {
-    "bays=0,facing=east,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=false,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=east,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=east,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_0",
-      "y": 90
+    "bays=0,compute=false,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=east,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=north,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=false,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=north,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=north,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_0"
+    "bays=0,compute=false,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=north,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=south,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=false,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=south,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=south,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_0",
-      "y": 180
+    "bays=0,compute=false,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=south,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=west,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=false,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=west,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=west,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_0",
-      "y": 270
+    "bays=0,compute=false,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=0,facing=west,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=false,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=east,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=true,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=east,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=east,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_1",
-      "y": 90
+    "bays=0,compute=true,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=east,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=north,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=true,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=north,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=north,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_1"
+    "bays=0,compute=true,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=north,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=south,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=true,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=south,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=south,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_1",
-      "y": 180
+    "bays=0,compute=true,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=south,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=west,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=0,compute=true,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=west,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=west,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_1",
-      "y": 270
+    "bays=0,compute=true,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=1,facing=west,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=0,compute=true,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=east,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=false,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=east,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=east,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_2",
-      "y": 90
+    "bays=1,compute=false,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=east,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=north,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=false,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=north,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=north,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_2"
+    "bays=1,compute=false,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=north,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=south,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=false,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=south,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=south,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_2",
-      "y": 180
+    "bays=1,compute=false,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=south,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=west,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=false,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=west,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=west,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_2",
-      "y": 270
+    "bays=1,compute=false,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=2,facing=west,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=false,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=east,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=true,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=east,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=east,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_3",
-      "y": 90
+    "bays=1,compute=true,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=east,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=north,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=true,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=north,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=north,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_3"
+    "bays=1,compute=true,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=north,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=south,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=true,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=south,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=south,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_3",
-      "y": 180
+    "bays=1,compute=true,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=south,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=west,front=false,top=false": {
-      "model": "jsc:block/server_rack_casing"
+    "bays=1,compute=true,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=west,front=false,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=west,front=true,top=false": {
-      "model": "jsc:block/server_rack_bays_3",
-      "y": 270
+    "bays=1,compute=true,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
     },
-    "bays=3,facing=west,front=true,top=true": {
-      "model": "jsc:block/server_rack_part"
+    "bays=1,compute=true,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=false,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=2,compute=true,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=false,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=east,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=east,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=east,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=east,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=north,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=north,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=north,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=north,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=south,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=south,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=south,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=south,front=true,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=west,front=false,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=west,front=false,top=true": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=west,front=true,top=false": {
+      "model": "jsc:block/rack"
+    },
+    "bays=3,compute=true,facing=west,front=true,top=true": {
+      "model": "jsc:block/rack"
     }
   }
 }

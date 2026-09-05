@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,6 +35,23 @@ class ConnectivityIndexTest {
     @BeforeEach
     void setUp() {
         index = new ConnectivityIndex();
+    }
+
+    @Test
+    void componentPositions_isSharedUntilTheTopologyChanges() {
+        index.onCablePlaced(pos(0, 0, 0), Set.of());
+        index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
+        final Set<Long> first = index.componentPositions(pos(0, 0, 0));
+        assertEquals(Set.of(pos(0, 0, 0), pos(1, 0, 0)), first);
+        assertSame(first, index.componentPositions(pos(1, 0, 0)), "the same component answers from the cache");
+        assertThrows(UnsupportedOperationException.class, () -> first.add(pos(9, 9, 9)));
+        // Growing the run invalidates it; the new answer carries the new cable.
+        index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
+        assertEquals(Set.of(pos(0, 0, 0), pos(1, 0, 0), pos(2, 0, 0)), index.componentPositions(pos(0, 0, 0)));
+        // Cutting it invalidates it too.
+        index.onCableRemoved(pos(1, 0, 0));
+        assertEquals(Set.of(pos(0, 0, 0)), index.componentPositions(pos(0, 0, 0)));
+        assertEquals(Set.of(pos(2, 0, 0)), index.componentPositions(pos(2, 0, 0)));
     }
 
     @Test

@@ -64,6 +64,13 @@ public final class PeripheralLinks {
                 && owner.cableType() == type) {
             return OptionalLong.of(part.controllerPos().asLong());
         }
+        // A rack cabinet spans several blocks; a cable touching any part links to its controller.
+        if (be instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackPartBlockEntity part
+                && part.controllerPos() != null
+                && level.getBlockEntity(part.controllerPos()) instanceof PeripheralOwner owner
+                && owner.cableType() == type) {
+            return OptionalLong.of(part.controllerPos().asLong());
+        }
         return OptionalLong.empty();
     }
 

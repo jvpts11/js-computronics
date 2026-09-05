@@ -73,6 +73,33 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
         return linkedOwner == null ? null : BlockPos.of(linkedOwner);
     }
 
+    // The machine this screen is currently showing on someone else's behalf: a Remote Control
+    // session puts a REMOTE computer on this monitor, so for as long as it lasts the screen answers
+    // for that machine and not for the one its cable is linked to. Transient by nature — a session
+    // does not outlive the window it was opened in.
+    private BlockPos remoteSession;
+
+    /** Starts (or ends, with {@code null}) a remote session showing {@code machine} on this screen. */
+    public void setRemoteSession(@org.jetbrains.annotations.Nullable final BlockPos machine) {
+        this.remoteSession = machine;
+    }
+
+    /** The machine a remote session is showing here, or null when the screen is showing its own. */
+    @org.jetbrains.annotations.Nullable
+    public BlockPos remoteSession() {
+        return remoteSession;
+    }
+
+    /**
+     * Whether this monitor legitimately shows {@code machine}: either its cable links to it, or a
+     * remote session put it there. The menus validate through this, so a taken-over screen is not
+     * torn down for showing a computer that is not its own.
+     */
+    public boolean shows(final BlockPos machine) {
+        return machine != null
+                && (machine.equals(ownerPos()) || machine.equals(remoteSession));
+    }
+
     public int lastTab() {
         return lastTab;
     }
@@ -118,7 +145,8 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
         final boolean lit = state.getValue(MonitorBlock.LIT);
         // LIT = true only when the linked computer is actively running — not just linked but powered off.
         final boolean computerRunning = linkedOwner != null
-                && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof AbstractComputerBlockEntity host
+                && level.getBlockEntity(BlockPos.of(linkedOwner))
+                        instanceof dev.jsc.jscomputronics.module.computing.os.OsHost host
                 && host.isRunning();
         if (!computerRunning) {
             bootTicks = 0;

@@ -56,7 +56,7 @@ runs/
 logs/
 
 # ============================================================
-# Sistema operacional
+# Operating system
 # ============================================================
 .DS_Store
 Thumbs.db
@@ -66,14 +66,45 @@ desktop.ini
 *.swp
 
 # ============================================================
-# Design Docs
+# Design specs and balancing notes (private; docs/ is the public documentation)
 # ============================================================
-docs
-# !docs/design/
+spec/
 
 # ============================================================
-# Local Files
+# Local files
 # ============================================================
 .local/
 local/
 *.local
+
+# ============================================================
+# AI assistant configuration and instructions (never commit yours; see AI_POLICY.md)
+# ============================================================
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.mcp.json
+AGENTS.md
+.codex/
+GEMINI.md
+.gemini/
+.cursor/
+.cursorrules
+.cursorignore
+.cursorindexingignore
+.windsurf/
+.windsurfrules
+.aider*
+.clinerules
+.clinerules/
+.roo/
+.roomodes
+.continue/
+.trae/
+.kiro/
+.junie/
+.aiassistant/
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+.copilot/

@@ -38,13 +38,10 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
         this.hw = new ServerHardwareHandler(owner, hand);
 
         // The spec readout (tiles + tracks + problems, in a smaller font) sits on top;
-        // the bays follow. Left column: board + PSU on one row, disks in a 2-wide grid.
+        // the bays follow. Left column: board + PSU. No disk slots since the racks rework —
+        // a server's drives live in the rack's front-panel hotswap slots, not in the chassis.
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.MOBO, 8, 96));
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.PSU, 26, 96));
-        for (int i = 0; i < ServerHardwareHandler.DISK; i++) {
-            addSlot(new BoardSlot(hw, ServerHardwareHandler.DISK_START + i,
-                    8 + (i % 2) * 18, 126 + (i / 2) * 18, i, this::boardDiskSlots));
-        }
         // Middle column: CPUs on a row, RAM in 2 rows, GPUs in 2 rows.
         for (int i = 0; i < ServerHardwareHandler.CPU; i++) {
             addSlot(new BoardSlot(hw, ServerHardwareHandler.CPU_START + i, 52 + i * 18, 96, i, this::boardCpuSlots));
@@ -66,9 +63,16 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
                 ? board.spec() : null;
     }
 
+    private dev.jsc.jscomputronics.module.computing.rack.RackChassis chassis() {
+        final var chassis = ServerItem.chassisOf(owner.getItemInHand(hand));
+        return chassis != null ? chassis : dev.jsc.jscomputronics.module.computing.rack.RackChassis.SERVER;
+    }
+
     public int boardCpuSlots() {
+        // The chassis caps the sockets the board offers: the lower of the two wins.
         final MotherboardSpec spec = boardSpec();
-        return spec == null ? 0 : Math.min(ServerHardwareHandler.CPU, spec.cpuSlots());
+        return spec == null ? 0
+                : Math.min(Math.min(ServerHardwareHandler.CPU, spec.cpuSlots()), chassis().maxCpus());
     }
 
     public int boardRamSlots() {
@@ -78,13 +82,10 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
 
     public int boardGpuSlots() {
         final MotherboardSpec spec = boardSpec();
-        return spec == null ? 0 : Math.min(ServerHardwareHandler.GPU, spec.pcieSlots());
+        return spec == null ? 0
+                : Math.min(Math.min(ServerHardwareHandler.GPU, spec.pcieSlots()), chassis().maxPcie());
     }
 
-    public int boardDiskSlots() {
-        final MotherboardSpec spec = boardSpec();
-        return spec == null ? 0 : Math.min(ServerHardwareHandler.DISK, spec.diskSlots());
-    }
 
     public static ServerAssemblyMenu fromNetwork(final int containerId, final Inventory playerInventory,
                                                  final RegistryFriendlyByteBuf buf) {
@@ -111,9 +112,6 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
         return ServerItem.nodeUuid(owner.getItemInHand(hand));
     }
 
-    public long storedItems() {
-        return ServerItem.storage(owner.getItemInHand(hand)).total();
-    }
 
     public String serverName() {
         return ServerItem.customName(owner.getItemInHand(hand));

@@ -80,6 +80,20 @@ public class CablePartItem extends Item {
             return InteractionResult.PASS; // every candidate face is taken
         }
         final Level level = context.getLevel();
+        // Crafting buses belong on crafting cables and storage buses on data cables. A storage bus on a
+        // crafting cable would autonomously move items the crafting engine is accounting for (and vice versa
+        // the crafting buses are inert), so a mismatched mount is refused with a hint instead.
+        final boolean craftingPart = type == CablePartType.INPUT || type == CablePartType.RECEIVING;
+        final boolean craftingCable =
+                cable.tier() == dev.jsc.jscomputronics.common.network.DataTier.CRAFTING;
+        if (craftingPart != craftingCable) {
+            if (!level.isClientSide() && context.getPlayer() != null) {
+                context.getPlayer().displayClientMessage(net.minecraft.network.chat.Component.literal(
+                        craftingPart ? "Crafting buses mount on crafting cables"
+                                : "Storage buses mount on data cables"), true);
+            }
+            return InteractionResult.FAIL;
+        }
         if (!level.isClientSide()) {
             cable.addPart(face, type.create());
             level.playSound(null, cable.getBlockPos(), SoundType.METAL.getPlaceSound(),
@@ -93,12 +107,12 @@ public class CablePartItem extends Item {
 
     @Nullable
     private static Direction chooseFace(final DataCableBlockEntity cable, final Direction clicked) {
-        if (!cable.hasPart(clicked) && cable.neighborHandler(clicked) != null) {
+        if (!cable.hasPart(clicked) && !cable.neighborPort(clicked).isEmpty()) {
             return clicked;
         }
         Direction firstFree = null;
-        Direction inventoryFace = null;
-        int inventoryCount = 0;
+        Direction dataFace = null;
+        int dataCount = 0;
         for (final Direction direction : Direction.values()) {
             if (cable.hasPart(direction)) {
                 continue;
@@ -106,13 +120,16 @@ public class CablePartItem extends Item {
             if (firstFree == null) {
                 firstFree = direction;
             }
-            if (cable.neighborHandler(direction) != null) {
-                inventoryFace = direction;
-                inventoryCount++;
+            // Any face touching a block that offers data — items, fluids, or chemicals — is a candidate, so a
+            // fluid- or chemical-only machine face (e.g. a chemical tank side) snaps the bus the same way an
+            // inventory does, now that buses carry every kind of data.
+            if (!cable.neighborPort(direction).isEmpty()) {
+                dataFace = direction;
+                dataCount++;
             }
         }
-        if (inventoryCount == 1) {
-            return inventoryFace;
+        if (dataCount == 1) {
+            return dataFace;
         }
         if (!cable.hasPart(clicked)) {
             return clicked;

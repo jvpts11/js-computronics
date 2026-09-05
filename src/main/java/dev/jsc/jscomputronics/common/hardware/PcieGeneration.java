@@ -35,8 +35,28 @@ public enum PcieGeneration {
     /**
      * Whether this card bus is compatible with the given motherboard slot. ISA, PCI, and AGP are
      * physically distinct and reject each other; all PCIe generations are cross-compatible.
+     *
+     * <p>A newer card in an older slot still runs — it is simply held to the older slot's bandwidth.
+     * See {@link #bandwidthFactorIn}.
      */
     public boolean compatibleWith(final PcieGeneration slot) {
         return this.busFamily() == slot.busFamily();
+    }
+
+    /**
+     * How much of this card's throughput survives in {@code slot}, as a fraction of 1.0. Each bus
+     * generation carries roughly twice the bandwidth of the one before it, so a card seated in a slot
+     * one generation older gets about half its lane bandwidth, two generations older about a quarter,
+     * and so on. A card in a slot of its own generation or newer runs at full speed.
+     *
+     * <p>The floor keeps an extreme mismatch slow rather than useless: an ancient board is a bad home
+     * for a modern card, not a brick wall.
+     */
+    public double bandwidthFactorIn(final PcieGeneration slot) {
+        final int behind = this.ordinal() - slot.ordinal();
+        if (behind <= 0) {
+            return 1.0;
+        }
+        return Math.max(0.125, Math.pow(0.5, behind));
     }
 }

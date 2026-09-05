@@ -1,8 +1,0 @@
-{
-  "parent": "minecraft:block/orientable",
-  "textures": {
-    "front": "jsc:block/pattern_reader_front",
-    "side": "jsc:block/pattern_station_side",
-    "top": "jsc:block/pattern_station_top"
-  }
-}

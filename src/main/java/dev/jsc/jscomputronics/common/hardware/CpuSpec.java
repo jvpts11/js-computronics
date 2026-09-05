@@ -21,7 +21,7 @@ public record CpuSpec(HardwareEra era,
                       int tdpWatts,
                       boolean alien) {
 
-    private static final int CAPACITY_FACTOR = 160;
+    private static final int CAPACITY_FACTOR = 40;
 
     public CpuSpec {
         Objects.requireNonNull(era, "era must not be null");

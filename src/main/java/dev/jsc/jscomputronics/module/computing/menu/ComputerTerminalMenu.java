@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.computing.menu;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
+import dev.jsc.jscomputronics.module.computing.gui.layout.ComputerTerminalLayout;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
 import dev.jsc.jscomputronics.module.computing.operation.payload.NetworkItemEntry;
 import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
@@ -36,23 +37,29 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
     public static final int TAB_TASKS = 4;
     public static final int TAB_MAINTENANCE = 5;
     public static final int TAB_CRAFT = 6;
+    /** The process/service manager: the network's background services (the IQL Engine and its state). */
+    public static final int TAB_PROCESSES = 7;
     // A launch-only rail entry: clicking it opens the Command Prompt rather than switching content,
-    // so it is never the active tab (the menu's initial-tab clamp stops at TAB_CRAFT).
-    public static final int TAB_CONSOLE = 7;
+    // so it is never the active tab (the menu's initial-tab clamp stops at TAB_PROCESSES).
+    public static final int TAB_CONSOLE = 8;
 
     // Slot layout (relative to the screen's top-left). The screen draws the slot
     // backgrounds and the inventory at these exact positions.
     public static final int STORAGE_COLS = 9;
     public static final int STORAGE_X = 68;
     public static final int STORAGE_Y = 40;
-    public static final int INV_X = 41;
-    public static final int INV_Y = 148;
-    public static final int HOTBAR_Y = 206;
-    public static final int MAINFRAME_INV_DROP = 22;
+    // The inventory positions come from ComputerTerminalLayout, the single source the layout test
+    // validates, so the real slots placed here are covered by that test.
+    public static final int INV_X = ComputerTerminalLayout.INV_X;
+    public static final int INV_Y = ComputerTerminalLayout.INV_Y;
+    public static final int HOTBAR_Y = ComputerTerminalLayout.HOTBAR_Y;
+    public static final int MAINFRAME_INV_DROP = ComputerTerminalLayout.MAINFRAME_INV_DROP;
 
     private static final double MONITOR_REACH = 16.0;
 
-    private static final int DATA_COUNT = 31;
+    private static final int DATA_COUNT = 33;
+    private static final int DATA_INDEX_HEALTH = 31;
+    private static final int DATA_INDEX_HEALTH_TYPES = 32;
     private static final int DATA_USABLE_SLOTS = 18;
     private static final int DATA_CRAFT_COMPUTERS = 29;
     // The host's board-derived hardware-era ordinal (or -1 when no board), synced so the client can skin the
@@ -125,7 +132,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         this.monitorPos = monitorPos.immutable();
         // Open on the player's last-used tab; fall back to Network, and never land on the
         // Mainframe-only Task Manager when the host is a plain computer.
-        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_CRAFT ? initialTab : TAB_NETWORK;
+        int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_PROCESSES ? initialTab : TAB_NETWORK;
         if ((tab == TAB_TASKS || tab == TAB_MAINTENANCE) && (host == null || !host.isMainframeHost())) {
             tab = TAB_NETWORK;
         }
@@ -206,6 +213,8 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
                 final dev.jsc.jscomputronics.common.tier.HardwareEra era = host.displayEra();
                 yield era == null ? -1 : era.ordinal();
             }
+            case DATA_INDEX_HEALTH -> host.indexHealthState();
+            case DATA_INDEX_HEALTH_TYPES -> host.indexHealthTypeCount();
             default -> 0;
         };
     }
@@ -238,7 +247,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
 
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
-        if (id >= TAB_LOCAL && id <= TAB_CRAFT) {
+        if (id >= TAB_LOCAL && id <= TAB_PROCESSES) {
             this.activeTab = id;
             // Remember the tab on the Monitor so reopening this terminal lands here again.
             if (level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor) {
@@ -275,12 +284,28 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
                 ComputingPayloads.dispatchCraftCatalog(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
+            } else if (id == TAB_PROCESSES) {
+                // Per-host: the processes shown are the ones running on THIS computer (the host).
+                ComputingPayloads.dispatchProcesses(serverPlayer, hostPos(), serverLevel);
             }
         }
     }
 
     private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
             .CraftCatalogPayload.Entry> craftCatalog = java.util.List.of();
+
+    private java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .ProcessListPayload.ProcessLine> processes = java.util.List.of();
+
+    public void setProcesses(final java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .ProcessListPayload.ProcessLine> processes) {
+        this.processes = processes;
+    }
+
+    public java.util.List<dev.jsc.jscomputronics.module.computing.operation.payload
+            .ProcessListPayload.ProcessLine> processes() {
+        return processes;
+    }
 
     @Nullable
     private dev.jsc.jscomputronics.module.computing.operation.payload.CraftPlanPayload craftPlan;
@@ -416,6 +441,11 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         if (activeTab == TAB_TASKS || activeTab == TAB_OPS) {
             ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
         }
+        if (activeTab == TAB_OPS) {
+            // Keep the log live too: a craft that just settled drops out of the active list and must appear in
+            // the recent log the same tick, so the Operations view is fully real-time (in flight and just done).
+            ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
+        }
         if (activeTab == TAB_CRAFT
                 && ComputingPayloads.networkHasActiveOps(serverLevel, host.networkUuid())) {
             // Keep the RUNNING bars moving and settle finished crafts into RECENT.
@@ -522,6 +552,18 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         return data.get(26);
     }
 
+    /** The index's health state, as an {@code IndexHealth.State} ordinal. */
+    public dev.jsc.jscomputronics.common.operation.index.IndexHealth.State indexHealth() {
+        final var states = dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.values();
+        final int ordinal = data.get(DATA_INDEX_HEALTH);
+        return ordinal >= 0 && ordinal < states.length ? states[ordinal] : states[0];
+    }
+
+    /** How many item types the index has flagged. */
+    public int indexHealthTypes() {
+        return data.get(DATA_INDEX_HEALTH_TYPES);
+    }
+
     public long networkStorageUsed() {
         return data.get(27);
     }
@@ -573,10 +615,12 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         if (!(level.getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor)) {
             return false;
         }
-        final BlockPos owner = monitor.ownerPos();
-        return owner != null && owner.equals(hostPos)
+        // Either the cable links this machine, or a Remote Control session put it on the screen.
+        return monitor.shows(hostPos)
                 && player.distanceToSqr(monitorPos.getX() + 0.5, monitorPos.getY() + 0.5,
-                monitorPos.getZ() + 0.5) <= MONITOR_REACH * MONITOR_REACH;
+                monitorPos.getZ() + 0.5) <= MONITOR_REACH * MONITOR_REACH
+                // The network GUI dies with its machine (power off, system disk pulled).
+                && CommandPromptMenu.sessionAlive(level, hostPos);
     }
 
     @Override

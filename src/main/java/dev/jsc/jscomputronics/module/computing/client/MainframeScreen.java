@@ -30,7 +30,15 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
     private static final int POWER_X = 8;
     private static final int AUTO_X = 66;
     private static final int FAILOVER_X = 124;
-    private static final int NODES_X = 182;
+
+    /** Window-relative centre of the POWER button (client tests press it the way the player does). */
+    public static int powerButtonX() {
+        return POWER_X + BTN_W / 2;
+    }
+
+    public static int powerButtonY() {
+        return BTN_Y + BTN_H / 2;
+    }
 
     public MainframeScreen(final MainframeMenu menu, final Inventory inventory, final Component title) {
         super(menu, inventory, title);
@@ -81,7 +89,6 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
                 !auto && hover(mouseX, mouseY, POWER_X, BTN_Y, BTN_W, BTN_H));
         JscOsTheme.button(g, x + AUTO_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, AUTO_X, BTN_Y, BTN_W, BTN_H));
         JscOsTheme.button(g, x + FAILOVER_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, FAILOVER_X, BTN_Y, BTN_W, BTN_H));
-        JscOsTheme.button(g, x + NODES_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, NODES_X, BTN_Y, BTN_W, BTN_H));
 
         // Player inventory.
         for (int row = 0; row < 3; row++) {
@@ -156,7 +163,6 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
         final boolean failover = menu.failoverEnabled();
         JscOsTheme.textCenter(g, font, "FAIL " + (failover ? "ON" : "OFF"), FAILOVER_X + BTN_W / 2, BTN_Y + 4,
                 failover ? JscOsTheme.accent() : JscOsTheme.dim());
-        JscOsTheme.textCenter(g, font, "NODES", NODES_X + BTN_W / 2, BTN_Y + 4, JscOsTheme.accent());
     }
 
     private void opRow(final GuiGraphics g, final String key, final String value, final int y, final int valueColor) {
@@ -184,12 +190,6 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
             }
             if (hover((int) mouseX, (int) mouseY, FAILOVER_X, BTN_Y, BTN_W, BTN_H)) {
                 sendButton(MainframeMenu.BUTTON_FAILOVER);
-                return true;
-            }
-            if (hover((int) mouseX, (int) mouseY, NODES_X, BTN_Y, BTN_W, BTN_H)) {
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                        new dev.jsc.jscomputronics.module.computing.operation.payload.RequestNetworkNodesPayload(
-                                menu.blockPos()));
                 return true;
             }
         }

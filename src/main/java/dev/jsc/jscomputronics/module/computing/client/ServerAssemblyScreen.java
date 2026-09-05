@@ -80,15 +80,12 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
         JscOsTheme.panel(g, x + 126, y + 26, 55, 18);
         JscOsTheme.panel(g, x + 185, y + 26, 51, 18);
 
-        // Power-headroom + storage tracks.
+        // Power-headroom track. There is no storage track any more: drives live in the rack's
+        // hotswap bays, so the assembly has no storage of its own to meter.
         final int draw = build == null ? 0 : build.powerDraw();
         final int watt = build == null ? 0 : build.psu().wattage();
         final double pf = watt <= 0 ? 0.0 : Math.min(1.0, (double) draw / watt);
         JscOsTheme.track(g, x + 52, y + 49, 130, pf, draw > watt ? JscOsTheme.red() : JscOsTheme.green());
-        final long cap = build == null ? 0L : build.totalStorageItems();
-        final long used = menu.storedItems();
-        final double sf = cap <= 0 ? 0.0 : Math.min(1.0, (double) used / cap);
-        JscOsTheme.track(g, x + 52, y + 59, 130, sf, sf >= 0.9 ? JscOsTheme.red() : JscOsTheme.green());
 
         // Problems strip.
         JscOsTheme.panel(g, x + 8, y + 68, 228, 12);
@@ -148,9 +145,10 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
         JscOsTheme.textS(g, font, "POWER", 8, 49, JscOsTheme.text());
         JscOsTheme.textSRight(g, font, build == null ? "-- W" : draw + "/" + watt + "W", 236, 49,
                 draw > watt ? JscOsTheme.red() : JscOsTheme.dim());
-        final long cap = build == null ? 0L : build.totalStorageItems();
+        // Drives live in the rack's hotswap bays since the racks rework, so the assembly has no
+        // storage of its own to report — point the player at the right place instead.
         JscOsTheme.textS(g, font, "STORAGE", 8, 59, JscOsTheme.text());
-        JscOsTheme.textSRight(g, font, JscOsTheme.fmt(menu.storedItems()) + "/" + JscOsTheme.fmt(cap), 236, 59, JscOsTheme.dim());
+        JscOsTheme.textSRight(g, font, "drives mount in the rack bays", 236, 59, JscOsTheme.dim());
 
         // Problems strip.
         renderProblems(g, build);
@@ -158,7 +156,6 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
         // Hardware bay labels (names only — the slots show installed vs available).
         JscOsTheme.textS(g, font, "BOARD", 8, 87, JscOsTheme.dim());
         JscOsTheme.textS(g, font, "CPU", 52, 87, JscOsTheme.dim());
-        JscOsTheme.textS(g, font, "DISK", 8, 117, JscOsTheme.dim());
         JscOsTheme.textS(g, font, "RAM", 52, 117, JscOsTheme.dim());
         JscOsTheme.textS(g, font, "GPU", 52, 165, JscOsTheme.dim());
     }

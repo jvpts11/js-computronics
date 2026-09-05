@@ -35,7 +35,10 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
 
     private static final int MAX_TERMINAL_HISTORY = 256;
 
-    private final int parallelQueues;
+    // Not final: the lane count follows the Mainframe's GPU count, which the player can change at runtime by
+    // hot-swapping a GPU. It is resized in place (see setParallelQueues) rather than by rebuilding the dispatcher,
+    // so a hardware change never tears down the in-flight Operations the Mainframe is tracking.
+    private volatile int parallelQueues;
     private final ExecutorService workers;
     private final PriorityQueue<PendingOp> pending = new PriorityQueue<>(ORDER);
     private final ConcurrentLinkedQueue<Runnable> mainThreadActions = new ConcurrentLinkedQueue<>();
@@ -204,6 +207,18 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
 
     public int parallelQueues() {
         return parallelQueues;
+    }
+
+    /**
+     * Resizes the number of parallel lanes in place, following the Mainframe's GPU count. The next {@link #tick()}
+     * promotes up to the new count; already-running tasks are never interrupted. This exists so hot-swapping a GPU
+     * changes throughput without rebuilding the dispatcher, which would otherwise abandon every in-flight Operation.
+     */
+    public void setParallelQueues(final int queues) {
+        if (queues < 1) {
+            throw new IllegalArgumentException("parallelQueues must be >= 1; got " + queues);
+        }
+        this.parallelQueues = queues;
     }
 
     public long completedCount() {

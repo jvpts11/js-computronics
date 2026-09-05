@@ -117,8 +117,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private static final int DEPOSIT_W = NET_COLS * 18 - 2;
     private static final int DEPOSIT_H = 14;
 
+    // Indexed by ComputerTerminalMenu.TAB_* id — keep in sync with those constants (Processes = 7, Console = 8).
     private static final String[] TAB_NAMES =
-            {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Console"};
+            {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Processes", "Console"};
 
     private int netScrollRow;
     int selectedOp;
@@ -128,6 +129,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     @org.jetbrains.annotations.Nullable
     private EditBox searchBox;
     boolean sortByQuantity = true;
+    // The grid's filtered and sorted view, kept between frames: it is asked for several times a frame and
+    // re-sorting a big network's catalog each time cost the frame rate (see visibleItems).
+    private List<NetworkItemEntry> visibleCache = List.of();
+    private List<NetworkItemEntry> visibleSource = List.of();
+    private String visibleKey = "";
 
     // Storage tab — public/private slider band. The Storage tab inserts a band between the header bar
     // and the item toolbar, then shifts its toolbar/grid/deposit down by STORAGE_SHIFT so nothing
@@ -255,6 +261,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             new TasksTerminalTab(this, menu),
             new MaintenanceTerminalTab(this, menu),
             new CraftTerminalTab(this, menu),
+            new ProcessesTerminalTab(this, menu),
         };
     }
 
@@ -335,17 +342,19 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                     ? new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
                             ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_CRAFT,
                             ComputerTerminalMenu.TAB_OPS, ComputerTerminalMenu.TAB_TASKS,
-                            ComputerTerminalMenu.TAB_MAINTENANCE}
+                            ComputerTerminalMenu.TAB_MAINTENANCE, ComputerTerminalMenu.TAB_PROCESSES}
                     : new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
                             ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS,
-                            ComputerTerminalMenu.TAB_TASKS, ComputerTerminalMenu.TAB_MAINTENANCE};
+                            ComputerTerminalMenu.TAB_TASKS, ComputerTerminalMenu.TAB_MAINTENANCE,
+                            ComputerTerminalMenu.TAB_PROCESSES};
         }
         return craft
                 ? new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
                         ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_CRAFT,
-                        ComputerTerminalMenu.TAB_OPS}
+                        ComputerTerminalMenu.TAB_OPS, ComputerTerminalMenu.TAB_PROCESSES}
                 : new int[]{ComputerTerminalMenu.TAB_LOCAL, ComputerTerminalMenu.TAB_STORAGE,
-                        ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS};
+                        ComputerTerminalMenu.TAB_NETWORK, ComputerTerminalMenu.TAB_OPS,
+                        ComputerTerminalMenu.TAB_PROCESSES};
     }
 
     // Per-tab rendering delegates; instantiated in init() once menu and screen geometry are ready.
@@ -382,6 +391,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         syncPalette();
         final int x = leftPos;
         final int y = topPos;
+
+        // The host computer's hardware-era monitor frame wraps the whole terminal window.
+        MonitorFrame.renderBody(g, x, y, imageWidth, imageHeight, screenEra(), font);
 
         g.fill(x - 1, y - 1, x + imageWidth + 1, y + imageHeight + 1, OUTER);
         g.fill(x, y, x + imageWidth, y + imageHeight, SCREEN);
@@ -683,7 +695,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new dev.jsc.jscomputronics.module.computing.operation.payload.CraftSubmitPayload(
-                        menu.monitorPos(), menu.hostPos(), craftPopup.result(), craftQty, partial));
+                        menu.monitorPos(), menu.hostPos(), craftPopup.result(), craftQty, partial, true));
         closeCraftPopup();
     }
 
@@ -837,9 +849,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     List<NetworkItemEntry> visibleItems() {
         final String q = searchBox == null ? "" : searchBox.getValue().trim().toLowerCase(Locale.ROOT);
-        final List<NetworkItemEntry> out = new ArrayList<>();
         final List<NetworkItemEntry> source = menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE
                 ? menu.localItems() : menu.networkItems();
+        // A snapshot replaces the menu's list object, so the list itself tells a fresh snapshot from the last one.
+        final String key = menu.activeTab() + "|" + sortByQuantity + "|" + q;
+        if (source == visibleSource && key.equals(visibleKey)) {
+            return visibleCache;
+        }
+        final List<NetworkItemEntry> out = new ArrayList<>();
         for (final NetworkItemEntry e : source) {
             if (q.isEmpty()
                     || e.name().getString().toLowerCase(Locale.ROOT).contains(q)) {
@@ -852,6 +869,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             out.sort((a, b) -> a.name().getString()
                     .compareToIgnoreCase(b.name().getString()));
         }
+        visibleCache = out;
+        visibleSource = source;
+        visibleKey = key;
         return out;
     }
 
@@ -1293,7 +1313,17 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                     }
                 }
             }
-            case 7 -> { // Console — a ">" prompt and a blinking cursor underscore
+            case 7 -> { // Processes — a cog (the network's background services)
+                g.fill(x + 7, y + 2, x + 9, y + 4, c);   // tooth: top
+                g.fill(x + 7, y + 12, x + 9, y + 14, c); // tooth: bottom
+                g.fill(x + 2, y + 7, x + 4, y + 9, c);   // tooth: left
+                g.fill(x + 12, y + 7, x + 14, y + 9, c); // tooth: right
+                g.fill(x + 5, y + 5, x + 11, y + 7, c);  // ring: top edge
+                g.fill(x + 5, y + 9, x + 11, y + 11, c); // ring: bottom edge
+                g.fill(x + 5, y + 5, x + 7, y + 11, c);  // ring: left edge
+                g.fill(x + 9, y + 5, x + 11, y + 11, c); // ring: right edge
+            }
+            case 8 -> { // Console — a ">" prompt and a blinking cursor underscore
                 g.fill(x + 3, y + 4, x + 5, y + 6, c);
                 g.fill(x + 5, y + 6, x + 7, y + 8, c);
                 g.fill(x + 3, y + 8, x + 5, y + 10, c);
@@ -1422,6 +1452,12 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         if (popupOp != null) {
             return handleOpPopupClick(mouseX, mouseY, button);
         }
+        // Let the active content tab claim the press (e.g. the Processes tab's action buttons), after any
+        // modal popup above has had its chance but before the rail/grid handlers below.
+        final int active = menu.activeTab();
+        if (active >= 0 && active < tabs.length && tabs[active].onMouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         // Privacy slider (Storage tab): a press on a disk's track starts a drag and jumps the value to
         // the cursor. Handled before the deposit/grid handlers so a slider drag never deposits a stack.
         if (button == 0) {
@@ -1443,17 +1479,22 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             searchBox.setFocused(false);
         }
-        // Deposit: holding a stack and clicking the grid or deposit bar inserts it into the network
-        // (Network tab) or the computer's local storage (Storage tab) — left = whole stack, right = one.
+        // Holding a stack and clicking the grid or deposit bar hands it to the network (Network tab) or the
+        // computer's local storage (Storage tab): left = the whole stack as items, right = one — one item, or
+        // what a held container holds; and a held empty container right-clicked on a fluid or chemical
+        // entry fills from it, so the entry under the cursor travels with a right-click.
         if (isGridTab() && !menu.getCarried().isEmpty()
                 && (button == 0 || button == 1)
                 && (overDepositBar(mouseX, mouseY) || overNetworkGrid(mouseX, mouseY))) {
+            final java.util.Optional<dev.jsc.jscomputronics.module.computing.storage.StorageKey> entry = button == 1
+                    ? java.util.Optional.ofNullable(networkItemAt((int) mouseX, (int) mouseY)).map(NetworkItemEntry::key)
+                    : java.util.Optional.empty();
             if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
                 PacketDistributor.sendToServer(new TerminalLocalDepositPayload(menu.monitorPos(), menu.hostPos(),
-                        button == 1 ? TerminalLocalDepositPayload.CURSOR_ONE : TerminalLocalDepositPayload.CURSOR));
+                        button == 1 ? TerminalLocalDepositPayload.CURSOR_ONE : TerminalLocalDepositPayload.CURSOR, entry));
             } else {
                 PacketDistributor.sendToServer(new TerminalInsertPayload(menu.monitorPos(), menu.hostPos(),
-                        button == 1 ? TerminalInsertPayload.CURSOR_ONE : TerminalInsertPayload.CURSOR));
+                        button == 1 ? TerminalInsertPayload.CURSOR_ONE : TerminalInsertPayload.CURSOR, entry));
             }
             return true;
         }
@@ -1618,10 +1659,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 && slot != null && slot.hasItem() && slot.index >= menu.storageSlotCount()) {
             if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
                 PacketDistributor.sendToServer(new TerminalLocalDepositPayload(
-                        menu.monitorPos(), menu.hostPos(), slot.index));
+                        menu.monitorPos(), menu.hostPos(), slot.index, java.util.Optional.empty()));
             } else {
                 PacketDistributor.sendToServer(new TerminalInsertPayload(
-                        menu.monitorPos(), menu.hostPos(), slot.index));
+                        menu.monitorPos(), menu.hostPos(), slot.index, java.util.Optional.empty()));
             }
             return;
         }
@@ -1986,7 +2027,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         drawDataIcon(g, popupEntry.key(), -1L, px + 8, py + 5);
         g.drawString(font, font.plainSubstrByWidth(popupEntry.name().getString(), POPUP_W - 78),
                 px + 28, py + 6, TEXT, false);
-        g.drawString(font, fmt(popupEntry.total()) + (popupEntry.isFluid() ? " mB" : "")
+        g.drawString(font, fmt(popupEntry.total()) + (popupEntry.key().isItem() ? "" : " mB")
                         + (popupFromStorage ? " in local" : " available"),
                 px + 28, py + 17, DIM, false);
         if (!popupFromStorage) {
@@ -2088,8 +2129,12 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     void drawDataIcon(final GuiGraphics g, final StorageKey key, final long count,
                               final int x, final int y) {
-        if (key.isFluid()) {
-            FluidSprite.draw(g, key.fluidPrototype(), x, y);
+        if (!key.isItem()) {
+            if (key.isChemical()) {
+                ChemicalSprite.draw(g, key, x, y);
+            } else {
+                FluidSprite.draw(g, key.fluidPrototype(), x, y);
+            }
             if (count >= 0L) {
                 final String c = fmt(count);
                 g.pose().pushPose();

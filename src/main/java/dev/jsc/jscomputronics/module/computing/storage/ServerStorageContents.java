@@ -71,7 +71,7 @@ public record ServerStorageContents(Map<StorageKey, Long> items) {
             Line.CODEC.listOf().xmap(ServerStorageContents::fromLines, ServerStorageContents::toLines);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ServerStorageContents> STREAM_CODEC =
-            Line.STREAM_CODEC.apply(ByteBufCodecs.list())
+            Line.STREAM_CODEC.apply(ByteBufCodecs.list(16384))
                     .map(ServerStorageContents::fromLines, ServerStorageContents::toLines);
 
     public long total() {

@@ -50,13 +50,29 @@ public final class CliShell {
      */
     public Response run(final String line, final CliComputer computer) {
         final CliOutput out = new CliOutput(width);
+        // A source build that finished in the background is announced before whatever the player typed
+        // (an empty Enter included), the way a shell shows a finished job ahead of the next prompt.
+        for (final String notice : computer.drainBuildNotices()) {
+            out.ok(notice);
+        }
         final List<String> tokens = CliTokenizer.tokenize(line);
         if (tokens.isEmpty()) {
             return new Response(out.lines(), false);
         }
         final String word = tokens.get(0);
+        // A bare drive qualifier like "D:" switches the current drive (DOS-style), not a command.
+        if (tokens.size() == 1 && word.length() == 2 && word.charAt(1) == ':'
+                && Character.isLetter(word.charAt(0))) {
+            final CliComputer.FsResult switched = computer.changeDrive(word.charAt(0));
+            if (!switched.ok()) {
+                out.error(switched.message());
+            }
+            return new Response(out.lines(), false);
+        }
         final CliCommand command = find(word);
-        if (command == null) {
+        // A command that is not available on this computer (another distribution's package manager, an
+        // uninstalled program's verbs) does not exist here, exactly like an unknown word.
+        if (command == null || !command.available(computer)) {
             out.error("command not found: " + word);
             out.dim("type 'help' to list commands");
             return new Response(out.lines(), false);

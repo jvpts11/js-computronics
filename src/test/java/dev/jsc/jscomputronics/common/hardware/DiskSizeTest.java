@@ -35,8 +35,10 @@ class DiskSizeTest {
     @Test
     void capacityMb_matchesDiskSpec() {
         // A disk built from a size yields capacityMb = items × 256, regardless of tier.
-        final DiskSpec hdd = new DiskSpec(StorageTier.HDD, DiskSize.TB_1.capacityItems(), 6);
-        final DiskSpec nvme = new DiskSpec(StorageTier.NVME, DiskSize.TB_1.capacityItems(), 5);
+        final DiskSpec hdd = new DiskSpec(StorageTier.HDD, dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD,
+                DiskSize.TB_1.capacityItems(), 6);
+        final DiskSpec nvme = new DiskSpec(StorageTier.NVME, dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD,
+                DiskSize.TB_1.capacityItems(), 5);
         assertEquals(hdd.capacityMb(), nvme.capacityMb());
         assertEquals(1_048_576L, hdd.capacityMb());
     }

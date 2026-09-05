@@ -28,7 +28,7 @@ public final class StorageAllocator {
         }
         final List<ItemLocation> ordered = sources.stream()
                 .filter(location -> location.quantity() > 0L)
-                .sorted(Comparator.comparingInt((ItemLocation l) -> l.tier().latencyTicks())
+                .sorted(Comparator.comparingInt(ItemLocation::latencyTicks)
                         .thenComparing(Comparator.comparingLong(ItemLocation::quantity).reversed()))
                 .toList();
 

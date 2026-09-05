@@ -44,5 +44,9 @@ public final class JscDataGenerators {
                 new JscItemTagsProvider(output, event.getLookupProvider(), existingFiles));
         generator.addProvider(event.includeServer(),
                 new JscGameTestStructureProvider(output));
+        generator.addProvider(event.includeServer(),
+                new JscRecipeMachinesProvider(output));
+        generator.addProvider(event.includeServer(),
+                new JscAdvancementProvider(output, event.getLookupProvider(), existingFiles));
     }
 }

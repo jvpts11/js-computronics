@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.operation.payload;
 
+import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -14,10 +15,17 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.Optional;
+
 /**
- * Client to server: a Storage tab asked to DEPOSIT items into the computer's local storage.
+ * Client to server: a Storage tab hands a stack to the computer's local storage. The source is a
+ * player-inventory menu slot (shift-click, the whole stack as items), the cursor ({@link #CURSOR}, the whole
+ * stack as items) or the cursor on a right-click ({@link #CURSOR_ONE}: one item, or what a held container
+ * holds); with {@code CURSOR_ONE}, {@code entry} names the fluid or chemical entry under the cursor so a held
+ * empty container fills from it instead.
  */
-public record TerminalLocalDepositPayload(BlockPos monitorPos, BlockPos hostPos, int slotIndex)
+public record TerminalLocalDepositPayload(BlockPos monitorPos, BlockPos hostPos, int slotIndex,
+                                          Optional<StorageKey> entry)
         implements CustomPacketPayload {
 
     public static final int CURSOR = -1;
@@ -32,6 +40,7 @@ public record TerminalLocalDepositPayload(BlockPos monitorPos, BlockPos hostPos,
                     BlockPos.STREAM_CODEC, TerminalLocalDepositPayload::monitorPos,
                     BlockPos.STREAM_CODEC, TerminalLocalDepositPayload::hostPos,
                     ByteBufCodecs.VAR_INT, TerminalLocalDepositPayload::slotIndex,
+                    ByteBufCodecs.optional(StorageKey.STREAM_CODEC), TerminalLocalDepositPayload::entry,
                     TerminalLocalDepositPayload::new);
 
     @Override

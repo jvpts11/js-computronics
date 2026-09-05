@@ -40,12 +40,52 @@ public final class NetworkStorage {
     }
 
     private final List<Entry> entries;
+    private final Map<NodeUuid, Entry> byNode;
 
     private NetworkStorage(final List<Entry> entries) {
         this.entries = entries;
+        this.byNode = new HashMap<>(entries.size() * 2);
+        for (final Entry entry : entries) {
+            byNode.putIfAbsent(entry.node(), entry);
+        }
     }
 
+    /**
+     * The view built for one network this tick. Every Operation ticking on a network asks for the same
+     * view, and building it walks every server of the network, so it is built once per tick and shared:
+     * the stores inside are live, only the roster is a snapshot, and a server that leaves mid-tick reads
+     * as empty through {@link ServerNodeStore} rather than through a stale rack.
+     */
+    private record TickView(ServerLevel level, long gameTime, NetworkStorage storage) {
+    }
+
+    private static final Map<NetworkUuid, TickView> VIEWS = new HashMap<>();
+
     public static NetworkStorage of(final ServerLevel level, final NetworkUuid network) {
+        final long now = level.getGameTime();
+        final TickView cached = VIEWS.get(network);
+        if (cached != null && cached.level() == level && cached.gameTime() == now) {
+            return cached.storage();
+        }
+        // A view is good for one tick. Anything older only pins the racks (and their drives) of a network
+        // nobody is asking about any more, possibly in a level that has since unloaded.
+        VIEWS.values().removeIf(view -> view.gameTime() != now || view.level() != level);
+        final NetworkStorage built = build(level, network);
+        VIEWS.put(network, new TickView(level, now, built));
+        return built;
+    }
+
+    /** Whether any cached view predates {@code now}; for tests of the eviction above. */
+    public static boolean holdsStaleViews(final long now) {
+        for (final TickView view : VIEWS.values()) {
+            if (view.gameTime() != now) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static NetworkStorage build(final ServerLevel level, final NetworkUuid network) {
         final NetworkSystem system = NetworkSystem.get(level);
         final List<Entry> entries = new ArrayList<>();
         for (final ServerNode server : system.serversOf(network)) {
@@ -135,30 +175,49 @@ public final class NetworkStorage {
                                                final DataSink destination,
                                                @Nullable final Set<NodeUuid> allowed) {
         final Map<NodeUuid, Long> pulled = new LinkedHashMap<>();
-        final long batchSize = key.batch();
         long moved = 0L;
         for (final Entry entry : entries) {
             if (allowed != null && !allowed.contains(entry.node())) {
                 continue;
             }
-            final NodeStore store = entry.store();
-            long available = store.count(key);
-            while (moved < amount && available > 0L) {
-                final long batch = Math.min(Math.min(amount - moved, available), batchSize);
-                final long accepted = destination.insert(key, batch, false);
-                if (accepted <= 0L) {
-                    return pulled; // destination full
-                }
-                store.extract(key, accepted);
-                moved += accepted;
-                available -= accepted;
-                pulled.merge(entry.node(), accepted, Long::sum);
+            final long wanted = Math.min(amount - moved, entry.store().count(key));
+            final long got = pull(entry.store(), key, amount - moved, destination);
+            if (got > 0L) {
+                moved += got;
+                pulled.merge(entry.node(), got, Long::sum);
             }
-            if (moved >= amount) {
-                break;
+            if (moved >= amount || got < wanted) {
+                break; // done, or the destination is full and no other node can help
             }
         }
         return pulled;
+    }
+
+    /**
+     * Pulls up to {@code amount} of {@code key} from one node straight into the destination — the per-source
+     * step of a SELECT, found by node in constant time instead of a walk over the whole network.
+     */
+    public long pullFrom(final NodeUuid node, final StorageKey key, final long amount, final DataSink destination) {
+        final Entry entry = byNode.get(node);
+        return entry == null ? 0L : pull(entry.store(), key, amount, destination);
+    }
+
+    /** Moves batches of {@code key} from one store into the destination until the amount, the store or the destination runs out. */
+    private static long pull(final NodeStore store, final StorageKey key, final long amount, final DataSink destination) {
+        final long batchSize = key.batch();
+        long moved = 0L;
+        long available = store.count(key);
+        while (moved < amount && available > 0L) {
+            final long batch = Math.min(Math.min(amount - moved, available), batchSize);
+            final long accepted = destination.insert(key, batch, false);
+            if (accepted <= 0L) {
+                break; // destination full
+            }
+            store.extract(key, accepted);
+            moved += accepted;
+            available -= accepted;
+        }
+        return moved;
     }
 
     public int insert(final ItemStack stack) {
@@ -177,6 +236,28 @@ public final class NetworkStorage {
             remaining -= entry.store().insert(key, remaining);
         }
         return (int) (stack.getCount() - remaining);
+    }
+
+    /**
+     * Inserts {@code amount} of a key (item OR fluid) into the network, returning how much was stored. This is
+     * the key-typed counterpart of {@link #insert(ItemStack)}, used to put a machine craft's fluid (or item)
+     * output back into the network.
+     */
+    public long insert(final StorageKey key, final long amount) {
+        if (key == null || amount <= 0L) {
+            return 0L;
+        }
+        long remaining = amount;
+        for (final Entry entry : entries) {
+            if (remaining <= 0L) {
+                break;
+            }
+            if (!entry.acceptsInsert()) {
+                continue; // never write into a PC's public area
+            }
+            remaining -= entry.store().insert(key, remaining);
+        }
+        return amount - remaining;
     }
 
     public Map<NodeUuid, Long> insertBreakdown(final ItemStack stack) {

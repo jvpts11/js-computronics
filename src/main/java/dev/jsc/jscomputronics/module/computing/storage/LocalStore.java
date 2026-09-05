@@ -7,40 +7,55 @@
  */
 package dev.jsc.jscomputronics.module.computing.storage;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.item.DiskItem;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Collections;
-
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * A computer's local storage as a capacity-bounded, component-preserving type → quantity store that lives on its installed disks — the data is held in each disk item's {@link ComputingModule#DISK_STORAGE} component, so a computer's local storage is literally the union of its disks.
+ * A computer's local storage as a capacity-bounded, component-preserving type → quantity store that lives
+ * on its installed disks: each disk's items are its {@link StorageVolume}, so a computer's local storage is
+ * literally the union of its disks. A write touches one volume in place and refreshes that disk's usage
+ * summary, whatever the disk holds.
  */
 public final class LocalStore implements WeightedStore {
 
     private final List<ItemStack> disks;
     private final Runnable onChanged;
+    private final boolean balanced;
 
     public LocalStore(final List<ItemStack> disks, final Runnable onChanged) {
+        this(disks, onChanged, false);
+    }
+
+    /**
+     * @param balanced when true, writes go to the emptiest disk first instead of filling disks in
+     *                 order — what the Load Balancer service buys a server: no single drive fills up
+     *                 while its neighbours sit half empty.
+     */
+    public LocalStore(final List<ItemStack> disks, final Runnable onChanged, final boolean balanced) {
         this.disks = disks;
         this.onChanged = onChanged;
+        this.balanced = balanced;
+    }
+
+    /** The disks in the order a write should visit them: by free space when balancing, else as given. */
+    private List<ItemStack> writeOrder() {
+        if (!balanced) {
+            return disks;
+        }
+        final List<ItemStack> ordered = new java.util.ArrayList<>(disks);
+        ordered.sort(java.util.Comparator.comparingLong(
+                (final ItemStack disk) -> diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM
+                        - DriveVolumes.peek(disk).usedWeight()).reversed());
+        return ordered;
     }
 
     private static long diskCapacity(final ItemStack disk) {
         return disk.getItem() instanceof DiskItem item ? item.spec().capacityItems() : 0L;
-    }
-
-    private static ServerStorageContents contentsOf(final ItemStack disk) {
-        return disk.getOrDefault(ComputingModule.DISK_STORAGE.get(), ServerStorageContents.EMPTY);
-    }
-
-    private static void setContents(final ItemStack disk, final Map<StorageKey, Long> items) {
-        disk.set(ComputingModule.DISK_STORAGE.get(), new ServerStorageContents(items));
     }
 
     public long capacity() {
@@ -58,7 +73,7 @@ public final class LocalStore implements WeightedStore {
     public long usedWeight() {
         long total = 0L;
         for (final ItemStack disk : disks) {
-            total += contentsOf(disk).usedWeight();
+            total += DriveVolumes.peek(disk).usedWeight();
         }
         return total;
     }
@@ -78,7 +93,7 @@ public final class LocalStore implements WeightedStore {
     public Map<StorageKey, Long> view() {
         final Map<StorageKey, Long> merged = new LinkedHashMap<>();
         for (final ItemStack disk : disks) {
-            contentsOf(disk).items().forEach((key, count) -> merged.merge(key, count, Long::sum));
+            DriveVolumes.peek(disk).items().forEach((key, count) -> merged.merge(key, count, Long::sum));
         }
         return merged;
     }
@@ -103,7 +118,7 @@ public final class LocalStore implements WeightedStore {
 
     /** The used data weight stored on one disk. */
     public long diskUsedWeight(final int index) {
-        return index >= 0 && index < disks.size() ? contentsOf(disks.get(index)).usedWeight() : 0L;
+        return index >= 0 && index < disks.size() ? DriveVolumes.peek(disks.get(index)).usedWeight() : 0L;
     }
 
     /** The capacity data weight of one disk. */
@@ -117,7 +132,7 @@ public final class LocalStore implements WeightedStore {
         final Map<StorageKey, Long> merged = new LinkedHashMap<>();
         for (final ItemStack disk : disks) {
             final long capacityWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM;
-            DiskStorageView.publicView(contentsOf(disk).items(), capacityWeight, DiskItem.publicPermille(disk))
+            DiskStorageView.publicView(DriveVolumes.peek(disk).items(), capacityWeight, DiskItem.publicPermille(disk))
                     .forEach((key, count) -> merged.merge(key, count, Long::sum));
         }
         return merged;
@@ -128,7 +143,7 @@ public final class LocalStore implements WeightedStore {
         long total = 0L;
         for (final ItemStack disk : disks) {
             final long capacityWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM;
-            total += DiskStorageView.publicWeight(contentsOf(disk).items(), capacityWeight,
+            total += DiskStorageView.publicWeight(DriveVolumes.peek(disk).items(), capacityWeight,
                     DiskItem.publicPermille(disk));
         }
         return total;
@@ -139,7 +154,7 @@ public final class LocalStore implements WeightedStore {
         final Map<StorageKey, Long> merged = new LinkedHashMap<>();
         for (final ItemStack disk : disks) {
             final long capacityWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM;
-            DiskStorageView.privateView(contentsOf(disk).items(), capacityWeight, DiskItem.publicPermille(disk))
+            DiskStorageView.privateView(DriveVolumes.peek(disk).items(), capacityWeight, DiskItem.publicPermille(disk))
                     .forEach((key, count) -> merged.merge(key, count, Long::sum));
         }
         return merged;
@@ -157,24 +172,21 @@ public final class LocalStore implements WeightedStore {
             if (taken >= amount) {
                 break;
             }
+            final StorageVolume volume = DriveVolumes.peek(disk);
+            if (volume.isEmpty()) {
+                continue;
+            }
             final long capacityWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM;
-            final ServerStorageContents contents = contentsOf(disk);
-            final long publicHave = DiskStorageView.publicView(contents.items(), capacityWeight,
+            final long publicHave = DiskStorageView.publicView(volume.items(), capacityWeight,
                     DiskItem.publicPermille(disk)).getOrDefault(key, 0L);
             if (publicHave <= 0L) {
                 continue;
             }
-            final long take = Math.min(amount - taken, publicHave);
-            final long have = contents.count(key);
-            final Map<StorageKey, Long> next = new HashMap<>(contents.items());
-            final long left = have - take;
-            if (left <= 0L) {
-                next.remove(key);
-            } else {
-                next.put(key, left);
+            final long got = volume.take(key, Math.min(amount - taken, publicHave));
+            if (got > 0L) {
+                DriveVolumes.refreshUsage(disk, volume);
+                taken += got;
             }
-            setContents(disk, next);
-            taken += take;
         }
         if (taken > 0L) {
             onChanged.run();
@@ -185,7 +197,7 @@ public final class LocalStore implements WeightedStore {
     public long count(final StorageKey key) {
         long total = 0L;
         for (final ItemStack disk : disks) {
-            total += contentsOf(disk).count(key);
+            total += DriveVolumes.peek(disk).count(key);
         }
         return total;
     }
@@ -196,19 +208,22 @@ public final class LocalStore implements WeightedStore {
         }
         final long unitWeight = key.weight(1L); // 1000 for an item, 1 per mB of fluid
         long remaining = amount;
-        for (final ItemStack disk : disks) {
+        for (final ItemStack disk : writeOrder()) {
             if (remaining <= 0L) {
                 break;
             }
-            final long roomWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM - contentsOf(disk).usedWeight();
-            final long roomNative = roomWeight / unitWeight;
+            final long capacityWeight = diskCapacity(disk) * StorageKey.MB_EQ_PER_ITEM;
+            if (capacityWeight <= 0L) {
+                continue;
+            }
+            final StorageVolume volume = DriveVolumes.of(disk);
+            final long roomNative = (capacityWeight - volume.usedWeight()) / unitWeight;
             if (roomNative <= 0L) {
                 continue;
             }
             final long put = Math.min(remaining, roomNative);
-            final Map<StorageKey, Long> next = new HashMap<>(contentsOf(disk).items());
-            next.merge(key, put, Long::sum);
-            setContents(disk, next);
+            volume.add(key, put);
+            DriveVolumes.refreshUsage(disk, volume);
             remaining -= put;
         }
         final long stored = amount - remaining;
@@ -227,21 +242,12 @@ public final class LocalStore implements WeightedStore {
             if (taken >= amount) {
                 break;
             }
-            final ServerStorageContents contents = contentsOf(disk);
-            final long have = contents.count(key);
-            if (have <= 0L) {
-                continue;
+            final StorageVolume volume = DriveVolumes.peek(disk);
+            final long got = volume.take(key, amount - taken);
+            if (got > 0L) {
+                DriveVolumes.refreshUsage(disk, volume);
+                taken += got;
             }
-            final long take = Math.min(amount - taken, have);
-            final Map<StorageKey, Long> next = new HashMap<>(contents.items());
-            final long left = have - take;
-            if (left <= 0L) {
-                next.remove(key);
-            } else {
-                next.put(key, left);
-            }
-            setContents(disk, next);
-            taken += take;
         }
         if (taken > 0L) {
             onChanged.run();

@@ -22,15 +22,10 @@ import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
 import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackBlock;
 import dev.jsc.jscomputronics.module.computing.block.ServerRackPartBlock;
-import dev.jsc.jscomputronics.module.computing.block.ServerRackStructure;
-import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodeBlock;
-import dev.jsc.jscomputronics.module.computing.block.SupercomputerNodePartBlock;
-import dev.jsc.jscomputronics.module.computing.blockentity.SupercomputerNodeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MonitorBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.DatacenterStationBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.ServerRouterBlockEntity;
 import dev.jsc.jscomputronics.module.computing.datacenter.DatacenterSection;
@@ -43,6 +38,7 @@ import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
+import dev.jsc.jscomputronics.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -753,12 +749,23 @@ public final class NetworkGameTests {
     public static void mainframe_buildPicksUpInstalledDisk(final GameTestHelper helper) {
         final BlockPos a = new BlockPos(2, 2, 2);
         final MainframeBlockEntity be = placeRunningMainframe(helper, a);
+        // Replace the disk installed by the setup helper with a larger one.
         be.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
         helper.startSequence()
-                .thenExecuteAfter(SETTLE, () -> helper.assertTrue(
-                        be.storageItems() == DiskSize.TB_1.capacityItems(),
-                        "build should report the installed disk's capacity; got " + be.storageItems()))
+                .thenExecuteAfter(SETTLE, () -> {
+                    // The installed OS (mc_net, 512-item footprint) reserves part of the disk;
+                    // the usable storage is the raw disk capacity minus the OS reservation.
+                    final long osFootprint = be.reservedByOs();
+                    final long expected = DiskSize.TB_1.capacityItems() - osFootprint;
+                    helper.assertTrue(
+                            be.storageItems() == expected,
+                            "build should report the installed disk's capacity net of the OS footprint"
+                                    + " (raw=" + DiskSize.TB_1.capacityItems()
+                                    + " footprint=" + osFootprint
+                                    + " expected=" + expected
+                                    + "); got " + be.storageItems());
+                })
                 .thenSucceed();
     }
 
@@ -775,7 +782,7 @@ public final class NetworkGameTests {
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                         Direction.EAST)); // cables attach through the rear (west side here)
         if (helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe) {
-            rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+            TestWorldBuilder.mountDefaultServer(rackBe, 0);
         } else {
             helper.fail("no server rack block entity placed");
         }
@@ -786,7 +793,7 @@ public final class NetworkGameTests {
                     final var servers = NetworkSystem.get(helper.getLevel()).serversOf(net);
                     helper.assertTrue(servers.size() == 1,
                             "the rack's Server should register on the mainframe network; got " + servers.size());
-                    helper.assertTrue(servers.get(0).storageMB() > 0,
+                    helper.assertTrue(servers.get(0).storageItems() > 0,
                             "registered Server should report its disk storage");
                 })
                 .thenExecute(() -> helper.setBlock(rack, Blocks.AIR)) // break the rack
@@ -822,7 +829,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     helper.assertTrue(helper.getBlockState(part).getBlock() instanceof ServerRackPartBlock,
@@ -845,56 +852,89 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
-    // Supercomputer Node (shares the Server Rack footprint; rides the shared multiblock lifecycle)
+    // Supercomputer Rack: the typed cabinet on the same foundation as the Server Rack
 
+    /**
+     * A typed cabinet seats only its own kind: a node is refused by a Server Rack and a server by a
+     * Supercomputer Rack, while rack equipment fits both. And a dismantled Supercomputer Rack hands back
+     * its own item, never a Server Rack.
+     */
     @GameTest(template = ARENA)
-    public static void supercomputerNode_formsAndDissolves(final GameTestHelper helper) {
-        final BlockPos controller = new BlockPos(4, 2, 2); // footprint x[4,5] y[2,4] z[2,3]
-        final BlockPos part = new BlockPos(4, 3, 2);       // a part, one up from the controller
-        final Direction facing = Direction.EAST;           // cables attach through the rear (west side here)
-        helper.setBlock(controller, ComputingModule.SUPERCOMPUTER_NODE.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, facing));
-        // Drive the self-assembly the way item placement would, so all 11 parts exist.
-        ((SupercomputerNodeBlock) ComputingModule.SUPERCOMPUTER_NODE.get()).setPlacedBy(
-                helper.getLevel(), helper.absolutePos(controller),
-                helper.getBlockState(controller), null, ItemStack.EMPTY);
-
+    public static void supercomputerRack_seatsOnlyNodesAndDropsItsOwnItem(final GameTestHelper helper) {
+        final BlockPos serverRack = new BlockPos(2, 2, 2);
+        final BlockPos scRack = new BlockPos(6, 2, 2);
+        helper.setBlock(serverRack, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(scRack, ComputingModule.SUPERCOMPUTER_RACK.get());
         helper.startSequence()
-                .thenExecuteAfter(SETTLE + 2, () -> helper.assertTrue(
-                        helper.getBlockState(part).getBlock() instanceof SupercomputerNodePartBlock,
-                        "placing the node must raise its structural parts"))
-                .thenExecute(() -> helper.setBlock(part, Blocks.AIR)) // break one part
                 .thenExecuteAfter(SETTLE, () -> {
-                    helper.assertTrue(helper.getBlockState(controller).isAir(),
-                            "breaking a part must take the controller down too");
-                    helper.assertTrue(helper.getBlockState(part).isAir(),
-                            "the broken part must be gone");
-                    helper.assertTrue(helper.getBlockState(new BlockPos(5, 4, 3)).isAir(),
-                            "the whole cabinet must dissolve, including the far-top-back corner");
+                    if (!(helper.getBlockEntity(serverRack) instanceof ServerRackBlockEntity server)
+                            || !(helper.getBlockEntity(scRack) instanceof ServerRackBlockEntity sc)) {
+                        throw new IllegalStateException("a cabinet is missing its block entity");
+                    }
+                    final ItemStack node = ComputingModule.defaultSupercomputerNode();
+                    final ItemStack plainServer = ComputingModule.defaultServer();
+                    final ItemStack kvm = new ItemStack(ComputingModule.KVM_SWITCH.get());
+                    helper.assertTrue(sc.rackType()
+                                    == dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SUPERCOMPUTER,
+                            "the typed cabinet reports its own kind");
+                    helper.assertTrue(sc.acceptsChassis(node), "a Supercomputer Rack seats a node");
+                    helper.assertTrue(!sc.acceptsChassis(plainServer), "a Supercomputer Rack refuses a server");
+                    helper.assertTrue(!server.acceptsChassis(node), "a Server Rack refuses a node");
+                    helper.assertTrue(server.acceptsChassis(kvm) && sc.acceptsChassis(kvm),
+                            "rack equipment fits every cabinet");
+                    helper.assertTrue(!sc.getServers().insertItem(0, plainServer, false).isEmpty(),
+                            "the slot itself must refuse the wrong chassis, not only the check");
+                    helper.assertTrue(sc.getServers().insertItem(0, node, false).isEmpty(),
+                            "the slot takes a node");
                 })
                 .thenSucceed();
     }
 
+    /**
+     * The HBW Interface finds its nodes inside Supercomputer Racks on the high-compute fabric: each
+     * seated node is a cluster slot, rated by the co-processor it carries, and the interface's parallel
+     * craft budget is the sum of the slots it can actually use.
+     */
     @GameTest(template = ARENA)
-    public static void supercomputerNode_teardownDropsNothing(final GameTestHelper helper) {
-        final BlockPos controller = new BlockPos(4, 2, 2);
-        final Direction facing = Direction.EAST;
-        helper.setBlock(controller, ComputingModule.SUPERCOMPUTER_NODE.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, facing));
-        ((SupercomputerNodeBlock) ComputingModule.SUPERCOMPUTER_NODE.get()).setPlacedBy(
-                helper.getLevel(), helper.absolutePos(controller),
-                helper.getBlockState(controller), null, ItemStack.EMPTY);
-        if (helper.getBlockEntity(controller) instanceof SupercomputerNodeBlockEntity node) {
-            node.getHardware().setStackInSlot(0, new ItemStack(Items.IRON_INGOT)); // installed hardware
+    public static void hbwInterface_discoversNodesSeatedInRacks(final GameTestHelper helper) {
+        final BlockPos hub = new BlockPos(2, 2, 2);
+        final BlockPos cable = hub.east();
+        final BlockPos rackPos = cable.above(); // a leaf on the fabric, kept inside the arena
+        helper.setBlock(hub, ComputingModule.HBW_INTERFACE.get());
+        helper.setBlock(cable, ComputingModule.HPC_CABLE.get());
+        helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
+        if (helper.getBlockEntity(rackPos) instanceof ServerRackBlockEntity rack) {
+            rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
+            rack.getServers().setStackInSlot(2, ComputingModule.defaultSupercomputerNode());
         } else {
-            helper.fail("no supercomputer node block entity placed");
+            helper.fail("no Supercomputer Rack block entity placed");
             return;
         }
         helper.startSequence()
-                .thenExecuteAfter(2, () -> helper.setBlock(
-                        ServerRackStructure.partPositions(controller, facing).get(0), Blocks.AIR))
-                .thenExecuteAfter(2, () -> helper.assertTrue(droppedItems(helper, controller) == 0,
-                        "dissolving the node must not drop the node or its hardware (creative-safe teardown)"))
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    if (!(helper.getBlockEntity(hub)
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity hbw)) {
+                        throw new IllegalStateException("no HBW Interface block entity");
+                    }
+                    final var slots = hbw.clusterSlots();
+                    helper.assertTrue(slots.size() == 2,
+                            "two seated nodes are two cluster slots; got " + slots.size());
+                    helper.assertTrue(slots.get(0).node().equals(helper.absolutePos(rackPos))
+                                    && slots.get(0).row() == 0 && slots.get(1).row() == 2,
+                            "slots point at the rack and the rows the nodes occupy");
+                    // Two Phi 5100 fill slots 1 and 2: 8 + 16 parallel crafts.
+                    helper.assertTrue(hbw.parallelCrafts() == 24,
+                            "the budget sums the rated slots; got " + hbw.parallelCrafts());
+                    // Switch the second node's bay off: its slot goes dark and the budget drops.
+                    ((ServerRackBlockEntity) helper.getBlockEntity(rackPos)).toggleBayPower(2);
+                })
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    if (helper.getBlockEntity(hub)
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity hbw) {
+                        helper.assertTrue(hbw.parallelCrafts() == 8,
+                                "a node whose bay is off contributes nothing; got " + hbw.parallelCrafts());
+                    }
+                })
                 .thenSucceed();
     }
 
@@ -912,7 +952,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
@@ -957,7 +997,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         final dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[] op =
                 new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[1];
@@ -1006,7 +1046,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         final dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[] op =
                 new dev.jsc.jscomputronics.module.computing.operation.NetworkSelectOperation[1];
@@ -1055,7 +1095,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
@@ -1083,7 +1123,8 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, smallDiskServer());
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.SSD, DiskSize.GB_500)));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
@@ -1096,46 +1137,6 @@ public final class NetworkGameTests {
                             "network should hold exactly 2,000; got " + ns.count(Items.COBBLESTONE));
                 })
                 .thenSucceed();
-    }
-
-    private static ItemStack bigDiskServer() {
-        final net.minecraft.core.NonNullList<ItemStack> hw = net.minecraft.core.NonNullList.withSize(
-                dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.SLOTS, ItemStack.EMPTY);
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.MOBO,
-                new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.CPU_START,
-                new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.RAM_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.PSU,
-                new ItemStack(ComputingModule.PSU_650G.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
-                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START + 1,
-                new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
-        final ItemStack server = new ItemStack(ComputingModule.SERVER.get());
-        server.set(ComputingModule.SERVER_HARDWARE.get(),
-                net.minecraft.world.item.component.ItemContainerContents.fromItems(hw));
-        return server;
-    }
-
-    private static ItemStack smallDiskServer() {
-        final net.minecraft.core.NonNullList<ItemStack> hw = net.minecraft.core.NonNullList.withSize(
-                dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.SLOTS, ItemStack.EMPTY);
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.MOBO,
-                new ItemStack(ComputingModule.MOTHERBOARD_EEB_P.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.CPU_START,
-                new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.RAM_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.PSU,
-                new ItemStack(ComputingModule.PSU_650G.get()));
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.DISK_START,
-                new ItemStack(ComputingModule.disk(StorageTier.SSD, DiskSize.GB_500)));
-        final ItemStack server = new ItemStack(ComputingModule.SERVER.get());
-        server.set(ComputingModule.SERVER_HARDWARE.get(),
-                net.minecraft.world.item.component.ItemContainerContents.fromItems(hw));
-        return server;
     }
 
     @GameTest(template = ARENA)
@@ -1152,7 +1153,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
@@ -1190,7 +1191,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     // Seed the Server with 200 cobblestone.
@@ -1232,7 +1233,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
@@ -1245,9 +1246,10 @@ public final class NetworkGameTests {
                             "whoami should report the computer kind");
                     helper.assertTrue(cliContains(shell.run("status", cli), "ONLINE"),
                             "status should report the running computer as online");
-                    helper.assertTrue(cliContains(shell.run("operation query", cli), "cobblestone"),
-                            "operation query should list the network's cobblestone");
-                    helper.assertTrue(cliContains(shell.run("operation query diamond", cli), "no rows"),
+                    helper.assertTrue(cliContains(shell.run("operation query items", cli), "cobblestone"),
+                            "operation query items should list the network's cobblestone");
+                    helper.assertTrue(
+                            cliContains(shell.run("operation query items WHERE name contains diamond", cli), "no rows"),
                             "operation query with a non-matching filter should say so");
                     helper.assertTrue(cliContains(shell.run("operation select 50 cobblestone", cli), "SELECT queued"),
                             "operation select should queue an operation through the network");
@@ -1258,7 +1260,7 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
-    public static void nms_runsParsedSqlAgainstTheNetwork(final GameTestHelper helper) {
+    public static void nms_runsParsedIqlAgainstTheNetwork(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hbw = new BlockPos(2, 2, 2);
         final BlockPos router = new BlockPos(3, 2, 2);
@@ -1276,27 +1278,155 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
                     final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
                             (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer,
                             helper.getLevel());
-                    final var dialect = dev.jsc.jscomputronics.module.computing.program.sql.SqlDialect.STANDARD;
-
-                    final var read = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
-                            "SELECT * FROM network", dialect);
+                    final var read = dev.jsc.jscomputronics.module.computing.program.iql.IqlParser.tryParse(
+                            "QUERY items");
                     helper.assertTrue(read.ok(), "the read statement must parse");
-                    helper.assertFalse(cli.query(read.operation().item(), read.operation().source(), 64).isEmpty(),
-                            "SELECT * must return the network's rows");
+                    helper.assertFalse(cli.queryObject("items", null, "", 64).isEmpty(),
+                            "QUERY items must return the network's rows");
+                    helper.assertFalse(cli.queryObject("servers", null, "", 64).isEmpty(),
+                            "QUERY servers must list the rack's server");
 
-                    final var pull = dev.jsc.jscomputronics.module.computing.program.sql.SqlParser.parse(
-                            "SELECT 50 FROM network WHERE item = 'cobblestone'", dialect);
+                    final var selectAll = dev.jsc.jscomputronics.module.computing.program.iql.IqlParser.tryParse(
+                            "SELECT *");
+                    helper.assertTrue(selectAll.ok(), "SELECT * must parse");
+                    helper.assertTrue(cli.execute(selectAll.operation()).ok(),
+                            "SELECT * must queue an extraction for every item type");
+
+                    final var pull = dev.jsc.jscomputronics.module.computing.program.iql.IqlParser.tryParse(
+                            "SELECT 50 cobblestone");
                     helper.assertTrue(pull.ok(), "the pull statement must parse");
                     helper.assertTrue(cli.execute(pull.operation()).ok(),
                             "executing the pull must queue an operation");
+
+                    // The Object Explorer snapshot must mirror the real network, not a static example tree.
+                    final var schema = dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                            .nmsSchema(helper.getLevel(),
+                                    (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer);
+                    helper.assertTrue(schema.networkLabel().startsWith("jsc-net-"),
+                            "the Object Explorer must show the real network label");
+                    helper.assertFalse(schema.servers().isEmpty(),
+                            "the Object Explorer must list the rack's real server");
+                    helper.assertTrue(schema.itemTypes() >= 1,
+                            "the Object Explorer must count the network's item types");
                 })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iqlEngine_storesAndRunsSavedObjects(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos eth = new BlockPos(4, 2, 2);
+        final BlockPos pc = new BlockPos(5, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
+        helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
+        final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+        final var viewType = dev.jsc.jscomputronics.module.computing.program.iql.IqlDefinition.ObjectType.VIEW;
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
+                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer,
+                            helper.getLevel());
+                    // 'install iqlengine' (the normal install command) installs the Engine service on the Mainframe.
+                    helper.assertTrue(cli.install("iqlengine").ok(),
+                            "'install iqlengine' must install the Engine on the Mainframe");
+                    helper.assertTrue(mainframe.isIqlEngineInstalled(),
+                            "the Engine must be installed after 'install iqlengine'");
+                    helper.assertTrue(cli.iqlEngineInstalled(),
+                            "the computer must report the Engine installed");
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(
+                            mainframe, cli, 64);
+
+                    helper.assertTrue(engine.run("CREATE VIEW stock AS QUERY items").ok(),
+                            "CREATE VIEW must succeed");
+                    helper.assertTrue(mainframe.iqlCatalog().contains(viewType, "stock"),
+                            "the catalog must hold the created view");
+
+                    // The NMS Object Explorer snapshot must reflect the real catalog, not mock examples.
+                    final var schema = dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                            .nmsSchema(helper.getLevel(),
+                                    (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) computer);
+                    helper.assertTrue(schema.engine().views().contains("stock"),
+                            "the NMS Object Explorer must list the created view");
+                    helper.assertTrue("running".equals(schema.engine().state()),
+                            "the NMS must show the Engine as running");
+
+                    final var query = engine.run("QUERY stock");
+                    helper.assertTrue(query.ok(), "QUERY <view> must run the saved query: " + query.message());
+                    helper.assertFalse(query.rows().isEmpty(), "QUERY <view> must return the network's rows");
+
+                    // QUERY * returns every item; the full WHERE really filters by qty now (cobblestone = 200).
+                    helper.assertFalse(engine.run("QUERY *").rows().isEmpty(), "QUERY * must return all items");
+                    helper.assertFalse(engine.run("QUERY items WHERE qty > 100").rows().isEmpty(),
+                            "WHERE qty > 100 must keep the 200 cobblestone");
+                    helper.assertTrue(engine.run("QUERY items WHERE qty > 1000").rows().isEmpty(),
+                            "WHERE qty > 1000 must filter out the 200 cobblestone");
+
+                    helper.assertTrue(engine.run("CREATE PROCEDURE refresh AS { QUERY items; QUERY servers }").ok(),
+                            "CREATE PROCEDURE must succeed");
+                    helper.assertTrue(engine.run("EXEC refresh").ok(),
+                            "EXEC must run the procedure's statements in order");
+
+                    // Gate: a stopped Engine rejects definitions; ad-hoc actions are unaffected.
+                    mainframe.setIqlEngineRunning(false);
+                    helper.assertFalse(engine.run("CREATE VIEW v2 AS QUERY items").ok(),
+                            "a CREATE must fail when the Engine is stopped");
+                    mainframe.setIqlEngineRunning(true);
+
+                    helper.assertTrue(engine.run("DROP VIEW stock").ok(), "DROP VIEW must succeed");
+                    helper.assertFalse(mainframe.iqlCatalog().contains(viewType, "stock"),
+                            "the view must be gone after DROP");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iqlJobAgent_firesScheduledJobs(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbw = new BlockPos(2, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(hbw, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 8, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 1_000_000L);
+                    mainframe.installIqlEngine();
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                                    mainframe, helper.getLevel()), 64);
+                    // EVERY 1t: the agent (evaluating every 10 ticks) fires this within a couple of evaluations.
+                    helper.assertTrue(engine.run("CREATE JOB drainer AS DROP 100 cobblestone EVERY 1t").ok(),
+                            "CREATE JOB must succeed");
+                })
+                .thenExecuteAfter(60, () -> helper.assertTrue(
+                        mainframe.completedOps() > 0 || !mainframe.recentOperations().isEmpty(),
+                        "the EVERY job must have fired its DROP operation by now"))
                 .thenSucceed();
     }
 
@@ -1331,7 +1461,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
@@ -1384,7 +1514,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 2_500);
@@ -1422,7 +1552,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     final NetworkUuid net = mainframe.networkUuid();
@@ -1491,8 +1621,12 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     final long capacityBefore = be.capacity();
                     final long storageBefore = be.storageItems();
-                    helper.assertTrue(storageBefore == DiskSize.TB_1.capacityItems(),
-                            "build should report the installed disk's capacity before reload; got " + storageBefore);
+                    // The OS (installed by the setup helper) reserves part of the disk; the usable storage is
+                    // the raw disk capacity minus the OS footprint.
+                    final long expectedStorage = DiskSize.TB_1.capacityItems() - be.reservedByOs();
+                    helper.assertTrue(storageBefore == expectedStorage,
+                            "build should report the disk's capacity net of the OS footprint before reload; got "
+                                    + storageBefore + " expected " + expectedStorage);
 
                     final var registries = helper.getLevel().registryAccess();
                     final net.minecraft.nbt.CompoundTag saved = be.saveWithFullMetadata(registries);
@@ -1534,7 +1668,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         // Import Bus part on the east face of the cable end, facing a barrel of cobblestone.
         final BlockPos cableEnd = new BlockPos(4, 2, 2);
@@ -1563,6 +1697,61 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void importBus_flushConservation(final GameTestHelper helper) {
+        // Break the cable while items are in the "flushed" state (extracted from source,
+        // INSERT dispatched but not yet settled) and verify nothing is silently discarded.
+        // Items must be conserved: either in network storage (if INSERT completed first)
+        // or dropped as entities at the cable position (if INSERT was still in flight).
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack at " + rack);
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            cable.addPart(Direction.EAST, new ImportBusPart());
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, Blocks.BARREL);
+        if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container container) {
+            container.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+        }
+
+        // After SETTLE the network is live and extraction starts. FLUSH_TICKS (20) later the bus
+        // dispatches an INSERT; the HDD's disk-seek latency (10 ticks) means the INSERT is still
+        // in flight at tick SETTLE+22. Breaking the cable at that point exercises the dropContents
+        // path for in-flight flushes — items must not vanish.
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 22, () -> helper.destroyBlock(cableEnd))
+                .thenExecuteAfter(SETTLE, () -> {
+                    final long inNetwork = mainframe.networkUuid() != null
+                            ? NetworkStorage.of(helper.getLevel(), mainframe.networkUuid()).count(Items.COBBLESTONE)
+                            : 0L;
+                    final long inWorld = helper.getLevel().getEntitiesOfClass(
+                                    net.minecraft.world.entity.item.ItemEntity.class,
+                                    new net.minecraft.world.phys.AABB(helper.absolutePos(cableEnd)).inflate(6.0))
+                            .stream()
+                            .filter(e -> e.getItem().is(Items.COBBLESTONE))
+                            .mapToLong(e -> e.getItem().getCount())
+                            .sum();
+                    helper.assertTrue(inNetwork + inWorld > 0L,
+                            "cobblestone must not be silently discarded: inNetwork=" + inNetwork
+                                    + " inWorld=" + inWorld);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void exportBus_movesNetworkItemsIntoChest(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
@@ -1577,7 +1766,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         // Export Bus part on the east face of the cable end, facing a barrel.
         final BlockPos cableEnd = new BlockPos(4, 2, 2);
@@ -1616,6 +1805,191 @@ public final class NetworkGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void importBus_filterImportsOnlyThatType(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            final ImportBusPart bus = new ImportBusPart();
+            cable.addPart(Direction.EAST, bus);
+            bus.setFilter(new ItemStack(Items.COBBLESTONE)); // import only cobblestone, leave the dirt
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container c) {
+                        c.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+                        c.setItem(1, new ItemStack(Items.DIRT, 64));
+                    }
+                })
+                .thenExecuteAfter(80, () -> {
+                    final long cobble = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    final long dirt = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.DIRT);
+                    helper.assertTrue(cobble > 0L, "the filtered import must pull cobblestone; got " + cobble);
+                    helper.assertTrue(dirt == 0L, "the filter must leave dirt in the barrel; net dirt=" + dirt);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iql_deleteToNamedBusExports(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            final ExportBusPart bus = new ExportBusPart();
+            cable.addPart(Direction.EAST, bus);
+            bus.setName("out"); // no filter, so it never auto-exports; the query drives it by name
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () ->
+                        rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))
+                .thenExecuteAfter(10, () -> {
+                    // Run the export only after the network has indexed the server's stock.
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(mainframe,
+                                    helper.getLevel()), 64);
+                    final var outcome = engine.run("DELETE cobblestone TO out");
+                    helper.assertTrue(outcome.ok(), "DELETE TO a named bus should be accepted: " + outcome.message());
+                })
+                .thenExecuteAfter(40, () -> {
+                    long inBarrel = 0L;
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container c) {
+                        for (int i = 0; i < c.getContainerSize(); i++) {
+                            if (c.getItem(i).is(Items.COBBLESTONE)) {
+                                inBarrel += c.getItem(i).getCount();
+                            }
+                        }
+                    }
+                    helper.assertTrue(inBarrel > 0L, "DELETE TO a named bus must export into its inventory; got " + inBarrel);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void iql_insertFromNamedBusImports(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(3, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(new BlockPos(4, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+        final BlockPos cableEnd = new BlockPos(4, 2, 2);
+        if (helper.getBlockEntity(cableEnd) instanceof DataCableBlockEntity cable) {
+            final ImportBusPart bus = new ImportBusPart();
+            cable.addPart(Direction.EAST, bus);
+            bus.setName("in");
+            bus.toggleMode(); // redstone mode: with no signal it never auto-imports, so the query drives it
+        }
+        final BlockPos barrel = new BlockPos(5, 2, 2);
+        helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    if (helper.getBlockEntity(barrel) instanceof net.minecraft.world.Container c) {
+                        c.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+                    }
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(mainframe,
+                                    helper.getLevel()), 64);
+                    final var outcome = engine.run("INSERT cobblestone FROM in");
+                    helper.assertTrue(outcome.ok(), "INSERT FROM a named bus should be accepted: " + outcome.message());
+                })
+                .thenExecuteAfter(80, () -> {
+                    final long net = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(net > 0L, "INSERT FROM a named bus must import into the network; got " + net);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void job_pausePreventsFiringUntilRestart(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos rack = new BlockPos(2, 2, 3);
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
+        helper.setBlock(new BlockPos(2, 2, 2), ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, Direction.SOUTH));
+        if (!(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
+            helper.fail("no server rack");
+            return;
+        }
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 1000);
+                    mainframe.installIqlEngine();
+                    final var engine = new dev.jsc.jscomputronics.module.computing.program.IqlEngine(mainframe,
+                            new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(mainframe,
+                                    helper.getLevel()), 64);
+                    engine.run("CREATE JOB killer AS DROP 64 cobblestone EVERY 5t");
+                    mainframe.pauseJob("killer"); // paused from the start, so it must never fire
+                })
+                .thenExecuteAfter(40, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left == 1000L, "a paused job must not fire; cobblestone left=" + left);
+                    mainframe.restartJob("killer"); // resume + re-arm
+                })
+                .thenExecuteAfter(40, () -> {
+                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
+                            .count(Items.COBBLESTONE);
+                    helper.assertTrue(left < 1000L, "a restarted job must fire again; cobblestone left=" + left);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void nmsScript_travelsInSchemaSnapshot(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, new BlockPos(1, 2, 2));
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 6, () -> {
+                    mainframe.installIqlEngine();
+                    mainframe.setSavedScript("QUERY items WHERE qty > 10");
+                    final var schema = dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads
+                            .nmsSchema(helper.getLevel(), mainframe);
+                    helper.assertTrue("QUERY items WHERE qty > 10".equals(schema.engine().script()),
+                            "the saved script must travel in the schema snapshot; got: '"
+                                    + schema.engine().script() + "'");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void insert_abandonsCleanlyOnPowerOff(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos rack = new BlockPos(2, 2, 3); // behind the cable (rear-only connection)
@@ -1630,7 +2004,9 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, bigDiskServer());
+        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
+        rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
 
         // A large INSERT: far beyond one tick of the server's RAM-bounded write rate, so it is
         // certainly still in flight when power is cut a few ticks in.
@@ -1681,7 +2057,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         // A large pull into a roomy sink, so it spans many ticks (it cannot finish before we cut it).
         final long seeded = 8_000L;
@@ -1739,7 +2115,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
@@ -1778,8 +2154,8 @@ public final class NetworkGameTests {
                             PersonalComputerBlockEntity.DISK_SLOTS_START, 1, false);
                     helper.assertFalse(disk.isEmpty(), "the disk should come out");
                     // The items travel WITH the disk; local storage is empty without it.
-                    final var contents = disk.get(ComputingModule.DISK_STORAGE.get());
-                    helper.assertTrue(contents != null && contents.count(Items.COBBLESTONE) == 100L,
+                    final var contents = dev.jsc.jscomputronics.module.computing.storage.DriveVolumes.contents(disk);
+                    helper.assertTrue(contents.count(Items.COBBLESTONE) == 100L,
                             "the pulled disk must carry its 100 cobblestone");
                     helper.assertTrue(computer.localStore().used() == 0L,
                             "local storage is empty once the disk is removed; got " + computer.localStore().used());
@@ -1802,7 +2178,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         final ItemStack named = new ItemStack(Items.DIAMOND_SWORD);
         named.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
@@ -1878,7 +2254,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 40))
@@ -1918,7 +2294,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         final BlockPos barrel = new BlockPos(4, 2, 2);
         helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
 
@@ -1975,7 +2351,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         final dev.jsc.jscomputronics.module.computing.operation.NetworkInsertOperation[] op = {null};
 
@@ -2010,7 +2386,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> {
@@ -2070,7 +2446,7 @@ public final class NetworkGameTests {
             helper.fail("no server rack");
             return;
         }
-        rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
+        TestWorldBuilder.mountDefaultServer(rackBe, 0);
         final BlockPos barrel = new BlockPos(4, 2, 2);
         helper.setBlock(barrel, net.minecraft.world.level.block.Blocks.BARREL);
 
@@ -2138,12 +2514,10 @@ public final class NetworkGameTests {
 
     // Helpers
 
-    private static MainframeBlockEntity placeRunningMainframe(final GameTestHelper helper, final BlockPos relative) {
-        helper.setBlock(relative, ComputingModule.MAINFRAME.get());
-        final MainframeBlockEntity be = mainframeAt(helper, relative);
-        installValidBuild(be);
-        be.togglePower(); // valid build never powers on by itself
-        return be;
+    // Package-private so the performance benchmarks (PerformanceGameTests) can reuse the same powered-up
+    // Mainframe setup without duplicating the hardware-install plumbing.
+    static MainframeBlockEntity placeRunningMainframe(final GameTestHelper helper, final BlockPos relative) {
+        return TestWorldBuilder.forGameTest(helper).placeRunningMainframe(relative);
     }
 
     private static MainframeBlockEntity formRunningMainframe(final GameTestHelper helper,
@@ -2335,6 +2709,108 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    /**
+     * Every supercomputer runs its own queue: a craft asks the online supercomputer with the most free
+     * slots, so a second supercomputer takes work while the first is full instead of idling behind it.
+     */
+    @GameTest(template = ARENA)
+    public static void supercomputers_craftsGoToTheOneWithRoom(final GameTestHelper helper) {
+        // A cluster is online only on a network: one Mainframe feeds a bandwidth cable along z=2, and each
+        // interface hangs off it to the south with its own fabric (HPC cable + rack) further south, far
+        // enough apart that the two fabrics never touch.
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hubA = new BlockPos(3, 2, 3);
+        final BlockPos hubB = new BlockPos(6, 2, 3);
+        placeRunningMainframe(helper, m);
+        for (int x = 2; x <= 6; x++) {
+            helper.setBlock(new BlockPos(x, 2, 2), ComputingModule.HBW_CABLE.get());
+        }
+        for (final BlockPos hub : new BlockPos[]{hubA, hubB}) {
+            final BlockPos cable = hub.south();
+            final BlockPos rackPos = cable.above();
+            helper.setBlock(hub, ComputingModule.HBW_INTERFACE.get());
+            helper.setBlock(cable, ComputingModule.HPC_CABLE.get());
+            helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
+            if (helper.getBlockEntity(rackPos) instanceof ServerRackBlockEntity rack) {
+                rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
+            }
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    if (!(helper.getBlockEntity(hubA)
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity a)
+                            || !(helper.getBlockEntity(hubB)
+                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity b)) {
+                        throw new IllegalStateException("an HBW Interface is missing its block entity");
+                    }
+                    helper.assertTrue(a.parallelCrafts() == 8 && b.parallelCrafts() == 8,
+                            "each cluster rates one slot of 8 crafts; got " + a.parallelCrafts() + "/" + b.parallelCrafts());
+                    helper.assertTrue(a.clusterOnline() && b.clusterOnline(),
+                            "both clusters are online on the Mainframe's network");
+                    final var both = java.util.List.of(a, b);
+                    // Fill A completely: the next craft must be sent to B, not left waiting on A.
+                    a.acquireCraftSlots(java.util.UUID.randomUUID(), 8);
+                    helper.assertTrue(dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                                    .chooseLeastLoaded(both) == b,
+                            "with A full, the craft goes to B");
+                    // Free A: it is back to the most room, so it is chosen again (ties go to the first).
+                    a.acquireCraftSlots(java.util.UUID.randomUUID(), 0);
+                    b.acquireCraftSlots(java.util.UUID.randomUUID(), 3);
+                    helper.assertTrue(dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation
+                                    .chooseLeastLoaded(both) == a || a.craftSlotsInUse() == 8,
+                            "the emptier supercomputer wins");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * A datacenter is made of Server Racks. The router's branch walk follows any data cable, the
+     * high-compute fabric included, so a Supercomputer Rack it reaches that way must still not become a
+     * section member — while a Server Rack on another face forms its section as usual.
+     */
+    @GameTest(template = ARENA)
+    public static void serverRouter_ignoresSupercomputerRacks(final GameTestHelper helper) {
+        final BlockPos m = new BlockPos(1, 2, 2);
+        final BlockPos hbwIn = new BlockPos(2, 2, 2);
+        final BlockPos router = new BlockPos(3, 2, 2);
+        final BlockPos hpcEast = new BlockPos(4, 2, 2);
+        final BlockPos scRack = new BlockPos(5, 2, 2);
+        final BlockPos hbwSouth = new BlockPos(3, 2, 3);
+        final BlockPos rackSouth = new BlockPos(3, 2, 4);
+        placeRunningMainframe(helper, m);
+        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
+        helper.setBlock(hpcEast, ComputingModule.HPC_CABLE.get());
+        helper.setBlock(scRack, ComputingModule.SUPERCOMPUTER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.EAST)); // rear faces the fabric cable to the west
+        if (helper.getBlockEntity(scRack) instanceof ServerRackBlockEntity sc) {
+            sc.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
+        }
+        helper.setBlock(hbwSouth, ComputingModule.HBW_CABLE.get());
+        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get().defaultBlockState()
+                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
+                        Direction.SOUTH)); // rear faces the section cable to the north
+        seedServer(helper, rackSouth);
+        if (!(helper.getBlockEntity(router) instanceof ServerRouterBlockEntity routerBe)) {
+            helper.fail("no server router");
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, routerBe::recomputeNow)
+                .thenExecute(() -> {
+                    final java.util.List<DatacenterSection> sections = routerBe.sections();
+                    helper.assertTrue(sections.size() == 1,
+                            "only the Server Rack forms a section; got " + sections.size());
+                    helper.assertTrue(sections.get(0).face() == Direction.SOUTH,
+                            "the section is the Server Rack's, not the supercomputer's; got "
+                                    + sections.get(0).face());
+                })
+                .thenSucceed();
+    }
+
     @GameTest(template = ARENA)
     public static void serverRouter_removalSplitsNetworkAndUnregisters(final GameTestHelper helper) {
         final BlockPos m = new BlockPos(1, 2, 2);
@@ -2396,125 +2872,47 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
+    /**
+     * The write a player actually makes is one stack, and it must be shared out — a batch of a whole stack
+     * put all 64 on the first server, so the setting looked dead however it was set. A run of single items
+     * has to move down the row too, which is what the rotation is for.
+     */
     @GameTest(template = ARENA)
-    public static void datacenterStation_bindsSectionAndSeesServers(final GameTestHelper helper) {
-        final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos hbwIn = new BlockPos(2, 2, 2);
-        final BlockPos router = new BlockPos(3, 2, 2);
-        final BlockPos hbwEast = new BlockPos(4, 2, 2);
-        final BlockPos rack = new BlockPos(5, 2, 2);
-        final BlockPos station = new BlockPos(2, 3, 2); // on top of the input cable, on the network
-        placeRunningMainframe(helper, m);
-        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
-        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.EAST)); // cables attach through the rear (west side here)
-        seedServer(helper, rack);
-        helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
-        if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)) {
-            helper.fail("no datacenter station");
+    public static void loadBalancer_roundRobinSplitsOneStackAndTakesTurns(final GameTestHelper helper) {
+        final BlockPos rackA = new BlockPos(2, 2, 2);
+        final BlockPos rackB = new BlockPos(4, 2, 2);
+        helper.setBlock(rackA, ComputingModule.SERVER_RACK.get());
+        helper.setBlock(rackB, ComputingModule.SERVER_RACK.get());
+        seedServer(helper, rackA);
+        seedServer(helper, rackB);
+        if (!(helper.getBlockEntity(rackA) instanceof ServerRackBlockEntity a)
+                || !(helper.getBlockEntity(rackB) instanceof ServerRackBlockEntity b)) {
+            helper.fail("no server racks");
             return;
         }
         helper.startSequence()
-                .thenExecuteAfter(SETTLE + 4, () -> {
-                    st.ensureBound();
-                    helper.assertTrue(st.network() != null, "the Station reads its segment's network");
-                    helper.assertTrue(st.section() != null, "the Station binds to the router's section");
-                    helper.assertTrue(st.sectionServers().size() == 1,
-                            "the bound section sees its one Server; got " + st.sectionServers().size());
-                })
-                .thenSucceed();
-    }
-
-    @GameTest(template = ARENA)
-    public static void datacenterStation_bindsTheBranchItSitsOn(final GameTestHelper helper) {
-        final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos hbwIn = new BlockPos(2, 2, 2);
-        final BlockPos router = new BlockPos(3, 2, 2);
-        final BlockPos hbwEast = new BlockPos(4, 2, 2);
-        final BlockPos rackEast = new BlockPos(5, 2, 2);
-        final BlockPos hbwSouth = new BlockPos(3, 2, 3);
-        final BlockPos rackSouth = new BlockPos(3, 2, 4);
-        final BlockPos station = new BlockPos(4, 3, 2); // touching the EAST branch cable
-        placeRunningMainframe(helper, m);
-        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
-        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rackEast, ComputingModule.SERVER_RACK.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.EAST)); // rear faces the section cable to the west
-        helper.setBlock(hbwSouth, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rackSouth, ComputingModule.SERVER_RACK.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.SOUTH)); // rear faces the section cable to the north
-        seedServer(helper, rackEast);
-        seedServer(helper, rackSouth);
-        helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
-        if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)) {
-            helper.fail("no datacenter station");
-            return;
-        }
-        helper.startSequence()
-                .thenExecuteAfter(SETTLE + 4, () -> {
-                    st.ensureBound();
-                    final DatacenterSection bound = st.section();
-                    helper.assertTrue(bound != null, "the Station binds a section");
-                    helper.assertTrue(bound.face() == Direction.EAST,
-                            "the Station must bind the branch it is cabled into (EAST); got " + bound.face());
-                })
-                .thenSucceed();
-    }
-
-    @GameTest(template = ARENA)
-    public static void datacenterStation_sectionScopedSelectPulls(final GameTestHelper helper) {
-        final BlockPos m = new BlockPos(1, 2, 2);
-        final BlockPos hbwIn = new BlockPos(2, 2, 2);
-        final BlockPos router = new BlockPos(3, 2, 2);
-        final BlockPos hbwEast = new BlockPos(4, 2, 2);
-        final BlockPos rack = new BlockPos(5, 2, 2);
-        final BlockPos station = new BlockPos(2, 3, 2);
-        final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
-        helper.setBlock(hbwIn, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(router, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.EAST)); // back (the uplink) faces the Mainframe cable to the west
-        helper.setBlock(hbwEast, ComputingModule.HBW_CABLE.get());
-        helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
-                .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
-                        Direction.EAST)); // cables attach through the rear (west side here)
-        seedServer(helper, rack);
-        helper.setBlock(station, ComputingModule.DATACENTER_STATION.get());
-        if (!(helper.getBlockEntity(station) instanceof DatacenterStationBlockEntity st)
-                || !(helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe)) {
-            helper.fail("missing station or rack");
-            return;
-        }
-        helper.startSequence()
-                .thenExecuteAfter(SETTLE + 4, () -> {
-                    rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 100);
-                    st.ensureBound();
-                })
-                .thenExecuteAfter(2, () -> {
-                    final java.util.Set<dev.jsc.jscomputronics.common.uuid.NodeUuid> sources =
-                            new java.util.HashSet<>(st.sectionServers());
-                    helper.assertTrue(!sources.isEmpty(), "the section resolves its Servers");
-                    final ItemStackHandler dest = new ItemStackHandler(9);
-                    final var op = mainframe.submitNetworkSelect(StorageKey.of(Items.COBBLESTONE), 40L,
-                            new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(dest, null),
-                            "datacenter", sources);
-                    helper.assertTrue(op != null, "the section-scoped SELECT is dispatched");
-                })
-                .thenExecuteAfter(10, () -> {
-                    final long left = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid())
-                            .count(Items.COBBLESTONE);
-                    helper.assertTrue(left == 60L,
-                            "the section-scoped SELECT pulled 40 from the section; left " + left);
+                .thenExecuteAfter(SETTLE, () -> {
+                    final ServerStore sa = a.getServerStorage(0);
+                    final ServerStore sb = b.getServerStorage(0);
+                    final StorageKey key = StorageKey.of(Items.COBBLESTONE);
+                    helper.assertTrue(LoadBalancer.insert(java.util.List.of(sa, sb), key, 64L,
+                            LoadBalanceMode.ROUND_ROBIN) == 64L, "one stack is stored whole");
+                    helper.assertTrue(sa.count(Items.COBBLESTONE) == 32L && sb.count(Items.COBBLESTONE) == 32L,
+                            "one stack splits across the servers (32/32); got "
+                                    + sa.count(Items.COBBLESTONE) + "/" + sb.count(Items.COBBLESTONE));
+                    // Single items, one write each: the rotation must land them on alternate servers.
+                    final StorageKey dirt = StorageKey.of(Items.DIRT);
+                    for (int i = 0; i < 4; i++) {
+                        LoadBalancer.insert(java.util.List.of(sa, sb), dirt, 1L, LoadBalanceMode.ROUND_ROBIN, i);
+                    }
+                    helper.assertTrue(sa.count(Items.DIRT) == 2L && sb.count(Items.DIRT) == 2L,
+                            "four single deposits alternate (2/2); got "
+                                    + sa.count(Items.DIRT) + "/" + sb.count(Items.DIRT));
+                    // Manual is the one mode that deliberately fills in order, top server first.
+                    final StorageKey sand = StorageKey.of(Items.SAND);
+                    LoadBalancer.insert(java.util.List.of(sa, sb), sand, 64L, LoadBalanceMode.MANUAL);
+                    helper.assertTrue(sa.count(Items.SAND) == 64L && sb.count(Items.SAND) == 0L,
+                            "manual fills the first server; got " + sa.count(Items.SAND) + "/" + sb.count(Items.SAND));
                 })
                 .thenSucceed();
     }
@@ -2754,11 +3152,7 @@ public final class NetworkGameTests {
     }
 
     private static void seedServer(final GameTestHelper helper, final BlockPos rack) {
-        if (helper.getBlockEntity(rack) instanceof ServerRackBlockEntity rackBe) {
-            rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
-        } else {
-            helper.fail("no server rack at " + rack);
-        }
+        TestWorldBuilder.forGameTest(helper).seedServer(rack);
     }
 
     @GameTest(template = ARENA)
@@ -2798,71 +3192,21 @@ public final class NetworkGameTests {
      * cable must orient it; this keeps the fixtures declaring "computer next to cable" working.
      */
     private static void faceRearTowardCable(final GameTestHelper helper, final BlockPos pos) {
-        final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pos);
-        if (!state.hasProperty(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING)) {
-            return;
-        }
-        for (final net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
-            if (helper.getBlockState(pos.relative(d)).getBlock()
-                    instanceof dev.jsc.jscomputronics.module.computing.block.DataCableBlock) {
-                helper.setBlock(pos, state.setValue(
-                        net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, d.getOpposite()));
-                return;
-            }
-        }
+        TestWorldBuilder.forGameTest(helper).faceRearTowardCable(pos);
     }
 
     private static PersonalComputerBlockEntity placeRunningPC(final GameTestHelper helper, final BlockPos relative) {
-        helper.setBlock(relative, ComputingModule.PERSONAL_COMPUTER.get());
-        faceRearTowardCable(helper, relative);
-        if (!(helper.getBlockEntity(relative) instanceof PersonalComputerBlockEntity be)) {
-            throw new IllegalStateException("no personal computer at " + relative);
-        }
-        final ItemStackHandler hw = be.getHardware();
-        hw.setStackInSlot(PersonalComputerBlockEntity.MOTHERBOARD_SLOT,
-                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
-        hw.setStackInSlot(PersonalComputerBlockEntity.CPU_SLOT,
-                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
-        hw.setStackInSlot(PersonalComputerBlockEntity.RAM_SLOTS_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,
-                new ItemStack(ComputingModule.PSU_650G.get()));
-        be.togglePower();
-        return be;
+        return TestWorldBuilder.forGameTest(helper).placeRunningPersonalComputer(relative);
     }
 
-    private static CraftingComputerBlockEntity placeRunningCraftingComputer(
+    // Package-private so the performance benchmarks can reuse the powered-up Crafting Computer setup.
+    static CraftingComputerBlockEntity placeRunningCraftingComputer(
             final GameTestHelper helper, final BlockPos relative) {
-        helper.setBlock(relative, ComputingModule.CRAFTING_COMPUTER.get());
-        faceRearTowardCable(helper, relative);
-        if (!(helper.getBlockEntity(relative) instanceof CraftingComputerBlockEntity be)) {
-            throw new IllegalStateException("no crafting computer at " + relative);
-        }
-        final ItemStackHandler hw = be.getHardware();
-        hw.setStackInSlot(CraftingComputerBlockEntity.MOTHERBOARD_SLOT,
-                new ItemStack(ComputingModule.MOTHERBOARD_ATX_P.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.CPU_SLOT,
-                new ItemStack(ComputingModule.CPU_ASCENT_965.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.RAM_SLOTS_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START,
-                new ItemStack(ComputingModule.CRAFTING_CARD_T2.get()));
-        hw.setStackInSlot(CraftingComputerBlockEntity.PSU_SLOT,
-                new ItemStack(ComputingModule.PSU_650G.get()));
-        be.togglePower();
-        return be;
+        return TestWorldBuilder.forGameTest(helper).placeRunningCraftingComputer(relative);
     }
 
     private static void installValidBuild(final MainframeBlockEntity be) {
-        final ItemStackHandler inv = be.getInventory();
-        inv.setStackInSlot(MainframeBlockEntity.MOTHERBOARD_SLOT,
-                new ItemStack(ComputingModule.MOTHERBOARD_MTX_P.get()));
-        inv.setStackInSlot(MainframeBlockEntity.CPU_SLOTS_START,
-                new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
-        inv.setStackInSlot(MainframeBlockEntity.RAM_SLOTS_START,
-                new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
-        inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT,
-                new ItemStack(ComputingModule.PSU_650G.get()));
+        TestWorldBuilder.installMainframeBuild(be);
     }
 
     private static int droppedItems(final GameTestHelper helper, final BlockPos around) {

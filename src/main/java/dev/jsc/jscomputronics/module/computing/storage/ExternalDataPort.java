@@ -7,146 +7,95 @@
  */
 package dev.jsc.jscomputronics.module.computing.storage;
 
-import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.fluids.FluidStack;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.items.ItemHandlerHelper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * A {@link DataSink} + {@link DataSource} over an external block's item AND fluid capabilities at once.
+ * A block face as the network sees it: the {@link DataChannel} of every kind of data the block offers there,
+ * so "everything is data" meets a real machine in one place. Production code builds ports with
+ * {@link #at(Level, BlockPos, Direction)}, which asks {@link DataChannels} for every kind; the handler
+ * constructors exist for tests and for callers that already hold a specific capability.
  */
-public final class ExternalDataPort implements DataSink, DataSource {
+public final class ExternalDataPort implements DataPort {
 
-    @Nullable
-    private final IItemHandler items;
-    @Nullable
-    private final IFluidHandler fluids;
+    private final Map<StorageKey.Kind, DataChannel> channels;
+
+    private ExternalDataPort(final Map<StorageKey.Kind, DataChannel> channels) {
+        this.channels = channels;
+    }
+
+    /** The port onto the block at {@code pos} as seen from {@code side}, with every kind of data it offers. */
+    public static ExternalDataPort at(final Level level, final BlockPos pos, @Nullable final Direction side) {
+        return new ExternalDataPort(DataChannels.resolve(level, pos, side));
+    }
 
     public ExternalDataPort(@Nullable final IItemHandler items, @Nullable final IFluidHandler fluids) {
-        this.items = items;
-        this.fluids = fluids;
+        this(items, fluids, null);
     }
 
+    public ExternalDataPort(@Nullable final IItemHandler items, @Nullable final IFluidHandler fluids,
+                            @Nullable final ChemicalPort chemicals) {
+        this.channels = new EnumMap<>(StorageKey.Kind.class);
+        if (items != null) {
+            channels.put(StorageKey.Kind.ITEM, new ItemChannel(items));
+        }
+        if (fluids != null) {
+            channels.put(StorageKey.Kind.FLUID, new FluidChannel(fluids));
+        }
+        if (chemicals != null) {
+            channels.put(StorageKey.Kind.CHEMICAL, new ChemicalChannel(chemicals));
+        }
+    }
+
+    /** The kinds of data this face offers. */
+    public Set<StorageKey.Kind> kinds() {
+        return channels.keySet();
+    }
+
+    @Override
     public boolean isEmpty() {
-        return items == null && fluids == null;
+        return channels.isEmpty();
     }
 
-    private static IFluidHandler.FluidAction action(final boolean simulate) {
-        return simulate ? IFluidHandler.FluidAction.SIMULATE : IFluidHandler.FluidAction.EXECUTE;
+    @Nullable
+    private DataChannel channel(final StorageKey key) {
+        return channels.get(key.kind());
     }
 
     @Override
     public long insert(final StorageKey key, final long amount, final boolean simulate) {
-        if (amount <= 0L) {
-            return 0L;
-        }
-        if (key.isFluid()) {
-            if (fluids == null) {
-                return 0L;
-            }
-            final int want = (int) Math.min(amount, Integer.MAX_VALUE);
-            return fluids.fill(key.fluidStack(want), action(simulate));
-        }
-        if (items == null) {
-            return 0L;
-        }
-        // Items insert in vanilla-sized stacks; EXECUTE mutates the handler so each batch sees the
-        // remaining room. (Simulation is best-effort — the operation path always executes.)
-        final int batch = Math.max(1, key.stack(1).getMaxStackSize());
-        long inserted = 0L;
-        long remaining = amount;
-        while (remaining > 0L) {
-            final int chunk = (int) Math.min(remaining, batch);
-            final ItemStack leftover = ItemHandlerHelper.insertItem(items, key.stack(chunk), simulate);
-            final int accepted = chunk - leftover.getCount();
-            if (accepted <= 0) {
-                break;
-            }
-            inserted += accepted;
-            remaining -= accepted;
-            if (simulate) {
-                break; // can't loop a non-mutating simulate; report one batch
-            }
-        }
-        return inserted;
+        final DataChannel channel = channel(key);
+        return channel == null ? 0L : channel.insert(key, amount, simulate);
     }
 
     @Override
     public long extract(final StorageKey key, final long amount, final boolean simulate) {
-        if (amount <= 0L) {
-            return 0L;
-        }
-        if (key.isFluid()) {
-            if (fluids == null) {
-                return 0L;
-            }
-            final int want = (int) Math.min(amount, Integer.MAX_VALUE);
-            return fluids.drain(key.fluidStack(want), action(simulate)).getAmount();
-        }
-        if (items == null) {
-            return 0L;
-        }
-        long extracted = 0L;
-        for (int slot = 0; slot < items.getSlots() && extracted < amount; slot++) {
-            final ItemStack inSlot = items.getStackInSlot(slot);
-            if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, key.stack(1))) {
-                continue;
-            }
-            final int got = items.extractItem(slot, (int) Math.min(amount - extracted, Integer.MAX_VALUE),
-                    simulate).getCount();
-            extracted += got;
-        }
-        return extracted;
+        final DataChannel channel = channel(key);
+        return channel == null ? 0L : channel.extract(key, amount, simulate);
     }
 
+    @Override
     public long count(final StorageKey key) {
-        long total = 0L;
-        if (key.isFluid()) {
-            if (fluids != null) {
-                for (int tank = 0; tank < fluids.getTanks(); tank++) {
-                    final FluidStack inTank = fluids.getFluidInTank(tank);
-                    if (FluidStack.isSameFluidSameComponents(inTank, key.fluidPrototype())) {
-                        total += inTank.getAmount();
-                    }
-                }
-            }
-        } else if (items != null) {
-            for (int slot = 0; slot < items.getSlots(); slot++) {
-                final ItemStack inSlot = items.getStackInSlot(slot);
-                if (ItemStack.isSameItemSameComponents(inSlot, key.stack(1))) {
-                    total += inSlot.getCount();
-                }
-            }
-        }
-        return total;
+        final DataChannel channel = channel(key);
+        return channel == null ? 0L : channel.count(key);
     }
 
     @Override
     public List<StorageKey> available() {
-        final Set<StorageKey> keys = new LinkedHashSet<>();
-        if (items != null) {
-            for (int slot = 0; slot < items.getSlots(); slot++) {
-                final ItemStack inSlot = items.getStackInSlot(slot);
-                if (!inSlot.isEmpty()) {
-                    keys.add(StorageKey.of(inSlot));
-                }
-            }
+        final List<StorageKey> keys = new ArrayList<>();
+        for (final DataChannel channel : channels.values()) {
+            keys.addAll(channel.available());
         }
-        if (fluids != null) {
-            for (int tank = 0; tank < fluids.getTanks(); tank++) {
-                final FluidStack inTank = fluids.getFluidInTank(tank);
-                if (!inTank.isEmpty()) {
-                    keys.add(StorageKey.of(inTank));
-                }
-            }
-        }
-        return new ArrayList<>(keys);
+        return keys;
     }
 }

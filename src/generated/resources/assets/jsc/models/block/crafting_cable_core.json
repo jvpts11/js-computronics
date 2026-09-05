@@ -1,0 +1,6 @@
+{
+  "parent": "jsc:block/cable_core",
+  "textures": {
+    "cable": "jsc:block/crafting_cable"
+  }
+}

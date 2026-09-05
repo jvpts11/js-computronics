@@ -42,7 +42,7 @@ import java.util.List;
  */
 public class MainframeBlock extends AbstractMultiblockControllerBlock
         implements dev.jsc.jscomputronics.common.network.DataNetworkConnectable,
-        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable {
+        dev.jsc.jscomputronics.common.peripheral.PeripheralConnectable, EraChassisBlock {
 
     public static final MapCodec<MainframeBlock> CODEC = simpleCodec(MainframeBlock::new);
 
@@ -56,8 +56,31 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
 
+    /**
+     * The hardware era this Mainframe belongs to. It selects the block's skin and gates which MTX board
+     * installs — only a board of this same era is accepted and counted in the build. The base is
+     * {@link dev.jsc.jscomputronics.common.tier.HardwareEra#STANDARD}; the Vintage and Legacy variants
+     * override it.
+     */
+    public dev.jsc.jscomputronics.common.tier.HardwareEra era() {
+        return dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
+    }
+
     @Override
-    protected MapCodec<MainframeBlock> codec() {
+    public dev.jsc.jscomputronics.common.tier.HardwareEra chassisEra() {
+        return era();
+    }
+
+    /**
+     * The item this Mainframe drops and is picked as — its own era variant. Overridden per era so a
+     * broken or pick-blocked Mainframe yields the matching era's item.
+     */
+    protected net.minecraft.world.item.Item blockItem() {
+        return ComputingModule.MAINFRAME_ITEM.get();
+    }
+
+    @Override
+    protected MapCodec<? extends MainframeBlock> codec() {
         return CODEC;
     }
 
@@ -91,15 +114,21 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     @Override
     protected BlockState partStateFor(final BlockPos controller, final Direction facing,
                                       final BlockPos part, final BlockState controllerState) {
+        // Stamp the controller's era onto every structural part so the whole footprint wears one skin.
+        final dev.jsc.jscomputronics.common.tier.HardwareEra era =
+                controllerState.getBlock() instanceof MainframeBlock mf
+                        ? mf.era()
+                        : dev.jsc.jscomputronics.common.tier.HardwareEra.STANDARD;
         return ComputingModule.MAINFRAME_PART.get().defaultBlockState()
                 .setValue(FACING, facing)
                 .setValue(MainframePartBlock.CORE,
-                        MainframeStructure.isCentralColumn(controller, facing, part));
+                        MainframeStructure.isCentralColumn(controller, facing, part))
+                .setValue(MainframePartBlock.ERA, era.level());
     }
 
     @Override
     protected void dropContents(final ServerLevel level, final BlockPos controller) {
-        Block.popResource(level, controller, new ItemStack(ComputingModule.MAINFRAME_ITEM.get()));
+        Block.popResource(level, controller, new ItemStack(blockItem()));
         if (level.getBlockEntity(controller) instanceof MainframeBlockEntity be) {
             BlockDrops.spill(level, controller, be.getInventory());
         }
@@ -130,13 +159,22 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     @Override
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
+        // The Mainframe block is hardware only: clicking it always opens the hardware-assembly GUI
+        // (the same one its parts open). All software (firmware, OS) is used on a linked monitor.
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof MainframeBlockEntity mainframe) {
+            // Sneaking takes the service panel off the card bay (or puts it back): the processors,
+            // memory and cards are only ever seen through that opening.
+            if (player.isShiftKeyDown()) {
+                mainframe.toggleServicePanel();
+                return InteractionResult.sidedSuccess(false);
+            }
             serverPlayer.openMenu(
                     new SimpleMenuProvider(
                             (id, inventory, p) -> new dev.jsc.jscomputronics.module.computing.menu.MainframeMenu(
                                     id, inventory, mainframe),
-                            Component.translatable("block.jsc.mainframe")),
+                            // Each era is its own machine and carries its own name in the GUI header.
+                            state.getBlock().getName()),
                     buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.sidedSuccess(level.isClientSide());

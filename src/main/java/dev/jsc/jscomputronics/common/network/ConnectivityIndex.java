@@ -36,6 +36,10 @@ public final class ConnectivityIndex {
 
     private final Map<Long, Set<Long>> adjacency = new HashMap<>();
 
+    // Every component's positions, by root, kept until the topology changes: a Mainframe asks for its
+    // segment every tick, and walking every cable of a big base to answer was a fixed cost on the idle tick.
+    private final Map<Integer, Set<Long>> componentCache = new HashMap<>();
+
     // Queries
 
     public Optional<NetworkUuid> networkOf(long encodedPos) {
@@ -78,9 +82,32 @@ public final class ConnectivityIndex {
             return Set.of();
         }
         final int root = dsu.find(id);
+        Set<Long> cached = componentCache.get(root);
+        if (cached == null) {
+            final Set<Long> result = new LinkedHashSet<>();
+            for (final Map.Entry<Long, Integer> entry : posToId.entrySet()) {
+                if (dsu.find(entry.getValue()) == root) {
+                    result.add(entry.getKey());
+                }
+            }
+            cached = java.util.Collections.unmodifiableSet(result);
+            componentCache.put(root, cached);
+        }
+        return cached;
+    }
+
+    /**
+     * Every cable position belonging to the given network. A read-only scan (the same shape as
+     * {@link #componentPositions}) used to locate a named device, such as a bus, mounted anywhere on the
+     * network's cabling without needing a starting position.
+     */
+    public Set<Long> positionsOf(final NetworkUuid network) {
+        if (network == null) {
+            return Set.of();
+        }
         final Set<Long> result = new LinkedHashSet<>();
         for (final Map.Entry<Long, Integer> entry : posToId.entrySet()) {
-            if (dsu.find(entry.getValue()) == root) {
+            if (network.equals(rootToUuid.get(dsu.find(entry.getValue())))) {
                 result.add(entry.getKey());
             }
         }
@@ -96,6 +123,7 @@ public final class ConnectivityIndex {
         }
 
         // 1. Allocate a fresh DSU element for the new cable.
+        componentCache.clear();
         int newId = dsu.makeSet();
         posToId.put(encodedPos, newId);
         idToPos.put(newId, encodedPos);
@@ -182,8 +210,12 @@ public final class ConnectivityIndex {
                 continue;
             }
             ids.add(id);
-            if (surviving == null) {
-                surviving = rootToUuid.get(dsu.find(id));
+            // Deterministic survivor: the lexicographically smallest UUID among the merged components, so
+            // which network identity wins a merge does not depend on iteration order (unpredictable to the
+            // player and unstable across reloads).
+            final NetworkUuid uuid = rootToUuid.get(dsu.find(id));
+            if (uuid != null && (surviving == null || uuid.asString().compareTo(surviving.asString()) < 0)) {
+                surviving = uuid;
             }
         }
         if (ids.size() < 2) {
@@ -198,6 +230,7 @@ public final class ConnectivityIndex {
             root = dsu.find(root);
         }
         if (merged) {
+            componentCache.clear();
             cleanupOrphanedUuids(root);
             if (surviving != null) {
                 rootToUuid.put(root, surviving);
@@ -247,6 +280,7 @@ public final class ConnectivityIndex {
         final Set<Long> survivors = new LinkedHashSet<>(posToId.keySet());
         survivors.remove(encodedPos);
         dsu.clear();
+        componentCache.clear();
         posToId.clear();
         idToPos.clear();
         rootToUuid.clear();
@@ -328,6 +362,7 @@ public final class ConnectivityIndex {
         rootToUuid.clear();
         adjacency.clear();
         dsu.clear();
+        componentCache.clear();
     }
 
     /**

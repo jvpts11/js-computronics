@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "jsc:block/dvd_drive_active",
+    "side": "jsc:block/dvd_drive_casing",
+    "top": "jsc:block/dvd_drive_casing"
+  }
+}

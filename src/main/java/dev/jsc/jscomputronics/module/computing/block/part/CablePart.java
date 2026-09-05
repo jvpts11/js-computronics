@@ -17,7 +17,7 @@ import net.minecraft.world.item.ItemStack;
 /**
  * A thin device attached to one face of a data cable, in the AE2 sense: the cable and up to six parts share a single block position, and a part interacts with the block its mounted face points at (an adjacent inventory, for the buses).
  */
-public sealed interface CablePart permits ImportBusPart, ExportBusPart {
+public sealed interface CablePart permits AbstractBusPart {
 
     CablePartType type();
 

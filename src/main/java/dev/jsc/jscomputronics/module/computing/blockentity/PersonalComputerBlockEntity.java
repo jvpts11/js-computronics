@@ -158,13 +158,21 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         return localStore().view();
     }
 
-    @Override
-    public int usableStorageSlots() {
+    /**
+     * The net storage capacity in item-equivalents after subtracting the installed OS footprint.
+     * This is the capacity available for local data; the OS occupies disk space from installation.
+     */
+    public long netStorageItems() {
         final ComputerBuild build = currentBuild();
         if (build == null) {
-            return 0;
+            return 0L;
         }
-        final long capacity = build.totalStorageItems();
+        return Math.max(0L, build.totalStorageItems() - reservedByOs());
+    }
+
+    @Override
+    public int usableStorageSlots() {
+        final long capacity = netStorageItems(); // already net of OS footprint
         return capacity <= 0 ? 0 : (int) Math.min(STORAGE_SLOTS, (capacity + 63) / 64);
     }
 
@@ -175,8 +183,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     public long localStorageCapacity() {
-        final ComputerBuild build = currentBuild();
-        return build == null ? 0L : build.totalStorageItems();
+        return netStorageItems();
     }
 
     @Override

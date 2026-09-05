@@ -34,10 +34,13 @@ public class CraftingCardItem extends SpecItem<CraftingCardSpec> implements Expa
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
         final CraftingCardSpec spec = spec();
-        tooltip.add(Component.literal("Executes recipes  -  " + spec.cpuFactor() + "x CPU")
+        tooltip.add(Component.literal("Crafting accelerator (FPGA)").withStyle(ChatFormatting.GRAY));
+        final String threadWord = spec.threads() == 1 ? " thread" : " threads";
+        tooltip.add(Component.literal("Threads  -  " + spec.threads() + threadWord)
                 .withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.literal(spec.tier() + "  -  " + spec.tdpWatts() + " W")
+        tooltip.add(Component.literal("Throughput  -  " + spec.cpuFactor() + "x CPU")
+                .withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.literal(spec.tier() + "  -  " + spec.tdpWatts() + " W  -  " + spec.bus())
                 .withStyle(ChatFormatting.DARK_GRAY));
-        tooltip.add(Component.literal(spec.bus().toString()).withStyle(ChatFormatting.DARK_GRAY));
     }
 }

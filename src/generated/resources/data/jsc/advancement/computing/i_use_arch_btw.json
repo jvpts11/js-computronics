@@ -1,0 +1,30 @@
+{
+  "parent": "jsc:computing/root",
+  "criteria": {
+    "boot_arch": {
+      "conditions": {
+        "os": "jsc:arch"
+      },
+      "trigger": "jsc:os_first_boot"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.jsc.computing.i_use_arch_btw.description"
+    },
+    "frame": "challenge",
+    "icon": {
+      "count": 1,
+      "id": "jsc:usb_flash_drive"
+    },
+    "title": {
+      "translate": "advancements.jsc.computing.i_use_arch_btw.title"
+    }
+  },
+  "requirements": [
+    [
+      "boot_arch"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

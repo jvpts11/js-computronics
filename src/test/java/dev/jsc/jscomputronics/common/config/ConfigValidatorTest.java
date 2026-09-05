@@ -198,25 +198,6 @@ class ConfigValidatorTest {
     }
 
     @Test
-    void sqlDialectKey_declaresWhitelistAndDefault() {
-        ConfigKey<String> key = JscConfigKeys.SQL_DIALECT;
-        assertEquals("computing.sql_dialect", key.dottedPath());
-        assertEquals("SIMPLE", key.defaultValue());
-        assertEquals(List.of("SIMPLE", "STANDARD"), key.whitelist().orElseThrow());
-        assertTrue(JscConfigKeys.registry().isWhitelisted("computing.sql_dialect"));
-    }
-
-    @Test
-    void validate_sqlDialectKey_garbageClampsToSimple() {
-        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
-
-        ConfigValidationResult<String> result =
-                validator.validate(JscConfigKeys.SQL_DIALECT, "garbage");
-
-        assertEquals("SIMPLE", result.value());
-    }
-
-    @Test
     void whitelisted_validValue_returnsValid() {
         ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
         ConfigKey<String> key = ConfigKey.whitelisted(

@@ -9,6 +9,7 @@ package dev.jsc.jscomputronics.module.computing.menu;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
+import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingComputerLayout;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -56,7 +57,7 @@ public class CraftingComputerMenu extends AbstractComputerMenu {
                     8 + i * 18, 106, i, be::boardDiskSlots));
         }
 
-        addPlayerInventory(playerInventory, 8, 138);
+        addPlayerInventory(playerInventory, CraftingComputerLayout.INV_X, CraftingComputerLayout.INV_Y);
         addDataSlots(this.data);
     }
 
@@ -139,6 +140,10 @@ public class CraftingComputerMenu extends AbstractComputerMenu {
         return data.get(CraftingComputerBlockEntity.DATA_CRAFT_THROUGHPUT);
     }
 
+    public int craftThreads() {
+        return data.get(CraftingComputerBlockEntity.DATA_CRAFT_THREADS);
+    }
+
     public int romUsed() {
         return data.get(CraftingComputerBlockEntity.DATA_ROM_USED);
     }
@@ -162,7 +167,13 @@ public class CraftingComputerMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        return stillValid(access, player, ComputingModule.CRAFTING_COMPUTER.get());
+        // Validate against the block family, not a single block: the Standard, Vintage and Legacy
+        // Crafting Computers are distinct blocks that share this menu. Checking only the Standard block
+        // would make the server reject a Vintage/Legacy menu as invalid and close it the instant it opens.
+        return access.evaluate((level, pos) ->
+                level.getBlockState(pos).getBlock()
+                        instanceof dev.jsc.jscomputronics.module.computing.block.CraftingComputerBlock
+                        && player.canInteractWithBlock(pos, 4.0), true);
     }
 
     @Override

@@ -1,0 +1,30 @@
+{
+  "parent": "jsc:computing/root",
+  "criteria": {
+    "boot_gentoo": {
+      "conditions": {
+        "os": "jsc:gentoo"
+      },
+      "trigger": "jsc:os_first_boot"
+    }
+  },
+  "display": {
+    "description": {
+      "translate": "advancements.jsc.computing.recompile.description"
+    },
+    "frame": "challenge",
+    "icon": {
+      "count": 1,
+      "id": "jsc:cd_rom"
+    },
+    "title": {
+      "translate": "advancements.jsc.computing.recompile.title"
+    }
+  },
+  "requirements": [
+    [
+      "boot_gentoo"
+    ]
+  ],
+  "sends_telemetry_event": true
+}

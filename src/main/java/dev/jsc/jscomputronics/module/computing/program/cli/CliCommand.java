@@ -32,4 +32,12 @@ public interface CliCommand {
 
     /** Runs the command, writing its result into {@code context.out()}. Must not throw for ordinary errors. */
     void run(CliContext context);
+
+    /**
+     * Whether this command is available on a given computer — used to hide a program's commands until that
+     * program is installed there. Built-ins are always available; a program's verbs override this.
+     */
+    default boolean available(final CliComputer computer) {
+        return true;
+    }
 }
