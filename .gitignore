@@ -28,7 +28,7 @@ build/
 !gradle-wrapper.properties
 
 # Datagen metadata cache — generated assets ARE committed, this hash cache is not.
-src/generated/resources/.cache/
+*/src/generated/resources/.cache/
 
 # ============================================================
 # IntelliJ IDEA
