@@ -1,7 +1,7 @@
 # Code style
 
-J's Computronics is a NeoForge mod for Minecraft 1.21.1, written in Java 21 and built with Gradle and
-ModDevGradle. Everything in the repository is written in English: code, comments, Javadoc, translation
+The J's Tech Series is a set of NeoForge mods for Minecraft 1.21.1, written in Java 21 and built with
+Gradle and ModDevGradle. Everything in the repository is written in English: code, comments, Javadoc, translation
 keys and values, commit messages, branch names and issues. The style below is what a reviewer expects to
 see in a pull request.
 

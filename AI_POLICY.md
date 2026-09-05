@@ -1,6 +1,6 @@
 # AI contribution policy
 
-Contributions made with the help of artificial intelligence are welcome in J's Computronics, on the
+Contributions made with the help of artificial intelligence are welcome in the J's Tech Series, on the
 following conditions. They exist to avoid the code to become a mess, the PR requests easier 
 and the people who work here respected. A pull request that does not meet them is rejected, whatever it contains.
 
@@ -19,8 +19,8 @@ Every pull request must state:
 2. every file the change touched, created or deleted;
 3. a precise explanation of what was changed and why.
 
-A pull request without this is rejected regardless of its content. This is how J's Computronics, and the
-mods related to it, make sure the code is sound and does not absorb the structural problems of somebody
+A pull request without this is rejected regardless of its content. This is how the mods of the J's Tech
+Series make sure the code is sound and does not absorb the structural problems of somebody
 else's mistakes or lack of attention in what this person was doing.
 
 ## 3. Write for the humans who work here
