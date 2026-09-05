@@ -14,7 +14,17 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
-version = mod_version
+// The version every artifact carries (the jar name and the mod metadata alike). A build from a tree that is
+// not the tagged release commit is a snapshot named after the commit it came from, "0.2.0a-SNAPSHOT.6a288a7":
+// the loader orders a snapshot below its release and above the previous one, so a development jar never
+// shadows a release. Build the tagged release with -Prelease to drop the suffix.
+def gitShortSha = providers.exec {
+    commandLine 'git', 'rev-parse', '--short', 'HEAD'
+    ignoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.getOrElse('')
+version = providers.gradleProperty('release').isPresent()
+        ? mod_version
+        : "${mod_version}-SNAPSHOT.${gitShortSha.isEmpty() ? 'local' : gitShortSha}"
 group = mod_group_id
 
 sourceSets.main.resources {
@@ -67,7 +77,8 @@ repositories {
 }
 
 base {
-    archivesName = mod_id
+    // jsc-1.21.1-0.1.0a.jar: the mod, the Minecraft line it is built for, its version.
+    archivesName = "${mod_id}-${minecraft_version}"
 }
 
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
@@ -224,7 +235,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            mod_version            : mod_version,
+            mod_version            : project.version.toString(),
             mod_authors            : mod_authors,
             mod_description        : mod_description,
     ]

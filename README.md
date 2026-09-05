@@ -2,7 +2,9 @@
 
 A logistics mod where you build actual computers to handle your items.
 
-Minecraft 1.21.1, NeoForge. Early development, no public builds yet.
+Minecraft 1.21.1, NeoForge. Early development, no public builds yet. The mod is in alpha, at `0.1.0a`;
+what the numbers and the letter mean is in [docs/RELEASING.md](docs/RELEASING.md), and the changes per
+version are in [CHANGELOG.md](CHANGELOG.md).
 
 ## The idea
 

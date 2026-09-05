@@ -108,3 +108,6 @@ GEMINI.md
 .github/instructions/
 .github/prompts/
 .copilot/
+
+# Local archive of released jars (one per tagged version); the releases themselves live on GitHub.
+releases/
