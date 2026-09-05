@@ -8,13 +8,9 @@
 package dev.jsc.jscomputronics.common.registry;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jstech.core.material.MaterialForm;
-import dev.jstech.core.material.MaterialItems;
-import dev.jstech.core.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -25,7 +21,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * Creative-mode tabs for J's Computronics — one tab per logical module, so the catalog stays organized as it grows.
+ * The creative-mode tab of J's Computronics. Every mod of the series carries its own tab.
  */
 public final class JscCreativeModeTabs {
 
@@ -45,21 +41,6 @@ public final class JscCreativeModeTabs {
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, JsComputronics.MODID);
-
-    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> INDUSTRIAL =
-            CREATIVE_MODE_TABS.register("industrial", () -> CreativeModeTab.builder()
-                    .title(Component.translatable("itemGroup.jsc.industrial"))
-                    .icon(() -> new ItemStack(IndustrialModule.MACERATOR_ITEM.get()))
-                    .displayItems((parameters, output) -> {
-                        output.accept(IndustrialModule.MACERATOR_ITEM.get());
-                        output.accept(IndustrialModule.ELECTRIC_FURNACE_ITEM.get());
-                        output.accept(IndustrialModule.COMPRESSOR_ITEM.get());
-                        output.accept(IndustrialModule.COAL_GENERATOR_ITEM.get());
-                        output.accept(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get());
-                        output.accept(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get());
-                        output.accept(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get());
-                    })
-                    .build());
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> COMPUTING =
             CREATIVE_MODE_TABS.register("computing", () -> CreativeModeTab.builder()

@@ -8,9 +8,6 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jstech.core.material.MaterialForm;
-import dev.jstech.core.material.MaterialItems;
-import dev.jstech.core.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
@@ -62,22 +59,6 @@ public class JscItemModelProvider extends ItemModelProvider {
     protected void registerModels() {
         // UncheckedModelFile avoids datagen ordering coupling: the parent
         // block model is produced by the BlockStateProvider in the same run.
-        getBuilder("macerator")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/macerator")));
-        getBuilder("coal_generator")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/coal_generator")));
-        getBuilder("electric_furnace")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/electric_furnace")));
-        getBuilder("compressor")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/compressor")));
-
-        basicItem(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get());
-        // iron_plate and copper_plate textures are pending artwork; mark as generated so datagen does not fail before they land.
-        existingFileHelper.trackGenerated(modLoc("item/iron_plate"), TEXTURE);
-        basicItem(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get());
-        existingFileHelper.trackGenerated(modLoc("item/copper_plate"), TEXTURE);
-        basicItem(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get());
-
         // Cables show their core model in the inventory.
         getBuilder("ethernet_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/ethernet_cable_core")));

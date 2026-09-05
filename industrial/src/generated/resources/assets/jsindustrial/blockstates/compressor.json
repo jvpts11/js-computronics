@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "jsindustrial:block/compressor",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "jsindustrial:block/compressor"
+    },
+    "facing=south": {
+      "model": "jsindustrial:block/compressor",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "jsindustrial:block/compressor",
+      "y": 270
+    }
+  }
+}

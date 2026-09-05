@@ -27,5 +27,6 @@ public final class JsIndustrial {
 
     public JsIndustrial(final IEventBus modEventBus, final ModContainer modContainer) {
         LOGGER.info("J's Industrial {} loaded.", modContainer.getModInfo().getVersion());
+        IndustrialModule.register(modEventBus);
     }
 }

@@ -82,7 +82,7 @@ public final class MachineCraftDataGameTests {
     public static void processingPattern_ingredientTotalsMergeDuplicates(final GameTestHelper helper) {
         final ProcessingPattern p = new ProcessingPattern(
                 List.of(in(Items.IRON_INGOT, 3), in(Items.IRON_INGOT, 5), in(Items.COAL, 2)),
-                List.of(out(Items.IRON_BLOCK, 1, 100)), "jsc:compressor", 200);
+                List.of(out(Items.IRON_BLOCK, 1, 100)), "jsindustrial:compressor", 200);
         final Map<StorageKey, Long> totals = p.ingredientTotals();
         helper.assertTrue(totals.get(StorageKey.of(Items.IRON_INGOT)) == 8L, "iron totals merge to 8");
         helper.assertTrue(totals.get(StorageKey.of(Items.COAL)) == 2L, "coal totals to 2");
@@ -93,7 +93,7 @@ public final class MachineCraftDataGameTests {
     @GameTest(template = ARENA)
     public static void processingPattern_primaryOutputAndSameRecipe(final GameTestHelper helper) {
         final ProcessingPattern base = new ProcessingPattern(List.of(in(Items.IRON_INGOT, 1)),
-                List.of(out(Items.COPPER_INGOT, 2, 100), out(Items.GOLD_NUGGET, 1, 50)), "jsc:macerator", 200);
+                List.of(out(Items.COPPER_INGOT, 2, 100), out(Items.GOLD_NUGGET, 1, 50)), "jsindustrial:macerator", 200);
         helper.assertTrue(base.primaryOutput() != null
                 && base.primaryOutput().key().equals(StorageKey.of(Items.COPPER_INGOT)), "primary is the first output");
         helper.assertTrue(new ProcessingPattern(List.of(), List.of(), "x", 1).primaryOutput() == null,
@@ -103,9 +103,9 @@ public final class MachineCraftDataGameTests {
         helper.assertFalse(base.sameRecipe(new ProcessingPattern(base.inputs(), base.outputs(), "OTHER", 200)),
                 "a different machine is a different recipe");
         helper.assertFalse(base.sameRecipe(new ProcessingPattern(List.of(in(Items.GOLD_INGOT, 1)), base.outputs(),
-                "jsc:macerator", 200)), "a different input is a different recipe");
+                "jsindustrial:macerator", 200)), "a different input is a different recipe");
         helper.assertFalse(base.sameRecipe(new ProcessingPattern(base.inputs(),
-                List.of(out(Items.COPPER_INGOT, 2, 100), out(Items.GOLD_NUGGET, 1, 75)), "jsc:macerator", 200)),
+                List.of(out(Items.COPPER_INGOT, 2, 100), out(Items.GOLD_NUGGET, 1, 75)), "jsindustrial:macerator", 200)),
                 "a different output chance is a different recipe");
         helper.succeed();
     }
@@ -117,7 +117,7 @@ public final class MachineCraftDataGameTests {
                 List.of(in(Items.IRON_INGOT, 7), fluidIn(Fluids.WATER, 250)),
                 List.of(out(Items.COPPER_INGOT, 3, 100), out(Items.GOLD_NUGGET, 1, 1),
                         fluidOut(Fluids.LAVA, 50, 99)),
-                "jsc:compressor", 175);
+                "jsindustrial:compressor", 175);
         final String snbt = CraftFile.serializeProcessing(original, reg).orElseThrow();
         helper.assertTrue("proc".equals(CraftFile.typeOf(snbt)), "tagged as proc");
         final ProcessingPattern back = CraftFile.parseProcessing(snbt, reg).orElseThrow();
@@ -134,7 +134,7 @@ public final class MachineCraftDataGameTests {
     public static void craftFile_multiStageMixedRoundTrip(final GameTestHelper helper) {
         final HolderLookup.Provider reg = helper.getLevel().registryAccess();
         final ProcessingPattern proc = new ProcessingPattern(List.of(in(Items.IRON_INGOT, 1)),
-                List.of(out(Items.IRON_BLOCK, 1, 100)), "jsc:compressor", 200);
+                List.of(out(Items.IRON_BLOCK, 1, 100)), "jsindustrial:compressor", 200);
         final CraftingPattern bench = new CraftingPattern(grid(new ItemStack(Items.IRON_INGOT)),
                 new ItemStack(Items.IRON_BLOCK));
         final MultiStagePattern original = new MultiStagePattern(
@@ -163,9 +163,9 @@ public final class MachineCraftDataGameTests {
     @GameTest(template = ARENA)
     public static void networkRecipe_resultKeyAndSameRecipe(final GameTestHelper helper) {
         final ProcessingPattern itemProc = new ProcessingPattern(List.of(in(Items.IRON_INGOT, 1)),
-                List.of(out(Items.COPPER_INGOT, 1, 100)), "jsc:macerator", 200);
+                List.of(out(Items.COPPER_INGOT, 1, 100)), "jsindustrial:macerator", 200);
         final ProcessingPattern fluidProc = new ProcessingPattern(List.of(in(Items.IRON_INGOT, 1)),
-                List.of(fluidOut(Fluids.WATER, 1000, 100)), "jsc:compressor", 200);
+                List.of(fluidOut(Fluids.WATER, 1000, 100)), "jsindustrial:compressor", 200);
         final NetworkRecipe r1 = NetworkRecipe.ofProcessing(itemProc);
         helper.assertTrue(r1.usesMachine(), "a processing recipe uses a machine");
         helper.assertTrue(r1.resultKey().equals(StorageKey.of(Items.COPPER_INGOT)), "item result key");

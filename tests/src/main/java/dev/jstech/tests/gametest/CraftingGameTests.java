@@ -597,9 +597,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () ->
@@ -617,7 +617,7 @@ public final class CraftingGameTests {
                 })
                 .thenExecuteAfter(15, () -> {
                     if (!(helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor)) {
                         helper.fail("no Compressor block entity");
                         return;
@@ -642,16 +642,16 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     // Pre-place the declared output in the machine's output slot so the engine can pull it.
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
                     }
@@ -683,15 +683,15 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
                     }
@@ -726,9 +726,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final var stone = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE);
 
         helper.startSequence()
@@ -736,7 +736,7 @@ public final class CraftingGameTests {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     // Pre-place the declared output so the run has something to collect.
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
                     }
@@ -805,9 +805,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -829,7 +829,7 @@ public final class CraftingGameTests {
                 })
                 .thenExecuteAfter(15, () -> {
                     if (!(helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor)) {
                         helper.fail("no Compressor");
                         return;
@@ -854,9 +854,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
                 dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
@@ -864,7 +864,7 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 16));
                     }
@@ -901,9 +901,9 @@ public final class CraftingGameTests {
                     if (helper.getBlockEntity(new BlockPos(5, 2, 2))
                             instanceof dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity cc) {
                         cc.loadMachineRecipe(dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe
-                                .ofProcessing(procPattern("jsc:macerator")));
+                                .ofProcessing(procPattern("jsindustrial:macerator")));
                         cc.loadMachineRecipe(dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe
-                                .ofProcessing(procPattern("jsc:compressor")));
+                                .ofProcessing(procPattern("jsindustrial:compressor")));
                     }
                 })
                 .thenExecuteAfter(2, () -> helper.assertTrue(net.mainframe.networkMachineRecipes().size() == 2,
@@ -933,9 +933,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
                 dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op1 =
                 new java.util.concurrent.atomic.AtomicReference<>();
@@ -1025,15 +1025,15 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final long[] before = new long[2];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 200);
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 64));
                     }
@@ -1091,9 +1091,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final long[] before = new long[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -1127,15 +1127,15 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final long[] before = new long[2];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 1000);
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 64));
                     }
@@ -1168,9 +1168,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
                 dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
@@ -1200,15 +1200,15 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final long[] before = new long[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 128);
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 16));
                     }
@@ -1253,14 +1253,14 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 16));
                     }
@@ -1337,7 +1337,7 @@ public final class CraftingGameTests {
         long total = net.storage(helper).count(
                 dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item));
         if (helper.getBlockEntity(machine)
-                instanceof dev.jsc.jscomputronics.module.industrial.blockentity.CompressorBlockEntity compressor) {
+                instanceof dev.jstech.industrial.blockentity.CompressorBlockEntity compressor) {
             final var inv = compressor.getInventory();
             for (int s = 0; s < inv.getSlots(); s++) {
                 if (inv.getStackInSlot(s).is(item)) {
@@ -1356,9 +1356,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
                 dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
@@ -1561,7 +1561,7 @@ public final class CraftingGameTests {
         // Real processing machines must be present — vanilla and this mod's own.
         for (final String required : new String[]{
                 "minecraft:furnace", "minecraft:blast_furnace", "minecraft:smoker", "minecraft:brewing_stand",
-                "minecraft:crafter", "minecraft:hopper", "jsc:macerator", "jsc:compressor"}) {
+                "minecraft:crafter", "minecraft:hopper", "jsindustrial:macerator", "jsindustrial:compressor"}) {
             helper.assertTrue(ids.contains(required), "machine catalog must contain " + required);
         }
         // Decoration, structure, portals and plain storage must be filtered out.
@@ -1584,9 +1584,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final var opHolder = new java.util.concurrent.atomic.AtomicReference<
                 dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation>();
 
@@ -1595,7 +1595,7 @@ public final class CraftingGameTests {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     // Pre-place finished stone in the compressor's output so stage 1 can collect it.
                     if (helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
                     }
@@ -1683,9 +1683,9 @@ public final class CraftingGameTests {
         final BlockPos machine = new BlockPos(5, 2, 5);
         helper.setBlock(cable, ComputingModule.CRAFTING_CABLE.get());
         helper.setBlock(sw, ComputingModule.CRAFTING_SWITCH.get());
-        helper.setBlock(machine, dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get());
+        helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
-                dev.jsc.jscomputronics.module.industrial.IndustrialModule.COMPRESSOR.get()).toString();
+                dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -1707,7 +1707,7 @@ public final class CraftingGameTests {
                 })
                 .thenExecuteAfter(8, () -> {
                     if (!(helper.getBlockEntity(machine)
-                            instanceof dev.jsc.jscomputronics.module.industrial.blockentity
+                            instanceof dev.jstech.industrial.blockentity
                                     .CompressorBlockEntity compressor)) {
                         helper.fail("no Compressor block entity");
                         return;

@@ -1,0 +1,10 @@
+{
+  "type": "jsindustrial:compressing",
+  "ingredient": {
+    "tag": "c:ingots/copper"
+  },
+  "result": {
+    "count": 1,
+    "id": "jscore:copper_plate"
+  }
+}

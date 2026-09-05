@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "jsindustrial:block/compressor_front",
+    "side": "jsindustrial:block/compressor_side",
+    "top": "jsindustrial:block/compressor_top"
+  }
+}

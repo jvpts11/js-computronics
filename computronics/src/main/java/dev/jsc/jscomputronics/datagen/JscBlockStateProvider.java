@@ -10,7 +10,6 @@ package dev.jsc.jscomputronics.datagen;
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.DataCableBlock;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.client.model.generators.BlockStateProvider;
 import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.client.model.generators.MultiPartBlockStateBuilder;
@@ -30,36 +29,6 @@ public class JscBlockStateProvider extends BlockStateProvider {
 
     @Override
     protected void registerStatesAndModels() {
-        final ModelFile maceratorModel = models().orientable(
-                "macerator",
-                modLoc("block/macerator_side"),
-                modLoc("block/macerator_front"),
-                modLoc("block/macerator_top"));
-
-        horizontalBlock(IndustrialModule.MACERATOR.get(), maceratorModel);
-
-        final ModelFile compressorModel = models().orientable(
-                "compressor",
-                modLoc("block/compressor_side"),
-                modLoc("block/compressor_front"),
-                modLoc("block/compressor_top"));
-        horizontalBlock(IndustrialModule.COMPRESSOR.get(), compressorModel);
-
-        final ModelFile coalGeneratorModel = models().orientable(
-                "coal_generator",
-                modLoc("block/coal_generator_side"),
-                modLoc("block/coal_generator_front"),
-                modLoc("block/coal_generator_top"));
-
-        horizontalBlock(IndustrialModule.COAL_GENERATOR.get(), coalGeneratorModel);
-
-        final ModelFile electricFurnaceModel = models().orientable(
-                "electric_furnace",
-                modLoc("block/electric_furnace_side"),
-                modLoc("block/electric_furnace_front"),
-                modLoc("block/electric_furnace_top"));
-        horizontalBlock(IndustrialModule.ELECTRIC_FURNACE.get(), electricFurnaceModel);
-
         pipeCable(ComputingModule.ETHERNET_CABLE.get(), "ethernet_cable");
         pipeCable(ComputingModule.HBW_CABLE.get(), "hbw_cable");
         pipeCable(ComputingModule.HPC_CABLE.get(), "hpc_cable");

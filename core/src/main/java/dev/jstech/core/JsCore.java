@@ -8,6 +8,7 @@
 package dev.jstech.core;
 
 import com.mojang.logging.LogUtils;
+import dev.jstech.core.registry.CoreItems;
 import dev.jstech.core.registry.JscAttachments;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -16,7 +17,8 @@ import org.slf4j.Logger;
 
 /**
  * The shared library of the J's Tech Series. It has no gameplay of its own: it carries what every mod of
- * the series is built on, and every one of them requires it.
+ * the series is built on, and every one of them requires it. The one thing it adds to the game is the
+ * material catalogue, the items several mods process and trade.
  */
 @Mod(JsCore.MODID)
 public final class JsCore {
@@ -29,5 +31,6 @@ public final class JsCore {
         LOGGER.info("J's Core {} loaded.", modContainer.getModInfo().getVersion());
         // The data network lives on the level and the chunks as attachments the core owns.
         JscAttachments.register(modEventBus);
+        CoreItems.register(modEventBus);
     }
 }

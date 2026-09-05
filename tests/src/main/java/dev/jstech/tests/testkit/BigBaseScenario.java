@@ -21,8 +21,8 @@ import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
 import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
-import dev.jsc.jscomputronics.module.industrial.blockentity.AbstractMachineBlockEntity;
+import dev.jstech.industrial.IndustrialModule;
+import dev.jstech.industrial.blockentity.AbstractMachineBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
@@ -486,7 +486,7 @@ public final class BigBaseScenario {
     @Nullable
     private static ProcessingPattern copperPlatePattern() {
         final Item plate = BuiltInRegistries.ITEM.getOptional(
-                ResourceLocation.fromNamespaceAndPath("jsc", "copper_plate")).orElse(null);
+                ResourceLocation.fromNamespaceAndPath("jscore", "copper_plate")).orElse(null);
         if (plate == null) {
             return null;
         }

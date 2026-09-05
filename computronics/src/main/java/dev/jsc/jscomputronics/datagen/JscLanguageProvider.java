@@ -8,12 +8,8 @@
 package dev.jsc.jscomputronics.datagen;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jstech.core.material.MaterialForm;
-import dev.jstech.core.material.MaterialItems;
-import dev.jstech.core.material.ModMaterial;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.HardwareItems;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.neoforge.common.data.LanguageProvider;
 import net.minecraft.data.PackOutput;
 
@@ -28,15 +24,7 @@ public class JscLanguageProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
-        add("itemGroup.jsc.industrial", "J's Computronics: Industrial");
-        add("itemGroup.jsc.computing", "J's Computronics: Computing");
-        addBlock(IndustrialModule.MACERATOR, "Macerator");
-        addBlock(IndustrialModule.COAL_GENERATOR, "Coal Generator");
-        addBlock(IndustrialModule.ELECTRIC_FURNACE, "Electric Furnace");
-        addBlock(IndustrialModule.COMPRESSOR, "Compressor");
-        add(MaterialItems.get(ModMaterial.IRON, MaterialForm.DUST).get(), "Iron Dust");
-        add(MaterialItems.get(ModMaterial.IRON, MaterialForm.PLATE).get(), "Iron Plate");
-        add(MaterialItems.get(ModMaterial.COPPER, MaterialForm.PLATE).get(), "Copper Plate");
+        add("itemGroup.jsc.computing", "J's Computronics");
         addBlock(ComputingModule.ETHERNET_CABLE, "Ethernet Cable");
         addBlock(ComputingModule.HBW_CABLE, "HBW Cable");
         addBlock(ComputingModule.HPC_CABLE, "High Compute Cable");

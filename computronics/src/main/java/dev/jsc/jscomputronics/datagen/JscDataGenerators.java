@@ -37,11 +37,7 @@ public final class JscDataGenerators {
         generator.addProvider(event.includeClient(),
                 new JscLanguageProvider(output));
         generator.addProvider(event.includeServer(),
-                new JscRecipeProvider(output, event.getLookupProvider()));
-        generator.addProvider(event.includeServer(),
                 new JscLootTableProvider(output, event.getLookupProvider()));
-        generator.addProvider(event.includeServer(),
-                new JscItemTagsProvider(output, event.getLookupProvider(), existingFiles));
         generator.addProvider(event.includeServer(),
                 new JscRecipeMachinesProvider(output));
         generator.addProvider(event.includeServer(),

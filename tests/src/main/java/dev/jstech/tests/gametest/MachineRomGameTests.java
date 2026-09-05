@@ -17,7 +17,7 @@ import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
+import dev.jstech.industrial.IndustrialModule;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -51,7 +51,7 @@ public final class MachineRomGameTests {
     @GameTest(template = ARENA)
     public static void rom_machineRecipeDedupeAndSharedLimit(final GameTestHelper helper) {
         final CraftingComputerBlockEntity cc = placeComputer(helper, new BlockPos(2, 2, 2));
-        final NetworkRecipe recipe = proc("jsc:macerator");
+        final NetworkRecipe recipe = proc("jsindustrial:macerator");
         helper.assertTrue(cc.loadMachineRecipe(recipe), "first load accepted");
         helper.assertFalse(cc.loadMachineRecipe(recipe), "an identical recipe is deduped");
         helper.assertTrue(cc.machineRecipes().size() == 1, "still one recipe after the duplicate");
@@ -91,9 +91,9 @@ public final class MachineRomGameTests {
         helper.assertTrue(MachineConfig.DEFAULT.maxJobs() == 0, "DEFAULT is auto (0 = use every machine)");
         helper.assertTrue(new MachineConfig(0, false, false).maxJobs() == 0, "maxJobs 0 stays 0 (auto)");
         helper.assertTrue(new MachineConfig(-9, false, false).maxJobs() == 0, "negative maxJobs clamps to 0 (auto)");
-        cc.setMachineConfig("jsc:compressor", new MachineConfig(4, true, true));
-        helper.assertTrue(cc.machineConfig("jsc:compressor").maxJobs() == 4, "set config is read back");
-        helper.assertTrue(cc.machineConfig("jsc:compressor").locked(), "locked is read back");
+        cc.setMachineConfig("jsindustrial:compressor", new MachineConfig(4, true, true));
+        helper.assertTrue(cc.machineConfig("jsindustrial:compressor").maxJobs() == 4, "set config is read back");
+        helper.assertTrue(cc.machineConfig("jsindustrial:compressor").locked(), "locked is read back");
         cc.setMachineConfig("", new MachineConfig(8, false, false)); // blank key is ignored
         helper.assertTrue(cc.machineConfig("").equals(MachineConfig.DEFAULT), "a blank key is not stored");
         helper.succeed();
@@ -105,8 +105,8 @@ public final class MachineRomGameTests {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity cc = placeComputer(helper, pos);
         cc.loadPattern(benchPattern(Items.IRON_BLOCK));
-        cc.loadMachineRecipe(proc("jsc:macerator"));
-        cc.setMachineConfig("jsc:macerator", new MachineConfig(6, true, true));
+        cc.loadMachineRecipe(proc("jsindustrial:macerator"));
+        cc.setMachineConfig("jsindustrial:macerator", new MachineConfig(6, true, true));
 
         final CompoundTag saved = cc.saveWithFullMetadata(reg);
         helper.setBlock(pos, Blocks.AIR);
@@ -118,7 +118,7 @@ public final class MachineRomGameTests {
         reloaded.loadWithComponents(saved, reg);
         helper.assertTrue(reloaded.romPatterns().size() == 1, "bench ROM survived the reload");
         helper.assertTrue(reloaded.machineRecipes().size() == 1, "machine ROM survived the reload");
-        final MachineConfig cfg = reloaded.machineConfig("jsc:macerator");
+        final MachineConfig cfg = reloaded.machineConfig("jsindustrial:macerator");
         helper.assertTrue(cfg.maxJobs() == 6 && cfg.locked() && cfg.feedMax(), "the machine config survived");
         helper.succeed();
     }

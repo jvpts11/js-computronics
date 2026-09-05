@@ -8,8 +8,8 @@
 package dev.jstech.tests.gametest;
 
 import dev.jstech.core.util.BlockDrops;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
-import dev.jsc.jscomputronics.module.industrial.blockentity.MaceratorBlockEntity;
+import dev.jstech.industrial.IndustrialModule;
+import dev.jstech.industrial.blockentity.MaceratorBlockEntity;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

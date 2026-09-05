@@ -45,8 +45,8 @@ public final class MachinePayloadGameTests {
                 new CraftManagerStatePayload.WireRomEntry(0, "Iron Block", true),
                 new CraftManagerStatePayload.WireRomEntry(1, "Gold Block", false));
         final List<CraftManagerStatePayload.WireMachine> machines = List.of(
-                new CraftManagerStatePayload.WireMachine("@1,2,3", "jsc:compressor", "N (1, 2, 3)", false, true, 4),
-                new CraftManagerStatePayload.WireMachine("@4,5,6", "jsc:macerator", "E (4, 5, 6)", true, false, 1));
+                new CraftManagerStatePayload.WireMachine("@1,2,3", "jsindustrial:compressor", "N (1, 2, 3)", false, true, 4),
+                new CraftManagerStatePayload.WireMachine("@4,5,6", "jsindustrial:macerator", "E (4, 5, 6)", true, false, 1));
         final CraftManagerStatePayload payload = new CraftManagerStatePayload(
                 "media:42", "Floppy (A:)", List.of("alpha.craft", "beta.craft"), rom, true, "Loaded 2", machines);
         assertRoundTrip(helper, CraftManagerStatePayload.STREAM_CODEC, payload);
@@ -77,7 +77,7 @@ public final class MachinePayloadGameTests {
     @GameTest(template = ARENA)
     public static void setMachineConfig_streamCodecRoundTrip(final GameTestHelper helper) {
         assertRoundTrip(helper, SetMachineConfigPayload.STREAM_CODEC,
-                new SetMachineConfigPayload(new BlockPos(7, -3, 19), "jsc:compressor", 8, true, false));
+                new SetMachineConfigPayload(new BlockPos(7, -3, 19), "jsindustrial:compressor", 8, true, false));
         assertRoundTrip(helper, SetMachineConfigPayload.STREAM_CODEC,
                 new SetMachineConfigPayload(new BlockPos(0, 0, 0), "", 1, false, true));
         helper.succeed();
@@ -90,7 +90,7 @@ public final class MachinePayloadGameTests {
                         PatternStudioEditPayload.PROC_SET_CHANCE, 4, 75));
         assertRoundTrip(helper, PatternStudioEditPayload.STREAM_CODEC,
                 PatternStudioEditPayload.text(new BlockPos(-5, 60, -9), new BlockPos(-4, 60, -9),
-                        PatternStudioEditPayload.PROC_SET_MACHINE, 0, "jsc:macerator", ""));
+                        PatternStudioEditPayload.PROC_SET_MACHINE, 0, "jsindustrial:macerator", ""));
         // An item rides the wire by value; compare the fields around it (ItemStack has no value equality).
         final PatternStudioEditPayload withItem = PatternStudioEditPayload.item(new BlockPos(0, 1, 0),
                 new BlockPos(1, 1, 0), PatternStudioEditPayload.BENCH_SET_CELL, 8,

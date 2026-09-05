@@ -11,7 +11,6 @@ import com.mojang.logging.LogUtils;
 import dev.jstech.core.config.JscConfigBridge;
 import dev.jsc.jscomputronics.common.registry.JscCreativeModeTabs;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.industrial.IndustrialModule;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -34,8 +33,6 @@ public class JsComputronics {
         // settings the Operation console reads (e.g. the SQL dialect).
         JscConfigBridge.register(modEventBus, modContainer);
 
-        // Module registration. When the module config system exists, each of
-        IndustrialModule.register(modEventBus);
         ComputingModule.register(modEventBus);
         JscCreativeModeTabs.register(modEventBus);
 
