@@ -42,6 +42,10 @@ public final class IndustrialRecipeMachinesGameTests {
         final List<String> smelting = RecipeMachines.machinesFor("minecraft:smelting");
         helper.assertTrue(smelting.contains("minecraft:furnace") && smelting.contains("jsindustrial:electric_furnace"),
                 "smelting keeps the vanilla furnaces and gains the Electric Furnace; got " + smelting);
+        // The vanilla machines stay first whatever order the files were read in: a smelt the network cannot
+        // place on a declared machine pairs with the furnace, not with whichever mod loaded first.
+        helper.assertTrue(smelting.get(0).equals("minecraft:furnace"),
+                "the furnace is the default machine of a vanilla smelt; got " + smelting);
         helper.succeed();
     }
 }

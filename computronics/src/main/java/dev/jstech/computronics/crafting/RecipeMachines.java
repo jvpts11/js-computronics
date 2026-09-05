@@ -32,6 +32,11 @@ import java.util.Map;
  * is a JSON object whose keys are recipe type ids and whose values are lists of machine block ids, so a pack
  * (or another mod) can teach the Studio about its machines without code. Types nobody maps fall back to the
  * generic category of their recipe type.
+ *
+ * <p>The order of a type's machines is what the Studio picks by default when the network declares none of
+ * them, so it must not depend on which mod's file was read first: the machines from the recipe type's own
+ * namespace come first (a vanilla smelt pairs with the furnace, whatever else can smelt), then the rest in
+ * the order of the files' ids.
  */
 @EventBusSubscriber(modid = JsComputronics.MODID)
 public final class RecipeMachines {
@@ -75,7 +80,9 @@ public final class RecipeMachines {
 
     private static void load(final Map<ResourceLocation, JsonElement> files) {
         final Map<String, List<String>> merged = new LinkedHashMap<>();
-        for (final Map.Entry<ResourceLocation, JsonElement> file : files.entrySet()) {
+        final List<Map.Entry<ResourceLocation, JsonElement>> ordered = new ArrayList<>(files.entrySet());
+        ordered.sort(Map.Entry.comparingByKey((a, b) -> a.toString().compareTo(b.toString())));
+        for (final Map.Entry<ResourceLocation, JsonElement> file : ordered) {
             if (!(file.getValue() instanceof JsonObject object)) {
                 JsComputronics.LOGGER.warn("recipe_machines file {} is not an object; skipped", file.getKey());
                 continue;
@@ -97,8 +104,18 @@ public final class RecipeMachines {
                 }
             }
         }
+        for (final Map.Entry<String, List<String>> entry : merged.entrySet()) {
+            final String namespace = namespaceOf(entry.getKey());
+            entry.getValue().sort((a, b) -> Boolean.compare(!namespaceOf(a).equals(namespace),
+                    !namespaceOf(b).equals(namespace)));
+        }
         replace(merged);
         JsComputronics.LOGGER.info("Loaded {} recipe type to machine mappings", merged.size());
+    }
+
+    private static String namespaceOf(final String id) {
+        final int colon = id.indexOf(':');
+        return colon < 0 ? "minecraft" : id.substring(0, colon);
     }
 
     @SubscribeEvent
