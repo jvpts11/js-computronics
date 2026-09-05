@@ -48,7 +48,8 @@ class LayoutAuditTest {
     private static final Set<String> COVERED = Set.of(
             "BusLayout", "ClusterManagementComputerLayout", "CraftingComputerLayout", "NmsLayout",
             "ComputerTerminalLayout", "ServerRouterLayout", "NetworkInteractorLayout",
-            "CraftingSwitchLayout", "PatternEncoderLayout", "ServerRackLayout", "FilesLayout", "ThisPcLayout");
+            "CraftingSwitchLayout", "PatternEncoderLayout", "ServerRackLayout", "FilesLayout", "ThisPcLayout",
+            "PatternStudioLayout");
 
     private record AuditCase(String label, GuiLayout layout, boolean fixedSize) {
     }
@@ -104,6 +105,13 @@ class LayoutAuditTest {
         c.add(new AuditCase("NetworkInteractorLayout(default)", NetworkInteractorLayout.toGuiLayout(330, 226), false));
         c.add(new AuditCase("NetworkInteractorLayout(min)", NetworkInteractorLayout.toGuiLayout(minW, 150), false));
         c.add(new AuditCase("NetworkInteractorLayout(wide)", NetworkInteractorLayout.toGuiLayout(520, 360), false));
+        // The Pattern Studio is a resizable desktop window too: the content a standard monitor's window gives
+        // it (194), a maximized one (210) and one too short for the inventory band, which then folds away.
+        for (final int h : new int[]{194, 210, dev.jsc.jscomputronics.module.computing.gui.layout.PatternStudioLayout
+                .minContentHeight() - 1}) {
+            c.add(new AuditCase("PatternStudioLayout(" + h + ")",
+                    dev.jsc.jscomputronics.module.computing.gui.layout.PatternStudioLayout.layout(322, h), false));
+        }
         return c;
     }
 
