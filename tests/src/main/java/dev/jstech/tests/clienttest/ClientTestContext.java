@@ -437,8 +437,8 @@ public final class ClientTestContext {
 
     /** Clicks a desktop-relative point (window and app geometry, as the desktop apps report it). */
     public void clickDesktop(final int[] point) {
-        final dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen desktop =
-                screen(dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen.class);
+        final dev.jstech.computronics.client.os.DesktopScreen desktop =
+                screen(dev.jstech.computronics.client.os.DesktopScreen.class);
         click(desktop.desktopX() + point[0] + 0.5, desktop.desktopY() + point[1] + 0.5);
     }
 

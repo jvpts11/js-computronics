@@ -7,33 +7,33 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.client.CraftingComputerScreen;
-import dev.jsc.jscomputronics.module.computing.client.FirmwareScreen;
-import dev.jsc.jscomputronics.module.computing.client.MainframeScreen;
-import dev.jsc.jscomputronics.module.computing.client.OsInstallScreen;
-import dev.jsc.jscomputronics.module.computing.client.ServerRackScreen;
-import dev.jsc.jscomputronics.module.computing.client.os.CraftingManagerApp;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopWindow;
-import dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp;
-import dev.jsc.jscomputronics.module.computing.client.os.PatternStudioApp;
-import dev.jsc.jscomputronics.module.computing.client.os.ThisPcApp;
-import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingComputerLayout;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.program.Programs;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
+import dev.jstech.computronics.client.CraftingComputerScreen;
+import dev.jstech.computronics.client.FirmwareScreen;
+import dev.jstech.computronics.client.MainframeScreen;
+import dev.jstech.computronics.client.OsInstallScreen;
+import dev.jstech.computronics.client.ServerRackScreen;
+import dev.jstech.computronics.client.os.CraftingManagerApp;
+import dev.jstech.computronics.client.os.DesktopScreen;
+import dev.jstech.computronics.client.os.DesktopWindow;
+import dev.jstech.computronics.client.os.NetworkInteractorApp;
+import dev.jstech.computronics.client.os.PatternStudioApp;
+import dev.jstech.computronics.client.os.ThisPcApp;
+import dev.jstech.computronics.gui.layout.CraftingComputerLayout;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computronics.program.Programs;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
 import net.minecraft.core.BlockPos;
@@ -117,11 +117,11 @@ public final class FullJourneyClientTests {
     private static final int CC_HOTBAR_Y = CraftingComputerLayout.INV_Y + 58 + 8;
     private static final int CC_POWER_X = CraftingComputerLayout.POWER_X + CraftingComputerLayout.COL_R_W / 2;
     private static final int CC_POWER_Y = CraftingComputerLayout.POWER_Y + CraftingComputerLayout.BTN_H / 2;
-    private static final int RACK_SLOT_X = dev.jsc.jscomputronics.module.computing.gui.layout
+    private static final int RACK_SLOT_X = dev.jstech.computronics.gui.layout
             .ServerRackLayout.SERVER_X + 8;
-    private static final int RACK_SLOT_Y = dev.jsc.jscomputronics.module.computing.gui.layout
+    private static final int RACK_SLOT_Y = dev.jstech.computronics.gui.layout
             .ServerRackLayout.ROW_Y0 + 8;
-    private static final int RACK_HOTBAR_Y = dev.jsc.jscomputronics.module.computing.gui.layout
+    private static final int RACK_HOTBAR_Y = dev.jstech.computronics.gui.layout
             .ServerRackLayout.HOTBAR_Y + 8;
     private static final int FURNACE_FUEL_X = 64;
     private static final int FURNACE_FUEL_Y = 61;
@@ -671,9 +671,9 @@ public final class FullJourneyClientTests {
                                               final String recipeType) {
         final PatternStudioApp app = studio(ctx);
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new dev.jsc.jscomputronics.integration.jei.payload.SetProcessingPatternPayload(app.host(), app.monitorPos(),
-                        List.of(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.DataCell.fromStack(input)),
-                        List.of(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.DataCell.fromStack(output)),
+                new dev.jstech.computronics.integration.jei.payload.SetProcessingPatternPayload(app.host(), app.monitorPos(),
+                        List.of(dev.jstech.computronics.crafting.PatternWorkbench.DataCell.fromStack(input)),
+                        List.of(dev.jstech.computronics.crafting.PatternWorkbench.DataCell.fromStack(output)),
                         recipeType));
     }
 
@@ -685,13 +685,13 @@ public final class FullJourneyClientTests {
             grid.add(i < cells.length ? cells[i] : ItemStack.EMPTY);
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new dev.jsc.jscomputronics.integration.jei.payload.SetPatternPayload(app.host(), app.monitorPos(), grid, recipeId));
+                new dev.jstech.computronics.integration.jei.payload.SetPatternPayload(app.host(), app.monitorPos(), grid, recipeId));
     }
 
-    private static dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity encoder(
+    private static dev.jstech.computronics.blockentity.PatternEncoderBlockEntity encoder(
             final ClientTestContext ctx, final ServerLevel level) {
         return level.getBlockEntity(abs(ctx, ENCODER))
-                instanceof dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity be ? be : null;
+                instanceof dev.jstech.computronics.blockentity.PatternEncoderBlockEntity be ? be : null;
     }
 
     /** Opens the craft popup for {@code name} on the Crafting tab, adds {@code plusOnes} and submits. */
@@ -727,21 +727,21 @@ public final class FullJourneyClientTests {
         return TestWorldBuilder.at(level, ctx.origin()).blockEntity(at, MediaReaderBlockEntity.class);
     }
 
-    private static dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity sw(
+    private static dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity sw(
             final ClientTestContext ctx, final ServerLevel level) {
         return TestWorldBuilder.at(level, ctx.origin()).blockEntity(SWITCH,
-                dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity.class);
+                dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity.class);
     }
 
     private static boolean switchDeclaresFurnace(final ClientTestContext ctx, final ServerLevel level) {
-        return level.getBlockEntity(abs(ctx, SWITCH)) instanceof dev.jsc.jscomputronics.module.computing.blockentity
+        return level.getBlockEntity(abs(ctx, SWITCH)) instanceof dev.jstech.computronics.blockentity
                 .CraftingSwitchBlockEntity s
                 && s.declaredMachines().stream().anyMatch(m -> m.machineType().equals("minecraft:furnace"));
     }
 
     private static int craftFiles(final ClientTestContext ctx, final ServerLevel level) {
         final ItemStack media = TestWorldBuilder.at(level, ctx.origin())
-                .blockEntity(ENCODER, dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity.class)
+                .blockEntity(ENCODER, dev.jstech.computronics.blockentity.PatternEncoderBlockEntity.class)
                 .media().getStackInSlot(0);
         int n = 0;
         for (final DiskFilesystem.FileEntry e : DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL)) {

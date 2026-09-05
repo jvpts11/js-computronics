@@ -7,14 +7,14 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkOperation;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.operation.payload.OperationRecord;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

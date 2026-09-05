@@ -7,16 +7,16 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkOperation;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.operation.payload.OperationRecord;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -307,9 +307,9 @@ public final class MekanismHardwareMatrixGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(rig.net().mainframe().submitNetworkCraft(frame, 4, false, "battery", null) == null,
                             "a Mainframe that is not running must refuse the request");
-                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
-                            (dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost) rig.net().cc(), helper.getLevel());
-                    final var response = dev.jsc.jscomputronics.module.computing.program.cli.CliCommands.newShell(50)
+                    final var cli = new dev.jstech.computronics.program.ServerCliComputer(
+                            (dev.jstech.computronics.terminal.ComputerTerminalHost) rig.net().cc(), helper.getLevel());
+                    final var response = dev.jstech.computronics.program.cli.CliCommands.newShell(50)
                             .run("operation craft 4 " + FRAME, cli);
                     final String text = String.join(" | ", response.lines().stream().map(l -> l.text()).toList());
                     helper.assertTrue(!text.contains("CRAFT queued"), "the shell must not queue a craft without a running Mainframe; got " + text);

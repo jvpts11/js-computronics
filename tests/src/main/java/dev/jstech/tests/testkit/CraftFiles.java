@@ -7,14 +7,14 @@
  */
 package dev.jstech.tests.testkit;
 
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.MultiStagePattern;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.fs.CraftFile;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
+import dev.jstech.computronics.storage.StorageKey;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;

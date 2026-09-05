@@ -7,19 +7,19 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.ProgramSpec;
+import dev.jstech.computronics.os.fs.InstallerLayout;
+import dev.jstech.computronics.os.media.InstallMedia;
+import dev.jstech.computronics.os.media.InstallerProjection;
+import dev.jstech.computronics.os.media.MediaFormat;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computronics.os.media.MediaReaderBlock;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
 import dev.jstech.core.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
-import dev.jsc.jscomputronics.module.computing.os.ProgramSpec;
-import dev.jsc.jscomputronics.module.computing.os.fs.InstallerLayout;
-import dev.jsc.jscomputronics.module.computing.os.media.InstallMedia;
-import dev.jsc.jscomputronics.module.computing.os.media.InstallerProjection;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaFormat;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlock;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

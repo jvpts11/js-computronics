@@ -7,10 +7,10 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

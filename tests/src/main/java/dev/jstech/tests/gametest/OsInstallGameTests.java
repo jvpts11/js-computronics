@@ -7,20 +7,20 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.HardwareItems;
-import dev.jsc.jscomputronics.module.computing.block.MonitorBlock;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
-import dev.jsc.jscomputronics.module.computing.os.OsHost;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.HardwareItems;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.block.MonitorBlock;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.operation.payload.ComputingPayloads;
+import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;

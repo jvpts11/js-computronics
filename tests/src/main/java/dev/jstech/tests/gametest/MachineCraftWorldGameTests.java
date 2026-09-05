@@ -7,7 +7,7 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jstech.computronics.ComputingModule;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

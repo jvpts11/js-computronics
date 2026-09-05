@@ -7,12 +7,12 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart;
-import dev.jsc.jscomputronics.module.computing.block.part.ImportBusPart;
-import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.block.part.ExportBusPart;
+import dev.jstech.computronics.block.part.ImportBusPart;
+import dev.jstech.computronics.blockentity.DataCableBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;

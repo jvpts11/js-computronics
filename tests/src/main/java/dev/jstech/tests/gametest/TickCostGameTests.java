@@ -7,10 +7,10 @@
  */
 package dev.jstech.tests.gametest;
 
+import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.network.ServerNode;
 import dev.jstech.core.uuid.NetworkUuid;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.gametest.framework.GameTest;

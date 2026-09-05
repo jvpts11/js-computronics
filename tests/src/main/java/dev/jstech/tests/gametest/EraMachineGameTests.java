@@ -7,14 +7,14 @@
  */
 package dev.jstech.tests.gametest;
 
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.HardwareItems;
+import dev.jstech.computronics.block.MainframeBlock;
+import dev.jstech.computronics.block.MainframePartBlock;
+import dev.jstech.computronics.block.MainframeStructure;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.core.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.HardwareItems;
-import dev.jsc.jscomputronics.module.computing.block.MainframeBlock;
-import dev.jsc.jscomputronics.module.computing.block.MainframePartBlock;
-import dev.jsc.jscomputronics.module.computing.block.MainframeStructure;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -72,7 +72,7 @@ public final class EraMachineGameTests {
         final Player player = helper.makeMockPlayer(GameType.CREATIVE);
         final BlockPos absolute = helper.absolutePos(pos);
         player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
-        final var menu = new dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu(
+        final var menu = new dev.jstech.computronics.menu.CraftingComputerMenu(
                 1, player.getInventory(), be);
         helper.assertFalse(menu.slots.isEmpty(), "the Crafting Computer menu must build its slots for " + block);
         helper.assertTrue(menu.stillValid(player),
@@ -108,7 +108,7 @@ public final class EraMachineGameTests {
         final Player player = helper.makeMockPlayer(GameType.CREATIVE);
         final BlockPos absolute = helper.absolutePos(pos);
         player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
-        final var menu = new dev.jsc.jscomputronics.module.computing.menu.MainframeMenu(
+        final var menu = new dev.jstech.computronics.menu.MainframeMenu(
                 1, player.getInventory(), be);
         helper.assertFalse(menu.slots.isEmpty(), "the Mainframe menu must build its slots for " + block);
         helper.assertTrue(menu.stillValid(player),

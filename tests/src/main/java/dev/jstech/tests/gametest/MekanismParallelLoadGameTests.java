@@ -7,20 +7,20 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.block.part.InputBusPart;
-import dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkOperation;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.block.part.InputBusPart;
+import dev.jstech.computronics.block.part.ReceivingBusPart;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.DataCableBlockEntity;
+import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.operation.payload.OperationRecord;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -100,14 +100,14 @@ public final class MekanismParallelLoadGameTests {
         world.setBlock(CABLE, ComputingModule.HPC_CABLE.get());
         world.setBlock(NODE_RACK, ComputingModule.SUPERCOMPUTER_RACK.get());
         final var rack = world.blockEntity(NODE_RACK,
-                dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity.class);
+                dev.jstech.computronics.blockentity.ServerRackBlockEntity.class);
         rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
         rack.toggleBayPower(0); // bays start on; the offline fixture wants the node dark
     }
 
     private static void powerCluster(final TestWorldBuilder world) {
         world.blockEntity(NODE_RACK,
-                dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity.class).toggleBayPower(0);
+                dev.jstech.computronics.blockentity.ServerRackBlockEntity.class).toggleBayPower(0);
     }
 
     private static void placeCluster(final TestWorldBuilder world) {

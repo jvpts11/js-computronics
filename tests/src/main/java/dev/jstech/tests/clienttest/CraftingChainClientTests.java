@@ -7,27 +7,27 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.integration.jei.payload.SetProcessingPatternPayload;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.block.part.InputBusPart;
-import dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.client.os.CraftingManagerApp;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopWindow;
-import dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp;
-import dev.jsc.jscomputronics.module.computing.client.os.PatternStudioApp;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.program.Programs;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.block.part.InputBusPart;
+import dev.jstech.computronics.block.part.ReceivingBusPart;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.DataCableBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
+import dev.jstech.computronics.client.os.CraftingManagerApp;
+import dev.jstech.computronics.client.os.DesktopScreen;
+import dev.jstech.computronics.client.os.DesktopWindow;
+import dev.jstech.computronics.client.os.NetworkInteractorApp;
+import dev.jstech.computronics.client.os.PatternStudioApp;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.PatternWorkbench;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.integration.jei.payload.SetProcessingPatternPayload;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computronics.program.Programs;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.testkit.CraftFiles;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.client.Minecraft;
@@ -360,7 +360,7 @@ public final class CraftingChainClientTests {
                     ctx.assertTrue(!mainframe.networkMachineRecipes().isEmpty(),
                             "the Mainframe must see the Crafting Computer's machine recipe");
                     final var sw = world.blockEntity(SWITCH,
-                            dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity.class);
+                            dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity.class);
                     ctx.assertTrue(sw.declaredMachines().stream().anyMatch(m -> m.machineType().equals("minecraft:furnace")),
                             "the switch must declare the adjacent furnace; declared=" + sw.declaredMachines());
                 })
@@ -420,7 +420,7 @@ public final class CraftingChainClientTests {
                             final TestWorldBuilder world = TestWorldBuilder.at(level, ctx.origin());
                             final MainframeBlockEntity mainframe = world.blockEntity(MAINFRAME, MainframeBlockEntity.class);
                             final var sw = world.blockEntity(SWITCH,
-                                    dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity.class);
+                                    dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity.class);
                             return "active=" + mainframe.activeOperationRecords() + " recent=" + mainframe.recentOperations()
                                     + " declared=" + sw.declaredMachines();
                         })
@@ -479,8 +479,8 @@ public final class CraftingChainClientTests {
                             List.of(new ProcessingPattern.ProcessingInput(StorageKey.of(Items.RAW_IRON), 1L)),
                             List.of(new ProcessingPattern.ProcessingOutput(StorageKey.of(Items.IRON_INGOT), 1L, 100)),
                             "minecraft:furnace", 200);
-                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
-                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc)));
+                    final var multi = new dev.jstech.computronics.crafting.MultiStagePattern(
+                            List.of(dev.jstech.computronics.crafting.MultiStagePattern.Stage.proc(proc)));
                     ctx.assertTrue(world.blockEntity(CRAFTING_COMPUTER, CraftingComputerBlockEntity.class)
                             .loadMachineRecipe(NetworkRecipe.ofMultiStage(multi)),
                             "the multi-stage iron recipe loads into the ROM");
@@ -601,22 +601,22 @@ public final class CraftingChainClientTests {
                 })
                 .thenTeleport(SETTLE + 2, PLAYER_AT_SWITCH, Direction.WEST)
                 .thenRightClick(SETTLE, SWITCH)
-                .thenAwaitScreen(dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen.class, SCREEN_WAIT)
-                .thenWaitUntil(() -> ctx.screen(dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen.class)
+                .thenAwaitScreen(dev.jstech.computronics.client.CraftingSwitchScreen.class, SCREEN_WAIT)
+                .thenWaitUntil(() -> ctx.screen(dev.jstech.computronics.client.CraftingSwitchScreen.class)
                         .isLinkedShown(), SCREEN_WAIT, "the LINKED pill (survey synced to the client)")
                 .thenScreenshot(2, "linked")
                 .then(0, () -> {
-                    final var screen = ctx.screen(dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen.class);
+                    final var screen = ctx.screen(dev.jstech.computronics.client.CraftingSwitchScreen.class);
                     final String north = screen.faceRowText(Direction.NORTH.get3DDataValue());
                     final String south = screen.faceRowText(Direction.SOUTH.get3DDataValue());
                     ctx.assertTrue(north.contains("computer"), "the cable face must read as the computer link; got '" + north + "'");
                     ctx.assertTrue(south.toLowerCase(java.util.Locale.ROOT).contains("machine")
                             || south.contains("Furnace"), "the furnace must be listed on the SOUTH face; got '" + south + "'");
-                    ctx.clickGui(dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen.faceRowX(),
-                            dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen.faceRowY(
+                    ctx.clickGui(dev.jstech.computronics.client.CraftingSwitchScreen.faceRowX(),
+                            dev.jstech.computronics.client.CraftingSwitchScreen.faceRowY(
                                     Direction.SOUTH.get3DDataValue()));
                 })
-                .thenAssert(1, () -> ctx.screen(dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen.class)
+                .thenAssert(1, () -> ctx.screen(dev.jstech.computronics.client.CraftingSwitchScreen.class)
                         .selectedFace() == Direction.SOUTH.get3DDataValue(), "clicking the SOUTH row selects it")
                 .thenScreenshot(2, "south-selected")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
@@ -681,24 +681,24 @@ public final class CraftingChainClientTests {
         if (!ModList.get().isLoaded("jei")) {
             return "viewer not installed";
         }
-        return dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.describeOverlay(Minecraft.getInstance().screen);
+        return dev.jstech.computronics.integration.jei.JscJeiPlugin.describeOverlay(Minecraft.getInstance().screen);
     }
 
     // The viewer steps pass trivially without the viewer installed, so the rest of the test still runs.
 
     private static boolean viewerShowsRecipesFor(final ItemStack result) {
         return !ModList.get().isLoaded("jei")
-                || dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.showRecipesFor(result);
+                || dev.jstech.computronics.integration.jei.JscJeiPlugin.showRecipesFor(result);
     }
 
     private static boolean viewerScreenOpen() {
         return ModList.get().isLoaded("jei")
-                && dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.viewerScreenOpen();
+                && dev.jstech.computronics.integration.jei.JscJeiPlugin.viewerScreenOpen();
     }
 
     private static boolean viewerTransferAllowed() {
         return !ModList.get().isLoaded("jei")
-                || dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.studioTransferAllowed();
+                || dev.jstech.computronics.integration.jei.JscJeiPlugin.studioTransferAllowed();
     }
 
     /** Sends the raw iron smelt to the Studio's machine draft: the payload the viewer's transfer button sends. */

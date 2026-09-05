@@ -7,13 +7,13 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStorageContents;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computronics.storage.ServerStorageContents;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

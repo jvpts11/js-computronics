@@ -7,20 +7,20 @@
  */
 package dev.jstech.tests.clienttest;
 
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.client.CommandPromptScreen;
+import dev.jstech.computronics.client.os.DesktopScreen;
+import dev.jstech.computronics.client.os.DesktopWindow;
+import dev.jstech.computronics.client.os.NetworkInteractorApp;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.program.Programs;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.gametest.MekanismRig;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.client.CommandPromptScreen;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopWindow;
-import dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.program.Programs;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

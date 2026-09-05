@@ -17,11 +17,12 @@ Every `.java` file starts with this block comment, above the `package` line:
  *
  * This file is part of J's Computronics.
  */
-package dev.jsc.jscomputronics...;
+package dev.jstech.computronics...;
 ```
 
 The SPDX tag identifies the licence; the full text lives in `LICENSE`. Do not use the line-comment form and
-do not paste the long licence preamble.
+do not paste the long licence preamble. The last line names the mod the file belongs to: J's Core, J's
+Computronics or J's Industrial.
 
 ## Modelling
 

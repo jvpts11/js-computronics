@@ -7,13 +7,13 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.storage.DataSink;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -144,10 +144,10 @@ public final class PerformanceGameTests {
         final int load = 5000;
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            java.util.List.of(new dev.jsc.jscomputronics.module.computing.crafting
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            java.util.List.of(new dev.jstech.computronics.crafting
                                     .ProcessingPattern.ProcessingInput(StorageKey.of(Items.IRON_INGOT), 1L)),
-                            java.util.List.of(new dev.jsc.jscomputronics.module.computing.crafting
+                            java.util.List.of(new dev.jstech.computronics.crafting
                                     .ProcessingPattern.ProcessingOutput(StorageKey.of(Items.COPPER_INGOT), 1L, 100)),
                             "jsc:nonexistent_machine", 100_000);
                     for (int i = 0; i < load; i++) {

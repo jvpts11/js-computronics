@@ -7,18 +7,18 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench;
-import dev.jsc.jscomputronics.module.computing.crafting.RecipeBook;
-import dev.jsc.jscomputronics.module.computing.crafting.RecipeMachines;
-import dev.jsc.jscomputronics.module.computing.operation.payload.PatternStudioPayloads;
-import dev.jsc.jscomputronics.module.computing.operation.payload.PatternStudioStatePayload;
-import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.PatternWorkbench;
+import dev.jstech.computronics.crafting.RecipeBook;
+import dev.jstech.computronics.crafting.RecipeMachines;
+import dev.jstech.computronics.operation.payload.PatternStudioPayloads;
+import dev.jstech.computronics.operation.payload.PatternStudioStatePayload;
+import dev.jstech.computronics.os.fs.CraftFile;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.CraftFiles;
 import dev.jstech.tests.testkit.TestWorldBuilder;
@@ -69,7 +69,7 @@ public final class PatternStudioGameTests {
         studio.setMachineType("minecraft:furnace");
         studio.setProcTimeout(600);
         studio.setProcName("Smelt", "");
-        studio.addStage(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(
+        studio.addStage(dev.jstech.computronics.crafting.MultiStagePattern.Stage.proc(
                 CraftFiles.furnaceIron(200)));
         studio.setPipelineName("Iron line", "");
         studio.remember(PatternWorkbench.Kind.MACHINE, "disk", "smelt.craft");
@@ -192,7 +192,7 @@ public final class PatternStudioGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // Open the machine file from the drive: it lands in the machine draft with its provenance.
                     final String key = "media:" + helper.absolutePos(DVD_DRIVE).asLong();
-                    final String content = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem
+                    final String content = dev.jstech.computronics.os.fs.DiskFilesystem
                             .read(disc, "iron_ingot.craft").orElseThrow();
                     helper.assertTrue("proc".equals(CraftFile.typeOf(content)), "the file is a machine recipe");
                     studio.loadMachine(CraftFile.parseProcessing(content, reg).orElseThrow(), key, "iron_ingot.craft");
@@ -215,14 +215,14 @@ public final class PatternStudioGameTests {
                 })
                 .thenExecuteAfter(150, () -> {
                     helper.assertTrue(encoder.completed() == 1, "the pipeline burned; completed=" + encoder.completed());
-                    final String back = dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem
+                    final String back = dev.jstech.computronics.os.fs.DiskFilesystem
                             .read(encoder.mediaStack(), "nuggets_from_ore.craft").orElse("");
                     final var parsed = CraftFile.parseMultiStage(back, reg);
                     helper.assertTrue(parsed.isPresent() && parsed.get().stages().size() == 2
                             && "Nuggets from ore".equals(parsed.get().name()), "the burned pipeline reads back with its name");
                     // The same draft loads straight into this computer's ROM as a machine recipe.
                     helper.assertTrue(net.cc().loadMachineRecipe(
-                            dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe.ofMultiStage(studio.multiStagePattern())),
+                            dev.jstech.computronics.crafting.NetworkRecipe.ofMultiStage(studio.multiStagePattern())),
                             "the pipeline loads into the ROM");
                     final CraftingPattern bench = CraftFiles.oakPlanks();
                     helper.assertTrue(net.cc().loadPattern(bench), "a bench pattern loads beside it");

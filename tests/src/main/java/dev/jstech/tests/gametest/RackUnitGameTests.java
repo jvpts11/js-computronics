@@ -7,18 +7,18 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.item.DiskItem;
-import dev.jsc.jscomputronics.module.computing.item.ServerItem;
-import dev.jsc.jscomputronics.module.computing.rack.RackLayout;
-import dev.jsc.jscomputronics.module.computing.rack.RaidMode;
-import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.item.DiskItem;
+import dev.jstech.computronics.item.ServerItem;
+import dev.jstech.computronics.rack.RackLayout;
+import dev.jstech.computronics.rack.RaidMode;
+import dev.jstech.computronics.storage.DriveVolumes;
+import dev.jstech.computronics.storage.ServerStore;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -229,9 +229,9 @@ public final class RackUnitGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(rack.isRunning(), "a complete powered build makes the host run");
                     helper.assertTrue(rack.needsPost(), "a freshly mounted server runs POST first");
-                    helper.assertTrue(dev.jsc.jscomputronics.module.computing.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
                                     .targetForComputer(rack)
-                                    == dev.jsc.jscomputronics.module.computing.os.boot.BootController.BootTarget.FIRMWARE,
+                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.FIRMWARE,
                             "with no system on the bay drive the host boots to the firmware");
                     final net.minecraft.resources.ResourceLocation mcNet =
                             net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
@@ -243,9 +243,9 @@ public final class RackUnitGameTests {
                     helper.assertTrue(rack.getFrontSlots().getStackInSlot(0)
                                     .get(ComputingModule.SYSTEM_OS.get()) != null,
                             "the SYSTEM_OS component lives on the drive itself");
-                    helper.assertTrue(dev.jsc.jscomputronics.module.computing.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
                                     .targetForComputer(rack)
-                                    != dev.jsc.jscomputronics.module.computing.os.boot.BootController.BootTarget.FIRMWARE,
+                                    != dev.jstech.computronics.os.boot.BootController.BootTarget.FIRMWARE,
                             "with a system installed the host boots past the firmware");
                 })
                 .thenSucceed();
@@ -316,7 +316,7 @@ public final class RackUnitGameTests {
                     helper.assertTrue(!rack.isRunning(), "the delegating host is off with the bay");
                     // Leave a window on the machine's desktop: the power cycle must not carry it over.
                     rack.setOpenWindows(java.util.List.of(
-                            new dev.jsc.jscomputronics.module.computing.os.OpenWindow(
+                            new dev.jstech.computronics.os.OpenWindow(
                                     "Files", 40, 30, 200, 140, false, false)));
                     rack.toggleBayPower(0);
                 })
@@ -536,7 +536,7 @@ public final class RackUnitGameTests {
                     // Pulling a drive out from under a running machine leaves rows unconfirmed.
                     rack.getFrontSlots().extractItem(0, 1, false);
                     helper.assertTrue(index.health().state()
-                                    == dev.jsc.jscomputronics.common.operation.index.IndexHealth.State.STALE,
+                                    == dev.jstech.computronics.operation.index.IndexHealth.State.STALE,
                             "a hot pull marks the index stale");
                     helper.assertTrue(index.health().recommendedAction().equals("REINDEX"),
                             "the strip asks for a reindex");
@@ -559,12 +559,12 @@ public final class RackUnitGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // Name the server so it has a host name worth typing.
-                    dev.jsc.jscomputronics.module.computing.item.ServerItem.setCustomName(
+                    dev.jstech.computronics.item.ServerItem.setCustomName(
                             rack.getServers().getStackInSlot(0), "vault");
                     rack.console().setComputerName("vault");
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                    final var cli = new dev.jstech.computronics.program.ServerCliComputer(
                             mainframe, helper.getLevel());
                     helper.assertTrue(cli.reachableHosts().stream()
                                     .anyMatch(h -> h.hostname().equals("vault")),
@@ -593,10 +593,10 @@ public final class RackUnitGameTests {
         final var mainframe = world.placeRunningMainframe(new BlockPos(1, 2, 2));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var cli = new dev.jsc.jscomputronics.module.computing.program.ServerCliComputer(
+                    final var cli = new dev.jstech.computronics.program.ServerCliComputer(
                             mainframe, helper.getLevel());
                     final var console = mainframe.console();
-                    final String version = dev.jsc.jscomputronics.module.computing.program
+                    final String version = dev.jstech.computronics.program
                             .ServerCliComputer.modVersion();
 
                     // Nothing to reconcile on a machine with no packages.
@@ -665,13 +665,13 @@ public final class RackUnitGameTests {
         final net.minecraft.world.entity.player.Player player =
                 helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
         final net.minecraft.world.InteractionHand hand = net.minecraft.world.InteractionHand.MAIN_HAND;
-        final int slot = dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.GPU_START;
+        final int slot = dev.jstech.computronics.item.ServerHardwareHandler.GPU_START;
         final ItemStack phi = new ItemStack(ComputingModule.PHI_5100.get());
         final ItemStack gpu = new ItemStack(ComputingModule.GPU_HD_7970.get());
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     player.setItemInHand(hand, new ItemStack(ComputingModule.SUPERCOMPUTER_NODE.get()));
-                    final var node = new dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler(player, hand);
+                    final var node = new dev.jstech.computronics.item.ServerHardwareHandler(player, hand);
                     helper.assertTrue(node.insertItem(slot, phi.copy(), false).isEmpty(),
                             "a node's expansion slot takes the co-processor");
                     // The second slot is for the GPU a machine needs to be sat at — not for a second
@@ -682,7 +682,7 @@ public final class RackUnitGameTests {
                             "the node's second expansion slot takes a GPU");
 
                     player.setItemInHand(hand, new ItemStack(ComputingModule.SERVER.get()));
-                    final var server = new dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler(player, hand);
+                    final var server = new dev.jstech.computronics.item.ServerHardwareHandler(player, hand);
                     helper.assertTrue(!server.insertItem(slot, phi.copy(), true).isEmpty(),
                             "a plain server refuses the co-processor");
                     helper.assertTrue(server.insertItem(slot, gpu.copy(), true).isEmpty(),
@@ -695,13 +695,13 @@ public final class RackUnitGameTests {
     private static ItemStack hotServer() {
         final ItemStack server = ComputingModule.defaultServer();
         final net.minecraft.core.NonNullList<ItemStack> hw = net.minecraft.core.NonNullList.withSize(
-                dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.SLOTS, ItemStack.EMPTY);
-        final var existing = dev.jsc.jscomputronics.module.computing.item.ServerItem.hardware(server);
+                dev.jstech.computronics.item.ServerHardwareHandler.SLOTS, ItemStack.EMPTY);
+        final var existing = dev.jstech.computronics.item.ServerItem.hardware(server);
         for (int i = 0; i < hw.size() && i < existing.getSlots(); i++) {
             hw.set(i, existing.getStackInSlot(i).copy());
         }
         // One accelerator: enough to make the machine hot, still inside the 650W supply.
-        hw.set(dev.jsc.jscomputronics.module.computing.item.ServerHardwareHandler.GPU_START,
+        hw.set(dev.jstech.computronics.item.ServerHardwareHandler.GPU_START,
                 new ItemStack(ComputingModule.GPU_HD_7970.get()));
         server.set(ComputingModule.SERVER_HARDWARE.get(),
                 net.minecraft.world.item.component.ItemContainerContents.fromItems(hw));
@@ -793,14 +793,14 @@ public final class RackUnitGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(rack.rackType()
-                                    == dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SERVER,
+                                    == dev.jstech.computronics.rack.RackChassis.RackType.SERVER,
                             "the Server Rack is the general cabinet");
                     // The three server chassis belong to this cabinet; the supercomputer node does not.
-                    for (final var chassis : dev.jsc.jscomputronics.module.computing.rack.RackChassis.values()) {
+                    for (final var chassis : dev.jstech.computronics.rack.RackChassis.values()) {
                         final boolean server = chassis
-                                != dev.jsc.jscomputronics.module.computing.rack.RackChassis.SUPERCOMPUTER_NODE;
+                                != dev.jstech.computronics.rack.RackChassis.SUPERCOMPUTER_NODE;
                         helper.assertTrue((chassis.rackType()
-                                        == dev.jsc.jscomputronics.module.computing.rack.RackChassis.RackType.SERVER)
+                                        == dev.jstech.computronics.rack.RackChassis.RackType.SERVER)
                                         == server,
                                 chassis + (server ? " belongs in the Server Rack" : " belongs in the Supercomputer Rack"));
                     }

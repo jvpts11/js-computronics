@@ -7,10 +7,10 @@
  */
 package dev.jstech.tests.testkit;
 
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.storage.ExternalDataPort;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;

@@ -7,20 +7,20 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.DiskSpec;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.HardwareItems;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.DiskSpec;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.OsDef;
+import dev.jstech.computronics.os.OsDisks;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.HardwareItems;
-import dev.jsc.jscomputronics.module.computing.os.OsDef;
-import dev.jsc.jscomputronics.module.computing.os.OsDisks;
-import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;

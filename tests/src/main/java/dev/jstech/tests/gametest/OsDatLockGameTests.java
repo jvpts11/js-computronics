@@ -7,19 +7,19 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.operation.payload.ComputingPayloads;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computronics.storage.DriveVolumes;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

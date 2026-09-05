@@ -7,12 +7,12 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.client.ClusterManagementComputerScreen;
-import dev.jsc.jscomputronics.module.computing.client.CraftingSwitchScreen;
-import dev.jsc.jscomputronics.module.computing.client.ServerRackScreen;
-import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
+import dev.jstech.computronics.client.ClusterManagementComputerScreen;
+import dev.jstech.computronics.client.CraftingSwitchScreen;
+import dev.jstech.computronics.client.ServerRackScreen;
+import dev.jstech.computronics.client.os.DesktopScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

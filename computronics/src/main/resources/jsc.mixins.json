@@ -1,6 +1,6 @@
 {
   "required": true,
-  "package": "dev.jsc.jscomputronics.mixin",
+  "package": "dev.jstech.computronics.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
   "injectors": {

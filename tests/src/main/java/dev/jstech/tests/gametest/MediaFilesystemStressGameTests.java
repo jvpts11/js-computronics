@@ -7,10 +7,10 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;

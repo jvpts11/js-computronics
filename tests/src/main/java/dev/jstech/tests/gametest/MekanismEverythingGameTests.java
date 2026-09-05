@@ -8,16 +8,16 @@
 package dev.jstech.tests.gametest;
 
 import com.mojang.logging.LogUtils;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.program.ServerCliComputer;
-import dev.jsc.jscomputronics.module.computing.program.iql.IqlParseResult;
-import dev.jsc.jscomputronics.module.computing.program.iql.IqlParser;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.MultiStagePattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.program.ServerCliComputer;
+import dev.jstech.computronics.program.iql.IqlParseResult;
+import dev.jstech.computronics.program.iql.IqlParser;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -88,7 +88,7 @@ public final class MekanismEverythingGameTests {
             final BlockPos rackPos = cable.above(); // the row in front belongs to the rig's machines
             helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
             if (helper.getBlockEntity(rackPos)
-                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack) {
+                    instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity rack) {
                 rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
             }
         }

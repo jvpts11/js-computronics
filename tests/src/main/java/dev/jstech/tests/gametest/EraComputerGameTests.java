@@ -7,9 +7,9 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.HardwareItems;
-import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.HardwareItems;
+import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

@@ -7,35 +7,35 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.DataCableBlockEntity;
+import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.fs.CraftFile;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
 import dev.jstech.tests.JsTests;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.entity.FurnaceBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.material.Fluids;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
-import net.neoforged.neoforge.items.ItemStackHandler;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.GameType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.FurnaceBlockEntity;
+import net.minecraft.world.level.material.Fluids;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,13 +70,13 @@ public final class CraftingGameTests {
                     helper.assertTrue(encoder.ownerPos() != null && encoder.ownerPos().equals(net.cc.getBlockPos()),
                             "the encoder links to the adjacent computer; got " + encoder.ownerPos());
                     studio.refreshPreview(helper.getLevel());
-                    helper.assertTrue(studio.serialize(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.Kind.BENCH,
+                    helper.assertTrue(studio.serialize(dev.jstech.computronics.crafting.PatternWorkbench.Kind.BENCH,
                             helper.getLevel().registryAccess()).isEmpty(), "an empty bench serializes to nothing");
                     studio.setGhost(0, new ItemStack(Items.OAK_LOG));
                     studio.refreshPreview(helper.getLevel());
                     helper.assertTrue(studio.preview().is(Items.OAK_PLANKS) && studio.preview().getCount() == 4,
                             "one log previews four planks");
-                    final var content = studio.serialize(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.Kind.BENCH,
+                    final var content = studio.serialize(dev.jstech.computronics.crafting.PatternWorkbench.Kind.BENCH,
                             helper.getLevel().registryAccess());
                     helper.assertTrue(content.isPresent(), "a resolved bench draft serializes");
                     helper.assertTrue(encoder.queueBurn("oak_planks", content.get()), "the encoder queues the burn");
@@ -239,7 +239,7 @@ public final class CraftingGameTests {
     public static void craft_partialScalesDownAndReportsIt(final GameTestHelper helper) {
         final Network net = buildCraftingNetwork(helper);
         final var opHolder = new java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation>();
+                dev.jstech.computronics.crafting.NetworkCraftOperation>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.OAK_LOG, 1);
@@ -259,7 +259,7 @@ public final class CraftingGameTests {
                     final var op = opHolder.get();
                     helper.assertTrue(op.isDone(), "the partial CRAFT must settle");
                     helper.assertTrue(op.craftStatus()
-                                    == dev.jsc.jscomputronics.module.computing.operation.payload
+                                    == dev.jstech.computronics.operation.payload
                                     .OperationRecord.STATUS_PARTIAL,
                             "a scaled-down craft settles as COMPLETED_PARTIAL");
                     helper.assertTrue(op.delivered() == 4, "one log yields 4 planks; got " + op.delivered());
@@ -313,15 +313,15 @@ public final class CraftingGameTests {
     public static void serverRack_faceReflectsInstalledServers(final GameTestHelper helper) {
         final BlockPos rack = new BlockPos(2, 2, 2);
         final net.minecraft.core.Direction facing = net.minecraft.core.Direction.NORTH;
-        helper.setBlock(rack, dev.jsc.jscomputronics.module.computing.ComputingModule.SERVER_RACK.get()
+        helper.setBlock(rack, dev.jstech.computronics.ComputingModule.SERVER_RACK.get()
                 .defaultBlockState().setValue(
                         net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, facing));
-        ((dev.jsc.jscomputronics.module.computing.block.ServerRackBlock)
-                dev.jsc.jscomputronics.module.computing.ComputingModule.SERVER_RACK.get())
+        ((dev.jstech.computronics.block.ServerRackBlock)
+                dev.jstech.computronics.ComputingModule.SERVER_RACK.get())
                 .setPlacedBy(helper.getLevel(), helper.absolutePos(rack),
                         helper.getBlockState(rack), null, ItemStack.EMPTY);
         if (!(helper.getBlockEntity(rack)
-                instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rackBe)) {
+                instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity rackBe)) {
             throw new IllegalStateException("no server rack at " + rack);
         }
         helper.startSequence()
@@ -333,25 +333,25 @@ public final class CraftingGameTests {
                     rackBe.getServers().setStackInSlot(4, ComputingModule.defaultServer());
                 })
                 .thenExecuteAfter(SETTLE, () -> {
-                    final var bays = dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS;
+                    final var bays = dev.jstech.computronics.block.ServerRackBlock.BAYS;
                     helper.assertTrue(helper.getBlockState(rack).getValue(bays) == 3,
                             "the controller bay lights up for its server");
                     final BlockPos second = new BlockPos(
-                            dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                            dev.jstech.computronics.block.ServerRackStructure
                                     .bayBlockPos(rack, facing, 1, 0));
                     helper.assertTrue(helper.getBlockState(second).getValue(bays) == 3,
                             "the second column lights up for its server");
                     final BlockPos upper = new BlockPos(
-                            dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                            dev.jstech.computronics.block.ServerRackStructure
                                     .bayBlockPos(rack, facing, 0, 1));
                     helper.assertTrue(helper.getBlockState(upper).getValue(bays) == 3,
                             "the upper bay lights up for its server");
                     rackBe.getServers().setStackInSlot(2, ItemStack.EMPTY);
                 })
                 .thenExecuteAfter(SETTLE, () -> {
-                    final var bays = dev.jsc.jscomputronics.module.computing.block.ServerRackBlock.BAYS;
+                    final var bays = dev.jstech.computronics.block.ServerRackBlock.BAYS;
                     final BlockPos second = new BlockPos(
-                            dev.jsc.jscomputronics.module.computing.block.ServerRackStructure
+                            dev.jstech.computronics.block.ServerRackStructure
                                     .bayBlockPos(rack, facing, 1, 0));
                     helper.assertTrue(helper.getBlockState(second).getValue(bays) == 0,
                             "pulling a Server empties its bay on the face");
@@ -371,7 +371,7 @@ public final class CraftingGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     if (!(helper.getBlockEntity(hub)
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                            instanceof dev.jstech.computronics.blockentity
                                     .HbwInterfaceBlockEntity be)) {
                         throw new IllegalStateException("no hbw interface");
                     }
@@ -381,7 +381,7 @@ public final class CraftingGameTests {
                     final var slots = be.clusterSlots();
                     helper.assertTrue(slots.size() == 3, "three nodes surveyed");
                     helper.assertTrue(slots.get(2).code()
-                                    == dev.jsc.jscomputronics.module.computing.blockentity
+                                    == dev.jstech.computronics.blockentity
                                     .HbwInterfaceBlockEntity.SLOT_UNDER_RATED,
                             "a 5100 in slot 3 is flagged under-rated, never crashes");
                 })
@@ -392,9 +392,9 @@ public final class CraftingGameTests {
     public static void supercomputer_unlocksParallelCrafting(final GameTestHelper helper) {
         final Network net = buildCraftingNetwork(helper);
         final var first = new java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation>();
+                dev.jstech.computronics.crafting.NetworkCraftOperation>();
         final var second = new java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation>();
+                dev.jstech.computronics.crafting.NetworkCraftOperation>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.OAK_LOG, 8000);
@@ -446,7 +446,7 @@ public final class CraftingGameTests {
         final BlockPos hub = new BlockPos(2, 2, 3);
         final BlockPos cc2Pos = new BlockPos(4, 2, 1);
         final var opHolder = new java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation>();
+                dev.jstech.computronics.crafting.NetworkCraftOperation>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.OAK_LOG, 8000);
@@ -463,7 +463,7 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // The cluster must be online with room for at least two parallel crafts before we submit.
                     if (!(helper.getBlockEntity(hub)
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                            instanceof dev.jstech.computronics.blockentity
                                     .HbwInterfaceBlockEntity sc) || !sc.clusterOnline()
                             || sc.parallelCrafts() < 2) {
                         helper.fail("the supercomputer cluster is not online with >=2 slots");
@@ -521,7 +521,7 @@ public final class CraftingGameTests {
             final BlockPos rackPos = cable.above();
             helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
             if (helper.getBlockEntity(rackPos)
-                    instanceof dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack) {
+                    instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity rack) {
                 rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
             }
         }
@@ -533,16 +533,16 @@ public final class CraftingGameTests {
      * The assembled test network, with handles on the parts the assertions need.
      */
     private record Network(
-            dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity mainframe,
-            dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity rack,
+            dev.jstech.computronics.blockentity.MainframeBlockEntity mainframe,
+            dev.jstech.computronics.blockentity.ServerRackBlockEntity rack,
             CraftingComputerBlockEntity cc) {
 
         void seed(final GameTestHelper helper, final net.minecraft.world.item.Item item, final int count) {
             rack.getServerStorage(0).insert(item, count);
         }
 
-        dev.jsc.jscomputronics.module.computing.operation.NetworkStorage storage(final GameTestHelper helper) {
-            return dev.jsc.jscomputronics.module.computing.operation.NetworkStorage.of(
+        dev.jstech.computronics.operation.NetworkStorage storage(final GameTestHelper helper) {
+            return dev.jstech.computronics.operation.NetworkStorage.of(
                     helper.getLevel(), mainframe.networkUuid());
         }
     }
@@ -552,9 +552,9 @@ public final class CraftingGameTests {
         return new Network(net.mainframe(), net.rack(), net.cc());
     }
 
-    private static dev.jsc.jscomputronics.module.computing.storage.StorageKey storageKey(
+    private static dev.jstech.computronics.storage.StorageKey storageKey(
             final net.minecraft.world.item.Item item) {
-        return dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item);
+        return dev.jstech.computronics.storage.StorageKey.of(item);
     }
 
     // Pattern fixtures
@@ -606,11 +606,11 @@ public final class CraftingGameTests {
                         // Cobblestone has no compressor recipe, so it stays put and we can observe the delivery.
                         net.seed(helper, Items.COBBLESTONE, 64))
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 200);
                     helper.assertTrue(net.mainframe.submitNetworkProcessing(pattern, 4, "test") != null,
                             "the processing operation is accepted");
@@ -657,18 +657,18 @@ public final class CraftingGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 200);
                     helper.assertTrue(net.mainframe.submitNetworkProcessing(pattern, 1, "test") != null,
                             "the processing operation is accepted");
                 })
                 .thenExecuteAfter(10, () -> {
                     final long inNetwork = net.storage(helper).count(
-                            dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE));
+                            dev.jstech.computronics.storage.StorageKey.of(Items.STONE));
                     helper.assertTrue(inNetwork > 0,
                             "the engine collected the machine's output into the network; net stone=" + inNetwork);
                 })
@@ -697,20 +697,20 @@ public final class CraftingGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var proc = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var proc = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 200);
-                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
-                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc)));
+                    final var multi = new dev.jstech.computronics.crafting.MultiStagePattern(
+                            List.of(dev.jstech.computronics.crafting.MultiStagePattern.Stage.proc(proc)));
                     helper.assertTrue(net.mainframe.submitNetworkMultiStage(multi, 1, "test") != null,
                             "the multi-stage operation is accepted");
                 })
                 .thenExecuteAfter(14, () -> {
                     final long inNetwork = net.storage(helper).count(
-                            dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE));
+                            dev.jstech.computronics.storage.StorageKey.of(Items.STONE));
                     helper.assertTrue(inNetwork > 0,
                             "the multi-stage ran its processing stage and the output reached the network; stone="
                                     + inNetwork);
@@ -729,7 +729,7 @@ public final class CraftingGameTests {
         helper.setBlock(machine, dev.jstech.industrial.IndustrialModule.COMPRESSOR.get());
         final String machineType = BuiltInRegistries.BLOCK.getKey(
                 dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
-        final var stone = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE);
+        final var stone = dev.jstech.computronics.storage.StorageKey.of(Items.STONE);
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -743,16 +743,16 @@ public final class CraftingGameTests {
                     // Load ONLY a multi-stage recipe for stone. The recursive craft planner unwraps processing
                     // patterns but never multi-stage ones, so it is blind to this recipe — which is why the CLI
                     // and IQL, before they shared the terminal's entry point, could not craft it.
-                    final var proc = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                    final var proc = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
                                     stone, 1L, 100)),
                             machineType, 200);
-                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
-                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc)));
+                    final var multi = new dev.jstech.computronics.crafting.MultiStagePattern(
+                            List.of(dev.jstech.computronics.crafting.MultiStagePattern.Stage.proc(proc)));
                     net.cc.loadMachineRecipe(
-                            dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe.ofMultiStage(multi));
+                            dev.jstech.computronics.crafting.NetworkRecipe.ofMultiStage(multi));
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // The old recursive-plan path cannot make stone: no bench or processing pattern produces it.
@@ -773,17 +773,17 @@ public final class CraftingGameTests {
     public static void processing_unknownMachineTimesOutAndConservesInputs(final GameTestHelper helper) {
         final Network net = buildCraftingNetwork(helper);
         final java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
+                dev.jstech.computronics.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> net.seed(helper, Items.COBBLESTONE, 16))
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // No switch or machine exists for this type: the op must time out gracefully, not hang.
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             "jsc:does_not_exist", 5);
                     op.set(net.mainframe.submitNetworkProcessing(pattern, 4, "test"));
                     helper.assertTrue(op.get() != null, "the operation is accepted");
@@ -791,7 +791,7 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(20, () -> {
                     helper.assertTrue(op.get().isDone(), "the op timed out instead of hanging on a missing machine");
                     helper.assertTrue(net.storage(helper).count(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE)) >= 16,
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE)) >= 16,
                             "no machine ran, so the inputs are conserved in the network");
                 })
                 .thenSucceed();
@@ -813,17 +813,17 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 64);
                     if (helper.getBlockEntity(new BlockPos(5, 2, 2))
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity cc) {
-                        cc.setMachineConfig(machineType, new dev.jsc.jscomputronics.module.computing.blockentity
+                            instanceof dev.jstech.computronics.blockentity.CraftingComputerBlockEntity cc) {
+                        cc.setMachineConfig(machineType, new dev.jstech.computronics.blockentity
                                 .CraftingComputerBlockEntity.MachineConfig(1, true, false)); // locked = paused
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 200);
                     helper.assertTrue(net.mainframe.submitNetworkProcessing(pattern, 4, "test") != null, "accepted");
                 })
@@ -858,7 +858,7 @@ public final class CraftingGameTests {
         final String machineType = BuiltInRegistries.BLOCK.getKey(
                 dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
+                dev.jstech.computronics.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -870,23 +870,23 @@ public final class CraftingGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 200);
                     op.set(net.mainframe.submitNetworkProcessing(pattern, 1, "test"));
                     final byte live = op.get().liveRecord().status();
-                    helper.assertTrue(live == dev.jsc.jscomputronics.module.computing.operation.payload
+                    helper.assertTrue(live == dev.jstech.computronics.operation.payload
                                     .OperationRecord.STATUS_WAITING
-                            || live == dev.jsc.jscomputronics.module.computing.operation.payload
+                            || live == dev.jstech.computronics.operation.payload
                                     .OperationRecord.STATUS_PROCESSING,
                             "the live record is in-flight before completion; got " + live);
                 })
                 .thenExecuteAfter(12, () -> {
                     helper.assertTrue(op.get().isDone(), "the op finished");
-                    helper.assertTrue(op.get().toRecord().status() == dev.jsc.jscomputronics.module.computing
+                    helper.assertTrue(op.get().toRecord().status() == dev.jstech.computronics
                                     .operation.payload.OperationRecord.STATUS_COMPLETED,
                             "status is COMPLETED after collecting the requested output");
                 })
@@ -899,10 +899,10 @@ public final class CraftingGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     if (helper.getBlockEntity(new BlockPos(5, 2, 2))
-                            instanceof dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity cc) {
-                        cc.loadMachineRecipe(dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe
+                            instanceof dev.jstech.computronics.blockentity.CraftingComputerBlockEntity cc) {
+                        cc.loadMachineRecipe(dev.jstech.computronics.crafting.NetworkRecipe
                                 .ofProcessing(procPattern("jsindustrial:macerator")));
-                        cc.loadMachineRecipe(dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe
+                        cc.loadMachineRecipe(dev.jstech.computronics.crafting.NetworkRecipe
                                 .ofProcessing(procPattern("jsindustrial:compressor")));
                     }
                 })
@@ -937,10 +937,10 @@ public final class CraftingGameTests {
         final String machineType = BuiltInRegistries.BLOCK.getKey(
                 dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op1 =
+                dev.jstech.computronics.crafting.NetworkProcessingOperation> op1 =
                 new java.util.concurrent.atomic.AtomicReference<>();
         final java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op2 =
+                dev.jstech.computronics.crafting.NetworkProcessingOperation> op2 =
                 new java.util.concurrent.atomic.AtomicReference<>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> net.seed(helper, Items.COBBLESTONE, 256))
@@ -966,23 +966,23 @@ public final class CraftingGameTests {
                 .thenSucceed();
     }
 
-    private static dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern cobblePattern(
+    private static dev.jstech.computronics.crafting.ProcessingPattern cobblePattern(
             final String machineType) {
-        return new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                        dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                        dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+        return new dev.jstech.computronics.crafting.ProcessingPattern(
+                List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                        dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                        dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                 machineType, 200);
     }
 
-    private static dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern procPattern(
+    private static dev.jstech.computronics.crafting.ProcessingPattern procPattern(
             final String machineType) {
-        return new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                        dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.IRON_INGOT), 1L)),
-                List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                        dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COPPER_INGOT), 1L, 100)),
+        return new dev.jstech.computronics.crafting.ProcessingPattern(
+                List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                        dev.jstech.computronics.storage.StorageKey.of(Items.IRON_INGOT), 1L)),
+                List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                        dev.jstech.computronics.storage.StorageKey.of(Items.COPPER_INGOT), 1L, 100)),
                 machineType, 200);
     }
 
@@ -991,27 +991,27 @@ public final class CraftingGameTests {
         final Network net = buildCraftingNetwork(helper);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var key = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE);
-                    final var stone = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE);
+                    final var key = dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE);
+                    final var stone = dev.jstech.computronics.storage.StorageKey.of(Items.STONE);
                     // No outputs => no result key => the op must settle FAILED at construction, never hang.
-                    final var noOut = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
+                    final var noOut = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     key, 1L)),
                             List.of(), "jsc:x", 200);
                     final var op = net.mainframe.submitNetworkProcessing(noOut, 1, "test");
                     helper.assertTrue(op != null && op.isDone(), "a pattern with no outputs settles immediately");
                     helper.assertTrue(op.toRecord().status()
-                            == dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord.STATUS_FAILED,
+                            == dev.jstech.computronics.operation.payload.OperationRecord.STATUS_FAILED,
                             "and its status is FAILED");
                     // No inputs => also FAILED.
-                    final var noIn = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
+                    final var noIn = new dev.jstech.computronics.crafting.ProcessingPattern(
                             List.of(),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
                                     stone, 1L, 100)),
                             "jsc:x", 200);
                     final var op2 = net.mainframe.submitNetworkProcessing(noIn, 1, "test");
                     helper.assertTrue(op2 != null && op2.isDone()
-                            && op2.toRecord().status() == dev.jsc.jscomputronics.module.computing.operation.payload
+                            && op2.toRecord().status() == dev.jstech.computronics.operation.payload
                                     .OperationRecord.STATUS_FAILED, "a pattern with no inputs is FAILED too");
                 })
                 .thenSucceed();
@@ -1041,11 +1041,11 @@ public final class CraftingGameTests {
                     before[1] = totalOf(helper, net, machine, Items.STONE);
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 200);
                     net.mainframe.submitNetworkProcessing(pattern, 32, "conserve");
                 })
@@ -1067,13 +1067,13 @@ public final class CraftingGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final var storage = net.storage(helper);
-                    final var water = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(
+                    final var water = dev.jstech.computronics.storage.StorageKey.of(
                             new FluidStack(Fluids.WATER, 1));
                     final long inserted = storage.insert(water, 8000L);
                     helper.assertTrue(inserted > 0, "the network accepts fluid into its mB-eq capacity");
                     helper.assertTrue(storage.count(water) == inserted, "the inserted fluid is counted exactly");
                     final FluidTank tank = new FluidTank(1_000_000);
-                    final var port = new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(null, tank);
+                    final var port = new dev.jstech.computronics.storage.ExternalDataPort(null, tank);
                     final long moved = storage.select(water, inserted, port);
                     helper.assertTrue(moved == inserted, "all the fluid moves out of the network");
                     helper.assertTrue(storage.count(water) == 0, "the network fluid is fully drained");
@@ -1103,11 +1103,11 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // No output ever appears (the machine has no cobblestone recipe) and the timeout is short, so
                     // the op times out after feeding some inputs. None of those inputs may be lost.
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 6);
                     net.mainframe.submitNetworkProcessing(pattern, 64, "timeout");
                 })
@@ -1172,7 +1172,7 @@ public final class CraftingGameTests {
         final String machineType = BuiltInRegistries.BLOCK.getKey(
                 dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
+                dev.jstech.computronics.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
         final long[] before = new long[1];
         helper.startSequence()
@@ -1289,11 +1289,11 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.IRON_INGOT, 30_000);
                     final var storage = net.storage(helper);
-                    final var iron = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.IRON_INGOT);
+                    final var iron = dev.jstech.computronics.storage.StorageKey.of(Items.IRON_INGOT);
                     final long total = storage.count(iron);
                     helper.assertTrue(total > 0, "the network holds a large item load (" + total + ")");
                     final ItemStackHandler sink = new ItemStackHandler(1024);
-                    final var port = new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(sink, null);
+                    final var port = new dev.jstech.computronics.storage.ExternalDataPort(sink, null);
                     final long moved = storage.select(iron, total, port);
                     helper.assertTrue(moved == total, "the whole load moves out");
                     helper.assertTrue(storage.count(iron) == 0, "the network is fully drained, nothing stuck");
@@ -1315,13 +1315,13 @@ public final class CraftingGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final var storage = net.storage(helper);
-                    final var water = dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(
+                    final var water = dev.jstech.computronics.storage.StorageKey.of(
                             new FluidStack(Fluids.WATER, 1));
                     final long inserted = storage.insert(water, 500_000L);
                     helper.assertTrue(inserted > 0, "the network accepts a large fluid load (" + inserted + " mB)");
                     helper.assertTrue(storage.count(water) == inserted, "the whole load is counted exactly");
                     final FluidTank tank = new FluidTank(4_000_000);
-                    final var port = new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(null, tank);
+                    final var port = new dev.jstech.computronics.storage.ExternalDataPort(null, tank);
                     final long moved = storage.select(water, inserted, port);
                     helper.assertTrue(moved == inserted, "the whole large load moves out in one go");
                     helper.assertTrue(storage.count(water) == 0, "the network is fully drained, nothing stuck");
@@ -1335,7 +1335,7 @@ public final class CraftingGameTests {
     private static long totalOf(final GameTestHelper helper, final Network net, final BlockPos machine,
                                 final net.minecraft.world.item.Item item) {
         long total = net.storage(helper).count(
-                dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(item));
+                dev.jstech.computronics.storage.StorageKey.of(item));
         if (helper.getBlockEntity(machine)
                 instanceof dev.jstech.industrial.blockentity.CompressorBlockEntity compressor) {
             final var inv = compressor.getInventory();
@@ -1360,17 +1360,17 @@ public final class CraftingGameTests {
         final String machineType = BuiltInRegistries.BLOCK.getKey(
                 dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation> op =
+                dev.jstech.computronics.crafting.NetworkProcessingOperation> op =
                 new java.util.concurrent.atomic.AtomicReference<>();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> net.seed(helper, Items.COBBLESTONE, 64))
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // Short timeout so the op resolves quickly once its machine disappears.
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.STONE), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.STONE), 1L, 100)),
                             machineType, 8);
                     op.set(net.mainframe.submitNetworkProcessing(pattern, 64, "test"));
                 })
@@ -1407,11 +1407,11 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     if (helper.getBlockEntity(cableAbove) instanceof DataCableBlockEntity c) {
                         c.addPart(Direction.DOWN,
-                                new dev.jsc.jscomputronics.module.computing.block.part.InputBusPart());
+                                new dev.jstech.computronics.block.part.InputBusPart());
                     }
                     if (helper.getBlockEntity(cableBelow) instanceof DataCableBlockEntity c) {
                         c.addPart(Direction.UP,
-                                new dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart());
+                                new dev.jstech.computronics.block.part.ReceivingBusPart());
                     }
                     net.seed(helper, Items.RAW_COPPER, 32);
                     if (helper.getBlockEntity(furnace) instanceof FurnaceBlockEntity fb) {
@@ -1419,7 +1419,7 @@ public final class CraftingGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var swBe = (dev.jsc.jscomputronics.module.computing.blockentity
+                    final var swBe = (dev.jstech.computronics.blockentity
                             .CraftingSwitchBlockEntity) helper.getBlockEntity(sw);
                     final boolean found = swBe.declaredMachines().stream()
                             .anyMatch(m -> m.machineType().equals("minecraft:furnace"));
@@ -1429,11 +1429,11 @@ public final class CraftingGameTests {
                                             && l.machinePos().equals(helper.absolutePos(furnace))
                                             && l.switchFace() == Direction.SOUTH.get3DDataValue()),
                             "the discovered machine must carry its position and the switch face it hangs from");
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.RAW_COPPER), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COPPER_INGOT), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.RAW_COPPER), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.COPPER_INGOT), 1L, 100)),
                             "minecraft:furnace", 200);
                     net.mainframe.submitNetworkProcessing(pattern, 16, "remote");
                 })
@@ -1444,7 +1444,7 @@ public final class CraftingGameTests {
                     helper.assertTrue(fb != null && fb.getItem(2).isEmpty(),
                             "the Receiving Bus must collect the remote furnace's output");
                     final long stored = net.storage(helper)
-                            .count(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.COPPER_INGOT));
+                            .count(dev.jstech.computronics.storage.StorageKey.of(Items.COPPER_INGOT));
                     helper.assertTrue(stored >= 8,
                             "collected ingots must land in network storage, got " + stored);
                 })
@@ -1471,11 +1471,11 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     if (helper.getBlockEntity(cableAbove) instanceof DataCableBlockEntity c) {
                         c.addPart(Direction.DOWN,
-                                new dev.jsc.jscomputronics.module.computing.block.part.InputBusPart());
+                                new dev.jstech.computronics.block.part.InputBusPart());
                     }
                     if (helper.getBlockEntity(cableBelow) instanceof DataCableBlockEntity c) {
                         c.addPart(Direction.UP,
-                                new dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart());
+                                new dev.jstech.computronics.block.part.ReceivingBusPart());
                     }
                     net.seed(helper, Items.RAW_IRON, 32);
                     // Pre-load finished ingots in the furnace's OUTPUT slot: collecting them proves the
@@ -1485,11 +1485,11 @@ public final class CraftingGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.RAW_IRON), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
-                                    dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.IRON_INGOT), 1L, 100)),
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.RAW_IRON), 1L)),
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
+                                    dev.jstech.computronics.storage.StorageKey.of(Items.IRON_INGOT), 1L, 100)),
                             "minecraft:furnace", 200);
                     // Request more than the pre-loaded ingots so the op keeps feeding after collecting them.
                     net.mainframe.submitNetworkProcessing(pattern, 16, "sided");
@@ -1501,7 +1501,7 @@ public final class CraftingGameTests {
                     helper.assertTrue(fb != null && fb.getItem(2).isEmpty(),
                             "the Receiving Bus below must have collected the finished ingots");
                     final long ingotsStored = net.storage(helper)
-                            .count(dev.jsc.jscomputronics.module.computing.storage.StorageKey.of(Items.IRON_INGOT));
+                            .count(dev.jstech.computronics.storage.StorageKey.of(Items.IRON_INGOT));
                     helper.assertTrue(ingotsStored >= 8,
                             "the collected ingots must land in the network storage, got " + ingotsStored);
                 })
@@ -1512,7 +1512,7 @@ public final class CraftingGameTests {
     public static void machineCategory_genericPatternMatchesTaggedFace(final GameTestHelper helper) {
         // Categories are dynamic: every installed recipe type is one.
         final java.util.List<String> categories =
-                dev.jsc.jscomputronics.module.computing.crafting.MachineCategory.categoryIds();
+                dev.jstech.computronics.crafting.MachineCategory.categoryIds();
         helper.assertTrue(categories.contains("minecraft:smelting"),
                 "the dynamic category list must contain minecraft:smelting");
         helper.assertTrue(categories.contains("minecraft:blasting"),
@@ -1524,12 +1524,12 @@ public final class CraftingGameTests {
         helper.setBlock(switchPos.north(), Blocks.FURNACE);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final var sw = (dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity)
+                    final var sw = (dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity)
                             helper.getBlockEntity(switchPos);
                     sw.setFaceCategory(net.minecraft.core.Direction.NORTH, "minecraft:smelting");
                 })
                 .thenExecuteAfter(SETTLE, () -> {
-                    final var sw = (dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity)
+                    final var sw = (dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity)
                             helper.getBlockEntity(switchPos);
                     final var machines = sw.declaredMachines();
                     helper.assertFalse(machines.isEmpty(), "the tagged furnace face must be declared");
@@ -1538,13 +1538,13 @@ public final class CraftingGameTests {
                     helper.assertTrue(furnace != null, "the declared machine must be the furnace");
                     helper.assertTrue("minecraft:smelting".equals(furnace.category()),
                             "the declared machine must carry the face's category");
-                    helper.assertTrue(dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation
+                    helper.assertTrue(dev.jstech.computronics.crafting.NetworkProcessingOperation
                                     .machineMatches(furnace, "generic:minecraft:smelting"),
                             "a generic smelting pattern must match the tagged face");
-                    helper.assertFalse(dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation
+                    helper.assertFalse(dev.jstech.computronics.crafting.NetworkProcessingOperation
                                     .machineMatches(furnace, "generic:minecraft:blasting"),
                             "a generic blasting pattern must not match a smelting-tagged face");
-                    helper.assertTrue(dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation
+                    helper.assertTrue(dev.jstech.computronics.crafting.NetworkProcessingOperation
                                     .machineMatches(furnace, "minecraft:furnace"),
                             "concrete block-id matching must keep working on a tagged face");
                 })
@@ -1555,7 +1555,7 @@ public final class CraftingGameTests {
     public static void machineCatalog_listsVanillaMachinesAndSkipsNonMachines(final GameTestHelper helper) {
         final java.util.Set<String> ids = new java.util.HashSet<>();
         for (final net.minecraft.resources.ResourceLocation id
-                : dev.jsc.jscomputronics.module.computing.crafting.MachineCatalog.machineIds()) {
+                : dev.jstech.computronics.crafting.MachineCatalog.machineIds()) {
             ids.add(id.toString());
         }
         // Real processing machines must be present — vanilla and this mod's own.
@@ -1588,7 +1588,7 @@ public final class CraftingGameTests {
         final String machineType = BuiltInRegistries.BLOCK.getKey(
                 dev.jstech.industrial.IndustrialModule.COMPRESSOR.get()).toString();
         final var opHolder = new java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation>();
+                dev.jstech.computronics.crafting.NetworkMultiStageOperation>();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -1603,15 +1603,15 @@ public final class CraftingGameTests {
                     // bench stage must run from the pattern embedded in the stage itself.
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var proc = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
+                    final var proc = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     storageKey(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
                                     storageKey(Items.STONE), 1L, 100)),
                             machineType, 200);
-                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
-                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc),
-                                    dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage
+                    final var multi = new dev.jstech.computronics.crafting.MultiStagePattern(
+                            List.of(dev.jstech.computronics.crafting.MultiStagePattern.Stage.proc(proc),
+                                    dev.jstech.computronics.crafting.MultiStagePattern.Stage
                                             .bench(stoneButtonPattern())));
                     opHolder.set(net.mainframe.submitNetworkMultiStage(multi, 1, "test"));
                     helper.assertTrue(opHolder.get() != null, "the mixed multi-stage operation is accepted");
@@ -1621,7 +1621,7 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(80, () -> {
                     helper.assertTrue(opHolder.get().isDone(), "the mixed pipeline must settle");
                     helper.assertTrue(opHolder.get().toRecord().status()
-                                    == dev.jsc.jscomputronics.module.computing.operation.payload
+                                    == dev.jstech.computronics.operation.payload
                                             .OperationRecord.STATUS_COMPLETED,
                             "the mixed pipeline must settle COMPLETED; status="
                                     + opHolder.get().toRecord().status());
@@ -1639,20 +1639,20 @@ public final class CraftingGameTests {
         // it, stage 2 must never run, and the network's inputs must be conserved.
         final Network net = buildCraftingNetwork(helper);
         final var opHolder = new java.util.concurrent.atomic.AtomicReference<
-                dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation>();
+                dev.jstech.computronics.crafting.NetworkMultiStageOperation>();
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> net.seed(helper, Items.COBBLESTONE, 16))
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var proc = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
+                    final var proc = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     storageKey(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
                                     storageKey(Items.STONE), 1L, 100)),
                             "jsc:does_not_exist", 5);
-                    final var multi = new dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern(
-                            List.of(dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage.proc(proc),
-                                    dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern.Stage
+                    final var multi = new dev.jstech.computronics.crafting.MultiStagePattern(
+                            List.of(dev.jstech.computronics.crafting.MultiStagePattern.Stage.proc(proc),
+                                    dev.jstech.computronics.crafting.MultiStagePattern.Stage
                                             .bench(stoneButtonPattern())));
                     opHolder.set(net.mainframe.submitNetworkMultiStage(multi, 1, "test"));
                     helper.assertTrue(opHolder.get() != null, "the operation is accepted");
@@ -1660,7 +1660,7 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(30, () -> {
                     helper.assertTrue(opHolder.get().isDone(), "the pipeline must settle instead of hanging");
                     helper.assertTrue(opHolder.get().toRecord().status()
-                                    == dev.jsc.jscomputronics.module.computing.operation.payload
+                                    == dev.jstech.computronics.operation.payload
                                             .OperationRecord.STATUS_FAILED,
                             "a failed stage must fail the whole pipeline; status="
                                     + opHolder.get().toRecord().status());
@@ -1690,15 +1690,15 @@ public final class CraftingGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     net.seed(helper, Items.COBBLESTONE, 64);
-                    net.cc.setMachineConfig(machineType, new dev.jsc.jscomputronics.module.computing.blockentity
+                    net.cc.setMachineConfig(machineType, new dev.jstech.computronics.blockentity
                             .CraftingComputerBlockEntity.MachineConfig(1, false, true)); // feedMax = Fill
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // Cobblestone has no compressor recipe, so everything delivered stays in the input slot.
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     storageKey(Items.COBBLESTONE), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
                                     storageKey(Items.STONE), 1L, 100)),
                             machineType, 200);
                     // Feeding never exceeds the demand, so ask for enough to let Fill mode show its cadence.
@@ -1751,14 +1751,14 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     if (helper.getBlockEntity(cableAbove) instanceof DataCableBlockEntity c) {
                         c.addPart(Direction.DOWN,
-                                new dev.jsc.jscomputronics.module.computing.block.part.InputBusPart());
+                                new dev.jstech.computronics.block.part.InputBusPart());
                     }
                     if (helper.getBlockEntity(cableBelow) instanceof DataCableBlockEntity c) {
                         c.addPart(Direction.UP,
-                                new dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart());
+                                new dev.jstech.computronics.block.part.ReceivingBusPart());
                     }
                     // The remote furnace hangs off the run leaving the switch's SOUTH face; tag that face.
-                    if (helper.getBlockEntity(sw) instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                    if (helper.getBlockEntity(sw) instanceof dev.jstech.computronics.blockentity
                             .CraftingSwitchBlockEntity swBe) {
                         swBe.setFaceCategory(Direction.SOUTH, "minecraft:smelting");
                     }
@@ -1768,7 +1768,7 @@ public final class CraftingGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var swBe = (dev.jsc.jscomputronics.module.computing.blockentity
+                    final var swBe = (dev.jstech.computronics.blockentity
                             .CraftingSwitchBlockEntity) helper.getBlockEntity(sw);
                     final var remote = swBe.declaredMachines().stream()
                             .filter(m -> m.machineType().equals("minecraft:furnace")).findFirst().orElse(null);
@@ -1781,10 +1781,10 @@ public final class CraftingGameTests {
                     helper.assertTrue(tag.contains("BusMachineLines")
                                     && !tag.getList("BusMachineLines", Tag.TAG_COMPOUND).isEmpty(),
                             "the update tag must carry the discovered bus machines for the switch GUI");
-                    final var pattern = new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern(
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput(
+                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     storageKey(Items.RAW_COPPER), 1L)),
-                            List.of(new dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput(
+                            List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput(
                                     storageKey(Items.COPPER_INGOT), 1L, 100)),
                             "generic:minecraft:smelting", 200);
                     helper.assertTrue(net.mainframe.submitNetworkProcessing(pattern, 16, "generic") != null,
@@ -1818,7 +1818,7 @@ public final class CraftingGameTests {
             throw new IllegalStateException("no pattern encoder at " + encoderPos);
         }
         if (!(helper.getBlockEntity(drivePos)
-                instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity drive)) {
+                instanceof dev.jstech.computronics.os.media.MediaReaderBlockEntity drive)) {
             throw new IllegalStateException("no media reader at " + drivePos);
         }
         encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.DVD_RW.get()));
@@ -1833,7 +1833,7 @@ public final class CraftingGameTests {
                     studio.setGhost(0, new ItemStack(Items.OAK_LOG));
                     studio.refreshPreview(helper.getLevel());
                     final var content = studio.serialize(
-                            dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.Kind.BENCH,
+                            dev.jstech.computronics.crafting.PatternWorkbench.Kind.BENCH,
                             helper.getLevel().registryAccess());
                     helper.assertTrue(content.isPresent() && encoder.queueBurn("oak_planks", content.get()),
                             "the bench draft is sent to the encoder");
@@ -1841,7 +1841,7 @@ public final class CraftingGameTests {
                     final var player = helper.makeMockPlayer(GameType.CREATIVE);
                     final BlockPos absolute = helper.absolutePos(encoderPos);
                     player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
-                    final var encoderMenu = new dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu(
+                    final var encoderMenu = new dev.jstech.computronics.menu.PatternEncoderMenu(
                             1, player.getInventory(), encoder);
                     helper.assertTrue(encoderMenu.stillValid(player), "the Pattern Encoder menu stays open");
                 })
@@ -1880,7 +1880,7 @@ public final class CraftingGameTests {
                     final var player = helper.makeMockPlayer(GameType.CREATIVE);
                     final BlockPos absolute = helper.absolutePos(new BlockPos(5, 2, 2));
                     player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
-                    final var ccMenu = new dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu(
+                    final var ccMenu = new dev.jstech.computronics.menu.CraftingComputerMenu(
                             1, player.getInventory(), net.cc);
                     helper.assertTrue(ccMenu.stillValid(player), "the Crafting Computer menu stays open");
                     // Stock the ingredients now: the craft planner reads the incremental network index,

@@ -7,11 +7,11 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalPort;
-import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.storage.ChemicalBridges;
+import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.ExternalDataPort;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import io.netty.buffer.Unpooled;
@@ -25,8 +25,8 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -171,15 +171,15 @@ public final class ChemicalDataGameTests {
     public static void importBus_pullsAGasOutOfATankIntoTheNetwork(final GameTestHelper helper) {
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-        world.setBlock(BUS_CABLE, dev.jsc.jscomputronics.module.computing.ComputingModule.ETHERNET_CABLE.get());
+        world.setBlock(BUS_CABLE, dev.jstech.computronics.ComputingModule.ETHERNET_CABLE.get());
         world.placeFromItem(TANK_A, BuiltInRegistries.BLOCK.get(TANK));
         final StorageKey oxygen = StorageKey.chemical(OXYGEN);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().fill(OXYGEN, 500, false) == 500, "the tank must take 500 mB of oxygen");
-                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable) {
-                        cable.addPart(Direction.SOUTH, new dev.jsc.jscomputronics.module.computing.block.part.ImportBusPart());
+                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computronics.blockentity.DataCableBlockEntity cable) {
+                        cable.addPart(Direction.SOUTH, new dev.jstech.computronics.block.part.ImportBusPart());
                     }
                 })
                 .thenWaitUntil(() -> helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) >= 500,
@@ -200,7 +200,7 @@ public final class ChemicalDataGameTests {
         // tank item that held oxygen when it was picked up. The max keeps the faced tank at 300 mB, no more.
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-        world.setBlock(BUS_CABLE, dev.jsc.jscomputronics.module.computing.ComputingModule.ETHERNET_CABLE.get());
+        world.setBlock(BUS_CABLE, dev.jstech.computronics.ComputingModule.ETHERNET_CABLE.get());
         world.placeFromItem(TANK_A, BuiltInRegistries.BLOCK.get(TANK));
         world.placeFromItem(TANK_B, BuiltInRegistries.BLOCK.get(TANK));
         final StorageKey oxygen = StorageKey.chemical(OXYGEN);
@@ -225,8 +225,8 @@ public final class ChemicalDataGameTests {
                     helper.assertTrue(!filterItem[0].isEmpty(), "picking the tank up must drop its item");
                     helper.assertTrue(ChemicalBridges.chemicalOf(filterItem[0]).filter(OXYGEN::equals).isPresent(),
                             "the tank item must carry the oxygen; got " + ChemicalBridges.chemicalOf(filterItem[0]));
-                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable) {
-                        final var bus = new dev.jsc.jscomputronics.module.computing.block.part.ExportBusPart();
+                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computronics.blockentity.DataCableBlockEntity cable) {
+                        final var bus = new dev.jstech.computronics.block.part.ExportBusPart();
                         cable.addPart(Direction.WEST, bus);
                         bus.setFilter(filterItem[0]);
                         bus.getDataAccess().set(1, 300); // max: keep the faced block at 300 mB

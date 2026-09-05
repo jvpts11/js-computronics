@@ -7,20 +7,20 @@
  */
 package dev.jstech.tests.testkit;
 
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.HardwareItems;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.storage.ServerStore;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.HardwareItems;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.HbwInterfaceBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
 import dev.jstech.industrial.IndustrialModule;
 import dev.jstech.industrial.blockentity.AbstractMachineBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -420,7 +420,7 @@ public final class BigBaseScenario {
         // A cabinet refuses to raise its eleven parts into occupied space, so in a real world (as opposed to
         // an empty test arena) the ground has to come out first — otherwise every cabinet stays a lone
         // controller block, no rack forms, and the base has nothing on its network at all.
-        world.clearFor(dev.jsc.jscomputronics.module.computing.block.ServerRackStructure.allPositions(pos, facing));
+        world.clearFor(dev.jstech.computronics.block.ServerRackStructure.allPositions(pos, facing));
         world.setBlock(pos, state);
         ((AbstractMultiblockControllerBlock) rackBlock).setPlacedBy(world.level(), world.absolute(pos), state,
                 null, ItemStack.EMPTY);

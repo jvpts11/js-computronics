@@ -15,7 +15,7 @@ ${mod_description}
 '''
 
 # Mixin config. The mixins array stays empty until the first mixin is added
-# under the dev.jsc.jscomputronics.mixin package.
+# under the dev.jstech.computronics.mixin package.
 [[mixins]]
 config = "${mod_id}.mixins.json"
 

@@ -7,12 +7,12 @@
  */
 package dev.jstech.tests.gametest;
 
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
+import dev.jstech.computronics.os.fs.CraftFile;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.media.MediaFormat;
 import dev.jstech.core.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaFormat;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.CraftFiles;
 import net.minecraft.core.BlockPos;

@@ -7,14 +7,14 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput;
-import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.MultiStagePattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput;
+import dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.os.fs.CraftFile;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.gametest.framework.GameTest;
@@ -193,8 +193,8 @@ public final class MachineCraftDataGameTests {
     public static void externalDataPort_routesItemsFluidsAndToleratesNull(final GameTestHelper helper) {
         final net.neoforged.neoforge.items.ItemStackHandler items =
                 new net.neoforged.neoforge.items.ItemStackHandler(2);
-        final dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort itemPort =
-                new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(items, null);
+        final dev.jstech.computronics.storage.ExternalDataPort itemPort =
+                new dev.jstech.computronics.storage.ExternalDataPort(items, null);
         helper.assertTrue(itemPort.insert(StorageKey.of(Items.IRON_INGOT), 10, false) == 10,
                 "items insert into the item handler");
         helper.assertTrue(itemPort.count(StorageKey.of(Items.IRON_INGOT)) == 10, "count reflects the insert");
@@ -202,8 +202,8 @@ public final class MachineCraftDataGameTests {
                 "a fluid into an item-only port inserts nothing");
         helper.assertTrue(itemPort.extract(StorageKey.of(Items.IRON_INGOT), 4, false) == 4, "items extract back");
 
-        final dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort nullPort =
-                new dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort(null, null);
+        final dev.jstech.computronics.storage.ExternalDataPort nullPort =
+                new dev.jstech.computronics.storage.ExternalDataPort(null, null);
         helper.assertTrue(nullPort.isEmpty(), "a port with no handlers is empty");
         helper.assertTrue(nullPort.insert(StorageKey.of(Items.IRON_INGOT), 5, false) == 0,
                 "a null port accepts nothing, without crashing");

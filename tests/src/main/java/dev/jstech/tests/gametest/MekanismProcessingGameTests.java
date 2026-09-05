@@ -7,13 +7,13 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkProcessingOperation;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.operation.payload.OperationRecord;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalPort;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.crafting.NetworkProcessingOperation;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.operation.payload.OperationRecord;
+import dev.jstech.computronics.storage.ChemicalBridges;
+import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -215,8 +215,8 @@ public final class MekanismProcessingGameTests {
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final dev.jstech.tests.testkit.TestWorldBuilder world = rig.world();
                     // Right (west) face: the run cable already touches it; left (east) and front (north) spurs.
-                    if (world.getBlockEntity(MekanismRig.CABLE_WEST) instanceof dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity cable) {
-                        cable.addPart(Direction.EAST, new dev.jsc.jscomputronics.module.computing.block.part.InputBusPart());
+                    if (world.getBlockEntity(MekanismRig.CABLE_WEST) instanceof dev.jstech.computronics.blockentity.DataCableBlockEntity cable) {
+                        cable.addPart(Direction.EAST, new dev.jstech.computronics.block.part.InputBusPart());
                     }
                     MekanismRig.mountLeftInputBus(world);
                     MekanismRig.mountFrontReceivingBus(world);

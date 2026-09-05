@@ -7,18 +7,18 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.operation.payload.ComputingPayloads;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.boot.BootController;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
 import dev.jstech.core.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
-import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
-import dev.jsc.jscomputronics.module.computing.os.boot.BootController;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -159,7 +159,7 @@ public final class OsGameTests {
 
                     // Era gating: a LEGACY-minimum OS must NOT install on a Vintage-era hardware.
                     helper.assertTrue(
-                            !dev.jsc.jscomputronics.module.computing.os.OsGating.canInstall(
+                            !dev.jstech.computronics.os.OsGating.canInstall(
                                     HardwareEra.LEGACY, HardwareEra.VINTAGE),
                             "canInstall(LEGACY, VINTAGE) must be false (era gate rejects newer OS on older hardware)");
                 })
@@ -245,16 +245,16 @@ public final class OsGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final var routerBe = helper.getBlockEntity(routerPos);
-                    helper.assertTrue(routerBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                    helper.assertTrue(routerBe instanceof dev.jstech.computronics.blockentity
                                     .ServerRouterBlockEntity,
                             "the Server Router must create a ServerRouterBlockEntity");
                     helper.assertFalse(
-                            routerBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                            routerBe instanceof dev.jstech.computronics.blockentity
                                     .AbstractComputerBlockEntity,
                             "the Server Router must NOT extend AbstractComputerBlockEntity");
                     final var managerBe = helper.getBlockEntity(managerPos);
                     helper.assertTrue(
-                            managerBe instanceof dev.jsc.jscomputronics.module.computing.blockentity
+                            managerBe instanceof dev.jstech.computronics.blockentity
                                     .AbstractComputerBlockEntity,
                             "the Cluster Management Computer is a computer: it extends AbstractComputerBlockEntity");
 

@@ -7,14 +7,14 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.storage.DiskUsage;
-import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
-import dev.jsc.jscomputronics.module.computing.storage.ServerStore;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
-import dev.jsc.jscomputronics.module.computing.storage.StorageVolume;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.storage.DiskUsage;
+import dev.jstech.computronics.storage.DriveVolumes;
+import dev.jstech.computronics.storage.ServerStore;
+import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computronics.storage.StorageVolume;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.gametest.framework.GameTest;
@@ -78,7 +78,7 @@ public final class DiskUsageGameTests {
         helper.assertTrue(both.equals("Used 44%: 12 items, 22,944 mB of fluid, 500 mB of chemical across 3 types"), "got: " + both);
         // Chemicals are named only while a chemical mod (Mekanism on the dev runtime) is present.
         final String capacity = "Holds 80 items, or 80,000 mB of fluid"
-                + (dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges.anyRegistered() ? " or chemical" : "");
+                + (dev.jstech.computronics.storage.ChemicalBridges.anyRegistered() ? " or chemical" : "");
         helper.assertTrue(DiskUsage.capacityLine(80).equals(capacity), "got: " + DiskUsage.capacityLine(80));
         helper.assertTrue(DiskUsage.EMPTY.isEmpty() && !water.isEmpty(), "emptiness follows the weight");
         helper.succeed();

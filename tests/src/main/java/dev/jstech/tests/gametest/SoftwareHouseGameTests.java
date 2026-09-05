@@ -7,15 +7,15 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.os.Branding;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.SoftwareHouse;
+import dev.jstech.computronics.os.media.InstallerProjection;
+import dev.jstech.computronics.os.media.MediaItem;
+import dev.jstech.computronics.os.media.MediaKind;
 import dev.jstech.core.tier.HardwareEra;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.os.Branding;
-import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
-import dev.jsc.jscomputronics.module.computing.os.SoftwareHouse;
-import dev.jsc.jscomputronics.module.computing.os.media.InstallerProjection;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaItem;
-import dev.jsc.jscomputronics.module.computing.os.media.MediaKind;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;

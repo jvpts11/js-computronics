@@ -7,15 +7,15 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PersonalComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.program.ServerCliComputer;
-import dev.jsc.jscomputronics.module.computing.program.iql.IqlParseResult;
-import dev.jsc.jscomputronics.module.computing.program.iql.IqlParser;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
-import dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.program.ServerCliComputer;
+import dev.jstech.computronics.program.iql.IqlParseResult;
+import dev.jstech.computronics.program.iql.IqlParser;
+import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computronics.terminal.ComputerTerminalHost;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;

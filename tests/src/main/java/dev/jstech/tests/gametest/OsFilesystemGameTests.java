@@ -7,21 +7,21 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.common.hardware.DiskSize;
-import dev.jsc.jscomputronics.common.hardware.StorageTier;
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.OsRegistry;
-import dev.jsc.jscomputronics.module.computing.os.VolumeLabel;
-import dev.jsc.jscomputronics.module.computing.os.boot.BootController;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
-import dev.jsc.jscomputronics.module.computing.os.fs.FilesystemContents;
-import dev.jsc.jscomputronics.module.computing.os.fs.StoredFile;
-import dev.jsc.jscomputronics.module.computing.storage.DriveVolumes;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.JsComputronics;
+import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computronics.hardware.DiskSize;
+import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computronics.os.FilesystemKind;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.VolumeLabel;
+import dev.jstech.computronics.os.boot.BootController;
+import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computronics.os.fs.FileType;
+import dev.jstech.computronics.os.fs.FilesystemContents;
+import dev.jstech.computronics.os.fs.StoredFile;
+import dev.jstech.computronics.storage.DriveVolumes;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -514,7 +514,7 @@ public final class OsFilesystemGameTests {
      */
     @GameTest(template = ARENA)
     public static void programs_registryIsWellFormed(final GameTestHelper helper) {
-        final var builtins = dev.jsc.jscomputronics.module.computing.os.OsBootstrap.builtinPrograms();
+        final var builtins = dev.jstech.computronics.os.OsBootstrap.builtinPrograms();
         helper.assertTrue(!builtins.isEmpty(), "the built-in program list must not be empty");
         for (final var spec : builtins) {
             helper.assertTrue(OsRegistry.getProgram(spec.id()) == spec,
@@ -531,7 +531,7 @@ public final class OsFilesystemGameTests {
 
         // The OS registry is well-formed too: every built-in OS is registered with a display name and a
         // kernel that itself exists, so its lang key and install disc derive cleanly.
-        final var oses = dev.jsc.jscomputronics.module.computing.os.OsBootstrap.builtinOses();
+        final var oses = dev.jstech.computronics.os.OsBootstrap.builtinOses();
         helper.assertTrue(!oses.isEmpty(), "the built-in OS list must not be empty");
         for (final var os : oses) {
             helper.assertTrue(OsRegistry.getOs(os.id()) == os, "OS " + os.id() + " must be registered");
@@ -615,16 +615,16 @@ public final class OsFilesystemGameTests {
     public static void console_prefsAndInstallPersistNbt(final GameTestHelper helper) {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState state =
-                            new dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState();
+                    final dev.jstech.computronics.program.ComputerConsoleState state =
+                            new dev.jstech.computronics.program.ComputerConsoleState();
                     state.install("jsc:nms");
                     state.setWallpaper("winxp");
                     state.setComputerName("HAL");
                     final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
                     state.save(tag);
 
-                    final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState loaded =
-                            new dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState();
+                    final dev.jstech.computronics.program.ComputerConsoleState loaded =
+                            new dev.jstech.computronics.program.ComputerConsoleState();
                     loaded.load(tag);
                     helper.assertTrue(loaded.isInstalled("jsc:nms"),
                             "an installed program must persist across a reload");
@@ -644,28 +644,28 @@ public final class OsFilesystemGameTests {
     public static void console_iconPositionPersistsNbt(final GameTestHelper helper) {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState state =
-                            new dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState();
+                    final dev.jstech.computronics.program.ComputerConsoleState state =
+                            new dev.jstech.computronics.program.ComputerConsoleState();
                     final int cell =
-                            dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState.packCell(2, 3);
+                            dev.jstech.computronics.program.ComputerConsoleState.packCell(2, 3);
                     state.setIconCell("file:Notes.txt", cell);
                     state.setIconCell("app:Network",
-                            dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState.packCell(1, 0));
+                            dev.jstech.computronics.program.ComputerConsoleState.packCell(1, 0));
                     final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
                     state.save(tag);
 
-                    final dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState loaded =
-                            new dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState();
+                    final dev.jstech.computronics.program.ComputerConsoleState loaded =
+                            new dev.jstech.computronics.program.ComputerConsoleState();
                     loaded.load(tag);
                     final Integer back = loaded.iconCells().get("file:Notes.txt");
                     helper.assertTrue(back != null && back == cell,
                             "a pinned icon's cell must persist; got " + back);
                     helper.assertTrue(
-                            dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState
+                            dev.jstech.computronics.program.ComputerConsoleState
                                     .cellColumn(back) == 2,
                             "the persisted column must be 2");
                     helper.assertTrue(
-                            dev.jsc.jscomputronics.module.computing.program.ComputerConsoleState
+                            dev.jstech.computronics.program.ComputerConsoleState
                                     .cellRow(back) == 3,
                             "the persisted row must be 3");
                     helper.assertTrue(loaded.iconCells().containsKey("app:Network"),
@@ -682,7 +682,7 @@ public final class OsFilesystemGameTests {
     @GameTest(template = ARENA)
     public static void fs_moveBetweenDesktopAndFolderConservesFile(final GameTestHelper helper) {
         final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
-        final String desktop = dev.jsc.jscomputronics.module.computing.os.fs.SystemLayout.DESKTOP_DIR;
+        final String desktop = dev.jstech.computronics.os.fs.SystemLayout.DESKTOP_DIR;
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {

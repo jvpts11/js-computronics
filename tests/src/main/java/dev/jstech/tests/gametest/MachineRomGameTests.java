@@ -7,16 +7,16 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity.MachineConfig;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingInput;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern.ProcessingOutput;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity.MachineConfig;
+import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity;
+import dev.jstech.computronics.crafting.CraftingPattern;
+import dev.jstech.computronics.crafting.NetworkRecipe;
+import dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput;
+import dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput;
+import dev.jstech.computronics.crafting.ProcessingPattern;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.industrial.IndustrialModule;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;

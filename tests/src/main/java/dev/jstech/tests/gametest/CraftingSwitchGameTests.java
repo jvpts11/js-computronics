@@ -7,8 +7,8 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.CraftingSwitchBlockEntity;
+import dev.jstech.computronics.ComputingModule;
+import dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity;
 import dev.jstech.industrial.IndustrialModule;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;

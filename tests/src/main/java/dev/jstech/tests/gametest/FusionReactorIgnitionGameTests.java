@@ -7,11 +7,11 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalPort;
-import dev.jsc.jscomputronics.module.computing.storage.ExternalDataPort;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jstech.computronics.operation.NetworkStorage;
+import dev.jstech.computronics.storage.ChemicalBridges;
+import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.ExternalDataPort;
+import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
