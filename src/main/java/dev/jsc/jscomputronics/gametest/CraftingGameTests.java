@@ -53,25 +53,36 @@ public final class CraftingGameTests {
     private static final String ARENA = "empty";
     private static final int SETTLE = 4;
 
-    @GameTest(template = ARENA)
-    public static void patternEncoder_writesCraftFileOntoMedia(final GameTestHelper helper) {
-        final BlockPos pos = new BlockPos(2, 2, 2);
-        helper.setBlock(pos, ComputingModule.PATTERN_ENCODER.get());
-        if (!(helper.getBlockEntity(pos) instanceof PatternEncoderBlockEntity encoder)) {
-            throw new IllegalStateException("no pattern encoder at " + pos);
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void studio_benchDraftBurnsOntoMediaAtTheLinkedEncoder(final GameTestHelper helper) {
+        // The workbench lives on the computer; the encoder beside it is its burner. One oak log resolves to
+        // four planks through the recipe book, and the burned file reads back as that pattern.
+        final Network net = buildCraftingNetwork(helper);
+        final BlockPos encoderPos = new BlockPos(5, 2, 3); // adjacent to the Crafting Computer at (5,2,2)
+        helper.setBlock(encoderPos, ComputingModule.PATTERN_ENCODER.get());
+        if (!(helper.getBlockEntity(encoderPos) instanceof PatternEncoderBlockEntity encoder)) {
+            throw new IllegalStateException("no pattern encoder at " + encoderPos);
         }
-        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
-
+        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.DVD_RW.get()));
+        final var studio = net.cc.studio();
         helper.startSequence()
-                .thenExecuteAfter(SETTLE, () -> {
-                    // Empty grid: nothing to write.
-                    helper.assertFalse(encoder.writePattern(), "an empty grid must not write a pattern");
-                    // One oak log resolves to four planks via the vanilla recipe book.
-                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-                    helper.assertTrue(encoder.writePattern(),
-                            "a resolvable recipe writes a .craft onto the media");
-
-                    final ItemStack media = encoder.media().getStackInSlot(0);
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(encoder.ownerPos() != null && encoder.ownerPos().equals(net.cc.getBlockPos()),
+                            "the encoder links to the adjacent computer; got " + encoder.ownerPos());
+                    studio.refreshPreview(helper.getLevel());
+                    helper.assertTrue(studio.serialize(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.Kind.BENCH,
+                            helper.getLevel().registryAccess()).isEmpty(), "an empty bench serializes to nothing");
+                    studio.setGhost(0, new ItemStack(Items.OAK_LOG));
+                    studio.refreshPreview(helper.getLevel());
+                    helper.assertTrue(studio.preview().is(Items.OAK_PLANKS) && studio.preview().getCount() == 4,
+                            "one log previews four planks");
+                    final var content = studio.serialize(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.Kind.BENCH,
+                            helper.getLevel().registryAccess());
+                    helper.assertTrue(content.isPresent(), "a resolved bench draft serializes");
+                    helper.assertTrue(encoder.queueBurn("oak_planks", content.get()), "the encoder queues the burn");
+                })
+                .thenExecuteAfter(120, () -> {
+                    final ItemStack media = encoder.mediaStack();
                     final List<DiskFilesystem.FileEntry> files =
                             DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL);
                     int craftCount = 0;
@@ -82,21 +93,19 @@ public final class CraftingGameTests {
                             craftPath = e.path();
                         }
                     }
-                    helper.assertTrue(craftCount == 1, "exactly one .craft file is written");
+                    helper.assertTrue(craftCount == 1, "exactly one .craft file is burned");
                     final var content = DiskFilesystem.read(media, craftPath);
                     helper.assertTrue(content.isPresent(), "the .craft file is readable");
                     final var parsed = CraftFile.parse(content.get(), helper.getLevel().registryAccess());
                     helper.assertTrue(parsed.isPresent(), "the .craft round-trips back into a pattern");
-                    helper.assertTrue(parsed.get().result().is(Items.OAK_PLANKS),
-                            "the written pattern produces the recipe output");
-                    helper.assertTrue(parsed.get().result().getCount() == 4,
-                            "one log yields four planks");
+                    helper.assertTrue(parsed.get().result().is(Items.OAK_PLANKS) && parsed.get().result().getCount() == 4,
+                            "the burned pattern produces four planks");
                 })
                 .thenSucceed();
     }
 
     @GameTest(template = ARENA)
-    public static void patternEncoder_requiresWritableMedia(final GameTestHelper helper) {
+    public static void encoder_requiresWritableMediaOfItsEra(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         helper.setBlock(pos, ComputingModule.PATTERN_ENCODER.get());
         if (!(helper.getBlockEntity(pos) instanceof PatternEncoderBlockEntity encoder)) {
@@ -104,17 +113,15 @@ public final class CraftingGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-                    // No media in the slot: nothing to write to.
-                    helper.assertFalse(encoder.canWrite(), "a resolved recipe with no media cannot write");
-                    // Read-only media (a pressed CD-ROM) is rejected by the encoder's media slot.
-                    helper.assertFalse(
-                            encoder.media().isItemValid(0, new ItemStack(ComputingModule.CD_ROM.get())),
-                            "read-only media is rejected by the encoder slot");
-                    // A writable floppy is accepted and, with a resolved recipe, enables the write.
-                    encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
-                    helper.assertTrue(encoder.canWrite(),
-                            "writable media with a resolved recipe enables the write");
+                    helper.assertFalse(encoder.hasMedia(), "nothing in the bay to write to");
+                    // Read-only media (a pressed CD-ROM) is rejected by the bay.
+                    helper.assertFalse(encoder.media().isItemValid(0, new ItemStack(ComputingModule.CD_ROM.get())),
+                            "read-only media is rejected by the bay");
+                    // A floppy is the wrong era for a Standard encoder; a DVD-RW is right.
+                    helper.assertFalse(encoder.media().isItemValid(0, new ItemStack(ComputingModule.FLOPPY_DISK.get())),
+                            "a Standard encoder refuses a floppy");
+                    helper.assertTrue(encoder.media().isItemValid(0, new ItemStack(ComputingModule.DVD_RW.get())),
+                            "a Standard encoder takes a DVD-RW");
                 })
                 .thenSucceed();
     }
@@ -1803,10 +1810,10 @@ public final class CraftingGameTests {
         // exact steps the Crafting Manager's Load button runs), then request the craft through the same
         // entry point the terminal's request popup uses, and watch the result land in network storage.
         final Network net = buildCraftingNetwork(helper);
-        final BlockPos encoderPos = new BlockPos(1, 2, 4);
+        final BlockPos encoderPos = new BlockPos(5, 2, 1); // adjacent to the Crafting Computer at (5,2,2)
         final BlockPos drivePos = new BlockPos(5, 2, 3); // adjacent to the Crafting Computer at (5,2,2)
         helper.setBlock(encoderPos, ComputingModule.PATTERN_ENCODER.get());
-        helper.setBlock(drivePos, ComputingModule.FLOPPY_DRIVE.get());
+        helper.setBlock(drivePos, ComputingModule.DVD_DRIVE.get());
         if (!(helper.getBlockEntity(encoderPos) instanceof PatternEncoderBlockEntity encoder)) {
             throw new IllegalStateException("no pattern encoder at " + encoderPos);
         }
@@ -1814,31 +1821,44 @@ public final class CraftingGameTests {
                 instanceof dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity drive)) {
             throw new IllegalStateException("no media reader at " + drivePos);
         }
-        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
+        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.DVD_RW.get()));
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // 1) Author the pattern at the encoder, exactly as the GUI's WRITE button does.
-                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-                    helper.assertTrue(encoder.writePattern(), "the encoder writes the .craft onto the floppy");
-                    // The encoder's own menu must stay open for a player standing at it.
+                    // 1) Author the pattern on the computer's workbench and send it to the linked encoder, exactly
+                    //    as the Studio's Burn button does.
+                    helper.assertTrue(encoder.ownerPos() != null && encoder.ownerPos().equals(net.cc.getBlockPos()),
+                            "the encoder must link to the adjacent Crafting Computer; got " + encoder.ownerPos());
+                    final var studio = net.cc.studio();
+                    studio.setGhost(0, new ItemStack(Items.OAK_LOG));
+                    studio.refreshPreview(helper.getLevel());
+                    final var content = studio.serialize(
+                            dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.Kind.BENCH,
+                            helper.getLevel().registryAccess());
+                    helper.assertTrue(content.isPresent() && encoder.queueBurn("oak_planks", content.get()),
+                            "the bench draft is sent to the encoder");
+                    // The encoder's own bay panel must stay open for a player standing at it.
                     final var player = helper.makeMockPlayer(GameType.CREATIVE);
                     final BlockPos absolute = helper.absolutePos(encoderPos);
                     player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
                     final var encoderMenu = new dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu(
                             1, player.getInventory(), encoder);
                     helper.assertTrue(encoderMenu.stillValid(player), "the Pattern Encoder menu stays open");
-                    // 2) Carry the floppy over: out of the encoder, into the drive next to the computer.
-                    final ItemStack floppy = encoder.media().getStackInSlot(0);
-                    encoder.media().setStackInSlot(0, ItemStack.EMPTY);
-                    drive.mediaSlot().setStackInSlot(0, floppy);
+                })
+                .thenExecuteAfter(120, () -> {
+                    helper.assertTrue(encoder.completed() == 1, "the encoder burned the file; completed=" + encoder.completed());
+                    helper.assertFalse(encoder.locked(), "the bay is free once the job is over");
+                    // 2) Carry the disc over: out of the encoder, into the drive next to the computer.
+                    final ItemStack disc = encoder.ejectMedia();
+                    helper.assertFalse(disc.isEmpty(), "the disc comes out of the encoder");
+                    drive.mediaSlot().setStackInSlot(0, disc);
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     // 3) The drive auto-links to the adjacent Crafting Computer over the peripheral system —
                     //    this link is what lets the Crafting Manager list the medium as a volume.
                     helper.assertTrue(drive.ownerPos() != null
                                     && drive.ownerPos().equals(helper.absolutePos(new BlockPos(5, 2, 2))),
-                            "the floppy drive must auto-link to the Crafting Computer; got " + drive.ownerPos());
+                            "the DVD drive must auto-link to the Crafting Computer; got " + drive.ownerPos());
                     helper.assertTrue(net.cc.linkedEndpoints().contains(helper.absolutePos(drivePos).asLong()),
                             "the Crafting Computer must list the drive as a linked endpoint");
                     // 4) Load the .craft from the linked medium into the Recipe ROM (the Load button's steps).
@@ -1851,7 +1871,7 @@ public final class CraftingGameTests {
                             craftPath = e.path();
                         }
                     }
-                    helper.assertTrue(craftPath != null, "the carried floppy still holds the .craft file");
+                    helper.assertTrue(craftPath != null, "the carried disc still holds the .craft file");
                     final var content = DiskFilesystem.read(media, craftPath);
                     final var parsed = CraftFile.parse(content.orElse(""), helper.getLevel().registryAccess());
                     helper.assertTrue(parsed.isPresent(), "the .craft parses back into a pattern");

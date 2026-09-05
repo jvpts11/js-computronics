@@ -80,6 +80,8 @@ public final class ComputingClientSetup {
         event.registerBlockEntityRenderer(ComputingModule.SERVER_RACK_BE.get(), RackRenderer::new);
         // The Mainframe is the same idea: one cabinet per era, drawn from the controller block.
         event.registerBlockEntityRenderer(ComputingModule.MAINFRAME_BE.get(), MainframeRenderer::new);
+        // The Pattern Encoder: one burner body per era, with its bay, display and lamps.
+        event.registerBlockEntityRenderer(ComputingModule.PATTERN_ENCODER_BE.get(), PatternEncoderRenderer::new);
     }
 
     @SubscribeEvent

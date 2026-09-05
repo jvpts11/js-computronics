@@ -155,6 +155,12 @@ public final class OsInstallScreen extends Screen {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
+    /** Screen centre of the primary action drawn on the last frame (client tests click it). */
+    public int[] primaryButtonCenter() {
+        return primary == null ? new int[]{width / 2, height / 2}
+                : new int[]{primary[0] + primary[2] / 2, primary[1] + primary[3] / 2};
+    }
+
     private static boolean in(final int[] r, final double mx, final double my) {
         return r != null && mx >= r[0] && mx < r[0] + r[2] && my >= r[1] && my < r[1] + r[3];
     }

@@ -7,74 +7,97 @@
  */
 package dev.jsc.jscomputronics.module.computing.blockentity;
 
+import dev.jsc.jscomputronics.common.peripheral.PeripheralCableType;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralEndpoint;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralLinkValidator;
+import dev.jsc.jscomputronics.common.peripheral.PeripheralOwner;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.crafting.MultiStagePattern;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
+import dev.jsc.jscomputronics.module.computing.PeripheralLinks;
+import dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock;
 import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
 import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
 import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
+import dev.jsc.jscomputronics.module.computing.os.fs.FsPaths;
 import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
-import dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaFormat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Containers;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.CraftingInput;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * The Pattern Encoder: a workstation that authors crafting recipes onto pattern media. It hosts three authoring
- * modes that all write the same {@link FileType#CRAFT} file format the Crafting Manager loads into a machine ROM:
- * a bench recipe laid out on a ghost 3x3 grid, a machine PROCESSING recipe (inputs into a named machine TYPE,
- * yielding declared outputs with per-output chances and a timeout), and a MULTI-STAGE pipeline assembled from
- * ordered bench/processing stages. The processing input/output grids and the stage list are ghost data only — the
- * player's items are never consumed; a click records a copy.
+ * The Pattern Encoder: the burner that puts recipe files onto removable media. It is a peripheral of a
+ * computer, linked over the peripheral cable like a drive, and it authors nothing itself; the computer's
+ * Pattern Studio does the authoring and hands finished files over one at a time. Each file is a job: the
+ * head seeks, the bytes go down at the medium's rate, the medium is read back and compared, and the bay
+ * stays locked until the job is over. Jobs queue up, so a session's worth of recipes can be sent at once.
+ *
+ * <p>The encoder comes in three eras, and each writes the media of its day: a Vintage encoder writes floppy
+ * disks, a Legacy one writes CDs, a Standard one writes DVDs, CDs and USB sticks (and no floppies).
  */
-public class PatternEncoderBlockEntity extends BlockEntity {
+public class PatternEncoderBlockEntity extends BlockEntity implements PeripheralEndpoint,
+        software.bernie.geckolib.animatable.GeoBlockEntity {
 
-    /** Number of cells in each of the processing input and output ghost grids (3 columns, scrollable). */
-    public static final int PROC_GRID = 27;
+    /** The most jobs waiting behind the one being written. */
+    public static final int QUEUE_MAX = 8;
 
-    private final ItemStackHandler ghostGrid = new ItemStackHandler(CraftingPattern.GRID_SIZE) {
-        @Override
-        protected void onContentsChanged(final int slot) {
-            setChanged();
-            refreshPreview();
-        }
-    };
+    // The body's only motion: the disc spins and the activity lamp pulses while the head is down. No part
+    // ever moves out of the block; everything else the body shows is bone visibility set by the renderer.
+    private static final software.bernie.geckolib.animation.RawAnimation WRITE =
+            software.bernie.geckolib.animation.RawAnimation.begin().thenLoop("animation.pattern_encoder.write");
+
+    private final software.bernie.geckolib.animatable.instance.AnimatableInstanceCache geckoCache =
+            software.bernie.geckolib.util.GeckoLibUtil.createInstanceCache(this);
+
+    @Override
+    public void registerControllers(
+            final software.bernie.geckolib.animation.AnimatableManager.ControllerRegistrar controllers) {
+        controllers.add(new software.bernie.geckolib.animation.AnimationController<>(this, "work", 0,
+                state -> busy() ? state.setAndContinue(WRITE) : software.bernie.geckolib.animation.PlayState.STOP));
+    }
+
+    @Override
+    public software.bernie.geckolib.animatable.instance.AnimatableInstanceCache getAnimatableInstanceCache() {
+        return geckoCache;
+    }
+    /** How long a finished or failed job stays on the display before the next one starts. */
+    public static final int HOLD_TICKS = 30;
+
+    /** Where a job is. */
+    public enum Phase {
+        IDLE, SEEK, WRITE, VERIFY, DONE, ERROR
+    }
+
+    /** One file waiting to be burned: its base name (no extension) and its content. */
+    public record BurnRequest(String fileName, String content) {
+    }
+
+    private static final String NBT_LINKED_OWNER = "LinkedOwner";
 
     private final ItemStackHandler media = new ItemStackHandler(1) {
         @Override
         public boolean isItemValid(final int slot, final ItemStack stack) {
-            return stack.getItem() instanceof FormattedMediaItem item && item.writable();
+            return acceptsMedia(stack);
         }
 
         @Override
@@ -83,594 +106,517 @@ public class PatternEncoderBlockEntity extends BlockEntity {
         }
 
         @Override
+        public ItemStack extractItem(final int slot, final int amount, final boolean simulate) {
+            // The bay is locked while the head is on the medium: pulling the disc mid-write is how a
+            // real burner ruins one, so the encoder simply refuses.
+            return locked() ? ItemStack.EMPTY : super.extractItem(slot, amount, simulate);
+        }
+
+        @Override
         protected void onContentsChanged(final int slot) {
             setChanged();
+            sync();
         }
     };
 
-    /**
-     * One processing cell: a kind of data (item, fluid or chemical), the amount per run and whether that amount
-     * is an estimate a recipe transfer worked out rather than one the author confirmed. Cells are ghost data —
-     * an item cell shows the item, a fluid or chemical cell shows the substance — and never hold real items.
-     */
-    public record DataCell(StorageKey key, long amount, boolean estimated) {
+    private final Deque<BurnRequest> queue = new ArrayDeque<>();
+    private Phase phase = Phase.IDLE;
+    private int phaseTicks;
+    private int phaseTotal;
+    private int writeTicks;
+    private String currentFile = "";
+    private String message = "";
+    private int completed;
 
-        /** What a fluid or chemical cell gets when it is placed from an item that carries it: one bucket. */
-        public static final long CONTINUOUS_DEFAULT_AMOUNT = StorageKey.MB_EQ_PER_ITEM;
-
-        public static final Codec<DataCell> CODEC = RecordCodecBuilder.create(i -> i.group(
-                StorageKey.CODEC.fieldOf("key").forGetter(DataCell::key),
-                Codec.LONG.fieldOf("amount").forGetter(DataCell::amount),
-                Codec.BOOL.optionalFieldOf("estimated", false).forGetter(DataCell::estimated)
-        ).apply(i, DataCell::new));
-
-        public static final StreamCodec<RegistryFriendlyByteBuf, DataCell> STREAM_CODEC = StreamCodec.composite(
-                StorageKey.STREAM_CODEC, DataCell::key,
-                ByteBufCodecs.VAR_LONG, DataCell::amount,
-                ByteBufCodecs.BOOL, DataCell::estimated,
-                DataCell::new);
-
-        public boolean isItem() {
-            return key.isItem();
-        }
-
-        /** The ghost stack an item cell shows, with the amount as its count; empty for fluids and chemicals. */
-        public ItemStack stack() {
-            return key.isItem() ? key.stack((int) Math.min(amount, Integer.MAX_VALUE)) : ItemStack.EMPTY;
-        }
-
-        /**
-         * The cell a carried stack places: a fluid container names its fluid and a chemical-carrying item its
-         * chemical (a bucket's worth each), any other stack is an item cell with the stack's count as the amount.
-         */
-        @Nullable
-        public static DataCell fromStack(final ItemStack carried) {
-            if (carried.isEmpty()) {
-                return null;
-            }
-            final Optional<StorageKey> fluid = FluidUtil.getFluidContained(carried)
-                    .filter(f -> !f.isEmpty()).map(StorageKey::of);
-            if (fluid.isPresent()) {
-                return new DataCell(fluid.get(), CONTINUOUS_DEFAULT_AMOUNT, false);
-            }
-            final Optional<StorageKey> chemical = ChemicalBridges.chemicalOf(carried).map(StorageKey::chemical);
-            if (chemical.isPresent()) {
-                return new DataCell(chemical.get(), CONTINUOUS_DEFAULT_AMOUNT, false);
-            }
-            return new DataCell(StorageKey.of(carried), carried.getCount(), false);
-        }
-    }
-
-    // PROCESSING authoring state. Inputs/outputs are data cells (null = empty); each output carries a chance
-    // (100 = guaranteed). The machine TYPE is a block registry-id string (or a Crafting Switch face name) the
-    // engine matches against a declared machine. All of this is synced to the client by the update tag so the
-    // screen can read it back without a dedicated payload.
-    private final DataCell[] procInputs = new DataCell[PROC_GRID];
-    private final DataCell[] procOutputs = new DataCell[PROC_GRID];
-
-    private final int[] outputChances = newFullChances();
-    private String machineType = "";
-    private int procTimeout = ProcessingPattern.DEFAULT_TIMEOUT_TICKS;
-
-    // MULTI-STAGE authoring state: an ordered list of stages assembled from the bench grid or the processing tab.
-    private final List<MultiStagePattern.Stage> stages = new ArrayList<>();
-
-    private ItemStack preview = ItemStack.EMPTY;
+    @Nullable
+    private Long linkedOwner;
 
     public PatternEncoderBlockEntity(final BlockPos pos, final BlockState state) {
         super(ComputingModule.PATTERN_ENCODER_BE.get(), pos, state);
     }
 
-    private static int[] newFullChances() {
-        final int[] c = new int[PROC_GRID];
-        for (int i = 0; i < PROC_GRID; i++) {
-            c[i] = ProcessingPattern.FULL_CHANCE;
-        }
-        return c;
+    // ---- era and media ----
+
+    /** The era of this encoder's chassis, which decides the media it writes. */
+    public HardwareEra era() {
+        return getBlockState().getBlock() instanceof PatternEncoderBlock block ? block.era() : HardwareEra.STANDARD;
     }
 
-    public ItemStackHandler ghostGrid() {
-        return ghostGrid;
+    /** Whether an encoder of {@code era} writes media of {@code format}. */
+    public static boolean eraAccepts(final HardwareEra era, final MediaFormat format) {
+        return switch (era) {
+            case VINTAGE -> format == MediaFormat.FLOPPY;
+            case LEGACY -> format == MediaFormat.CD;
+            default -> format == MediaFormat.DVD || format == MediaFormat.CD || format == MediaFormat.USB;
+        };
+    }
+
+    /**
+     * Bytes the head lays down per tick on {@code format}. The fixed part of a burn is the drive, not the
+     * file: a floppy seeks before it writes and a CD spins up, which is why an old drive feels slow even
+     * for a tiny file. A USB stick has no head to move and takes the file at once.
+     */
+    public static int bytesPerTick(final MediaFormat format) {
+        return switch (format) {
+            case FLOPPY -> 250;
+            case CD -> 1024;
+            case DVD -> 4096;
+            case USB -> Integer.MAX_VALUE;
+        };
+    }
+
+    /** Ticks {@code format} spends finding its place before the first byte: a seek, a spin-up, a handshake. */
+    public static int seekTicks(final MediaFormat format) {
+        return switch (format) {
+            case FLOPPY -> 20;
+            case CD -> 30;
+            case DVD -> 15;
+            case USB -> 4;
+        };
+    }
+
+    /** Ticks the read-back after the last byte takes on {@code format}. */
+    public static int verifyTicks(final MediaFormat format) {
+        return switch (format) {
+            case FLOPPY, CD -> 10;
+            case DVD -> 5;
+            case USB -> 2;
+        };
+    }
+
+    /** The whole burn of {@code bytes} on {@code format}: seek, write and verify. */
+    public static int burnTicks(final MediaFormat format, final int bytes) {
+        return seekTicks(format) + writeTicks(format, bytes) + verifyTicks(format);
+    }
+
+    private static int writeTicks(final MediaFormat format, final int bytes) {
+        return Math.max(1, (int) Math.ceil(bytes / (double) bytesPerTick(format)));
+    }
+
+    /** Whether the bay takes {@code stack}: writable media of a format this era's encoder writes. */
+    public boolean acceptsMedia(final ItemStack stack) {
+        return !stack.isEmpty()
+                && stack.getItem() instanceof FormattedMediaItem item
+                && item.writable()
+                && eraAccepts(era(), item.format());
     }
 
     public ItemStackHandler media() {
         return media;
     }
 
-    /** The input cell at {@code cell}, or null when empty. */
-    @Nullable
-    public DataCell procInput(final int cell) {
-        return cell >= 0 && cell < PROC_GRID ? procInputs[cell] : null;
+    public ItemStack mediaStack() {
+        return media.getStackInSlot(0);
     }
 
-    /** The output cell at {@code cell}, or null when empty. */
-    @Nullable
-    public DataCell procOutput(final int cell) {
-        return cell >= 0 && cell < PROC_GRID ? procOutputs[cell] : null;
+    public boolean hasMedia() {
+        return !mediaStack().isEmpty();
     }
 
-    public ItemStack preview() {
-        return preview;
+    /** Puts {@code stack} in the bay if it is empty and the medium is accepted; returns what was not taken. */
+    public ItemStack insertMedia(final ItemStack stack) {
+        return media.insertItem(0, stack, false);
     }
 
-    public void setGhost(final int cell, final ItemStack stack) {
-        if (cell < 0 || cell >= CraftingPattern.GRID_SIZE) {
-            return;
-        }
-        ghostGrid.setStackInSlot(cell, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+    /** Takes the medium out, unless a job holds it; empty when nothing came out. */
+    public ItemStack ejectMedia() {
+        return media.extractItem(0, 1, false);
     }
 
-    public void refreshPreview() {
-        final Level level = getLevel();
-        if (level == null || level.isClientSide()) {
-            return;
-        }
-        final List<ItemStack> cells = gridCells();
-        boolean empty = true;
-        for (final ItemStack cell : cells) {
-            if (!cell.isEmpty()) {
-                empty = false;
-                break;
-            }
-        }
-        if (empty) {
-            preview = ItemStack.EMPTY;
-            return;
-        }
-        final CraftingInput input = CraftingInput.of(3, 3, cells);
-        preview = level.getRecipeManager()
-                .getRecipeFor(RecipeType.CRAFTING, input, level)
-                .map(holder -> holder.value().assemble(input, level.registryAccess()))
-                .orElse(ItemStack.EMPTY);
-    }
-
-    public boolean canWrite() {
-        if (preview.isEmpty()) {
-            return false;
-        }
-        return mediaWritable();
-    }
-
-    public boolean writePattern() {
-        refreshPreview();
-        if (!canWrite()) {
-            return false;
-        }
-        final Level level = getLevel();
-        if (level == null || level.isClientSide()) {
-            return false;
-        }
-        final Optional<String> serialized = CraftFile.serialize(
-                new CraftingPattern(gridCells(), preview.copy()), level.registryAccess());
-        if (serialized.isEmpty()) {
-            return false;
-        }
-        return writeToMedia(craftFileName(itemBaseName(preview)), serialized.get());
-    }
-
-    // --- PROCESSING authoring ---
-
-    /** Places the carried stack's data into an input cell (an empty hand clears it); items are never consumed. */
-    public void setProcInput(final int cell, final ItemStack carried) {
-        setProcCell(false, cell, DataCell.fromStack(carried));
-    }
-
-    public void setProcOutput(final int cell, final ItemStack carried) {
-        setProcCell(true, cell, DataCell.fromStack(carried));
-    }
-
-    /** Sets or clears ({@code null}) a processing cell directly. */
-    public void setProcCell(final boolean output, final int cell, @Nullable final DataCell value) {
-        if (cell < 0 || cell >= PROC_GRID) {
-            return;
-        }
-        (output ? procOutputs : procInputs)[cell] = value;
-        setChanged();
-        sync();
-    }
-
-    /** Sets a cell's amount per run; a confirmed amount is no longer an estimate. Clears the cell at 0. */
-    public void setProcAmount(final boolean output, final int cell, final long amount) {
-        final DataCell current = output ? procOutput(cell) : procInput(cell);
-        if (current == null) {
-            return;
-        }
-        setProcCell(output, cell, amount <= 0 ? null : new DataCell(current.key(), amount, false));
-    }
+    // ---- jobs ----
 
     /**
-     * Replaces the whole processing draft with the given recipe — used by the recipe viewer's transfer, which
-     * hands us a recipe's inputs and outputs at once. All output chances reset to guaranteed; the machine choice
-     * is kept (the player pairs the recipe with its machine explicitly).
+     * Queues a file for burning. Refused when the queue is full or the name is not one the filesystem can
+     * hold; the medium is checked when the job starts, so a job can be queued before the disc goes in.
      */
-    public void applyProcessingCells(final List<DataCell> inputs, final List<DataCell> outputs) {
-        for (int i = 0; i < PROC_GRID; i++) {
-            procInputs[i] = i < inputs.size() ? inputs.get(i) : null;
-            procOutputs[i] = i < outputs.size() ? outputs.get(i) : null;
-            outputChances[i] = ProcessingPattern.FULL_CHANCE;
+    public boolean queueBurn(final String fileName, final String content) {
+        if (queue.size() >= QUEUE_MAX || fileName == null || fileName.isBlank() || content == null
+                || fileName.length() + ".craft".length() > FsPaths.MAX_NAME_LENGTH) {
+            return false;
         }
+        queue.addLast(new BurnRequest(fileName, content));
         setChanged();
-        sync();
-    }
-
-    /** {@link #applyProcessingCells} for plain item stacks (each stack's count is its amount). */
-    public void applyProcessingRecipe(final List<ItemStack> inputs, final List<ItemStack> outputs) {
-        final List<DataCell> ins = new ArrayList<>();
-        for (final ItemStack in : inputs) {
-            final DataCell cell = DataCell.fromStack(in);
-            if (cell != null) {
-                ins.add(cell);
-            }
-        }
-        final List<DataCell> outs = new ArrayList<>();
-        for (final ItemStack out : outputs) {
-            final DataCell cell = DataCell.fromStack(out);
-            if (cell != null) {
-                outs.add(cell);
-            }
-        }
-        applyProcessingCells(ins, outs);
-    }
-
-    public int outputChance(final int cell) {
-        return cell >= 0 && cell < PROC_GRID ? outputChances[cell] : ProcessingPattern.FULL_CHANCE;
-    }
-
-    public void setOutputChance(final int cell, final int percent) {
-        if (cell < 0 || cell >= PROC_GRID) {
-            return;
-        }
-        outputChances[cell] = Math.max(1, Math.min(ProcessingPattern.FULL_CHANCE, percent));
-        sync();
-    }
-
-    public String machineType() {
-        return machineType;
-    }
-
-    public void setMachineType(final String type) {
-        machineType = type == null ? "" : type;
-        sync();
-    }
-
-    public int procTimeout() {
-        return procTimeout;
-    }
-
-    public void setProcTimeout(final int ticks) {
-        procTimeout = Math.max(1, ticks);
-        sync();
-    }
-
-    public void clearProcessing() {
-        for (int i = 0; i < PROC_GRID; i++) {
-            procInputs[i] = null;
-            procOutputs[i] = null;
-            outputChances[i] = ProcessingPattern.FULL_CHANCE;
-        }
-        setChanged();
-        sync();
-    }
-
-    /** Builds the processing pattern currently authored (may be incomplete; validate with {@link #canWriteProcessing}). */
-    public ProcessingPattern buildProcessingPattern() {
-        final List<ProcessingPattern.ProcessingInput> ins = new ArrayList<>();
-        final List<ProcessingPattern.ProcessingOutput> outs = new ArrayList<>();
-        for (int i = 0; i < PROC_GRID; i++) {
-            final DataCell in = procInputs[i];
-            if (in != null) {
-                ins.add(new ProcessingPattern.ProcessingInput(in.key(), in.amount(), in.estimated()));
-            }
-            final DataCell out = procOutputs[i];
-            if (out != null) {
-                outs.add(new ProcessingPattern.ProcessingOutput(out.key(), out.amount(), outputChances[i]));
-            }
-        }
-        return new ProcessingPattern(ins, outs, machineType, procTimeout);
-    }
-
-    public boolean canWriteProcessing() {
-        if (!mediaWritable() || machineType.isBlank()) {
-            return false;
-        }
-        final ProcessingPattern pattern = buildProcessingPattern();
-        return !pattern.inputs().isEmpty() && !pattern.outputs().isEmpty();
-    }
-
-    public boolean writeProcessingPattern() {
-        final Level level = getLevel();
-        if (level == null || level.isClientSide() || !canWriteProcessing()) {
-            return false;
-        }
-        final ProcessingPattern pattern = buildProcessingPattern();
-        final Optional<String> serialized = CraftFile.serializeProcessing(pattern, level.registryAccess());
-        if (serialized.isEmpty()) {
-            return false;
-        }
-        final ProcessingPattern.ProcessingOutput primary = pattern.primaryOutput();
-        final String base = primary != null && primary.key().isItem()
-                ? itemBaseName(primary.key().stack(1))
-                : machineBaseName(machineType);
-        return writeToMedia(craftFileName(base), serialized.get());
-    }
-
-    // --- MULTI-STAGE authoring ---
-
-    public List<MultiStagePattern.Stage> stages() {
-        return List.copyOf(stages);
-    }
-
-    public boolean addBenchStage() {
-        refreshPreview();
-        if (preview.isEmpty()) {
-            return false;
-        }
-        stages.add(MultiStagePattern.Stage.bench(new CraftingPattern(gridCells(), preview.copy())));
-        // Clear the recipe grid so the NEXT stage is built fresh, not the same one re-added every click.
-        for (int i = 0; i < CraftingPattern.GRID_SIZE; i++) {
-            ghostGrid.setStackInSlot(i, ItemStack.EMPTY);
-        }
-        preview = ItemStack.EMPTY;
         sync();
         return true;
     }
 
-    public boolean addProcessingStage() {
-        if (machineType.isBlank()) {
-            return false;
-        }
-        final ProcessingPattern pattern = buildProcessingPattern();
-        if (pattern.inputs().isEmpty() || pattern.outputs().isEmpty()) {
-            return false;
-        }
-        stages.add(MultiStagePattern.Stage.proc(pattern));
-        clearProcessing(); // clear inputs/outputs so the NEXT stage is built fresh (also syncs)
-        return true;
+    public int queued() {
+        return queue.size();
     }
 
-    /**
-     * Appends a stage by loading a {@code .craft} file from the inserted medium and routing on its kind: a bench
-     * pattern becomes a bench stage, a machine pattern a processing stage. A multi-stage file is rejected (a
-     * multi-stage pattern cannot be nested inside another). This is how the multi-stage picker adds stages.
-     */
-    public boolean addStageFromMedia(final String fileName) {
-        final Level level = getLevel();
-        if (level == null || fileName == null || fileName.isBlank()) {
-            return false;
+    public Phase phase() {
+        return phase;
+    }
+
+    /** Whether the head is on the medium (seeking, writing or verifying). */
+    public boolean busy() {
+        return phase == Phase.SEEK || phase == Phase.WRITE || phase == Phase.VERIFY;
+    }
+
+    /** Whether the bay refuses to give the medium up. */
+    public boolean locked() {
+        return busy();
+    }
+
+    /** The file being burned (or just burned), without its extension. */
+    public String currentFile() {
+        return currentFile;
+    }
+
+    /** Files burned since the block was placed. */
+    public int completed() {
+        return completed;
+    }
+
+    /** The format in the bay, or null with the bay empty. */
+    @Nullable
+    private MediaFormat bayFormat() {
+        return mediaStack().getItem() instanceof FormattedMediaItem item ? item.format() : null;
+    }
+
+    /** The format of the medium in the bay, or null with the bay empty; what the body draws. */
+    @Nullable
+    public MediaFormat mediaFormat() {
+        return bayFormat();
+    }
+
+    /** Progress of the current job across seek, write and verify, 0..100. */
+    public int progressPercent() {
+        if (!busy() && phase != Phase.DONE) {
+            return 0;
         }
-        final Optional<String> content = DiskFilesystem.read(media.getStackInSlot(0), fileName);
-        if (content.isEmpty()) {
-            return false;
+        if (phase == Phase.DONE) {
+            return 100;
         }
-        final var registries = level.registryAccess();
-        final String type = CraftFile.typeOf(content.get());
-        final MultiStagePattern.Stage stage;
-        if ("proc".equals(type)) {
-            final Optional<ProcessingPattern> p = CraftFile.parseProcessing(content.get(), registries);
-            if (p.isEmpty()) {
-                return false;
-            }
-            stage = MultiStagePattern.Stage.proc(p.get());
-        } else if ("multi".equals(type)) {
-            return false; // a multi-stage pattern can't be a stage of another multi-stage
+        final MediaFormat format = bayFormat();
+        final int seek = format == null ? 0 : seekTicks(format);
+        final int verify = format == null ? 0 : verifyTicks(format);
+        final int total = seek + writeTicks + verify;
+        final int elapsed = switch (phase) {
+            case SEEK -> phaseTicks;
+            case WRITE -> seek + phaseTicks;
+            case VERIFY -> seek + writeTicks + phaseTicks;
+            default -> 0;
+        };
+        return total <= 0 ? 0 : Math.max(0, Math.min(100, elapsed * 100 / total));
+    }
+
+    /** One line for a display: what the encoder is doing, or why it stopped. */
+    public String statusLine() {
+        return switch (phase) {
+            case IDLE -> hasMedia() ? (queue.isEmpty() ? "Ready" : "Starting...") : "Insert media";
+            case SEEK -> "Seeking";
+            case WRITE -> "Writing " + currentFile + ".craft";
+            case VERIFY -> "Verifying " + currentFile + ".craft";
+            case DONE -> "Done: " + currentFile + ".craft";
+            case ERROR -> message.isEmpty() ? "Error" : message;
+        };
+    }
+
+    /** The reason the last job failed, or {@code ""}. */
+    public String lastError() {
+        return phase == Phase.ERROR ? message : "";
+    }
+
+    /** Drops every waiting job and stops the current one; nothing half-written is left on the medium. */
+    public void cancelAll() {
+        queue.clear();
+        if (busy()) {
+            enter(Phase.ERROR, HOLD_TICKS);
+            message = "Cancelled";
+        }
+        setChanged();
+        sync();
+    }
+
+    // ---- ticking ----
+
+    public static void serverTick(final Level level, final BlockPos pos, final BlockState state,
+                                  final PatternEncoderBlockEntity be) {
+        if (level instanceof ServerLevel serverLevel) {
+            be.tick(serverLevel);
+        }
+    }
+
+    private void tick(final ServerLevel level) {
+        tickLink(level);
+        tickJob(level);
+    }
+
+    private void tickLink(final ServerLevel level) {
+        final long self = worldPosition.asLong();
+        final PeripheralLinkValidator validator = PeripheralLinks.validator(level);
+        if (linkedOwner == null) {
+            PeripheralLinks.discoverOwner(level, self)
+                    .ifPresent(ownerPos -> validator.tryEstablishLink(ownerPos, self));
         } else {
-            final Optional<CraftingPattern> p = CraftFile.parse(content.get(), registries);
-            if (p.isEmpty()) {
-                return false;
+            final boolean ownerPresent = level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner;
+            if (!ownerPresent || !validator.isLinkStillValid(linkedOwner, self, PeripheralCableType.COMPUTING)) {
+                unlink(level);
             }
-            stage = MultiStagePattern.Stage.bench(p.get());
-        }
-        stages.add(stage);
-        sync();
-        return true;
-    }
-
-    public void removeStage(final int index) {
-        if (index >= 0 && index < stages.size()) {
-            stages.remove(index);
-            sync();
         }
     }
 
-    public void clearStages() {
-        if (!stages.isEmpty()) {
-            stages.clear();
-            sync();
+    private void tickJob(final ServerLevel level) {
+        switch (phase) {
+            case IDLE -> {
+                if (queue.isEmpty()) {
+                    return;
+                }
+                if (!hasMedia()) {
+                    // The job waits for a disc rather than failing: the player queued it on purpose and the
+                    // display says what is missing.
+                    return;
+                }
+                final BurnRequest next = queue.peekFirst();
+                currentFile = next.fileName();
+                final MediaFormat format = ((FormattedMediaItem) mediaStack().getItem()).format();
+                writeTicks = writeTicks(format, next.content().getBytes(StandardCharsets.UTF_8).length);
+                enter(Phase.SEEK, seekTicks(format));
+                sync();
+            }
+            case SEEK -> {
+                if (++phaseTicks >= phaseTotal) {
+                    enter(Phase.WRITE, writeTicks);
+                }
+            }
+            case WRITE -> {
+                if (++phaseTicks >= phaseTotal) {
+                    final BurnRequest job = queue.pollFirst();
+                    if (job == null) {
+                        enter(Phase.IDLE, 0);
+                        return;
+                    }
+                    final String written = write(level, job);
+                    if (written == null) {
+                        enter(Phase.ERROR, HOLD_TICKS);
+                        message = "Write failed: " + (hasMedia() ? "medium full" : "no medium");
+                    } else {
+                        currentFile = written;
+                        final MediaFormat format = bayFormat();
+                        enter(Phase.VERIFY, format == null ? 1 : verifyTicks(format));
+                    }
+                    sync();
+                }
+            }
+            case VERIFY -> {
+                if (++phaseTicks >= phaseTotal) {
+                    final String path = currentFile + ".craft";
+                    final Optional<String> back = hasMedia() ? DiskFilesystem.read(mediaStack(), path) : Optional.empty();
+                    if (back.isPresent()) {
+                        completed++;
+                        enter(Phase.DONE, HOLD_TICKS);
+                    } else {
+                        enter(Phase.ERROR, HOLD_TICKS);
+                        message = "Verify failed: " + path;
+                    }
+                    setChanged();
+                    sync();
+                }
+            }
+            case DONE, ERROR -> {
+                if (++phaseTicks >= phaseTotal) {
+                    enter(Phase.IDLE, 0);
+                    sync();
+                }
+            }
         }
     }
 
-    public boolean canWriteMultiStage() {
-        return mediaWritable() && !stages.isEmpty();
-    }
-
-    public boolean writeMultiStagePattern() {
-        final Level level = getLevel();
-        if (level == null || level.isClientSide() || !canWriteMultiStage()) {
-            return false;
+    private void enter(final Phase next, final int total) {
+        phase = next;
+        phaseTicks = 0;
+        phaseTotal = total;
+        if (next != Phase.ERROR) {
+            message = "";
         }
-        final MultiStagePattern pattern = new MultiStagePattern(stages);
-        final Optional<String> serialized = CraftFile.serializeMultiStage(pattern, level.registryAccess());
-        if (serialized.isEmpty()) {
-            return false;
-        }
-        return writeToMedia(craftFileName("multistage"), serialized.get());
+        setChanged();
     }
 
-    // --- shared write/media helpers ---
-
-    private boolean mediaWritable() {
-        final ItemStack stack = media.getStackInSlot(0);
-        return !stack.isEmpty()
-                && stack.getItem() instanceof FormattedMediaItem item
-                && item.writable();
-    }
-
-    private boolean writeToMedia(final String fileName, final String content) {
-        final ItemStack mediaStack = media.getStackInSlot(0);
+    /**
+     * Puts the job's file on the medium under a free name and returns the base name it got, or null when the
+     * medium refused it. A second file with the same name never overwrites the first; it gets a suffix.
+     */
+    @Nullable
+    private String write(final ServerLevel level, final BurnRequest job) {
+        final ItemStack mediaStack = mediaStack();
         if (!(mediaStack.getItem() instanceof FormattedMediaItem)) {
-            return false;
+            return null;
         }
-        // Never overwrite an existing craft silently: a second pattern with the same result name (or another
-        // multi-stage) would erase the first. The filesystem hands out the next free suffix instead.
-        final String path = DiskFilesystem.uniquePath(mediaStack, fileName, ".craft", content);
+        final String path = DiskFilesystem.uniquePath(mediaStack, job.fileName(), ".craft", job.content());
         final long freeWeight = mediaFreeWeight(mediaStack);
         final DiskFilesystem.WriteResult result = DiskFilesystem.write(
-                mediaStack, path, FileType.CRAFT, content,
-                freeWeight, FilesystemKind.HIERARCHICAL, getLevel() == null ? 0L : getLevel().getGameTime());
-        if (result == DiskFilesystem.WriteResult.OK) {
-            media.setStackInSlot(0, mediaStack);
-            setChanged();
-            return true;
+                mediaStack, path, FileType.CRAFT, job.content(), freeWeight, FilesystemKind.HIERARCHICAL,
+                level.getGameTime());
+        if (result != DiskFilesystem.WriteResult.OK) {
+            return null;
         }
-        return false;
+        media.setStackInSlot(0, mediaStack);
+        return path.endsWith(".craft") ? path.substring(0, path.length() - ".craft".length()) : path;
     }
 
-    public boolean eraseMedia() {
-        // Physical media is ejected by hand; no erase-in-place for removable media.
-        return false;
+    /** What the medium has left for files, in the filesystem's weight units. */
+    private static long mediaFreeWeight(final ItemStack mediaStack) {
+        if (!(mediaStack.getItem() instanceof FormattedMediaItem item)) {
+            return 0L;
+        }
+        final long capacity = (long) item.format().capacityItems()
+                * dev.jsc.jscomputronics.module.computing.storage.StorageKey.MB_EQ_PER_ITEM;
+        final long used = DiskFilesystem.filesWeight(mediaStack);
+        return Math.max(0L, capacity - used);
+    }
+
+    // ---- PeripheralEndpoint ----
+
+    @Override
+    public PeripheralCableType cableType() {
+        return PeripheralCableType.COMPUTING;
+    }
+
+    @Override
+    public Optional<Long> linkedOwner() {
+        return Optional.ofNullable(linkedOwner);
+    }
+
+    @Override
+    public void onOwnerLinked(final long ownerPos) {
+        linkedOwner = ownerPos;
+        setChanged();
+        sync();
+    }
+
+    @Override
+    public void onOwnerUnlinked() {
+        linkedOwner = null;
+        setChanged();
+        sync();
+    }
+
+    /** The linked computer's position, or null while unlinked. */
+    @Nullable
+    public BlockPos ownerPos() {
+        return linkedOwner == null ? null : BlockPos.of(linkedOwner);
+    }
+
+    /** Breaks the link from this side, freeing the computer's endpoint slot. Safe with no link. */
+    public void unlink(final ServerLevel level) {
+        if (linkedOwner != null && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner owner) {
+            owner.onEndpointUnlinked(worldPosition.asLong());
+        }
+        onOwnerUnlinked();
     }
 
     public void dropContents(final Level level, final BlockPos pos) {
         final ItemStack disc = media.getStackInSlot(0);
         if (!disc.isEmpty()) {
-            net.minecraft.world.Containers.dropItemStack(
-                    level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, disc);
+            Containers.dropItemStack(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, disc);
             media.setStackInSlot(0, ItemStack.EMPTY);
         }
     }
 
-    private static String itemBaseName(final ItemStack resultItem) {
-        if (resultItem == null || resultItem.isEmpty()) {
-            return "pattern";
-        }
-        final ResourceLocation key = BuiltInRegistries.ITEM.getKey(resultItem.getItem());
-        return key == null ? "pattern" : key.getPath();
-    }
+    // ---- persistence and sync ----
 
-    private static String machineBaseName(final String machine) {
-        final int colon = machine.indexOf(':');
-        final String path = colon >= 0 ? machine.substring(colon + 1) : machine;
-        return path.isBlank() ? "processing" : path;
-    }
-
-    private static String craftFileName(final String base) {
-        final StringBuilder sb = new StringBuilder();
-        for (final char c : base.toCharArray()) {
-            sb.append(Character.isLetterOrDigit(c) || c == '_' ? c : '_');
-            if (sb.length() >= 32) {
-                break;
-            }
-        }
-        return sb.isEmpty() ? "pattern" : sb.toString();
-    }
-
-    private static long mediaFreeWeight(final ItemStack mediaStack) {
-        if (!(mediaStack.getItem() instanceof FormattedMediaItem fmt)) {
-            return 0L;
-        }
-        final long capWeight = (long) fmt.format().capacityItems() * StorageKey.MB_EQ_PER_ITEM;
-        return Math.max(0L, capWeight
-                - dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem.filesWeight(mediaStack));
-    }
-
-    private List<ItemStack> gridCells() {
-        final List<ItemStack> cells = new ArrayList<>(CraftingPattern.GRID_SIZE);
-        for (int i = 0; i < CraftingPattern.GRID_SIZE; i++) {
-            cells.add(ghostGrid.getStackInSlot(i));
-        }
-        return cells;
-    }
-
-    /** Marks the block entity dirty and pushes a fresh update tag so the open screen sees the new authoring state. */
     private void sync() {
-        setChanged();
-        final Level level = getLevel();
         if (level != null && !level.isClientSide()) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
     }
 
     @Override
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        if (tag.contains("GhostGrid")) {
-            ghostGrid.deserializeNBT(registries, tag.getCompound("GhostGrid"));
-        }
         if (tag.contains("Media")) {
             media.deserializeNBT(registries, tag.getCompound("Media"));
         }
-        // Cells are a list of {Cell (codec), Index}; a draft saved by an older version as item slots is dropped.
-        final RegistryOps<Tag> cellOps = RegistryOps.create(NbtOps.INSTANCE, registries);
-        loadCells(tag, "ProcInputs", procInputs, cellOps);
-        loadCells(tag, "ProcOutputs", procOutputs, cellOps);
-        final int[] chances = tag.getIntArray("OutputChances");
-        for (int i = 0; i < PROC_GRID; i++) {
-            outputChances[i] = i < chances.length && chances[i] >= 1 && chances[i] <= ProcessingPattern.FULL_CHANCE
-                    ? chances[i] : ProcessingPattern.FULL_CHANCE;
+        queue.clear();
+        final ListTag jobs = tag.getList("Queue", Tag.TAG_COMPOUND);
+        for (int i = 0; i < jobs.size() && queue.size() < QUEUE_MAX; i++) {
+            final CompoundTag job = jobs.getCompound(i);
+            queue.addLast(new BurnRequest(job.getString("Name"), job.getString("Content")));
         }
-        machineType = tag.getString("MachineType");
-        procTimeout = tag.contains("ProcTimeout")
-                ? Math.max(1, tag.getInt("ProcTimeout")) : ProcessingPattern.DEFAULT_TIMEOUT_TICKS;
-        stages.clear();
-        if (tag.contains("Stages")) {
-            final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-            MultiStagePattern.CODEC.parse(ops, tag.get("Stages")).result()
-                    .ifPresent(pattern -> stages.addAll(pattern.stages()));
-        }
+        phase = phaseOf(tag.getString("Phase"));
+        phaseTicks = tag.getInt("PhaseTicks");
+        phaseTotal = tag.getInt("PhaseTotal");
+        writeTicks = tag.getInt("WriteTicks");
+        currentFile = tag.getString("CurrentFile");
+        message = tag.getString("Message");
+        completed = tag.getInt("Completed");
+        linkedOwner = tag.contains(NBT_LINKED_OWNER) ? tag.getLong(NBT_LINKED_OWNER) : null;
     }
 
-    private static ListTag saveCells(final DataCell[] cells, final RegistryOps<Tag> ops) {
-        final ListTag list = new ListTag();
-        for (int i = 0; i < cells.length; i++) {
-            if (cells[i] == null) {
-                continue;
-            }
-            final int index = i;
-            DataCell.CODEC.encodeStart(ops, cells[i]).result().ifPresent(cellTag -> {
-                final CompoundTag row = new CompoundTag();
-                row.put("Cell", cellTag);
-                row.putInt("Index", index);
-                list.add(row);
-            });
-        }
-        return list;
-    }
-
-    private static void loadCells(final CompoundTag tag, final String name, final DataCell[] cells,
-                                  final RegistryOps<Tag> ops) {
-        java.util.Arrays.fill(cells, null);
-        if (!(tag.get(name) instanceof ListTag list)) {
-            return;
-        }
-        for (int i = 0; i < list.size(); i++) {
-            final CompoundTag row = list.getCompound(i);
-            final int index = row.getInt("Index");
-            if (index >= 0 && index < cells.length && row.contains("Cell")) {
-                cells[index] = DataCell.CODEC.parse(ops, row.get("Cell")).result().orElse(null);
+    private static Phase phaseOf(final String name) {
+        for (final Phase p : Phase.values()) {
+            if (p.name().equals(name)) {
+                return p;
             }
         }
+        return Phase.IDLE;
     }
 
     @Override
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("GhostGrid", ghostGrid.serializeNBT(registries));
         tag.put("Media", media.serializeNBT(registries));
-        final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-        tag.put("ProcInputs", saveCells(procInputs, ops));
-        tag.put("ProcOutputs", saveCells(procOutputs, ops));
-        tag.putIntArray("OutputChances", outputChances.clone());
-        tag.putString("MachineType", machineType);
-        tag.putInt("ProcTimeout", procTimeout);
-        MultiStagePattern.CODEC.encodeStart(ops, new MultiStagePattern(stages)).result()
-                .ifPresent(stagesTag -> tag.put("Stages", stagesTag));
+        final ListTag jobs = new ListTag();
+        for (final BurnRequest job : queue) {
+            final CompoundTag t = new CompoundTag();
+            t.putString("Name", job.fileName());
+            t.putString("Content", job.content());
+            jobs.add(t);
+        }
+        tag.put("Queue", jobs);
+        tag.putString("Phase", phase.name());
+        tag.putInt("PhaseTicks", phaseTicks);
+        tag.putInt("PhaseTotal", phaseTotal);
+        tag.putInt("WriteTicks", writeTicks);
+        tag.putString("CurrentFile", currentFile);
+        tag.putString("Message", message);
+        tag.putInt("Completed", completed);
+        if (linkedOwner != null) {
+            tag.putLong(NBT_LINKED_OWNER, linkedOwner);
+        }
+    }
+
+    /** The waiting jobs' file names, for a display. */
+    public List<String> queuedNames() {
+        final List<String> names = new ArrayList<>();
+        for (final BurnRequest job : queue) {
+            names.add(job.fileName());
+        }
+        return names;
     }
 
     @Override
     public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
         final CompoundTag tag = super.getUpdateTag(registries);
-        saveAdditional(tag, registries);
+        // The client draws the bay, the display and the LEDs; the queued contents themselves stay on the server.
+        tag.put("Media", media.serializeNBT(registries));
+        tag.putString("Phase", phase.name());
+        tag.putInt("PhaseTicks", phaseTicks);
+        tag.putInt("PhaseTotal", phaseTotal);
+        tag.putInt("WriteTicks", writeTicks);
+        tag.putString("CurrentFile", currentFile);
+        tag.putString("Message", message);
+        tag.putInt("Completed", completed);
+        tag.putInt("QueueSize", queue.size());
+        if (linkedOwner != null) {
+            tag.putLong(NBT_LINKED_OWNER, linkedOwner);
+        }
         return tag;
+    }
+
+    /** Queue length as last synced to a client (the jobs themselves are not sent). */
+    private int syncedQueue;
+
+    @Override
+    public void handleUpdateTag(final CompoundTag tag, final HolderLookup.Provider registries) {
+        super.handleUpdateTag(tag, registries);
+        syncedQueue = tag.getInt("QueueSize");
+    }
+
+    /** The queue length a client display shows: the synced count off the server, the real one on it. */
+    public int displayQueued() {
+        return level != null && level.isClientSide() ? syncedQueue : queue.size();
     }
 
     @Override

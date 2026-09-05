@@ -137,8 +137,9 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.PHI_7120.get());
         basicItem(ComputingModule.PHI_7290.get());
         basicItem(ComputingModule.PHI_9000.get());
-        getBuilder("pattern_encoder")
-                .parent(new ModelFile.UncheckedModelFile(modLoc("block/pattern_encoder")));
+        cabinetItem("pattern_encoder");
+        cabinetItem("legacy_pattern_encoder");
+        cabinetItem("vintage_pattern_encoder");
         getBuilder("floppy_drive").parent(new ModelFile.UncheckedModelFile(modLoc("block/floppy_drive")));
         getBuilder("cd_drive").parent(new ModelFile.UncheckedModelFile(modLoc("block/cd_drive")));
         getBuilder("dvd_drive").parent(new ModelFile.UncheckedModelFile(modLoc("block/dvd_drive")));

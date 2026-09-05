@@ -1,0 +1,23 @@
+{
+  "minecraft:blasting": [
+    "minecraft:blast_furnace"
+  ],
+  "minecraft:campfire_cooking": [
+    "minecraft:campfire",
+    "minecraft:soul_campfire"
+  ],
+  "minecraft:smelting": [
+    "minecraft:furnace",
+    "minecraft:blast_furnace",
+    "minecraft:smoker"
+  ],
+  "minecraft:smithing": [
+    "minecraft:smithing_table"
+  ],
+  "minecraft:smoking": [
+    "minecraft:smoker"
+  ],
+  "minecraft:stonecutting": [
+    "minecraft:stonecutter"
+  ]
+}

@@ -191,13 +191,17 @@ public class JscBlockStateProvider extends BlockStateProvider {
         simpleBlock(ComputingModule.HBW_INTERFACE.get(), models().cubeColumn(
                 "hbw_interface", modLoc("block/hbw_interface_side"), modLoc("block/hbw_interface_top")));
 
-        // Pattern Encoder and Reader share the workstation casing; the front face tells them apart.
-        final ModelFile patternEncoderModel = models().orientable(
-                "pattern_encoder",
-                modLoc("block/pattern_station_side"),
-                modLoc("block/pattern_encoder_front"),
-                modLoc("block/pattern_station_top"));
-        horizontalBlock(ComputingModule.PATTERN_ENCODER.get(), patternEncoderModel);
+        // Pattern Encoders: one burner body per era, drawn as a model by the block entity. The blocks
+        // themselves are invisible; the only model they need carries the particle texture.
+        final ModelFile encoderInvisible = models().getBuilder("pattern_encoder_body")
+                .texture("particle", modLoc("block/pattern_encoder_particle"));
+        for (final net.minecraft.world.level.block.Block body : java.util.List.of(
+                ComputingModule.PATTERN_ENCODER.get(), ComputingModule.LEGACY_PATTERN_ENCODER.get(),
+                ComputingModule.VINTAGE_PATTERN_ENCODER.get())) {
+            getVariantBuilder(body).forAllStates(state ->
+                    net.neoforged.neoforge.client.model.generators.ConfiguredModel.builder()
+                            .modelFile(encoderInvisible).build());
+        }
 
         // Media reader drives: the front carries the drive face, the sides and top use the drive's
         // own casing texture, and the LOADED blockstate swaps the front to the lit "_active" face.

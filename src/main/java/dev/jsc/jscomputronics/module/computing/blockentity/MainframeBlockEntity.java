@@ -1038,13 +1038,18 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 || demand <= 0) {
             return null;
         }
-        final var patterns = networkPatterns();
-        if (extraPattern != null && !patterns.contains(extraPattern)) {
-            patterns.add(extraPattern);
+        final var stock = networkIndex.snapshot();
+        // A cell that accepts a tag is settled here, against what the network holds right now, so the
+        // planner and the craft itself only ever see exact items.
+        final var patterns = dev.jsc.jscomputronics.module.computing.crafting.AnyTagResolver
+                .resolveAll(networkPatterns(), stock);
+        final dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern extra = extraPattern == null ? null
+                : dev.jsc.jscomputronics.module.computing.crafting.AnyTagResolver.resolve(extraPattern, stock);
+        if (extra != null && !patterns.contains(extra)) {
+            patterns.add(extra);
         }
         // Machine patterns take part in the plan: an ingredient no bench makes may come out of a machine.
         final var machines = networkProcessingPatterns();
-        final var stock = networkIndex.snapshot();
         long target = demand;
         var plan = dev.jsc.jscomputronics.module.computing.crafting.CraftPlanner.plan(
                 key, target, patterns, machines, stock);
@@ -1068,7 +1073,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkCraftOperation(
                 serverLevel, networkUuid(), key, demand, plan, networkIndex,
                 java.util.UUID.randomUUID(), craftingComputerPositions(), supercomputerPositions(),
-                requesterLabel, extraPattern, this);
+                requesterLabel, extra, this);
         activeOperations.add(operation);
         return operation;
     }
@@ -1111,8 +1116,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel) || networkUuid() == null || demand <= 0) {
             return null;
         }
+        // Bench stages that accept a tag are settled against stock now, the way a plain craft's are.
+        final var resolved = dev.jsc.jscomputronics.module.computing.crafting.AnyTagResolver
+                .resolve(pattern, networkIndex.snapshot());
         final var operation = new dev.jsc.jscomputronics.module.computing.crafting.NetworkMultiStageOperation(
-                this, pattern, demand, requesterLabel);
+                this, resolved, demand, requesterLabel);
         activeOperations.add(operation);
         return operation;
     }

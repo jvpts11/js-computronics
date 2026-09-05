@@ -94,6 +94,8 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.CRAFTING_SWITCH_ITEM.get());
                         output.accept(ComputingModule.HBW_INTERFACE_ITEM.get());
                         output.accept(ComputingModule.PATTERN_ENCODER_ITEM.get());
+                        output.accept(ComputingModule.LEGACY_PATTERN_ENCODER_ITEM.get());
+                        output.accept(ComputingModule.VINTAGE_PATTERN_ENCODER_ITEM.get());
                         output.accept(ComputingModule.FLOPPY_DRIVE_ITEM.get());
                         output.accept(ComputingModule.CD_DRIVE_ITEM.get());
                         output.accept(ComputingModule.DVD_DRIVE_ITEM.get());

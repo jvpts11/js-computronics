@@ -104,7 +104,8 @@ neoForge {
             create("clientTests${shard}") {
                 client()
                 gameDirectory = project.file("run/clienttests/shard-${shard}")
-                programArguments.addAll '--width', '960', '--height', '600'
+                // 640 tall so the GUI (scale 2) shows the full 256-pixel monitor glass a player gets.
+                programArguments.addAll '--width', '960', '--height', '640'
                 systemProperty 'jsc.clienttests', 'true'
                 systemProperty 'jsc.clienttests.shard', "${shard}"
                 systemProperty 'jsc.clienttests.shards', "${clientShards}"

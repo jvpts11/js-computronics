@@ -43,6 +43,9 @@ public final class Programs {
     public static final ResourceLocation CRAFTING_MANAGER =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "crafting_manager");
 
+    public static final ResourceLocation PATTERN_STUDIO =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "pattern_studio");
+
     /** Cluster Manager: the Cluster Management Computer's front for every cluster on its network. */
     public static final ResourceLocation CLUSTER_MANAGER =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "cluster_manager");

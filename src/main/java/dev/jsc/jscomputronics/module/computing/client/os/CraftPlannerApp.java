@@ -154,7 +154,7 @@ public final class CraftPlannerApp implements DesktopApp {
             final boolean hov = mouseX >= x && mouseX < x + w && mouseY >= ry && mouseY < ry + rowH;
             skin.listRow(g, x, ry, w, rowH, hov, sel);
             itemIcon(g, e.result(), x + 1, ry, 12);
-            g.drawString(font, trim(font, e.result().getHoverName().getString(), w - 18),
+            g.drawString(font, trim(font, e.title(), w - 18),
                     x + 15, ry + 3, sel ? skin.accent() : skin.text(), false);
             final ItemStack pick = e.result().copy();
             hits.add(new Hit(x, ry, w, rowH, () -> select(pick)));
@@ -313,7 +313,8 @@ public final class CraftPlannerApp implements DesktopApp {
         final String q = search.toLowerCase(Locale.ROOT);
         final List<CraftCatalogPayload.Entry> out = new ArrayList<>();
         for (final CraftCatalogPayload.Entry e : catalog) {
-            if (e.result().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)) {
+            if (e.title().toLowerCase(Locale.ROOT).contains(q)
+                    || e.result().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)) {
                 out.add(e);
             }
         }

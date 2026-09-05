@@ -44,7 +44,7 @@ import java.util.Set;
  * items and cursor on top. The item grid above the band scrolls its items when there are more than fit. An
  * embedded console still runs ad-hoc operations through the same path as the Shell.
  */
-public final class NetworkInteractorApp implements DesktopApp {
+public final class NetworkInteractorApp implements InventoryBandApp {
 
     // Labels kept short so all five tabs fit the strip; "Local"/"Network" abbreviate the longer mock names.
     private static final String[] TABS = {"Status", "Local", "Network", "Crafting", "Operations"};
@@ -845,7 +845,8 @@ public final class NetworkInteractorApp implements DesktopApp {
         final String q = search.toString().toLowerCase(java.util.Locale.ROOT);
         final java.util.List<CraftCatalogPayload.Entry> out = new ArrayList<>();
         for (final CraftCatalogPayload.Entry e : crafts) {
-            if (e.result().getHoverName().getString().toLowerCase(java.util.Locale.ROOT).contains(q)) {
+            if (e.title().toLowerCase(java.util.Locale.ROOT).contains(q)
+                    || e.result().getHoverName().getString().toLowerCase(java.util.Locale.ROOT).contains(q)) {
                 out.add(e);
             }
         }
@@ -1491,7 +1492,7 @@ public final class NetworkInteractorApp implements DesktopApp {
         g.fill(px, py, px + CRAFT_W, py + 1, skin.accent());
 
         DesktopItems.item(g, craftPopup.result(), px + 4, py + 3);
-        g.drawString(font, "Craft " + trimTo(font, craftPopup.result().getHoverName().getString(), CRAFT_W - 40),
+        g.drawString(font, "Craft " + trimTo(font, craftPopup.title(), CRAFT_W - 40),
                 px + 24, py + 6, TEXT, false);
 
         // Quantity field + steppers (-64 / -1 / +1 / +64).
@@ -1857,17 +1858,26 @@ public final class NetworkInteractorApp implements DesktopApp {
     public java.util.List<String> craftableNames() {
         final java.util.List<String> out = new ArrayList<>();
         for (final CraftCatalogPayload.Entry e : filteredCrafts()) {
-            out.add(e.result().getHoverName().getString());
+            out.add(e.title());
         }
         return out;
     }
 
     public int[] craftingTabCenter() {
+        return tabCenter(TAB_CRAFTING);
+    }
+
+    /** Content-local centre of the Network tab: the grid a carried stack is deposited into. */
+    public int[] networkTabCenter() {
+        return tabCenter(TAB_NETWORK);
+    }
+
+    private int[] tabCenter(final int tab) {
         int tabX = 0;
-        for (int i = 0; i < TAB_CRAFTING; i++) {
+        for (int i = 0; i < tab; i++) {
             tabX += fontWidth(TABS[i]) + 12;
         }
-        return new int[]{tabX + (fontWidth(TABS[TAB_CRAFTING]) + 12) / 2, TAB_H / 2};
+        return new int[]{tabX + (fontWidth(TABS[tab]) + 12) / 2, TAB_H / 2};
     }
 
     /** The centre of the grid cell showing craftable {@code index} (must be scrolled into view). */

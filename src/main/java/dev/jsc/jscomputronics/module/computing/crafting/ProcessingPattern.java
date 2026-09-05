@@ -28,10 +28,16 @@ import java.util.Map;
  * probabilistic byproduct that feeds planning but never blocks the craft (the real yield is counted at runtime).
  */
 public record ProcessingPattern(List<ProcessingInput> inputs, List<ProcessingOutput> outputs,
-                                String machineType, int timeoutTicks) {
+                                String machineType, int timeoutTicks, String name, String note) {
 
     public static final int DEFAULT_TIMEOUT_TICKS = 200;
     public static final int FULL_CHANCE = 100;
+
+    /** A recipe without an author's name or note: it goes by its primary output. */
+    public ProcessingPattern(final List<ProcessingInput> inputs, final List<ProcessingOutput> outputs,
+                             final String machineType, final int timeoutTicks) {
+        this(inputs, outputs, machineType, timeoutTicks, "", "");
+    }
 
     /**
      * One input: a key (item, fluid or chemical) and how much of it the machine consumes per run. An
@@ -92,13 +98,22 @@ public record ProcessingPattern(List<ProcessingInput> inputs, List<ProcessingOut
         outputs = List.copyOf(outputs);
         machineType = machineType == null ? "" : machineType;
         timeoutTicks = Math.max(1, timeoutTicks);
+        name = clamp(name, CraftingPattern.MAX_NAME);
+        note = clamp(note, CraftingPattern.MAX_NOTE);
+    }
+
+    private static String clamp(final String s, final int max) {
+        final String value = s == null ? "" : s.trim();
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     public static final Codec<ProcessingPattern> CODEC = RecordCodecBuilder.create(i -> i.group(
             ProcessingInput.CODEC.listOf().fieldOf("inputs").forGetter(ProcessingPattern::inputs),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(ProcessingPattern::outputs),
             Codec.STRING.fieldOf("machine").forGetter(ProcessingPattern::machineType),
-            Codec.INT.fieldOf("timeout").forGetter(ProcessingPattern::timeoutTicks)
+            Codec.INT.fieldOf("timeout").forGetter(ProcessingPattern::timeoutTicks),
+            Codec.STRING.optionalFieldOf("name", "").forGetter(ProcessingPattern::name),
+            Codec.STRING.optionalFieldOf("note", "").forGetter(ProcessingPattern::note)
     ).apply(i, ProcessingPattern::new));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ProcessingPattern> STREAM_CODEC =
@@ -107,7 +122,23 @@ public record ProcessingPattern(List<ProcessingInput> inputs, List<ProcessingOut
                     ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list(64)), ProcessingPattern::outputs,
                     ByteBufCodecs.stringUtf8(64), ProcessingPattern::machineType,
                     ByteBufCodecs.VAR_INT, ProcessingPattern::timeoutTicks,
+                    ByteBufCodecs.stringUtf8(CraftingPattern.MAX_NAME), ProcessingPattern::name,
+                    ByteBufCodecs.stringUtf8(CraftingPattern.MAX_NOTE), ProcessingPattern::note,
                     ProcessingPattern::new);
+
+    /** What the recipe is called where it is listed: its name, or its primary output's when it has none. */
+    public String displayName() {
+        if (!name.isEmpty()) {
+            return name;
+        }
+        final ProcessingOutput primary = primaryOutput();
+        return primary == null ? "recipe" : primary.key().displayName().getString();
+    }
+
+    /** The same recipe under a new name and note. */
+    public ProcessingPattern withName(final String newName, final String newNote) {
+        return new ProcessingPattern(inputs, outputs, machineType, timeoutTicks, newName, newNote);
+    }
 
     /** Total of each input key per run (merging duplicate keys), for reservation/planning. */
     public Map<StorageKey, Long> ingredientTotals() {

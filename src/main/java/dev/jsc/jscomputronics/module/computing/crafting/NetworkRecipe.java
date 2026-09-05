@@ -81,6 +81,20 @@ public record NetworkRecipe(Optional<CraftingPattern> bench, Optional<Processing
         return null;
     }
 
+    /** What the recipe is called where it is listed: its author's name, or its result's name when it has none. */
+    public String displayName() {
+        if (bench.isPresent()) {
+            return bench.get().displayName();
+        }
+        if (proc.isPresent()) {
+            return proc.get().displayName();
+        }
+        if (multi.isPresent()) {
+            return multi.get().displayName();
+        }
+        return "recipe";
+    }
+
     /** Same recipe = same kind producing the same result, used to dedupe loads into the ROM. */
     public boolean sameRecipe(final NetworkRecipe other) {
         if (bench.isPresent() && other.bench.isPresent()) {

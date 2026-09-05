@@ -20,6 +20,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -84,6 +85,34 @@ public final class OsMediaGameTests {
                     helper.assertTrue(dvd.insertedKind() == MediaKind.PROGRAM_INSTALL,
                             "the inserted installer must be readable from the slot afterwards");
                 })
+                .thenSucceed();
+    }
+
+    /**
+     * Breaking a drive that holds a disc must remove the drive and drop the disc. Dropping the disc empties
+     * the slot, and the slot's client sync used to write the drive's own state back into the world in the
+     * middle of the removal, which made the chunk abort it: the disc popped out and the drive stayed.
+     */
+    @GameTest(template = ARENA)
+    public static void drive_breaksCleanlyWhileLoaded(final GameTestHelper helper) {
+        final BlockPos pos = new BlockPos(1, 1, 1);
+        helper.setBlock(pos, ComputingModule.CD_DRIVE.get());
+        if (!(helper.getBlockEntity(pos) instanceof MediaReaderBlockEntity reader)) {
+            helper.fail("no MediaReaderBlockEntity at " + pos);
+            return;
+        }
+        helper.assertTrue(reader.insertMedia(new ItemStack(ComputingModule.CD_ROM.get())).isEmpty(),
+                "the CD drive must take the CD");
+        helper.startSequence()
+                .thenExecute(() -> helper.assertTrue(helper.getLevel().destroyBlock(helper.absolutePos(pos), true),
+                        "breaking the loaded drive must remove it"))
+                .thenExecute(() -> {
+                    helper.assertBlockPresent(Blocks.AIR, pos);
+                    // Straight from the level: the helper's own lookup fails loudly on a missing block entity.
+                    helper.assertTrue(helper.getLevel().getBlockEntity(helper.absolutePos(pos)) == null,
+                            "the drive's block entity must be gone with the block");
+                })
+                .thenExecuteAfter(2, () -> helper.assertItemEntityPresent(ComputingModule.CD_ROM.get(), pos, 2.0))
                 .thenSucceed();
     }
 

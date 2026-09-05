@@ -58,7 +58,7 @@ class LayoutAuditTest {
         final List<AuditCase> c = new ArrayList<>();
         c.add(new AuditCase("BusLayout", BusLayout.layout(), true));
         c.add(new AuditCase("CraftingSwitchLayout", CraftingSwitchLayout.layout(), true));
-        c.add(new AuditCase("PatternEncoderLayout(processing)", PatternEncoderLayout.processing(), true));
+        c.add(new AuditCase("PatternEncoderLayout", PatternEncoderLayout.layout(), true));
         c.add(new AuditCase("ClusterManagementComputerLayout", ClusterManagementComputerLayout.layout(), true));
         c.add(new AuditCase("CraftingComputerLayout", CraftingComputerLayout.layout(), true));
         c.add(new AuditCase("NmsLayout", NmsLayout.layout(), true));

@@ -297,7 +297,13 @@ public class MediaReaderBlockEntity extends BlockEntity implements PeripheralEnd
 
     private void syncToClients() {
         if (level != null && !level.isClientSide()) {
-            final BlockState state = getBlockState();
+            // Read the state from the world, not the cached one: while the drive is being broken the world
+            // already holds its replacement, and writing the drive's state back (the drop empties the slot)
+            // would make the chunk abort the removal, leaving the drive standing with its disc on the floor.
+            final BlockState state = level.getBlockState(worldPosition);
+            if (!(state.getBlock() instanceof MediaReaderBlock)) {
+                return;
+            }
             final boolean loaded = !slot.getStackInSlot(0).isEmpty();
             if (state.hasProperty(MediaReaderBlock.LOADED) && state.getValue(MediaReaderBlock.LOADED) != loaded) {
                 // Flip the LOADED blockstate so the model shows the lit "_active" face.

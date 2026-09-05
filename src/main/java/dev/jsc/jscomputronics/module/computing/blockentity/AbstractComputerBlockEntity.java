@@ -372,6 +372,16 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     private final java.util.List<dev.jsc.jscomputronics.module.computing.os.OpenWindow> openWindows =
             new java.util.ArrayList<>();
 
+    // The recipe drafts the Pattern Studio edits. Machine state like the windows: a draft half laid out when
+    // the player walks away is still there for whoever sits down next, and after the game was closed.
+    private final dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench studio =
+            new dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench();
+
+    @Override
+    public dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench studio() {
+        return studio;
+    }
+
     @Override
     public java.util.List<dev.jsc.jscomputronics.module.computing.os.OpenWindow> openWindows() {
         return java.util.List.copyOf(openWindows);
@@ -1144,6 +1154,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         openWindows.addAll(dev.jsc.jscomputronics.module.computing.os.OpenWindow.loadAll(
                 tag.getList("OpenWindows", net.minecraft.nbt.Tag.TAG_COMPOUND)));
         pendingInstallSlot = tag.contains("PendingInstall") ? tag.getInt("PendingInstall") : NO_PENDING_INSTALL;
+        if (tag.contains("Studio")) {
+            studio.load(tag.getCompound("Studio"), registries);
+        }
         // A world saved before the software moved onto the disk still carries the old block-level tag;
         // adopt it once so the machine keeps what it had, and it lands on the disk at the next save.
         if (tag.contains("Console")) {
@@ -1183,6 +1196,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (pendingInstallSlot != NO_PENDING_INSTALL) {
             tag.putInt("PendingInstall", pendingInstallSlot);
         }
+        final CompoundTag studioTag = new CompoundTag();
+        studio.save(studioTag, registries);
+        tag.put("Studio", studioTag);
         if (!linkedMonitors.isEmpty()) {
             tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }

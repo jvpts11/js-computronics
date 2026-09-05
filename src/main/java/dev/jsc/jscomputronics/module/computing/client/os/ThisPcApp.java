@@ -138,6 +138,10 @@ public final class ThisPcApp implements DesktopApp {
         this.contentW = width;
         this.contentH = height;
         hits.clear();
+        // The hit rectangles are recorded in desktop coordinates; the content origin makes them window-local
+        // again for whoever asks where a button sits (the client tests), before any click has landed here.
+        lastX = x;
+        lastY = y;
         g.fill(x, y, x + width, y + height, skin.windowBg());
 
         renderCard(g, font, x, y, width, mouseX, mouseY);
@@ -462,8 +466,6 @@ public final class ThisPcApp implements DesktopApp {
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,
                              final int button) {
-        lastX = window.x() + 4;
-        lastY = window.y() + 18;
         if (renaming) {
             commitRename();
         }

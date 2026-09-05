@@ -8,6 +8,7 @@
 package dev.jsc.jscomputronics.clienttest;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.integration.jei.payload.SetProcessingPatternPayload;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.block.part.InputBusPart;
 import dev.jsc.jscomputronics.module.computing.block.part.ReceivingBusPart;
@@ -15,22 +16,21 @@ import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlock
 import dev.jsc.jscomputronics.module.computing.blockentity.DataCableBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.MainframeBlockEntity;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.client.PatternEncoderScreen;
 import dev.jsc.jscomputronics.module.computing.client.os.CraftingManagerApp;
 import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
 import dev.jsc.jscomputronics.module.computing.client.os.DesktopWindow;
 import dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp;
+import dev.jsc.jscomputronics.module.computing.client.os.PatternStudioApp;
 import dev.jsc.jscomputronics.module.computing.crafting.NetworkRecipe;
+import dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench;
 import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
-import dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
-import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
-import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
-import dev.jsc.jscomputronics.module.computing.os.fs.FileType;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.program.Programs;
 import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jsc.jscomputronics.testkit.CraftFiles;
 import dev.jsc.jscomputronics.testkit.TestWorldBuilder;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -39,13 +39,17 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.FurnaceBlockEntity;
+import net.neoforged.fml.ModList;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
 /**
- * Client tests for the machine-autocrafting chain as the player experiences it: the Pattern Encoder
- * screen, the media, the Crafting Manager, the request and the machine driven through the switch.
+ * Client tests for the machine-autocrafting chain as the player experiences it: the Pattern Studio authoring
+ * recipes on a computer and sending them to its encoder, the Crafting Manager loading a disc's craft into the
+ * Recipe ROM, the Network Interactor and the Command Prompt requesting crafts that drive a furnace through the
+ * switch and buses, and the Crafting Switch GUI reporting what it sees.
  */
 public final class CraftingChainClientTests {
 
@@ -54,276 +58,128 @@ public final class CraftingChainClientTests {
 
     private static final int SETTLE = 4;
     private static final int SCREEN_WAIT = 40;
-
-    // Pattern Encoder tab bar (mirrors the screen's hit areas: y 19..30; C 8..58, P 60..118, M 120..192).
-    private static final int TAB_ROW_Y = 24;
-    private static final int TAB_CRAFTING_X = 33;
-    private static final int TAB_PROCESSING_X = 89;
-    private static final int TAB_MULTI_X = 156;
-
-    private static final BlockPos ENCODER = new BlockPos(1, 2, 4);
-    private static final BlockPos PLAYER_AT_ENCODER = new BlockPos(1, 2, 6);
-
-    @ClientTest
-    public static void patternEncoder_opensAndTabsRespondToClicks(final ClientTestContext ctx) {
-        ctx.thenBuild(0, world -> {
-                    world.buildCraftingNetwork();
-                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-                })
-                .thenTeleport(SETTLE, PLAYER_AT_ENCODER, Direction.NORTH)
-                .thenRightClick(SETTLE, ENCODER)
-                .thenAwaitScreen(PatternEncoderScreen.class, SCREEN_WAIT)
-                .thenScreenshot(2, "crafting-tab")
-                .thenAssert(0, () -> ctx.screen(PatternEncoderScreen.class).activeTab() == PatternEncoderMenu.TAB_CRAFTING,
-                        "the encoder opens on the CRAFTING tab")
-                .then(0, () -> ctx.clickGui(TAB_PROCESSING_X, TAB_ROW_Y))
-                .thenAssert(1, () -> ctx.screen(PatternEncoderScreen.class).activeTab() == PatternEncoderMenu.TAB_PROCESSING,
-                        "clicking the PROCESSING tab switches to it")
-                .thenScreenshot(2, "processing-tab")
-                .then(0, () -> ctx.clickGui(TAB_MULTI_X, TAB_ROW_Y))
-                .thenAssert(1, () -> ctx.screen(PatternEncoderScreen.class).activeTab() == PatternEncoderMenu.TAB_MULTI,
-                        "clicking the MULTI-STAGE tab switches to it")
-                .thenScreenshot(2, "multi-tab")
-                .then(0, () -> ctx.clickGui(TAB_CRAFTING_X, TAB_ROW_Y))
-                .thenAssert(1, () -> ctx.screen(PatternEncoderScreen.class).activeTab() == PatternEncoderMenu.TAB_CRAFTING,
-                        "clicking the CRAFTING tab switches back")
-                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
-                .thenAwaitNoScreen(SCREEN_WAIT);
-    }
-
-    // Pattern Encoder slots and controls, as clicked by the player (window-relative centres).
-    private static final int MEDIA_SLOT_X = 16;
-    private static final int MEDIA_SLOT_Y = 116;
-    private static final int INPUT_CELL_X = 16;   // first cell of the PROCESSING inputs grid
-    private static final int OUTPUT_CELL_X = 146; // first cell of the PROCESSING outputs grid
-    private static final int PROC_CELL_Y = 52;
-    private static final int MACHINE_BTN_X = 101;
-    private static final int MACHINE_BTN_Y = 50;
-    private static final int WRITE_X = 144;
-    private static final int WRITE_Y = 116;
-    private static final int HOTBAR_Y = 204;
-
-    private static int hotbarX(final int slot) {
-        return 16 + slot * 18;
-    }
-
-    /**
-     * Authors a furnace processing pattern the way the player does: floppy from the hotbar into the media
-     * slot, raw iron and an ingot from the hotbar into the ghost grids, the machine from the picker via its
-     * search box, then WRITE — and checks the .craft really landed on the floppy.
-     */
-    @ClientTest
-    public static void patternEncoder_writesProcessingPatternThroughTheGui(final ClientTestContext ctx) {
-        ctx.thenBuild(0, world -> {
-                    world.buildCraftingNetwork();
-                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-                })
-                .thenServer(0, level -> {
-                    ctx.give(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
-                    ctx.give(1, new ItemStack(Items.RAW_IRON, 8));
-                    ctx.give(2, new ItemStack(Items.IRON_INGOT));
-                })
-                .thenTeleport(SETTLE, PLAYER_AT_ENCODER, Direction.NORTH)
-                .thenRightClick(SETTLE, ENCODER)
-                .thenAwaitScreen(PatternEncoderScreen.class, SCREEN_WAIT)
-                // Floppy: pick it up from the hotbar, drop it into the media slot.
-                .then(2, () -> ctx.clickGui(hotbarX(0), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(MEDIA_SLOT_X, MEDIA_SLOT_Y))
-                .thenServer(SETTLE, level -> ctx.assertTrue(
-                        encoder(ctx, level).media().getStackInSlot(0).is(ComputingModule.FLOPPY_DISK.get()),
-                        "the floppy must sit in the encoder's media slot"))
-                // Inputs / outputs on the PROCESSING tab, placed from the carried stack and put back.
-                .then(0, () -> ctx.clickGui(TAB_PROCESSING_X, TAB_ROW_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(1), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(INPUT_CELL_X, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(1), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(OUTPUT_CELL_X, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
-                .thenServer(SETTLE, level -> {
-                    final var be = encoder(ctx, level);
-                    ctx.assertTrue(be.procInput(0) != null && be.procInput(0).key().equals(StorageKey.of(Items.RAW_IRON)),
-                            "input cell 0 must hold the raw iron placed from the cursor");
-                    ctx.assertTrue(be.procOutput(0) != null && be.procOutput(0).key().equals(StorageKey.of(Items.IRON_INGOT)),
-                            "output cell 0 must hold the ingot placed from the cursor");
-                })
-                .thenScreenshot(2, "grids-filled")
-                // Machine: open the picker, search, pick the vanilla furnace.
-                .then(0, () -> ctx.clickGui(MACHINE_BTN_X, MACHINE_BTN_Y))
-                .thenAssert(1, () -> ctx.screen(PatternEncoderScreen.class).isMachinePickerOpen(),
-                        "the machine button opens the picker")
-                .then(0, () -> ctx.type("furnace"))
-                .thenScreenshot(2, "machine-picker")
-                .then(0, () -> {
-                    final PatternEncoderScreen screen = ctx.screen(PatternEncoderScreen.class);
-                    final int row = screen.machinePickerRows().indexOf("minecraft:furnace");
-                    ctx.assertTrue(row >= 0, "searching 'furnace' must list minecraft:furnace; rows="
-                            + screen.machinePickerRows());
-                    ctx.clickGui(screen.machinePickerRowX(), screen.machinePickerRowY(row - screen.machinePickerScroll()));
-                })
-                .thenAssert(1, () -> !ctx.screen(PatternEncoderScreen.class).isMachinePickerOpen(),
-                        "picking a machine closes the picker")
-                .thenServer(SETTLE, level -> ctx.assertEquals("minecraft:furnace",
-                        encoder(ctx, level).machineType(), "the encoder must store the picked machine"))
-                // Write, then prove the .craft is on the floppy.
-                .thenScreenshot(2, "ready-to-write")
-                .then(0, () -> ctx.clickGui(WRITE_X, WRITE_Y))
-                .thenServer(SETTLE + 2, level -> {
-                    final ItemStack media = encoder(ctx, level).media().getStackInSlot(0);
-                    boolean craft = false;
-                    for (final DiskFilesystem.FileEntry e : DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL)) {
-                        craft |= e.type() == FileType.CRAFT;
-                    }
-                    ctx.assertTrue(craft, "WRITE PROCESSING must put a .craft file on the floppy");
-                })
-                .thenScreenshot(2, "written")
-                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
-                .thenAwaitNoScreen(SCREEN_WAIT);
-    }
-
-    private static final BlockPos GAS_TANK = new BlockPos(3, 2, 6);
-    private static final ResourceLocation OXYGEN = ResourceLocation.fromNamespaceAndPath("mekanism", "oxygen");
-
-    /**
-     * Authors a chemical processing pattern the way the player does: a tank item that holds oxygen names the
-     * gas in an input cell (a bucket's worth), the amount popup brings it to the 200 mB one purification burns,
-     * an estimated cell wears its mark, and WRITE puts the recipe on the floppy with the confirmed amount.
-     */
-    @ClientTest
-    public static void patternEncoder_writesChemicalPatternThroughTheGui(final ClientTestContext ctx) {
-        final ItemStack[] gasItem = {ItemStack.EMPTY};
-        ctx.thenBuild(0, world -> {
-                    world.buildCraftingNetwork();
-                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-                    world.placeFromItem(GAS_TANK, net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
-                            ResourceLocation.fromNamespaceAndPath("mekanism", "basic_chemical_tank")));
-                })
-                .thenServer(SETTLE, level -> {
-                    // A tank with a little oxygen, picked up: its item carries the gas and names it for the cell.
-                    final var port = dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges
-                            .portFor(level, ctx.abs(GAS_TANK), Direction.UP);
-                    ctx.assertTrue(port.isPresent() && port.get().fill(OXYGEN, 100, false) == 100, "the tank takes oxygen");
-                    level.destroyBlock(ctx.abs(GAS_TANK), true);
-                })
-                .thenServer(2, level -> {
-                    for (final net.minecraft.world.entity.item.ItemEntity drop : level.getEntitiesOfClass(
-                            net.minecraft.world.entity.item.ItemEntity.class,
-                            net.minecraft.world.phys.AABB.encapsulatingFullBlocks(ctx.abs(GAS_TANK.offset(-1, -1, -1)), ctx.abs(GAS_TANK.offset(1, 1, 1))))) {
-                        if (dev.jsc.jscomputronics.module.computing.storage.ChemicalBridges.chemicalOf(drop.getItem()).isPresent()) {
-                            gasItem[0] = drop.getItem().copy();
-                            drop.discard();
-                        }
-                    }
-                    ctx.assertTrue(!gasItem[0].isEmpty(), "picking the tank up must give an item that carries the oxygen");
-                    ctx.give(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
-                    ctx.give(1, gasItem[0]);
-                    ctx.give(2, new ItemStack(Items.RAW_IRON));
-                })
-                .thenTeleport(SETTLE, PLAYER_AT_ENCODER, Direction.NORTH)
-                .thenRightClick(SETTLE, ENCODER)
-                .thenAwaitScreen(PatternEncoderScreen.class, SCREEN_WAIT)
-                .then(2, () -> ctx.clickGui(hotbarX(0), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(MEDIA_SLOT_X, MEDIA_SLOT_Y))
-                .then(0, () -> ctx.clickGui(TAB_PROCESSING_X, TAB_ROW_Y))
-                // The gas item into the first input cell, then back to the hotbar; the raw iron into the second.
-                .then(2, () -> ctx.clickGui(hotbarX(1), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(INPUT_CELL_X, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(1), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(INPUT_CELL_X + 18, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
-                .thenServer(SETTLE, level -> {
-                    final var cell = encoder(ctx, level).procInput(0);
-                    ctx.assertTrue(cell != null && cell.key().isChemical() && OXYGEN.equals(cell.key().chemicalId())
-                                    && cell.amount() == 1000, "the gas item must name oxygen with a bucket's worth; got " + cell);
-                    // An estimated cell beside it, the way a recipe transfer leaves one, for the eye.
-                    encoder(ctx, level).setProcCell(false, 2, new dev.jsc.jscomputronics.module.computing.blockentity
-                            .PatternEncoderBlockEntity.DataCell(StorageKey.chemical(OXYGEN), 200, true));
-                })
-                .thenScreenshot(2, "chemical-cells")
-                // Click the gas cell with an empty hand: the amount popup; -100 eight times brings 1 000 to 200.
-                .then(2, () -> ctx.clickGui(INPUT_CELL_X, PROC_CELL_Y))
-                .thenAssert(1, () -> ctx.screen(PatternEncoderScreen.class).isAmountPopupOpen(), "a gas cell opens the amount popup")
-                .thenScreenshot(2, "amount-popup")
-                .then(1, () -> {
-                    for (int i = 0; i < 8; i++) {
-                        ctx.clickGui(PatternEncoderScreen.amountStepperX(0), PatternEncoderScreen.amountStepperY());
-                    }
-                })
-                .thenServer(SETTLE, level -> ctx.assertTrue(encoder(ctx, level).procInput(0) != null
-                        && encoder(ctx, level).procInput(0).amount() == 200, "eight -100 steps must leave 200 mB; got "
-                        + encoder(ctx, level).procInput(0)))
-                .then(0, () -> ctx.clickGui(PatternEncoderScreen.amountDoneX(), PatternEncoderScreen.amountDoneY()))
-                .thenAssert(1, () -> !ctx.screen(PatternEncoderScreen.class).isAmountPopupOpen(), "DONE closes the popup")
-                // Output and machine as before, then WRITE.
-                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(OUTPUT_CELL_X, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), HOTBAR_Y))
-                .then(0, () -> ctx.clickGui(MACHINE_BTN_X, MACHINE_BTN_Y))
-                .then(0, () -> ctx.type("purification"))
-                .then(1, () -> {
-                    final PatternEncoderScreen screen = ctx.screen(PatternEncoderScreen.class);
-                    final int row = screen.machinePickerRows().indexOf("mekanism:purification_chamber");
-                    ctx.assertTrue(row >= 0, "searching 'purification' must list the chamber; rows=" + screen.machinePickerRows());
-                    ctx.clickGui(screen.machinePickerRowX(), screen.machinePickerRowY(row - screen.machinePickerScroll()));
-                })
-                .thenServer(SETTLE, level -> {
-                    final var built = encoder(ctx, level).buildProcessingPattern();
-                    ctx.assertTrue(built.inputs().size() == 3 && built.inputs().get(0).key().isChemical()
-                                    && built.inputs().get(0).amount() == 200 && !built.inputs().get(0).estimated(),
-                            "the confirmed oxygen input must be 200 mB and no estimate; got " + built.inputs());
-                    ctx.assertTrue(built.inputs().get(2).estimated(), "the untouched cell stays an estimate");
-                })
-                .then(0, () -> ctx.clickGui(WRITE_X, WRITE_Y))
-                .thenServer(SETTLE + 2, level -> {
-                    final ItemStack media = encoder(ctx, level).media().getStackInSlot(0);
-                    boolean craft = false;
-                    for (final DiskFilesystem.FileEntry e : DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL)) {
-                        craft |= e.type() == FileType.CRAFT;
-                    }
-                    ctx.assertTrue(craft, "WRITE PROCESSING must put the chemical .craft on the floppy");
-                })
-                .thenScreenshot(2, "chemical-written")
-                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
-                .thenAwaitNoScreen(SCREEN_WAIT);
-    }
+    /** Long enough for a cold start's POST to play out on the monitor before the desktop shows. */
+    private static final int BOOT_WAIT = 400;
 
     private static final BlockPos CRAFTING_COMPUTER = new BlockPos(5, 2, 2);
     private static final BlockPos DRIVE = new BlockPos(5, 2, 3);
+    private static final BlockPos ENCODER = new BlockPos(5, 2, 1);
     private static final BlockPos MONITOR = new BlockPos(6, 2, 2);
     private static final BlockPos PLAYER_AT_DRIVE = new BlockPos(5, 2, 5);
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
     private static final ResourceLocation FRAMES_95 =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_95");
-    private static final String CRAFTING_MANAGER_LAUNCHER = "Crafting Mgr";
+    /** The Studio and the Crafting Manager need Frames XP or newer, so their Crafting Computers run XP. */
+    private static final ResourceLocation FRAMES_XP =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
+    /** The Frames desktops name a program by its own display name. */
+    private static final String CRAFTING_MANAGER_LAUNCHER = "Crafting Manager";
+    private static final String STUDIO_LAUNCHER = "Pattern Studio";
+
+    /**
+     * Authors a furnace recipe the way the player does now: on the Pattern Studio, with the raw iron smelt
+     * transferred from the recipe viewer (the same payload its transfer button sends, paired with the furnace
+     * the data maps it to), with the timeout typed in, then Burn sends it to the encoder beside the computer,
+     * which puts the .craft on the disc in its bay.
+     */
+    @ClientTest(timeoutTicks = 2400)
+    public static void patternStudio_burnsATransferredMachineRecipeAtTheEncoder(final ClientTestContext ctx) {
+        ctx.thenBuild(0, world -> {
+                    final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
+                    net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
+                            new ItemStack(ComputingModule.GPU_HD_7970.get()));
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_XP, Programs.PATTERN_STUDIO);
+                    net.cc().togglePower();
+                    net.cc().togglePower();
+                    world.placeMonitor(MONITOR, Direction.EAST);
+                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
+                    world.blockEntity(ENCODER, PatternEncoderBlockEntity.class).media()
+                            .setStackInSlot(0, new ItemStack(ComputingModule.DVD_RW.get()));
+                })
+                .thenWaitUntilServer(level -> encoder(ctx, level).ownerPos() != null, SCREEN_WAIT,
+                        "the encoder to link to the adjacent Crafting Computer", level -> "owner=" + encoder(ctx, level).ownerPos())
+                .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                // A cold start runs the firmware's POST on the monitor first; the desktop follows it.
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(STUDIO_LAUNCHER),
+                        SCREEN_WAIT, "the Pattern Studio to be listed as installed")
+                .then(0, () -> launch(ctx, STUDIO_LAUNCHER))
+                .thenWaitUntil(() -> studio(ctx) != null && studio(ctx).isLoaded(), SCREEN_WAIT, "the Studio window with its state")
+                .thenAssert(0, () -> studio(ctx).state().encoder().linked(), "the Studio must see the linked encoder")
+                // The player's inventory must be there without maximizing: the window the desktop opens fits it.
+                .thenAssert(2, () -> studio(ctx).bandShown(), "the Studio's inventory band must show in the default window")
+                .thenScreenshot(80, "studio")
+                .then(0, () -> JsComputronics.LOGGER.info("[JSC-CT] viewer on the desktop: {}", viewerReport()))
+                // The viewer's transfer button: with its recipe screen over the desktop, the transfer must still
+                // find the Studio in front (the desktop is the viewer's parent screen there, not the current one).
+                .then(0, () -> ctx.assertTrue(viewerShowsRecipesFor(new ItemStack(Items.IRON_INGOT)),
+                        "the viewer must open its recipe screen for the iron ingot"))
+                .thenWaitUntil(CraftingChainClientTests::viewerScreenOpen, SCREEN_WAIT, "the viewer's recipe screen")
+                .thenScreenshot(2, "viewer-recipes")
+                .thenAssert(0, CraftingChainClientTests::viewerTransferAllowed,
+                        "the transfer must reach the Studio while the viewer's recipe screen covers the desktop")
+                .then(0, () -> {
+                    if (viewerScreenOpen()) {
+                        ctx.key(GLFW.GLFW_KEY_ESCAPE); // back to the desktop under the viewer
+                    }
+                })
+                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                // The raw iron smelt, transferred from the viewer: the payload its transfer button sends.
+                .then(0, () -> transferSmelt(ctx))
+                .thenWaitUntil(() -> studio(ctx).activeTab() == PatternStudioApp.TAB_MACHINE
+                                && "minecraft:furnace".equals(studio(ctx).state().machineType()),
+                        SCREEN_WAIT, "the smelt to land in the machine draft paired with the furnace")
+                .thenServer(0, level -> {
+                    final var studio = cc(ctx, level).studio();
+                    ctx.assertTrue(studio.procInput(0) != null && studio.procInput(0).key().equals(StorageKey.of(Items.RAW_IRON)),
+                            "the workbench holds raw iron as the input");
+                    ctx.assertTrue(studio.procOutput(0) != null && studio.procOutput(0).key().equals(StorageKey.of(Items.IRON_INGOT)),
+                            "the workbench holds the ingot as the output");
+                })
+                // Timeout typed in.
+                .then(0, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).timeoutFieldCenter())))
+                .then(1, () -> {
+                    for (int i = 0; i < 6; i++) {
+                        ctx.key(GLFW.GLFW_KEY_BACKSPACE);
+                    }
+                    ctx.type("600");
+                    ctx.key(GLFW.GLFW_KEY_ENTER);
+                })
+                .thenWaitUntilServer(level -> cc(ctx, level).studio().procTimeout() == 600, SCREEN_WAIT,
+                        "the typed timeout to reach the workbench", level -> "timeout=" + cc(ctx, level).studio().procTimeout())
+                .thenScreenshot(2, "machine-draft")
+                // Burn, and prove the .craft lands on the disc in the encoder.
+                .then(0, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).barButtonCenter(0))))
+                .thenWaitUntilServer(level -> encoder(ctx, level).completed() == 1, 200,
+                        "the encoder to burn the file", level -> "encoder=" + encoder(ctx, level).statusLine())
+                .thenServer(0, level -> ctx.assertTrue(CraftFiles.count(encoder(ctx, level).mediaStack()) == 1,
+                        "Burn must put one .craft on the disc"))
+                .thenScreenshot(2, "burned")
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT);
+    }
 
     /**
      * Carries a floppy holding a .craft to the drive beside the Crafting Computer (right-click with it in
      * hand), opens the desktop on the linked monitor, launches the Crafting Manager from the Start menu,
-     * selects the file and loads it — and checks the recipe lands in the Recipe ROM.
+     * selects the file and loads it, and checks the recipe lands in the Recipe ROM.
      */
     @ClientTest(timeoutTicks = 1800)
     public static void craftingManager_loadsACraftFromTheFloppyDrive(final ClientTestContext ctx) {
         ctx.thenBuild(0, world -> {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-                    // The computer hosts a monitor (needs a GPU) and boots Frames 95 with the Crafting Manager.
+                    // The computer hosts a monitor (needs a GPU) and boots Frames XP with the Crafting Manager.
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_XP, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.setBlock(DRIVE, ComputingModule.FLOPPY_DRIVE.get());
                     world.placeMonitor(MONITOR, Direction.EAST);
-                    // A floppy already carrying a bench .craft (authored server-side: the encoder GUI has its own test).
-                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-                    final PatternEncoderBlockEntity encoder = world.blockEntity(ENCODER, PatternEncoderBlockEntity.class);
-                    encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
-                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-                    if (!encoder.writePattern()) {
-                        throw new IllegalStateException("could not author the .craft for the test");
-                    }
-                    final ItemStack floppy = encoder.media().getStackInSlot(0);
-                    encoder.media().setStackInSlot(0, ItemStack.EMPTY);
+                    // A floppy already carrying a bench .craft, as an encoder leaves it (the Studio has its own test).
+                    final ItemStack floppy = new ItemStack(ComputingModule.FLOPPY_DISK.get());
+                    CraftFiles.writeBench(floppy, CraftFiles.oakPlanks(), world.level().registryAccess());
                     ctx.give(0, floppy);
                 })
                 // Insert the floppy: hold it and right-click the drive.
@@ -342,7 +198,7 @@ public final class CraftingChainClientTests {
                 // Open the desktop on the monitor and launch the Crafting Manager from Start.
                 .thenTeleport(0, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(CRAFTING_MANAGER_LAUNCHER),
                         SCREEN_WAIT, "the Crafting Manager to be listed as installed")
                 .thenScreenshot(2, "desktop")
@@ -355,7 +211,7 @@ public final class CraftingChainClientTests {
                 .then(0, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     final int item = desktop.launcherLabels().indexOf(CRAFTING_MANAGER_LAUNCHER);
-                    ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(item));
+                    ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
                 })
                 .thenWaitUntil(() -> craftingManager(ctx) != null && craftingManager(ctx).isLoaded(),
                         SCREEN_WAIT, "the Crafting Manager window with its state")
@@ -393,26 +249,19 @@ public final class CraftingChainClientTests {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_XP, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.setBlock(DRIVE, ComputingModule.FLOPPY_DRIVE.get());
                     world.placeMonitor(MONITOR, Direction.EAST);
-                    world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-                    final PatternEncoderBlockEntity encoder = world.blockEntity(ENCODER, PatternEncoderBlockEntity.class);
-                    encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
-                    encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-                    if (!encoder.writePattern()) {
-                        throw new IllegalStateException("could not author the .craft for the test");
-                    }
-                    final ItemStack floppy = encoder.media().getStackInSlot(0);
-                    encoder.media().setStackInSlot(0, ItemStack.EMPTY);
+                    final ItemStack floppy = new ItemStack(ComputingModule.FLOPPY_DISK.get());
+                    CraftFiles.writeBench(floppy, CraftFiles.oakPlanks(), world.level().registryAccess());
                     ctx.give(0, floppy);
                 })
                 // The manager first, with nothing in the drive.
                 .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(CRAFTING_MANAGER_LAUNCHER),
                         SCREEN_WAIT, "the Crafting Manager to be listed as installed")
                 .then(0, () -> {
@@ -422,7 +271,7 @@ public final class CraftingChainClientTests {
                 .then(1, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     final int item = desktop.launcherLabels().indexOf(CRAFTING_MANAGER_LAUNCHER);
-                    ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(item));
+                    ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
                 })
                 .thenWaitUntil(() -> craftingManager(ctx) != null && craftingManager(ctx).isLoaded(),
                         SCREEN_WAIT, "the Crafting Manager window with its state")
@@ -441,7 +290,7 @@ public final class CraftingChainClientTests {
                         "right-clicking the drive with the floppy must insert it"))
                 .thenTeleport(0, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenWaitUntil(() -> craftingManager(ctx) != null, SCREEN_WAIT,
                         "the Crafting Manager window to come back with the desktop")
                 .thenWaitUntil(() -> !craftingManager(ctx).mediaFiles().isEmpty(), SCREEN_WAIT,
@@ -471,7 +320,7 @@ public final class CraftingChainClientTests {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_XP, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
@@ -518,7 +367,7 @@ public final class CraftingChainClientTests {
                 // Open the desktop, launch the Network Interactor, go to its Crafting tab.
                 .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .then(2, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     ctx.click(desktop.startButtonX(), desktop.startButtonY());
@@ -527,7 +376,7 @@ public final class CraftingChainClientTests {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     final int item = desktop.launcherLabels().indexOf(NETWORK_LAUNCHER);
                     ctx.assertTrue(item >= 0, "the Start menu must list " + NETWORK_LAUNCHER + "; got " + desktop.launcherLabels());
-                    ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(item));
+                    ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
                 })
                 .thenWaitUntil(() -> networkInteractor(ctx) != null, SCREEN_WAIT, "the Network Interactor window")
                 .then(2, () -> ctx.clickDesktop(networkInteractorPoint(ctx, networkInteractor(ctx).craftingTabCenter())))
@@ -586,14 +435,14 @@ public final class CraftingChainClientTests {
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }
 
-    private static final String TERMINAL_LAUNCHER = "Terminal";
+    private static final String PROMPT_LAUNCHER = "Command Prompt";
 
     /**
-     * The player crafts through the Command Prompt: they open the Terminal, type an IQL {@code operation craft}
+     * The player crafts through the Command Prompt: they open it from Start, type an IQL {@code operation craft}
      * for a multi-stage-only recipe, and run it. The recursive craft planner never unwraps a multi-stage recipe,
      * so before the CLI and IQL shared the terminal's craft entry point this request could not run at all; now it
      * drives the furnace through the switch and buses exactly like the graphical terminal, and the ingots land in
-     * network storage — proving the CLI/IQL is a true alternative interface, not a lesser one.
+     * network storage, proving the CLI/IQL is a true alternative interface, not a lesser one.
      */
     @ClientTest(timeoutTicks = 2400)
     public static void commandPrompt_iqlCraftRunsAMultiStageRecipe(final ClientTestContext ctx) {
@@ -641,12 +490,12 @@ public final class CraftingChainClientTests {
                     ctx.assertTrue(mainframe.submitNetworkCraft(StorageKey.of(Items.IRON_INGOT), 1, true, "check") == null,
                             "the recursive planner must not see the multi-stage-only recipe");
                 })
-                // Open the desktop and launch the Terminal (the Command Prompt) from Start.
+                // Open the desktop and launch the Command Prompt from Start.
                 .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
-                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(TERMINAL_LAUNCHER),
-                        SCREEN_WAIT, "the Terminal to be listed in Start")
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(PROMPT_LAUNCHER),
+                        SCREEN_WAIT, "the Command Prompt to be listed in Start")
                 .then(0, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     ctx.click(desktop.startButtonX(), desktop.startButtonY());
@@ -654,11 +503,11 @@ public final class CraftingChainClientTests {
                 .thenAssert(1, () -> ctx.screen(DesktopScreen.class).isStartOpen(), "the Start button opens the menu")
                 .then(0, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
-                    ctx.click(desktop.startMenuItemX(),
-                            desktop.startMenuItemY(desktop.launcherLabels().indexOf(TERMINAL_LAUNCHER)));
+                    final int item = desktop.launcherLabels().indexOf(PROMPT_LAUNCHER);
+                    ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
                 })
-                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).windowFor(TERMINAL_LAUNCHER) != null,
-                        SCREEN_WAIT, "the Terminal window to open")
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).windowFor(PROMPT_LAUNCHER) != null,
+                        SCREEN_WAIT, "the Command Prompt window to open")
                 .thenScreenshot(2, "terminal")
                 // Type the IQL craft and run it with Enter.
                 .then(0, () -> ctx.type("operation craft 8 iron_ingot"))
@@ -691,7 +540,7 @@ public final class CraftingChainClientTests {
     }
 
     /**
-     * A recipe loaded into the Recipe ROM must still be there after the world is saved, left and reopened —
+     * A recipe loaded into the Recipe ROM must still be there after the world is saved, left and reopened,
      * seen from the Crafting Manager, the way the player would check.
      */
     @ClientTest(timeoutTicks = 3600)
@@ -700,7 +549,7 @@ public final class CraftingChainClientTests {
                     final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_XP, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
@@ -714,7 +563,7 @@ public final class CraftingChainClientTests {
                 .thenSaveAndReload(SETTLE)
                 .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(CRAFTING_MANAGER_LAUNCHER),
                         SCREEN_WAIT, "the Crafting Manager to be listed after the reload")
                 .then(0, () -> {
@@ -723,8 +572,8 @@ public final class CraftingChainClientTests {
                 })
                 .then(1, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
-                    ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(
-                            desktop.launcherLabels().indexOf(CRAFTING_MANAGER_LAUNCHER)));
+                    final int item = desktop.launcherLabels().indexOf(CRAFTING_MANAGER_LAUNCHER);
+                    ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
                 })
                 .thenWaitUntil(() -> craftingManager(ctx) != null && craftingManager(ctx).isLoaded(),
                         SCREEN_WAIT, "the Crafting Manager window with its state")
@@ -739,7 +588,7 @@ public final class CraftingChainClientTests {
 
     /**
      * The Crafting Switch GUI must tell the player what the switch sees: LINKED to the computer through its
-     * cable face, and the adjacent furnace listed on the face it touches — the state the server surveys and
+     * cable face, and the adjacent furnace listed on the face it touches, the state the server surveys and
      * syncs, not something the client could guess.
      */
     @ClientTest
@@ -774,6 +623,16 @@ public final class CraftingChainClientTests {
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }
 
+    // --- helpers ---
+
+    private static void launch(final ClientTestContext ctx, final String label) {
+        final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
+        ctx.click(desktop.startButtonX(), desktop.startButtonY());
+        final int item = desktop.launcherLabels().indexOf(label);
+        ctx.assertTrue(item >= 0, "the Start menu must list " + label + "; got " + desktop.launcherLabels());
+        ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
+    }
+
     private static NetworkInteractorApp networkInteractor(final ClientTestContext ctx) {
         final DesktopWindow window = ctx.screen(DesktopScreen.class).windowFor(NETWORK_LAUNCHER);
         return window != null && window.app() instanceof NetworkInteractorApp app ? app : null;
@@ -781,9 +640,26 @@ public final class CraftingChainClientTests {
 
     /** Converts a Network Interactor content-local point into desktop coordinates. */
     private static int[] networkInteractorPoint(final ClientTestContext ctx, final int[] local) {
-        final DesktopWindow window = ctx.screen(DesktopScreen.class).windowFor(NETWORK_LAUNCHER);
+        return windowPoint(ctx, NETWORK_LAUNCHER, local);
+    }
+
+    private static PatternStudioApp studio(final ClientTestContext ctx) {
+        if (!(ctx.mc().screen instanceof DesktopScreen desktop)) {
+            return null;
+        }
+        final DesktopWindow window = desktop.windowFor(STUDIO_LAUNCHER);
+        return window != null && window.app() instanceof PatternStudioApp app ? app : null;
+    }
+
+    private static int[] studioPoint(final ClientTestContext ctx, final int[] local) {
+        return windowPoint(ctx, STUDIO_LAUNCHER, local);
+    }
+
+    /** Converts a window's content-local point into desktop coordinates. */
+    private static int[] windowPoint(final ClientTestContext ctx, final String label, final int[] local) {
+        final DesktopWindow window = ctx.screen(DesktopScreen.class).windowFor(label);
         if (window == null) {
-            throw new ClientTestFailure("the Network Interactor window is gone");
+            throw new ClientTestFailure("the " + label + " window is gone");
         }
         return new int[]{window.x() + 4 + local[0], window.y() + 18 + local[1]};
     }
@@ -798,6 +674,47 @@ public final class CraftingChainClientTests {
             return be;
         }
         throw new ClientTestFailure("no floppy drive at " + ctx.abs(DRIVE));
+    }
+
+    /** What the recipe viewer reports about the current screen, or a note when it is not installed. */
+    private static String viewerReport() {
+        if (!ModList.get().isLoaded("jei")) {
+            return "viewer not installed";
+        }
+        return dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.describeOverlay(Minecraft.getInstance().screen);
+    }
+
+    // The viewer steps pass trivially without the viewer installed, so the rest of the test still runs.
+
+    private static boolean viewerShowsRecipesFor(final ItemStack result) {
+        return !ModList.get().isLoaded("jei")
+                || dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.showRecipesFor(result);
+    }
+
+    private static boolean viewerScreenOpen() {
+        return ModList.get().isLoaded("jei")
+                && dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.viewerScreenOpen();
+    }
+
+    private static boolean viewerTransferAllowed() {
+        return !ModList.get().isLoaded("jei")
+                || dev.jsc.jscomputronics.integration.jei.JscJeiPlugin.studioTransferAllowed();
+    }
+
+    /** Sends the raw iron smelt to the Studio's machine draft: the payload the viewer's transfer button sends. */
+    private static void transferSmelt(final ClientTestContext ctx) {
+        final PatternStudioApp app = studio(ctx);
+        PacketDistributor.sendToServer(new SetProcessingPatternPayload(app.host(), app.monitorPos(),
+                List.of(PatternWorkbench.DataCell.fromStack(new ItemStack(Items.RAW_IRON))),
+                List.of(PatternWorkbench.DataCell.fromStack(new ItemStack(Items.IRON_INGOT))),
+                "minecraft:smelting"));
+    }
+
+    private static CraftingComputerBlockEntity cc(final ClientTestContext ctx, final ServerLevel level) {
+        if (level.getBlockEntity(ctx.abs(CRAFTING_COMPUTER)) instanceof CraftingComputerBlockEntity be) {
+            return be;
+        }
+        throw new ClientTestFailure("no Crafting Computer at " + ctx.abs(CRAFTING_COMPUTER));
     }
 
     private static PatternEncoderBlockEntity encoder(final ClientTestContext ctx, final ServerLevel level) {

@@ -220,6 +220,9 @@ public final class OsBootstrap {
             // The Crafting Manager installs only on a Crafting Computer -> Frames XP or newer.
             ProgramSpec.of(rl("crafting_manager"), "craftmgr", "Crafting Manager", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.CRAFTING_COMPUTER)
                     .withEra(LEGACY).withHouse(SoftwareHouse.AUTODECK),
+            // The Pattern Studio authors recipe files on any desktop and hands them to a linked encoder.
+            ProgramSpec.of(rl("pattern_studio"), "studio", "Pattern Studio", false, DESKTOPS, 96, ProgramKind.APP, 2, HostScope.ANY)
+                    .withEra(LEGACY).withHouse(SoftwareHouse.AUTODECK),
             // The Cluster Manager installs only on a Cluster Management Computer -> Frames XP or newer.
             ProgramSpec.of(rl("cluster_manager"), "clustermgr", "Cluster Manager", false, DESKTOPS, 96, ProgramKind.APP, 2, HostScope.CLUSTER_MANAGEMENT_COMPUTER)
                     .withEra(STANDARD).withHouse(SoftwareHouse.JSC),

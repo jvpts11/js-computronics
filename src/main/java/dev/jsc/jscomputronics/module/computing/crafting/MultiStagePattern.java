@@ -23,7 +23,12 @@ import java.util.Optional;
  * later stage chains the previous one's output. If any stage times out, the already-inserted ingredients are
  * returned to the network and the whole craft fails visibly. Fluids are only valid inside processing stages.
  */
-public record MultiStagePattern(List<Stage> stages) {
+public record MultiStagePattern(List<Stage> stages, String name, String note) {
+
+    /** A pipeline without an author's name or note: it goes by its final result. */
+    public MultiStagePattern(final List<Stage> stages) {
+        this(stages, "", "");
+    }
 
     /** One stage: exactly one of {@code bench}/{@code proc} is present. */
     public record Stage(Optional<CraftingPattern> bench, Optional<ProcessingPattern> proc) {
@@ -54,15 +59,51 @@ public record MultiStagePattern(List<Stage> stages) {
 
     public MultiStagePattern {
         stages = List.copyOf(stages);
+        name = clamp(name, CraftingPattern.MAX_NAME);
+        note = clamp(note, CraftingPattern.MAX_NOTE);
+    }
+
+    private static String clamp(final String s, final int max) {
+        final String value = s == null ? "" : s.trim();
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     public static final Codec<MultiStagePattern> CODEC = RecordCodecBuilder.create(i -> i.group(
-            Stage.CODEC.listOf().fieldOf("stages").forGetter(MultiStagePattern::stages)
+            Stage.CODEC.listOf().fieldOf("stages").forGetter(MultiStagePattern::stages),
+            Codec.STRING.optionalFieldOf("name", "").forGetter(MultiStagePattern::name),
+            Codec.STRING.optionalFieldOf("note", "").forGetter(MultiStagePattern::note)
     ).apply(i, MultiStagePattern::new));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, MultiStagePattern> STREAM_CODEC =
-            Stage.STREAM_CODEC.apply(ByteBufCodecs.list(64))
-                    .map(MultiStagePattern::new, MultiStagePattern::stages);
+            StreamCodec.composite(
+                    Stage.STREAM_CODEC.apply(ByteBufCodecs.list(64)), MultiStagePattern::stages,
+                    ByteBufCodecs.stringUtf8(CraftingPattern.MAX_NAME), MultiStagePattern::name,
+                    ByteBufCodecs.stringUtf8(CraftingPattern.MAX_NOTE), MultiStagePattern::note,
+                    MultiStagePattern::new);
+
+    /** What the pipeline is called where it is listed: its name, or its final result's when it has none. */
+    public String displayName() {
+        if (!name.isEmpty()) {
+            return name;
+        }
+        final Stage last = finalStage();
+        final StorageKey key = last == null ? null : outputKey(last);
+        return key == null ? "pipeline" : key.displayName().getString();
+    }
+
+    /** The same pipeline under a new name and note. */
+    public MultiStagePattern withName(final String newName, final String newNote) {
+        return new MultiStagePattern(stages, newName, newNote);
+    }
+
+    /** The same pipeline with every bench stage's tagged cells resolved by {@code chooser}. */
+    public MultiStagePattern resolved(final java.util.function.Function<String, net.minecraft.world.item.ItemStack> chooser) {
+        final List<Stage> out = new java.util.ArrayList<>(stages.size());
+        for (final Stage stage : stages) {
+            out.add(stage.bench().isPresent() ? Stage.bench(stage.bench().get().resolved(chooser)) : stage);
+        }
+        return new MultiStagePattern(out, name, note);
+    }
 
     /** The last stage, which produces the multi-stage's final result; null if the pipeline is empty. */
     public Stage finalStage() {

@@ -26,15 +26,35 @@ public record CraftCatalogPayload(List<Entry> entries) implements CustomPacketPa
     public static final byte DOT_RED = 0;
 
     public static final int MAX_ENTRIES = 512;
+    /** The most characters of a recipe's own name an entry carries. */
+    public static final int MAX_LABEL = 64;
 
-    public record Entry(ItemStack result, byte availability, boolean multiStage) {
+    /**
+     * One craftable result.
+     *
+     * @param result       what the recipe makes
+     * @param availability the stock dot: green, amber or red
+     * @param multiStage   whether a multi-stage pipeline makes it
+     * @param label        the name the recipe's author gave it, or {@code ""} when it goes by its result
+     */
+    public record Entry(ItemStack result, byte availability, boolean multiStage, String label) {
+
+        public Entry(final ItemStack result, final byte availability, final boolean multiStage) {
+            this(result, availability, multiStage, "");
+        }
 
         public static final StreamCodec<RegistryFriendlyByteBuf, Entry> STREAM_CODEC =
                 StreamCodec.composite(
                         ItemStack.STREAM_CODEC, Entry::result,
                         ByteBufCodecs.BYTE, Entry::availability,
                         ByteBufCodecs.BOOL, Entry::multiStage,
+                        ByteBufCodecs.stringUtf8(MAX_LABEL), Entry::label,
                         Entry::new);
+
+        /** What the entry is listed as: the recipe's own name, or its result's name when it has none. */
+        public String title() {
+            return label.isEmpty() ? result.getHoverName().getString() : label;
+        }
     }
 
     public static final CustomPacketPayload.Type<CraftCatalogPayload> TYPE =

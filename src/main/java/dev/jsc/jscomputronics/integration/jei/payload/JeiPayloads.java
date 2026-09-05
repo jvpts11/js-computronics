@@ -8,24 +8,20 @@
 package dev.jsc.jscomputronics.integration.jei.payload;
 
 import dev.jsc.jscomputronics.JsComputronics;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.CraftingPattern;
-import dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu;
+import dev.jsc.jscomputronics.module.computing.operation.payload.PatternStudioPayloads;
+import dev.jsc.jscomputronics.module.computing.os.OsHost;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.List;
-
 /**
- * Registers and handles the {@link SetPatternPayload} used by the JEI recipe-transfer integration.
- *
- * This class has no dependency on JEI types and is always loaded regardless of whether JEI
- * is installed.  The payload is only ever sent by {@code PatternEncoderTransferHandler}, which
- * is guarded by the {@code @JeiPlugin} lifecycle, so the handler runs silently when JEI is absent.
+ * Registers and handles the payloads the recipe-viewer integration sends: a recipe dropped into the Pattern
+ * Studio's bench or machine draft. This class has no dependency on the viewer's types and is always loaded;
+ * the payloads are only ever sent by the viewer plugin, which exists only when the viewer is installed.
  */
 @EventBusSubscriber(modid = JsComputronics.MODID, bus = EventBusSubscriber.Bus.MOD)
 public final class JeiPayloads {
@@ -35,59 +31,40 @@ public final class JeiPayloads {
 
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent event) {
-        event.registrar("1").playToServer(
-                SetPatternPayload.TYPE,
-                SetPatternPayload.STREAM_CODEC,
+        event.registrar("1").playToServer(SetPatternPayload.TYPE, SetPatternPayload.STREAM_CODEC,
                 JeiPayloads::handleSetPattern);
-        event.registrar("1").playToServer(
-                SetProcessingPatternPayload.TYPE,
-                SetProcessingPatternPayload.STREAM_CODEC,
+        event.registrar("1").playToServer(SetProcessingPatternPayload.TYPE, SetProcessingPatternPayload.STREAM_CODEC,
                 JeiPayloads::handleSetProcessingPattern);
     }
 
-    private static void handleSetProcessingPattern(
-            final SetProcessingPatternPayload payload,
-            final IPayloadContext context) {
+    private static void handleSetPattern(final SetPatternPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)) {
+            if (!(context.player() instanceof ServerPlayer player) || !(player.level() instanceof ServerLevel level)) {
                 return;
             }
-            // Same trust model as handleSetPattern: the open, still-valid menu decides which encoder is written.
-            if (!(player.containerMenu instanceof PatternEncoderMenu menu)
-                    || !menu.stillValid(player)) {
+            // The host is resolved through the monitor the player is at, never from the position alone.
+            final OsHost host = PatternStudioPayloads.studioHost(player, level, payload.host(), payload.monitorPos());
+            if (host == null) {
                 return;
             }
-            if (!(player.serverLevel().getBlockEntity(menu.blockEntityPos())
-                    instanceof PatternEncoderBlockEntity be)) {
-                return;
-            }
-            be.applyProcessingCells(payload.inputs(), payload.outputs());
-            menu.setActiveTab(PatternEncoderMenu.TAB_PROCESSING);
+            PatternStudioPayloads.applyBenchGrid(host, level, payload.grid(), payload.recipeId());
+            PacketDistributor.sendToPlayer(player, PatternStudioPayloads.buildState(level, host, "Recipe placed on the bench", 0));
         });
     }
 
-    private static void handleSetPattern(
-            final SetPatternPayload payload,
-            final IPayloadContext context) {
+    private static void handleSetProcessingPattern(final SetProcessingPatternPayload payload,
+                                                   final IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)) {
+            if (!(context.player() instanceof ServerPlayer player) || !(player.level() instanceof ServerLevel level)) {
                 return;
             }
-            // Validate the open menu first; resolve the BE from the menu's own position
-            // rather than payload.pos() so a spoofed BlockPos cannot write to a different
-            // PatternEncoder that the player is not actually interacting with.
-            if (!(player.containerMenu instanceof PatternEncoderMenu menu)
-                    || !menu.stillValid(player)) {
+            final OsHost host = PatternStudioPayloads.studioHost(player, level, payload.host(), payload.monitorPos());
+            if (host == null) {
                 return;
             }
-            if (!(player.serverLevel().getBlockEntity(menu.blockEntityPos())
-                    instanceof PatternEncoderBlockEntity be)) {
-                return;
-            }
-            final List<ItemStack> grid = payload.grid();
-            for (int i = 0; i < CraftingPattern.GRID_SIZE; i++) {
-                be.setGhost(i, i < grid.size() ? grid.get(i) : ItemStack.EMPTY);
-            }
+            PatternStudioPayloads.applyProcessingCells(host, level, payload.inputs(), payload.outputs(),
+                    payload.recipeType());
+            PacketDistributor.sendToPlayer(player, PatternStudioPayloads.buildState(level, host, "Recipe placed in the machine draft", 1));
         });
     }
 }

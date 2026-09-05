@@ -16,15 +16,15 @@ import dev.jsc.jscomputronics.module.computing.blockentity.ServerRackBlockEntity
 import dev.jsc.jscomputronics.module.computing.client.CraftingComputerScreen;
 import dev.jsc.jscomputronics.module.computing.client.FirmwareScreen;
 import dev.jsc.jscomputronics.module.computing.client.MainframeScreen;
-import dev.jsc.jscomputronics.module.computing.client.PatternEncoderScreen;
+import dev.jsc.jscomputronics.module.computing.client.OsInstallScreen;
 import dev.jsc.jscomputronics.module.computing.client.ServerRackScreen;
 import dev.jsc.jscomputronics.module.computing.client.os.CraftingManagerApp;
 import dev.jsc.jscomputronics.module.computing.client.os.DesktopScreen;
 import dev.jsc.jscomputronics.module.computing.client.os.DesktopWindow;
 import dev.jsc.jscomputronics.module.computing.client.os.NetworkInteractorApp;
+import dev.jsc.jscomputronics.module.computing.client.os.PatternStudioApp;
 import dev.jsc.jscomputronics.module.computing.client.os.ThisPcApp;
 import dev.jsc.jscomputronics.module.computing.gui.layout.CraftingComputerLayout;
-import dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu;
 import dev.jsc.jscomputronics.module.computing.operation.NetworkStorage;
 import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
 import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
@@ -62,6 +62,8 @@ public final class FullJourneyClientTests {
 
     private static final int SETTLE = 4;
     private static final int SCREEN_WAIT = 60;
+    /** Long enough for a cold start's POST to play out on the monitor before the desktop shows. */
+    private static final int BOOT_WAIT = 400;
 
     // World layout (relative; y = 2 stands on the ground). The Mainframe faces EAST (placed looking west), so
     // its 3x2x2 footprint covers x 1..2, z 1..3; the rack faces SOUTH (placed looking north) and covers
@@ -87,10 +89,11 @@ public final class FullJourneyClientTests {
     private static final BlockPos CABLE_RUN_3 = new BlockPos(7, 4, 6);
     private static final BlockPos CABLE_ABOVE_FURNACE = new BlockPos(7, 4, 5);
     private static final BlockPos FURNACE = new BlockPos(7, 3, 5);
-    private static final BlockPos ENCODER = new BlockPos(10, 2, 5);
+    private static final BlockPos ENCODER = CC_CD_DRIVE;
 
     private static final ResourceLocation NETWORK_OS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_net");
-    private static final ResourceLocation FRAMES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "frames_95");
+    /** The Crafting Computer runs Frames XP: the Pattern Studio needs XP or newer. */
+    private static final ResourceLocation FRAMES_XP = ResourceLocation.fromNamespaceAndPath("jsc", "frames_xp");
 
     // Assembly GUI slot centres (window-relative): the Mainframe and Crafting Computer share the left column.
     private static final int MOBO_X = 16;
@@ -124,23 +127,9 @@ public final class FullJourneyClientTests {
     private static final int FURNACE_FUEL_Y = 61;
     private static final int FURNACE_HOTBAR_Y = 150;
 
-    // Pattern Encoder (window-relative).
-    private static final int TAB_ROW_Y = 24;
-    private static final int TAB_CRAFTING_X = 33;
-    private static final int TAB_PROCESSING_X = 89;
-    private static final int TAB_MULTI_X = 156;
-    private static final int MEDIA_SLOT_X = 16;
-    private static final int MEDIA_SLOT_Y = 116;
-    private static final int GHOST_CELL_X = 34;
-    private static final int GHOST_CELL_Y = 52;
-    private static final int INPUT_CELL_X = 16;
-    private static final int OUTPUT_CELL_X = 146;
-    private static final int PROC_CELL_Y = 52;
-    private static final int MACHINE_BTN_X = 101;
-    private static final int MACHINE_BTN_Y = 50;
-    private static final int WRITE_X = 144;
-    private static final int WRITE_Y = 116;
-    private static final int ENCODER_HOTBAR_Y = 204;
+    // The Pattern Studio's launcher label and the encoder's spot: the CD drive's slot above the computer, once
+    // the installs are done and the drive comes down.
+    private static final String STUDIO = "Pattern Studio";
 
     private static int hotbarX(final int slot) {
         return 16 + slot * 18;
@@ -224,15 +213,22 @@ public final class FullJourneyClientTests {
                                 + " media=" + reader(ctx, level, MF_FLOPPY_DRIVE).mediaSlot().getStackInSlot(0))
                 .then(2, () -> ctx.selectHotbar(8))
                 .thenRightClick(SETTLE, MF_MONITOR)
-                .thenAwaitScreen(FirmwareScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(FirmwareScreen.class, BOOT_WAIT)
                 .thenScreenshot(SETTLE, "03-mainframe-firmware")
                 .then(0, () -> {
                     final int[] install = ctx.screen(FirmwareScreen.class).installButtonCenter();
                     ctx.click(install[0], install[1]);
                 })
-                .thenWaitUntilServer(level -> mainframe(ctx, level).hasOs(), SCREEN_WAIT,
-                        "the firmware to install the Network OS from the linked floppy",
+                // The firmware hands over to the install sequence: confirm it, then the write takes its time.
+                .thenAwaitScreen(OsInstallScreen.class, SCREEN_WAIT)
+                .then(SETTLE, () -> {
+                    final int[] confirm = ctx.screen(OsInstallScreen.class).primaryButtonCenter();
+                    ctx.click(confirm[0], confirm[1]);
+                })
+                .thenWaitUntilServer(level -> mainframe(ctx, level).hasOs(), BOOT_WAIT,
+                        "the install sequence to write the Network OS from the linked floppy",
                         level -> "hasOs=" + mainframe(ctx, level).hasOs())
+                .then(SETTLE, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT)
                 // Reboot so the freshly installed OS boots (power off, power on — as the player would).
                 .thenTeleport(SETTLE, new BlockPos(1, 2, 5), Direction.NORTH)
@@ -292,9 +288,9 @@ public final class FullJourneyClientTests {
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
 
-        // ---- 6. Frames 95 from a CD through the firmware on the Crafting Computer's monitor, then reboot.
+        // ---- 6. Frames XP from a CD through the firmware on the Crafting Computer's monitor, then reboot.
         ctx.thenGive(0, new ItemStack(ComputingModule.CD_DRIVE.get()), new ItemStack(ComputingModule.MONITOR.get()),
-                        installer(new ItemStack(ComputingModule.CD_ROM.get()), MediaKind.OS_INSTALL, FRAMES_95))
+                        installer(new ItemStack(ComputingModule.CD_ROM.get()), MediaKind.OS_INSTALL, FRAMES_XP))
                 .thenTeleport(SETTLE, new BlockPos(9, 2, 2), Direction.WEST)
                 .then(SETTLE, () -> ctx.selectHotbar(0))
                 .thenPlace(1, CC_CD_DRIVE)
@@ -309,14 +305,21 @@ public final class FullJourneyClientTests {
                         level -> "owner=" + reader(ctx, level, CC_CD_DRIVE).ownerPos())
                 .then(2, () -> ctx.selectHotbar(8))
                 .thenRightClick(SETTLE, CC_MONITOR)
-                .thenAwaitScreen(FirmwareScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(FirmwareScreen.class, BOOT_WAIT)
                 .thenScreenshot(SETTLE, "06-crafting-computer-firmware")
                 .then(0, () -> {
                     final int[] install = ctx.screen(FirmwareScreen.class).installButtonCenter();
                     ctx.click(install[0], install[1]);
                 })
-                .thenWaitUntilServer(level -> cc(ctx, level).hasOs(), SCREEN_WAIT,
-                        "the firmware to install Frames 95 from the linked CD drive", level -> "hasOs=" + cc(ctx, level).hasOs())
+                .thenAwaitScreen(OsInstallScreen.class, SCREEN_WAIT)
+                .then(SETTLE, () -> {
+                    final int[] confirm = ctx.screen(OsInstallScreen.class).primaryButtonCenter();
+                    ctx.click(confirm[0], confirm[1]);
+                })
+                .thenWaitUntilServer(level -> cc(ctx, level).hasOs(), BOOT_WAIT,
+                        "the install sequence to write the desktop system from the linked CD drive",
+                        level -> "hasOs=" + cc(ctx, level).hasOs())
+                .then(SETTLE, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT)
                 .thenTeleport(SETTLE, new BlockPos(7, 2, 0), Direction.SOUTH)
                 .thenRightClick(SETTLE, CRAFTING_COMPUTER)
@@ -346,19 +349,56 @@ public final class FullJourneyClientTests {
                 .thenTeleport(SETTLE, new BlockPos(10, 2, 2), Direction.WEST)
                 .then(SETTLE, () -> ctx.selectHotbar(8))
                 .thenRightClick(1, CC_MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenScreenshot(SETTLE, "07-frames-desktop")
                 .then(0, () -> launch(ctx, "This PC"))
                 .thenWaitUntil(() -> app(ctx, "This PC", ThisPcApp.class) != null
                                 && firstInstallable(app(ctx, "This PC", ThisPcApp.class)) >= 0,
                         SCREEN_WAIT, "This PC to list the installer disc with an Install button")
                 .thenScreenshot(2, "07-this-pc")
-                .then(0, () -> {
+                // A frame must have drawn the Install button before its centre can be read.
+                .then(SETTLE, () -> {
                     final ThisPcApp app = app(ctx, "This PC", ThisPcApp.class);
                     ctx.clickDesktop(appPoint(ctx, "This PC", app.installButtonCenter(firstInstallable(app))));
                 })
                 .thenWaitUntilServer(level -> cc(ctx, level).console().isInstalled(Programs.CRAFTING_MANAGER.toString()),
                         SCREEN_WAIT, "This PC to install the Crafting Manager from the disc",
+                        level -> "installed=" + cc(ctx, level).console().installed())
+                .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
+                .thenAwaitNoScreen(SCREEN_WAIT);
+
+        // ---- 7b. The same again for the Pattern Studio: swap the disc, install it from This PC.
+        ctx.thenGive(0, ItemStack.EMPTY)
+                .thenTeleport(SETTLE, new BlockPos(9, 2, 2), Direction.WEST)
+                .then(SETTLE, () -> ctx.selectHotbar(0))
+                .thenSneakClick(1, CC_CD_DRIVE, Direction.UP)
+                .thenWaitUntilServer(level -> reader(ctx, level, CC_CD_DRIVE).mediaSlot().getStackInSlot(0).isEmpty(),
+                        SCREEN_WAIT, "sneak-clicking the CD drive to eject the Crafting Manager disc",
+                        level -> "media=" + reader(ctx, level, CC_CD_DRIVE).mediaSlot().getStackInSlot(0))
+                .thenGive(0, installer(new ItemStack(ComputingModule.CD_ROM.get()), MediaKind.PROGRAM_INSTALL, Programs.PATTERN_STUDIO))
+                .then(SETTLE, () -> ctx.selectHotbar(0))
+                .thenRightClick(1, CC_CD_DRIVE)
+                .thenWaitUntilServer(level -> !reader(ctx, level, CC_CD_DRIVE).mediaSlot().getStackInSlot(0).isEmpty(),
+                        SCREEN_WAIT, "the Studio installer disc to sit in the CD drive", level -> "")
+                .thenTeleport(SETTLE, new BlockPos(10, 2, 2), Direction.WEST)
+                .then(SETTLE, () -> ctx.selectHotbar(8))
+                .thenRightClick(1, CC_MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .then(2, () -> {
+                    if (app(ctx, "This PC", ThisPcApp.class) == null) {
+                        launch(ctx, "This PC");
+                    }
+                })
+                .thenWaitUntil(() -> app(ctx, "This PC", ThisPcApp.class) != null
+                                && firstInstallable(app(ctx, "This PC", ThisPcApp.class)) >= 0,
+                        SCREEN_WAIT, "This PC to list the Studio installer disc with an Install button")
+                // A frame must have drawn the Install button before its centre can be read.
+                .then(SETTLE, () -> {
+                    final ThisPcApp app = app(ctx, "This PC", ThisPcApp.class);
+                    ctx.clickDesktop(appPoint(ctx, "This PC", app.installButtonCenter(firstInstallable(app))));
+                })
+                .thenWaitUntilServer(level -> cc(ctx, level).console().isInstalled(Programs.PATTERN_STUDIO.toString()),
+                        SCREEN_WAIT, "This PC to install the Pattern Studio from the disc",
                         level -> "installed=" + cc(ctx, level).console().installed())
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
@@ -398,75 +438,97 @@ public final class FullJourneyClientTests {
                         SCREEN_WAIT, "the coal to sit in the furnace's fuel slot", level -> "");
 
         // ---- 9. Author a processing pattern (raw iron -> ingot, furnace, 600 ticks), a bench pattern (ingot ->
-        //         nuggets) and a multi-stage pattern (processing then bench) on one floppy at the encoder.
-        ctx.thenGive(0, new ItemStack(ComputingModule.PATTERN_ENCODER.get()), new ItemStack(ComputingModule.FLOPPY_DISK.get()),
-                        new ItemStack(Items.RAW_IRON, 8), new ItemStack(Items.IRON_INGOT, 8))
-                .thenTeleport(SETTLE, new BlockPos(10, 2, 7), Direction.NORTH)
+        //         nuggets) and a multi-stage pattern (processing then bench) on the Pattern Studio, each burned
+        //         onto one DVD-RW at the encoder linked to the computer. The CD drive above the computer comes
+        //         down (its installs are done) and the encoder takes its place, adjacent to the computer.
+        ctx.thenGive(0, new ItemStack(ComputingModule.PATTERN_ENCODER.get()), new ItemStack(ComputingModule.DVD_RW.get()))
+                .thenTeleport(SETTLE, new BlockPos(9, 2, 2), Direction.WEST)
+                .thenServer(SETTLE, level -> ctx.assertTrue(level.destroyBlock(abs(ctx, CC_CD_DRIVE), true),
+                        "the CD drive must come down; found " + level.getBlockState(abs(ctx, CC_CD_DRIVE))))
+                .thenWaitUntilServer(level -> !(level.getBlockEntity(abs(ctx, CC_CD_DRIVE)) instanceof MediaReaderBlockEntity),
+                        SCREEN_WAIT, "the CD drive to come down",
+                        level -> "state=" + level.getBlockState(abs(ctx, CC_CD_DRIVE))
+                                + " be=" + level.getBlockEntity(abs(ctx, CC_CD_DRIVE)))
                 .then(SETTLE, () -> ctx.selectHotbar(0))
                 .thenPlace(1, ENCODER)
-                .then(2, () -> ctx.selectHotbar(8))
-                .thenRightClick(SETTLE, ENCODER)
-                .thenAwaitScreen(PatternEncoderScreen.class, SCREEN_WAIT)
-                .then(2, () -> slotFromHotbar(ctx, 1, ENCODER_HOTBAR_Y, MEDIA_SLOT_X, MEDIA_SLOT_Y))
-                // Processing.
-                .then(2, () -> ctx.clickGui(TAB_PROCESSING_X, TAB_ROW_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), ENCODER_HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(INPUT_CELL_X, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(2), ENCODER_HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(3), ENCODER_HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(OUTPUT_CELL_X, PROC_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(3), ENCODER_HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(MACHINE_BTN_X, MACHINE_BTN_Y))
-                .then(1, () -> ctx.type("furnace"))
-                .then(2, () -> {
-                    final PatternEncoderScreen screen = ctx.screen(PatternEncoderScreen.class);
-                    final int row = screen.machinePickerRows().indexOf("minecraft:furnace");
-                    ctx.assertTrue(row >= 0, "the picker must list minecraft:furnace; rows=" + screen.machinePickerRows());
-                    ctx.clickGui(screen.machinePickerRowX(), screen.machinePickerRowY(row - screen.machinePickerScroll()));
-                })
-                .then(2, () -> {
-                    ctx.clickGui(PatternEncoderScreen.timeoutBoxX(), PatternEncoderScreen.timeoutBoxY());
-                    for (int i = 0; i < 4; i++) {
+                .thenWaitUntilServer(level -> encoder(ctx, level) != null && encoder(ctx, level).ownerPos() != null,
+                        SCREEN_WAIT, "the encoder to link to the Crafting Computer",
+                        level -> "encoder=" + level.getBlockState(abs(ctx, ENCODER)))
+                .then(2, () -> ctx.selectHotbar(1))
+                .thenRightClick(1, ENCODER)
+                .thenWaitUntilServer(level -> encoder(ctx, level).hasMedia(), SCREEN_WAIT,
+                        "the DVD-RW to sit in the encoder's bay", level -> "")
+                .thenTeleport(SETTLE, new BlockPos(10, 2, 2), Direction.WEST)
+                .then(SETTLE, () -> ctx.selectHotbar(8))
+                .thenRightClick(1, CC_MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains(STUDIO), SCREEN_WAIT,
+                        "the Pattern Studio to be listed on the Start menu")
+                .then(0, () -> launch(ctx, STUDIO))
+                .thenWaitUntil(() -> app(ctx, STUDIO, PatternStudioApp.class) != null
+                                && app(ctx, STUDIO, PatternStudioApp.class).isLoaded()
+                                && app(ctx, STUDIO, PatternStudioApp.class).state().encoder().linked(),
+                        SCREEN_WAIT, "the Studio window, seeing the linked encoder")
+                .thenScreenshot(2, "09-studio")
+                // Processing, transferred from the recipe viewer (the payload its transfer button sends): the raw
+                // iron smelt, paired with the furnace the data maps.
+                .then(0, () -> transferMachineRecipe(ctx, new ItemStack(Items.RAW_IRON), new ItemStack(Items.IRON_INGOT),
+                        "minecraft:smelting"))
+                .thenWaitUntilServer(level -> "minecraft:furnace".equals(cc(ctx, level).studio().machineType()), SCREEN_WAIT,
+                        "the smelt to land in the machine draft paired with the furnace",
+                        level -> "machine=" + cc(ctx, level).studio().machineType())
+                .then(2, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).timeoutFieldCenter())))
+                .then(1, () -> {
+                    for (int i = 0; i < 6; i++) {
                         ctx.key(GLFW.GLFW_KEY_BACKSPACE);
                     }
                     ctx.type("600");
+                    ctx.key(GLFW.GLFW_KEY_ENTER);
                 })
+                .thenWaitUntilServer(level -> cc(ctx, level).studio().procTimeout() == 600, SCREEN_WAIT,
+                        "the typed timeout to reach the workbench", level -> "timeout=" + cc(ctx, level).studio().procTimeout())
                 .thenScreenshot(SETTLE, "09-processing-pattern")
-                .then(0, () -> ctx.clickGui(WRITE_X, WRITE_Y))
-                .thenWaitUntilServer(level -> craftFiles(ctx, level) == 1, SCREEN_WAIT, "the processing .craft on the floppy",
-                        level -> "files=" + craftFiles(ctx, level))
-                // Bench: one ingot in the grid resolves to nine nuggets.
-                .then(2, () -> ctx.clickGui(TAB_CRAFTING_X, TAB_ROW_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(3), ENCODER_HOTBAR_Y))
-                .then(2, () -> ctx.clickGui(GHOST_CELL_X, GHOST_CELL_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(3), ENCODER_HOTBAR_Y))
+                .then(0, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).barButtonCenter(0))))
+                .thenWaitUntilServer(level -> craftFiles(ctx, level) == 1, 300, "the processing .craft on the disc",
+                        level -> "files=" + craftFiles(ctx, level) + " encoder=" + encoder(ctx, level).statusLine())
+                // Bench, transferred from the viewer: one ingot to nine nuggets.
+                .then(2, () -> transferBenchRecipe(ctx, "minecraft:iron_nugget", new ItemStack(Items.IRON_INGOT)))
+                .thenWaitUntilServer(level -> cc(ctx, level).studio().preview().is(Items.IRON_NUGGET), SCREEN_WAIT,
+                        "the nugget recipe to land on the bench", level -> "preview=" + cc(ctx, level).studio().preview())
                 .thenScreenshot(SETTLE, "09-bench-pattern")
-                .then(0, () -> ctx.clickGui(WRITE_X, WRITE_Y))
-                .thenWaitUntilServer(level -> craftFiles(ctx, level) == 2, SCREEN_WAIT, "the bench .craft on the floppy",
-                        level -> "files=" + craftFiles(ctx, level))
-                // Multi-stage: pick the processing file, then the bench file, from the stage picker.
-                .then(2, () -> ctx.clickGui(TAB_MULTI_X, TAB_ROW_Y))
-                .then(2, () -> ctx.clickGui(PatternEncoderScreen.addStageButtonX(), PatternEncoderScreen.addStageButtonY()))
-                .thenAssert(2, () -> ctx.screen(PatternEncoderScreen.class).isStagePickerOpen(), "Add stage opens the picker")
-                .then(0, () -> pickStage(ctx, "iron_ingot"))
-                .then(SETTLE, () -> ctx.clickGui(PatternEncoderScreen.addStageButtonX(), PatternEncoderScreen.addStageButtonY()))
-                .then(2, () -> pickStage(ctx, "iron_nugget"))
+                .then(0, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).barButtonCenter(0))))
+                .thenWaitUntilServer(level -> craftFiles(ctx, level) == 2, 300, "the bench .craft on the disc",
+                        level -> "files=" + craftFiles(ctx, level) + " encoder=" + encoder(ctx, level).statusLine())
+                // Multi-stage: the machine draft, then the bench draft, as stages; burn the pipeline.
+                .then(2, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).tabCenter(PatternStudioApp.TAB_PIPELINE))))
+                .then(2, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).pipelineButtonCenter(1))))
+                .thenWaitUntilServer(level -> cc(ctx, level).studio().stages().size() == 1, SCREEN_WAIT,
+                        "the machine draft to become the first stage", level -> "stages=" + cc(ctx, level).studio().stages().size())
+                .then(2, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).pipelineButtonCenter(0))))
+                .thenWaitUntilServer(level -> cc(ctx, level).studio().stages().size() == 2, SCREEN_WAIT,
+                        "the bench draft to become the second stage", level -> "stages=" + cc(ctx, level).studio().stages().size())
                 .thenScreenshot(SETTLE, "09-multi-stage-pattern")
-                .then(0, () -> ctx.clickGui(WRITE_X, WRITE_Y))
-                .thenWaitUntilServer(level -> craftFiles(ctx, level) == 3, SCREEN_WAIT, "the multi-stage .craft on the floppy",
-                        level -> "files=" + craftFiles(ctx, level))
-                // Take the floppy back into the hotbar.
-                .then(2, () -> ctx.clickGui(MEDIA_SLOT_X, MEDIA_SLOT_Y))
-                .then(2, () -> ctx.clickGui(hotbarX(1), ENCODER_HOTBAR_Y))
+                .then(0, () -> ctx.clickDesktop(studioPoint(ctx, studio(ctx).barButtonCenter(0))))
+                .thenWaitUntilServer(level -> craftFiles(ctx, level) == 3, 300, "the multi-stage .craft on the disc",
+                        level -> "files=" + craftFiles(ctx, level) + " encoder=" + encoder(ctx, level).statusLine())
                 .then(2, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
 
-        // ---- 10. A floppy drive on the Crafting Computer, the floppy in it, and both machine patterns loaded.
-        ctx.thenServer(0, level -> ctx.give(0, new ItemStack(ComputingModule.FLOPPY_DRIVE.get())))
+        // ---- 10. A DVD drive on the Crafting Computer, the disc out of the encoder and into it, and both machine
+        //          patterns loaded.
+        ctx.thenServer(0, level -> ctx.give(2, new ItemStack(ComputingModule.DVD_DRIVE.get())))
+                .thenTeleport(SETTLE, new BlockPos(7, 2, -1), Direction.SOUTH)
+                .then(SETTLE, () -> ctx.selectHotbar(2))
+                .thenPlace(1, CC_FLOPPY_DRIVE)
+                // Creative placement leaves the encoder item in slot 0; free it so the ejected disc lands there.
+                .thenGive(0, ItemStack.EMPTY)
+                .thenTeleport(SETTLE, new BlockPos(9, 2, 2), Direction.WEST)
+                .then(SETTLE, () -> ctx.selectHotbar(8))
+                .thenSneakClick(1, ENCODER, Direction.EAST)
+                .thenWaitUntilServer(level -> !encoder(ctx, level).hasMedia(), SCREEN_WAIT,
+                        "sneak-clicking the encoder to eject the disc", level -> "")
                 .thenTeleport(SETTLE, new BlockPos(7, 2, -1), Direction.SOUTH)
                 .then(SETTLE, () -> ctx.selectHotbar(0))
-                .thenPlace(1, CC_FLOPPY_DRIVE)
-                .then(2, () -> ctx.selectHotbar(1))
                 .thenRightClick(SETTLE, CC_FLOPPY_DRIVE)
                 .thenWaitUntilServer(level -> reader(ctx, level, CC_FLOPPY_DRIVE).ownerPos() != null
                                 && !reader(ctx, level, CC_FLOPPY_DRIVE).mediaSlot().getStackInSlot(0).isEmpty(),
@@ -475,24 +537,26 @@ public final class FullJourneyClientTests {
                 .thenTeleport(SETTLE, new BlockPos(10, 2, 2), Direction.WEST)
                 .then(SETTLE, () -> ctx.selectHotbar(8))
                 .thenRightClick(1, CC_MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
-                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains("Crafting Mgr"), SCREEN_WAIT,
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains("Crafting Manager"), SCREEN_WAIT,
                         "the Crafting Manager to be listed on the Start menu")
-                .then(0, () -> launch(ctx, "Crafting Mgr"))
-                .thenWaitUntil(() -> app(ctx, "Crafting Mgr", CraftingManagerApp.class) != null
-                                && app(ctx, "Crafting Mgr", CraftingManagerApp.class).mediaFiles().size() == 3,
+                .then(0, () -> launch(ctx, "Crafting Manager"))
+                .thenWaitUntil(() -> app(ctx, "Crafting Manager", CraftingManagerApp.class) != null
+                                && app(ctx, "Crafting Manager", CraftingManagerApp.class).mediaFiles().size() == 3,
                         SCREEN_WAIT, "the Crafting Manager to list the three files")
                 .then(0, () -> {
-                    final CraftingManagerApp app = app(ctx, "Crafting Mgr", CraftingManagerApp.class);
+                    final CraftingManagerApp app = app(ctx, "Crafting Manager", CraftingManagerApp.class);
                     final List<String> files = app.mediaFiles();
                     for (int i = 0; i < files.size(); i++) {
-                        if (!files.get(i).startsWith("iron_nugget")) { // the bench craft rides inside the multi-stage
+                        // The bench craft rides inside the multi-stage one, so only the plain bench file stays out;
+                        // the multi-stage file shares its result's name and carries the encoder's "_2" suffix.
+                        if (!files.get(i).equals("iron_nugget.craft")) {
                             ctx.clickDesktop(app.mediaRowCenter(i));
                         }
                     }
                 })
-                .then(2, () -> ctx.clickDesktop(app(ctx, "Crafting Mgr", CraftingManagerApp.class).actionButtonCenter(0)))
-                .thenWaitUntil(() -> app(ctx, "Crafting Mgr", CraftingManagerApp.class).romNames().size() == 2, SCREEN_WAIT,
+                .then(2, () -> ctx.clickDesktop(app(ctx, "Crafting Manager", CraftingManagerApp.class).actionButtonCenter(0)))
+                .thenWaitUntil(() -> app(ctx, "Crafting Manager", CraftingManagerApp.class).romNames().size() == 2, SCREEN_WAIT,
                         "the processing and multi-stage recipes to appear in the ROM")
                 .thenScreenshot(2, "10-crafting-manager-loaded")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
@@ -503,9 +567,11 @@ public final class FullJourneyClientTests {
         ctx.thenGive(0, new ItemStack(Items.RAW_IRON, 4))
                 .then(SETTLE, () -> ctx.selectHotbar(8))
                 .thenRightClick(1, CC_MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .then(2, () -> launch(ctx, "Network"))
                 .thenWaitUntil(() -> app(ctx, "Network", NetworkInteractorApp.class) != null, SCREEN_WAIT, "the Network Interactor window")
+                // The interactor reopens on the tab last used anywhere on this client, so pick the network grid.
+                .then(2, () -> ctx.clickDesktop(appPoint(ctx, "Network", app(ctx, "Network", NetworkInteractorApp.class).networkTabCenter())))
                 .then(2, () -> ctx.clickDesktop(appPoint(ctx, "Network", app(ctx, "Network", NetworkInteractorApp.class).inventoryBandSlotCenter(27))))
                 .then(2, () -> ctx.clickDesktop(appPoint(ctx, "Network", app(ctx, "Network", NetworkInteractorApp.class).gridFirstCellCenter())))
                 .thenWaitUntilServer(level -> stored(ctx, level, Items.RAW_IRON) >= 4, SCREEN_WAIT,
@@ -528,7 +594,7 @@ public final class FullJourneyClientTests {
         // ---- 12. The multi-stage pipeline: nine nuggets = smelt one ingot, then the bench stage.
         ctx.thenTeleport(SETTLE, new BlockPos(10, 2, 2), Direction.WEST)
                 .thenRightClick(SETTLE, CC_MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenWaitUntil(() -> app(ctx, "Network", NetworkInteractorApp.class) != null
                                 || ctx.screen(DesktopScreen.class).launcherLabels().contains("Network"), SCREEN_WAIT, "the desktop")
                 .then(2, () -> {
@@ -563,7 +629,7 @@ public final class FullJourneyClientTests {
         ctx.click(desktop.startButtonX(), desktop.startButtonY());
         final int item = desktop.launcherLabels().indexOf(label);
         ctx.assertTrue(item >= 0, "the Start menu must list " + label + "; got " + desktop.launcherLabels());
-        ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(item));
+        ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
     }
 
     private static <T> T app(final ClientTestContext ctx, final String label, final Class<T> type) {
@@ -592,16 +658,40 @@ public final class FullJourneyClientTests {
         return -1;
     }
 
-    private static void pickStage(final ClientTestContext ctx, final String fileStartsWith) {
-        final PatternEncoderScreen screen = ctx.screen(PatternEncoderScreen.class);
-        final List<String> files = screen.stagePickerFiles();
-        for (int i = 0; i < files.size(); i++) {
-            if (files.get(i).startsWith(fileStartsWith)) {
-                ctx.clickGui(screen.stagePickerRowX(), screen.stagePickerRowY(i));
-                return;
-            }
+    private static PatternStudioApp studio(final ClientTestContext ctx) {
+        return app(ctx, STUDIO, PatternStudioApp.class);
+    }
+
+    private static int[] studioPoint(final ClientTestContext ctx, final int[] local) {
+        return appPoint(ctx, STUDIO, local);
+    }
+
+    /** Sends a machine recipe to the Studio's machine draft: the payload the viewer's transfer button sends. */
+    private static void transferMachineRecipe(final ClientTestContext ctx, final ItemStack input, final ItemStack output,
+                                              final String recipeType) {
+        final PatternStudioApp app = studio(ctx);
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.jsc.jscomputronics.integration.jei.payload.SetProcessingPatternPayload(app.host(), app.monitorPos(),
+                        List.of(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.DataCell.fromStack(input)),
+                        List.of(dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench.DataCell.fromStack(output)),
+                        recipeType));
+    }
+
+    /** Sends a bench recipe to the Studio's bench: the payload the viewer's transfer button sends. */
+    private static void transferBenchRecipe(final ClientTestContext ctx, final String recipeId, final ItemStack... cells) {
+        final PatternStudioApp app = studio(ctx);
+        final List<ItemStack> grid = new java.util.ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            grid.add(i < cells.length ? cells[i] : ItemStack.EMPTY);
         }
-        throw new ClientTestFailure("no " + fileStartsWith + "* file in the stage picker; files=" + files);
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.jsc.jscomputronics.integration.jei.payload.SetPatternPayload(app.host(), app.monitorPos(), grid, recipeId));
+    }
+
+    private static dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity encoder(
+            final ClientTestContext ctx, final ServerLevel level) {
+        return level.getBlockEntity(abs(ctx, ENCODER))
+                instanceof dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity be ? be : null;
     }
 
     /** Opens the craft popup for {@code name} on the Crafting tab, adds {@code plusOnes} and submits. */

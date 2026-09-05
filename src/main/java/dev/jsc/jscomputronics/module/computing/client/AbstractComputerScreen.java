@@ -40,6 +40,18 @@ public abstract class AbstractComputerScreen<T extends AbstractContainerMenu> ex
         return null;
     }
 
+    /**
+     * Outer bounds of the monitor body drawn around this screen's glass (the bezel and its chin), in screen
+     * coordinates. A recipe viewer placing its panel beside the monitor reads this so the panel sits next to the
+     * bezel rather than over it.
+     */
+    public dev.jsc.jscomputronics.module.computing.client.theme.MonitorFrameStyle.Geometry frameBounds() {
+        final HardwareEra era = screenEra();
+        return dev.jsc.jscomputronics.module.computing.client.theme.MonitorFrameStyle
+                .forEra(era == null ? HardwareEra.STANDARD : era)
+                .geometry(leftPos, topPos, imageWidth, imageHeight);
+    }
+
     @Override
     protected void init() {
         super.init();

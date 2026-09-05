@@ -644,7 +644,8 @@ public final class ComputingModule {
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
 
-    // Pattern system — the Pattern Encoder writes .craft files onto removable media
+    // Pattern system — the Pattern Encoder burns .craft files onto removable media, one encoder per era:
+    // the Standard one writes DVDs, CDs and USB sticks, the Legacy one CDs, the Vintage one floppies.
 
     public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock> PATTERN_ENCODER =
             BLOCKS.register("pattern_encoder",
@@ -652,17 +653,57 @@ public final class ComputingModule {
                             BlockBehaviour.Properties.of()
                                     .mapColor(MapColor.COLOR_GRAY)
                                     .strength(1.5F)
-                                    .sound(SoundType.METAL)));
+                                    .sound(SoundType.METAL)
+                                    // The body is drawn by the block entity: without this a full cube would
+                                    // block its own light and cull the faces of its neighbours.
+                                    .noOcclusion(), HardwareEra.STANDARD));
+
+    /**
+     * How an encoder body sits in an item slot: the body is one full block (x -0.5..0.5, y 0..1,
+     * z -0.5..0.5 around its origin), so only the height needs re-centring.
+     */
+    private static final dev.jsc.jscomputronics.module.computing.item.CabinetBlockItem.Fit ENCODER_FIT =
+            new dev.jsc.jscomputronics.module.computing.item.CabinetBlockItem.Fit(16.0F, 0.0F, -0.5F, 0.0F);
 
     public static final DeferredItem<BlockItem> PATTERN_ENCODER_ITEM = ITEMS.register(
-            "pattern_encoder", () -> new BlockItem(PATTERN_ENCODER.get(), new Item.Properties()));
+            "pattern_encoder", () -> new dev.jsc.jscomputronics.module.computing.item.CabinetBlockItem(
+                    PATTERN_ENCODER.get(), new Item.Properties(), "pattern_encoder", "pattern_encoder",
+                    "pattern_encoder", ENCODER_FIT));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock> LEGACY_PATTERN_ENCODER =
+            BLOCKS.register("legacy_pattern_encoder",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.COLOR_LIGHT_GRAY)
+                                    .strength(1.5F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion(), HardwareEra.LEGACY));
+
+    public static final DeferredItem<BlockItem> LEGACY_PATTERN_ENCODER_ITEM = ITEMS.register(
+            "legacy_pattern_encoder", () -> new dev.jsc.jscomputronics.module.computing.item.CabinetBlockItem(
+                    LEGACY_PATTERN_ENCODER.get(), new Item.Properties(), "pattern_encoder", "legacy_pattern_encoder",
+                    "pattern_encoder", ENCODER_FIT));
+
+    public static final DeferredBlock<dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock> VINTAGE_PATTERN_ENCODER =
+            BLOCKS.register("vintage_pattern_encoder",
+                    () -> new dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock(
+                            BlockBehaviour.Properties.of()
+                                    .mapColor(MapColor.TERRACOTTA_WHITE)
+                                    .strength(1.5F)
+                                    .sound(SoundType.METAL)
+                                    .noOcclusion(), HardwareEra.VINTAGE));
+
+    public static final DeferredItem<BlockItem> VINTAGE_PATTERN_ENCODER_ITEM = ITEMS.register(
+            "vintage_pattern_encoder", () -> new dev.jsc.jscomputronics.module.computing.item.CabinetBlockItem(
+                    VINTAGE_PATTERN_ENCODER.get(), new Item.Properties(), "pattern_encoder", "vintage_pattern_encoder",
+                    "pattern_encoder", ENCODER_FIT));
 
     public static final DeferredHolder<BlockEntityType<?>,
             BlockEntityType<dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity>> PATTERN_ENCODER_BE =
             BLOCK_ENTITIES.register("pattern_encoder",
                     () -> BlockEntityType.Builder.of(
                             dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity::new,
-                            PATTERN_ENCODER.get()).build(null));
+                            PATTERN_ENCODER.get(), LEGACY_PATTERN_ENCODER.get(), VINTAGE_PATTERN_ENCODER.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu>> PATTERN_ENCODER_MENU =

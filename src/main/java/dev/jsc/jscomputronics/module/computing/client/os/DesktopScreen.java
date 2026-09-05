@@ -7,6 +7,7 @@
  */
 package dev.jsc.jscomputronics.module.computing.client.os;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import dev.jsc.jscomputronics.common.gui.layout.DesktopZ;
 import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.blockentity.AbstractComputerBlockEntity;
@@ -33,6 +34,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.client.event.ContainerScreenEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
@@ -563,6 +566,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return out;
     }
 
+    /** Whether {@code app} runs in the front (focused) window; what a recipe viewer's drop or transfer targets. */
+    public boolean isFront(final DesktopApp app) {
+        final DesktopWindow front = frontWindow();
+        return front != null && front.app() == app;
+    }
+
     /** The open window hosting the program launched under {@code label}, or null. */
     @org.jetbrains.annotations.Nullable
     public DesktopWindow windowFor(final String label) {
@@ -589,17 +598,46 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return ox() + startMenuX() + BAND_W + 30;
     }
 
+    /**
+     * Screen x of the centre of the {@code index}-th Start menu entry. Frames XP lays its entries in two
+     * columns (programs left, places right), so the column depends on the entry.
+     */
+    public int startMenuItemX(final int index) {
+        if (panel == dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_XP
+                && index >= 0 && index < launchers.size()) {
+            final boolean place = XP_PLACES.contains(launchers.get(index).label());
+            final int colX = ox() + startMenuX() + (place ? XP_LEFT_W + 3 : 3);
+            final int colW = place ? XP_MENU_W - XP_LEFT_W - 6 : XP_LEFT_W - 6;
+            return colX + colW / 2;
+        }
+        return startMenuItemX();
+    }
+
     public int startMenuItemY(final int index) {
         final int tbY = sh() - TASKBAR_H;
+        if (panel == dev.jsc.jscomputronics.module.computing.os.PanelStyle.FRAMES_XP
+                && index >= 0 && index < launchers.size()) {
+            final Launcher target = launchers.get(index);
+            final List<Launcher> column = XP_PLACES.contains(target.label()) ? xpRightLaunchers() : xpLeftLaunchers();
+            final int row = Math.max(0, column.indexOf(target));
+            return oy() + tbY - startMenuHeight() + XP_HEADER_H + 3 + row * XP_ROW_H + XP_ROW_H / 2;
+        }
         return oy() + tbY - startMenuHeight() + 4 + index * MENU_ITEM_H + MENU_ITEM_H / 2;
     }
 
-    /** The host computer's hardware era, read from its block entity so the monitor frame matches the chassis. */
+    /**
+     * The host computer's hardware era, read from its block entity so the monitor frame matches the chassis.
+     * Never null: a host that cannot name an era yet (a rack whose unit the client has not received) gets the
+     * Standard frame, since the frame geometry is asked for every frame by the recipe viewer as well.
+     */
     private HardwareEra era() {
         final Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(host)
                 instanceof dev.jsc.jscomputronics.module.computing.os.OsHost be) {
-            return be.displayEra();
+            final HardwareEra era = be.displayEra();
+            if (era != null) {
+                return era;
+            }
         }
         return HardwareEra.STANDARD;
     }
@@ -871,6 +909,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // renderBackground already draws the vanilla blur + dim gradient once; a second identical fill
         // would darken the world behind the desktop to near-black (the double-dim bug). One pass only.
         renderBackground(g, mouseX, mouseY, partialTick);
+        // The desktop paints everything itself instead of running the container's render pass, so it posts the
+        // two container render events that pass would post: a recipe viewer draws its ingredient list beside the
+        // monitor from them (its plain screen-render hook skips container screens on purpose).
+        NeoForge.EVENT_BUS.post(new ContainerScreenEvent.Render.Background(this, g, mouseX, mouseY));
         // Drain any cross-app open requests (e.g. Files asked to launch the Editor).
         if (!PENDING_OPEN.isEmpty()) {
             for (final String key : PENDING_OPEN) {
@@ -1205,6 +1247,15 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             g.pose().popPose();
         }
         g.pose().popPose(); // close the (ox, oy) desktop-origin translate
+
+        // The container pass posts its foreground event with the pose at the gui origin and the depth test off,
+        // so a listener draws over the finished screen without fighting the desktop's layered depth.
+        RenderSystem.disableDepthTest();
+        g.pose().pushPose();
+        g.pose().translate(leftPos, topPos, 0);
+        NeoForge.EVENT_BUS.post(new ContainerScreenEvent.Render.Foreground(this, g, mouseX, mouseY));
+        g.pose().popPose();
+        RenderSystem.enableDepthTest();
     }
 
     // The desktop paints its whole surface in the render() override above and does not call super.render(), so
@@ -2958,8 +3009,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             if (w.bodyHit(mouseX, mouseY)) {
                 bringToFront(i);
-                // A click landing on an active inventory slot (only the front Network Interactor has them) is a
-                // real container click: let the vanilla container drive the cursor, drag, and shift-click.
+                // A click landing on an active inventory slot (only the front inventory-band window has them) is
+                // a real container click: let the vanilla container drive the cursor, drag, and shift-click.
+                if (w.app() instanceof InventoryBandApp && !(w.app() instanceof NetworkInteractorApp)
+                        && !w.app().modalActive() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
+                    return super.mouseClicked(mouseXAbs, mouseYAbs, button);
+                }
                 if (w.app() instanceof NetworkInteractorApp ni) {
                     // Shift-click an inventory slot inserts that whole stack into the network (Network tab) or
                     // local storage (Local tab), like MC-NET — instead of the vanilla quick-move between slots.
@@ -3102,7 +3157,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // No window drag/resize in progress. While the front Network Interactor holds a stack on the cursor,
         // a drag is the vanilla "spread across slots" gesture — hand it to the container, not the app.
         final DesktopWindow w = frontWindow();
-        if (w != null && w.app() instanceof NetworkInteractorApp && !menu.getCarried().isEmpty()) {
+        if (w != null && w.app() instanceof InventoryBandApp && !menu.getCarried().isEmpty()) {
             return super.mouseDragged(mouseXAbs, mouseYAbs, button, dx, dy);
         }
         if (w != null) {
@@ -3342,7 +3397,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     @org.jetbrains.annotations.Nullable
     private DesktopWindow frontNetworkInteractorWindow() {
         final DesktopWindow w = frontWindow();
-        return w != null && w.app() instanceof NetworkInteractorApp ? w : null;
+        return w != null && w.app() instanceof InventoryBandApp ? w : null;
     }
 
     /**
@@ -3370,7 +3425,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private void syncInventorySlots() {
         final DesktopWindow w = frontNetworkInteractorWindow();
-        if (w == null || !(w.app() instanceof NetworkInteractorApp app)) {
+        if (w == null || !(w.app() instanceof InventoryBandApp app)) {
             menu.setSlotsActive(false);
             return;
         }

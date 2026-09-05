@@ -9,10 +9,10 @@ package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.operation.payload.ComputingPayloads;
 import dev.jsc.jscomputronics.module.computing.operation.payload.CraftManagerStatePayload;
 import dev.jsc.jscomputronics.module.computing.os.media.MediaReaderBlockEntity;
+import dev.jsc.jscomputronics.testkit.CraftFiles;
 import dev.jsc.jscomputronics.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -51,14 +51,9 @@ public final class CraftingManagerMediaGameTests {
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
         world.setBlock(FLOPPY_DRIVE, ComputingModule.FLOPPY_DRIVE.get());
         world.setBlock(DVD_DRIVE, ComputingModule.DVD_DRIVE.get());
-        // Three... well, one craft written onto a DVD-RW by the encoder, the way a player does it.
-        world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-        final PatternEncoderBlockEntity encoder = world.blockEntity(ENCODER, PatternEncoderBlockEntity.class);
-        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.DVD_RW.get()));
-        encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-        helper.assertTrue(encoder.writePattern(), "the encoder writes the craft onto the DVD-RW");
-        final ItemStack dvd = encoder.media().getStackInSlot(0);
-        encoder.media().setStackInSlot(0, ItemStack.EMPTY);
+        // Three... well, one craft on a DVD-RW, as the encoder leaves it once its job is through.
+        final ItemStack dvd = new ItemStack(ComputingModule.DVD_RW.get());
+        CraftFiles.writeBench(dvd, CraftFiles.oakPlanks(), helper.getLevel().registryAccess());
 
         final MediaReaderBlockEntity floppyDrive = world.blockEntity(FLOPPY_DRIVE, MediaReaderBlockEntity.class);
         final MediaReaderBlockEntity dvdDrive = world.blockEntity(DVD_DRIVE, MediaReaderBlockEntity.class);
@@ -99,13 +94,8 @@ public final class CraftingManagerMediaGameTests {
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
         world.setBlock(DVD_DRIVE, ComputingModule.DVD_DRIVE.get());
-        world.setBlock(ENCODER, ComputingModule.PATTERN_ENCODER.get());
-        final PatternEncoderBlockEntity encoder = world.blockEntity(ENCODER, PatternEncoderBlockEntity.class);
-        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.DVD_RW.get()));
-        encoder.setGhost(0, new ItemStack(Items.OAK_LOG));
-        helper.assertTrue(encoder.writePattern(), "the encoder writes the craft onto the DVD-RW");
-        final ItemStack dvd = encoder.media().getStackInSlot(0);
-        encoder.media().setStackInSlot(0, ItemStack.EMPTY);
+        final ItemStack dvd = new ItemStack(ComputingModule.DVD_RW.get());
+        CraftFiles.writeBench(dvd, CraftFiles.oakPlanks(), helper.getLevel().registryAccess());
 
         // The explorer lets a player rename a file to anything up to the filesystem's limit.
         final String longName = "a".repeat(dev.jsc.jscomputronics.module.computing.os.fs.FsPaths.MAX_NAME_LENGTH - 6)

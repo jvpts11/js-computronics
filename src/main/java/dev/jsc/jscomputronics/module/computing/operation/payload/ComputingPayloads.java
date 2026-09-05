@@ -36,10 +36,8 @@ import dev.jsc.jscomputronics.module.computing.menu.ComputerTerminalMenu;
 import dev.jsc.jscomputronics.module.computing.menu.PersonalComputerMenu;
 import dev.jsc.jscomputronics.module.computing.menu.ServerRouterMenu;
 import dev.jsc.jscomputronics.module.computing.blockentity.CraftingComputerBlockEntity;
-import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
 import dev.jsc.jscomputronics.module.computing.program.Programs;
 import dev.jsc.jscomputronics.module.computing.menu.CraftingComputerMenu;
-import dev.jsc.jscomputronics.module.computing.menu.PatternEncoderMenu;
 import dev.jsc.jscomputronics.module.computing.os.FilesystemKind;
 import dev.jsc.jscomputronics.module.computing.os.OsDef;
 import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
@@ -302,8 +300,6 @@ public final class ComputingPayloads {
                 ComputingPayloads::handlePostComplete);
         registrar.playToServer(UninstallProgramPayload.TYPE, UninstallProgramPayload.STREAM_CODEC,
                 ComputingPayloads::handleUninstallProgram);
-        registrar.playToClient(CraftFileListPayload.TYPE, CraftFileListPayload.STREAM_CODEC,
-                ComputingPayloads::handleCraftFileList);
         registrar.playToServer(SaveIqlFilePayload.TYPE, SaveIqlFilePayload.STREAM_CODEC,
                 ComputingPayloads::handleSaveIqlFile);
         registrar.playToServer(RequestIqlFileListPayload.TYPE, RequestIqlFileListPayload.STREAM_CODEC,
@@ -316,11 +312,6 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleIqlFileContent);
         registrar.playToClient(OpenComputerUiPayload.TYPE, OpenComputerUiPayload.STREAM_CODEC,
                 ComputingPayloads::handleOpenComputerUi);
-        registrar.playToServer(RequestPatternEncoderFilesPayload.TYPE,
-                RequestPatternEncoderFilesPayload.STREAM_CODEC,
-                ComputingPayloads::handleRequestPatternEncoderFiles);
-        registrar.playToServer(PatternEncoderEditPayload.TYPE, PatternEncoderEditPayload.STREAM_CODEC,
-                ComputingPayloads::handlePatternEncoderEdit);
         registrar.playToServer(RequestCraftManagerPayload.TYPE, RequestCraftManagerPayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestCraftManager);
         // The Cluster Manager: the Cluster Management Computer's program asks, acts, and gets a state back.
@@ -973,7 +964,7 @@ public final class ComputingPayloads {
      * Resolves a {@code media:<readerPos>[/sub]} path to the medium's {@link net.minecraft.world.item.ItemStack}
      * in a linked drive, or {@link net.minecraft.world.item.ItemStack#EMPTY} if not reachable.
      */
-    private static net.minecraft.world.item.ItemStack mediaStackFor(final ServerLevel level,
+    static net.minecraft.world.item.ItemStack mediaStackFor(final ServerLevel level,
             final dev.jsc.jscomputronics.module.computing.os.OsHost computer,
             final String mediaPath) {
         final String rest = mediaPath.substring("media:".length());
@@ -1696,7 +1687,7 @@ public final class ComputingPayloads {
     }
 
     /** Resolves the filesystem kind of the computer's installed OS, or NONE when absent. */
-    private static dev.jsc.jscomputronics.module.computing.os.FilesystemKind filesystemKindOf(
+    static dev.jsc.jscomputronics.module.computing.os.FilesystemKind filesystemKindOf(
             final dev.jsc.jscomputronics.module.computing.os.OsHost computer) {
         final dev.jsc.jscomputronics.module.computing.os.OsDef os = computer.installedOs();
         if (os == null) {
@@ -2170,9 +2161,11 @@ public final class ComputingPayloads {
         if (mainframe == null) {
             return java.util.List.of();
         }
-        final var patterns = mainframe.networkPatterns();
         final var stock = dev.jsc.jscomputronics.module.computing.operation.NetworkStorage
                 .of(level, net).query();
+        // "Any" cells are judged against what the network holds, the way a craft would resolve them.
+        final var patterns = dev.jsc.jscomputronics.module.computing.crafting.AnyTagResolver
+                .resolveAll(mainframe.networkPatterns(), stock);
         final java.util.Map<StorageKey, CraftCatalogPayload.Entry> entries = new java.util.LinkedHashMap<>();
         for (final var pattern : patterns) {
             final StorageKey key = StorageKey.of(pattern.result());
@@ -2194,7 +2187,7 @@ public final class ComputingPayloads {
                 dot = any ? CraftCatalogPayload.DOT_AMBER : CraftCatalogPayload.DOT_RED;
             }
             entries.put(key, new CraftCatalogPayload.Entry(pattern.result().copy(), dot,
-                    mainframe.hasMultiStageRecipe(key)));
+                    mainframe.hasMultiStageRecipe(key), wire(pattern.name(), CraftCatalogPayload.MAX_LABEL)));
             if (entries.size() >= CraftCatalogPayload.MAX_ENTRIES) {
                 break;
             }
@@ -2226,7 +2219,9 @@ public final class ComputingPayloads {
                 dot = all ? CraftCatalogPayload.DOT_GREEN
                         : (any ? CraftCatalogPayload.DOT_AMBER : CraftCatalogPayload.DOT_RED);
             }
-            entries.put(key, new CraftCatalogPayload.Entry(result, dot, recipe.multi().isPresent()));
+            final String label = recipe.proc().map(p -> p.name()).orElse(recipe.multi().map(m -> m.name()).orElse(""));
+            entries.put(key, new CraftCatalogPayload.Entry(result, dot, recipe.multi().isPresent(),
+                    wire(label, CraftCatalogPayload.MAX_LABEL)));
         }
         return java.util.List.copyOf(entries.values());
     }
@@ -2836,7 +2831,7 @@ public final class ComputingPayloads {
         return stack;
     }
 
-    private static MainframeBlockEntity resolveMainframe(final ServerLevel level, final NetworkUuid network) {
+    static MainframeBlockEntity resolveMainframe(final ServerLevel level, final NetworkUuid network) {
         final java.util.Optional<Long> pos = NetworkSystem.get(level).mainframePositionOf(network);
         if (pos.isEmpty()) {
             return null;
@@ -4064,7 +4059,7 @@ public final class ComputingPayloads {
      * Resolves the host computer for a desktop Network Interactor action, validating the player is within
      * reach of the monitor (the desktop is a client-only Screen with no server menu to authenticate against).
      */
-    private static dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost niHost(
+    static dev.jsc.jscomputronics.module.computing.terminal.ComputerTerminalHost niHost(
             final ServerPlayer player, final ServerLevel level, final BlockPos hostPos, final BlockPos monitorPos) {
         if (player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(monitorPos)) > 64.0) {
             return null;
@@ -4824,106 +4819,20 @@ public final class ComputingPayloads {
         }
     }
 
-    /** Delivers the {@link CraftFileListPayload} to the open Pattern Encoder's screen. */
-    private static void handleCraftFileList(final CraftFileListPayload payload, final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (context.player().containerMenu instanceof PatternEncoderMenu menu) {
-                menu.setCraftFiles(payload.files());
-            }
-        });
-    }
-
-    // ---- Pattern Encoder media file listing ----
-
-    /**
-     * Lists the {@code .craft} files on the removable medium in the Pattern Encoder's media slot.
-     * Responds with a {@link CraftFileListPayload} so the open screen can show what is already
-     * written on the medium.
-     */
-    private static void handleRequestPatternEncoderFiles(final RequestPatternEncoderFilesPayload payload,
-                                                          final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)
-                    || !(player.containerMenu instanceof PatternEncoderMenu menu)
-                    || !menu.blockEntityPos().equals(payload.encoderPos())
-                    || !(player.level() instanceof ServerLevel level)
-                    || !(level.getBlockEntity(payload.encoderPos()) instanceof PatternEncoderBlockEntity be)) {
-                return;
-            }
-            final ItemStack mediaStack = be.media().getStackInSlot(0);
-            if (mediaStack.isEmpty()) {
-                PacketDistributor.sendToPlayer(player, new CraftFileListPayload(List.of()));
-                return;
-            }
-            PacketDistributor.sendToPlayer(player,
-                    craftFileListFromMedia(mediaStack));
-        });
-    }
-
-    /**
-     * Applies one PROCESSING / MULTI-STAGE authoring edit to the Pattern Encoder. The server is authoritative: it
-     * validates the open menu and position, then mutates the block entity (which syncs itself with a fresh update
-     * tag). A successful write also refreshes the medium's {@code .craft} file list back to the client.
-     */
-    private static void handlePatternEncoderEdit(final PatternEncoderEditPayload payload,
-                                                 final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)
-                    || !(player.containerMenu instanceof PatternEncoderMenu menu)
-                    || !menu.blockEntityPos().equals(payload.pos())
-                    || !(player.level() instanceof ServerLevel level)
-                    || !(level.getBlockEntity(payload.pos()) instanceof PatternEncoderBlockEntity be)) {
-                return;
-            }
-            final ItemStack carried = menu.getCarried();
-            boolean wrote = false;
-            switch (payload.action()) {
-                case PatternEncoderEditPayload.ACTION_SET_TAB -> menu.setActiveTab(payload.value());
-                case PatternEncoderEditPayload.ACTION_SET_INPUT -> be.setProcInput(payload.index(), carried);
-                case PatternEncoderEditPayload.ACTION_SET_OUTPUT -> be.setProcOutput(payload.index(), carried);
-                case PatternEncoderEditPayload.ACTION_SET_CHANCE ->
-                        be.setOutputChance(payload.index(), payload.value());
-                case PatternEncoderEditPayload.ACTION_SET_MACHINE -> be.setMachineType(payload.text());
-                case PatternEncoderEditPayload.ACTION_SET_TIMEOUT -> be.setProcTimeout(payload.value());
-                case PatternEncoderEditPayload.ACTION_WRITE_PROC -> wrote = be.writeProcessingPattern();
-                case PatternEncoderEditPayload.ACTION_WRITE_MULTI -> wrote = be.writeMultiStagePattern();
-                case PatternEncoderEditPayload.ACTION_ADD_STAGE_BENCH -> be.addBenchStage();
-                case PatternEncoderEditPayload.ACTION_ADD_STAGE_PROC -> be.addProcessingStage();
-                case PatternEncoderEditPayload.ACTION_REMOVE_STAGE -> be.removeStage(payload.index());
-                case PatternEncoderEditPayload.ACTION_CLEAR_STAGES -> be.clearStages();
-                case PatternEncoderEditPayload.ACTION_CLEAR_PROC -> be.clearProcessing();
-                case PatternEncoderEditPayload.ACTION_SET_AMOUNT ->
-                        be.setProcAmount("out".equals(payload.text()), payload.index(), payload.value());
-                case PatternEncoderEditPayload.ACTION_CLEAR_CELL ->
-                        be.setProcCell("out".equals(payload.text()), payload.index(), null);
-                case PatternEncoderEditPayload.ACTION_ADD_STAGE_FROM_MEDIA ->
-                        be.addStageFromMedia(payload.text());
-                default -> {
-                    return;
-                }
-            }
-            if (wrote) {
-                final ItemStack mediaStack = be.media().getStackInSlot(0);
-                PacketDistributor.sendToPlayer(player, mediaStack.isEmpty()
-                        ? new CraftFileListPayload(List.of()) : craftFileListFromMedia(mediaStack));
-            }
-        });
-    }
-
-    /** Builds a {@link CraftFileListPayload} listing all {@code .craft} files on the given medium. */
-    private static CraftFileListPayload craftFileListFromMedia(final ItemStack media) {
+    /** The names of the {@code .craft} files on a medium, in listing order, capped to what a wire field carries. */
+    static List<String> craftFileListFromMedia(final ItemStack media) {
         final List<DiskFilesystem.FileEntry> entries =
                 DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL);
         final List<String> names = new ArrayList<>();
         for (final DiskFilesystem.FileEntry e : entries) {
             // A name the wire cannot carry would disconnect the player on every listing; the filesystem's own
             // name limit is the cap, so this only guards against a path the filesystem should never hold.
-            if (e.type() == FileType.CRAFT && names.size() < CraftFileListPayload.MAX_FILES
+            if (e.type() == FileType.CRAFT && names.size() < CraftManagerStatePayload.MAX_MEDIA_FILES
                     && e.path().length() <= dev.jsc.jscomputronics.module.computing.os.fs.FsPaths.MAX_NAME_LENGTH) {
                 names.add(e.path());
             }
         }
-        return new CraftFileListPayload(names);
+        return names;
     }
 
     // ---- Crafting Manager (B2) — media ↔ ROM transfer ----
@@ -5436,7 +5345,7 @@ public final class ComputingPayloads {
                 // Collect every .craft file on the medium that is not already in the ROM.
                 final Set<String> romNames = new HashSet<>();
                 for (final CraftingPattern p : cc.romPatterns()) {
-                    romNames.add(craftFileNameFor(p.result()) + ".craft");
+                    romNames.add(craftFileNameFor(p) + ".craft");
                 }
                 final List<DiskFilesystem.FileEntry> entries =
                         DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL);
@@ -5487,7 +5396,7 @@ public final class ComputingPayloads {
                     }
                     parsed++;
                     added = cc.loadPattern(p.get());
-                    diskName = craftFileNameFor(p.get().result()) + ".craft";
+                    diskName = craftFileNameFor(p.get()) + ".craft";
                 }
                 // The recipe registers in the ROM (what the network can craft) and the .craft is mirrored under
                 // crafts/ on the system disk so it shows up in the Files app.
@@ -5534,7 +5443,7 @@ public final class ComputingPayloads {
                 if (idx < 0 || idx >= rom.size()) {
                     continue;
                 }
-                final String diskName = craftFileNameFor(rom.get(idx).result()) + ".craft";
+                final String diskName = craftFileNameFor(rom.get(idx)) + ".craft";
                 cc.removePattern(idx);
                 deleteCraftFromDisk(cc, diskName);
             }
@@ -5551,7 +5460,7 @@ public final class ComputingPayloads {
      * loaded recipes are visible (and copyable) in the Files app. A flat filesystem keeps them at the
      * root; a hierarchical one nests them in {@code crafts/}. A no-op when there is no system disk.
      */
-    private static void writeCraftToDisk(final CraftingComputerBlockEntity cc, final String fileName,
+    static void writeCraftToDisk(final CraftingComputerBlockEntity cc, final String fileName,
                                          final String content) {
         final net.minecraft.world.item.ItemStack disk = cc.systemDisk();
         if (disk.isEmpty()) {
@@ -5592,13 +5501,13 @@ public final class ComputingPayloads {
      * {@code .craft} for any ROM pattern missing its mirror file. This self-heals a disk whose ROM
      * predates the mirror, so opening the Crafting Manager always presents a consistent view.
      */
-    private static void reconcileCraftsFolder(final CraftingComputerBlockEntity cc, final ServerLevel level) {
+    static void reconcileCraftsFolder(final CraftingComputerBlockEntity cc, final ServerLevel level) {
         if (cc.systemDisk().isEmpty()) {
             return;
         }
         boolean wrote = false;
         for (final CraftingPattern pattern : cc.romPatterns()) {
-            final String diskName = craftFileNameFor(pattern.result()) + ".craft";
+            final String diskName = craftFileNameFor(pattern) + ".craft";
             if (craftFileExistsOnDisk(cc, diskName)) {
                 continue;
             }
@@ -5614,7 +5523,7 @@ public final class ComputingPayloads {
     }
 
     /** Reports whether a mirrored {@code .craft} of the given name already exists on the system disk. */
-    private static boolean craftFileExistsOnDisk(final CraftingComputerBlockEntity cc, final String fileName) {
+    static boolean craftFileExistsOnDisk(final CraftingComputerBlockEntity cc, final String fileName) {
         final net.minecraft.world.item.ItemStack disk = cc.systemDisk();
         if (disk.isEmpty()) {
             return false;
@@ -5665,15 +5574,14 @@ public final class ComputingPayloads {
                     } else {
                         continue;
                     }
-                    final var resultKey = r.resultKey();
-                    base = sanitizeFileBase(resultKey == null ? "recipe" : resultKey.displayName().getString());
+                    base = sanitizeFileBase(r.displayName());
                 } else {
                     if (idx < 0 || idx >= rom.size()) {
                         continue;
                     }
                     final CraftingPattern pattern = rom.get(idx);
                     content = CraftFile.serialize(pattern, level.registryAccess());
-                    base = craftFileNameFor(pattern.result());
+                    base = craftFileNameFor(pattern);
                 }
                 if (content.isEmpty()) {
                     continue;
@@ -5730,7 +5638,7 @@ public final class ComputingPayloads {
                         || !fmt.writable()) {
                     continue;
                 }
-                final List<String> files = craftFileListFromMedia(m).files();
+                final List<String> files = craftFileListFromMedia(m);
                 if (mediaVolumeKey.isEmpty() || !files.isEmpty()) {
                     mediaVolumeKey = "media:" + endpoint;
                     mediaLabel = wire(dev.jsc.jscomputronics.module.computing.os.VolumeLabel.of(m, "Removable Drive"), 64);
@@ -5749,8 +5657,8 @@ public final class ComputingPayloads {
             final CraftingPattern p = rom.get(i);
             // Every string below is cut to its wire field: a result renamed to a long name or a modded machine
             // with a long id must never make the state impossible to send.
-            final String name = wire(p.result().getHoverName().getString(), 64);
-            final String fileName = craftFileNameFor(p.result()) + ".craft";
+            final String name = wire(p.displayName(), 64);
+            final String fileName = craftFileNameFor(p) + ".craft";
             romEntries.add(new CraftManagerStatePayload.WireRomEntry(i, name, mediaFileSet.contains(fileName)));
         }
         // Machine recipes (processing / multi-stage) share the ROM and must be listed too — an invisible entry
@@ -5760,9 +5668,7 @@ public final class ComputingPayloads {
         for (int i = 0; i < machineRecipes.size()
                 && romEntries.size() < CraftManagerStatePayload.MAX_ROM_ENTRIES; i++) {
             final var r = machineRecipes.get(i);
-            final var key = r.resultKey();
-            final String base = key == null ? "recipe" : key.displayName().getString();
-            final String name = wire(base + (r.multi().isPresent() ? " [multi]" : " [machine]"), 64);
+            final String name = wire(r.displayName() + (r.multi().isPresent() ? " [multi]" : " [machine]"), 64);
             romEntries.add(new CraftManagerStatePayload.WireRomEntry(
                     CraftManagerStatePayload.MACHINE_ROM_BASE + i, name, false));
         }
@@ -5799,15 +5705,23 @@ public final class ComputingPayloads {
         return s.length() <= max ? s : s.substring(0, max);
     }
 
+    /**
+     * The file base-name a bench pattern goes by: the name its author gave it, sanitized, or its result's
+     * registry path when it has none (what every pattern was called before names existed).
+     */
+    static String craftFileNameFor(final CraftingPattern pattern) {
+        return pattern.name().isEmpty() ? craftFileNameFor(pattern.result()) : sanitizeFileBase(pattern.name());
+    }
+
     /** Derives a safe file base-name from the result {@link ItemStack}'s registry path. */
-    private static String craftFileNameFor(final ItemStack result) {
+    static String craftFileNameFor(final ItemStack result) {
         final net.minecraft.resources.ResourceLocation key =
                 net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(result.getItem());
         return sanitizeFileBase(key == null ? "pattern" : key.getPath());
     }
 
     /** Clamps a display or registry name to a safe file base (letters/digits/underscore, max 32 chars). */
-    private static String sanitizeFileBase(final String base) {
+    static String sanitizeFileBase(final String base) {
         final StringBuilder sb = new StringBuilder();
         for (final char c : base.toLowerCase(java.util.Locale.ROOT).toCharArray()) {
             sb.append(Character.isLetterOrDigit(c) || c == '_' ? c : '_');

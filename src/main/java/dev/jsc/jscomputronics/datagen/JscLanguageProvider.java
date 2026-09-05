@@ -84,6 +84,8 @@ public class JscLanguageProvider extends LanguageProvider {
         addBlock(ComputingModule.VINTAGE_CLUSTER_MANAGEMENT_COMPUTER, "Vintage Cluster Management Computer");
         addBlock(ComputingModule.LEGACY_CLUSTER_MANAGEMENT_COMPUTER, "Legacy Cluster Management Computer");
         addBlock(ComputingModule.PATTERN_ENCODER, "Pattern Encoder");
+        addBlock(ComputingModule.LEGACY_PATTERN_ENCODER, "Legacy Pattern Encoder");
+        addBlock(ComputingModule.VINTAGE_PATTERN_ENCODER, "Vintage Pattern Encoder");
         addBlock(ComputingModule.FLOPPY_DRIVE, "Floppy Drive");
         addBlock(ComputingModule.CD_DRIVE, "CD Drive");
         addBlock(ComputingModule.DVD_DRIVE, "DVD Drive");
@@ -214,6 +216,8 @@ public class JscLanguageProvider extends LanguageProvider {
                 "The service that compiles and runs IQL on the Mainframe. The NMS is its front end.");
         add("program.jsc.crafting_manager.desc",
                 "Load crafting patterns and watch the jobs the network is working through.");
+        add("program.jsc.pattern_studio.desc",
+                "Author bench, machine and multi-stage recipes, then burn them onto media at a linked encoder.");
         add("program.jsc.minesweeper.desc", "Minesweeper.");
         add("program.jsc.storage_insights.desc",
                 "Where the network's storage went: biggest types, what is running low, how full each server is.");

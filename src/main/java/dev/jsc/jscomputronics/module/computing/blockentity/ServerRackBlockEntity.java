@@ -272,6 +272,9 @@ public class ServerRackBlockEntity extends BlockEntity
         final List<dev.jsc.jscomputronics.module.computing.os.OpenWindow> openWindows = new ArrayList<>();
         /** A guided installer that wrote the system but is still waiting for its reboot. */
         int pendingInstallSlot = dev.jsc.jscomputronics.module.computing.os.OsHost.NO_PENDING_INSTALL;
+        /** The recipe drafts the Pattern Studio edits on this machine; ride on the Server item like the windows. */
+        final dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench studio =
+                new dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench();
     }
 
     private final Map<Integer, UnitState> unitStates = new HashMap<>();
@@ -293,9 +296,19 @@ public class ServerRackBlockEntity extends BlockEntity
                         saved.getList("OpenWindows", net.minecraft.nbt.Tag.TAG_COMPOUND)));
                 state.pendingInstallSlot = saved.contains("PendingInstall") ? saved.getInt("PendingInstall")
                         : dev.jsc.jscomputronics.module.computing.os.OsHost.NO_PENDING_INSTALL;
+                if (saved.contains("Studio") && getLevel() != null) {
+                    state.studio.load(saved.getCompound("Studio"), getLevel().registryAccess());
+                }
             }
             return state;
         });
+    }
+
+    @Override
+    @org.jetbrains.annotations.Nullable
+    public dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench studio() {
+        final int slot = soleComputerSlot();
+        return slot < 0 ? null : unitState(slot).studio;
     }
 
     /** The console of the machine mounted at {@code slot}, or null when that row holds none. */
@@ -339,6 +352,11 @@ public class ServerRackBlockEntity extends BlockEntity
         }
         if (state.pendingInstallSlot != dev.jsc.jscomputronics.module.computing.os.OsHost.NO_PENDING_INSTALL) {
             tag.putInt("PendingInstall", state.pendingInstallSlot);
+        }
+        if (getLevel() != null) {
+            final net.minecraft.nbt.CompoundTag studioTag = new net.minecraft.nbt.CompoundTag();
+            state.studio.save(studioTag, getLevel().registryAccess());
+            tag.put("Studio", studioTag);
         }
         stack.set(ComputingModule.SERVER_CONSOLE.get(), tag);
     }

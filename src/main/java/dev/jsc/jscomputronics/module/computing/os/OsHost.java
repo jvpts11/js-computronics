@@ -170,4 +170,13 @@ public interface OsHost extends dev.jsc.jscomputronics.common.peripheral.Periphe
     /** The hardware era the GUI should wear (a fixed-era chassis wins over the board). */
     @Nullable
     HardwareEra displayEra();
+
+    /**
+     * The machine's recipe workbench: the drafts the Pattern Studio edits, kept with the machine so they survive
+     * the window and the session. Null on a host that has no room for one (a machine that is not seated).
+     */
+    @Nullable
+    default dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench studio() {
+        return null;
+    }
 }

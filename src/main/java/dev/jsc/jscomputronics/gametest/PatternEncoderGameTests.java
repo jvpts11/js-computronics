@@ -8,27 +8,31 @@
 package dev.jsc.jscomputronics.gametest;
 
 import dev.jsc.jscomputronics.JsComputronics;
+import dev.jsc.jscomputronics.common.tier.HardwareEra;
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.crafting.ProcessingPattern;
 import dev.jsc.jscomputronics.module.computing.os.fs.CraftFile;
-import dev.jsc.jscomputronics.module.computing.storage.StorageKey;
+import dev.jsc.jscomputronics.module.computing.os.fs.DiskFilesystem;
+import dev.jsc.jscomputronics.module.computing.os.media.MediaFormat;
+import dev.jsc.jscomputronics.testkit.CraftFiles;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Battery 1, front E (Pattern Encoder authoring): write-gating, the ghost-grid build, stage assembly, and that
- * the authoring state survives a reload. Exercised on the block entity directly (the screen sends edits to these
- * same methods through a server-authoritative payload).
+ * The Pattern Encoder as a burner: which media each era's encoder takes, how a job moves through seek, write
+ * and verify, that the bay is locked while the head is down, that the queue drains in order, and that a job
+ * survives a reload. The encoder authors nothing; the content it burns comes from a computer's Studio.
  */
 @GameTestHolder(JsComputronics.MODID)
 @PrefixGameTestTemplate(false)
@@ -38,120 +42,162 @@ public final class PatternEncoderGameTests {
     }
 
     private static final String ARENA = "empty";
+    private static final BlockPos POS = new BlockPos(2, 2, 2);
 
     @GameTest(template = ARENA)
-    public static void patternEncoder_writeGatingAndBuild(final GameTestHelper helper) {
-        final PatternEncoderBlockEntity be = place(helper, new BlockPos(2, 2, 2));
-        helper.assertFalse(be.canWriteProcessing(), "an empty encoder cannot write a processing pattern");
-        helper.assertFalse(be.canWriteMultiStage(), "an empty encoder cannot write a multi-stage pattern");
+    public static void encoder_acceptsTheMediaOfItsEra(final GameTestHelper helper) {
+        final PatternEncoderBlockEntity vintage = place(helper, new BlockPos(1, 2, 1), ComputingModule.VINTAGE_PATTERN_ENCODER.get());
+        final PatternEncoderBlockEntity legacy = place(helper, new BlockPos(3, 2, 1), ComputingModule.LEGACY_PATTERN_ENCODER.get());
+        final PatternEncoderBlockEntity standard = place(helper, new BlockPos(5, 2, 1), ComputingModule.PATTERN_ENCODER.get());
+        final ItemStack floppy = new ItemStack(ComputingModule.FLOPPY_DISK.get());
+        final ItemStack cdRw = new ItemStack(ComputingModule.CD_RW.get());
+        final ItemStack dvdRw = new ItemStack(ComputingModule.DVD_RW.get());
+        final ItemStack usb = new ItemStack(ComputingModule.USB_FLASH_DRIVE.get());
+        final ItemStack cdRom = new ItemStack(ComputingModule.CD_ROM.get());
 
-        be.setMachineType("jsc:compressor");
-        be.setProcInput(0, new ItemStack(Items.IRON_INGOT, 4));
-        helper.assertFalse(be.canWriteProcessing(), "inputs without outputs cannot write");
-        be.setProcOutput(0, new ItemStack(Items.IRON_BLOCK, 1));
-
-        final ProcessingPattern built = be.buildProcessingPattern();
-        helper.assertTrue(built.inputs().size() == 1 && built.inputs().get(0).amount() == 4,
-                "the input amount is the placed stack count");
-        helper.assertTrue(built.outputs().size() == 1, "one output is recorded");
-        helper.assertTrue("jsc:compressor".equals(built.machineType()), "the machine type is recorded");
-        // Even fully authored, no writable media is inserted, so the write stays gated.
-        helper.assertFalse(be.canWriteProcessing(), "no media still blocks the write");
-
-        be.setMachineType("");
-        be.setProcInput(0, new ItemStack(Items.IRON_INGOT, 4));
-        be.setProcOutput(0, new ItemStack(Items.IRON_BLOCK, 1));
-        helper.assertFalse(be.canWriteProcessing(), "a blank machine blocks the write");
+        helper.assertTrue(vintage.era() == HardwareEra.VINTAGE && legacy.era() == HardwareEra.LEGACY
+                && standard.era() == HardwareEra.STANDARD, "each block reports its era");
+        helper.assertTrue(vintage.acceptsMedia(floppy), "a Vintage encoder takes a floppy");
+        helper.assertFalse(vintage.acceptsMedia(cdRw), "a Vintage encoder refuses a CD");
+        helper.assertTrue(legacy.acceptsMedia(cdRw), "a Legacy encoder takes a CD-RW");
+        helper.assertFalse(legacy.acceptsMedia(floppy), "a Legacy encoder refuses a floppy");
+        helper.assertFalse(legacy.acceptsMedia(dvdRw), "a Legacy encoder refuses a DVD");
+        helper.assertTrue(standard.acceptsMedia(dvdRw) && standard.acceptsMedia(cdRw) && standard.acceptsMedia(usb),
+                "a Standard encoder takes DVD-RW, CD-RW and USB");
+        helper.assertFalse(standard.acceptsMedia(floppy), "a Standard encoder refuses a floppy");
+        helper.assertFalse(standard.acceptsMedia(cdRom), "read-only media is refused everywhere");
+        helper.assertTrue(PatternEncoderBlockEntity.eraAccepts(HardwareEra.ADVANCED, MediaFormat.USB),
+                "later eras write what the Standard one writes");
         helper.succeed();
     }
 
-    @GameTest(template = ARENA)
-    public static void patternEncoder_processingStageAssembly(final GameTestHelper helper) {
-        final PatternEncoderBlockEntity be = place(helper, new BlockPos(2, 2, 2));
-        helper.assertFalse(be.addProcessingStage(), "no machine/inputs/outputs means no stage is added");
-
-        be.setMachineType("jsc:macerator");
-        be.setProcInput(0, new ItemStack(Items.IRON_ORE, 1));
-        be.setProcOutput(0, new ItemStack(Items.IRON_INGOT, 2));
-        helper.assertTrue(be.addProcessingStage(), "a complete processing stage is added");
-        helper.assertTrue(be.stages().size() == 1, "one stage assembled");
-        helper.assertTrue(be.stages().get(0).isProcessing(), "it is a processing stage");
-
-        be.removeStage(5); // out of range is a safe no-op
-        helper.assertTrue(be.stages().size() == 1, "out-of-range removal is a no-op");
-        be.removeStage(0);
-        helper.assertTrue(be.stages().isEmpty(), "the stage is removed");
-        helper.succeed();
-    }
-
-    @GameTest(template = ARENA)
-    public static void patternEncoder_authoringStateSurvivesReload(final GameTestHelper helper) {
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void encoder_burnsAQueuedFileThroughSeekWriteAndVerify(final GameTestHelper helper) {
         final HolderLookup.Provider reg = helper.getLevel().registryAccess();
-        final BlockPos pos = new BlockPos(2, 2, 2);
-        final PatternEncoderBlockEntity be = place(helper, pos);
-        be.setMachineType("jsc:macerator");
-        be.setProcInput(0, new ItemStack(Items.IRON_INGOT, 3));
-        be.setProcOutput(1, new ItemStack(Items.GOLD_NUGGET, 5));
-        be.setOutputChance(1, 50);
-        be.setProcTimeout(123);
+        final PatternEncoderBlockEntity encoder = place(helper, POS, ComputingModule.VINTAGE_PATTERN_ENCODER.get());
+        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.FLOPPY_DISK.get()));
+        final String content = CraftFile.serialize(CraftFiles.oakPlanks(), reg).orElseThrow();
+        final int bytes = content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        final int total = PatternEncoderBlockEntity.burnTicks(MediaFormat.FLOPPY, bytes);
+        helper.assertTrue(PatternEncoderBlockEntity.seekTicks(MediaFormat.FLOPPY) == 20
+                && PatternEncoderBlockEntity.verifyTicks(MediaFormat.FLOPPY) == 10 && total > 30,
+                "a floppy seeks 20 ticks and verifies 10; total=" + total);
 
-        final CompoundTag saved = be.saveWithFullMetadata(reg);
-        helper.setBlock(pos, Blocks.AIR);
-        helper.setBlock(pos, ComputingModule.PATTERN_ENCODER.get());
-        if (!(helper.getBlockEntity(pos) instanceof PatternEncoderBlockEntity reloaded)) {
-            helper.fail("no reloaded encoder");
-            return;
+        helper.assertTrue(encoder.queueBurn("oak_planks", content), "the job is queued");
+        helper.assertTrue(encoder.queued() == 1 && !encoder.busy(), "queued, not yet started");
+        // Watch the job tick by tick: the phases must come in order, the bay must stay locked while the head
+        // is down, and the file must only be on the disc once the write is over.
+        final List<PatternEncoderBlockEntity.Phase> seen = new ArrayList<>();
+        final int[] ticks = {0};
+        helper.startSequence()
+                .thenWaitUntil(() -> {
+                    ticks[0]++;
+                    final PatternEncoderBlockEntity.Phase phase = encoder.phase();
+                    if (seen.isEmpty() || seen.get(seen.size() - 1) != phase) {
+                        seen.add(phase);
+                    }
+                    if (encoder.busy()) {
+                        helper.assertTrue(encoder.locked(), "the bay is locked while the head is down");
+                        helper.assertTrue(encoder.ejectMedia().isEmpty(), "the medium cannot be pulled mid-job");
+                    }
+                    if (phase == PatternEncoderBlockEntity.Phase.SEEK || phase == PatternEncoderBlockEntity.Phase.WRITE) {
+                        helper.assertTrue(CraftFiles.count(encoder.mediaStack()) == 0, "nothing is on the disc before the write ends");
+                    }
+                    if (phase != PatternEncoderBlockEntity.Phase.DONE) {
+                        throw new net.minecraft.gametest.framework.GameTestAssertException("still burning: " + phase);
+                    }
+                })
+                .thenExecute(() -> {
+                    final List<PatternEncoderBlockEntity.Phase> order = new ArrayList<>(seen);
+                    order.remove(PatternEncoderBlockEntity.Phase.IDLE);
+                    helper.assertTrue(order.equals(List.of(PatternEncoderBlockEntity.Phase.SEEK,
+                            PatternEncoderBlockEntity.Phase.WRITE, PatternEncoderBlockEntity.Phase.VERIFY,
+                            PatternEncoderBlockEntity.Phase.DONE)), "the phases run seek, write, verify, done; got " + seen);
+                    helper.assertTrue(Math.abs(ticks[0] - total) <= 3,
+                            "the job takes about " + total + " ticks; took " + ticks[0]);
+                    helper.assertTrue(encoder.progressPercent() == 100, "done reads 100%");
+                    helper.assertTrue(encoder.completed() == 1, "one file completed");
+                    final ItemStack media = encoder.mediaStack();
+                    final String back = DiskFilesystem.read(media, "oak_planks.craft").orElse("");
+                    helper.assertTrue(CraftFile.parse(back, reg).map(p -> p.result().getCount() == 4).orElse(false),
+                            "the burned file reads back as the pattern");
+                })
+                .thenExecuteAfter(PatternEncoderBlockEntity.HOLD_TICKS + 1, () -> {
+                    helper.assertFalse(encoder.locked(), "the bay unlocks when the job is over");
+                    helper.assertFalse(encoder.ejectMedia().isEmpty(), "the medium comes out afterwards");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 400)
+    public static void encoder_drainsItsQueueInOrderAndNamesDuplicates(final GameTestHelper helper) {
+        final HolderLookup.Provider reg = helper.getLevel().registryAccess();
+        final PatternEncoderBlockEntity encoder = place(helper, POS, ComputingModule.LEGACY_PATTERN_ENCODER.get());
+        encoder.media().setStackInSlot(0, new ItemStack(ComputingModule.CD_RW.get()));
+        final String planks = CraftFile.serialize(CraftFiles.oakPlanks(), reg).orElseThrow();
+        final String furnace = CraftFile.serializeProcessing(CraftFiles.furnaceIron(200), reg).orElseThrow();
+        helper.assertTrue(encoder.queueBurn("oak_planks", planks), "first job queued");
+        helper.assertTrue(encoder.queueBurn("iron_ingot", furnace), "second job queued");
+        helper.assertTrue(encoder.queueBurn("oak_planks", planks + " "), "a third job under a taken name is queued");
+        helper.assertTrue(encoder.queued() == 3, "three waiting");
+        for (int i = 0; i < PatternEncoderBlockEntity.QUEUE_MAX - 3; i++) {
+            helper.assertTrue(encoder.queueBurn("filler" + i, planks), "the queue takes up to its limit");
         }
-        reloaded.loadWithComponents(saved, reg);
-        helper.assertTrue("jsc:macerator".equals(reloaded.machineType()), "machine type survived");
-        helper.assertTrue(reloaded.procInput(0) != null && reloaded.procInput(0).amount() == 3, "input survived");
-        helper.assertTrue(reloaded.procOutput(1) != null && reloaded.procOutput(1).amount() == 5, "output survived");
-        helper.assertTrue(reloaded.outputChance(1) == 50, "output chance survived");
-        helper.assertTrue(reloaded.procTimeout() == 123, "timeout survived");
-        helper.succeed();
+        helper.assertFalse(encoder.queueBurn("overflow", planks), "the queue refuses beyond its limit");
+        encoder.cancelAll();
+        helper.assertTrue(encoder.queued() == 0, "cancel drops every waiting job");
+        helper.assertTrue(encoder.queueBurn("oak_planks", planks) && encoder.queueBurn("iron_ingot", furnace)
+                && encoder.queueBurn("oak_planks", planks + " "), "re-queued after the cancel");
+
+        helper.startSequence()
+                .thenExecuteAfter(300, () -> {
+                    final ItemStack media = encoder.mediaStack();
+                    helper.assertTrue(encoder.completed() == 3, "three files burned; completed=" + encoder.completed());
+                    helper.assertTrue(CraftFiles.count(media) == 3, "three files on the disc");
+                    helper.assertTrue(DiskFilesystem.exists(media, "oak_planks.craft"), "the first keeps its name");
+                    helper.assertTrue(DiskFilesystem.exists(media, "iron_ingot.craft"), "the second keeps its name");
+                    helper.assertTrue(DiskFilesystem.exists(media, "oak_planks_2.craft"),
+                            "a second file under a taken name gets a suffix instead of overwriting");
+                    helper.assertFalse(encoder.busy(), "idle when the queue is empty");
+                })
+                .thenSucceed();
     }
 
-    @GameTest(template = ARENA)
-    public static void patternEncoder_cellsHoldFluidsAndChemicalsWithAmounts(final GameTestHelper helper) {
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void encoder_waitsForMediaAndSurvivesAReload(final GameTestHelper helper) {
         final HolderLookup.Provider reg = helper.getLevel().registryAccess();
-        final PatternEncoderBlockEntity be = place(helper, new BlockPos(2, 2, 2));
-        be.setMachineType("mekanism:purification_chamber");
-        // A water bucket names water, a bucket's worth; a plain stack is an item with its count.
-        be.setProcInput(0, new ItemStack(Items.WATER_BUCKET));
-        be.setProcInput(1, new ItemStack(Items.RAW_IRON, 1));
-        final PatternEncoderBlockEntity.DataCell water = be.procInput(0);
-        helper.assertTrue(water != null && water.key().isFluid()
-                        && water.amount() == PatternEncoderBlockEntity.DataCell.CONTINUOUS_DEFAULT_AMOUNT,
-                "a fluid container places its fluid, one bucket's worth; got " + water);
-        // A chemical cell set by a recipe transfer carries an estimated amount until the author confirms it.
-        final StorageKey oxygen = StorageKey.chemical(ResourceLocation.fromNamespaceAndPath("mekanism", "oxygen"));
-        be.setProcCell(false, 2, new PatternEncoderBlockEntity.DataCell(oxygen, 200, true));
-        be.setProcCell(true, 0, new PatternEncoderBlockEntity.DataCell(StorageKey.of(Items.IRON_NUGGET), 2, false));
-
-        final ProcessingPattern built = be.buildProcessingPattern();
-        helper.assertTrue(built.inputs().size() == 3, "three inputs; got " + built.inputs());
-        final ProcessingPattern.ProcessingInput estimated = built.inputs().get(2);
-        helper.assertTrue(estimated.key().equals(oxygen) && estimated.amount() == 200 && estimated.estimated(),
-                "the chemical input keeps its estimate flag; got " + estimated);
-        // The flag survives the .craft file and the block's own save.
-        final String snbt = CraftFile.serializeProcessing(built, reg).orElseThrow();
-        final ProcessingPattern parsed = CraftFile.parseProcessing(snbt, reg).orElseThrow();
-        helper.assertTrue(parsed.inputs().get(2).estimated() && parsed.inputs().get(0).key().isFluid(),
-                "fluid and estimate survive the .craft round trip");
-        final CompoundTag saved = be.saveWithFullMetadata(reg);
-        be.clearProcessing();
-        be.loadWithComponents(saved, reg);
-        helper.assertTrue(be.procInput(2) != null && be.procInput(2).estimated(), "the estimate survives the block's save");
-        // Confirming an amount makes it the author's own.
-        be.setProcAmount(false, 2, 200);
-        helper.assertTrue(be.procInput(2) != null && !be.procInput(2).estimated(), "setting the amount clears the estimate");
-        be.setProcAmount(false, 2, 0);
-        helper.assertTrue(be.procInput(2) == null, "an amount of zero clears the cell");
-        helper.succeed();
+        final PatternEncoderBlockEntity encoder = place(helper, POS, ComputingModule.PATTERN_ENCODER.get());
+        final String planks = CraftFile.serialize(CraftFiles.oakPlanks(), reg).orElseThrow();
+        helper.assertTrue(encoder.queueBurn("oak_planks", planks), "a job queues with the bay empty");
+        helper.startSequence()
+                .thenExecuteAfter(10, () -> {
+                    helper.assertFalse(encoder.busy(), "with no medium the job waits");
+                    helper.assertTrue("Insert media".equals(encoder.statusLine()), "the display says what is missing");
+                    // The block goes away and comes back with its saved state: the job is still waiting.
+                    final CompoundTag saved = encoder.saveWithFullMetadata(reg);
+                    helper.setBlock(POS, Blocks.AIR);
+                    helper.setBlock(POS, ComputingModule.PATTERN_ENCODER.get());
+                    if (!(helper.getBlockEntity(POS) instanceof PatternEncoderBlockEntity reloaded)) {
+                        helper.fail("no reloaded encoder");
+                        return;
+                    }
+                    reloaded.loadWithComponents(saved, reg);
+                    helper.assertTrue(reloaded.queued() == 1, "the queued job survives the reload");
+                    reloaded.media().setStackInSlot(0, new ItemStack(ComputingModule.USB_FLASH_DRIVE.get()));
+                })
+                .thenExecuteAfter(120, () -> {
+                    if (!(helper.getBlockEntity(POS) instanceof PatternEncoderBlockEntity reloaded)) {
+                        helper.fail("no reloaded encoder");
+                        return;
+                    }
+                    helper.assertTrue(reloaded.completed() == 1 && CraftFiles.count(reloaded.mediaStack()) == 1,
+                            "the waiting job runs once a medium goes in; completed=" + reloaded.completed());
+                })
+                .thenSucceed();
     }
 
-    private static PatternEncoderBlockEntity place(final GameTestHelper helper, final BlockPos pos) {
-        helper.setBlock(pos, ComputingModule.PATTERN_ENCODER.get());
+    private static PatternEncoderBlockEntity place(final GameTestHelper helper, final BlockPos pos, final Block block) {
+        helper.setBlock(pos, block);
         if (helper.getBlockEntity(pos) instanceof PatternEncoderBlockEntity be) {
             return be;
         }

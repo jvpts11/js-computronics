@@ -71,6 +71,7 @@ public final class ProgramClient {
         register(rl("nms"), (host, mon, os) ->
                 new dev.jsc.jscomputronics.module.computing.client.NmsApp(host, mon));
         register(rl("crafting_manager"), (host, mon, os) -> new CraftingManagerApp(host));
+        register(rl("pattern_studio"), (host, mon, os) -> new PatternStudioApp(host, mon));
         register(rl("cluster_manager"), (host, mon, os) -> new ClusterManagerApp(host));
         register(rl("minesweeper"), (host, mon, os) -> new MinesweeperApp());
         register(rl("storage_insights"), (host, mon, os) -> new StorageInsightsApp(host, mon));

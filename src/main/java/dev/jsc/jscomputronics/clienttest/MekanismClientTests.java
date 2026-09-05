@@ -46,12 +46,15 @@ public final class MekanismClientTests {
 
     private static final int SETTLE = 4;
     private static final int SCREEN_WAIT = 40;
+    /** Long enough for a cold start's POST to play out on the monitor before the desktop shows. */
+    private static final int BOOT_WAIT = 400;
     private static final BlockPos MAINFRAME = new BlockPos(1, 2, 2);
     private static final BlockPos CRAFTING_COMPUTER = new BlockPos(5, 2, 2);
     private static final BlockPos MONITOR = new BlockPos(6, 2, 2);
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
     private static final String NETWORK_LAUNCHER = "Network";
-    private static final ResourceLocation FRAMES_95 = ResourceLocation.fromNamespaceAndPath("jsc", "frames_95");
+    /** The Crafting Manager needs Frames XP or newer. */
+    private static final ResourceLocation FRAMES_XP = ResourceLocation.fromNamespaceAndPath("jsc", "frames_xp");
     private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_dos");
     private static final ResourceLocation INFUSER = MekanismRig.mek("metallurgic_infuser");
     private static final ResourceLocation ALLOY_INFUSED = MekanismRig.mek("alloy_infused");
@@ -93,7 +96,7 @@ public final class MekanismClientTests {
                     final TestWorldBuilder.CraftingNetwork net = MekanismRig.place(world, INFUSER);
                     net.cc().getHardware().setStackInSlot(CraftingComputerBlockEntity.PCIE_SLOTS_START + 1,
                             new ItemStack(ComputingModule.GPU_HD_7970.get()));
-                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_95, Programs.CRAFTING_MANAGER);
+                    TestWorldBuilder.installDesktop(net.cc(), FRAMES_XP, Programs.CRAFTING_MANAGER);
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
@@ -132,7 +135,7 @@ public final class MekanismClientTests {
                 // Open the desktop, launch the Network Interactor, go to its Crafting tab.
                 .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .then(2, () -> {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     ctx.click(desktop.startButtonX(), desktop.startButtonY());
@@ -141,7 +144,7 @@ public final class MekanismClientTests {
                     final DesktopScreen desktop = ctx.screen(DesktopScreen.class);
                     final int item = desktop.launcherLabels().indexOf(NETWORK_LAUNCHER);
                     ctx.assertTrue(item >= 0, "the Start menu must list " + NETWORK_LAUNCHER + "; got " + desktop.launcherLabels());
-                    ctx.click(desktop.startMenuItemX(), desktop.startMenuItemY(item));
+                    ctx.click(desktop.startMenuItemX(item), desktop.startMenuItemY(item));
                 })
                 .thenWaitUntil(() -> networkInteractor(ctx) != null, SCREEN_WAIT, "the Network Interactor window")
                 .then(2, () -> ctx.clickDesktop(networkInteractorPoint(ctx, networkInteractor(ctx).craftingTabCenter())))
@@ -189,7 +192,7 @@ public final class MekanismClientTests {
                 })
                 // Back on the desktop: the Network Interactor is still open on the network grid with the frames.
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(DesktopScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
                 .thenWaitUntil(() -> networkInteractor(ctx) != null, SCREEN_WAIT, "the Network Interactor window again")
                 .thenScreenshot(2, "mekanism-frames-in-storage")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
@@ -228,7 +231,7 @@ public final class MekanismClientTests {
                 })
                 .thenTeleport(SETTLE + 2, PLAYER_AT_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(CommandPromptScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(CommandPromptScreen.class, BOOT_WAIT)
                 .thenScreenshot(2, "mc-dos-prompt")
                 .then(2, () -> ctx.type("operation craft 4 " + FRAME))
                 .then(1, () -> ctx.key(GLFW.GLFW_KEY_ENTER))
@@ -248,7 +251,7 @@ public final class MekanismClientTests {
                                 + " recent=" + mainframe(ctx, level).recentOperations())
                 // Back at the prompt, the operation log names the finished craft.
                 .thenRightClick(SETTLE, MONITOR)
-                .thenAwaitScreen(CommandPromptScreen.class, SCREEN_WAIT)
+                .thenAwaitScreen(CommandPromptScreen.class, BOOT_WAIT)
                 .then(2, () -> ctx.type("operation query operations"))
                 .then(1, () -> ctx.key(GLFW.GLFW_KEY_ENTER))
                 .thenScreenshot(4, "mc-dos-operations")

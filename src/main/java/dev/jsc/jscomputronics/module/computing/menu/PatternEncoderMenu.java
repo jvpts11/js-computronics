@@ -8,47 +8,32 @@
 package dev.jsc.jscomputronics.module.computing.menu;
 
 import dev.jsc.jscomputronics.module.computing.ComputingModule;
+import dev.jsc.jscomputronics.module.computing.block.PatternEncoderBlock;
 import dev.jsc.jscomputronics.module.computing.blockentity.PatternEncoderBlockEntity;
-import dev.jsc.jscomputronics.module.computing.os.media.FormattedMediaItem;
+import dev.jsc.jscomputronics.module.computing.gui.layout.PatternEncoderLayout;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.world.Containers;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.items.ItemStackHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 /**
- * Menu for the Pattern Encoder: a ghost 3x3 recipe grid (clicks set count-1 copies, the player's items are never consumed), a live result preview resolved server-side from the recipe book, a real media slot, and the player inventory.
+ * The Pattern Encoder's bay panel: the one media slot, the player's inventory, and two buttons (eject the
+ * medium, cancel the queue). Everything the panel displays about the job comes off the block entity, which
+ * the server keeps synced; the authoring itself happens on the linked computer's Pattern Studio.
  */
 public class PatternEncoderMenu extends AbstractComputerMenu {
 
-    public static final int BUTTON_WRITE = 0;
-    public static final int BUTTON_ERASE = 1;
+    public static final int BUTTON_EJECT = 0;
+    public static final int BUTTON_CANCEL = 1;
 
-    /** Authoring tabs. The crafting grid + preview slots are active only on {@link #TAB_CRAFTING}. */
-    public static final int TAB_CRAFTING = 0;
-    public static final int TAB_PROCESSING = 1;
-    public static final int TAB_MULTI = 2;
-
-    public static final int GRID_START = 0;
-    public static final int PREVIEW_SLOT = 9;
-    public static final int MEDIA_SLOT = 10;
-    private static final int PLAYER_START = 11;
+    public static final int MEDIA_SLOT = 0;
 
     private final PatternEncoderBlockEntity blockEntity;
     private final ContainerLevelAccess access;
-
-    private final ItemStackHandler previewMirror = new ItemStackHandler(1);
-
-    private int activeTab = TAB_CRAFTING;
 
     public PatternEncoderMenu(final int containerId, final Inventory playerInventory,
                               final PatternEncoderBlockEntity be) {
@@ -56,34 +41,13 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
         this.blockEntity = be;
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
 
-        // Ghost grid 3x3 — clicks are intercepted in clicked(); items never move. Only on the crafting tab.
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 3; col++) {
-                addSlot(new GhostSlot(be.ghostGrid(), col + row * 3, 26 + col * 18, 44 + row * 18,
-                        () -> activeTab == TAB_CRAFTING));
-            }
-        }
-        // Result preview — read-only, written by broadcastChanges from the BE's resolver. Only on the crafting tab.
-        addSlot(new SlotItemHandler(previewMirror, 0, 100, 62) {
-            @Override
-            public boolean mayPlace(final ItemStack stack) {
-                return false;
-            }
-
+        addSlot(new SlotItemHandler(be.media(), 0, PatternEncoderLayout.MEDIA_X + 1, PatternEncoderLayout.MEDIA_Y + 1) {
             @Override
             public boolean mayPickup(final Player player) {
-                return false;
-            }
-
-            @Override
-            public boolean isActive() {
-                return activeTab == TAB_CRAFTING;
+                return !blockEntity.locked();
             }
         });
-        // Media bay — accepts writable removable media (floppy, CD-RW, DVD-RW, USB). Shared by every tab.
-        addSlot(new SlotItemHandler(be.media(), 0, 8, 108));
-
-        addPlayerInventory(playerInventory, 8, 138);
+        addPlayerInventory(playerInventory, PatternEncoderLayout.INV_X, PatternEncoderLayout.INV_Y);
     }
 
     @org.jetbrains.annotations.Nullable
@@ -96,149 +60,50 @@ public class PatternEncoderMenu extends AbstractComputerMenu {
         return null;
     }
 
-
-    /**
-     * A ghost cell: never holds a real item — a click records a copy of the carried stack.
-     */
-    private static final class GhostSlot extends SlotItemHandler {
-        private final java.util.function.BooleanSupplier activeWhen;
-
-        private GhostSlot(final ItemStackHandler handler, final int index, final int x, final int y,
-                          final java.util.function.BooleanSupplier activeWhen) {
-            super(handler, index, x, y);
-            this.activeWhen = activeWhen;
-        }
-
-        @Override
-        public boolean mayPlace(final ItemStack stack) {
-            return false;
-        }
-
-        @Override
-        public boolean mayPickup(final Player player) {
-            return false;
-        }
-
-        @Override
-        public boolean isActive() {
-            return activeWhen.getAsBoolean();
-        }
-    }
-
-    @Override
-    public void clicked(final int slotId, final int button, final ClickType type, final Player player) {
-        // Ghost grid: set the cell from the carried item (a copy), or clear with an empty cursor.
-        if (slotId >= GRID_START && slotId < GRID_START + 9) {
-            blockEntity.setGhost(slotId - GRID_START, getCarried());
-            return;
-        }
-        super.clicked(slotId, button, type, player);
-    }
-
     @Override
     public boolean clickMenuButton(final Player player, final int id) {
-        if (id == BUTTON_WRITE) {
-            return blockEntity.writePattern();
+        if (id == BUTTON_EJECT) {
+            if (blockEntity.locked()) {
+                return false;
+            }
+            final ItemStack ejected = blockEntity.ejectMedia();
+            if (ejected.isEmpty()) {
+                return false;
+            }
+            if (!player.addItem(ejected)) {
+                final BlockPos pos = blockEntity.getBlockPos();
+                Containers.dropItemStack(player.level(), pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, ejected);
+            }
+            return true;
         }
-        if (id == BUTTON_ERASE) {
-            return blockEntity.eraseMedia();
+        if (id == BUTTON_CANCEL) {
+            blockEntity.cancelAll();
+            return true;
         }
         return false;
     }
 
-    @Override
-    public void broadcastChanges() {
-        // Refresh the preview mirror from the BE before the container diffs the slots,
-        // so the client sees the resolved result without a dedicated payload.
-        if (blockEntity.getLevel() != null && !blockEntity.getLevel().isClientSide()) {
-            blockEntity.refreshPreview();
-            previewMirror.setStackInSlot(0, blockEntity.preview().copy());
-        }
-        super.broadcastChanges();
-    }
-
-    public int activeTab() {
-        return activeTab;
-    }
-
-    public void setActiveTab(final int tab) {
-        this.activeTab = tab;
+    public PatternEncoderBlockEntity blockEntity() {
+        return blockEntity;
     }
 
     public BlockPos blockEntityPos() {
         return blockEntity.getBlockPos();
     }
 
-    public ItemStack preview() {
-        return slots.get(PREVIEW_SLOT).getItem();
-    }
-
     public ItemStack mediaStack() {
         return slots.get(MEDIA_SLOT).getItem();
     }
 
-    public boolean canErase() {
-        return false;
-    }
-
-    // Craft-file list — delivered via RequestPatternEncoderFilesPayload on the client thread.
-
-    private List<String> craftFiles = List.of();
-
-    public void setCraftFiles(final List<String> files) {
-        craftFiles = Collections.unmodifiableList(new ArrayList<>(files));
-    }
-
-    public List<String> craftFiles() {
-        return craftFiles;
-    }
-
-    public boolean canWrite() {
-        return !preview().isEmpty() && !mediaStack().isEmpty();
+    @Override
+    public ItemStack quickMoveStack(final Player player, final int index) {
+        return quickMoveBetweenContainerAndPlayer(player, index, 1);
     }
 
     @Override
     public boolean stillValid(final Player player) {
-        return stillValid(access, player, ComputingModule.PATTERN_ENCODER.get());
-    }
-
-    @Override
-    public ItemStack quickMoveStack(final Player player, final int index) {
-        final Slot slot = slots.get(index);
-        if (slot == null || !slot.hasItem() || index < PLAYER_START) {
-            if (index == MEDIA_SLOT && slot != null && slot.hasItem()) {
-                // Shift-click the disc back to the inventory.
-                final ItemStack stack = slot.getItem();
-                final ItemStack original = stack.copy();
-                if (!moveItemStackTo(stack, PLAYER_START, slots.size(), true)) {
-                    return ItemStack.EMPTY;
-                }
-                slot.setByPlayer(stack.isEmpty() ? ItemStack.EMPTY : stack);
-                slot.onTake(player, stack);
-                return original;
-            }
-            return ItemStack.EMPTY;
-        }
-        final ItemStack stack = slot.getItem();
-        final ItemStack original = stack.copy();
-        // From the inventory: writable removable media goes to the media bay; everything else
-        // stays put (the recipe grid is ghost-only and never receives real items).
-        if (stack.getItem() instanceof FormattedMediaItem item && item.writable()) {
-            if (!moveItemStackTo(stack, MEDIA_SLOT, MEDIA_SLOT + 1, false)) {
-                return ItemStack.EMPTY;
-            }
-        } else {
-            return ItemStack.EMPTY;
-        }
-        if (stack.isEmpty()) {
-            slot.setByPlayer(ItemStack.EMPTY);
-        } else {
-            slot.setChanged();
-        }
-        if (stack.getCount() == original.getCount()) {
-            return ItemStack.EMPTY;
-        }
-        slot.onTake(player, stack);
-        return original;
+        // Every era's encoder shares this menu, so validity keys on the family, not one block.
+        return access.evaluate((level, pos) -> level.getBlockState(pos).getBlock() instanceof PatternEncoderBlock
+                && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0, true);
     }
 }

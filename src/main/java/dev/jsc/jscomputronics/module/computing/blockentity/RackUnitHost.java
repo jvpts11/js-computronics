@@ -259,6 +259,12 @@ public record RackUnitHost(ServerRackBlockEntity rack, int row) implements OsHos
         return rack.asUnit(row, rack::displayEra);
     }
 
+    @Override
+    @Nullable
+    public dev.jsc.jscomputronics.module.computing.crafting.PatternWorkbench studio() {
+        return rack.asUnit(row, rack::studio);
+    }
+
     // Peripheral links belong to the rack as a whole: every unit shares the cabinet's readers and monitors.
 
     @Override
