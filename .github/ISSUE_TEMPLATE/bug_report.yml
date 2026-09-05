@@ -1,0 +1,35 @@
+name: Bug report
+description: Something is broken, wrong or crashes.
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Mod version
+      description: From the mod list in game or from the jar name, for example 0.1.0a or 0.2.0a-SNAPSHOT.8954c2d.
+    validations:
+      required: true
+  - type: input
+    id: loader
+    attributes:
+      label: NeoForge version
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Steps that reproduce it are the most useful thing you can give.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or crash report
+      description: Paste the relevant part of latest.log or the crash report, or attach the file.
+      render: text
+  - type: input
+    id: mods
+    attributes:
+      label: Other mods involved
+      description: Only when the bug needs another mod to show up (JEI, Mekanism, and so on).

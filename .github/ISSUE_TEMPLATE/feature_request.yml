@@ -1,0 +1,29 @@
+name: Idea
+description: A feature or a change you would like to see.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The situation in the game that made you want this.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Computing
+        - Core
+        - Industrial
+        - Space
+        - Warfare
+        - Transport
+        - Other

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and discussion
+    url: https://github.com/jvpts11/js-computronics/discussions
+    about: For questions, ideas that are not a request yet, and showing what you built.
