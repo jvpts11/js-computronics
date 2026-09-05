@@ -129,6 +129,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     @org.jetbrains.annotations.Nullable
     private EditBox searchBox;
     boolean sortByQuantity = true;
+    // The grid's filtered and sorted view, kept between frames: it is asked for several times a frame and
+    // re-sorting a big network's catalog each time cost the frame rate (see visibleItems).
+    private List<NetworkItemEntry> visibleCache = List.of();
+    private List<NetworkItemEntry> visibleSource = List.of();
+    private String visibleKey = "";
 
     // Storage tab — public/private slider band. The Storage tab inserts a band between the header bar
     // and the item toolbar, then shifts its toolbar/grid/deposit down by STORAGE_SHIFT so nothing
@@ -844,9 +849,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     List<NetworkItemEntry> visibleItems() {
         final String q = searchBox == null ? "" : searchBox.getValue().trim().toLowerCase(Locale.ROOT);
-        final List<NetworkItemEntry> out = new ArrayList<>();
         final List<NetworkItemEntry> source = menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE
                 ? menu.localItems() : menu.networkItems();
+        // A snapshot replaces the menu's list object, so the list itself tells a fresh snapshot from the last one.
+        final String key = menu.activeTab() + "|" + sortByQuantity + "|" + q;
+        if (source == visibleSource && key.equals(visibleKey)) {
+            return visibleCache;
+        }
+        final List<NetworkItemEntry> out = new ArrayList<>();
         for (final NetworkItemEntry e : source) {
             if (q.isEmpty()
                     || e.name().getString().toLowerCase(Locale.ROOT).contains(q)) {
@@ -859,6 +869,9 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             out.sort((a, b) -> a.name().getString()
                     .compareToIgnoreCase(b.name().getString()));
         }
+        visibleCache = out;
+        visibleSource = source;
+        visibleKey = key;
         return out;
     }
 

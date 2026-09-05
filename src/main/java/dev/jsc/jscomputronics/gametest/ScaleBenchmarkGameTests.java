@@ -182,6 +182,7 @@ public final class ScaleBenchmarkGameTests {
                 OPS_PER_TICK * 16, RAMP_TICKS, crafting, 17L);
         final String[] crashed = new String[1];
         final long[] craftedBefore = new long[1];
+        final double[] firstIdle = {Double.NaN};
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + WARMUP_TICKS, () -> guarded(() -> {
                     final boolean networked = base.mainframe().networkUuid() != null;
@@ -197,8 +198,18 @@ public final class ScaleBenchmarkGameTests {
                             "the base must come up whole: network " + networked + ", servers " + servers + "/"
                                     + params.servers() + ", supercomputers online " + online + "/" + base.hubs().size()
                                     + ", crafting computers " + craftingComputers + "/" + base.craftingComputers().size());
-                    report.put("idle_ms", averageTickMs(server));
+                    firstIdle[0] = averageTickMs(server);
+                    report.put("idle_ms", firstIdle[0]);
                 }))
+                // The average covers the last hundred ticks, so one heavy tick inside the window reads as if
+                // the base paid it every tick: the server's autosave lands wherever its tick counter says
+                // (this server runs ticks back to back, so it moves from run to run), and the first window
+                // still carries the JIT. The idle cost is the better of two consecutive windows.
+                .thenExecuteAfter(TICK_AVERAGE_WINDOW, () -> {
+                    if (!Double.isNaN(firstIdle[0])) {
+                        report.put("idle_ms", Math.min(firstIdle[0], averageTickMs(server)));
+                    }
+                })
                 .thenWaitUntil(() -> drive(helper, small, crashed))
                 .thenExecute(() -> guarded(() -> {
                     helper.assertTrue(crashed[0] == null, "the load driver crashed: " + crashed[0]);

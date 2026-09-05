@@ -29,6 +29,12 @@ public final class ComputingClientSetup {
     }
 
     @SubscribeEvent
+    public static void onLoggingOut(final net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        // The desktop's per-machine caches belong to the world being left.
+        DesktopScreen.forgetClientState();
+    }
+
+    @SubscribeEvent
     public static void registerScreens(final RegisterMenuScreensEvent event) {
         // Wire the client-side firmware screen opener so blocks can open it without importing Minecraft.
         FirmwareScreenOpener.Holder.set((pos, monitorPos, kind, name) ->

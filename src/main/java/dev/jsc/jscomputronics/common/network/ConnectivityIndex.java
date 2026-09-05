@@ -36,6 +36,10 @@ public final class ConnectivityIndex {
 
     private final Map<Long, Set<Long>> adjacency = new HashMap<>();
 
+    // Every component's positions, by root, kept until the topology changes: a Mainframe asks for its
+    // segment every tick, and walking every cable of a big base to answer was a fixed cost on the idle tick.
+    private final Map<Integer, Set<Long>> componentCache = new HashMap<>();
+
     // Queries
 
     public Optional<NetworkUuid> networkOf(long encodedPos) {
@@ -78,13 +82,18 @@ public final class ConnectivityIndex {
             return Set.of();
         }
         final int root = dsu.find(id);
-        final Set<Long> result = new LinkedHashSet<>();
-        for (final Map.Entry<Long, Integer> entry : posToId.entrySet()) {
-            if (dsu.find(entry.getValue()) == root) {
-                result.add(entry.getKey());
+        Set<Long> cached = componentCache.get(root);
+        if (cached == null) {
+            final Set<Long> result = new LinkedHashSet<>();
+            for (final Map.Entry<Long, Integer> entry : posToId.entrySet()) {
+                if (dsu.find(entry.getValue()) == root) {
+                    result.add(entry.getKey());
+                }
             }
+            cached = java.util.Collections.unmodifiableSet(result);
+            componentCache.put(root, cached);
         }
-        return result;
+        return cached;
     }
 
     /**
@@ -114,6 +123,7 @@ public final class ConnectivityIndex {
         }
 
         // 1. Allocate a fresh DSU element for the new cable.
+        componentCache.clear();
         int newId = dsu.makeSet();
         posToId.put(encodedPos, newId);
         idToPos.put(newId, encodedPos);
@@ -220,6 +230,7 @@ public final class ConnectivityIndex {
             root = dsu.find(root);
         }
         if (merged) {
+            componentCache.clear();
             cleanupOrphanedUuids(root);
             if (surviving != null) {
                 rootToUuid.put(root, surviving);
@@ -269,6 +280,7 @@ public final class ConnectivityIndex {
         final Set<Long> survivors = new LinkedHashSet<>(posToId.keySet());
         survivors.remove(encodedPos);
         dsu.clear();
+        componentCache.clear();
         posToId.clear();
         idToPos.clear();
         rootToUuid.clear();
@@ -350,6 +362,7 @@ public final class ConnectivityIndex {
         rootToUuid.clear();
         adjacency.clear();
         dsu.clear();
+        componentCache.clear();
     }
 
     /**

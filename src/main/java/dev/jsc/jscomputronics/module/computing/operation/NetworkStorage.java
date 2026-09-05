@@ -67,9 +67,22 @@ public final class NetworkStorage {
         if (cached != null && cached.level() == level && cached.gameTime() == now) {
             return cached.storage();
         }
+        // A view is good for one tick. Anything older only pins the racks (and their drives) of a network
+        // nobody is asking about any more, possibly in a level that has since unloaded.
+        VIEWS.values().removeIf(view -> view.gameTime() != now || view.level() != level);
         final NetworkStorage built = build(level, network);
         VIEWS.put(network, new TickView(level, now, built));
         return built;
+    }
+
+    /** Whether any cached view predates {@code now}; for tests of the eviction above. */
+    public static boolean holdsStaleViews(final long now) {
+        for (final TickView view : VIEWS.values()) {
+            if (view.gameTime() != now) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static NetworkStorage build(final ServerLevel level, final NetworkUuid network) {

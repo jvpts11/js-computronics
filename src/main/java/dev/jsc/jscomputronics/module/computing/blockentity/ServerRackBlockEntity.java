@@ -247,6 +247,7 @@ public class ServerRackBlockEntity extends BlockEntity
             // A freshly mounted (or swapped) machine runs POST on its next session; whatever
             // console state the old occupant left in memory dies with the swap.
             unitStates.remove(slot);
+            buildCached[slot] = false;
             markStorageChanged(slot);
             setChanged();
             updateBayVisuals();
@@ -427,6 +428,30 @@ public class ServerRackBlockEntity extends BlockEntity
     }
 
     private final long[] storageModCounts = new long[CAPACITY_U];
+
+    // Each mounted machine's build, parsed from its item once per mount instead of on every tick: the
+    // tick, the thermal load and the port count all read it, and a rack of eight was re-parsing eight
+    // hardware inventories twenty times a second.
+    private final dev.jsc.jscomputronics.common.hardware.ComputerBuild[] buildCache =
+            new dev.jsc.jscomputronics.common.hardware.ComputerBuild[CAPACITY_U];
+    private final boolean[] buildCached = new boolean[CAPACITY_U];
+
+    // The bay capacity each unit registers, kept until its storage mod count moves (a drive or the machine
+    // itself went in or out): the tick asks for it for every unit, every tick, and computing it walks the
+    // chassis, the mounted units and the whole front panel.
+    private final long[] bayItemsCache = new long[CAPACITY_U];
+    private final long[] bayItemsMod = new long[CAPACITY_U];
+    private final boolean[] bayItemsCached = new boolean[CAPACITY_U];
+
+    /** The build of the machine mounted at {@code slot} (null for none, or an invalid one), parsed once per mount. */
+    @org.jetbrains.annotations.Nullable
+    private dev.jsc.jscomputronics.common.hardware.ComputerBuild buildAt(final int slot) {
+        if (!buildCached[slot]) {
+            buildCache[slot] = ServerItem.build(servers.getStackInSlot(slot));
+            buildCached[slot] = true;
+        }
+        return buildCache[slot];
+    }
 
     public void markStorageChanged(final int slot) {
         if (slot >= 0 && slot < storageModCounts.length) {
@@ -818,12 +843,18 @@ public class ServerRackBlockEntity extends BlockEntity
 
     /** The bay-backed storage capacity of the unit at {@code serverSlot}, in items: what the network registers. */
     public long bayStorageItems(final int serverSlot) {
+        if (bayItemsCached[serverSlot] && bayItemsMod[serverSlot] == storageModCounts[serverSlot]) {
+            return bayItemsCache[serverSlot];
+        }
         long items = 0L;
         for (final ItemStack drive : claimedDriveStacks(serverSlot)) {
             if (drive.getItem() instanceof DiskItem disk) {
                 items += disk.spec().capacityItems();
             }
         }
+        bayItemsCache[serverSlot] = items;
+        bayItemsMod[serverSlot] = storageModCounts[serverSlot];
+        bayItemsCached[serverSlot] = true;
         return items;
     }
 
@@ -866,7 +897,7 @@ public class ServerRackBlockEntity extends BlockEntity
                 continue;
             }
             // A Server is a node only when it is a valid, powered computer whose bay switch is on.
-            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = ServerItem.build(stack);
+            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = buildAt(i);
             if (build == null || !build.isPowered() || !bayPowerOn(i)) {
                 continue;
             }
@@ -1020,8 +1051,7 @@ public class ServerRackBlockEntity extends BlockEntity
     public int thermalLoadWatts() {
         int watts = 0;
         for (int i = 0; i < CAPACITY_U; i++) {
-            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build =
-                    ServerItem.build(servers.getStackInSlot(i));
+            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = buildAt(i);
             if (build != null && bayPowerOn(i)) {
                 watts += build.powerDraw();
             }
@@ -1171,7 +1201,8 @@ public class ServerRackBlockEntity extends BlockEntity
 
     @org.jetbrains.annotations.Nullable
     private dev.jsc.jscomputronics.common.hardware.ComputerBuild soleBuild() {
-        return ServerItem.build(soleServerStack());
+        final int slot = soleComputerSlot();
+        return slot < 0 ? null : buildAt(slot);
     }
 
     /** The front-slot index of the {@code i}-th DRIVE-role slot of the unit at {@code topRow}, or -1. */
@@ -1742,8 +1773,7 @@ public class ServerRackBlockEntity extends BlockEntity
         // switch, and blame the hardware for it.
         int ports = 0;
         for (final int slot : computerSlots()) {
-            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build =
-                    ServerItem.build(servers.getStackInSlot(slot));
+            final dev.jsc.jscomputronics.common.hardware.ComputerBuild build = buildAt(slot);
             if (build != null) {
                 ports = Math.max(ports, build.motherboard().peripheralPorts());
             }

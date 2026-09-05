@@ -94,6 +94,15 @@ public final class NetworkInteractorApp implements DesktopApp {
     private final StringBuilder search = new StringBuilder();
     /** How the grid is ordered: 0 by name, 1 most stored first, 2 least stored first. */
     private int sortMode;
+    // The grid's filtered and sorted view, kept between frames: cells, tooltip and hit-tests all ask for it
+    // several times a frame, and re-sorting thousands of entries each time was a frame-rate cost.
+    private List<NetworkItemEntry> filteredCache = List.of();
+    private List<NetworkItemEntry> filteredSource = List.of();
+    private String filteredKey = "";
+    private List<CraftCatalogPayload.Entry> craftsCache = List.of();
+    private String craftsKey = "";
+    /** Bumped whenever a snapshot replaces the lists, so a stale filtered view is never shown. */
+    private int listVersion;
     private static final int SORT_MODES = 3;
     private static final String[] SORT_LABELS = {"A-Z", "MOST", "LEAST"};
     private boolean searchFocus;
@@ -252,6 +261,7 @@ public final class NetworkInteractorApp implements DesktopApp {
         active.localItems.addAll(payload.localItems());
         active.crafts.clear();
         active.crafts.addAll(payload.crafts());
+        active.listVersion++;
         active.online = payload.mainframeOnline();
         active.usedItems = payload.usedItems();
         active.serverCount = payload.serverCount();
@@ -828,6 +838,10 @@ public final class NetworkInteractorApp implements DesktopApp {
         if (search.length() == 0) {
             return crafts;
         }
+        final String key = listVersion + "|" + search;
+        if (key.equals(craftsKey)) {
+            return craftsCache;
+        }
         final String q = search.toString().toLowerCase(java.util.Locale.ROOT);
         final java.util.List<CraftCatalogPayload.Entry> out = new ArrayList<>();
         for (final CraftCatalogPayload.Entry e : crafts) {
@@ -835,6 +849,8 @@ public final class NetworkInteractorApp implements DesktopApp {
                 out.add(e);
             }
         }
+        craftsCache = out;
+        craftsKey = key;
         return out;
     }
 
@@ -1125,6 +1141,10 @@ public final class NetworkInteractorApp implements DesktopApp {
     }
 
     private List<NetworkItemEntry> filtered(final List<NetworkItemEntry> source) {
+        final String key = listVersion + "|" + sortMode + "|" + search;
+        if (source == filteredSource && key.equals(filteredKey)) {
+            return filteredCache;
+        }
         final String q = search.toString().trim().toLowerCase(Locale.ROOT);
         final List<NetworkItemEntry> out = new ArrayList<>();
         for (final NetworkItemEntry e : source) {
@@ -1137,6 +1157,9 @@ public final class NetworkInteractorApp implements DesktopApp {
             case 2 -> out.sort((a, b) -> Long.compare(a.total(), b.total()));
             default -> out.sort((a, b) -> a.name().getString().compareToIgnoreCase(b.name().getString()));
         }
+        filteredCache = out;
+        filteredSource = source;
+        filteredKey = key;
         return out;
     }
 

@@ -250,8 +250,6 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleNiSelect);
         registrar.playToServer(RequestNiOperationsPayload.TYPE, RequestNiOperationsPayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestNiOperations);
-        registrar.playToServer(NiHotbarClickPayload.TYPE, NiHotbarClickPayload.STREAM_CODEC,
-                ComputingPayloads::handleNiHotbarClick);
         registrar.playToServer(NiCraftPayload.TYPE, NiCraftPayload.STREAM_CODEC,
                 ComputingPayloads::handleNiCraft);
         registrar.playToServer(OpenProgramPayload.TYPE, OpenProgramPayload.STREAM_CODEC,
@@ -4283,49 +4281,6 @@ public final class ComputingPayloads {
                         payload.entry().get(), "ni", refresh);
             } else {
                 DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, one, "ni", refresh);
-            }
-        });
-    }
-
-    private static void handleNiHotbarClick(final NiHotbarClickPayload payload, final IPayloadContext context) {
-        context.enqueueWork(() -> {
-            if (!(context.player() instanceof ServerPlayer player)
-                    || !(player.level() instanceof ServerLevel level)) {
-                return;
-            }
-            final var host = niHost(player, level, payload.host(), payload.monitorPos());
-            // 0-35 = the player's main inventory + hotbar (not armor/offhand).
-            if (host == null || payload.slot() < 0 || payload.slot() >= 36) {
-                return;
-            }
-            // The whole hotbar stack as items, like a shift-click.
-            final DataHandoff.Source source = DataHandoff.inventory(player, payload.slot());
-            final int amount = source.get().getCount();
-            final dev.jsc.jscomputronics.module.computing.os.OsHost computer =
-                    host instanceof dev.jsc.jscomputronics.module.computing.os.OsHost c ? c : null;
-            final Runnable refresh = () -> {
-                if (computer != null) {
-                    sendNetworkInteractor(player, level, computer);
-                }
-            };
-            if (payload.mode() == NiHotbarClickPayload.MODE_INV_TO_NET) {
-                // Push the stack into the network; leftover the network cannot hold comes back.
-                if (host.networkUuid() == null) {
-                    return;
-                }
-                final MainframeBlockEntity mainframe = resolveMainframe(level, host.networkUuid());
-                if (mainframe == null) {
-                    return;
-                }
-                if (DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, false,
-                        "ni", refresh) == DataHandoff.Outcome.NO_DISPATCHER) {
-                    player.displayClientMessage(Component.literal(
-                            "The network Mainframe needs an OS installed to accept items."), true);
-                }
-            } else {
-                // Deposit the hotbar stack into this computer's local storage.
-                DataHandoff.intoLocalStore(host.localStore(), player, source, amount, false);
-                refresh.run();
             }
         });
     }

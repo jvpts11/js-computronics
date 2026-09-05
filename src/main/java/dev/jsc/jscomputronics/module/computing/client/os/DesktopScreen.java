@@ -114,6 +114,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         PENDING_OPEN.add(OPEN_FILES_AT + dir);
     }
 
+    /**
+     * Forgets every per-machine client cache: the programs' insides kept for the machines of the world the
+     * player is leaving, and any open request that never found a desktop. Called on logout, so nothing of
+     * one world lingers into the next.
+     */
+    public static void forgetClientState() {
+        SAVED_APPS.clear();
+        PENDING_OPEN.clear();
+    }
+
     /** The launcher labels the active desktop can open (built-in apps plus installed programs). */
     public static java.util.List<String> openableLabels() {
         return active != null ? active.launcherLabels() : java.util.List.of();
