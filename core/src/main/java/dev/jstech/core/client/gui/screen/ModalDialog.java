@@ -40,13 +40,13 @@ public final class ModalDialog extends Screen {
         final int buttonsY = this.height / 2 + 20;
 
         addRenderableWidget(Button.builder(
-                        Component.translatable("gui.jsc.confirm"),
+                        Component.translatable("gui.jscore.confirm"),
                         b -> resolve(true))
                 .bounds(centerX - 105, buttonsY, 100, 20)
                 .build());
 
         addRenderableWidget(Button.builder(
-                        Component.translatable("gui.jsc.cancel"),
+                        Component.translatable("gui.jscore.cancel"),
                         b -> resolve(false))
                 .bounds(centerX + 5, buttonsY, 100, 20)
                 .build());

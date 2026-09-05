@@ -63,6 +63,44 @@ public final class RecipeMachines {
         machinesByType = Collections.unmodifiableMap(copy);
     }
 
+    /**
+     * Reads every {@code recipe_machines} file the resource manager can see and replaces the map with them:
+     * what the reload listener does on a data reload, callable directly to check what a datapack declares.
+     */
+    public static void reload(final ResourceManager manager) {
+        final Map<ResourceLocation, JsonElement> files = new LinkedHashMap<>();
+        SimpleJsonResourceReloadListener.scanDirectory(manager, FOLDER, GSON, files);
+        load(files);
+    }
+
+    private static void load(final Map<ResourceLocation, JsonElement> files) {
+        final Map<String, List<String>> merged = new LinkedHashMap<>();
+        for (final Map.Entry<ResourceLocation, JsonElement> file : files.entrySet()) {
+            if (!(file.getValue() instanceof JsonObject object)) {
+                JsComputronics.LOGGER.warn("recipe_machines file {} is not an object; skipped", file.getKey());
+                continue;
+            }
+            for (final Map.Entry<String, JsonElement> entry : object.entrySet()) {
+                final List<String> machines = merged.computeIfAbsent(entry.getKey(), k -> new ArrayList<>());
+                if (entry.getValue().isJsonArray()) {
+                    for (final JsonElement id : entry.getValue().getAsJsonArray()) {
+                        final String machine = id.getAsString();
+                        if (!machines.contains(machine)) {
+                            machines.add(machine);
+                        }
+                    }
+                } else if (entry.getValue().isJsonPrimitive()) {
+                    final String machine = entry.getValue().getAsString();
+                    if (!machines.contains(machine)) {
+                        machines.add(machine);
+                    }
+                }
+            }
+        }
+        replace(merged);
+        JsComputronics.LOGGER.info("Loaded {} recipe type to machine mappings", merged.size());
+    }
+
     @SubscribeEvent
     public static void onAddReloadListeners(final AddReloadListenerEvent event) {
         event.addListener(new Listener());
@@ -77,31 +115,7 @@ public final class RecipeMachines {
         @Override
         protected void apply(final Map<ResourceLocation, JsonElement> files, final ResourceManager manager,
                              final ProfilerFiller profiler) {
-            final Map<String, List<String>> merged = new LinkedHashMap<>();
-            for (final Map.Entry<ResourceLocation, JsonElement> file : files.entrySet()) {
-                if (!(file.getValue() instanceof JsonObject object)) {
-                    JsComputronics.LOGGER.warn("recipe_machines file {} is not an object; skipped", file.getKey());
-                    continue;
-                }
-                for (final Map.Entry<String, JsonElement> entry : object.entrySet()) {
-                    final List<String> machines = merged.computeIfAbsent(entry.getKey(), k -> new ArrayList<>());
-                    if (entry.getValue().isJsonArray()) {
-                        for (final JsonElement id : entry.getValue().getAsJsonArray()) {
-                            final String machine = id.getAsString();
-                            if (!machines.contains(machine)) {
-                                machines.add(machine);
-                            }
-                        }
-                    } else if (entry.getValue().isJsonPrimitive()) {
-                        final String machine = entry.getValue().getAsString();
-                        if (!machines.contains(machine)) {
-                            machines.add(machine);
-                        }
-                    }
-                }
-            }
-            replace(merged);
-            JsComputronics.LOGGER.info("Loaded {} recipe type to machine mappings", merged.size());
+            load(files);
         }
     }
 }

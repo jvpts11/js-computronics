@@ -17,8 +17,9 @@ import net.neoforged.neoforge.common.data.LanguageProvider;
 import java.util.Locale;
 
 /**
- * Generates the English names of the material catalogue. A name is the material followed by the form, both
- * capitalised ("Iron Dust", "Copper Plate"), so a newly activated form is named without a line here.
+ * Generates the English text of the core: the names of the material catalogue and the words of the GUI
+ * toolkit. A material name is the material followed by the form, both capitalised ("Iron Dust",
+ * "Copper Plate"), so a newly activated form is named without a line here.
  */
 public class JsCoreLanguageProvider extends LanguageProvider {
 
@@ -28,6 +29,10 @@ public class JsCoreLanguageProvider extends LanguageProvider {
 
     @Override
     protected void addTranslations() {
+        // The toolkit's modal dialog.
+        add("gui.jscore.confirm", "Confirm");
+        add("gui.jscore.cancel", "Cancel");
+
         for (final ModMaterial material : ModMaterial.values()) {
             for (final MaterialForm form : material.activeModForms()) {
                 add(MaterialItems.get(material, form).get(),

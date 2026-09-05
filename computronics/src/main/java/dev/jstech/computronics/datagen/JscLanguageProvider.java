@@ -151,8 +151,6 @@ public class JscLanguageProvider extends LanguageProvider {
         add("item.jsc.server_case.tooltip", "Crafting ingredient for a Server");
         add("menu.jsc.server_assembly", "Server Assembly");
         add("menu.jsc.network_overview", "Network Overview");
-        add("gui.jsc.confirm", "Confirm");
-        add("gui.jsc.cancel", "Cancel");
         // Storage tab — the per-disk public/private slider and its readouts.
         add("jsc.gui.storage.public_private", "Public / Private");
         add("jsc.gui.storage.public", "%s%% public");

@@ -52,8 +52,6 @@
   "block.jsc.vintage_pattern_encoder": "Vintage Pattern Encoder",
   "block.jsc.vintage_personal_computer": "Vintage Personal Computer",
   "block.jsc.vintage_server_rack": "Vintage Server Rack",
-  "gui.jsc.cancel": "Cancel",
-  "gui.jsc.confirm": "Confirm",
   "item.jsc.cache_card": "Cache Card",
   "item.jsc.cache_card.tooltip": "Bay gadget: cuts read latency on the bay's drives",
   "item.jsc.cd_rom": "CD-ROM",
