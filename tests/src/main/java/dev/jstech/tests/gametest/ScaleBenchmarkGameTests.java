@@ -426,6 +426,13 @@ public final class ScaleBenchmarkGameTests {
         }
     }
 
+    /**
+     * Passes of each one-shot serialization measurement. Each of them runs once in a real save or chunk load
+     * and takes a few milliseconds, which is also the scale of a garbage-collection or compilation pause, so
+     * a single pass reports the JVM's mood as often as the code's cost. The fastest pass is the code's cost.
+     */
+    private static final int SERIALIZATION_PASSES = 5;
+
     /** What a save writes for the racks and the Mainframe, what loading it back costs, and a full index query. */
     private static void measurePersistence(final ServerLevel level, final BigBaseScenario.Built base,
                                            final BenchReport report) {
@@ -434,12 +441,13 @@ public final class ScaleBenchmarkGameTests {
         entities.addAll(base.nodeRacks());
         entities.add(base.mainframe());
         final List<CompoundTag> tags = new ArrayList<>(entities.size());
+        final long saveNanos = fastestOf(() -> {
+            tags.clear();
+            for (final BlockEntity entity : entities) {
+                tags.add(entity.saveWithFullMetadata(registries));
+            }
+        });
         long bytes = 0;
-        final long saveStart = System.nanoTime();
-        for (final BlockEntity entity : entities) {
-            tags.add(entity.saveWithFullMetadata(registries));
-        }
-        final long saveNanos = System.nanoTime() - saveStart;
         for (final CompoundTag tag : tags) {
             bytes += nbtBytes(tag);
         }
@@ -459,12 +467,13 @@ public final class ScaleBenchmarkGameTests {
                 }
             }
         }
-        final long volumesStart = System.nanoTime();
         final List<Tag> encoded = new ArrayList<>(volumes.size());
-        for (final StorageVolume volume : volumes) {
-            encoded.add(ServerStorageContents.CODEC.encodeStart(ops, volume.snapshot()).getOrThrow());
-        }
-        final long volumesNanos = System.nanoTime() - volumesStart;
+        final long volumesNanos = fastestOf(() -> {
+            encoded.clear();
+            for (final StorageVolume volume : volumes) {
+                encoded.add(ServerStorageContents.CODEC.encodeStart(ops, volume.snapshot()).getOrThrow());
+            }
+        });
         long volumeBytes = 0;
         for (final Tag tag : encoded) {
             final CompoundTag holder = new CompoundTag();
@@ -475,17 +484,30 @@ public final class ScaleBenchmarkGameTests {
                 .put("volumes_count", volumes.size());
 
         // A reload is what a chunk coming back does: a fresh block entity reading the saved tag.
-        final long loadStart = System.nanoTime();
-        for (int i = 0; i < base.serverRacks().size(); i++) {
-            final ServerRackBlockEntity rack = base.serverRacks().get(i);
-            final ServerRackBlockEntity fresh = new ServerRackBlockEntity(rack.getBlockPos(), rack.getBlockState());
-            fresh.loadWithComponents(tags.get(i), registries);
-        }
-        report.put("reload_ms", (System.nanoTime() - loadStart) / 1_000_000.0);
+        final long reloadNanos = fastestOf(() -> {
+            for (int i = 0; i < base.serverRacks().size(); i++) {
+                final ServerRackBlockEntity rack = base.serverRacks().get(i);
+                final ServerRackBlockEntity fresh =
+                        new ServerRackBlockEntity(rack.getBlockPos(), rack.getBlockState());
+                fresh.loadWithComponents(tags.get(i), registries);
+            }
+        });
+        report.put("reload_ms", reloadNanos / 1_000_000.0);
 
         final long queryStart = System.nanoTime();
         final Map<StorageKey, Long> totals = NetworkStorage.of(level, base.mainframe().networkUuid()).query();
         report.put("query_ms", (System.nanoTime() - queryStart) / 1_000_000.0).put("query_types", totals.size());
+    }
+
+    /** The shortest of {@link #SERIALIZATION_PASSES} timed runs of {@code work}, in nanoseconds. */
+    private static long fastestOf(final Runnable work) {
+        long best = Long.MAX_VALUE;
+        for (int pass = 0; pass < SERIALIZATION_PASSES; pass++) {
+            final long start = System.nanoTime();
+            work.run();
+            best = Math.min(best, System.nanoTime() - start);
+        }
+        return best;
     }
 
     private static void finish(final GameTestHelper helper, final BenchReport report) {
