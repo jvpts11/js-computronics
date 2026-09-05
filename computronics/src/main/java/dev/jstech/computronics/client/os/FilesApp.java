@@ -13,12 +13,30 @@ import dev.jstech.computronics.operation.payload.DeleteFilePayload;
 import dev.jstech.computronics.operation.payload.DiskFilesPayload;
 import dev.jstech.computronics.operation.payload.EjectMediaPayload;
 import dev.jstech.computronics.operation.payload.InstallFromMediaPayload;
+import dev.jstech.computronics.operation.payload.MediumTransferPayload;
 import dev.jstech.computronics.operation.payload.MkdirPayload;
 import dev.jstech.computronics.operation.payload.MoveFilePayload;
 import dev.jstech.computronics.operation.payload.RenameFilePayload;
+import dev.jstech.computronics.operation.payload.RenameVolumePayload;
 import dev.jstech.computronics.operation.payload.RequestDiskFilesPayload;
 import dev.jstech.computronics.operation.payload.RequestFileContentPayload;
 import dev.jstech.computronics.operation.payload.SaveFilePayload;
+import dev.jstech.computronics.os.fs.InstallerLayout;
+import dev.jstech.computronics.os.fs.SystemLayout;
+import dev.jstech.core.client.gui.component.Breadcrumbs;
+import dev.jstech.core.client.gui.component.Button;
+import dev.jstech.core.client.gui.component.CellGrid;
+import dev.jstech.core.client.gui.component.ColumnHeader;
+import dev.jstech.core.client.gui.component.ContextMenu;
+import dev.jstech.core.client.gui.component.Draw;
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.ListView;
+import dev.jstech.core.client.gui.component.Panel;
+import dev.jstech.core.client.gui.component.Popup;
+import dev.jstech.core.client.gui.component.SearchField;
+import dev.jstech.core.client.gui.component.TextField;
+import dev.jstech.core.client.gui.component.Texts;
+import dev.jstech.core.client.gui.component.UiContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -26,10 +44,15 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * The file explorer, shown as a desktop window in the Windows-Explorer mould: a toolbar with back,
@@ -40,12 +63,25 @@ import java.util.Locale;
  * opens a text file in the Editor. Right-click opens a context menu with cut, copy, paste, rename,
  * delete, new file, new folder and properties, greyed where the volume forbids them.
  *
- * <p>The geometry lives in {@link FilesLayout}, where a test proves nothing overlaps.
+ * <p>The toolbar, the trail, the search, the tree, the column header, the list, the icon view, the
+ * inline rename fields, the status texts, the context menu and the properties dialog are components;
+ * the drag ghost, the drop targets and the rubber band are the explorer's own, since they read the
+ * lists' layout rather than draw in it. The geometry lives in {@link FilesLayout}, where a test proves
+ * nothing overlaps.
  */
 public final class FilesApp implements DesktopApp {
 
     private static final long DOUBLE_CLICK_MS = 300L;
     private static final int HISTORY_MAX = 32;
+    private static final int ICON_CELL_W = 52;
+    private static final int ICON_CELL_H = 30;
+    private static final int NAME_MAX = 64;
+    private static final int VOLUME_LABEL_MAX = 32;
+    private static final int SEARCH_MAX = 40;
+    private static final int PROPERTY_ROWS = 5;
+    private static final int DROP_TARGET_EDGE = 0xFF2E8B2E;
+    private static final int BAND_FILL = 0x334C84F0;
+    private static final int BAND_EDGE = 0xCC4C84F0;
 
     private OsSkin skin = OsSkin.fallback();
     private String os = "frames_95";
@@ -54,13 +90,12 @@ public final class FilesApp implements DesktopApp {
     // The monitor the desktop is shown on, needed to authenticate the sanctioned .dat-to-medium item
     // transfer (the server validates the player is within reach of this monitor). May be null when the
     // explorer is opened outside a desktop context.
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     private final BlockPos monitorPos;
     private String dir = "";
     private List<Row> allRows = new ArrayList<>();
     private List<Row> rows = new ArrayList<>();
     private int selected = -1;
-    private int scroll;
     private List<DiskFilesPayload.WireVolume> volumes = new ArrayList<>();
 
     private int lastClickRow = -1;
@@ -70,31 +105,24 @@ public final class FilesApp implements DesktopApp {
     private final List<String> back = new ArrayList<>();
     private final List<String> forward = new ArrayList<>();
 
-    // The search box filters the listing as the player types.
-    private final StringBuilder search = new StringBuilder();
-    private boolean searchFocused;
-
-    private SortBy sortBy = SortBy.NAME;
-    private boolean sortAscending = true;
     private boolean iconView;
 
-    // Right-click context menu: items built for the target when it opens.
-    private boolean contextOpen;
-    private int ctxX;
-    private int ctxY;
-    private int ctxRow = -1;
-    private List<MenuItem> ctxItems = List.of();
-
+    // An inline rename edits the row named by its path, so a listing that arrives meanwhile cannot make
+    // the field commit onto a different row.
     private int renaming = -1;
-    private final StringBuilder renameBuf = new StringBuilder();
+    @Nullable
+    private String renamePath;
     private String renameExt = "";
+    private int volRenaming = -1;
 
     // Drag-and-drop state: the row picked up on press, whether a drag is in progress, and the
-    // current cursor position (desktop-local) for the drag ghost.
+    // current cursor position for the drag ghost.
     private int dragRow = -1;
     private boolean dragging;
     private double dragMx;
     private double dragMy;
+    // The folder row a drag hovers, outlined in the list; computed once per frame.
+    private int dropTarget = -1;
 
     // Rubber-band selection over the file list. Pressing on empty space below the last row starts a
     // sweep; every row it crosses joins the selection. It never starts on a row, so the existing
@@ -104,33 +132,56 @@ public final class FilesApp implements DesktopApp {
     private double bandStartY;
     private double bandX;
     private double bandY;
-    private final java.util.Set<Integer> bandRows = new java.util.LinkedHashSet<>();
-    /** Rows the list can show at its current size, published by the last render for the band to respect. */
-    private int visibleRows = 1;
+    private final Set<Integer> bandRows = new LinkedHashSet<>();
 
     // After creating a New File/New Folder, the next listing enters rename on the matching row.
+    @Nullable
     private String pendingRename;
 
     // The clipboard: paths waiting to be pasted, and whether the paste moves them.
     private final List<String> clipboard = new ArrayList<>();
     private boolean clipboardCut;
 
-    // The properties panel, over the list, for one row.
-    private Row propsRow;
-
-    // Volume relabel state (right-click a volume in the tree).
-    private int volRenaming = -1;
-    private final StringBuilder volRenameBuf = new StringBuilder();
-    private boolean volContextOpen;
-    private int volCtxIndex = -1;
-    private int volCtxX;
-    private int volCtxY;
+    // The row the context menu was opened on, for the actions that apply to a sweep.
+    private int ctxRow = -1;
+    // The lines the properties dialog shows for the row it was opened on.
+    private List<String[]> propertyLines = List.of();
 
     private static FilesApp active;
 
-    // The content size of the last render, so click math uses the geometry that was drawn.
+    // ---- components ----
+    private final Panel root = new Panel();
+    private final Button backButton;
+    private final Button forwardButton;
+    private final Button upButton;
+    private final Button viewButton;
+    private final Breadcrumbs address;
+    private final SearchField search;
+    private final ListView<TreeItem> treeList;
+    private final ColumnHeader columns;
+    private final ListView<Row> fileList;
+    private final CellGrid iconGrid;
+    private final TextField renameField;
+    private final TextField volumeField;
+    private final Label statusLeft;
+    private final Label statusRight;
+    private final ContextMenu context = new ContextMenu(FilesLayout.CTX_W, FilesLayout.CTX_ITEM_H);
+    private final Popup properties;
+    private final Label[] propertyKeys = new Label[PROPERTY_ROWS];
+    private final Label[] propertyValues = new Label[PROPERTY_ROWS];
+    private final Button propertiesClose;
+
+    // The content rectangle and cursor of the last render: the components are laid out in it, and the
+    // click that follows arrives in the same coordinates.
+    private int lastX;
+    private int lastY;
     private int contentW = FilesLayout.DEFAULT_W;
     private int contentH = FilesLayout.DEFAULT_H;
+    private int lastMouseX;
+    private int lastMouseY;
+    // Where the click being handled landed, for a cell click that reports no position of its own.
+    private double clickX;
+    private double clickY;
 
     private enum Kind { UP, STORAGE, DIR, FILE }
 
@@ -139,18 +190,24 @@ public final class FilesApp implements DesktopApp {
     private enum IconType { UP, FOLDER, HOME, IQL, DOC, DAT, EXE, PKG, INF, BIN, CFG, LOG, CRAFT }
 
     private record Row(Kind kind, String name, String type, String size, IconType icon,
-                       @org.jetbrains.annotations.Nullable DiskFilesPayload.WireFile file,
-                       @org.jetbrains.annotations.Nullable ItemStack item) {
-    }
-
-    private record MenuItem(String label, boolean enabled, Runnable action) {
-        static MenuItem separator() {
-            return new MenuItem("-", false, () -> { });
-        }
+                       @Nullable DiskFilesPayload.WireFile file, @Nullable ItemStack item) {
     }
 
     /** One entry of the drive tree: a section title, a quick-access shortcut, or a volume. */
     private record TreeItem(String label, String target, boolean section, boolean removable, int volumeIndex) {
+    }
+
+    /** A text field for a file or volume name: a path separator cannot be typed into it. */
+    private static final class NameField extends TextField {
+
+        NameField(final int maxLength) {
+            super(maxLength);
+        }
+
+        @Override
+        protected boolean accepts(final char c) {
+            return super.accepts(c) && c != '/' && c != '\\';
+        }
     }
 
     public FilesApp(final BlockPos host) {
@@ -171,12 +228,58 @@ public final class FilesApp implements DesktopApp {
      * Opens the explorer skinned for {@code os} at {@code initialDir}, aware of the {@code monitorPos} the
      * desktop is shown on so it can authenticate the sanctioned {@code .dat}-to-medium item transfer.
      */
-    public FilesApp(final BlockPos host, final String os, final String initialDir,
-                    @org.jetbrains.annotations.Nullable final BlockPos monitorPos) {
+    public FilesApp(final BlockPos host, final String os, final String initialDir, @Nullable final BlockPos monitorPos) {
         this.host = host;
         this.monitorPos = monitorPos;
         this.os = os;
         this.skin = OsSkin.forDesktop(ResourceLocation.fromNamespaceAndPath("jsc", os));
+
+        backButton = root.add(new Button("<", this::goBack));
+        forwardButton = root.add(new Button(">", this::goForward));
+        upButton = root.add(new Button("^", this::goUp));
+        address = root.add(new Breadcrumbs(this::crumbs, this::go));
+        search = root.add(new SearchField(SEARCH_MAX));
+        search.setOnEdit(this::applyFilterAndSort);
+        search.setOnEscape(() -> {
+            search.reset();
+            applyFilterAndSort();
+        });
+        viewButton = root.add(new Button(() -> iconView ? "=" : "#", this::toggleView));
+
+        treeList = root.add(new ListView<TreeItem>(this::tree, FilesLayout.ROW_H, this::renderTreeRow)
+                .setPadding(1, 2)
+                .setOnClick(this::treeClicked));
+        columns = root.add(new ColumnHeader(List.of("Name", "Type", "Size")).setOnSort(column -> applyFilterAndSort()));
+        fileList = root.add(new ListView<Row>(() -> rows, FilesLayout.ROW_H, this::renderFileRow)
+                .setPadding(1, 1)
+                .setOnClick(this::rowClicked));
+        iconGrid = root.add(new CellGrid(1, 1, 1, ICON_CELL_W, ICON_CELL_H)
+                .setWells(false)
+                .setInset(2)
+                .setSelected(this::isSelected)
+                .setRenderer(this::renderIconCell)
+                .setOnClick((index, button, shift) -> rowClicked(index, button, clickX, clickY)));
+
+        renameField = root.add(new NameField(NAME_MAX));
+        renameField.setSuffix(() -> renameExt).setOnCommit(this::commitRename).setOnBlur(this::endRename);
+        renameField.setVisible(false);
+        volumeField = root.add(new NameField(VOLUME_LABEL_MAX));
+        volumeField.setOnCommit(this::commitVolumeRename).setOnBlur(this::endVolumeRename);
+        volumeField.setVisible(false);
+
+        statusLeft = root.add(new Label(this::statusLeftText));
+        statusRight = root.add(new Label(this::statusRightText, Label.Tone.DIM).setAlign(Label.Align.RIGHT));
+
+        properties = new Popup("Properties", FilesLayout.PROPS_W, FilesLayout.PROPS_H)
+                .setDim(0x40000000)
+                .setLayouter(this::layoutProperties);
+        for (int i = 0; i < PROPERTY_ROWS; i++) {
+            final int line = i;
+            propertyKeys[i] = properties.add(new Label(() -> propertyText(line, 0), Label.Tone.DIM));
+            propertyValues[i] = properties.add(new Label(() -> propertyText(line, 1)));
+        }
+        propertiesClose = properties.add(new Button("Close", properties::close).setPrimary(true));
+
         active = this;
         request(initialDir);
     }
@@ -207,7 +310,7 @@ public final class FilesApp implements DesktopApp {
     }
 
     /** The file or folder currently being dragged out of this explorer, or {@code null} when none. */
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     public DiskFilesPayload.WireFile draggedFile() {
         return isDragging() ? rows.get(dragRow).file() : null;
     }
@@ -248,6 +351,11 @@ public final class FilesApp implements DesktopApp {
         return FilesLayout.MIN_H;
     }
 
+    @Override
+    public boolean modalActive() {
+        return properties.isOpen();
+    }
+
     // ---- navigation ------------------------------------------------------------------------
 
     @Override
@@ -259,9 +367,10 @@ public final class FilesApp implements DesktopApp {
     private void request(final String target) {
         this.dir = target;
         this.selected = -1;
-        this.scroll = 0;
-        this.propsRow = null;
-        this.contextOpen = false;
+        fileList.setScroll(0);
+        iconGrid.setScroll(0);
+        properties.close();
+        context.close();
         // Row indices are about to mean something else, so a sweep selection cannot survive.
         this.bandActive = false;
         this.bandRows.clear();
@@ -308,6 +417,12 @@ public final class FilesApp implements DesktopApp {
             return;
         }
         go(parentOf(dir));
+    }
+
+    private void toggleView() {
+        iconView = !iconView;
+        fileList.setScroll(0);
+        iconGrid.setScroll(0);
     }
 
     private boolean onMedia() {
@@ -389,7 +504,7 @@ public final class FilesApp implements DesktopApp {
 
     /** Rebuilds the visible rows from the full listing: the search filter, then the sort, navigation rows first. */
     private void applyFilterAndSort() {
-        final String needle = search.toString().trim().toLowerCase(Locale.ROOT);
+        final String needle = search.query();
         final List<Row> nav = new ArrayList<>();
         final List<Row> dirs = new ArrayList<>();
         final List<Row> files = new ArrayList<>();
@@ -402,16 +517,16 @@ public final class FilesApp implements DesktopApp {
                 (r.kind() == Kind.DIR ? dirs : files).add(r);
             }
         }
-        final java.util.Comparator<Row> order = switch (sortBy) {
-            case TYPE -> java.util.Comparator.comparing((Row r) -> r.type().toLowerCase(Locale.ROOT))
+        final Comparator<Row> order = switch (sortBy()) {
+            case TYPE -> Comparator.comparing((Row r) -> r.type().toLowerCase(Locale.ROOT))
                     .thenComparing(r -> r.name().toLowerCase(Locale.ROOT));
-            case SIZE -> java.util.Comparator.comparingLong((Row r) -> r.file() == null ? 0L
+            case SIZE -> Comparator.comparingLong((Row r) -> r.file() == null ? 0L
                     : (r.file().projectsItem() ? r.file().count() : r.file().weight()))
                     .thenComparing(r -> r.name().toLowerCase(Locale.ROOT));
-            default -> java.util.Comparator.comparing((Row r) -> r.name().toLowerCase(Locale.ROOT));
+            default -> Comparator.comparing((Row r) -> r.name().toLowerCase(Locale.ROOT));
         };
-        dirs.sort(sortAscending ? order : order.reversed());
-        files.sort(sortAscending ? order : order.reversed());
+        dirs.sort(columns.ascending() ? order : order.reversed());
+        files.sort(columns.ascending() ? order : order.reversed());
         final List<Row> out = new ArrayList<>(nav.size() + dirs.size() + files.size());
         out.addAll(nav);
         out.addAll(dirs);
@@ -421,6 +536,24 @@ public final class FilesApp implements DesktopApp {
             selected = -1;
         }
         bandRows.removeIf(i -> i >= rows.size());
+        // The row being renamed follows its path through the rebuild.
+        renaming = renamePath == null ? -1 : indexOfPath(renamePath);
+    }
+
+    private SortBy sortBy() {
+        final SortBy[] all = SortBy.values();
+        final int column = columns.sortColumn();
+        return column >= 0 && column < all.length ? all[column] : SortBy.NAME;
+    }
+
+    private int indexOfPath(final String path) {
+        for (int i = 0; i < rows.size(); i++) {
+            final Row r = rows.get(i);
+            if (r.file() != null && r.file().path().equals(path)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static ItemStack stackOf(final String itemId) {
@@ -490,14 +623,17 @@ public final class FilesApp implements DesktopApp {
         return !os.startsWith("frames_");
     }
 
+    private boolean isSelected(final int index) {
+        return index == selected || bandRows.contains(index);
+    }
+
     // ---- the drive tree --------------------------------------------------------------------
 
     private List<TreeItem> tree() {
         final List<TreeItem> out = new ArrayList<>();
         out.add(new TreeItem("Quick access", "", true, false, -1));
-        out.add(new TreeItem("Desktop", linux()
-                ? dev.jstech.computronics.os.fs.SystemLayout.POSIX_DESKTOP_DIR
-                : dev.jstech.computronics.os.fs.SystemLayout.DESKTOP_DIR, false, false, -1));
+        out.add(new TreeItem("Desktop", linux() ? SystemLayout.POSIX_DESKTOP_DIR : SystemLayout.DESKTOP_DIR,
+                false, false, -1));
         out.add(new TreeItem("Storage", "Storage", false, false, -1));
         out.add(new TreeItem(linux() ? "Devices" : "This PC", "", true, false, -1));
         for (int i = 0; i < volumes.size(); i++) {
@@ -513,6 +649,52 @@ public final class FilesApp implements DesktopApp {
         return !item.section() && item.volumeIndex() >= 0;
     }
 
+    /** The index in the tree of the volume with {@code volumeIndex}, or -1. */
+    private int treeRowOfVolume(final int volumeIndex) {
+        final List<TreeItem> items = tree();
+        for (int i = 0; i < items.size(); i++) {
+            if (isVolumeItem(items.get(i)) && items.get(i).volumeIndex() == volumeIndex) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** The crumbs of the current path, from the root to here. */
+    private List<Breadcrumbs.Crumb> crumbs() {
+        final List<Breadcrumbs.Crumb> out = new ArrayList<>();
+        if (onMedia()) {
+            final String rootKey = "media:" + mediaReaderPos();
+            out.add(new Breadcrumbs.Crumb(linux() ? "Devices" : "This PC", ""));
+            final String letter = letterOf(rootKey);
+            out.add(new Breadcrumbs.Crumb(volumeLabel(rootKey) + (letter.isEmpty() ? "" : " (" + letter + ")"), rootKey));
+            final int slash = dir.indexOf('/');
+            if (slash >= 0) {
+                String acc = rootKey;
+                for (final String seg : dir.substring(slash + 1).split("/")) {
+                    if (seg.isEmpty()) {
+                        continue;
+                    }
+                    acc = acc + "/" + seg;
+                    out.add(new Breadcrumbs.Crumb(seg, acc));
+                }
+            }
+            return out;
+        }
+        out.add(new Breadcrumbs.Crumb(linux() ? "/" : "Local Disk (C:)", ""));
+        if (!dir.isEmpty()) {
+            String acc = "";
+            for (final String seg : dir.split("/")) {
+                if (seg.isEmpty()) {
+                    continue;
+                }
+                acc = acc.isEmpty() ? seg : acc + "/" + seg;
+                out.add(new Breadcrumbs.Crumb(seg, acc));
+            }
+        }
+        return out;
+    }
+
     // ---- rendering -------------------------------------------------------------------------
 
     @Override
@@ -522,93 +704,36 @@ public final class FilesApp implements DesktopApp {
         // The front (last-rendered) explorer window owns the DiskFilesPayload routing, so two open
         // Files windows don't leave the back one as a stale target and a closed one stops receiving.
         active = this;
-        this.contentW = width;
-        this.contentH = height;
-        final int text = skin.text();
-        final int dim = skin.dim();
+        lastX = x;
+        lastY = y;
+        contentW = width;
+        contentH = height;
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+        final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
         g.fill(x, y, x + width, y + height, skin.windowBg());
+        layout(x, y, width, height);
 
-        // ---- toolbar
-        final int ny = y + FilesLayout.navY();
-        navButton(g, font, x + FilesLayout.navX(0), ny, "<", !back.isEmpty(), mouseX, mouseY);
-        navButton(g, font, x + FilesLayout.navX(1), ny, ">", !forward.isEmpty(), mouseX, mouseY);
-        navButton(g, font, x + FilesLayout.navX(2), ny, "^", !dir.isEmpty(), mouseX, mouseY);
-        final int ax = x + FilesLayout.addressX();
-        final int aw = FilesLayout.addressW(width);
-        skin.field(g, ax, ny, aw, FilesLayout.NAV_H, false);
-        drawCrumbs(g, font, ax + 3, ny + 2, aw - 6, mouseX, mouseY);
-        final int sx = x + FilesLayout.searchX(width);
-        skin.field(g, sx, ny, FilesLayout.SEARCH_W, FilesLayout.NAV_H, searchFocused);
-        final String shown = search.length() == 0 && !searchFocused ? "Search" : search + (searchFocused ? "_" : "");
-        g.drawString(font, trim(font, shown, FilesLayout.SEARCH_W - 6), sx + 3, ny + 2,
-                search.length() == 0 && !searchFocused ? dim : text, false);
-        navButton(g, font, x + FilesLayout.viewX(width), ny, iconView ? "=" : "#", true, mouseX, mouseY);
+        // The surfaces the components sit on: the toolbar rule, the tree rail, the list well, the status bar.
         g.fill(x, y + FilesLayout.TOOL_H, x + width, y + FilesLayout.TOOL_H + 1, skin.edge());
-
-        // ---- the drive tree
-        final int ty = y + FilesLayout.treeY();
-        final int th = FilesLayout.treeH(height);
-        renderTree(g, font, x, ty, FilesLayout.TREE_W, th, mouseX, mouseY);
-
-        // ---- the column header and the list
+        g.fill(treeList.x(), treeList.y(), treeList.right(), treeList.bottom(), skin.listHover());
+        g.fill(treeList.right() - 1, treeList.y(), treeList.right(), treeList.bottom(), skin.edge());
         final int lx = x + FilesLayout.listX();
         final int lw = FilesLayout.listW(width);
-        final int cy = y + FilesLayout.colsY();
-        g.fill(lx, cy, lx + lw, cy + FilesLayout.COLS_H, skin.listHover());
-        g.fill(lx, cy + FilesLayout.COLS_H - 1, lx + lw, cy + FilesLayout.COLS_H, skin.edge());
-        final String arrow = sortAscending ? " ^" : " v";
-        g.drawString(font, "Name" + (sortBy == SortBy.NAME ? arrow : ""), lx + 4 + FilesLayout.ICON_W + 3, cy + 1, dim, false);
-        g.drawString(font, "Type" + (sortBy == SortBy.TYPE ? arrow : ""), x + FilesLayout.typeColX(width), cy + 1, dim, false);
-        g.drawString(font, "Size" + (sortBy == SortBy.SIZE ? arrow : ""), x + FilesLayout.sizeColX(width), cy + 1, dim, false);
-
         final int listY = y + FilesLayout.listY();
         final int listH = FilesLayout.listH(height);
         g.fill(lx, listY, lx + lw, listY + listH, skin.panelBg());
-        OsSkin.outline(g, lx, listY, lw, listH, skin.edge());
-        if (iconView) {
-            renderIconGrid(g, font, x, width, lx, listY, lw, listH, mouseX, mouseY);
-        } else {
-            renderRows(g, font, x, width, lx, listY, lw, listH, mouseX, mouseY);
-        }
+        Draw.outline(g, lx, listY, lw, listH, skin.edge());
+        skin.statusBar(g, x, y + FilesLayout.statusY(height), width, FilesLayout.STATUS_H);
+
+        dropTarget = dragging && !iconView ? folderRowAt(dragMx, dragMy) : -1;
+        root.render(g, ctx);
 
         // The rubber band, over the rows it is selecting.
         if (bandActive) {
             final int[] b = bandRect();
-            g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], 0x334C84F0);
-            OsSkin.outline(g, b[0], b[1], b[2], b[3], 0xCC4C84F0);
-        }
-
-        // ---- status bar
-        final int sy = y + FilesLayout.statusY(height);
-        skin.statusBar(g, x, sy, width, FilesLayout.STATUS_H);
-        int items = 0;
-        long used = 0L;
-        for (final Row r : rows) {
-            if (r.kind() == Kind.FILE || r.kind() == Kind.DIR) {
-                items++;
-            }
-            if (r.kind() == Kind.FILE && r.file() != null) {
-                used += r.file().weight();
-            }
-        }
-        final int selectedCount = bandRows.size() > 1 ? bandRows.size() : (selected >= 0 ? 1 : 0);
-        String left = items + (items == 1 ? " item" : " items");
-        if (selectedCount > 0) {
-            left += " · " + selectedCount + " selected";
-            if (selectedCount == 1 && selected >= 0 && selected < rows.size()) {
-                left += " · " + rows.get(selected).name();
-            }
-        }
-        g.drawString(font, trim(font, left, width / 2), x + 3, sy + 2, text, false);
-        final String right = readOnlyVolume() ? "read-only medium" : used + " mB used";
-        g.drawString(font, right, x + width - font.width(right) - 3, sy + 2, dim, false);
-
-        // ---- overlays: properties, the context menus, the drag ghost
-        if (propsRow != null) {
-            renderProperties(g, font, lx, listY, lw, listH, mouseX, mouseY);
-        }
-        if (contextOpen) {
-            renderContextMenu(g, font, x + ctxX, y + ctxY, mouseX, mouseY);
+            g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], BAND_FILL);
+            Draw.outline(g, b[0], b[1], b[2], b[3], BAND_EDGE);
         }
         if (dragging && dragRow >= 0 && dragRow < rows.size()) {
             final String label = rows.get(dragRow).name();
@@ -618,135 +743,101 @@ public final class FilesApp implements DesktopApp {
             g.fill(gx, gy, gx + gw, gy + 11, 0xD0303848);
             g.drawString(font, label, gx + 3, gy + 2, 0xFFFFFFFF, false);
         }
-        if (volContextOpen) {
-            final int mx = x + volCtxX;
-            final int my = y + volCtxY;
-            final int mw = 60;
-            g.fill(mx - 1, my - 1, mx + mw + 1, my + FilesLayout.CTX_ITEM_H + 3, 0xFF000000);
-            g.fill(mx, my, mx + mw, my + FilesLayout.CTX_ITEM_H + 2, skin.panelBg());
-            final boolean hov = mouseX >= mx && mouseX <= mx + mw
-                    && mouseY >= my + 1 && mouseY <= my + 1 + FilesLayout.CTX_ITEM_H;
-            if (hov) {
-                g.fill(mx + 1, my + 1, mx + mw - 1, my + 1 + FilesLayout.CTX_ITEM_H, skin.accent());
-            }
-            g.drawString(font, "Rename", mx + 4, my + 3, hov ? 0xFFFFFFFF : text, false);
-        }
+        context.render(g, ctx);
     }
 
-    private void navButton(final GuiGraphics g, final Font font, final int bx, final int by, final String glyph,
-                           final boolean enabled, final int mouseX, final int mouseY) {
-        final boolean hover = enabled && inRect(mouseX, mouseY, bx, by, FilesLayout.NAV_W, FilesLayout.NAV_H);
-        skin.button(g, font, bx, by, FilesLayout.NAV_W, FilesLayout.NAV_H, "", hover, false, false);
-        g.drawString(font, glyph, bx + (FilesLayout.NAV_W - font.width(glyph)) / 2, by + 2,
-                enabled ? skin.text() : skin.dim(), false);
+    /** Places every component from the content rectangle; the same layout the next click is read against. */
+    private void layout(final int x, final int y, final int width, final int height) {
+        final int ny = y + FilesLayout.navY();
+        backButton.setBounds(x + FilesLayout.navX(0), ny, FilesLayout.NAV_W, FilesLayout.NAV_H);
+        backButton.setEnabled(!back.isEmpty());
+        forwardButton.setBounds(x + FilesLayout.navX(1), ny, FilesLayout.NAV_W, FilesLayout.NAV_H);
+        forwardButton.setEnabled(!forward.isEmpty());
+        upButton.setBounds(x + FilesLayout.navX(2), ny, FilesLayout.NAV_W, FilesLayout.NAV_H);
+        upButton.setEnabled(!dir.isEmpty());
+        address.setBounds(x + FilesLayout.addressX(), ny, FilesLayout.addressW(width), FilesLayout.NAV_H);
+        search.setBounds(x + FilesLayout.searchX(width), ny, FilesLayout.SEARCH_W, FilesLayout.NAV_H);
+        viewButton.setBounds(x + FilesLayout.viewX(width), ny, FilesLayout.NAV_W, FilesLayout.NAV_H);
+
+        treeList.setBounds(x, y + FilesLayout.treeY(), FilesLayout.TREE_W, FilesLayout.treeH(height));
+
+        final int lx = x + FilesLayout.listX();
+        final int lw = FilesLayout.listW(width);
+        columns.setBounds(lx, y + FilesLayout.colsY(), lw, FilesLayout.COLS_H);
+        columns.setColumnX(lx + 4 + FilesLayout.ICON_W + 3, x + FilesLayout.typeColX(width), x + FilesLayout.sizeColX(width));
+
+        final int listY = y + FilesLayout.listY();
+        final int listH = FilesLayout.listH(height);
+        fileList.setBounds(lx, listY, lw, listH);
+        fileList.setVisible(!iconView);
+        final int cols = Math.max(1, (lw - 4) / ICON_CELL_W);
+        final int gridRows = Math.max(1, (listH - 2) / ICON_CELL_H);
+        iconGrid.setColumns(cols).setVisibleRows(gridRows).setTotalRows((rows.size() + cols - 1) / cols)
+                .setCellCount(rows.size()).place(lx + 2, listY + 2);
+        iconGrid.setVisible(iconView);
+
+        layoutRenameFields(width);
+
+        final int sy = y + FilesLayout.statusY(height) + 2;
+        statusLeft.setBounds(x + 3, sy, width / 2 - 3, 8);
+        statusRight.setBounds(x + width / 2, sy, width / 2 - 3, 8);
     }
 
-    /** The address as a trail of crumbs, each a click target, the last one the folder being shown. */
-    private void drawCrumbs(final GuiGraphics g, final Font font, final int cx, final int cy, final int maxW,
-                            final int mouseX, final int mouseY) {
-        final List<String[]> crumbs = crumbs();
-        int px = cx;
-        for (int i = 0; i < crumbs.size(); i++) {
-            final String label = crumbs.get(i)[0];
-            final int w = font.width(label);
-            if (px + w > cx + maxW) {
-                g.drawString(font, "..", px, cy, skin.dim(), false);
-                break;
-            }
-            final boolean last = i == crumbs.size() - 1;
-            final boolean hover = !last && inRect(mouseX, mouseY, px - 1, cy - 2, w + 2, FilesLayout.NAV_H - 2);
-            g.drawString(font, label, px, cy, hover ? skin.accent() : (last ? skin.text() : skin.dim()), false);
-            px += w;
-            if (!last) {
-                g.drawString(font, " > ", px, cy, skin.dim(), false);
-                px += font.width(" > ");
-            }
-        }
-    }
-
-    /** The crumbs of the current path: {label, target} pairs from the root to here. */
-    private List<String[]> crumbs() {
-        final List<String[]> out = new ArrayList<>();
-        if (onMedia()) {
-            final String rootKey = "media:" + mediaReaderPos();
-            out.add(new String[]{linux() ? "Devices" : "This PC", ""});
-            final String letter = letterOf(rootKey);
-            out.add(new String[]{volumeLabel(rootKey) + (letter.isEmpty() ? "" : " (" + letter + ")"), rootKey});
-            final int slash = dir.indexOf('/');
-            if (slash >= 0) {
-                String acc = rootKey;
-                for (final String seg : dir.substring(slash + 1).split("/")) {
-                    if (seg.isEmpty()) {
-                        continue;
-                    }
-                    acc = acc + "/" + seg;
-                    out.add(new String[]{seg, acc});
+    /** Puts the inline rename fields over the rows they edit, hidden while their row is out of view. */
+    private void layoutRenameFields(final int width) {
+        renameField.setVisible(false);
+        if (renaming >= 0 && renaming < rows.size()) {
+            if (iconView) {
+                final int[] c = iconGrid.cellRect(renaming);
+                if (c != null) {
+                    renameField.setBounds(c[0], c[1] + c[3] - 12, c[2], FilesLayout.ROW_H);
+                    renameField.setVisible(true);
                 }
-            }
-            return out;
-        }
-        out.add(new String[]{linux() ? "/" : "Local Disk (C:)", ""});
-        if (!dir.isEmpty()) {
-            String acc = "";
-            for (final String seg : dir.split("/")) {
-                if (seg.isEmpty()) {
-                    continue;
-                }
-                acc = acc.isEmpty() ? seg : acc + "/" + seg;
-                out.add(new String[]{seg, acc});
+            } else if (renaming >= fileList.scroll() && renaming < fileList.scroll() + fileList.visibleRows()) {
+                final int[] r = fileList.rowRect(renaming);
+                final int nameX = r[0] + 3 + FilesLayout.ICON_W + 3;
+                renameField.setBounds(nameX - 3, r[1], FilesLayout.nameMaxW(width) + 6, FilesLayout.ROW_H);
+                renameField.setVisible(true);
             }
         }
-        return out;
+        volumeField.setVisible(false);
+        if (volRenaming >= 0 && volRenaming < volumes.size()) {
+            final int row = treeRowOfVolume(volRenaming);
+            if (row >= treeList.scroll() && row < treeList.scroll() + treeList.visibleRows()) {
+                final int[] r = treeList.rowRect(row);
+                final boolean removable = volumes.get(volRenaming).removable();
+                final int fx = r[0] + FilesLayout.ICON_W;
+                volumeField.setBounds(fx, r[1], r[0] + r[2] - fx - (removable ? 10 : 1), FilesLayout.ROW_H);
+                volumeField.setVisible(true);
+            }
+        }
     }
 
-    /** The crumb under {@code mouseX} on the address bar, as a navigation target, or {@code null}. */
-    @org.jetbrains.annotations.Nullable
-    private String crumbAt(final Font font, final int ax, final double mouseX) {
-        final List<String[]> crumbs = crumbs();
-        int px = ax + 3;
-        for (int i = 0; i < crumbs.size() - 1; i++) {
-            final int w = font.width(crumbs.get(i)[0]);
-            if (mouseX >= px && mouseX < px + w) {
-                return crumbs.get(i)[1];
-            }
-            px += w + font.width(" > ");
+    private void renderTreeRow(final GuiGraphics g, final UiContext ctx, final TreeItem item, final int index,
+                               final int x, final int y, final int w, final int h, final boolean hovered,
+                               final boolean selectedRow) {
+        if (item.section()) {
+            g.drawString(ctx.font(), item.label().toUpperCase(Locale.ROOT), x + 3, y + 3, ctx.skin().dim(), false);
+            return;
         }
-        return null;
-    }
-
-    private void renderTree(final GuiGraphics g, final Font font, final int tx, final int ty,
-                            final int tw, final int th, final int mouseX, final int mouseY) {
-        g.fill(tx, ty, tx + tw, ty + th, skin.listHover());
-        g.fill(tx + tw - 1, ty, tx + tw, ty + th, skin.edge());
-        int vy = ty + 2;
-        final List<TreeItem> items = tree();
-        for (int i = 0; i < items.size() && vy + FilesLayout.ROW_H <= ty + th; i++) {
-            final TreeItem item = items.get(i);
-            if (item.section()) {
-                g.drawString(font, item.label().toUpperCase(Locale.ROOT), tx + 4, vy + 3, skin.dim(), false);
-                vy += FilesLayout.ROW_H;
-                continue;
-            }
-            final boolean cur = item.target().isEmpty() ? (dir.isEmpty() && isVolumeItem(item))
-                    : isVolumeItem(item) ? isCurrentVolume(item.target()) : dir.equals(item.target());
-            final boolean hover = inRect(mouseX, mouseY, tx + 1, vy, tw - 2, FilesLayout.ROW_H);
-            skin.listRow(g, tx + 1, vy, tw - 2, FilesLayout.ROW_H, hover, cur);
-            drawIcon(g, tx + 3, vy + 1, item.target().equals("Storage") ? IconType.DAT
-                    : (isVolumeItem(item) ? (item.removable() ? IconType.BIN : IconType.HOME) : IconType.FOLDER));
-            String label = isVolumeItem(item) && item.volumeIndex() == volRenaming ? volRenameBuf + "_" : item.label();
-            final int maxW = tw - (FilesLayout.ICON_W + 8) - (item.removable() ? 8 : 0);
-            label = trim(font, label, maxW);
-            g.drawString(font, label, tx + 4 + FilesLayout.ICON_W, vy + 2, skin.listRowText(cur), false);
-            if (item.removable()) {
-                // The eject control at the row's right edge: a tray glyph.
-                final int ex = tx + tw - 9;
-                final int c = cur ? skin.listRowText(true) : skin.dim();
-                g.fill(ex + 2, vy + 3, ex + 4, vy + 4, c);
-                g.fill(ex + 1, vy + 4, ex + 5, vy + 5, c);
-                g.fill(ex, vy + 5, ex + 6, vy + 6, c);
-                g.fill(ex, vy + 7, ex + 6, vy + 8, c);
-            }
-            vy += FilesLayout.ROW_H;
+        final boolean cur = item.target().isEmpty() ? (dir.isEmpty() && isVolumeItem(item))
+                : isVolumeItem(item) ? isCurrentVolume(item.target()) : dir.equals(item.target());
+        ctx.skin().listRow(g, x, y, w, h, hovered, cur);
+        drawIcon(g, x + 2, y + 1, item.target().equals("Storage") ? IconType.DAT
+                : (isVolumeItem(item) ? (item.removable() ? IconType.BIN : IconType.HOME) : IconType.FOLDER));
+        if (!(isVolumeItem(item) && item.volumeIndex() == volRenaming)) {
+            final int maxW = w + 2 - (FilesLayout.ICON_W + 8) - (item.removable() ? 8 : 0);
+            g.drawString(ctx.font(), Texts.clip(ctx.font(), item.label(), maxW), x + 3 + FilesLayout.ICON_W, y + 2,
+                    ctx.skin().listRowText(cur), false);
+        }
+        if (item.removable()) {
+            // The eject control at the row's right edge: a tray glyph.
+            final int ex = x + w - 8;
+            final int c = cur ? ctx.skin().listRowText(true) : ctx.skin().dim();
+            g.fill(ex + 2, y + 3, ex + 4, y + 4, c);
+            g.fill(ex + 1, y + 4, ex + 5, y + 5, c);
+            g.fill(ex, y + 5, ex + 6, y + 6, c);
+            g.fill(ex, y + 7, ex + 6, y + 8, c);
         }
     }
 
@@ -758,242 +849,165 @@ public final class FilesApp implements DesktopApp {
         return dir.equals(key) || dir.startsWith(key + "/");
     }
 
-    private void renderRows(final GuiGraphics g, final Font font, final int x, final int width, final int lx,
-                            final int listY, final int lw, final int listH, final int mouseX, final int mouseY) {
-        // Remembered for the rubber band, which must never select a row the player cannot see: a
-        // sweep that reached off-screen rows would delete files that were never shown as selected.
-        this.visibleRows = Math.max(1, (listH - 2) / FilesLayout.ROW_H);
-        clampScroll(visibleRows);
-        int dropTarget = -1;
-        if (dragging && dragMx >= lx) {
-            final int idx = scroll + (int) Math.floor((dragMy - (listY + 1)) / (double) FilesLayout.ROW_H);
-            if (idx >= 0 && idx < rows.size() && idx != dragRow) {
-                final Kind k = rows.get(idx).kind();
-                if (k == Kind.DIR || k == Kind.UP) {
-                    dropTarget = idx;
-                }
-            }
+    private void renderFileRow(final GuiGraphics g, final UiContext ctx, final Row r, final int index, final int x,
+                               final int y, final int w, final int h, final boolean hovered, final boolean selectedRow) {
+        final boolean sel = isSelected(index);
+        ctx.skin().listRow(g, x, y, w, h, hovered && index != renaming, sel);
+        if (index == dropTarget) {
+            Draw.outline(g, x, y, w, h, DROP_TARGET_EDGE);
         }
-        int row = listY + 1;
-        for (int i = scroll; i < rows.size() && (i - scroll) < visibleRows; i++) {
-            final Row r = rows.get(i);
-            final boolean sel = i == selected || bandRows.contains(i);
-            final boolean hover = i != renaming && inRect(mouseX, mouseY, lx, row, lw, FilesLayout.ROW_H);
-            skin.listRow(g, lx + 1, row, lw - 2, FilesLayout.ROW_H, hover, sel);
-            if (i == dropTarget) {
-                OsSkin.outline(g, lx + 1, row, lw - 2, FilesLayout.ROW_H, 0xFF2E8B2E);
-            }
-            if (r.item() != null) {
-                DesktopItems.item(g, r.item(), lx + 2, row - 3);
-            } else {
-                drawIcon(g, lx + 3, row + 1, r.icon());
-            }
-            final boolean ro = r.file() != null && r.file().readOnly();
-            final int nameColor = sel ? skin.listRowText(true) : (ro ? skin.dim() : skin.text());
-            final int subColor = sel ? skin.listRowText(true) : skin.dim();
-            final String name = i == renaming ? renameBuf + "_" + renameExt : r.name();
-            g.drawString(font, trim(font, name, FilesLayout.nameMaxW(width)), lx + 4 + FilesLayout.ICON_W + 3, row + 2,
-                    nameColor, false);
-            g.drawString(font, trim(font, r.type(), FilesLayout.TYPE_COL_W - 4), x + FilesLayout.typeColX(width), row + 2,
-                    subColor, false);
-            final int sizeX = x + width - 4 - font.width(r.size());
-            g.drawString(font, r.size(), sizeX, row + 2, subColor, false);
-            row += FilesLayout.ROW_H;
+        if (r.item() != null) {
+            DesktopItems.item(g, r.item(), x + 1, y - 3);
+        } else {
+            drawIcon(g, x + 2, y + 1, r.icon());
+        }
+        final boolean ro = r.file() != null && r.file().readOnly();
+        final int nameColor = sel ? ctx.skin().listRowText(true) : (ro ? ctx.skin().dim() : ctx.skin().text());
+        final int subColor = sel ? ctx.skin().listRowText(true) : ctx.skin().dim();
+        if (index != renaming) {
+            g.drawString(ctx.font(), Texts.clip(ctx.font(), r.name(), FilesLayout.nameMaxW(contentW)),
+                    x + 3 + FilesLayout.ICON_W + 3, y + 2, nameColor, false);
+        }
+        g.drawString(ctx.font(), Texts.clip(ctx.font(), r.type(), FilesLayout.TYPE_COL_W - 4),
+                lastX + FilesLayout.typeColX(contentW), y + 2, subColor, false);
+        g.drawString(ctx.font(), r.size(), lastX + contentW - 4 - ctx.font().width(r.size()), y + 2, subColor, false);
+    }
+
+    private void renderIconCell(final GuiGraphics g, final UiContext ctx, final int index, final int cx, final int cy,
+                                final int w, final int h, final boolean hovered) {
+        if (index >= rows.size()) {
+            return;
+        }
+        final Row r = rows.get(index);
+        if (r.item() != null) {
+            DesktopItems.item(g, r.item(), cx + w / 2 - 8, cy + 2);
+        } else {
+            drawIcon(g, cx + w / 2 - FilesLayout.ICON_W / 2, cy + 4, r.icon());
+        }
+        if (index != renaming) {
+            final String label = Texts.clip(ctx.font(), r.name(), w - 4);
+            g.drawString(ctx.font(), label, cx + (w - ctx.font().width(label)) / 2, cy + h - 9,
+                    ctx.skin().listRowText(isSelected(index)), false);
         }
     }
 
-    private void renderIconGrid(final GuiGraphics g, final Font font, final int x, final int width, final int lx,
-                                final int listY, final int lw, final int listH, final int mouseX, final int mouseY) {
-        final int cellW = 52;
-        final int cellH = 30;
-        final int cols = Math.max(1, (lw - 4) / cellW);
-        final int rowsVisible = Math.max(1, (listH - 2) / cellH);
-        this.visibleRows = rowsVisible * cols;
-        clampScroll(visibleRows);
-        for (int i = scroll; i < rows.size() && (i - scroll) < visibleRows; i++) {
-            final Row r = rows.get(i);
-            final int n = i - scroll;
-            final int cx = lx + 2 + (n % cols) * cellW;
-            final int cy = listY + 2 + (n / cols) * cellH;
-            final boolean sel = i == selected || bandRows.contains(i);
-            final boolean hover = inRect(mouseX, mouseY, cx, cy, cellW - 2, cellH - 2);
-            skin.listRow(g, cx, cy, cellW - 2, cellH - 2, hover, sel);
-            if (r.item() != null) {
-                DesktopItems.item(g, r.item(), cx + (cellW - 2) / 2 - 8, cy + 2);
-            } else {
-                drawIcon(g, cx + (cellW - 2) / 2 - FilesLayout.ICON_W / 2, cy + 4, r.icon());
+    private String statusLeftText() {
+        int items = 0;
+        for (final Row r : rows) {
+            if (r.kind() == Kind.FILE || r.kind() == Kind.DIR) {
+                items++;
             }
-            final String label = trim(font, r.name(), cellW - 6);
-            g.drawString(font, label, cx + ((cellW - 2) - font.width(label)) / 2, cy + cellH - 11,
-                    skin.listRowText(sel), false);
+        }
+        final int selectedCount = bandRows.size() > 1 ? bandRows.size() : (selected >= 0 ? 1 : 0);
+        String left = items + (items == 1 ? " item" : " items");
+        if (selectedCount > 0) {
+            left += " · " + selectedCount + " selected";
+            if (selectedCount == 1 && selected >= 0 && selected < rows.size()) {
+                left += " · " + rows.get(selected).name();
+            }
+        }
+        return left;
+    }
+
+    private String statusRightText() {
+        if (readOnlyVolume()) {
+            return "read-only medium";
+        }
+        long used = 0L;
+        for (final Row r : rows) {
+            if (r.kind() == Kind.FILE && r.file() != null) {
+                used += r.file().weight();
+            }
+        }
+        return used + " mB used";
+    }
+
+    @Override
+    public void renderModal(final GuiGraphics g, final Font font, final int x, final int y, final int width,
+                            final int height, final int mouseX, final int mouseY) {
+        if (properties.isOpen()) {
+            properties.renderIn(g, new UiContext(skin, font, mouseX, mouseY, 0f), x, y, width, height);
         }
     }
 
-    private void renderProperties(final GuiGraphics g, final Font font, final int lx, final int listY,
-                                  final int lw, final int listH, final int mouseX, final int mouseY) {
-        final int pw = Math.min(FilesLayout.PROPS_W, lw - 8);
-        final int ph = FilesLayout.PROPS_H;
-        final int px = lx + (lw - pw) / 2;
-        final int py = listY + Math.max(2, (listH - ph) / 2);
-        skin.panel(g, px, py, pw, ph);
-        g.fill(px, py, px + pw, py + 11, skin.listHover());
-        g.drawString(font, "Properties", px + 4, py + 2, skin.text(), false);
-        int ly = py + 14;
-        for (final String[] kv : propertiesOf(propsRow)) {
-            g.drawString(font, kv[0], px + 4, ly, skin.dim(), false);
-            g.drawString(font, trim(font, kv[1], pw - 48), px + 44, ly, skin.text(), false);
+    private void layoutProperties(final Popup p) {
+        int ly = p.contentTop();
+        for (int i = 0; i < PROPERTY_ROWS; i++) {
+            propertyKeys[i].setBounds(p.x() + 4, ly, 38, 8);
+            propertyValues[i].setBounds(p.x() + 44, ly, p.width() - 48, 8);
             ly += 10;
         }
-        final int bw = 36;
-        final int bx = px + pw - bw - 4;
-        final int by = py + ph - 14;
-        skin.button(g, font, bx, by, bw, 11, "Close", inRect(mouseX, mouseY, bx, by, bw, 11), false, true);
+        propertiesClose.setBounds(p.right() - 40, p.bottom() - 15, 36, 11);
     }
 
-    private List<String[]> propertiesOf(final Row r) {
+    private String propertyText(final int line, final int column) {
+        return line < propertyLines.size() ? propertyLines.get(line)[column] : "";
+    }
+
+    private void openProperties(final Row r) {
         final List<String[]> out = new ArrayList<>();
-        out.add(new String[]{"Name", r.name()});
-        out.add(new String[]{"Type", r.type()});
+        out.add(new String[] {"Name", r.name()});
+        out.add(new String[] {"Type", r.type()});
         if (r.file() != null) {
-            out.add(new String[]{"Size", r.file().projectsItem() ? r.file().count() + " items" : r.file().weight() + " mB"});
-            out.add(new String[]{"Where", displayPath(parentOf(r.file().path()))});
-            out.add(new String[]{"Access", r.file().readOnly() ? "read-only" : "read/write"});
+            out.add(new String[] {"Size", r.file().projectsItem() ? r.file().count() + " items" : r.file().weight() + " mB"});
+            out.add(new String[] {"Where", displayPath(parentOf(r.file().path()))});
+            out.add(new String[] {"Access", r.file().readOnly() ? "read-only" : "read/write"});
         }
-        return out;
-    }
-
-    private void renderContextMenu(final GuiGraphics g, final Font font, final int mx, final int my,
-                                   final int mouseX, final int mouseY) {
-        final int mh = ctxItems.size() * FilesLayout.CTX_ITEM_H + 2;
-        g.fill(mx - 1, my - 1, mx + FilesLayout.CTX_W + 1, my + mh + 1, 0xFF000000);
-        g.fill(mx, my, mx + FilesLayout.CTX_W, my + mh, skin.panelBg());
-        final int hover = mouseX >= mx && mouseX <= mx + FilesLayout.CTX_W
-                ? (int) Math.floor((mouseY - (my + 1)) / (double) FilesLayout.CTX_ITEM_H) : -1;
-        int iy = my + 1;
-        for (int k = 0; k < ctxItems.size(); k++) {
-            final MenuItem item = ctxItems.get(k);
-            if (item.label().equals("-")) {
-                g.fill(mx + 3, iy + FilesLayout.CTX_ITEM_H / 2, mx + FilesLayout.CTX_W - 3,
-                        iy + FilesLayout.CTX_ITEM_H / 2 + 1, skin.edge());
-            } else {
-                final boolean hov = k == hover && item.enabled();
-                if (hov) {
-                    g.fill(mx + 1, iy, mx + FilesLayout.CTX_W - 1, iy + FilesLayout.CTX_ITEM_H, skin.accent());
-                }
-                g.drawString(font, item.label(), mx + 4, iy + 2,
-                        hov ? 0xFFFFFFFF : (item.enabled() ? skin.text() : skin.dim()), false);
-            }
-            iy += FilesLayout.CTX_ITEM_H;
-        }
+        propertyLines = out;
+        properties.open();
+        properties.placeIn(lastX, lastY, contentW, contentH);
     }
 
     // ---- input -----------------------------------------------------------------------------
 
     @Override
-    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
-        if (renaming >= 0) {
-            commitRename();
+    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        // An open context menu takes the click first, wherever it lands; then the properties dialog.
+        if (context.isOpen()) {
+            context.mouseClicked(mouseX, mouseY, button);
+            return;
         }
-        if (volRenaming >= 0) {
-            commitVolumeRename();
+        if (properties.isOpen()) {
+            properties.mouseClicked(mouseX, mouseY, button);
+            return;
         }
-        final int contentX = window.x() + 4;
-        final int contentY = window.y() + 18;
-        final int width = contentW;
-        final int height = contentH;
-        final double lx = mouseX - contentX;
-        final double ly = mouseY - contentY;
-        searchFocused = false;
+        clickX = mouseX;
+        clickY = mouseY;
+        if (!root.mouseClicked(mouseX, mouseY, button) && iconView && inListWell(mouseX, mouseY)) {
+            // The icon view reports no click past its last tile; the rest of the well is the list's empty space.
+            rowClicked(-1, button, mouseX, mouseY);
+        }
+    }
 
-        // An open context menu intercepts this click first.
-        if (contextOpen) {
-            final int item = contextItemAt(lx, ly);
-            contextOpen = false;
-            if (item >= 0 && ctxItems.get(item).enabled() && !ctxItems.get(item).label().equals("-")) {
-                ctxItems.get(item).action().run();
+    /** Whether the point is in the list's well: the area the rows or the tiles are shown in. */
+    private boolean inListWell(final double mx, final double my) {
+        return mx >= lastX + FilesLayout.listX() && my >= lastY + FilesLayout.listY()
+                && my < lastY + FilesLayout.statusY(contentH);
+    }
+
+    private void treeClicked(final int index, final int button, final double mx, final double my) {
+        final List<TreeItem> items = tree();
+        if (index < 0 || index >= items.size() || items.get(index).section()) {
+            return;
+        }
+        final TreeItem item = items.get(index);
+        if (button == 1) {
+            if (isVolumeItem(item)) {
+                final int volume = item.volumeIndex();
+                openContext(List.of(new ContextMenu.Item("Rename", true, () -> startVolumeRename(volume))), mx, my);
             }
             return;
         }
-        if (volContextOpen) {
-            final boolean onItem = lx >= volCtxX && lx <= volCtxX + 60
-                    && ly >= volCtxY + 1 && ly <= volCtxY + 1 + FilesLayout.CTX_ITEM_H;
-            volContextOpen = false;
-            if (onItem && volCtxIndex >= 0 && volCtxIndex < volumes.size()) {
-                startVolumeRename(volCtxIndex);
-            }
-            return;
+        if (item.removable() && mx >= treeList.right() - 11) {
+            eject(item.target());
+        } else {
+            go(item.target());
         }
-        // The properties panel swallows clicks; its Close button dismisses it.
-        if (propsRow != null) {
-            if (ly >= FilesLayout.listY()) {
-                propsRow = null;
-            }
-            return;
-        }
+    }
 
-        // ---- toolbar
-        if (ly < FilesLayout.TOOL_H) {
-            final Font font = net.minecraft.client.Minecraft.getInstance().font;
-            if (inRect(lx, ly, FilesLayout.navX(0), FilesLayout.navY(), FilesLayout.NAV_W, FilesLayout.NAV_H)) {
-                goBack();
-            } else if (inRect(lx, ly, FilesLayout.navX(1), FilesLayout.navY(), FilesLayout.NAV_W, FilesLayout.NAV_H)) {
-                goForward();
-            } else if (inRect(lx, ly, FilesLayout.navX(2), FilesLayout.navY(), FilesLayout.NAV_W, FilesLayout.NAV_H)) {
-                goUp();
-            } else if (inRect(lx, ly, FilesLayout.viewX(width), FilesLayout.navY(), FilesLayout.NAV_W, FilesLayout.NAV_H)) {
-                iconView = !iconView;
-                scroll = 0;
-            } else if (inRect(lx, ly, FilesLayout.searchX(width), FilesLayout.navY(), FilesLayout.SEARCH_W, FilesLayout.NAV_H)) {
-                searchFocused = true;
-            } else if (inRect(lx, ly, FilesLayout.addressX(), FilesLayout.navY(), FilesLayout.addressW(width), FilesLayout.NAV_H)) {
-                final String target = crumbAt(font, contentX + FilesLayout.addressX(), mouseX);
-                if (target != null) {
-                    go(target);
-                }
-            }
-            return;
-        }
-
-        // ---- the drive tree
-        if (lx < FilesLayout.TREE_W && ly >= FilesLayout.treeY()) {
-            final int idx = (int) Math.floor((ly - FilesLayout.treeY() - 2) / (double) FilesLayout.ROW_H);
-            final List<TreeItem> items = tree();
-            if (idx >= 0 && idx < items.size() && !items.get(idx).section()) {
-                final TreeItem item = items.get(idx);
-                if (button == 1 && isVolumeItem(item)) {
-                    volCtxIndex = item.volumeIndex();
-                    volCtxX = (int) lx;
-                    volCtxY = (int) ly;
-                    volContextOpen = true;
-                } else if (button != 1) {
-                    if (item.removable() && lx >= FilesLayout.TREE_W - 11) {
-                        eject(item.target());
-                    } else {
-                        go(item.target());
-                    }
-                }
-            }
-            return;
-        }
-
-        // ---- the column header sorts
-        if (ly >= FilesLayout.colsY() && ly < FilesLayout.listY() && lx >= FilesLayout.listX()) {
-            final SortBy by = lx >= FilesLayout.sizeColX(width) ? SortBy.SIZE
-                    : (lx >= FilesLayout.typeColX(width) ? SortBy.TYPE : SortBy.NAME);
-            if (sortBy == by) {
-                sortAscending = !sortAscending;
-            } else {
-                sortBy = by;
-                sortAscending = true;
-            }
-            applyFilterAndSort();
-            return;
-        }
-
-        final int index = rowIndexAt(window, mouseX, mouseY);
-        final boolean onRow = index >= 0;
-
+    /** A click on row {@code index} of the list or the icon view, or on their empty space (-1). */
+    private void rowClicked(final int index, final int button, final double mx, final double my) {
+        final boolean onRow = index >= 0 && index < rows.size();
         if (button == 1) {
             // Right-click: select the row under the cursor and open the context menu there. A sweep
             // survives only when the menu is opened on one of the rows it selected.
@@ -1002,24 +1016,20 @@ public final class FilesApp implements DesktopApp {
             }
             selected = onRow ? index : -1;
             ctxRow = onRow ? index : -1;
-            ctxItems = buildContext(onRow ? rows.get(index) : null);
-            ctxX = (int) Math.min(lx, width - FilesLayout.CTX_W - 1);
-            ctxY = (int) Math.min(ly, height - ctxItems.size() * FilesLayout.CTX_ITEM_H - 3);
-            contextOpen = true;
+            openContext(buildContext(onRow ? rows.get(index) : null), mx, my);
             return;
         }
-
         if (!onRow) {
             selected = -1;
             bandRows.clear();
-            // Pressing empty space in the list starts a sweep. The coordinates are the window's own,
-            // the same ones the row hit test uses, so the band lines up with what it selects.
-            if (lx >= FilesLayout.listX() && ly >= FilesLayout.listY() && ly < FilesLayout.statusY(height)) {
+            // Pressing empty space in the list starts a sweep, in the coordinates the row hit test uses,
+            // so the band lines up with what it selects.
+            if (!iconView) {
                 bandActive = true;
-                bandStartX = mouseX;
-                bandStartY = mouseY;
-                bandX = mouseX;
-                bandY = mouseY;
+                bandStartX = mx;
+                bandStartY = my;
+                bandX = mx;
+                bandY = my;
             }
             return;
         }
@@ -1034,77 +1044,48 @@ public final class FilesApp implements DesktopApp {
         dragRow = (r.kind() == Kind.FILE || r.kind() == Kind.DIR) ? index : -1;
         dragging = false;
         if (doubleClick) {
-            open(rows.get(index));
+            open(r);
         }
     }
 
-    /** Maps a desktop position to a row index in the file list, or {@code -1} (tree, header, below the rows). */
-    private int rowIndexAt(final DesktopWindow window, final double mouseX, final double mouseY) {
-        final int lx = window.x() + 4 + FilesLayout.listX();
-        if (mouseX < lx) {
-            return -1;
-        }
-        final int listY = window.y() + 18 + FilesLayout.listY();
-        if (mouseY < listY) {
-            return -1;
-        }
-        if (iconView) {
-            final int lw = contentW - FilesLayout.listX();
-            final int cols = Math.max(1, (lw - 4) / 52);
-            final int col = (int) ((mouseX - (lx + 2)) / 52);
-            final int rowN = (int) ((mouseY - (listY + 2)) / 30);
-            if (col < 0 || col >= cols || rowN < 0) {
-                return -1;
-            }
-            final int idx = scroll + rowN * cols + col;
-            return idx >= 0 && idx < rows.size() ? idx : -1;
-        }
-        final int idx = scroll + (int) Math.floor((mouseY - (listY + 1)) / (double) FilesLayout.ROW_H);
-        return idx >= 0 && idx < rows.size() ? idx : -1;
-    }
-
-    private int contextItemAt(final double lx, final double ly) {
-        if (lx < ctxX || lx > ctxX + FilesLayout.CTX_W) {
-            return -1;
-        }
-        final int rel = (int) Math.floor((ly - (ctxY + 1)) / (double) FilesLayout.CTX_ITEM_H);
-        return rel >= 0 && rel < ctxItems.size() ? rel : -1;
+    private void openContext(final List<ContextMenu.Item> items, final double mx, final double my) {
+        context.open(items, (int) mx, (int) my, lastX, lastY, contentW, contentH);
     }
 
     /** The context menu for {@code target} (a row, or {@code null} for empty space), greyed where the volume forbids. */
-    private List<MenuItem> buildContext(@org.jetbrains.annotations.Nullable final Row target) {
+    private List<ContextMenu.Item> buildContext(@Nullable final Row target) {
         final boolean ro = readOnlyVolume();
-        final List<MenuItem> items = new ArrayList<>();
+        final List<ContextMenu.Item> items = new ArrayList<>();
         if (target != null && target.file() != null) {
             final boolean dat = target.file().projectsItem();
             final boolean setup = isSetup(target);
             final boolean editable = target.kind() == Kind.FILE && !dat && !setup && isText(target.file());
-            items.add(new MenuItem(setup ? "Run" : "Open", true, () -> open(target)));
+            items.add(new ContextMenu.Item(setup ? "Run" : "Open", true, () -> open(target)));
             if (target.kind() == Kind.FILE) {
-                items.add(new MenuItem("Open with Editor", editable, () -> openInEditor(target)));
+                items.add(new ContextMenu.Item("Open with Editor", editable, () -> openInEditor(target)));
             }
-            items.add(MenuItem.separator());
-            items.add(new MenuItem("Cut", !ro && !target.file().readOnly(), () -> cut(target)));
-            items.add(new MenuItem("Copy", !target.file().readOnly(), () -> copy(target)));
-            items.add(new MenuItem("Paste", !clipboard.isEmpty() && !ro, this::paste));
-            items.add(MenuItem.separator());
-            items.add(new MenuItem("Rename", !ro && !target.file().readOnly(), () -> startRenameAt(rows.indexOf(target))));
-            items.add(new MenuItem("Delete", !ro && !target.file().readOnly(), this::deleteContextRow));
-            items.add(MenuItem.separator());
-            items.add(new MenuItem("Properties", true, () -> propsRow = target));
+            items.add(ContextMenu.Item.separator());
+            items.add(new ContextMenu.Item("Cut", !ro && !target.file().readOnly(), () -> cut(target)));
+            items.add(new ContextMenu.Item("Copy", !target.file().readOnly(), () -> copy(target)));
+            items.add(new ContextMenu.Item("Paste", !clipboard.isEmpty() && !ro, this::paste));
+            items.add(ContextMenu.Item.separator());
+            items.add(new ContextMenu.Item("Rename", !ro && !target.file().readOnly(), () -> startRenameAt(rows.indexOf(target))));
+            items.add(new ContextMenu.Item("Delete", !ro && !target.file().readOnly(), this::deleteContextRow));
+            items.add(ContextMenu.Item.separator());
+            items.add(new ContextMenu.Item("Properties", true, () -> openProperties(target)));
         } else if (target != null) {
-            items.add(new MenuItem("Open", true, () -> open(target)));
-            items.add(MenuItem.separator());
+            items.add(new ContextMenu.Item("Open", true, () -> open(target)));
+            items.add(ContextMenu.Item.separator());
         } else {
-            items.add(new MenuItem("Paste", !clipboard.isEmpty() && !ro, this::paste));
-            items.add(new MenuItem("New File", !ro, this::newFile));
-            items.add(new MenuItem("New Folder", !ro, this::newFolder));
-            items.add(MenuItem.separator());
+            items.add(new ContextMenu.Item("Paste", !clipboard.isEmpty() && !ro, this::paste));
+            items.add(new ContextMenu.Item("New File", !ro, this::newFile));
+            items.add(new ContextMenu.Item("New Folder", !ro, this::newFolder));
+            items.add(ContextMenu.Item.separator());
             if (onMedia()) {
-                items.add(new MenuItem("Eject", true, () -> eject("media:" + mediaReaderPos())));
+                items.add(new ContextMenu.Item("Eject", true, () -> eject("media:" + mediaReaderPos())));
             }
         }
-        items.add(new MenuItem("Refresh", true, () -> request(dir)));
+        items.add(new ContextMenu.Item("Refresh", true, () -> request(dir)));
         return items;
     }
 
@@ -1117,16 +1098,25 @@ public final class FilesApp implements DesktopApp {
 
     private boolean isSetup(final Row r) {
         return r.kind() == Kind.FILE && r.file() != null && r.file().path().startsWith("media:")
-                && dev.jstech.computronics.os.fs.InstallerLayout.isSetup(r.file().path());
+                && InstallerLayout.isSetup(r.file().path());
     }
 
     @Override
-    public void mouseDragged(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
+    public void mouseDragged(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        if (context.isOpen()) {
+            return;
+        }
+        if (properties.isOpen()) {
+            properties.mouseDragged(mouseX, mouseY, button);
+            return;
+        }
+        if (root.mouseDragged(mouseX, mouseY, button)) {
+            return;
+        }
         if (bandActive) {
             bandX = mouseX;
             bandY = mouseY;
-            updateBandSelection(window);
+            updateBandSelection();
             return;
         }
         if (renaming >= 0 || dragRow < 0) {
@@ -1137,26 +1127,26 @@ public final class FilesApp implements DesktopApp {
         dragMy = mouseY;
     }
 
-    /** The band's rectangle in desktop coordinates: {x, y, w, h}. */
+    /** The band's rectangle: {x, y, w, h}. */
     private int[] bandRect() {
         final int bx = (int) Math.min(bandStartX, bandX);
         final int by = (int) Math.min(bandStartY, bandY);
-        return new int[]{bx, by, (int) Math.abs(bandX - bandStartX), (int) Math.abs(bandY - bandStartY)};
+        return new int[] {bx, by, (int) Math.abs(bandX - bandStartX), (int) Math.abs(bandY - bandStartY)};
     }
 
     /** Selects every visible row the band's vertical span crosses. */
-    private void updateBandSelection(final DesktopWindow window) {
+    private void updateBandSelection() {
         bandRows.clear();
         if (iconView) {
             return;
         }
-        final int listY = window.y() + 18 + FilesLayout.listY() + 1;
         final int[] r = bandRect();
         // Only rows actually on screen are candidates. Sweeping past the bottom of the list must not
         // reach rows scrolled out of view: they would be deleted without ever having looked selected.
-        final int last = Math.min(rows.size(), scroll + visibleRows);
-        for (int i = scroll; i < last; i++) {
-            final int rowTop = listY + (i - scroll) * FilesLayout.ROW_H;
+        final int first = fileList.scroll();
+        final int last = Math.min(rows.size(), first + fileList.visibleRows());
+        for (int i = first; i < last; i++) {
+            final int rowTop = fileList.rowRect(i)[1];
             if (rowTop >= r[1] + r[3]) {
                 break; // past the band; the rows below cannot intersect it either
             }
@@ -1167,8 +1157,12 @@ public final class FilesApp implements DesktopApp {
     }
 
     @Override
-    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY,
-                              final int button) {
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        if (properties.isOpen()) {
+            properties.mouseReleased(mouseX, mouseY, button);
+            return;
+        }
+        root.mouseReleased(mouseX, mouseY, button);
         if (bandActive) {
             // Letting go ends the sweep; what it crossed stays selected.
             bandActive = false;
@@ -1177,8 +1171,8 @@ public final class FilesApp implements DesktopApp {
         if (dragging && dragRow >= 0 && dragRow < rows.size()) {
             final Row src = rows.get(dragRow);
             // Where did the drag land: a removable-drive destination (left tree or a media row), or a folder?
-            final String mediaDest = mediaDropTarget(window, mouseX, mouseY);
-            final String destDir = folderDropTarget(window, mouseX, mouseY);
+            final String mediaDest = mediaDropTarget(mouseX, mouseY);
+            final String destDir = folderDropTarget(mouseX, mouseY);
 
             final boolean srcIsDat = src.file() != null && src.file().projectsItem();
             if (srcIsDat) {
@@ -1186,8 +1180,7 @@ public final class FilesApp implements DesktopApp {
                     // The one sanctioned .dat action: drop onto a removable medium fires a conservative item
                     // transfer (the stored item leaves the computer and appears on the medium), not a file move.
                     if (monitorPos != null) {
-                        PacketDistributor.sendToServer(new dev.jstech.computronics.operation
-                                .payload.MediumTransferPayload(host, monitorPos, src.file().path(), mediaDest));
+                        PacketDistributor.sendToServer(new MediumTransferPayload(host, monitorPos, src.file().path(), mediaDest));
                         request(dir);
                     }
                 } else if (destDir != null) {
@@ -1214,16 +1207,15 @@ public final class FilesApp implements DesktopApp {
      * file list targets the folder currently open. A media volume is excluded here: a desktop file cannot be
      * dropped onto a removable drive through this path (that is the sanctioned medium-transfer flow only).
      */
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     public String crossWindowDropDir(final DesktopWindow window, final double mouseX, final double mouseY) {
-        final double lx = mouseX - (window.x() + 4);
-        if (lx < FilesLayout.listX()) {
+        if (mouseX < lastX + FilesLayout.listX()) {
             return null;
         }
         if (dir.startsWith("media:")) {
             return null;
         }
-        final int row = rowIndexAt(window, mouseX, mouseY);
+        final int row = rowIndexAt(mouseX, mouseY);
         if (row >= 0 && row < rows.size()) {
             final Row t = rows.get(row);
             if (t.kind() == Kind.DIR && t.file() != null && !t.file().path().startsWith("media:")) {
@@ -1236,23 +1228,36 @@ public final class FilesApp implements DesktopApp {
         return dir;
     }
 
+    /** The row of the list or the tile of the icon view under the point, whichever is shown, or -1. */
+    private int rowIndexAt(final double mx, final double my) {
+        return iconView ? iconGrid.cellAt(mx, my) : fileList.rowAt(mx, my);
+    }
+
+    /** The folder row (or the up row) under the point that a dragged row could drop into, or -1. */
+    private int folderRowAt(final double mx, final double my) {
+        final int index = rowIndexAt(mx, my);
+        if (index < 0 || index == dragRow) {
+            return -1;
+        }
+        final Kind k = rows.get(index).kind();
+        return k == Kind.DIR || k == Kind.UP ? index : -1;
+    }
+
     /**
      * The removable-medium volume key under the drop point, or {@code null}. A medium is a target either as a
      * drive row in the file list ({@code media:} path) or as a row in the left drive tree.
      */
-    @org.jetbrains.annotations.Nullable
-    private String mediaDropTarget(final DesktopWindow window, final double mouseX, final double mouseY) {
-        final double lx = mouseX - (window.x() + 4);
-        final double ly = mouseY - (window.y() + 18);
-        if (lx < FilesLayout.TREE_W && ly >= FilesLayout.treeY()) {
-            final int idx = (int) Math.floor((ly - FilesLayout.treeY() - 2) / (double) FilesLayout.ROW_H);
+    @Nullable
+    private String mediaDropTarget(final double mouseX, final double mouseY) {
+        if (treeList.contains(mouseX, mouseY)) {
+            final int index = treeList.rowAt(mouseX, mouseY);
             final List<TreeItem> items = tree();
-            if (idx >= 0 && idx < items.size() && items.get(idx).removable()) {
-                return items.get(idx).target();
+            if (index >= 0 && index < items.size() && items.get(index).removable()) {
+                return items.get(index).target();
             }
             return null;
         }
-        final int row = rowIndexAt(window, mouseX, mouseY);
+        final int row = rowIndexAt(mouseX, mouseY);
         if (row >= 0 && row != dragRow) {
             final Row t = rows.get(row);
             if (t.kind() == Kind.DIR && t.file() != null && t.file().path().startsWith("media:")) {
@@ -1263,10 +1268,10 @@ public final class FilesApp implements DesktopApp {
     }
 
     /** The real folder directory under the drop point, or {@code null} (used for ordinary file/folder moves). */
-    @org.jetbrains.annotations.Nullable
-    private String folderDropTarget(final DesktopWindow window, final double mouseX, final double mouseY) {
-        final int target = rowIndexAt(window, mouseX, mouseY);
-        if (target < 0 || target == dragRow) {
+    @Nullable
+    private String folderDropTarget(final double mouseX, final double mouseY) {
+        final int target = folderRowAt(mouseX, mouseY);
+        if (target < 0) {
             return null;
         }
         final Row t = rows.get(target);
@@ -1281,7 +1286,19 @@ public final class FilesApp implements DesktopApp {
 
     @Override
     public boolean mouseScrolled(final double delta) {
-        scroll -= (int) Math.signum(delta) * (iconView ? Math.max(1, visibleRows / 3) : 1);
+        if (properties.isOpen()) {
+            return true;
+        }
+        if (root.mouseScrolled(lastMouseX, lastMouseY, delta)) {
+            return true;
+        }
+        // The wheel anywhere else in the window moves the listing.
+        final int step = delta > 0 ? -1 : 1;
+        if (iconView) {
+            iconGrid.scrollBy(step);
+        } else {
+            fileList.setScroll(fileList.scroll() + step);
+        }
         return true;
     }
 
@@ -1404,40 +1421,40 @@ public final class FilesApp implements DesktopApp {
             return;
         }
         renaming = index;
-        renameBuf.setLength(0);
+        renamePath = r.file().path();
+        String stem = r.name();
+        renameExt = "";
         if (r.kind() == Kind.FILE) {
             // Edit only the name, keeping the extension fixed (Windows-style rename).
-            final String full = r.name();
-            final int dot = full.lastIndexOf('.');
+            final int dot = stem.lastIndexOf('.');
             if (dot > 0) {
-                renameBuf.append(full, 0, dot);
-                renameExt = full.substring(dot);
-            } else {
-                renameBuf.append(full);
-                renameExt = "";
+                renameExt = stem.substring(dot);
+                stem = stem.substring(0, dot);
             }
-        } else {
-            renameBuf.append(r.name());
-            renameExt = "";
+        }
+        renameField.set(stem);
+        root.focus(renameField);
+    }
+
+    /** The rename field committing: the new name, without the extension it kept. */
+    private void commitRename(final String stem) {
+        final String oldPath = renamePath;
+        if (oldPath == null || stem.trim().isEmpty()) {
+            return;
+        }
+        final int slash = oldPath.lastIndexOf('/');
+        final String prefix = slash >= 0 ? oldPath.substring(0, slash + 1) : "";
+        final String newPath = prefix + stem.trim() + renameExt;
+        if (!newPath.equals(oldPath)) {
+            PacketDistributor.sendToServer(new RenameFilePayload(host, oldPath, newPath));
+            request(dir);
         }
     }
 
-    private void commitRename() {
-        if (renaming >= 0 && renaming < rows.size()) {
-            final Row r = rows.get(renaming);
-            if (r.file() != null) {
-                final String oldPath = r.file().path();
-                final String newName = renameBuf.toString().trim() + renameExt;
-                final int slash = oldPath.lastIndexOf('/');
-                final String prefix = slash >= 0 ? oldPath.substring(0, slash + 1) : "";
-                final String newPath = prefix + newName;
-                if (!renameBuf.toString().trim().isEmpty() && !newPath.equals(oldPath)) {
-                    PacketDistributor.sendToServer(new RenameFilePayload(host, oldPath, newPath));
-                    request(dir);
-                }
-            }
-        }
+    private void endRename() {
         renaming = -1;
+        renamePath = null;
+        renameField.setVisible(false);
     }
 
     private void deleteContextRow() {
@@ -1504,142 +1521,87 @@ public final class FilesApp implements DesktopApp {
         request(dir);
     }
 
-    private void startVolumeRename(final int idx) {
-        volRenaming = idx;
-        volRenameBuf.setLength(0);
-        volRenameBuf.append(volumes.get(idx).label());
-    }
-
-    private void commitVolumeRename() {
-        if (volRenaming >= 0 && volRenaming < volumes.size()) {
-            PacketDistributor.sendToServer(new dev.jstech.computronics.operation.payload
-                    .RenameVolumePayload(host, volumes.get(volRenaming).key(), volRenameBuf.toString().trim()));
-            volRenaming = -1;
-            request(dir);
+    private void startVolumeRename(final int index) {
+        if (index < 0 || index >= volumes.size()) {
             return;
         }
+        volRenaming = index;
+        volumeField.set(volumes.get(index).label());
+        root.focus(volumeField);
+    }
+
+    private void commitVolumeRename(final String label) {
+        if (volRenaming >= 0 && volRenaming < volumes.size()) {
+            PacketDistributor.sendToServer(new RenameVolumePayload(host, volumes.get(volRenaming).key(), label.trim()));
+            request(dir);
+        }
+    }
+
+    private void endVolumeRename() {
         volRenaming = -1;
+        volumeField.setVisible(false);
     }
 
     // ---- keyboard --------------------------------------------------------------------------
 
     @Override
     public boolean charTyped(final char c) {
-        if (volRenaming >= 0 && c >= 32 && c != 127 && c != '/' && c != '\\' && volRenameBuf.length() < 32) {
-            volRenameBuf.append(c);
-            return true;
+        if (properties.isOpen()) {
+            return properties.charTyped(c);
         }
-        if (renaming >= 0 && c >= 32 && c != 127 && c != '/' && c != '\\' && renameBuf.length() < 64) {
-            renameBuf.append(c);
-            return true;
-        }
-        if (searchFocused && c >= 32 && c != 127 && search.length() < 40) {
-            search.append(c);
-            applyFilterAndSort();
-            return true;
-        }
-        return false;
+        return root.charTyped(c);
     }
 
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
-        if (volRenaming >= 0) {
-            switch (key) {
-                case 257, 335 -> commitVolumeRename(); // Enter
-                case 256 -> volRenaming = -1;          // Escape cancels
-                case 259 -> {                          // Backspace
-                    if (volRenameBuf.length() > 0) {
-                        volRenameBuf.deleteCharAt(volRenameBuf.length() - 1);
-                    }
-                }
-                default -> {
-                    return false;
-                }
-            }
-            return true;
+        if (context.isOpen()) {
+            return context.keyPressed(key, scanCode, modifiers);
         }
-        if (renaming >= 0) {
-            switch (key) {
-                case 257, 335 -> commitRename();
-                case 256 -> renaming = -1;
-                case 259 -> {
-                    if (renameBuf.length() > 0) {
-                        renameBuf.deleteCharAt(renameBuf.length() - 1);
-                    }
-                }
-                default -> {
-                    return false;
-                }
-            }
-            return true;
+        if (properties.isOpen()) {
+            return properties.keyPressed(key, scanCode, modifiers);
         }
-        if (searchFocused) {
-            switch (key) {
-                case 256 -> {                          // Escape clears the search
-                    search.setLength(0);
-                    searchFocused = false;
-                    applyFilterAndSort();
-                }
-                case 259 -> {
-                    if (search.length() > 0) {
-                        search.deleteCharAt(search.length() - 1);
-                        applyFilterAndSort();
-                    }
-                }
-                case 257, 335 -> searchFocused = false;
-                default -> {
-                    return false;
-                }
-            }
-            return true;
+        if (root.keyPressed(key, scanCode, modifiers)) {
+            return true; // a field being typed in
         }
-        if (contextOpen || propsRow != null) {
-            if (key == 256) {
-                contextOpen = false;
-                propsRow = null;
-                return true;
-            }
-            return false;
-        }
-        final boolean ctrl = (modifiers & 2) != 0;
+        final boolean ctrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
         switch (key) {
-            case 259 -> goUp();                                   // Backspace
-            case 257, 335 -> {                                    // Enter opens the selection
+            case GLFW.GLFW_KEY_BACKSPACE -> goUp();
+            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
                 if (selected >= 0 && selected < rows.size()) {
                     open(rows.get(selected));
                 }
             }
-            case 265 -> moveSelection(-1);                        // Up
-            case 264 -> moveSelection(1);                         // Down
-            case 261 -> {                                         // Delete
+            case GLFW.GLFW_KEY_UP -> moveSelection(-1);
+            case GLFW.GLFW_KEY_DOWN -> moveSelection(1);
+            case GLFW.GLFW_KEY_DELETE -> {
                 if (selected >= 0) {
                     ctxRow = selected;
                     deleteContextRow();
                 }
             }
-            case 291 -> startRenameAt(selected);                  // F2
-            case 67 -> {                                          // Ctrl+C
+            case GLFW.GLFW_KEY_F2 -> startRenameAt(selected);
+            case GLFW.GLFW_KEY_C -> {
                 if (ctrl && selected >= 0 && selected < rows.size()) {
                     copy(rows.get(selected));
                 } else {
                     return false;
                 }
             }
-            case 88 -> {                                          // Ctrl+X
+            case GLFW.GLFW_KEY_X -> {
                 if (ctrl && selected >= 0 && selected < rows.size() && !readOnlyVolume()) {
                     cut(rows.get(selected));
                 } else {
                     return false;
                 }
             }
-            case 86 -> {                                          // Ctrl+V
+            case GLFW.GLFW_KEY_V -> {
                 if (ctrl) {
                     paste();
                 } else {
                     return false;
                 }
             }
-            case 65 -> {                                          // Ctrl+A
+            case GLFW.GLFW_KEY_A -> {
                 if (ctrl) {
                     bandRows.clear();
                     for (int i = 0; i < rows.size(); i++) {
@@ -1664,20 +1626,19 @@ public final class FilesApp implements DesktopApp {
         }
         selected = Math.max(0, Math.min(rows.size() - 1, selected + delta));
         bandRows.clear();
-        if (selected < scroll) {
-            scroll = selected;
-        } else if (selected >= scroll + visibleRows) {
-            scroll = selected - visibleRows + 1;
+        if (iconView) {
+            final int row = selected / iconGrid.columns();
+            if (row < iconGrid.scroll()) {
+                iconGrid.setScroll(row);
+            } else if (row >= iconGrid.scroll() + iconGrid.visibleRows()) {
+                iconGrid.setScroll(row - iconGrid.visibleRows() + 1);
+            }
+            return;
         }
-    }
-
-    private void clampScroll(final int visible) {
-        final int max = Math.max(0, rows.size() - visible);
-        if (scroll > max) {
-            scroll = max;
-        }
-        if (scroll < 0) {
-            scroll = 0;
+        if (selected < fileList.scroll()) {
+            fileList.setScroll(selected);
+        } else if (selected >= fileList.scroll() + fileList.visibleRows()) {
+            fileList.setScroll(selected - fileList.visibleRows() + 1);
         }
     }
 
@@ -1726,7 +1687,7 @@ public final class FilesApp implements DesktopApp {
             case UP -> {
                 g.fill(x, y + 1, x + w, y + 9, 0xFFA8A8A8);
                 g.fill(x, y + 1, x + w, y + 2, 0xFFD8D8D8);
-                OsSkin.outline(g, x, y + 1, w, 8, 0xFF707070);
+                Draw.outline(g, x, y + 1, w, 8, 0xFF707070);
                 g.fill(x + 5, y + 3, x + 7, y + 8, 0xFF303030);
                 g.fill(x + 3, y + 4, x + 9, y + 5, 0xFF303030);
             }
@@ -1734,7 +1695,7 @@ public final class FilesApp implements DesktopApp {
                 g.fill(x, y + 2, x + 5, y, 0xFFFFE9A8);
                 g.fill(x, y + 2, x + w, y + 9, 0xFFF4C842);
                 g.fill(x, y + 2, x + w, y + 3, 0xFFFFF3C4);
-                OsSkin.outline(g, x, y, w, 9, 0xFF9A7B16);
+                Draw.outline(g, x, y, w, 9, 0xFF9A7B16);
             }
             case HOME -> {
                 // A disk drive: a slab with an activity lamp.
@@ -1747,7 +1708,7 @@ public final class FilesApp implements DesktopApp {
                 // A removable medium or an opaque installer file: a dark cartridge.
                 g.fill(x + 1, y, x + w - 1, y + 9, 0xFF2E3238);
                 g.fill(x + 3, y + 2, x + w - 3, y + 4, 0xFFB8BEC8);
-                OsSkin.outline(g, x + 1, y, w - 2, 9, 0xFF1C1F24);
+                Draw.outline(g, x + 1, y, w - 2, 9, 0xFF1C1F24);
             }
             case IQL -> doc(g, x, y, 0xFFA9D4FF, 0xFF3A72B0);
             case DAT -> doc(g, x, y, 0xFFBDEEC0, 0xFF4F9B53);
@@ -1769,19 +1730,7 @@ public final class FilesApp implements DesktopApp {
         final int w = FilesLayout.ICON_W;
         g.fill(x + 1, y, x + w, y + 9, fill);
         g.fill(x + w - 3, y, x + w, y + 3, 0xFFFFFFFF);
-        OsSkin.outline(g, x + 1, y, w - 1, 9, edge);
-    }
-
-    private static boolean inRect(final double mx, final double my, final int x, final int y, final int w, final int h) {
-        return mx >= x && mx < x + w && my >= y && my < y + h;
-    }
-
-    private static String trim(final Font font, final String s, final int maxW) {
-        String out = s;
-        while (out.length() > 2 && font.width(out) > maxW) {
-            out = out.substring(0, out.length() - 1);
-        }
-        return out;
+        Draw.outline(g, x + 1, y, w - 1, 9, edge);
     }
 
     /** A Windows-style address for the path: {@code C:\dir\} on the disk, the drive's label on media. */

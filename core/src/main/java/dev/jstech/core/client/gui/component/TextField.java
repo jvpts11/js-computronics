@@ -25,10 +25,15 @@ public class TextField extends UiComponent {
 
     private final TextEditState state;
     private Supplier<String> placeholder = () -> "";
+    private Supplier<String> suffix = () -> "";
     @Nullable
     private Consumer<String> onCommit;
     @Nullable
     private Runnable onEdit;
+    @Nullable
+    private Runnable onEscape;
+    @Nullable
+    private Runnable onBlur;
     private boolean revertOnEscape = true;
 
     public TextField(final int maxLength) {
@@ -40,6 +45,12 @@ public class TextField extends UiComponent {
         if (!isFocused()) {
             state.sync(value);
         }
+        return this;
+    }
+
+    /** Puts a value in the field whatever its state, as the start of an edit does. */
+    public TextField set(final String value) {
+        state.sync(value);
         return this;
     }
 
@@ -81,6 +92,29 @@ public class TextField extends UiComponent {
         return this;
     }
 
+    /** Text shown after the caret that is not edited: the extension of a file being renamed. */
+    public TextField setSuffix(final Supplier<String> value) {
+        suffix = value;
+        return this;
+    }
+
+    /** Fires when Escape is pressed in the field, before the keyboard leaves it. */
+    public TextField setOnEscape(final Runnable action) {
+        onEscape = action;
+        return this;
+    }
+
+    /** Fires whenever the keyboard leaves the field, after any commit. */
+    public TextField setOnBlur(final Runnable action) {
+        onBlur = action;
+        return this;
+    }
+
+    /** Whether a character may be typed; a file name refuses path separators. */
+    protected boolean accepts(final char c) {
+        return c >= 32 && c != 127;
+    }
+
     @Override
     public boolean focusable() {
         return true;
@@ -94,7 +128,8 @@ public class TextField extends UiComponent {
         final String text;
         int color = ctx.skin().text();
         if (focused) {
-            text = Texts.tail(ctx.font(), shown, width() - 8) + "_";
+            final String tail = suffix.get();
+            text = Texts.tail(ctx.font(), shown, width() - 8 - ctx.font().width(tail)) + "_" + tail;
         } else if (shown.isEmpty()) {
             text = Texts.clip(ctx.font(), placeholder.get(), width() - 6);
             color = ctx.skin().dim();
@@ -114,7 +149,7 @@ public class TextField extends UiComponent {
         if (!isFocused()) {
             return false;
         }
-        if (c >= 32 && c != 127) {
+        if (accepts(c)) {
             state.type(c);
             edited();
         }
@@ -137,6 +172,9 @@ public class TextField extends UiComponent {
                     state.revert();
                     edited();
                 }
+                if (onEscape != null) {
+                    onEscape.run();
+                }
                 blur();
             }
             default -> {
@@ -153,6 +191,9 @@ public class TextField extends UiComponent {
             if (onCommit != null) {
                 onCommit.accept(state.value());
             }
+        }
+        if (onBlur != null) {
+            onBlur.run();
         }
     }
 

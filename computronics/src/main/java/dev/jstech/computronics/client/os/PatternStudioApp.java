@@ -191,12 +191,12 @@ public final class PatternStudioApp implements InventoryBandApp {
 
         inGrid = root.add(new CellGrid(PROC_COLS, PROC_ROWS, PatternWorkbench.PROC_GRID / PROC_COLS, CELL)
                 .setCues(CellGrid.Cues.RIGHT)
-                .setRenderer((g, ctx, index, cx, cy, size, hovered) -> renderProcCell(g, ctx, false, index, cx, cy))
+                .setRenderer((g, ctx, index, cx, cy, w, h, hovered) -> renderProcCell(g, ctx, false, index, cx, cy))
                 .setMarked(index -> procCellMarked(false, index))
                 .setOnClick((index, button, shift) -> procCellClicked(false, index, button, shift)));
         outGrid = root.add(new CellGrid(PROC_COLS, PROC_ROWS, PatternWorkbench.PROC_GRID / PROC_COLS, CELL)
                 .setCues(CellGrid.Cues.LEFT)
-                .setRenderer((g, ctx, index, cx, cy, size, hovered) -> renderProcCell(g, ctx, true, index, cx, cy))
+                .setRenderer((g, ctx, index, cx, cy, w, h, hovered) -> renderProcCell(g, ctx, true, index, cx, cy))
                 .setMarked(index -> procCellMarked(true, index))
                 .setOnClick((index, button, shift) -> procCellClicked(true, index, button, shift)));
         machineButton = root.add(new Button(this::machineButtonLabel, this::openMachinePicker));
@@ -530,7 +530,7 @@ public final class PatternStudioApp implements InventoryBandApp {
     }
 
     private void renderBenchCell(final GuiGraphics g, final UiContext ctx, final int index, final int cx, final int cy,
-                                 final int size, final boolean hovered) {
+                                 final int w, final int h, final boolean hovered) {
         if (state == null || index >= state.bench().size()) {
             return;
         }
@@ -550,7 +550,7 @@ public final class PatternStudioApp implements InventoryBandApp {
     }
 
     private void renderResultCell(final GuiGraphics g, final UiContext ctx, final int index, final int cx, final int cy,
-                                  final int size, final boolean hovered) {
+                                  final int w, final int h, final boolean hovered) {
         if (state == null) {
             return;
         }
@@ -835,9 +835,9 @@ public final class PatternStudioApp implements InventoryBandApp {
                 ctx.skin().listRowText(false), false);
     }
 
-    private void fileRowClicked(final int index, final int button) {
+    private void fileRowClicked(final int index, final int button, final double mx, final double my) {
         final List<FileRow> rows = fileRows();
-        if (button != 0 || index >= rows.size() || rows.get(index).header()) {
+        if (button != 0 || index < 0 || index >= rows.size() || rows.get(index).header()) {
             return;
         }
         final FileRow r = rows.get(index);
@@ -1035,12 +1035,12 @@ public final class PatternStudioApp implements InventoryBandApp {
         g.drawString(ctx.font(), Texts.clip(ctx.font(), c.label(), w - 6), x + 3, y + 2, ctx.skin().listRowText(current), false);
     }
 
-    private void choiceClicked(final int index, final int button) {
+    private void choiceClicked(final int index, final int button, final double mx, final double my) {
         if (button != 0) {
             return;
         }
         final List<Choice> choices = machineChoices();
-        if (index < choices.size()) {
+        if (index >= 0 && index < choices.size()) {
             send(PatternStudioEditPayload.text(host, monitorPos, PatternStudioEditPayload.PROC_SET_MACHINE, 0,
                     choices.get(index).key(), ""));
             machinePicker.close();

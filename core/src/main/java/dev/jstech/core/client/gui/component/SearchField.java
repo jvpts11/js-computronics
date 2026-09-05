@@ -27,9 +27,9 @@ public final class SearchField extends TextField {
         return edit().trim().toLowerCase(Locale.ROOT);
     }
 
-    /** Empties the field. */
+    /** Empties the field, whether or not it is being typed in. */
     public SearchField reset() {
-        sync("");
+        set("");
         return this;
     }
 }

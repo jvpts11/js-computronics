@@ -29,20 +29,21 @@ public final class ListView<T> extends UiComponent {
                     boolean selected);
     }
 
-    /** A click on a row. */
+    /** A click on a row, or on the empty space under the rows (index -1), with where it landed. */
     @FunctionalInterface
     public interface RowClick {
-        void click(int index, int button);
+        void click(int index, int button, double mx, double my);
     }
 
     private final Supplier<List<T>> items;
     private final int rowHeight;
     private final RowRenderer<T> renderer;
-    private RowClick onClick = (index, button) -> { };
+    private RowClick onClick = (index, button, mx, my) -> { };
     private boolean selectable;
     private int selected = -1;
     private int scroll;
-    private int padding;
+    private int paddingX;
+    private int paddingY;
 
     public ListView(final Supplier<List<T>> items, final int rowHeight, final RowRenderer<T> renderer) {
         this.items = items;
@@ -63,7 +64,13 @@ public final class ListView<T> extends UiComponent {
 
     /** Pixels kept empty inside the bounds, around the rows. */
     public ListView<T> setPadding(final int value) {
-        padding = Math.max(0, value);
+        return setPadding(value, value);
+    }
+
+    /** Pixels kept empty inside the bounds: {@code horizontal} at the sides, {@code vertical} above and below. */
+    public ListView<T> setPadding(final int horizontal, final int vertical) {
+        paddingX = Math.max(0, horizontal);
+        paddingY = Math.max(0, vertical);
         return this;
     }
 
@@ -95,12 +102,27 @@ public final class ListView<T> extends UiComponent {
 
     /** How many rows fit in the bounds. */
     public int visibleRows() {
-        return Math.max(1, (height() - padding * 2) / rowHeight);
+        return Math.max(1, (height() - paddingY * 2) / rowHeight);
     }
 
     /** The centre of item {@code index}'s row as laid out right now, where a test clicks it. */
     public int[] rowCenter(final int index) {
-        return new int[] {x() + width() / 2, y() + padding + (index - scroll) * rowHeight + rowHeight / 2};
+        return new int[] {x() + width() / 2, y() + paddingY + (index - scroll) * rowHeight + rowHeight / 2};
+    }
+
+    /** The rectangle of item {@code index}'s row as laid out right now: {x, y, w, h}. */
+    public int[] rowRect(final int index) {
+        return new int[] {x() + paddingX, y() + paddingY + (index - scroll) * rowHeight, width() - paddingX * 2, rowHeight};
+    }
+
+    /** The item under the point, or -1 when it is outside the bounds or below the last row. */
+    public int rowAt(final double mx, final double my) {
+        if (!contains(mx, my)) {
+            return -1;
+        }
+        final int row = (int) Math.floor((my - y() - paddingY) / (double) rowHeight);
+        final int index = scroll + row;
+        return row >= 0 && row < visibleRows() && index < items.get().size() ? index : -1;
     }
 
     private void clampScroll(final int count) {
@@ -115,14 +137,14 @@ public final class ListView<T> extends UiComponent {
             selected = -1;
         }
         final int visible = visibleRows();
-        final int rx = x() + padding;
-        final int rw = width() - padding * 2;
+        final int rx = x() + paddingX;
+        final int rw = width() - paddingX * 2;
         for (int i = 0; i < visible; i++) {
             final int index = scroll + i;
             if (index >= list.size()) {
                 break;
             }
-            final int ry = y() + padding + i * rowHeight;
+            final int ry = y() + paddingY + i * rowHeight;
             final boolean hovered = enabled() && ctx.over(rx, ry, rw, rowHeight);
             renderer.render(g, ctx, list.get(index), index, rx, ry, rw, rowHeight, hovered, index == selected);
         }
@@ -130,19 +152,11 @@ public final class ListView<T> extends UiComponent {
 
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
-        final List<T> list = items.get();
-        final int row = (int) (my - y() - padding) / rowHeight;
-        final int index = scroll + row;
-        if (row < 0 || index >= list.size()) {
-            if (selectable) {
-                selected = -1;
-            }
-            return true;
-        }
+        final int index = rowAt(mx, my);
         if (selectable) {
             selected = index;
         }
-        onClick.click(index, button);
+        onClick.click(index, button, mx, my);
         return true;
     }
 

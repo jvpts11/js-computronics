@@ -45,9 +45,9 @@ public final class FilesLayout {
     /** The context menu. */
     public static final int CTX_W = 96;
     public static final int CTX_ITEM_H = 11;
-    /** The properties panel drawn inside the list area. */
+    /** The properties dialog: a title, five rows of ten and a button row. */
     public static final int PROPS_W = 150;
-    public static final int PROPS_H = 74;
+    public static final int PROPS_H = 82;
 
     private FilesLayout() {
     }

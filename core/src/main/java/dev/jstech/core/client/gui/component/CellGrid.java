@@ -15,16 +15,17 @@ import org.jetbrains.annotations.Nullable;
 import java.util.function.IntPredicate;
 
 /**
- * A grid of square cells, the kind a recipe or an inventory is laid out in: each cell is drawn as an empty
- * well with a border, lit under the cursor, and a renderer puts the content in it. A grid taller than the
- * rows it shows scrolls by whole rows on the wheel, with cues beside it saying there is more.
+ * A grid of cells, the kind a recipe, an inventory or an icon view is laid out in: each cell is drawn as an
+ * empty well with a border (or as a plain row background, for tiles), lit under the cursor, and a renderer
+ * puts the content in it. A grid taller than the rows it shows scrolls by whole rows on the wheel, with cues
+ * beside it saying there is more.
  */
 public final class CellGrid extends UiComponent {
 
-    /** Draws the content of one cell. */
+    /** Draws the content of one cell in its rectangle. */
     @FunctionalInterface
     public interface CellRenderer {
-        void render(GuiGraphics g, UiContext ctx, int index, int x, int y, int size, boolean hovered);
+        void render(GuiGraphics g, UiContext ctx, int index, int x, int y, int w, int h, boolean hovered);
     }
 
     /** A click on a cell. */
@@ -38,27 +39,51 @@ public final class CellGrid extends UiComponent {
 
     private int columns;
     private int visibleRows;
-    private final int cell;
+    private final int cellW;
+    private final int cellH;
     private int totalRows;
     private int scroll;
     private int inset;
     private int cellCount = Integer.MAX_VALUE;
-    private CellRenderer renderer = (g, ctx, index, x, y, size, hovered) -> { };
+    private boolean wells = true;
+    private CellRenderer renderer = (g, ctx, index, x, y, w, h, hovered) -> { };
     private CellClick onClick = (index, button, shift) -> { };
     private IntPredicate marked = index -> false;
+    private IntPredicate selected = index -> false;
     private Cues cues = Cues.NONE;
 
-    /** A grid of {@code columns} by {@code visibleRows} cells of {@code cell} pixels; {@code totalRows} in all. */
+    /** A grid of {@code columns} by {@code visibleRows} square cells of {@code cell} pixels; {@code totalRows} in all. */
     public CellGrid(final int columns, final int visibleRows, final int totalRows, final int cell) {
+        this(columns, visibleRows, totalRows, cell, cell);
+    }
+
+    /** A grid of {@code columns} by {@code visibleRows} cells {@code cellW} wide and {@code cellH} tall. */
+    public CellGrid(final int columns, final int visibleRows, final int totalRows, final int cellW, final int cellH) {
         this.columns = Math.max(1, columns);
         this.visibleRows = Math.max(1, visibleRows);
         this.totalRows = Math.max(this.visibleRows, totalRows);
-        this.cell = Math.max(1, cell);
+        this.cellW = Math.max(1, cellW);
+        this.cellH = Math.max(1, cellH);
     }
 
     /** Pixels left empty at the right and bottom of every cell, so the wells sit apart like inventory slots. */
     public CellGrid setInset(final int value) {
-        inset = Math.max(0, Math.min(cell - 1, value));
+        inset = Math.max(0, Math.min(Math.min(cellW, cellH) - 1, value));
+        return this;
+    }
+
+    /**
+     * Whether cells are drawn as sunken wells with a border (an inventory) or as plain tiles that only show a
+     * background when hovered or selected (an icon view).
+     */
+    public CellGrid setWells(final boolean value) {
+        wells = value;
+        return this;
+    }
+
+    /** Which cells are drawn selected; only tiles ({@link #setWells} false) show it. */
+    public CellGrid setSelected(final IntPredicate predicate) {
+        selected = predicate;
         return this;
     }
 
@@ -120,7 +145,7 @@ public final class CellGrid extends UiComponent {
 
     /** Places the grid at ({@code x}, {@code y}); its size follows from the cells it shows. */
     public CellGrid place(final int x, final int y) {
-        setBounds(x, y, columns * cell, visibleRows * cell);
+        setBounds(x, y, columns * cellW, visibleRows * cellH);
         return this;
     }
 
@@ -128,8 +153,12 @@ public final class CellGrid extends UiComponent {
         return columns;
     }
 
-    public int cellSize() {
-        return cell;
+    public int cellWidth() {
+        return cellW;
+    }
+
+    public int cellHeight() {
+        return cellH;
     }
 
     public int scroll() {
@@ -148,13 +177,13 @@ public final class CellGrid extends UiComponent {
         if (index < 0 || row < 0 || row >= visibleRows) {
             return null;
         }
-        return new int[] {x() + (index % columns) * cell, y() + row * cell, cell - inset, cell - inset};
+        return new int[] {x() + (index % columns) * cellW, y() + row * cellH, cellW - inset, cellH - inset};
     }
 
     /** The centre of cell {@code index} as laid out now, where a test clicks it; the grid's centre if hidden. */
     public int[] cellCenter(final int index) {
         final int[] r = cellRect(index);
-        return r == null ? center() : new int[] {r[0] + cell / 2, r[1] + cell / 2};
+        return r == null ? center() : new int[] {r[0] + cellW / 2, r[1] + cellH / 2};
     }
 
     /** The index of the cell under the point, or -1 outside the grid or past the last cell that holds something. */
@@ -162,8 +191,8 @@ public final class CellGrid extends UiComponent {
         if (!contains(mx, my)) {
             return -1;
         }
-        final int col = (int) (mx - x()) / cell;
-        final int row = (int) (my - y()) / cell;
+        final int col = (int) (mx - x()) / cellW;
+        final int row = (int) (my - y()) / cellH;
         final int index = (scroll + row) * columns + col;
         return index < cellCount ? index : -1;
     }
@@ -171,22 +200,27 @@ public final class CellGrid extends UiComponent {
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
         setScroll(scroll);
-        final int size = cell - inset;
+        final int w = cellW - inset;
+        final int h = cellH - inset;
         for (int row = 0; row < visibleRows; row++) {
             for (int col = 0; col < columns; col++) {
                 final int index = (scroll + row) * columns + col;
                 if (index >= cellCount) {
                     break;
                 }
-                final int cx = x() + col * cell;
-                final int cy = y() + row * cell;
-                final boolean hovered = enabled() && ctx.over(cx, cy, size, size);
-                g.fill(cx, cy, cx + size, cy + size, ctx.skin().fieldBg());
-                Draw.outline(g, cx, cy, size, size, marked.test(index) ? ctx.skin().accent() : ctx.skin().edge());
-                if (hovered) {
-                    g.fill(cx + 1, cy + 1, cx + size - 1, cy + size - 1, ctx.skin().listHover());
+                final int cx = x() + col * cellW;
+                final int cy = y() + row * cellH;
+                final boolean hovered = enabled() && ctx.over(cx, cy, w, h);
+                if (wells) {
+                    g.fill(cx, cy, cx + w, cy + h, ctx.skin().fieldBg());
+                    Draw.outline(g, cx, cy, w, h, marked.test(index) ? ctx.skin().accent() : ctx.skin().edge());
+                    if (hovered) {
+                        g.fill(cx + 1, cy + 1, cx + w - 1, cy + h - 1, ctx.skin().listHover());
+                    }
+                } else {
+                    ctx.skin().listRow(g, cx, cy, w, h, hovered, selected.test(index));
                 }
-                renderer.render(g, ctx, index, cx, cy, size, hovered);
+                renderer.render(g, ctx, index, cx, cy, w, h, hovered);
             }
         }
         if (cues != Cues.NONE) {

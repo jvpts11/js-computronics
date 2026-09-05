@@ -551,7 +551,7 @@ public final class NetworkInteractorApp implements InventoryBandApp {
     }
 
     private void renderGridCell(final GuiGraphics g, final UiContext ctx, final int index, final int cx, final int cy,
-                                final int size, final boolean hovered) {
+                                final int size, final int cellHeight, final boolean hovered) {
         if (tab == TAB_CRAFTING) {
             final List<CraftCatalogPayload.Entry> list = filteredCrafts();
             if (index >= list.size()) {
@@ -873,8 +873,8 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         g.drawString(font, st, x + w - stW - 2, y + 2, opStatusColor(op.status()), false);
     }
 
-    private void opClicked(final int index, final int button) {
-        opSelected = opSelected == index ? -1 : index;
+    private void opClicked(final int index, final int button, final double mx, final double my) {
+        opSelected = index < 0 || opSelected == index ? -1 : index;
     }
 
     /** The selected Operation's detail in the right panel: amounts, status, and per-source/sub rows. */
