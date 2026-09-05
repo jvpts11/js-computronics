@@ -43,8 +43,6 @@ public final class JscDataGenerators {
         generator.addProvider(event.includeServer(),
                 new JscItemTagsProvider(output, event.getLookupProvider(), existingFiles));
         generator.addProvider(event.includeServer(),
-                new JscGameTestStructureProvider(output));
-        generator.addProvider(event.includeServer(),
                 new JscRecipeMachinesProvider(output));
         generator.addProvider(event.includeServer(),
                 new JscAdvancementProvider(output, event.getLookupProvider(), existingFiles));

@@ -1,12 +1,11 @@
-// J's Computronics: the computing mod of the series. It hosts the dev runs for the whole series, so a single
-// `runClient` (or `runGameTestServer`, or a client test shard) loads the core, this mod and the industrial mod.
+// J's Computronics: the computing mod of the series. The development runs live in the tests subproject; this
+// build only keeps the data generation run for its own resources.
 plugins {
     id 'net.neoforged.moddev'
 }
 
-// The runs below reach into the other subprojects' source sets, so those must be configured first.
+// The data run below reaches into the core's source set, so it must be configured first.
 evaluationDependsOn(':core')
-evaluationDependsOn(':industrial')
 
 base {
     // jsc-1.21.1-0.2.0a.jar: the mod, the Minecraft line it is built for, its version.
@@ -30,48 +29,6 @@ neoForge {
     }
 
     runs {
-        client {
-            client()
-            gameDirectory = rootProject.file('run')
-            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        // Client tests: real client windows that create a test world, drive the screens with synthetic
-        // input, take screenshots and write run/clienttests/shard-<i>/clienttests/report.txt. The suite is
-        // split round-robin over `clientShards` windows (default 4) so shards can run side by side:
-        //   .\gradlew.bat runClientTests0   (one shard)   -PclientShards=6 to change the split.
-        def clientShards = (providers.gradleProperty('clientShards').getOrElse('4')) as int
-        (0..<clientShards).each { shard ->
-            create("clientTests${shard}") {
-                client()
-                gameDirectory = rootProject.file("run/clienttests/shard-${shard}")
-                // 640 tall so the GUI (scale 2) shows the full 256-pixel monitor glass a player gets.
-                programArguments.addAll '--width', '960', '--height', '640'
-                systemProperty 'jsc.clienttests', 'true'
-                systemProperty 'jsc.clienttests.shard', "${shard}"
-                systemProperty 'jsc.clienttests.shards', "${clientShards}"
-                // -PctOnly=<substring> runs only the client tests whose name contains it (case-insensitive),
-                // so a single test can be driven without stealing the mouse for the whole suite.
-                systemProperty 'jsc.clienttests.only', (providers.gradleProperty('ctOnly').getOrElse(''))
-            }
-        }
-
-        server {
-            server()
-            gameDirectory = rootProject.file('run')
-            programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        // Launches GameTestServer, runs all registered gametests, then exits. By default the server crashes
-        // when no gametests are provided.
-        gameTestServer {
-            type = "gameTestServer"
-            gameDirectory = rootProject.file('run')
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
         data {
             data()
             gameDirectory = rootProject.file('run')
@@ -80,17 +37,12 @@ neoForge {
                     '--output', file('src/generated/resources/').getAbsolutePath(),
                     '--existing', file('src/main/resources/').getAbsolutePath(),
                     '--existing', rootProject.file('core/src/main/resources/').getAbsolutePath()
-        }
-
-        // Applies to all the run configs above.
-        configureEach {
-            // "REGISTRIES": for firing of registry events (other markers: "SCAN", "REGISTRYDUMP").
             systemProperty 'forge.logging.markers', 'REGISTRIES'
             logLevel = org.slf4j.event.Level.DEBUG
         }
     }
 
-    // Which source sets belong to which mod: the runs above load every one of them.
+    // Which source sets belong to which mod: the data run loads this mod and the core it depends on.
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
@@ -98,17 +50,12 @@ neoForge {
         jscore {
             sourceSet(rootProject.project(':core').sourceSets.main)
         }
-        jsindustrial {
-            sourceSet(rootProject.project(':industrial').sourceSets.main)
-        }
     }
 }
 
 dependencies {
     // The core library of the series: the API this mod is written against.
     implementation project(':core')
-    // The industrial mod is loaded by the dev runs beside this one; it is never a dependency of the code.
-    localRuntime project(':industrial')
 
     // ============================================================
     // Mod-loaded dependencies, included in the released JAR's requirements
@@ -118,24 +65,13 @@ dependencies {
     implementation "software.bernie.geckolib:geckolib-neoforge-${minecraft_version}:${geckolib_version}"
 
     // ============================================================
-    // Dev-runtime mods, present in runClient/runServer for integration testing only; never a published dependency.
+    // Soft integrations, compiled against their APIs only; the runtime jars live with the dev runs (tests).
     // ============================================================
-    localRuntime "mekanism:Mekanism:${mekanism_version}"
-    // Mekanism Generators: the Fusion Reactor and its parts are the target of the big autocrafting battery.
-    localRuntime "mekanism:Mekanism:${mekanism_version}:generators"
-    // Mekanism API, compile-only: the chemical bridge adapter compiles against it but the mod never loads a
-    // Mekanism class unless Mekanism is present (soft dependency, guarded at runtime).
+    // Mekanism API: the chemical bridge adapter compiles against it but the mod never loads a Mekanism class
+    // unless Mekanism is present (soft dependency, guarded at runtime).
     compileOnly "mekanism:Mekanism:${mekanism_version}:api"
-    // Applied Energistics 2: dev-runtime only, a second network to prove ours coexists with it.
-    localRuntime "appeng:appliedenergistics2:${ae2_version}"
-    // Create: dev-runtime, sustained tick load. TEMPORARILY DISABLED: its transitive dep
-    // com.tterrag.registrate:Registrate:MC1.21-1.3.0+67 does not resolve from the createmod/tterrag mavens;
-    // it needs the correct Registrate maven (or a local jar). Re-enable once that's sorted.
-    // localRuntime "com.simibubi.create:create-1.21.1:${create_version}"
-    // JEI: API jar for compiling plugins (IModPlugin, IRecipeTransferHandler, etc.).
-    // The full runtime jar is localRuntime only, never published as a hard dependency.
+    // JEI API: the plugin (IModPlugin, IRecipeTransferHandler, ...) compiles against it; never a hard dependency.
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
-    localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 }
 
 // Expands the declared properties into the mod metadata template. A missing property is an error.

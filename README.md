@@ -65,6 +65,17 @@ ties them together. The phases the series goes through, and what each one needs 
 - [JEI](https://github.com/mezz/JustEnoughItems) (optional, for recipe lookup beside the monitors).
 - [Mekanism](https://github.com/mekanism/Mekanism) (optional, its machines and chemicals join the network).
 
+## Repository layout
+
+One repository, several mods, all built at the same version:
+
+- `core/`: J's Core (`jscore`), the shared library every mod of the series requires.
+- `computronics/`: J's Computronics (`jsc`), this mod.
+- `industrial/`: J's Industrial (`jsindustrial`), the industrial mod.
+- `tests/`: the development-only test mod. **It is not a mod to install.** It holds the tests of every mod
+  and hosts the development runs; it is never released and adds nothing to the game. See
+  [tests/README.md](tests/README.md).
+
 ## Building from source
 
 ```
@@ -73,10 +84,10 @@ cd js-computronics
 ./gradlew build
 ```
 
-Java 21. The jar lands in `build/libs` as `jsc-1.21.1-<version>.jar`; a build that is not the tagged
-release carries a `-SNAPSHOT.<commit>` suffix. Useful tasks: `runClient`, `runServer`, `runData`,
-`test` (pure logic, JUnit), `runGameTestServer` (the mod in a headless server), and `runClientTests0`
-(a real client that drives the screens and takes screenshots).
+Java 21. Each mod's jar lands in its own `build/libs`, for example `computronics/build/libs/jsc-1.21.1-<version>.jar`;
+a build that is not the tagged release carries a `-SNAPSHOT.<commit>` suffix. Useful tasks: `runClient`,
+`runServer`, `runData`, `test` (pure logic, JUnit), `runGameTestServer` (the mods in a headless server), and
+`runClientTests0` (a real client that drives the screens and takes screenshots).
 
 ## Contributing
 

@@ -8,7 +8,7 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
-// One repository, several mods: the shared core library and one mod per module of the series.
-// Each subproject builds its own jar with its own mod metadata; the dev runs load all of them.
+// One repository, several mods: the shared core library, one mod per module of the series, and a
+// development-only test mod that holds every test and hosts the dev runs, which load all of them.
 rootProject.name = 'js-tech-series'
-include 'core', 'computronics', 'industrial'
+include 'core', 'computronics', 'industrial', 'tests'
