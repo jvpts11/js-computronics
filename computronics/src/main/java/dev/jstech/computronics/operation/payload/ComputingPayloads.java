@@ -1216,13 +1216,19 @@ public final class ComputingPayloads {
             disks.add(new SettingsSnapshotPayload.DiskUse(
                     stack.getHoverName().getString(), capMb, usedMb, stack == sysDisk));
         }
+        // The memory ledger: what the system, its desktop, its services and its windows hold right now.
+        final dev.jstech.computronics.os.RamLedger ledger = computer.ramLedger();
+        final List<SettingsSnapshotPayload.RamUse> ramUses = new ArrayList<>();
+        for (final dev.jstech.computronics.os.RamLedger.Entry entry : ledger.entries()) {
+            ramUses.add(new SettingsSnapshotPayload.RamUse(entry.name(), entry.mb(), entry.kind().name()));
+        }
         return new SettingsSnapshotPayload(pos, console.wallpaper(), console.computerName(),
                 st.accent(), st.clock12h(), st.guiScale(), st.brightness(),
                 String.valueOf(st.defaultSaveDrive()), st.removableAutoOpen(), st.themePreset(),
                 st.taskbarCentered(), st.darkMode(),
                 netshare, cpuLabel, computer.maxCpuMhz(),
-                (int) Math.min(Integer.MAX_VALUE, computer.ramBuffer()), computer.totalVramMb(),
-                osLabel, platform, installed, disks);
+                computer.ramTotalMb(), computer.totalVramMb(),
+                osLabel, platform, installed, disks, ledger.usedMb(), ramUses);
     }
 
     /** The last path segment (after the final {@code /}), or the whole path when it has no slash. */
@@ -4830,9 +4836,10 @@ public final class ComputingPayloads {
                     && player.level().getBlockEntity(payload.host()) instanceof OsHost computer
                     && computer.isRunning()) {
                 // A machine that has since been switched off or restarted keeps its empty desktop: the
-                // layout in flight belongs to a session that no longer exists.
+                // layout in flight belongs to a session that no longer exists. The machine keeps only the
+                // windows its RAM holds: a client that claims more than fits is trimmed to what does.
                 if (!computer.needsPost()) {
-                    computer.setOpenWindows(payload.toOpenWindows());
+                    computer.setOpenWindows(computer.windowsWithinBudget(payload.toOpenWindows()));
                 }
             }
         });

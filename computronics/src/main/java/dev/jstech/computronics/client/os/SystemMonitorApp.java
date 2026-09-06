@@ -11,6 +11,7 @@ import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.computronics.operation.payload.RequestSettingsPayload;
 import dev.jstech.computronics.operation.payload.SettingsSnapshotPayload;
 import dev.jstech.computronics.operation.payload.SettingsSnapshotPayload.DiskUse;
+import dev.jstech.computronics.operation.payload.SettingsSnapshotPayload.RamUse;
 import dev.jstech.core.client.gui.component.Draw;
 import dev.jstech.core.client.gui.component.Label;
 import dev.jstech.core.client.gui.component.ListView;
@@ -40,6 +41,9 @@ public final class SystemMonitorApp implements DesktopApp {
     private static final int C_RED = 0xFFD1495B;
     private static final int BAR_H = 8;
     private static final int DISK_ROW_H = BAR_H + 12;
+    private static final int MEM_ROW_H = 10;
+    /** Memory holders shown before the list scrolls, so the disks below keep their room. */
+    private static final int MEM_ROWS_SHOWN = 4;
 
     private final BlockPos host;
     private OsSkin skin = OsSkin.fallback();
@@ -58,6 +62,9 @@ public final class SystemMonitorApp implements DesktopApp {
     private final Label[] specGroups = new Label[3];
     private final Label[] specLabels = new Label[3];
     private final Label[] specValues = new Label[3];
+    private final Label memoryHeader;
+    private final Label memoryFree;
+    private final ListView<RamUse> memList;
     private final Label storageHeader;
     private final Label programsLabel;
     private final ListView<DiskUse> diskList;
@@ -69,9 +76,15 @@ public final class SystemMonitorApp implements DesktopApp {
         osLabel = root.add(new Label(() -> data == null ? "" : data.osLabel() + "  (" + data.platform() + ")", Label.Tone.DIM)
                 .setAlign(Label.Align.RIGHT));
         spec(0, "Processor", () -> data == null || data.cpuLabel().isEmpty() ? "-" : data.cpuLabel(), () -> cpuClock(data == null ? 0 : data.cpuMhz()));
-        spec(1, "Memory", () -> "RAM buffer", () -> JsTechTheme.fmt(data == null ? 0 : data.ramMb()) + " MB");
+        spec(1, "Memory", () -> "RAM", () -> data == null ? "-"
+                : JsTechTheme.fmt(data.ramUsedMb()) + " / " + JsTechTheme.fmt(data.ramMb()) + " MB");
         spec(2, "Graphics", () -> data != null && data.vramMb() > 0 ? "VRAM" : "no GPU",
                 () -> data != null && data.vramMb() > 0 ? JsTechTheme.fmt(data.vramMb()) + " MB" : "-");
+        memoryHeader = root.add(new Label("MEMORY", Label.Tone.DIM));
+        memoryFree = root.add(new Label(() -> data == null ? ""
+                : JsTechTheme.fmt(Math.max(0, data.ramMb() - data.ramUsedMb())) + " MB free", Label.Tone.DIM)
+                .setAlign(Label.Align.RIGHT));
+        memList = root.add(new ListView<RamUse>(() -> data == null ? List.of() : data.ramUses(), MEM_ROW_H, this::renderMemoryRow));
         storageHeader = root.add(new Label("STORAGE", Label.Tone.DIM));
         programsLabel = root.add(new Label(() -> data == null ? "" : data.installed().size() + " programs installed", Label.Tone.DIM)
                 .setAlign(Label.Align.RIGHT));
@@ -105,7 +118,7 @@ public final class SystemMonitorApp implements DesktopApp {
 
     @Override
     public int defaultHeight() {
-        return 190;
+        return 236;
     }
 
     @Override
@@ -115,7 +128,7 @@ public final class SystemMonitorApp implements DesktopApp {
 
     @Override
     public int minHeight() {
-        return 150;
+        return 176;
     }
 
     @Override
@@ -141,7 +154,8 @@ public final class SystemMonitorApp implements DesktopApp {
         final boolean ready = data != null;
         loadingLabel.setVisible(!ready);
         loadingLabel.setBounds(px, y + 8, pw, 8);
-        for (final var c : List.of(nameLabel, osLabel, storageHeader, programsLabel, diskList)) {
+        for (final var c : List.of(nameLabel, osLabel, memoryHeader, memoryFree, memList, storageHeader,
+                programsLabel, diskList)) {
             c.setVisible(ready);
         }
         int row = y + 6;
@@ -162,11 +176,29 @@ public final class SystemMonitorApp implements DesktopApp {
             row += 12;
         }
         row += 4;
+        memoryHeader.setBounds(px, row, pw / 2, 8);
+        memoryFree.setBounds(px + pw / 2, row, pw / 2, 8);
+        row += 12;
+        // The memory list shows a few holders and scrolls past that, so the disks below keep their room.
+        final int holders = data == null ? 1 : Math.max(1, data.ramUses().size());
+        final int memH = MEM_ROW_H * Math.min(MEM_ROWS_SHOWN, holders);
+        memList.setBounds(px, row, pw, memH);
+        row += memH + 4;
         storageHeader.setBounds(px, row, pw / 2, 8);
         programsLabel.setBounds(px + pw / 2, row, pw / 2, 8);
         row += 12;
         diskList.setBounds(px, row, pw, Math.max(DISK_ROW_H, y + height - row));
         root.render(g, ctx);
+    }
+
+    private void renderMemoryRow(final GuiGraphics g, final UiContext ctx, final RamUse use, final int index, final int x,
+                                 final int y, final int w, final int h, final boolean hovered, final boolean selected) {
+        final Font font = ctx.font();
+        final String amount = JsTechTheme.fmt(use.mb()) + " MB";
+        final int amountW = font.width(amount);
+        final String name = font.plainSubstrByWidth(use.label(), w - amountW - 6);
+        g.drawString(font, name, x, y + 1, ctx.skin().text(), false);
+        g.drawString(font, amount, x + w - amountW, y + 1, ctx.skin().dim(), false);
     }
 
     private void renderDiskRow(final GuiGraphics g, final UiContext ctx, final DiskUse disk, final int index, final int x,

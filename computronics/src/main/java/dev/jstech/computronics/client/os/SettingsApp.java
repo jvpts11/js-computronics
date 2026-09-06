@@ -342,7 +342,7 @@ public final class SettingsApp implements DesktopApp {
         y += 12;
         y = specRow(x, y, w, "Processor", d.cpuLabel() + " - " + d.cpuMhz() + " MHz");
         if (d.ramMb() > 0) {
-            y = specRow(x, y, w, "Memory", group(d.ramMb()) + " it");
+            y = specRow(x, y, w, "Memory", group(d.ramMb()) + " MB");
         }
         if (d.vramMb() > 0) {
             y = specRow(x, y, w, "Graphics", d.vramMb() + " MB VRAM");

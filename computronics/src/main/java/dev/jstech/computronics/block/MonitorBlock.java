@@ -336,7 +336,10 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
             final String name = level.getBlockState(owner).getBlock().getName().getString();
             final net.minecraft.resources.ResourceLocation osId = c.installedOsId();
             final Component title = level.getBlockState(owner).getBlock().getName();
-            final int ram = (int) Math.min(Integer.MAX_VALUE, c.ramBuffer());
+            // The machine's RAM and what its system, desktop and services already hold: the desktop weighs
+            // the windows it opens against the rest.
+            final int ramTotalMb = c.ramTotalMb();
+            final int ramReservedMb = c.ramReservedMb();
             // The desktop environment: the OS's bundled one (Frames) or the Linux package installed.
             // The desktop this session booted, not whatever is on disk right now: a package installed
             // since the machine came up belongs to the next boot.
@@ -344,9 +347,9 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                     c.bootedDesktopId() != null ? c.bootedDesktopId() : osId;
             player.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new dev.jstech.computronics.menu.DesktopMenu(
-                            id, inv, monitorPos, owner, osId, desktopId, name, ram), title),
+                            id, inv, monitorPos, owner, osId, desktopId, name, ramTotalMb, ramReservedMb), title),
                     buf -> dev.jstech.computronics.menu.DesktopMenu.writeOpenBuffer(
-                            buf, monitorPos, owner, osId, desktopId, name, ram));
+                            buf, monitorPos, owner, osId, desktopId, name, ramTotalMb, ramReservedMb));
         }
     }
 

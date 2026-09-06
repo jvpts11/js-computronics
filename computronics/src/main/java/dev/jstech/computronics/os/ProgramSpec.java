@@ -44,6 +44,9 @@ import java.util.Set;
  *                     banner, never a gate; a 2010s tool can still run on 2000s hardware if minEra allows
  * @param house        who wrote it, or {@link SoftwareHouse#BUNDLED} for a program credited to whichever
  *                     system or desktop ships it
+ * @param ramMb        megabytes the program holds while it runs; 0 means "derive it": a bundled program
+ *                     weighs a share of the system that ships it, anything else weighs by its generation
+ *                     ({@link RamLedger#eraWeightMb})
  */
 public record ProgramSpec(
         ResourceLocation id,
@@ -60,7 +63,8 @@ public record ProgramSpec(
         ResourceLocation iconId,
         dev.jstech.core.tier.HardwareEra minEra,
         dev.jstech.core.tier.HardwareEra era,
-        SoftwareHouse house
+        SoftwareHouse house,
+        int ramMb
 ) {
 
     public static final Codec<ProgramSpec> CODEC = RecordCodecBuilder.create(inst -> inst.group(
@@ -85,7 +89,8 @@ public record ProgramSpec(
             enumCodec(dev.jstech.core.tier.HardwareEra.class)
                     .optionalFieldOf("era", null)
                     .forGetter(ProgramSpec::era),
-            SoftwareHouse.CODEC.optionalFieldOf("house", SoftwareHouse.BUNDLED).forGetter(ProgramSpec::house)
+            SoftwareHouse.CODEC.optionalFieldOf("house", SoftwareHouse.BUNDLED).forGetter(ProgramSpec::house),
+            Codec.INT.optionalFieldOf("ram_mb", 0).forGetter(ProgramSpec::ramMb)
     ).apply(inst, ProgramSpec::new));
 
     /**
@@ -120,6 +125,9 @@ public record ProgramSpec(
         if (house == null) {
             house = SoftwareHouse.BUNDLED;
         }
+        if (ramMb < 0) {
+            ramMb = 0;
+        }
         platforms = Set.copyOf(platforms);
     }
 
@@ -147,7 +155,7 @@ public record ProgramSpec(
                                  final ProgramKind kind, final int minOsRank, final HostScope hostScope) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, 0, 0, minDiskMb,
                 kind, minOsRank, hostScope, id, dev.jstech.core.tier.HardwareEra.VINTAGE, null,
-                SoftwareHouse.BUNDLED);
+                SoftwareHouse.BUNDLED, 0);
     }
 
     /**
@@ -157,7 +165,7 @@ public record ProgramSpec(
      */
     public ProgramSpec withMinEra(final dev.jstech.core.tier.HardwareEra oldest) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
-                minDiskMb, kind, minOsRank, hostScope, iconId, oldest, era, house);
+                minDiskMb, kind, minOsRank, hostScope, iconId, oldest, era, house, ramMb);
     }
 
     /**
@@ -166,13 +174,34 @@ public record ProgramSpec(
      */
     public ProgramSpec withEra(final dev.jstech.core.tier.HardwareEra generation) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
-                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, generation, house);
+                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, generation, house, ramMb);
     }
 
     /** The same program, credited to {@code maker}: the name on its disc, its banner and its about line. */
     public ProgramSpec withHouse(final SoftwareHouse maker) {
         return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
-                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, era, maker);
+                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, era, maker, ramMb);
+    }
+
+    /** The same program, holding {@code megabytes} of RAM while it runs. */
+    public ProgramSpec withRam(final int megabytes) {
+        return new ProgramSpec(id, commandName, displayName, preinstalled, platforms, minCpuMhz, minVramMb,
+                minDiskMb, kind, minOsRank, hostScope, iconId, minEra, era, house, megabytes);
+    }
+
+    /**
+     * The megabytes this program holds while it runs under {@code system}: its declared size, else a share of
+     * the system's own when it ships with the system, else the weight of its generation. A bundled Files is
+     * a few megabytes on a nineties system and far more on a modern one; an installed tool weighs what it is.
+     */
+    public int ramMbOn(final OsDef system) {
+        if (preinstalled) {
+            return RamLedger.bundledWeightMb(system.ramMb());
+        }
+        if (ramMb > 0) {
+            return ramMb;
+        }
+        return RamLedger.eraWeightMb(era, kind);
     }
 
     /** Who to credit where the program is shown: its own house, or {@code shipper} when it is bundled. */

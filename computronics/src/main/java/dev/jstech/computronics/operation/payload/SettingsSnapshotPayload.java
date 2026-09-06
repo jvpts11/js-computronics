@@ -19,8 +19,8 @@ import java.util.List;
 /**
  * Server to client: the full state the Settings app draws — the editable per-computer knobs, the
  * read-only hardware/OS specs (System &amp; Display pages), the installed programs (Programs page),
- * and the per-disk usage (Storage page). Sent in reply to {@link RequestSettingsPayload} and after
- * every {@link SetSettingPayload}.
+ * the per-disk usage (Storage page) and the memory ledger (what holds RAM, for the System Monitor).
+ * Sent in reply to {@link RequestSettingsPayload} and after every {@link SetSettingPayload}.
  *
  * <p>The stream codec is written by hand because the payload has more fields than
  * {@code StreamCodec.composite} accepts.
@@ -46,11 +46,16 @@ public record SettingsSnapshotPayload(
         String osLabel,
         String platform,
         List<String> installed,
-        List<DiskUse> disks
+        List<DiskUse> disks,
+        int ramUsedMb,
+        List<RamUse> ramUses
 ) implements CustomPacketPayload {
 
     /** One disk's usage for the Storage page. */
     public record DiskUse(String label, long capMb, long usedMb, boolean system) {}
+
+    /** One holder of RAM for the System Monitor: what it is called, its megabytes and its kind's name. */
+    public record RamUse(String label, int mb, String kind) {}
 
     public static final int MAX = 64;
 
@@ -97,6 +102,14 @@ public record SettingsSnapshotPayload(
             buf.writeVarLong(d.usedMb());
             buf.writeBoolean(d.system());
         }
+        buf.writeVarInt(p.ramUsedMb);
+        buf.writeVarInt(Math.min(p.ramUses.size(), MAX));
+        for (int i = 0; i < p.ramUses.size() && i < MAX; i++) {
+            final RamUse r = p.ramUses.get(i);
+            buf.writeUtf(r.label(), 48);
+            buf.writeVarInt(r.mb());
+            buf.writeUtf(r.kind(), 16);
+        }
     }
 
     private static SettingsSnapshotPayload decode(final RegistryFriendlyByteBuf buf) {
@@ -129,8 +142,14 @@ public record SettingsSnapshotPayload(
         for (int i = 0; i < diskCount; i++) {
             disks.add(new DiskUse(buf.readUtf(48), buf.readVarLong(), buf.readVarLong(), buf.readBoolean()));
         }
+        final int ramUsedMb = buf.readVarInt();
+        final int ramUseCount = Math.min(buf.readVarInt(), MAX);
+        final List<RamUse> ramUses = new ArrayList<>(ramUseCount);
+        for (int i = 0; i < ramUseCount; i++) {
+            ramUses.add(new RamUse(buf.readUtf(48), buf.readVarInt(), buf.readUtf(16)));
+        }
         return new SettingsSnapshotPayload(pos, wallpaper, computerName, accent, clock12h, guiScale, brightness,
                 saveDrive, removableAutoOpen, themePreset, taskbarCentered, darkMode, netshare, cpuLabel, cpuMhz,
-                ramMb, vramMb, osLabel, platform, installed, disks);
+                ramMb, vramMb, osLabel, platform, installed, disks, ramUsedMb, ramUses);
     }
 }

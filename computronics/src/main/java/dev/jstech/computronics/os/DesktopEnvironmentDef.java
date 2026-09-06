@@ -55,6 +55,37 @@ public record DesktopEnvironmentDef(
     }
 
     /**
+     * The launcher label a program carries under this desktop, which is also the key of its open window: its
+     * name here, except that Frames 11 calls its prompt Megashell. The server resolves a window back to its
+     * program with the same rule.
+     */
+    public String launcherLabel(final ProgramSpec program) {
+        if (panelStyle == PanelStyle.FRAMES_11 && program.id().getPath().equals("command_prompt")) {
+            return "Megashell";
+        }
+        return nameOf(program);
+    }
+
+    /**
+     * The program a window opened under {@code key} belongs to: the one this desktop labels that way, else
+     * the one whose own name it is, else nothing. A window's key is its launcher label, so this is how the
+     * machine reads a saved layout back into programs.
+     */
+    @org.jetbrains.annotations.Nullable
+    public ProgramSpec programFor(final String key) {
+        ProgramSpec byName = null;
+        for (final ProgramSpec spec : OsRegistry.programs()) {
+            if (launcherLabel(spec).equals(key)) {
+                return spec;
+            }
+            if (byName == null && spec.displayName().equals(key)) {
+                byName = spec;
+            }
+        }
+        return byName;
+    }
+
+    /**
      * Who a program is credited to under this desktop: its own house, or this desktop's for a bundled one.
      * Files is the KDE Guild's on Plasma and Midsoft's on Frames; the Network Interactor stays JSC's anywhere.
      */

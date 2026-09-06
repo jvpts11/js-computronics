@@ -44,6 +44,8 @@ import java.util.Optional;
  * @param bundledDesktop the desktop environment this OS ships with, if any (the Frames editions bundle their
  *                       own; a Linux distribution boots to a TTY until one is installed)
  * @param house          who wrote it: the name on its banner, its copyright line and its install disc
+ * @param ramMb          megabytes the running system holds for itself before any program opens; a program
+ *                       bundled with it weighs a share of this ({@link RamLedger#bundledWeightMb})
  */
 public record OsDef(
         ResourceLocation id,
@@ -58,7 +60,8 @@ public record OsDef(
         PackageManagerKind packageManager,
         InstallMode installMode,
         Optional<ResourceLocation> bundledDesktop,
-        SoftwareHouse house
+        SoftwareHouse house,
+        int ramMb
 ) {
 
     public static final Codec<OsDef> CODEC = RecordCodecBuilder.create(inst -> inst.group(
@@ -76,7 +79,8 @@ public record OsDef(
             enumCodec(InstallMode.class).optionalFieldOf("install_mode", InstallMode.GUIDED)
                     .forGetter(OsDef::installMode),
             ResourceLocation.CODEC.optionalFieldOf("bundled_desktop").forGetter(OsDef::bundledDesktop),
-            SoftwareHouse.CODEC.optionalFieldOf("house", SoftwareHouse.MIDSOFT).forGetter(OsDef::house)
+            SoftwareHouse.CODEC.optionalFieldOf("house", SoftwareHouse.MIDSOFT).forGetter(OsDef::house),
+            Codec.INT.optionalFieldOf("ram_mb", 0).forGetter(OsDef::ramMb)
     ).apply(inst, OsDef::new));
 
     /**
@@ -93,7 +97,7 @@ public record OsDef(
         return new OsDef(id, capability, minEra, kernelId, footprintMb, Optional.empty(), platform,
                 displayName, "cmd",
                 platform == Platform.FRAMES ? PackageManagerKind.PCKMGR : PackageManagerKind.NONE,
-                InstallMode.GUIDED, bundledDesktop, house);
+                InstallMode.GUIDED, bundledDesktop, house, 0);
     }
 
     /** A Linux distribution: TTY capability on the Linux kernel, no bundled desktop, installable from the Legacy era. */
@@ -102,7 +106,13 @@ public record OsDef(
                                     final InstallMode installMode, final SoftwareHouse house) {
         return new OsDef(id, OsCapability.TERMINAL_ONLY, HardwareEra.LEGACY,
                 ResourceLocation.fromNamespaceAndPath("jsc", "linux"), footprintMb, Optional.empty(),
-                Platform.LINUX, displayName, shellId, packageManager, installMode, Optional.empty(), house);
+                Platform.LINUX, displayName, shellId, packageManager, installMode, Optional.empty(), house, 0);
+    }
+
+    /** The same system, holding {@code megabytes} of RAM for itself while it runs. */
+    public OsDef withRam(final int megabytes) {
+        return new OsDef(id, capability, minEra, kernelId, footprintMb, installMediaId, platform, displayName,
+                shellId, packageManager, installMode, bundledDesktop, house, megabytes);
     }
 
     public OsDef {
@@ -123,6 +133,9 @@ public record OsDef(
         }
         if (bundledDesktop == null) {
             bundledDesktop = Optional.empty();
+        }
+        if (ramMb < 0) {
+            ramMb = 0;
         }
     }
 

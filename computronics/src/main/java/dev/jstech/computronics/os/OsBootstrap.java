@@ -69,33 +69,38 @@ public final class OsBootstrap {
     // 20 MB vintage drive; Frames 11 is 80 items of a standard disk and will not fit a vintage one at all.
     private static final java.util.List<OsDef> BUILTIN_OSES = java.util.List.of(
             // MC-DOS: terminal-only CLI shell from the Vintage era.
+            // Each system also says the RAM it holds for itself while running (withRam): a fifth of a
+            // vintage machine's few megabytes for the DOS family, most of a small Legacy machine for XP,
+            // a good part of a gigabyte for Frames 11. Its bundled programs weigh a quarter of that each.
             OsDef.mediaInstalled(rl("mc_dos"), OsCapability.TERMINAL_ONLY, HardwareEra.VINTAGE, rl("dos"), 4,
-                    Platform.MC_DOS, "MC-DOS", Optional.empty(), SoftwareHouse.MIDSOFT),
+                    Platform.MC_DOS, "MC-DOS", Optional.empty(), SoftwareHouse.MIDSOFT).withRam(1),
             // MC-NET: full-screen network GUI (the rewrapped network interactor), from the Vintage era.
             OsDef.mediaInstalled(rl("mc_net"), OsCapability.NETWORK_GUI, HardwareEra.VINTAGE, rl("net_min"), 8,
-                    Platform.MC_NET, "MC-NET", Optional.empty(), SoftwareHouse.NOUVELL),
+                    Platform.MC_NET, "MC-NET", Optional.empty(), SoftwareHouse.NOUVELL).withRam(2),
             // The Frames editions bundle their own desktop environment (the id doubles as the DE id).
             OsDef.mediaInstalled(rl("frames_95"), OsCapability.FULL_DESKTOP, HardwareEra.LEGACY, rl("win9x"), 48,
-                    Platform.FRAMES, "Frames 95", Optional.of(rl("frames_95")), SoftwareHouse.MIDSOFT),
+                    Platform.FRAMES, "Frames 95", Optional.of(rl("frames_95")), SoftwareHouse.MIDSOFT).withRam(16),
             OsDef.mediaInstalled(rl("frames_xp"), OsCapability.FULL_DESKTOP, HardwareEra.LEGACY, rl("nt"), 1_536,
-                    Platform.FRAMES, "Frames XP", Optional.of(rl("frames_xp")), SoftwareHouse.MIDSOFT),
+                    Platform.FRAMES, "Frames XP", Optional.of(rl("frames_xp")), SoftwareHouse.MIDSOFT).withRam(64),
             OsDef.mediaInstalled(rl("frames_11"), OsCapability.FULL_DESKTOP, HardwareEra.STANDARD, rl("nt"), 20_480,
-                    Platform.FRAMES, "Frames 11", Optional.of(rl("frames_11")), SoftwareHouse.MIDSOFT),
+                    Platform.FRAMES, "Frames 11", Optional.of(rl("frames_11")), SoftwareHouse.MIDSOFT).withRam(768),
 
             // Linux distributions: all on the Linux kernel, all boot to a bash TTY until a desktop environment
             // is installed from the network mirror. Footprints are balancing estimates. The shells and package
             // managers are each distribution's real ones; Arch and Gentoo keep their manual installs. Each is
             // credited to its own house, the way the machines are credited to their makers.
+            // A distribution's own share is its base system at the TTY; the desktop package it installs
+            // weighs on top of it (the desktop environments below say how much).
             OsDef.linuxDistro(rl("ubuntu"), 8_192, "Ubuntu", "bash", PackageManagerKind.APT, InstallMode.GUIDED,
-                    SoftwareHouse.AXIOMATIC),
+                    SoftwareHouse.AXIOMATIC).withRam(48),
             OsDef.linuxDistro(rl("debian"), 4_096, "Debian", "bash", PackageManagerKind.APT, InstallMode.GUIDED,
-                    SoftwareHouse.DEBIAN_CIRCLE),
+                    SoftwareHouse.DEBIAN_CIRCLE).withRam(24),
             OsDef.linuxDistro(rl("fedora"), 8_192, "Fedora", "bash", PackageManagerKind.DNF, InstallMode.GUIDED,
-                    SoftwareHouse.RED_CAP),
+                    SoftwareHouse.RED_CAP).withRam(48),
             OsDef.linuxDistro(rl("arch"), 2_048, "Arch Linux", "zsh", PackageManagerKind.PACMAN, InstallMode.LIVE_MANUAL,
-                    SoftwareHouse.ARCH_COLLECTIVE),
+                    SoftwareHouse.ARCH_COLLECTIVE).withRam(12),
             OsDef.linuxDistro(rl("gentoo"), 4_096, "Gentoo", "bash", PackageManagerKind.EMERGE, InstallMode.SOURCE,
-                    SoftwareHouse.GENTOO_FOUNDRY)
+                    SoftwareHouse.GENTOO_FOUNDRY).withRam(12)
             // OS case (c): PDA/Tablet/Smartphone portables ship with a factory mobile OS. Those item/block
             // types do not exist yet; register the mobile OS here once they do.
     );
@@ -211,71 +216,74 @@ public final class OsBootstrap {
             // medium it ships on and the year on its banner, and never where it may install. The OS rank
             // stays the gate. A modern tool that still runs on XP is Standard-era software on a DVD.
             // Each installable also names its house (withHouse): the maker on its disc and its banner.
+            // And each says the RAM it holds while it runs (withRam): the balancing estimates follow the
+            // generation the tool was written in, so a modern tool is the heavier one.
             ProgramSpec.of(rl("nms"), "nms", "Network Management Studio", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.ANY)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT).withRam(128),
             // The IQL Engine is a headless Mainframe service (the NMS is its client): every platform, lives on
             // the Mainframe, follows the NMS OS version (Frames XP or newer).
             ProgramSpec.of(rl("iqlengine"), "iqlengine", "IQL Engine", false, ALL_PLATFORMS, 32, ProgramKind.SERVICE, 2, HostScope.MAINFRAME)
-                    .withEra(LEGACY).withHouse(SoftwareHouse.MIDSOFT),
+                    .withEra(LEGACY).withHouse(SoftwareHouse.MIDSOFT).withRam(24),
             // The Crafting Manager installs only on a Crafting Computer -> Frames XP or newer.
             ProgramSpec.of(rl("crafting_manager"), "craftmgr", "Crafting Manager", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.CRAFTING_COMPUTER)
-                    .withEra(LEGACY).withHouse(SoftwareHouse.AUTODECK),
+                    .withEra(LEGACY).withHouse(SoftwareHouse.AUTODECK).withRam(32),
             // The Pattern Studio authors recipe files on any desktop and hands them to a linked encoder.
             ProgramSpec.of(rl("pattern_studio"), "studio", "Pattern Studio", false, DESKTOPS, 96, ProgramKind.APP, 2, HostScope.ANY)
-                    .withEra(LEGACY).withHouse(SoftwareHouse.AUTODECK),
+                    .withEra(LEGACY).withHouse(SoftwareHouse.AUTODECK).withRam(24),
             // The Cluster Manager installs only on a Cluster Management Computer -> Frames XP or newer.
             ProgramSpec.of(rl("cluster_manager"), "clustermgr", "Cluster Manager", false, DESKTOPS, 96, ProgramKind.APP, 2, HostScope.CLUSTER_MANAGEMENT_COMPUTER)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.JSC),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.JSC).withRam(96),
             // Minesweeper: a small game available on any desktop (rank 0 = Frames 95 and newer).
             ProgramSpec.of(rl("minesweeper"), "mines", "Minesweeper", false, DESKTOPS, 16, ProgramKind.APP, 0, HostScope.ANY)
-                    .withEra(VINTAGE).withHouse(SoftwareHouse.MIDSOFT),
+                    .withEra(VINTAGE).withHouse(SoftwareHouse.MIDSOFT).withRam(1),
             // Storage Insights: a network dashboard -> Frames XP or newer.
             ProgramSpec.of(rl("storage_insights"), "insights", "Storage Insights", false, DESKTOPS, 64, ProgramKind.APP, 2, HostScope.ANY)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.VAULTIS),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.VAULTIS).withRam(64),
             // Craft Planner: a network planning tool -> Frames XP or newer.
             ProgramSpec.of(rl("craft_planner"), "planner", "Craft Planner", false, DESKTOPS, 64, ProgramKind.APP, 2, HostScope.ANY)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.AUTODECK),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.AUTODECK).withRam(64),
             // The Automation Engine is a headless Mainframe service; it needs the modern OS (Frames 11, rank 3).
             ProgramSpec.of(rl("automation_engine"), "autoeng", "Automation Engine", false, ALL_PLATFORMS, 32, ProgramKind.SERVICE, 3, HostScope.MAINFRAME)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.RED_CAP),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.RED_CAP).withRam(64),
             // The Automation Manager is a modern automation front-end -> Frames 11 (rank 3).
             ProgramSpec.of(rl("automation_manager"), "automgr", "Automation Manager", false, DESKTOPS, 64, ProgramKind.APP, 3, HostScope.ANY)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.RED_CAP),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.RED_CAP).withRam(96),
             // Server services: headless daemons that only make sense on a machine mounted in a rack,
             // which is what gives a server its ROLE — hardware decides capacity, software decides job.
             // Predictive Cache keeps the hot items staged, so queries this bay serves come back sooner.
             ProgramSpec.of(rl("predictive_cache"), "predcache", "Predictive Cache", false, ALL_PLATFORMS, 32, ProgramKind.SERVICE, 0, HostScope.SERVER)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.VAULTIS),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.VAULTIS).withRam(128),
             // Load Balancer spreads writes across the bay's drives instead of filling them in order.
             ProgramSpec.of(rl("load_balancer"), "loadbal", "Load Balancer", false, ALL_PLATFORMS, 32, ProgramKind.SERVICE, 0, HostScope.SERVER)
-                    .withEra(LEGACY).withHouse(SoftwareHouse.JSC),
+                    .withEra(LEGACY).withHouse(SoftwareHouse.JSC).withRam(16),
             // Integrity Monitor re-reads what a hot event left in doubt, so light index maintenance
             // stops being a chore (a fragmented index still wants a vacuum by hand).
             ProgramSpec.of(rl("integrity_monitor"), "integrity", "Integrity Monitor", false, ALL_PLATFORMS, 32, ProgramKind.SERVICE, 0, HostScope.SERVER)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.VAULTIS),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.VAULTIS).withRam(32),
             // Remote Control: the graphical way into the network's other machines (a headless rack server
             // above all). Any desktop, Frames XP or newer — the point-and-click twin of ssh.
             ProgramSpec.of(rl("remote_control"), "remotectl", "Remote Control", false, DESKTOPS, 48, ProgramKind.APP, 2, HostScope.ANY)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT).withRam(48),
             // The Mirror: the package repository service every Linux computer on the network installs from
             // (apt/dnf/pacman/emerge resolve against it). A headless Mainframe service on any platform.
             ProgramSpec.of(rl("mirror"), "mirror", "Mirror", false, ALL_PLATFORMS, 64, ProgramKind.SERVICE, 0, HostScope.MAINFRAME)
-                    .withEra(STANDARD).withHouse(SoftwareHouse.JSC),
+                    .withEra(STANDARD).withHouse(SoftwareHouse.JSC).withRam(32),
             // screenfetch: the little system-identity tool, a package the Mirror serves to any Linux (its
             // absence teaching the package manager: 'command not found' until you apt/dnf/pacman/emerge it).
             ProgramSpec.of(rl("screenfetch"), "screenfetch", "screenfetch", false, LINUX_ONLY, 4, ProgramKind.APP, 0, HostScope.ANY)
-                    .withEra(LEGACY).withHouse(SoftwareHouse.ARCH_COLLECTIVE),
+                    .withEra(LEGACY).withHouse(SoftwareHouse.ARCH_COLLECTIVE).withRam(1),
             // The Linux desktop environments: packages that turn a TTY distribution into a graphical desktop.
-            // Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest).
+            // Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest), and so is
+            // the RAM each holds once it is up, on top of the distribution's own share.
             // Each one requires the hardware generation it belongs to. KDE and GNOME are old enough to
             // run on Legacy machines; Cinnamon is a much later desktop and needs Standard hardware. A
             // Vintage computer therefore has no graphical desktop at all and lives at the TTY.
             ProgramSpec.of(rl("kde_plasma"), "kde-plasma", "KDE Plasma", false, LINUX_ONLY, 256, ProgramKind.DESKTOP_ENVIRONMENT, 0, HostScope.ANY)
-                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.KDE_GUILD),
+                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.KDE_GUILD).withRam(224),
             ProgramSpec.of(rl("gnome"), "gnome", "GNOME", false, LINUX_ONLY, 192, ProgramKind.DESKTOP_ENVIRONMENT, 0, HostScope.ANY)
-                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.GNOME_TRUST),
+                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.GNOME_TRUST).withRam(256),
             ProgramSpec.of(rl("cinnamon"), "cinnamon", "Cinnamon", false, LINUX_ONLY, 160, ProgramKind.DESKTOP_ENVIRONMENT, 0, HostScope.ANY)
-                    .withMinEra(STANDARD).withEra(STANDARD).withHouse(SoftwareHouse.SPEARMINT)
+                    .withMinEra(STANDARD).withEra(STANDARD).withHouse(SoftwareHouse.SPEARMINT).withRam(160)
     );
 
     /** The built-in program descriptors, so datagen (lang, install media) reads them from one source. */

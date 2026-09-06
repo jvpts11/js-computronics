@@ -70,12 +70,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private final List<Launcher> launchers = new ArrayList<>();
     private final List<String> installedPrograms = new ArrayList<>();
 
-    // --- Per-OS memory/process model: each open program is a process that costs RAM. The OS itself reserves
-    // an overhead; the RAM the computer has (minus that) caps how many programs run at once. A cooperative
-    // kernel (Frames 95) is fragile and crashes when overloaded; a preemptive one (XP/11) just refuses. ---
-    private int installedRam;
-    private static final int PROC_RAM = 48;
-    private static final int MAX_WINDOWS_CAP = 16;
+    // --- Per-OS memory model: the system, its desktop and its services hold their share of the machine's RAM
+    // (reserved, from the server) and every open program holds its own, weighed under the running system by the
+    // same rule the server applies. A cooperative kernel (Frames 95) is fragile and crashes when overloaded; a
+    // preemptive one (XP/11) just refuses. ---
+    private int ramTotalMb;
+    private int ramReservedMb;
     /** True while the cooperative OS is showing its crash screen; the desktop reboots to an empty session after. */
     private boolean crashing;
     private long crashUntil;
@@ -418,7 +418,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         this.monitorPos = menu.monitorPos();
         this.osId = menu.osId();
         this.desktopId = menu.desktopId();
-        this.installedRam = menu.ramBuffer();
+        this.ramTotalMb = menu.ramTotalMb();
+        this.ramReservedMb = menu.ramReservedMb();
         this.chrome = dev.jstech.computronics.os.OsRegistry.getDesktop(desktopId);
         this.panel = chrome != null ? chrome.panelStyle() : switch (desktopId.getPath()) {
             case "frames_xp" -> dev.jstech.computronics.os.PanelStyle.FRAMES_XP;
@@ -450,23 +451,24 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return chrome != null ? chrome.displayName() : desktopId.getPath();
     }
 
-    /** RAM the desktop itself reserves: a heavier, more modern desktop eats more, leaving less for programs. */
-    private int osOverhead() {
-        return switch (desktopId.getPath()) {
-            case "frames_95" -> 16;
-            case "frames_xp" -> 64;
-            case "frames_11" -> 256;
-            case "kde_plasma" -> 224;
-            case "gnome" -> 256;
-            case "cinnamon" -> 160;
-            default -> 32;
-        };
+    /** The megabytes a window opened under {@code key} holds: its program's weight under the running system. */
+    private int windowRamMb(final String key) {
+        final dev.jstech.computronics.os.OsDef os = dev.jstech.computronics.os.OsRegistry.getOs(osId);
+        return os == null ? 0 : dev.jstech.computronics.os.OsHost.windowRamMb(key, os, chrome);
     }
 
-    /** The number of programs this computer can run at once, from its RAM minus the OS overhead. */
-    private int maxWindows() {
-        final int usable = installedRam - osOverhead();
-        return Math.max(2, Math.min(MAX_WINDOWS_CAP, usable / PROC_RAM + 1));
+    /** What the open windows hold together. */
+    private int windowsRamMb() {
+        int sum = 0;
+        for (final DesktopWindow w : windows) {
+            sum += windowRamMb(w.appKey());
+        }
+        return sum;
+    }
+
+    /** Everything held right now: the system's share, its desktop and services, and the open windows. */
+    private int ramUsedMb() {
+        return ramReservedMb + windowsRamMb();
     }
 
     /** A cooperative kernel (Frames 95) has no memory protection: overloading it crashes the whole desktop. */
@@ -474,20 +476,25 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return osId.getPath().equals("frames_95");
     }
 
-    /** Whether another program window may open now; otherwise a preemptive OS refuses and a cooperative one crashes. */
-    private boolean allowOpen() {
+    /**
+     * Whether a window of {@code key} may open now, that is whether its program's weight still fits in the
+     * free RAM; otherwise a preemptive OS refuses with the figures and a cooperative one crashes.
+     */
+    private boolean allowOpen(final String key) {
         if (crashing) {
             return false;
         }
-        if (windows.size() < maxWindows()) {
+        final int need = windowRamMb(key);
+        final int free = ramTotalMb - ramUsedMb();
+        if (need <= free) {
             return true;
         }
         if (isCooperative()) {
             crashing = true;
             crashUntil = System.currentTimeMillis() + 4200;
         } else {
-            showError("Out of memory", "This computer cannot run more programs at once. "
-                    + "Close one, or install more RAM.");
+            showError("Out of memory", key + " needs " + need + " MB and only " + Math.max(0, free) + " MB of "
+                    + ramTotalMb + " MB are free. Close a program, or install more RAM.");
         }
         return false;
     }
@@ -842,11 +849,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * its own display name otherwise; the shell reads "Megashell" on Frames 11.
      */
     private String launcherLabel(final dev.jstech.computronics.os.ProgramSpec spec) {
+        if (chrome != null) {
+            return chrome.launcherLabel(spec); // the rule the server resolves a window back to its program with
+        }
         if (spec.id().getPath().equals("command_prompt")
                 && is(dev.jstech.computronics.os.PanelStyle.FRAMES_11)) {
             return "Megashell";
         }
-        return chrome != null ? chrome.nameOf(spec) : spec.displayName();
+        return spec.displayName();
     }
 
     /** Requests the desktop folder's files so they can be drawn as background icons. */
@@ -918,14 +928,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             for (final String key : PENDING_OPEN) {
                 if (key.startsWith(OPEN_FILES_AT)) {
                     // This PC asked for a drive or a folder to be opened in the explorer.
-                    if (allowOpen()) {
+                    if (allowOpen("Files")) {
                         openApp("Files", new FilesApp(host, desktopId.getPath(),
                                 key.substring(OPEN_FILES_AT.length()), monitorPos));
                     }
                     continue;
                 }
                 final DesktopApp app = factoryFor(key);
-                if (app != null && allowOpen()) {
+                if (app != null && allowOpen(key)) {
                     openApp(key, app);
                 }
             }
@@ -1104,7 +1114,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             int bx = 64;
             // Stop task buttons before the clock so they never overrun it or bleed off the right edge.
-            final int taskRight = sw - 38;
+            final int taskRight = taskStripRight(sw);
             for (final DesktopWindow w : windows) {
                 if (bx + 84 > taskRight) {
                     break;
@@ -1116,16 +1126,18 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 bx += 88;
             }
             final String clock = clockText();
-            final int clkW = font.width(clock) + 8;
-            final int clkX = sw - clkW - 2;
-            if (osp.equals("frames_95")) {
-                g.fill(clkX, tbY + 3, sw - 2, sh - 3, theme.taskbar());
-                bevel(g, clkX, tbY + 3, clkW, TASKBAR_H - 6, 0xFF808080, 0xFFFFFFFF); // sunken tray
-            } else if (osp.equals("frames_xp")) {
-                g.fill(clkX, tbY + 2, sw, sh - 2, 0xFF2C5FA8);
+            if (osp.equals("frames_xp")) {
+                renderXpTray(g, tbY, sw, sh, clock);
+            } else {
+                final int clkW = font.width(clock) + 8;
+                final int clkX = sw - clkW - 2;
+                if (osp.equals("frames_95")) {
+                    g.fill(clkX, tbY + 3, sw - 2, sh - 3, theme.taskbar());
+                    bevel(g, clkX, tbY + 3, clkW, TASKBAR_H - 6, 0xFF808080, 0xFFFFFFFF); // sunken tray
+                }
+                g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), false);
+                drawProcMeter(g, clkX - 6, tbY + 8, theme.startText());
             }
-            g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), false);
-            drawProcMeter(g, clkX - 6, tbY + 8, theme.startText());
         }
         g.pose().popPose(); // close the TASKBAR layer
 
@@ -1847,13 +1859,114 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         drawProcMeter(g, sw - font.width(clock) - 14, tbY + 8, 0xFF9AA3B2);
     }
 
-    /** Draws the "open programs / limit" meter right-aligned ending at {@code rightX}: amber then red near the cap. */
+    /** The memory meter's text, "used/total MB", shared by the panels so they can keep room for it. */
+    private String ramMeterText() {
+        return ramUsedMb() + "/" + ramTotalMb + " MB";
+    }
+
+    /** Where a panel's task buttons must stop: clear of the clock and the memory meter at its right end. */
+    private int taskStripRight(final int sw) {
+        if (is(dev.jstech.computronics.os.PanelStyle.FRAMES_XP)) {
+            return xpTrayLeft(sw) - 6;
+        }
+        return sw - font.width(clockText()) - font.width(ramMeterText()) - 24;
+    }
+
+    // --- The Frames XP notification area: a dark Luna block with a lit left edge holding the network and
+    // volume icons, the memory meter over its bar, and the clock. The sizes are the approved layout brought
+    // to the in-game scale: the block fills the 24 px taskbar bar two pixels of margin, 13 px icons centred
+    // in it, and the meter's bar sits under its own text. ---
+    private static final int XP_TRAY_PAD = 8;
+    private static final int XP_TRAY_ICON = 13;
+    private static final int XP_BAR_W = 65;
+    private static final int XP_BAR_H = 5;
+
+    private String xpRamText() {
+        return "RAM " + ramMeterText();
+    }
+
+    /** The left edge of the XP tray: its icons, the meter (as wide as its text or its bar) and the clock. */
+    private int xpTrayLeft(final int sw) {
+        final int meterW = Math.max(XP_BAR_W, font.width(xpRamText()));
+        return sw - (XP_TRAY_PAD + XP_TRAY_ICON + 4 + XP_TRAY_ICON + 8 + meterW + 10 + font.width(clockText()) + 7);
+    }
+
+    private void renderXpTray(final GuiGraphics g, final int tbY, final int sw, final int sh, final String clock) {
+        final int x = xpTrayLeft(sw);
+        final int top = tbY + 2;
+        final int bottom = sh - 2;
+        g.fillGradient(x, top, sw, bottom, 0xFF1A53C4, 0xFF0D3590);
+        g.fill(x, top, x + 1, bottom, 0xFF4A83E6); // the lit left edge
+        g.fill(x + 1, top, x + 2, bottom, 0xFF0A2C7A); // and its inset shadow
+        int cx = x + XP_TRAY_PAD;
+        final int iconY = tbY + (TASKBAR_H - XP_TRAY_ICON) / 2;
+        drawXpNetworkIcon(g, cx, iconY);
+        cx += XP_TRAY_ICON + 4;
+        drawXpVolumeIcon(g, cx, iconY);
+        cx += XP_TRAY_ICON + 8;
+        final String text = xpRamText();
+        g.drawString(font, text, cx, tbY + 5, 0xFFFFFFFF, false);
+        drawXpRamBar(g, cx, tbY + 16, Math.max(XP_BAR_W, font.width(text)), XP_BAR_H);
+        g.drawString(font, clock, sw - 7 - font.width(clock), tbY + 8, 0xFFFFFFFF, false);
+    }
+
+    /** The meter's bar: a dark trough with a border, filled green shading to amber, red once nearly full. */
+    private void drawXpRamBar(final GuiGraphics g, final int x, final int y, final int w, final int h) {
+        g.fill(x, y, x + w, y + h, 0xFF071F5C);
+        g.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xFF0A2C7A);
+        final int innerW = w - 2;
+        final int used = ramUsedMb();
+        if (ramTotalMb <= 0 || used <= 0) {
+            return;
+        }
+        final int fillW = (int) Math.min(innerW, (long) innerW * used / ramTotalMb);
+        final boolean nearlyFull = used * 100L >= ramTotalMb * 95L;
+        // The shade runs across the whole trough, so a fuller bar shows more of the amber end.
+        for (int px = 0; px < fillW; px++) {
+            final float t = innerW <= 1 ? 0f : (float) px / (innerW - 1);
+            final int color = nearlyFull && px >= innerW * 0.95f ? 0xFFEF6A5A : blend(0xFF5FE07A, 0xFFF0B23A, t);
+            g.fill(x + 1 + px, y + 1, x + 2 + px, y + h - 1, color);
+        }
+    }
+
+    /** Linear blend of two opaque colours, {@code t} from the first (0) to the second (1). */
+    private static int blend(final int from, final int to, final float t) {
+        final int r = (int) (((from >> 16) & 0xFF) + (((to >> 16) & 0xFF) - ((from >> 16) & 0xFF)) * t);
+        final int gr = (int) (((from >> 8) & 0xFF) + (((to >> 8) & 0xFF) - ((from >> 8) & 0xFF)) * t);
+        final int b = (int) ((from & 0xFF) + ((to & 0xFF) - (from & 0xFF)) * t);
+        return 0xFF000000 | (r << 16) | (gr << 8) | b;
+    }
+
+    /** Two small monitors, one behind the other: the XP network tray icon. */
+    private static void drawXpNetworkIcon(final GuiGraphics g, final int x, final int y) {
+        g.fill(x + 6, y, x + 13, y + 6, 0xFF2058D8);
+        g.fill(x + 7, y + 1, x + 12, y + 5, 0xFFCFE4FF);
+        g.fill(x + 8, y + 6, x + 11, y + 7, 0xFF2058D8);
+        g.fill(x, y + 4, x + 7, y + 10, 0xFF2058D8);
+        g.fill(x + 1, y + 5, x + 6, y + 9, 0xFFCFE4FF);
+        g.fill(x + 2, y + 10, x + 5, y + 11, 0xFF2058D8);
+    }
+
+    /** A speaker with two sound arcs: the XP volume tray icon. */
+    private static void drawXpVolumeIcon(final GuiGraphics g, final int x, final int y) {
+        final int c = 0xFFE8EEF8;
+        g.fill(x, y + 4, x + 3, y + 9, c);
+        g.fill(x + 3, y + 3, x + 4, y + 10, c);
+        g.fill(x + 4, y + 2, x + 5, y + 11, c);
+        g.fill(x + 5, y + 1, x + 6, y + 12, c);
+        g.fill(x + 8, y + 4, x + 9, y + 9, c);
+        g.fill(x + 10, y + 2, x + 11, y + 4, c);
+        g.fill(x + 11, y + 4, x + 12, y + 9, c);
+        g.fill(x + 10, y + 9, x + 11, y + 11, c);
+    }
+
+    /** Draws the memory meter right-aligned ending at {@code rightX}: amber past three quarters, red when nearly full. */
     private void drawProcMeter(final GuiGraphics g, final int rightX, final int y, final int normalColor) {
-        final int max = maxWindows();
-        final String procs = windows.size() + "/" + max;
-        final int color = windows.size() >= max ? 0xFFE06A6A
-                : windows.size() >= max - 1 ? 0xFFE0A020 : normalColor;
-        g.drawString(font, procs, rightX - font.width(procs), y, color, false);
+        final int used = ramUsedMb();
+        final String meter = ramMeterText();
+        final int color = ramTotalMb > 0 && used * 100L >= ramTotalMb * 95L ? 0xFFE06A6A
+                : ramTotalMb > 0 && used * 100L >= ramTotalMb * 75L ? 0xFFE0A020 : normalColor;
+        g.drawString(font, meter, rightX - font.width(meter), y, color, false);
     }
 
     /** The Windows 11 Start glyph: four solid blue panes with a thin gap. */
@@ -2023,7 +2136,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // Task buttons.
         int bx = 64;
-        final int taskRight = sw - 38;
+        final int taskRight = taskStripRight(sw);
         final DesktopWindow front = frontWindow();
         for (final DesktopWindow w : windows) {
             if (bx + 84 > taskRight) {
@@ -2062,7 +2175,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // The 64/88 origin and pitch are the ones the taskbar click handler already tests against, so the
         // button a player sees and the button they hit are the same rectangle.
         int bx = 64;
-        final int taskRight = sw - 38;
+        final int taskRight = taskStripRight(sw);
         final DesktopWindow front = frontWindow();
         for (final DesktopWindow w : windows) {
             if (bx + 84 > taskRight) {
@@ -2957,7 +3070,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (mouseY >= tbY + 3 && mouseX >= 64) {
             final int idx = (int) ((mouseX - 64) / 88);
             final int bxStart = 64 + idx * 88;
-            if (idx >= 0 && idx < windows.size() && mouseX <= bxStart + 84 && bxStart + 84 <= sw() - 38) {
+            if (idx >= 0 && idx < windows.size() && mouseX <= bxStart + 84 && bxStart + 84 <= taskStripRight(sw())) {
                 // Right-click opens the window's own menu, so a program can be closed without first
                 // going to it — the thing every taskbar does and this one did not.
                 if (button == 1) {
@@ -3545,7 +3658,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Starts a launcher: a built-in app opens a window; an action-based one (e.g. the NMS) runs its action. */
     private void runLauncher(final Launcher l) {
-        if (allowOpen()) {
+        if (allowOpen(l.label())) {
             openApp(l.label(), l.factory().get());
         }
     }

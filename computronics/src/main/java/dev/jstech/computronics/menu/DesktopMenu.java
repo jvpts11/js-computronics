@@ -44,8 +44,9 @@ public class DesktopMenu extends AbstractContainerMenu {
     private final BlockPos hostPos;
     private final ResourceLocation osId;
     private final String name;
-    /** The host computer's RAM buffer, so the desktop can model per-OS process/memory limits. */
-    private final int ramBuffer;
+    /** The host computer's RAM in megabytes, and what its system, desktop and services already hold of it. */
+    private final int ramTotalMb;
+    private final int ramReservedMb;
 
     /** Whether the 36 inventory slots are live this frame (true only while a Network Interactor window is focused). */
     private boolean slotsActive;
@@ -60,13 +61,13 @@ public class DesktopMenu extends AbstractContainerMenu {
 
     public DesktopMenu(final int containerId, final Inventory playerInventory, final BlockPos monitorPos,
                        final BlockPos hostPos, final ResourceLocation osId, final String name,
-                       final int ramBuffer) {
-        this(containerId, playerInventory, monitorPos, hostPos, osId, osId, name, ramBuffer);
+                       final int ramTotalMb, final int ramReservedMb) {
+        this(containerId, playerInventory, monitorPos, hostPos, osId, osId, name, ramTotalMb, ramReservedMb);
     }
 
     public DesktopMenu(final int containerId, final Inventory playerInventory, final BlockPos monitorPos,
                        final BlockPos hostPos, final ResourceLocation osId, final ResourceLocation desktopId,
-                       final String name, final int ramBuffer) {
+                       final String name, final int ramTotalMb, final int ramReservedMb) {
         super(ComputingModule.DESKTOP_MENU.get(), containerId);
         this.playerInventory = playerInventory;
         this.monitorPos = monitorPos;
@@ -74,7 +75,8 @@ public class DesktopMenu extends AbstractContainerMenu {
         this.osId = osId;
         this.desktopId = desktopId == null ? osId : desktopId;
         this.name = name;
-        this.ramBuffer = ramBuffer;
+        this.ramTotalMb = ramTotalMb;
+        this.ramReservedMb = ramReservedMb;
         // The player's 36 inventory slots in vanilla order: 27 main (indices 9-35) then 9 hotbar (0-8). The
         // x/y are placeholders — the client recreates them with real positions when a window shows them
         // (Slot.x/y are final in 1.21.1, so following a moving window means rebuilding the slot at the new spot).
@@ -146,27 +148,31 @@ public class DesktopMenu extends AbstractContainerMenu {
         final ResourceLocation os = buf.readResourceLocation();
         final ResourceLocation desktop = buf.readResourceLocation();
         final String machineName = buf.readUtf();
-        final int ram = buf.readVarInt();
-        return new DesktopMenu(containerId, playerInventory, monitor, host, os, desktop, machineName, ram);
+        final int ramTotalMb = buf.readVarInt();
+        final int ramReservedMb = buf.readVarInt();
+        return new DesktopMenu(containerId, playerInventory, monitor, host, os, desktop, machineName,
+                ramTotalMb, ramReservedMb);
     }
 
     /** Writes the open buffer the client reconstructs from: the positions, the OS id, the name, and the RAM. */
     public static void writeOpenBuffer(final RegistryFriendlyByteBuf buf, final BlockPos monitorPos,
                                        final BlockPos hostPos, final ResourceLocation osId, final String name,
-                                       final int ramBuffer) {
-        writeOpenBuffer(buf, monitorPos, hostPos, osId, osId, name, ramBuffer);
+                                       final int ramTotalMb, final int ramReservedMb) {
+        writeOpenBuffer(buf, monitorPos, hostPos, osId, osId, name, ramTotalMb, ramReservedMb);
     }
 
-    /** The full open buffer: positions, OS id, desktop environment id, name, RAM. */
+    /** The full open buffer: positions, OS id, desktop environment id, name, the RAM and what is already held. */
     public static void writeOpenBuffer(final RegistryFriendlyByteBuf buf, final BlockPos monitorPos,
                                        final BlockPos hostPos, final ResourceLocation osId,
-                                       final ResourceLocation desktopId, final String name, final int ramBuffer) {
+                                       final ResourceLocation desktopId, final String name,
+                                       final int ramTotalMb, final int ramReservedMb) {
         buf.writeBlockPos(monitorPos);
         buf.writeBlockPos(hostPos);
         buf.writeResourceLocation(osId);
         buf.writeResourceLocation(desktopId == null ? osId : desktopId);
         buf.writeUtf(name);
-        buf.writeVarInt(ramBuffer);
+        buf.writeVarInt(ramTotalMb);
+        buf.writeVarInt(ramReservedMb);
     }
 
     /** The desktop environment the screen draws (equals the OS id for the Frames editions). */
@@ -174,9 +180,14 @@ public class DesktopMenu extends AbstractContainerMenu {
         return desktopId;
     }
 
-    /** The host computer's RAM buffer (the desktop's per-OS memory model uses it). */
-    public int ramBuffer() {
-        return ramBuffer;
+    /** The host computer's RAM in megabytes. */
+    public int ramTotalMb() {
+        return ramTotalMb;
+    }
+
+    /** What the system, its desktop and its services held when the desktop opened, in megabytes. */
+    public int ramReservedMb() {
+        return ramReservedMb;
     }
 
     public BlockPos monitorPos() {

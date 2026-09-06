@@ -6,6 +6,17 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 
 ## [Unreleased]
 
+### Added
+- Every system, desktop, service and program holds a share of the computer's RAM, in megabytes, and a program
+  opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one
+  what its generation weighs, so a modern tool needs the gigabytes a modern machine has. The System Monitor lists
+  who holds what.
+
+### Changed
+- The desktop's open-program counter became a memory meter, "used/total MB", in every desktop's panel.
+- An Operation's provenance rows name the computer that asked and the program it asked through, as in
+  "lab-pc (Interactor)"; a bus reads as its kind and its name.
+
 ## [0.2.0a] - 2026-09-06
 
 The mod became a series. The code every module shares now lives in a library mod of its own, J's Core,
