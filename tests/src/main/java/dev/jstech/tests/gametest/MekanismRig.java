@@ -208,6 +208,30 @@ public final class MekanismRig {
     }
 
     /**
+     * Sets a factory up the way a player who cared would: every speed and energy upgrade it takes, and its
+     * auto-sort switched on. Without the sorting a factory only ever fills one of its slots, so it works one
+     * item at a time and is no faster than the bare machine; without the speed upgrades each of those
+     * operations still runs at the base rate. Returns false when the machine is not a factory.
+     */
+    public static boolean tuneFactory(final ServerLevel level, final BlockPos machine) {
+        if (!(level.getBlockEntity(machine) instanceof mekanism.common.tile.factory.TileEntityFactory<?> factory)) {
+            return false;
+        }
+        if (!factory.isSorting()) {
+            factory.toggleSorting();
+        }
+        final mekanism.common.tile.component.TileComponentUpgrade upgrades = factory.getComponent();
+        for (final mekanism.api.Upgrade upgrade
+                : new mekanism.api.Upgrade[] {mekanism.api.Upgrade.SPEED, mekanism.api.Upgrade.ENERGY}) {
+            if (upgrades.supports(upgrade)) {
+                upgrades.addUpgrades(upgrade, upgrade.getMax() - upgrades.getUpgrades(upgrade));
+                factory.recalculateUpgrades(upgrade);
+            }
+        }
+        return true;
+    }
+
+    /**
      * Tops the machine's buffer up through the FE capability on its back face (a creative cube's role); returns
      * false when the machine exposes no FE there.
      */

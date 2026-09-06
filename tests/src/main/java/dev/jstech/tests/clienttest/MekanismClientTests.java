@@ -56,7 +56,13 @@ public final class MekanismClientTests {
     /** The Crafting Manager needs Frames XP or newer. */
     private static final ResourceLocation FRAMES_XP = ResourceLocation.fromNamespaceAndPath("jsc", "frames_xp");
     private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_dos");
-    private static final ResourceLocation INFUSER = MekanismRig.mek("metallurgic_infuser");
+    /**
+     * The chain runs through an Ultimate Infusing Factory rather than a bare Metallurgic Infuser. It is the
+     * same machine to the mod — one declared type behind buses — but it works nine operations at a time, so
+     * the twelve infusions this build needs take a fraction of the ticks. The bare infuser stays covered by
+     * the machine GameTests, which leaves both a raw machine and a factory under test.
+     */
+    private static final ResourceLocation INFUSER = MekanismRig.mek("ultimate_infusing_factory");
     private static final ResourceLocation ALLOY_INFUSED = MekanismRig.mek("alloy_infused");
     private static final ResourceLocation ALLOY_REINFORCED = MekanismRig.mek("alloy_reinforced");
     private static final ResourceLocation ALLOY_ATOMIC = MekanismRig.mek("alloy_atomic");
@@ -73,6 +79,26 @@ public final class MekanismClientTests {
                 List.of(new ProcessingPattern.ProcessingInput(in, 1), new ProcessingPattern.ProcessingInput(extra, extraCount)),
                 List.of(new ProcessingPattern.ProcessingOutput(out, 1, 100)),
                 INFUSER.toString(), 400);
+    }
+
+    /**
+     * Tells the engine to fill this machine rather than hand it one lot at a time. A factory works several
+     * operations at once, and the default one-lot-per-cycle feed leaves all but one of its slots idle, so the
+     * chain ran as slowly as it would on a bare machine. This is the Machines tab's own Feed setting.
+     */
+    private static void fillTheFactory(final CraftingComputerBlockEntity cc) {
+        cc.setMachineConfig(INFUSER.toString(),
+                new CraftingComputerBlockEntity.MachineConfig(0, false, true));
+    }
+
+    /**
+     * Sets the factory up as a player would before leaning on it: sorting on and its upgrades in, so it works
+     * its slots in parallel and at speed. Without this the chain runs one infusion at a time at the base rate,
+     * which is what made this test take two minutes of real machine time.
+     */
+    private static void tuneMachines(final ClientTestContext ctx, final ServerLevel level) {
+        ctx.assertTrue(MekanismRig.tuneFactory(level, ctx.abs(MekanismRig.MACHINE)),
+                "the rig's machine must be a factory, so its upgrades and sorting can be set");
     }
 
     private static CraftingPattern framePattern() {
@@ -115,6 +141,8 @@ public final class MekanismClientTests {
                     MekanismRig.mountBottomInputBus(world);
                     // Flat patterns in the Recipe ROM: one per recipe, nothing chained by hand.
                     final CraftingComputerBlockEntity cc = world.blockEntity(CRAFTING_COMPUTER, CraftingComputerBlockEntity.class);
+                    fillTheFactory(cc);
+                    tuneMachines(ctx, level);
                     ctx.assertTrue(cc.loadPattern(framePattern()), "the frame pattern loads into the ROM");
                     ctx.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
                             StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE), 1, MekanismRig.itemKey(ALLOY_INFUSED)))),
@@ -221,6 +249,8 @@ public final class MekanismClientTests {
                     MekanismRig.mountBuses(world);
                     MekanismRig.mountBottomInputBus(world);
                     final CraftingComputerBlockEntity cc = world.blockEntity(CRAFTING_COMPUTER, CraftingComputerBlockEntity.class);
+                    fillTheFactory(cc);
+                    tuneMachines(ctx, level);
                     ctx.assertTrue(cc.loadPattern(framePattern()), "the frame pattern loads into the ROM");
                     ctx.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infuse(
                             StorageKey.of(Items.COPPER_INGOT), StorageKey.of(Items.REDSTONE), 1, MekanismRig.itemKey(ALLOY_INFUSED)))), "infused loads");

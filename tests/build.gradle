@@ -128,6 +128,10 @@ dependencies {
     localRuntime "mekanism:Mekanism:${mekanism_version}"
     localRuntime "mekanism:Mekanism:${mekanism_version}:generators"
     compileOnly "mekanism:Mekanism:${mekanism_version}:api"
+    // The whole mod, not just its API, so a test rig can set a machine up the way a player would: install
+    // its upgrades and switch its sorting on. Only this module compiles against it, and this module is
+    // development-only and never released; the mods themselves keep Mekanism a soft, guarded dependency.
+    compileOnly "mekanism:Mekanism:${mekanism_version}"
     localRuntime "appeng:appliedenergistics2:${ae2_version}"
     compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
     localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
