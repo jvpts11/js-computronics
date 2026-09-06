@@ -760,7 +760,7 @@ public final class CraftingGameTests {
                             "the recursive planner must be blind to a multi-stage-only recipe");
                     // The shared entry point the CLI/IQL, terminal and Network Interactor all route through finds
                     // the recipe by its result and runs the pipeline.
-                    helper.assertTrue(net.mainframe.submitCraftRequest(stone, 1, true, "cli", null) != null,
+                    helper.assertTrue(net.mainframe.submitCraftRequest(stone, 1, true, "test (Shell)", null) != null,
                             "the shared craft entry point must run the multi-stage recipe");
                 })
                 .thenExecuteAfter(14, () -> helper.assertTrue(net.storage(helper).count(stone) > 0,
@@ -1890,7 +1890,7 @@ public final class CraftingGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     // 5) Request the craft the way the terminal's request popup does.
                     helper.assertTrue(net.mainframe.submitNetworkCraft(
-                                    storageKey(Items.OAK_PLANKS), 4, true, "ni") != null,
+                                    storageKey(Items.OAK_PLANKS), 4, true, "test (Interactor)") != null,
                             "the craft request is accepted");
                 })
                 .thenExecuteAfter(20, () -> {

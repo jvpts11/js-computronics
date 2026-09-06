@@ -11,6 +11,7 @@ import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.DataCableBlockEntity;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.menu.ImportBusMenu;
+import dev.jstech.computronics.operation.MoveLabels;
 import dev.jstech.computronics.operation.NetworkInsertOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.storage.ExternalDataPort;
@@ -133,7 +134,7 @@ public non-sealed class ImportBusPart extends AbstractBusPart {
         ticksSinceFlush = 0;
         // Push the buffered data into the network as a timed INSERT; whatever does not fit comes back
         // as the Operation's leftover and is re-buffered when it finishes (above).
-        activeOp = mainframe.submitNetworkInsert(payloadKey, payloadAmount, "import");
+        activeOp = mainframe.submitNetworkInsert(payloadKey, payloadAmount, MoveLabels.bus("Import Bus", name()));
         flushedKey = payloadKey;
         flushedAmount = payloadAmount;
         if (activeOp == null) {

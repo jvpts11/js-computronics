@@ -10,6 +10,7 @@ package dev.jstech.computronics.program;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computronics.operation.MoveLabels;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.ComputingPayloads;
 import dev.jstech.computronics.operation.payload.OperationRecord;
@@ -492,7 +493,8 @@ public final class ServerCliComputer implements CliComputer {
         if (mainframe == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        final var op = mainframe.submitNetworkSelect(key, demand(quantity), host.localStorage(), "cli");
+        final var op = mainframe.submitNetworkSelect(key, demand(quantity), host.localStorage(),
+                host.originLabel(MoveLabels.SHELL));
         if (op == null) {
             return OpResult.fail("could not start the SELECT");
         }
@@ -571,7 +573,8 @@ public final class ServerCliComputer implements CliComputer {
             return OpResult.fail("nothing to push");
         }
         final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
-        final var op = mainframe == null ? null : mainframe.submitNetworkInsert(key, taken, "cli");
+        final var op = mainframe == null ? null
+                : mainframe.submitNetworkInsert(key, taken, host.originLabel(MoveLabels.SHELL));
         if (op == null) {
             host.localStore().insert(key, taken); // no dispatcher: put it straight back, never lose it
             return OpResult.fail("the network has no running Mainframe");
@@ -603,7 +606,8 @@ public final class ServerCliComputer implements CliComputer {
         }
         // Route through the shared entry point so the CLI and IQL craft a machine or multi-stage recipe
         // directly (not only a bench-planned tree), exactly as the terminal and Network Interactor do.
-        final var op = mainframe.submitCraftRequest(key, demand(quantity), true, "cli", null);
+        final var op = mainframe.submitCraftRequest(key, demand(quantity), true,
+                host.originLabel(MoveLabels.SHELL), null);
         if (op == null) {
             return OpResult.fail("no pattern crafts " + key.displayName().getString());
         }
@@ -1002,9 +1006,10 @@ public final class ServerCliComputer implements CliComputer {
             // SELECT pulls from the whole network; SELECT ... FROM <server> is a move scoped to that server,
             // both landing in this computer's local storage.
             final var operation = prioritize(from == null
-                    ? mainframe.submitNetworkSelect(key, demand(op.quantity()), host.localStorage(), "cli")
-                    : mainframe.submitNetworkMove(key, demand(op.quantity()), host.localStorage(), "cli",
-                            java.util.Set.of(from)), op);
+                    ? mainframe.submitNetworkSelect(key, demand(op.quantity()), host.localStorage(),
+                            host.originLabel(MoveLabels.IQL))
+                    : mainframe.submitNetworkMove(key, demand(op.quantity()), host.localStorage(),
+                            host.originLabel(MoveLabels.IQL), java.util.Set.of(from)), op);
             if (operation != null) {
                 operation.abortWhen(hostGone()); // the pull lands in this computer: stop once it is gone
                 queued++;
@@ -1047,7 +1052,8 @@ public final class ServerCliComputer implements CliComputer {
             if (stock.getOrDefault(key, 0L) <= 0L) {
                 continue;
             }
-            if (prioritize(mainframe.submitNetworkDelete(key, demand(op.quantity()), target, "cli"), op) != null) {
+            if (prioritize(mainframe.submitNetworkDelete(key, demand(op.quantity()), target,
+                    host.originLabel(MoveLabels.IQL)), op) != null) {
                 queued++;
             }
         }
@@ -1091,8 +1097,8 @@ public final class ServerCliComputer implements CliComputer {
         }
         int queued = 0;
         for (final StorageKey key : keys) {
-            if (prioritize(mainframe.submitNetworkMove(key, demand(op.quantity()), destSink, "cli",
-                    java.util.Set.of(source)), op) != null) {
+            if (prioritize(mainframe.submitNetworkMove(key, demand(op.quantity()), destSink,
+                    host.originLabel(MoveLabels.IQL), java.util.Set.of(source)), op) != null) {
                 queued++;
             }
         }
@@ -1117,7 +1123,8 @@ public final class ServerCliComputer implements CliComputer {
             if (stock.getOrDefault(key, 0L) <= 0L) {
                 continue;
             }
-            if (prioritize(mainframe.submitNetworkDelete(key, demand(op.quantity()), port, "cli"), op) != null) {
+            if (prioritize(mainframe.submitNetworkDelete(key, demand(op.quantity()), port,
+                    host.originLabel(MoveLabels.IQL)), op) != null) {
                 queued++;
             }
         }
@@ -1150,7 +1157,7 @@ public final class ServerCliComputer implements CliComputer {
                 continue;
             }
             final dev.jstech.computronics.operation.NetworkInsertOperation insert =
-                    prioritize(mainframe.submitNetworkInsert(key, pulled, "cli"), op);
+                    prioritize(mainframe.submitNetworkInsert(key, pulled, host.originLabel(MoveLabels.IQL)), op);
             if (insert != null) {
                 insert.onSettle(() -> {
                     final long left = insert.leftover();
@@ -1805,15 +1812,8 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public String hostname() {
-        final dev.jstech.computronics.program.ComputerConsoleState console = host.console();
-        if (console != null && !console.computerName().isBlank()) {
-            // A host name has no spaces or capitals; the computer's display name keeps its own form elsewhere.
-            return console.computerName().trim().toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
-        }
-        if (hostBlock instanceof OsHost computer && computer.installedOs() != null) {
-            return computer.installedOs().id().getPath();
-        }
-        return "computer";
+        // The host resolves its own name so the shell, the provenance rows and the remote host list agree.
+        return host.hostname();
     }
 
     @Override

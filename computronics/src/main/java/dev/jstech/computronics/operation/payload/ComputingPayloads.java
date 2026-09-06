@@ -23,6 +23,7 @@ import dev.jstech.computronics.menu.CraftingComputerMenu;
 import dev.jstech.computronics.menu.PersonalComputerMenu;
 import dev.jstech.computronics.menu.ServerRouterMenu;
 import dev.jstech.computronics.operation.DataHandoff;
+import dev.jstech.computronics.operation.MoveLabels;
 import dev.jstech.computronics.os.FilesystemKind;
 import dev.jstech.computronics.os.OsDef;
 import dev.jstech.computronics.os.OsDef;
@@ -2447,7 +2448,7 @@ public final class ComputingPayloads {
             // craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. The
             // multiStage flag picks the pipeline over the flat recursive path when a result has both.
             final var op = mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(),
-                    "terminal", refresh, payload.multiStage());
+                    host.originLabel(MoveLabels.TERMINAL), refresh, payload.multiStage());
             if (op != null) {
                 op.setPriority(payload.priority());
             }
@@ -3055,11 +3056,11 @@ public final class ComputingPayloads {
             final Runnable refresh = () -> sendSnapshot(player, level, net);
             if (one && payload.entry().isPresent() && DataContainers.canTake(source.get(), payload.entry().get())) {
                 DataHandoff.fillFromNetwork(mainframe, level, net, player, source, payload.entry().get(),
-                        "terminal", refresh);
+                        host.originLabel(MoveLabels.TERMINAL), refresh);
                 return;
             }
             DataHandoff.intoNetwork(mainframe, level, net, player, source, one ? 1 : source.get().getCount(),
-                    one, "terminal", refresh);
+                    one, host.originLabel(MoveLabels.TERMINAL), refresh);
         });
     }
 
@@ -4256,7 +4257,8 @@ public final class ComputingPayloads {
             if (mainframe == null) {
                 return;
             }
-            DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, false, "ni", refresh);
+            DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, false,
+                    host.originLabel(MoveLabels.INTERACTOR), refresh);
         });
     }
 
@@ -4279,7 +4281,8 @@ public final class ComputingPayloads {
                 if (mainframe == null) {
                     return;
                 }
-                final var op = mainframe.submitNetworkSelect(key, safeAmount, host.localStorage(), "ni");
+                final var op = mainframe.submitNetworkSelect(key, safeAmount, host.localStorage(),
+                        host.originLabel(MoveLabels.INTERACTOR));
                 if (op != null) {
                     op.setPriority(payload.priority());
                     op.abortWhen(gone(host));
@@ -4299,7 +4302,7 @@ public final class ComputingPayloads {
                 if (taken <= 0L) {
                     return;
                 }
-                final var op = mainframe.submitNetworkInsert(key, taken, "ni");
+                final var op = mainframe.submitNetworkInsert(key, taken, host.originLabel(MoveLabels.INTERACTOR));
                 if (op == null) {
                     host.localStore().insert(key, taken); // no live dispatcher: put it straight back
                     return;
@@ -4394,9 +4397,10 @@ public final class ComputingPayloads {
             }
             if (fill) {
                 DataHandoff.fillFromNetwork(mainframe, level, host.networkUuid(), player, source,
-                        payload.entry().get(), "ni", refresh);
+                        payload.entry().get(), host.originLabel(MoveLabels.INTERACTOR), refresh);
             } else {
-                DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, one, "ni", refresh);
+                DataHandoff.intoNetwork(mainframe, level, host.networkUuid(), player, source, amount, one,
+                        host.originLabel(MoveLabels.INTERACTOR), refresh);
             }
         });
     }
@@ -4428,7 +4432,8 @@ public final class ComputingPayloads {
             };
             // The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
             // craft; refreshNi resends the Network Interactor now and again when the operation settles.
-            mainframe.submitCraftRequest(StorageKey.of(payload.result()), safeAmount, true, "ni", refreshNi);
+            mainframe.submitCraftRequest(StorageKey.of(payload.result()), safeAmount, true,
+                    host.originLabel(MoveLabels.INTERACTOR), refreshNi);
             refreshNi.run();
         });
     }
@@ -5112,7 +5117,8 @@ public final class ComputingPayloads {
             if (sources.isEmpty()) {
                 return;
             }
-            final var op = mainframe.submitNetworkMove(payload.key(), payload.quantity(), dest.localStorage(), "cluster", sources);
+            final var op = mainframe.submitNetworkMove(payload.key(), payload.quantity(), dest.localStorage(),
+                    cmc.originLabel(MoveLabels.CLUSTER_MANAGER), sources);
             if (op != null) {
                 op.onSettle(() -> PacketDistributor.sendToPlayer(player,
                         buildClusterManagerState(cmc, level, ClusterManagerStatePayload.KIND_DATACENTER, payload.index(), "")));

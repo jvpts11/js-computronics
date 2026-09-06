@@ -920,10 +920,18 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     // Operations tab — recent network Operations + provenance detail
 
     void moveRow(final GuiGraphics g, final int cx, final int my, final OperationRecord.MoveRow mv) {
-        g.drawString(font, font.plainSubstrByWidth(mv.from(), 62), cx + 6, my, DIM, false);
-        g.drawString(font, ">", cx + 72, my, ACCENT, false);
-        g.drawString(font, font.plainSubstrByWidth(fmt(mv.qty()) + " " + mv.to(), POPUP_W - 88),
-                cx + 82, my, TEXT, false);
+        // Either end can be a "host (program)" label, so the parts are measured instead of sitting in fixed
+        // columns: the origin takes up to half the row, the arrow follows it, and the quantity and the
+        // destination get what is left.
+        final int left = cx + 6;
+        final int right = cx + POPUP_W - 6;
+        final String from = font.plainSubstrByWidth(mv.from(), (right - left) / 2 - 6);
+        g.drawString(font, from, left, my, DIM, false);
+        final int arrowX = left + font.width(from) + 4;
+        g.drawString(font, ">", arrowX, my, ACCENT, false);
+        final int tailX = arrowX + font.width(">") + 4;
+        g.drawString(font, font.plainSubstrByWidth(fmt(mv.qty()) + " " + mv.to(), right - tailX),
+                tailX, my, TEXT, false);
     }
 
     int statusColor(final byte status) {

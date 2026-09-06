@@ -11,6 +11,7 @@ import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.DataCableBlockEntity;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.menu.ExportBusMenu;
+import dev.jstech.computronics.operation.MoveLabels;
 import dev.jstech.computronics.operation.NetworkSelectOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.storage.ExternalDataPort;
@@ -89,7 +90,7 @@ public non-sealed class ExportBusPart extends AbstractBusPart {
             return;
         }
         // Pull the data out of the network into the faced block (item or fluid) as a timed DELETE.
-        activeOp = mainframe.submitNetworkDelete(key, want, dest, "export");
+        activeOp = mainframe.submitNetworkDelete(key, want, dest, MoveLabels.bus("Export Bus", name()));
     }
 
     private long computeWant(final ExternalDataPort dest, final StorageKey key, final long batch) {

@@ -1690,8 +1690,8 @@ public final class NetworkGameTests {
                     helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_INSERT,
                             "the import should be logged as an INSERT");
                     helper.assertTrue(!log.get(0).moves().isEmpty()
-                                    && log.get(0).moves().get(0).from().equals("import"),
-                            "provenance should read 'import'");
+                                    && log.get(0).moves().get(0).from().equals("Import Bus"),
+                            "provenance should name the Import Bus");
                 })
                 .thenSucceed();
     }
@@ -1798,8 +1798,8 @@ public final class NetworkGameTests {
                     helper.assertTrue(!log.isEmpty() && log.get(0).type() == OperationRecord.TYPE_DELETE,
                             "the export should be logged as a DELETE");
                     helper.assertTrue(!log.get(0).moves().isEmpty()
-                                    && log.get(0).moves().get(0).to().equals("export"),
-                            "provenance should go to 'export'");
+                                    && log.get(0).moves().get(0).to().equals("Export Bus"),
+                            "provenance should go to the Export Bus");
                 })
                 .thenSucceed();
     }

@@ -165,4 +165,30 @@ public interface ComputerTerminalHost {
     default dev.jstech.computronics.program.ComputerConsoleState console() {
         return null;
     }
+
+    /**
+     * This computer's host name, the way the shell's {@code hostname} reports it: the console's computer name,
+     * else the custom name from the assembly screen, else the installed system's id, else a plain "computer".
+     */
+    default String hostname() {
+        final dev.jstech.computronics.program.ComputerConsoleState console = console();
+        String customName = "";
+        String osId = "";
+        if (this instanceof dev.jstech.computronics.os.OsHost computer) {
+            customName = computer.customName();
+            if (computer.installedOs() != null) {
+                osId = computer.installedOs().id().getPath();
+            }
+        }
+        return dev.jstech.computronics.operation.MoveLabels.hostname(
+                console == null ? "" : console.computerName(), customName, osId);
+    }
+
+    /**
+     * The label an Operation's provenance shows for this computer acting through {@code program}, one of the
+     * {@link dev.jstech.computronics.operation.MoveLabels} names: {@code "host (program)"}.
+     */
+    default String originLabel(final String program) {
+        return dev.jstech.computronics.operation.MoveLabels.via(hostname(), program);
+    }
 }
