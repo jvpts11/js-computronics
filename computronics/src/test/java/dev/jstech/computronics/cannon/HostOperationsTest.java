@@ -64,6 +64,17 @@ class HostOperationsTest {
             if ("List".equals(member)) {
                 return Reply.of(new Values.ListValue(), 50);
             }
+            if ("Reprioritise".equals(member)) {
+                final Values.Obj made = new Values.Obj("AskResult");
+                final String wanted = arguments.size() < 2 ? "" : String.valueOf(arguments.get(1));
+                final boolean known = "high".equals(wanted) || "low".equals(wanted);
+                made.set("Ok", known);
+                made.set("Message", known ? "a1 is now " + wanted : "no such priority: " + wanted);
+                if (known) {
+                    this.log.add("Reprioritise " + item + " to " + wanted);
+                }
+                return Reply.of(made, 200);
+            }
             if (!"Pull".equals(member) && !"Push".equals(member) && !"Craft".equals(member)) {
                 throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Operations has no " + member);
             }
@@ -137,6 +148,20 @@ class HostOperationsTest {
         assertEquals(Process.State.FINISHED, process.state(), String.valueOf(process.message()));
         assertEquals(List.of("could not: no pattern crafts Bedrock", "carrying on"), process.console());
         assertTrue(net.log.isEmpty(), "and nothing was queued");
+    }
+
+    @Test
+    void operations_movesARunningOneUpTheQueue() {
+        final Asked net = new Asked();
+        final Process process = run(net, "Impatient", """
+                        AskResult moved = Operations.Reprioritise("a1", "high");
+                        Console.PrintLine(moved.Message);
+                        AskResult bad = Operations.Reprioritise("a1", "immediately");
+                        Console.PrintLine(bad.Ok ? "moved" : bad.Message);
+                """);
+        assertEquals(Process.State.FINISHED, process.state(), String.valueOf(process.message()));
+        assertEquals(List.of("a1 is now high", "no such priority: immediately"), process.console());
+        assertEquals(List.of("Reprioritise a1 to high"), net.log);
     }
 
     @Test

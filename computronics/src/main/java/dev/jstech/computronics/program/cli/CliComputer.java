@@ -77,6 +77,18 @@ public interface CliComputer {
     record ServerUse(String name, long stored, long capacity) {
     }
 
+    /**
+     * Moves a running operation up or down the queue.
+     *
+     * <p>Only one that is still going: what has already settled cannot be hurried.
+     *
+     * @param id       the short id, or any longer prefix of the full one
+     * @param priority the name of an {@code OperationPriority}
+     */
+    default OpResult repriorityOperation(final String id, final String priority) {
+        return OpResult.fail("this machine cannot reach the network");
+    }
+
     /** Every server on the network, with what each is holding; empty when this machine is on none. */
     default List<ServerUse> servers() {
         return List.of();

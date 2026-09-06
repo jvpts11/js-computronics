@@ -562,6 +562,33 @@ public final class ServerCliComputer implements CliComputer {
     }
 
     @Override
+    public OpResult repriorityOperation(final String id, final String priority) {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        final dev.jstech.core.operation.OperationPriority wanted;
+        try {
+            wanted = dev.jstech.core.operation.OperationPriority.valueOf(
+                    priority.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (final IllegalArgumentException notAPriority) {
+            return OpResult.fail("no such priority: " + priority);
+        }
+        final String prefix = id.trim().toLowerCase(java.util.Locale.ROOT);
+        if (prefix.isEmpty()) {
+            return OpResult.fail("which operation?");
+        }
+        for (final dev.jstech.computronics.operation.NetworkOperation operation : mainframe.liveOperations()) {
+            final String full = operation.operationId().toString();
+            if (full.startsWith(prefix) && prefix.length() >= ShortId.of(full).length()) {
+                operation.setPriority(wanted);
+                return OpResult.ok(ShortId.of(full) + " is now "
+                        + wanted.name().toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        return OpResult.fail("no operation " + id + " is still running");
+    }
+
     public OpResult cancelOperation(final String id) {
         final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
         if (mainframe == null) {

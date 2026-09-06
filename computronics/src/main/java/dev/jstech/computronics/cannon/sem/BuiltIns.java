@@ -432,6 +432,9 @@ public final class BuiltIns {
         this.method(operations, "Push", asked, PUBLIC_STATIC, this.stringType, whole);
         this.method(operations, "Craft", asked, PUBLIC_STATIC, this.stringType, whole);
         this.method(operations, "Cancel", asked, PUBLIC_STATIC, this.stringType);
+        // Moving one up the queue is asked for, not written into the record a program was handed: what
+        // it holds is a picture of how things were, and painting over a picture changes nothing.
+        this.method(operations, "Reprioritise", asked, PUBLIC_STATIC, this.stringType, this.stringType);
         this.method(operations, "Get", operation, PUBLIC_STATIC, this.stringType);
         this.method(operations, "List", new TypeSymbol.GenericType(this.listType, List.of(operation)),
                 PUBLIC_STATIC);

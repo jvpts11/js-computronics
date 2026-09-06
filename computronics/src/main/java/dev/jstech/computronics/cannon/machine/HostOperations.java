@@ -61,6 +61,8 @@ public final class HostOperations {
             case "Push" -> asked(computer.insert(item(arguments), amount(arguments), origin));
             case "Craft" -> asked(computer.craft(item(arguments), amount(arguments), origin));
             case "Cancel" -> asked(computer.cancelOperation(item(arguments)));
+            case "Reprioritise" -> asked(computer.repriorityOperation(item(arguments),
+                    arguments.size() < 2 ? "" : String.valueOf(arguments.get(1))));
             case "List" -> {
                 final Values.ListValue all = new Values.ListValue();
                 for (final CliComputer.ActiveOp op : computer.activeOps()) {
