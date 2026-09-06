@@ -46,6 +46,15 @@ public final class BuiltinCommands {
     }
 
     public static List<CliCommand> all() {
+        final List<CliCommand> out = new java.util.ArrayList<>(base());
+        // The toolchain's verbs come from the toolchain, so adding one there is enough to have it. Two
+        // lists of the same commands is two lists that eventually disagree, and the one that loses is
+        // always the one a player types into.
+        out.addAll(CannonCommands.all());
+        return List.copyOf(out);
+    }
+
+    private static List<CliCommand> base() {
         return List.of(
                 new Help(),
                 new Clear(),
@@ -77,8 +86,6 @@ public final class BuiltinCommands {
                 new Config(),
                 new Reboot(),
                 new ClusterCommand(),
-                new CannonCommands.Compile(),
-                new CannonCommands.Run(),
                 new MirrorCommand(),
                 new Uninstall(),
                 new Format(),

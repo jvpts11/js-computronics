@@ -58,6 +58,93 @@ class CannonCommandsTest {
     }
 
     @Test
+    void canpack_isNotThereUntilTheRuntimeIs() {
+        assertTrue(this.run("canpack init").contains("command not found"));
+    }
+
+    @Test
+    void canpackInit_writesAManifestThatIsAlreadyValid() {
+        this.computer.add(CannonCommands.RUNTIME);
+        assertTrue(this.run("canpack init stockwatch").contains("wrote package.cpk"));
+        final dev.jstech.computronics.cannon.pack.Manifest made =
+                dev.jstech.computronics.cannon.pack.Manifest.read(this.computer.files.get("package.cpk"));
+        assertEquals("stockwatch", made.name());
+        assertEquals("stockwatch.asm", made.entry());
+        assertTrue(made.problems().isEmpty(), () -> made.problems().toString());
+    }
+
+    @Test
+    void canpackInit_refusesToPaveOverOneThatIsAlreadyThere() {
+        this.computer.add(CannonCommands.RUNTIME);
+        this.computer.files.put("package.cpk", "name: mine\n");
+        assertTrue(this.errored("canpack init other"));
+        // Whatever the player had written in it is still there.
+        assertEquals("name: mine\n", this.computer.files.get("package.cpk"));
+    }
+
+    @Test
+    void canpackBuild_putsEveryNamedFileIntoOnePieceOfReadableText() {
+        this.computer.add(CannonCommands.RUNTIME);
+        this.computer.files.put("package.cpk", """
+                name: stockwatch
+                version: 1.0.0
+                house: jvpts11
+                entry: stockwatch.asm
+                icon: bell
+                ram: 1
+                file: stockwatch.asm
+                file: readme.txt
+                """);
+        this.computer.files.put("stockwatch.asm", ".asm 1\n.start Watcher script\n");
+        this.computer.files.put("readme.txt", "Watches the iron.\n");
+        assertTrue(this.run("canpack build").contains("built stockwatch-1.0.0.cpk"));
+        final String packed = this.computer.files.get("stockwatch-1.0.0.cpk");
+        assertTrue(packed.startsWith(".pkg 1\n"), packed);
+        assertTrue(packed.contains(".start Watcher script"), packed);
+        assertTrue(packed.contains("Watches the iron."), packed);
+    }
+
+    @Test
+    void canpackBuild_saysWhichFileIsMissingRatherThanBuildingHalfAPackage() {
+        this.computer.add(CannonCommands.RUNTIME);
+        this.computer.files.put("package.cpk", """
+                name: stockwatch
+                version: 1.0.0
+                entry: stockwatch.asm
+                file: stockwatch.asm
+                file: readme.txt
+                """);
+        this.computer.files.put("stockwatch.asm", ".asm 1\n");
+        assertTrue(this.run("canpack build").contains("readme.txt"));
+        assertFalse(this.computer.files.containsKey("stockwatch-1.0.0.cpk"),
+                "nothing half-built is left behind");
+    }
+
+    @Test
+    void canpackBuild_namesEveryLineOfTheManifestThatNeedsFixing() {
+        this.computer.add(CannonCommands.RUNTIME);
+        this.computer.files.put("package.cpk", """
+                name: Stock Watch
+                version: 1
+                entry: watch.can
+                icon: sparkle
+                ram: 0
+                file: watch.can
+                """);
+        this.computer.files.put("watch.can", "class W { }\n");
+        final String said = this.run("canpack build");
+        assertTrue(said.contains("name:"), said);
+        assertTrue(said.contains("version:"), said);
+        assertTrue(said.contains("icon:"), said);
+    }
+
+    @Test
+    void canpackBuild_asksForAManifestWhenThereIsNone() {
+        this.computer.add(CannonCommands.RUNTIME);
+        assertTrue(this.run("canpack build").contains("canpack init"));
+    }
+
+    @Test
     void compile_writesTheAssemblyBesideTheSource() {
         this.computer.add(CannonCommands.COMPILER);
         this.computer.files.put("Monitor.can", SCRIPT);

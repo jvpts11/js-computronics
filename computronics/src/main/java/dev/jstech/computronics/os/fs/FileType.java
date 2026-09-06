@@ -70,7 +70,17 @@ public enum FileType {
      * <p>It is text on purpose: a player can open what their program was turned into and follow it a
      * line at a time, which is the whole reason the compiler does not keep it to itself.
      */
-    ASM("asm", true, false);
+    ASM("asm", true, false),
+
+    /**
+     * A Cannon package: its manifest and every file in it, in one piece of text.
+     *
+     * <p>Editable like the rest, because a package is something one player hands to another and the one
+     * receiving it should be able to read every line before installing it. It is not {@code .pkg},
+     * which already means the manifest projected off an installation disc: one extension meaning two
+     * things depending on where the file sits is how a player learns not to trust what they open.
+     */
+    CPK("cpk", true, false);
 
     private final String extension;
     private final boolean userEditable;
