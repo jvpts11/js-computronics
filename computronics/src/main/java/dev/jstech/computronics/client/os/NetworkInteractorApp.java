@@ -43,6 +43,7 @@ import dev.jstech.core.client.gui.component.TabStrip;
 import dev.jstech.core.client.gui.component.Texts;
 import dev.jstech.core.client.gui.component.UiComponent;
 import dev.jstech.core.client.gui.component.UiContext;
+import dev.jstech.core.operation.OperationPriority;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -112,8 +113,8 @@ public final class NetworkInteractorApp implements InventoryBandApp {
     // instead of extracting a fixed amount.
     private static final int[] POPUP_STEPS = {-1000, -100, -10, -1, 1, 10, 100, 1000};
     private static final int POPUP_W = 188;
-    private static final int POPUP_H = 86;
-    private static final int POPUP_H_ADV = 158;
+    private static final int POPUP_H = 100;
+    private static final int POPUP_H_ADV = 172;
     private static final int ADV_ROWS = 4; // visible PULL-FROM rows
     private static final long MAX_TYPED_QTY = 999_999_999L;
 
@@ -178,6 +179,7 @@ public final class NetworkInteractorApp implements InventoryBandApp {
     private final List<NetworkServersPayload.ServerEntry> servers = new ArrayList<>();
     private final Set<String> popupDeselected = new HashSet<>(); // source server keys turned OFF
     private int popupDestIndex; // 0 = this computer; 1.. = servers.get(i-1)
+    private OperationPriority popupPriority = OperationPriority.DEFAULT;
 
     // The craft dialog's state; craftEntry is null while it is closed.
     @Nullable
@@ -186,6 +188,7 @@ public final class NetworkInteractorApp implements InventoryBandApp {
     // When the item in the craft popup can be made BOTH by a multi-stage pipeline and by composing its flat
     // patterns, this toggle chooses: true runs the pipeline, false lets the recursive planner build the tree.
     private boolean craftMulti = true;
+    private OperationPriority craftPriority = OperationPriority.DEFAULT;
     @Nullable
     private CraftPlanPayload craftPlan;
 
@@ -1184,6 +1187,7 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         popupAdvanced = false;
         popupDeselected.clear();
         popupDestIndex = 0;
+        popupPriority = OperationPriority.DEFAULT;
         requestPopup.setPreferredSize(POPUP_W, POPUP_H);
         requestPopup.rebuildSources();
         requestPopup.open();
@@ -1243,9 +1247,19 @@ public final class NetworkInteractorApp implements InventoryBandApp {
 
     private void popupAction(final int mode) {
         if (popupEntry != null && popupQty > 0) {
-            PacketDistributor.sendToServer(new NiGridClickPayload(host, monitorPos, popupEntry.key(), popupQty, mode));
+            PacketDistributor.sendToServer(new NiGridClickPayload(host, monitorPos, popupEntry.key(), popupQty, mode,
+                    popupPriority));
         }
         closePopup();
+    }
+
+    private void stepPopupPriority(final int direction) {
+        popupPriority = direction > 0 ? popupPriority.raise() : popupPriority.lower();
+    }
+
+    private void cycleCraftPriority() {
+        // Wraps from HIGH back to LOW so one button walks every level.
+        craftPriority = craftPriority == OperationPriority.HIGH ? OperationPriority.LOW : craftPriority.raise();
     }
 
     /** Sends the advanced request: the selected source Servers and the chosen destination. */
@@ -1265,7 +1279,7 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         final String destKey = (popupDestIndex > 0 && popupDestIndex - 1 < servers.size())
                 ? servers.get(popupDestIndex - 1).key() : "";
         PacketDistributor.sendToServer(new NiSelectPayload(host, monitorPos, popupEntry.key(), popupQty,
-                allSelected ? List.of() : sources, destKey));
+                allSelected ? List.of() : sources, destKey, popupPriority));
         closePopup();
     }
 
@@ -1312,6 +1326,18 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         private final QuantityBox qty = add(new QuantityBox("x", () -> popupQty));
         private final Button max = add(new Button("Max", NetworkInteractorApp.this::maxQty).setLabelScale(Texts.SMALL));
         private final Button[] steps = new Button[POPUP_STEPS.length];
+        private final Label prioLabel = add(new Label("PRIORITY", Label.Tone.DIM).setScale(Texts.SMALL));
+        private final Button prioDown = add(new Button("<", () -> stepPopupPriority(-1)).setLabelScale(Texts.SMALL));
+        private final UiComponent prioBox = add(new UiComponent() {
+            @Override
+            public void render(final GuiGraphics g, final UiContext ctx) {
+                ctx.skin().field(g, x(), y(), width(), height(), false);
+                final String text = popupPriority.label();
+                Texts.small(g, ctx.font(), text, x() + (width() - Texts.smallWidth(ctx.font(), text)) / 2, y() + 2,
+                        ctx.skin().text());
+            }
+        });
+        private final Button prioUp = add(new Button(">", () -> stepPopupPriority(1)).setLabelScale(Texts.SMALL));
         private final Label pullLabel = add(new Label("PULL FROM (servers)", Label.Tone.DIM).setScale(Texts.SMALL));
         private final Panel sources = add(new Panel());
         private final Label noSources = add(new Label("all sources", Label.Tone.DIM).setScale(Texts.SMALL));
@@ -1369,10 +1395,15 @@ public final class NetworkInteractorApp implements InventoryBandApp {
             for (int i = 0; i < steps.length; i++) {
                 steps[i].setBounds(px + 4 + i * 23, py + 44, 22, 12);
             }
+            // The scheduling level, on its own row under the quantity steppers, in both dialog modes.
+            prioLabel.setBounds(px + 4, py + 62, 50, 8);
+            prioDown.setBounds(px + 56, py + 60, 12, 12);
+            prioBox.setBounds(px + 70, py + 60, 40, 12);
+            prioUp.setBounds(px + 112, py + 60, 12, 12);
             final boolean advanced = advancedShown();
-            pullLabel.setBounds(px + 4, py + 60, POPUP_W - 8, 8);
+            pullLabel.setBounds(px + 4, py + 74, POPUP_W - 8, 8);
             pullLabel.setVisible(advanced);
-            final int listY = py + 69;
+            final int listY = py + 83;
             sources.setBounds(px + 6, listY, POPUP_W - 12, ADV_ROWS * 10);
             sources.setVisible(advanced && !servers.isEmpty());
             final List<UiComponent> rows = sources.children();
@@ -1394,9 +1425,9 @@ public final class NetworkInteractorApp implements InventoryBandApp {
             nextDest.setVisible(advanced);
             action.setVisible(advanced);
             final int bw = (POPUP_W - 12) / 2;
-            toInventory.setBounds(px + 4, py + 62, bw, 18);
-            toNetwork.setBounds(px + 4 + bw + 4, py + 62, bw, 18);
-            request.setBounds(px + 4, py + 62, POPUP_W - 8, 18);
+            toInventory.setBounds(px + 4, py + 76, bw, 18);
+            toNetwork.setBounds(px + 4 + bw + 4, py + 76, bw, 18);
+            request.setBounds(px + 4, py + 76, POPUP_W - 8, 18);
             toInventory.setVisible(!advanced && popupStorage);
             toNetwork.setVisible(!advanced && popupStorage);
             request.setVisible(!advanced && !popupStorage);
@@ -1444,6 +1475,7 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         craftEntry = entry;
         craftQty = 1;
         craftMulti = true; // default to the pipeline when the item has one; the toggle lets the player switch
+        craftPriority = OperationPriority.DEFAULT;
         craftPlan = null;
         closePopup();
         craftPopup.open();
@@ -1468,7 +1500,8 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         if (craftEntry != null) {
             // A multi-stage choice only bites when the entry actually has a pipeline; otherwise it is ignored.
             final boolean multi = !craftEntry.multiStage() || craftMulti;
-            PacketDistributor.sendToServer(new CraftSubmitPayload(monitorPos, host, craftEntry.result(), craftQty, partial, multi));
+            PacketDistributor.sendToServer(new CraftSubmitPayload(monitorPos, host, craftEntry.result(), craftQty, partial,
+                    multi, craftPriority));
         }
         craftPopup.close();
     }
@@ -1489,6 +1522,8 @@ public final class NetworkInteractorApp implements InventoryBandApp {
         private final QuantityBox qty = add(new QuantityBox("", () -> craftQty));
         private final Button[] steps = new Button[CRAFT_STEPS.length];
         private final Label planLabel = add(new Label("PLAN - raw ingredients", Label.Tone.DIM).setScale(Texts.SMALL));
+        private final Button priority = add(new Button(() -> "Prio: " + craftPriority.label(),
+                NetworkInteractorApp.this::cycleCraftPriority).setLabelScale(Texts.SMALL));
         private final UiComponent plan = add(new UiComponent() {
             @Override
             public void render(final GuiGraphics g, final UiContext ctx) {
@@ -1526,7 +1561,9 @@ public final class NetworkInteractorApp implements InventoryBandApp {
             for (int i = 0; i < steps.length; i++) {
                 steps[i].setBounds(px + 70 + i * 31, py + 22, 29, 14);
             }
-            planLabel.setBounds(px + 5, py + 41, CRAFT_W - 10, 8);
+            planLabel.setBounds(px + 5, py + 41, CRAFT_W - 70, 8);
+            // The scheduling level shares the plan header's row, on the right.
+            priority.setBounds(px + CRAFT_W - 61, py + 38, 56, 11);
             plan.setBounds(px + 4, py + 51, CRAFT_W - 8, CRAFT_H - 51 - 34);
             estimate.setBounds(px + 5, py + CRAFT_H - 32, 60, 8);
             estimate.setVisible(craftPlan != null);
@@ -1756,5 +1793,15 @@ public final class NetworkInteractorApp implements InventoryBandApp {
     /** The centre of the craft popup's full-request button. */
     public int[] craftPopupSubmitCenter() {
         return local(craftPopup.craft.center());
+    }
+
+    /** The centre of the craft popup's priority button (each click walks one level up, wrapping to LOW). */
+    public int[] craftPopupPriorityCenter() {
+        return local(craftPopup.priority.center());
+    }
+
+    /** The level the craft popup will submit at. */
+    public OperationPriority craftPriority() {
+        return craftPriority;
     }
 }

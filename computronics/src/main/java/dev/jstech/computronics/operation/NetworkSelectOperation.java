@@ -32,7 +32,9 @@ import java.util.function.BooleanSupplier;
  */
 public final class NetworkSelectOperation extends AbstractTransferOperation {
 
-    public static final int DEFAULT_WAIT_TIMEOUT_TICKS = 1200;
+    /** The design default of the WAITING timeout; the live value comes from the balance config. */
+    public static final int DEFAULT_WAIT_TIMEOUT_TICKS =
+            dev.jstech.core.operation.OperationBalance.DEFAULT_WAITING_TIMEOUT_TICKS;
 
     private final DataSink destination;
     private final String destinationLabel;
@@ -59,7 +61,7 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
                                   @Nullable final LatencyScheduler scheduler,
                                   final Set<NodeUuid> sourceFilter) {
         this(level, network, key, demand, destination, destinationLabel, recordType, operationId, index,
-                scheduler, sourceFilter, DEFAULT_WAIT_TIMEOUT_TICKS);
+                scheduler, sourceFilter, dev.jstech.core.operation.OperationBalance.waitingTimeoutTicks());
     }
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
@@ -208,8 +210,18 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         return this;
     }
 
+    @Override
     public UUID operationId() {
         return operationId;
+    }
+
+    @Override
+    public String typeId() {
+        return switch (recordType) {
+            case OperationRecord.TYPE_MOVE -> ComputingOperations.MOVE;
+            case OperationRecord.TYPE_DELETE -> ComputingOperations.DELETE;
+            default -> ComputingOperations.SELECT;
+        };
     }
 
     @Override
@@ -229,7 +241,7 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         movedPerServer.forEach((server, moved) ->
                 moves.add(new OperationRecord.MoveRow("SRV-" + shortId(server.asString()), moved, destinationLabel)));
         final List<OperationRecord.SubRow> subs = includeSubs ? subRows() : List.of();
-        return new OperationRecord(recordType, key, demand, movedTotal,
-                recordStatus, List.copyOf(moves), subs);
+        return new OperationRecord(operationId, recordType, key, demand, movedTotal,
+                recordStatus, priority(), List.copyOf(moves), subs);
     }
 }

@@ -15,6 +15,7 @@ import dev.jstech.computronics.operation.PersistentOperation;
 import dev.jstech.computronics.operation.index.Allocation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.core.uuid.NodeUuid;
 import net.minecraft.core.BlockPos;
@@ -50,6 +51,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
         StorageKey.CODEC.encodeStart(ops, resultKey).result().ifPresent(t -> tag.put("Result", t));
         tag.putLong("Requested", requested);
         tag.putString("Label", requesterLabel);
+        tag.putByte(PRIORITY_KEY, (byte) priority.ordinal());
         if (embeddedPattern != null) {
             CraftingPattern.CODEC.encodeStart(ops, embeddedPattern).result().ifPresent(t -> tag.put("Embedded", t));
         }
@@ -152,6 +154,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
         final CraftingPattern embedded = tag.contains("Embedded")
                 ? CraftingPattern.CODEC.parse(ops, tag.get("Embedded")).result().orElse(null) : null;
         final String label = tag.getString("Label");
+        final OperationPriority priority = savedPriority(tag);
         final List<NetworkProcessingOperation> running = new ArrayList<>();
         for (final NetworkProcessingOperation step : machineSteps) {
             if (step != null && !step.isDone()) {
@@ -159,24 +162,46 @@ public final class NetworkCraftOperation implements PersistentOperation {
             }
         }
         if (running.isEmpty()) {
-            return new Restored(mainframe.submitNetworkCraft(result, remaining, true, label, embedded), false);
+            return new Restored(withPriority(
+                    mainframe.submitNetworkCraft(result, remaining, true, label, embedded), priority), false);
         }
         // Re-plan a tick after the last in-flight step settles, once the storage index has seen what they made.
         final int[] pending = {running.size()};
         for (final NetworkProcessingOperation step : running) {
             step.onSettle(() -> {
                 if (--pending[0] == 0) {
-                    mainframe.runNextTick(() -> mainframe.submitNetworkCraft(result, remaining, true, label, embedded));
+                    mainframe.runNextTick(() -> withPriority(
+                            mainframe.submitNetworkCraft(result, remaining, true, label, embedded), priority));
                 }
             });
         }
         return new Restored(null, false);
     }
 
+    /** The scheduling level a saved operation ran at; the default for saves that predate priorities. */
+    static OperationPriority savedPriority(final CompoundTag tag) {
+        return tag.contains(PRIORITY_KEY)
+                ? OperationPriority.byOrdinal(tag.getByte(PRIORITY_KEY)) : OperationPriority.DEFAULT;
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private static NetworkCraftOperation withPriority(
+            @org.jetbrains.annotations.Nullable final NetworkCraftOperation operation,
+            final OperationPriority priority) {
+        if (operation != null) {
+            operation.setPriority(priority);
+        }
+        return operation;
+    }
+
+    static final String PRIORITY_KEY = "Priority";
+
     private static final String MACHINE_STEPS_KEY = "MachineSteps";
     private static final int STALL_LIMIT = 100;
 
-    public static final int DEFAULT_WAIT_TIMEOUT_TICKS = 1200;
+    /** The design default of the WAITING timeout; the live value comes from the balance config. */
+    public static final int DEFAULT_WAIT_TIMEOUT_TICKS =
+            dev.jstech.core.operation.OperationBalance.DEFAULT_WAITING_TIMEOUT_TICKS;
 
     private final ServerLevel level;
     private final NetworkUuid network;
@@ -211,7 +236,9 @@ public final class NetworkCraftOperation implements PersistentOperation {
     private int stalledTicks;
     private long deliveredResult;
     private boolean done;
+    private boolean cancelled;
     private byte status = OperationRecord.STATUS_FAILED;
+    private OperationPriority priority = OperationPriority.DEFAULT;
     private Runnable onSettle;
     // The Mainframe that runs this craft's machine steps as processing operations of their own; null only for
     // plans without machine steps.
@@ -296,7 +323,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
             // first the full ingredient reservation, then an idle computer that can execute. Distinct crafts are
             // gated by executor availability (a lone Crafting Computer serves one at a time; a Supercomputer
             // cluster unlocks parallel crafts), not by the Mainframe's operation queues — crafting is a subnet.
-            if (++waitTicks > DEFAULT_WAIT_TIMEOUT_TICKS) {
+            if (++waitTicks > dev.jstech.core.operation.OperationBalance.waitingTimeoutTicks()) {
                 timedOut = true;
                 finish();
                 return;
@@ -407,6 +434,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
             if (op == null) {
                 continue;
             }
+            op.setPriority(priority); // a stage of this craft reports the craft's level
             machineRuns.add(new MachineRun(i, op));
             launched[i] = true;
         }
@@ -779,12 +807,27 @@ public final class NetworkCraftOperation implements PersistentOperation {
         }
         pool.clear();
 
-        status = timedOut ? OperationRecord.STATUS_RESOURCE_LOCKED
-                : deliveredResult >= requested ? OperationRecord.STATUS_COMPLETED
+        status = deliveredResult >= requested ? OperationRecord.STATUS_COMPLETED
+                : cancelled ? OperationRecord.STATUS_DISCARDED
+                : timedOut ? OperationRecord.STATUS_RESOURCE_LOCKED
                 : deliveredResult > 0 ? OperationRecord.STATUS_PARTIAL : OperationRecord.STATUS_FAILED;
         if (onSettle != null) {
             onSettle.run();
         }
+    }
+
+    @Override
+    public void cancel() {
+        if (done) {
+            return;
+        }
+        cancelled = true;
+        // The machine steps in flight are this craft's own stages: stop them with it. Whatever the machines
+        // already hold stays in the machines, in the world, where the player can collect it.
+        for (final MachineRun run : new ArrayList<>(machineRuns)) {
+            run.op.cancel();
+        }
+        finish();
     }
 
     private void writeBack(final StorageKey key, final long amount) {
@@ -834,6 +877,11 @@ public final class NetworkCraftOperation implements PersistentOperation {
         return operationId;
     }
 
+    @Override
+    public String typeId() {
+        return dev.jstech.computronics.operation.ComputingOperations.CRAFT;
+    }
+
     public byte craftStatus() {
         return status;
     }
@@ -876,8 +924,22 @@ public final class NetworkCraftOperation implements PersistentOperation {
             moves.add(new OperationRecord.MoveRow(executorLabel(), produced, requesterLabel));
         }
         final List<OperationRecord.SubRow> subs = includeSubs ? subRows() : List.of();
-        return new OperationRecord(OperationRecord.TYPE_CRAFT, resultKey, requested, produced,
-                recordStatus, List.copyOf(moves), subs);
+        return new OperationRecord(operationId, OperationRecord.TYPE_CRAFT, resultKey, requested, produced,
+                recordStatus, priority, List.copyOf(moves), subs);
+    }
+
+    @Override
+    public OperationPriority priority() {
+        return priority;
+    }
+
+    @Override
+    public void setPriority(final OperationPriority priority) {
+        this.priority = java.util.Objects.requireNonNull(priority, "priority");
+        // The machine steps this craft is driving are its stages: they report the same level.
+        for (final MachineRun run : machineRuns) {
+            run.op.setPriority(priority);
+        }
     }
 
     private long producedSoFar() {

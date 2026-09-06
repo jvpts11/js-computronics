@@ -592,8 +592,31 @@ public interface CliComputer {
     record Holding(String server, long quantity) {
     }
 
-    /** A snapshot of one in-flight operation. */
-    record ActiveOp(String type, String item, long progress, long total, String status) {
+    /** A snapshot of one in-flight operation; {@code id} is the short id {@code cancel} takes. */
+    record ActiveOp(String id, String type, String item, long progress, long total, String status,
+                    String priority) {
+    }
+
+    /** Stops the in-flight operation with this short id (as listed by {@code ops}). */
+    default OpResult cancelOperation(final String id) {
+        return OpResult.fail("this computer cannot cancel network operations");
+    }
+
+    /**
+     * One operation type's last hour on the network: how many settled, the mean ticks waited and run, the
+     * share that fell short in whole percent, and what the type moved.
+     */
+    record OperationStat(String type, int count, int averageWait, int averageRun, int shortfallPercent, long moved) {
+    }
+
+    /** The network's operation statistics for the last hour, empty off a network. */
+    default List<OperationStat> operationStats() {
+        return List.of();
+    }
+
+    /** The most operations the network had in flight at once today. */
+    default int peakOperationsToday() {
+        return 0;
     }
 
     /** A program installed on the computer: its short command name and full id, for listing. */

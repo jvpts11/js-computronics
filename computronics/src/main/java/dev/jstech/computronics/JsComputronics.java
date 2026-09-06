@@ -10,7 +10,6 @@ package dev.jstech.computronics;
 import com.mojang.logging.LogUtils;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.registry.JscCreativeModeTabs;
-import dev.jstech.core.config.CoreConfigBridge;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -29,9 +28,8 @@ public class JsComputronics {
     public JsComputronics(IEventBus modEventBus, ModContainer modContainer) {
         LOGGER.info("J's Computronics {} loaded.", modContainer.getModInfo().getVersion());
 
-        // Server config: registers the TOML spec on the mod container and pushes loaded values into the runtime
-        // settings the Operation console reads (e.g. the SQL dialect).
-        CoreConfigBridge.register(modEventBus, modContainer);
+        // The Operation types the network runs, declared in the core registry for every other mod to see.
+        dev.jstech.computronics.operation.ComputingOperations.register();
 
         ComputingModule.register(modEventBus);
         JscCreativeModeTabs.register(modEventBus);

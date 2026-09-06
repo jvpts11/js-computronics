@@ -8,11 +8,13 @@
 package dev.jstech.computronics.client.os;
 
 import dev.jstech.core.client.gui.theme.JsTechTheme;
+import dev.jstech.computronics.operation.payload.CancelOperationPayload;
 import dev.jstech.computronics.operation.payload.NetworkManagerPayload;
 import dev.jstech.computronics.operation.payload.NetworkNodeInfo;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.operation.payload.RequestNetworkManagerPayload;
 import dev.jstech.computronics.operation.payload.RequestNiOperationsPayload;
+import dev.jstech.computronics.operation.payload.SetOperationPriorityPayload;
 import dev.jstech.computronics.program.OperationPalette;
 import dev.jstech.core.client.gui.component.Button;
 import dev.jstech.core.client.gui.component.ColumnHeader;
@@ -27,6 +29,7 @@ import dev.jstech.core.client.gui.component.Texts;
 import dev.jstech.core.client.gui.component.UiComponent;
 import dev.jstech.core.client.gui.component.UiContext;
 import dev.jstech.core.gui.layout.DesktopZ;
+import dev.jstech.core.operation.OperationPriority;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -52,12 +55,15 @@ import java.util.function.Supplier;
  */
 public final class NetworkManagerApp implements DesktopApp {
 
-    private static final List<String> TABS = List.of("Devices", "Processes", "Hardware", "Map", "Log");
+    private static final List<String> TABS = List.of("Devices", "Processes", "Hardware", "Map", "Log", "Stats");
     private static final int TAB_DEVICES = 0;
     private static final int TAB_PROCESSES = 1;
     private static final int TAB_HARDWARE = 2;
     private static final int TAB_MAP = 3;
     private static final int TAB_LOG = 4;
+    private static final int TAB_STATS = 5;
+    private static final int STAT_ROW_H = 12;
+    private static final int STATS_REFRESH_FRAMES = 100;
 
     private static final int OPS_REFRESH_FRAMES = 40;
     private static final int DEV_ROW_H = 12;
@@ -157,13 +163,23 @@ public final class NetworkManagerApp implements DesktopApp {
     private final Label noLogLabel;
     private final ListView<OperationRecord> logList;
     private final ScrollBar logBar;
+    private final Label statsHeader;
+    private final Label noStatsLabel;
+    private final ColumnHeader statsColumns;
+    private final ListView<NetworkManagerPayload.TypeStat> statsList;
     private final Popup detailPopup;
     private final Label detailType;
     private final Label detailName;
     private final Label detailAmount;
     private final Label detailSection;
+    private final Label detailTiming;
     private final ListView<DetailRow> detailList;
     private final Button detailClose;
+    private final Label detailPrioLabel;
+    private final Button detailPrioDown;
+    private final Label detailPrioValue;
+    private final Button detailPrioUp;
+    private final Button detailCancel;
 
     public NetworkManagerApp(final BlockPos host, final BlockPos monitorPos) {
         this.host = host;
@@ -179,7 +195,8 @@ public final class NetworkManagerApp implements DesktopApp {
         slotsLabel = root.add(new Label(() -> "Craft slots  " + scSlotsUsed + " / " + scSlotsTotal, Label.Tone.DIM));
         liveLabel = root.add(new Label(() -> activeOps.size() + " running", Label.Tone.DIM).setAlign(Label.Align.RIGHT));
         noProcLabel = root.add(new Label("No Operations in flight.", Label.Tone.DIM));
-        procList = root.add(new ListView<OperationRecord>(() -> activeOps, PROC_ROW_H, this::renderProcessRow));
+        procList = root.add(new ListView<OperationRecord>(() -> activeOps, PROC_ROW_H, this::renderProcessRow)
+                .setOnClick(this::processClicked));
         procBar = root.add(new ScrollBar(() -> Math.max(0, activeOps.size() - procList.visibleRows()), procList::scroll,
                 v -> procList.setScroll(v)));
 
@@ -208,6 +225,11 @@ public final class NetworkManagerApp implements DesktopApp {
         logBar = root.add(new ScrollBar(() -> Math.max(0, logNewestFirst.size() - logList.visibleRows()), logList::scroll,
                 v -> logList.setScroll(v)));
 
+        statsHeader = root.add(new Label(this::statsHeaderText, Label.Tone.DIM));
+        noStatsLabel = root.add(new Label("No Operations settled in the last hour.", Label.Tone.DIM));
+        statsColumns = root.add(new ColumnHeader(List.of("TYPE", "OPS/H", "WAIT", "RUN", "FAIL")).setSortable(false));
+        statsList = root.add(new ListView<NetworkManagerPayload.TypeStat>(this::statRows, STAT_ROW_H, this::renderStatRow));
+
         detailPopup = new Popup("", DETAIL_W, DETAIL_H).setDim(0xB0000000).setLayouter(this::layoutDetail);
         detailType = detailPopup.add(new Label(() -> detailOp == null ? "" : OperationPalette.labelFor(detailOp.type()))
                 .setColor(() -> detailOp == null ? 0 : OperationPalette.colorFor(detailOp.type())));
@@ -215,8 +237,16 @@ public final class NetworkManagerApp implements DesktopApp {
         detailAmount = detailPopup.add(new Label(this::detailAmountText)
                 .setColor(() -> detailOp == null ? 0 : statusColor(detailOp.status())));
         detailSection = detailPopup.add(new Label(this::detailSectionText, Label.Tone.DIM));
+        detailTiming = detailPopup.add(new Label(this::detailTimingText, Label.Tone.DIM).setAlign(Label.Align.RIGHT));
         detailList = detailPopup.add(new ListView<DetailRow>(() -> detailRows, 10, this::renderDetailRow));
         detailClose = detailPopup.add(new Button("Close", detailPopup::close));
+        // A live Operation can be re-prioritised from its detail; a logged one only shows the level it ran at.
+        detailPrioLabel = detailPopup.add(new Label("PRIORITY", Label.Tone.DIM));
+        detailPrioDown = detailPopup.add(new Button("<", () -> stepDetailPriority(-1)));
+        detailPrioValue = detailPopup.add(new Label(() -> detailOp == null ? "" : detailOp.priority().label())
+                .setAlign(Label.Align.CENTER));
+        detailPrioUp = detailPopup.add(new Button(">", () -> stepDetailPriority(1)));
+        detailCancel = detailPopup.add(new Button("Cancel", this::cancelDetail));
 
         active = this;
         PacketDistributor.sendToServer(new RequestNetworkManagerPayload(host));
@@ -236,6 +266,20 @@ public final class NetworkManagerApp implements DesktopApp {
             active.activeOps = ops;
             active.scSlotsUsed = slotsUsed;
             active.scSlotsTotal = slotsTotal;
+            active.refreshLiveDetail();
+        }
+    }
+
+    /** Keeps an open detail of a live Operation current with the latest snapshot (progress, status, level). */
+    private void refreshLiveDetail() {
+        if (detailOp == null || !detailOp.hasId() || !detailPopup.isOpen()) {
+            return;
+        }
+        for (final OperationRecord op : activeOps) {
+            if (op.id().equals(detailOp.id())) {
+                showDetail(op);
+                return;
+            }
         }
     }
 
@@ -300,6 +344,25 @@ public final class NetworkManagerApp implements DesktopApp {
         return data == null ? NetworkManagerPayload.Hardware.EMPTY : data.hardware();
     }
 
+    private NetworkManagerPayload.Statistics statistics() {
+        return data == null ? NetworkManagerPayload.Statistics.EMPTY : data.statistics();
+    }
+
+    private List<NetworkManagerPayload.TypeStat> statRows() {
+        return statistics().types();
+    }
+
+    private String statsHeaderText() {
+        final NetworkManagerPayload.Statistics stats = statistics();
+        return "Last hour: " + JsTechTheme.fmt(stats.movedLastHour()) + " items moved   -   peak "
+                + stats.peakConcurrent() + " in flight today";
+    }
+
+    /** Ticks as a short duration: whole seconds past a minute's worth, else ticks. */
+    private static String ticksLabel(final int ticks) {
+        return ticks >= 1200 ? (ticks / 20) + "s" : ticks + "t";
+    }
+
     private String networkText() {
         if (data == null) {
             return "";
@@ -323,6 +386,9 @@ public final class NetworkManagerApp implements DesktopApp {
         if (target == TAB_PROCESSES || target == TAB_LOG) {
             requestOps();
         }
+        if (target == TAB_STATS) {
+            PacketDistributor.sendToServer(new RequestNetworkManagerPayload(host));
+        }
     }
 
     // ---- rendering ----
@@ -341,6 +407,9 @@ public final class NetworkManagerApp implements DesktopApp {
         frame++;
         if ((tab == TAB_PROCESSES || tab == TAB_LOG) && frame % OPS_REFRESH_FRAMES == 0) {
             requestOps();
+        }
+        if (tab == TAB_STATS && frame % STATS_REFRESH_FRAMES == 0) {
+            PacketDistributor.sendToServer(new RequestNetworkManagerPayload(host));
         }
         final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
         g.fill(x, y, x + width, y + height, skin.windowBg());
@@ -427,6 +496,43 @@ public final class NetworkManagerApp implements DesktopApp {
             logList.setBounds(px, top, pw - BAR_W, Math.max(LOG_ROW_H, h));
             logBar.setBounds(px + pw - BAR_W, top, BAR_W, logList.visibleRows() * LOG_ROW_H);
         }
+
+        final boolean stats = ready && tab == TAB_STATS;
+        statsHeader.setVisible(stats);
+        noStatsLabel.setVisible(stats && statRows().isEmpty());
+        statsColumns.setVisible(stats && !statRows().isEmpty());
+        statsList.setVisible(stats && !statRows().isEmpty());
+        if (stats) {
+            statsHeader.setBounds(px + 2, top, pw, 8);
+            noStatsLabel.setBounds(px + 2, top + 14, pw, 8);
+            statsColumns.setBounds(px, top + 11, pw, 12);
+            // Five lanes: the type takes the left third, the four figures share the rest, right-aligned.
+            final int lane = (pw - pw / 3) / 4;
+            final int figuresX = px + pw / 3;
+            statsColumns.setColumnX(px + 4, figuresX, figuresX + lane, figuresX + 2 * lane, figuresX + 3 * lane);
+            statsList.setBounds(px, top + 23, pw, Math.max(STAT_ROW_H, h - 23));
+        }
+    }
+
+    private void renderStatRow(final GuiGraphics g, final UiContext ctx, final NetworkManagerPayload.TypeStat stat,
+                               final int index, final int x, final int y, final int w, final int h,
+                               final boolean hovered, final boolean selected) {
+        final Font font = ctx.font();
+        ctx.skin().listRow(g, x, y, w, h, hovered, false);
+        final byte type = stat.type();
+        g.drawString(font, OperationPalette.labelFor(type), statsColumns.columnX(0), y + 2,
+                OperationPalette.colorFor(type), false);
+        final String[] figures = {
+                String.valueOf(stat.count()),
+                ticksLabel(stat.averageWait()),
+                ticksLabel(stat.averageRun()),
+                stat.shortfallPercent() + "%"};
+        for (int i = 0; i < figures.length; i++) {
+            // Each figure sits right-aligned in its lane, so the columns read as a table.
+            final int laneRight = i == figures.length - 1 ? x + w - 4 : statsColumns.columnX(i + 2) - 6;
+            final int color = i == 3 && stat.shortfallPercent() > 0 ? C_AMBER : ctx.skin().text();
+            g.drawString(font, figures[i], laneRight - font.width(figures[i]), y + 2, color, false);
+        }
     }
 
     private void renderDeviceRow(final GuiGraphics g, final UiContext ctx, final NetworkNodeInfo n, final int index,
@@ -455,7 +561,14 @@ public final class NetworkManagerApp implements DesktopApp {
         ctx.skin().listRow(g, x, y, w, h, hovered, false);
         final String type = OperationPalette.labelFor(op.type());
         g.drawString(font, type, x + 4, y + 3, OperationPalette.colorFor(op.type()), false);
-        final int nameX = x + 4 + font.width(type) + 4;
+        int nameX = x + 4 + font.width(type) + 4;
+        // A level other than the default is worth a tag: raised in amber, lowered dimmed.
+        if (op.priority() != OperationPriority.DEFAULT) {
+            final String tag = op.priority().label();
+            g.drawString(font, tag, nameX, y + 3,
+                    op.priority().ordinal() > OperationPriority.DEFAULT.ordinal() ? C_AMBER : ctx.skin().dim(), false);
+            nameX += font.width(tag) + 4;
+        }
         final int barX = x + w / 2 + 4;
         g.drawString(font, Texts.clip(font, op.name().getString(), barX - nameX - 4), nameX, y + 3, ctx.skin().text(), false);
         final int barLen = w / 2 - 40;
@@ -485,6 +598,49 @@ public final class NetworkManagerApp implements DesktopApp {
             return;
         }
         openDetail(logNewestFirst.get(index));
+    }
+
+    private void processClicked(final int index, final int button, final double mx, final double my) {
+        if (button != 0 || index < 0 || index >= activeOps.size()) {
+            return;
+        }
+        openDetail(activeOps.get(index));
+    }
+
+    /** Whether the detail shows an Operation still in flight (its level can be changed). */
+    private boolean detailIsLive() {
+        if (detailOp == null || !detailOp.hasId()) {
+            return false;
+        }
+        for (final OperationRecord op : activeOps) {
+            if (op.id().equals(detailOp.id())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void stepDetailPriority(final int direction) {
+        if (!detailIsLive()) {
+            return;
+        }
+        final OperationPriority next = direction > 0 ? detailOp.priority().raise() : detailOp.priority().lower();
+        if (next == detailOp.priority()) {
+            return;
+        }
+        // Show the new level at once; the server's next live snapshot confirms it (or reverts it if the
+        // Operation settled in the meantime).
+        detailOp = detailOp.withPriority(next);
+        PacketDistributor.sendToServer(new SetOperationPriorityPayload(host, monitorPos, detailOp.id(), next));
+    }
+
+    /** Stops the Operation the detail shows; the next snapshot lists it in the log as DISCARDED. */
+    private void cancelDetail() {
+        if (!detailIsLive()) {
+            return;
+        }
+        PacketDistributor.sendToServer(new CancelOperationPayload(host, monitorPos, detailOp.id()));
+        detailPopup.close();
     }
 
     // ---- the map ----
@@ -691,6 +847,14 @@ public final class NetworkManagerApp implements DesktopApp {
     // ---- the detail dialog (a logged Operation and its sub-operations) ----
 
     private void openDetail(final OperationRecord op) {
+        showDetail(op);
+        detailList.setScroll(0);
+        detailPopup.open();
+        detailPopup.placeIn(lastX, lastY, lastW, lastH);
+    }
+
+    /** Points the detail at {@code op} and rebuilds its rows, leaving the dialog's scroll and place alone. */
+    private void showDetail(final OperationRecord op) {
         detailOp = op;
         final List<DetailRow> rows = new ArrayList<>();
         if (!op.subs().isEmpty()) {
@@ -703,9 +867,6 @@ public final class NetworkManagerApp implements DesktopApp {
             }
         }
         detailRows = rows;
-        detailList.setScroll(0);
-        detailPopup.open();
-        detailPopup.placeIn(lastX, lastY, lastW, lastH);
     }
 
     private String detailAmountText() {
@@ -714,6 +875,14 @@ public final class NetworkManagerApp implements DesktopApp {
         }
         final String reqLabel = detailOp.requested() >= 1_000_000_000L ? "all" : JsTechTheme.fmt(detailOp.requested());
         return JsTechTheme.fmt(detailOp.moved()) + " of " + reqLabel + "   " + statusLabel(detailOp.status());
+    }
+
+    /** How long the Operation waited and ran, on the section row's right; blank before its first tick. */
+    private String detailTimingText() {
+        if (detailOp == null || detailOp.waitedTicks() + detailOp.ranTicks() == 0) {
+            return "";
+        }
+        return "waited " + ticksLabel(detailOp.waitedTicks()) + ", ran " + ticksLabel(detailOp.ranTicks());
     }
 
     private String detailSectionText() {
@@ -727,11 +896,26 @@ public final class NetworkManagerApp implements DesktopApp {
         final int typeW = lastFont == null ? 30 : lastFont.width(detailType.text());
         detailType.setBounds(p.x() + 6, p.y() + 6, typeW, 8);
         detailName.setBounds(p.x() + 6 + typeW + 4, p.y() + 6, p.width() - 16 - typeW, 8);
-        detailAmount.setBounds(p.x() + 6, p.y() + 18, p.width() - 12, 8);
-        detailSection.setBounds(p.x() + 6, p.y() + 34, p.width() - 12, 8);
+        // The level sits at the right end of the amount row: a label, then < value > for a live Operation.
+        final boolean live = detailIsLive();
+        final int prioRight = p.right() - 6;
+        final int prioW = live ? 12 + 34 + 12 : 34;
+        final int prioLabelW = lastFont == null ? 40 : lastFont.width("PRIORITY") + 4;
+        detailAmount.setBounds(p.x() + 6, p.y() + 18, p.width() - 12 - prioW - prioLabelW - 4, 8);
+        detailPrioLabel.setBounds(prioRight - prioW - prioLabelW, p.y() + 18, prioLabelW, 8);
+        detailPrioDown.setBounds(prioRight - prioW, p.y() + 16, 12, 11);
+        detailPrioValue.setBounds(prioRight - (live ? 46 : 34), p.y() + 18, 34, 8);
+        detailPrioUp.setBounds(prioRight - 12, p.y() + 16, 12, 11);
+        detailPrioDown.setVisible(live);
+        detailPrioUp.setVisible(live);
+        detailSection.setBounds(p.x() + 6, p.y() + 34, p.width() / 2, 8);
+        detailTiming.setBounds(p.x() + p.width() / 2, p.y() + 34, p.width() / 2 - 6, 8);
         detailList.setBounds(p.x() + 8, p.y() + 45, p.width() - 14, Math.max(10, p.height() - 45 - 24));
         final int cw = (lastFont == null ? 30 : lastFont.width("Close")) + 12;
         detailClose.setBounds(p.right() - cw - 4, p.bottom() - 15, cw, 13);
+        final int xw = (lastFont == null ? 36 : lastFont.width("Cancel")) + 12;
+        detailCancel.setBounds(p.x() + 6, p.bottom() - 15, xw, 13);
+        detailCancel.setVisible(live);
     }
 
     private void renderDetailRow(final GuiGraphics g, final UiContext ctx, final DetailRow row, final int index,

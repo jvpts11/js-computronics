@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
 package dev.jstech.core.network;
 
@@ -213,6 +213,24 @@ public final class NetworkSystem {
                 .orElse(0L);
         for (var subframe : subframesOf(networkUuid)) {
             total += subframe.contributedCapacity();
+        }
+        return total;
+    }
+
+    /** The capacity the network's active Subframes lend their Mainframe, without the Mainframe's own. */
+    public long subframeCapacityOf(NetworkUuid networkUuid) {
+        long total = 0L;
+        for (var subframe : subframesOf(networkUuid)) {
+            total += subframe.contributedCapacity();
+        }
+        return total;
+    }
+
+    /** The dispatch queues the network's active Subframes add to their Mainframe (their GPUs). */
+    public int subframeQueuesOf(NetworkUuid networkUuid) {
+        int total = 0;
+        for (var subframe : subframesOf(networkUuid)) {
+            total += subframe.contributedQueues();
         }
         return total;
     }

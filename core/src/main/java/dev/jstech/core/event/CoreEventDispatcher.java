@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
 package dev.jstech.core.event;
 
@@ -30,6 +30,25 @@ public class CoreEventDispatcher {
         listenersByClass
                 .computeIfAbsent(eventClass, k -> new ArrayList<>())
                 .add(listener);
+    }
+
+    /**
+     * Removes one subscription, matched by identity on the listener; a listener that was never subscribed
+     * for that class is ignored. A class left with no listeners is dropped from the count.
+     */
+    public <E extends CoreEvent> void unsubscribe(
+            final Class<E> eventClass,
+            final Consumer<E> listener) {
+        Objects.requireNonNull(eventClass, "eventClass must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
+        final List<Consumer<? extends CoreEvent>> listeners = listenersByClass.get(eventClass);
+        if (listeners == null) {
+            return;
+        }
+        listeners.removeIf(existing -> existing == listener);
+        if (listeners.isEmpty()) {
+            listenersByClass.remove(eventClass);
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

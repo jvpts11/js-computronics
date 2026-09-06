@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * A multi-tick INSERT: writes an item into the network's servers over time — the inverse of a SELECT. It fills the fastest-tier servers first, up to each server's free space.
@@ -34,6 +35,7 @@ import java.util.Map;
 public final class NetworkInsertOperation extends AbstractTransferOperation {
 
     private final String sourceLabel;
+    private final UUID operationId = UUID.randomUUID();
 
     public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final String sourceLabel, final NetworkIndex index,
@@ -107,6 +109,16 @@ public final class NetworkInsertOperation extends AbstractTransferOperation {
     }
 
     @Override
+    public UUID operationId() {
+        return operationId;
+    }
+
+    @Override
+    public String typeId() {
+        return ComputingOperations.INSERT;
+    }
+
+    @Override
     public OperationRecord toRecord() {
         return buildRecord(status(), false);
     }
@@ -121,7 +133,7 @@ public final class NetworkInsertOperation extends AbstractTransferOperation {
         movedPerServer.forEach((server, written) ->
                 moves.add(new OperationRecord.MoveRow(sourceLabel, written, "SRV-" + shortId(server.asString()))));
         final List<OperationRecord.SubRow> subs = includeSubs ? subRows() : List.of();
-        return new OperationRecord(OperationRecord.TYPE_INSERT, key, demand, movedTotal,
-                recordStatus, List.copyOf(moves), subs);
+        return new OperationRecord(operationId, OperationRecord.TYPE_INSERT, key, demand, movedTotal,
+                recordStatus, priority(), List.copyOf(moves), subs);
     }
 }

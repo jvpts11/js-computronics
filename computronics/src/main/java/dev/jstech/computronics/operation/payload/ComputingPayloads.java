@@ -248,6 +248,10 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleNiSelect);
         registrar.playToServer(RequestNiOperationsPayload.TYPE, RequestNiOperationsPayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestNiOperations);
+        registrar.playToServer(SetOperationPriorityPayload.TYPE, SetOperationPriorityPayload.STREAM_CODEC,
+                ComputingPayloads::handleSetOperationPriority);
+        registrar.playToServer(CancelOperationPayload.TYPE, CancelOperationPayload.STREAM_CODEC,
+                ComputingPayloads::handleCancelOperation);
         registrar.playToServer(NiCraftPayload.TYPE, NiCraftPayload.STREAM_CODEC,
                 ComputingPayloads::handleNiCraft);
         registrar.playToServer(OpenProgramPayload.TYPE, OpenProgramPayload.STREAM_CODEC,
@@ -2254,31 +2258,56 @@ public final class ComputingPayloads {
                         machinePlan.feasible(), machinePlan.maxFeasible(), machinePlan.estimateTicks()));
                 return;
             }
-            final var plan = dev.jstech.computronics.crafting.CraftPlanner
-                    .plan(key, payload.quantity(), patterns, machines, stock);
-
-            // Raw-ingredient rows: total needed (consumed + still missing) vs what the network has.
-            final java.util.Map<StorageKey, Long> need = new java.util.LinkedHashMap<>(plan.rawConsumption());
-            plan.missing().forEach((k, v) -> need.merge(k, v, Long::sum));
-            final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
-            for (final var entry : need.entrySet()) {
-                if (rows.size() >= CraftPlanPayload.MAX_ROWS) {
-                    break;
-                }
-                final ItemStack icon = entry.getKey().stack(1);
-                if (!icon.isEmpty()) {
-                    rows.add(new CraftPlanPayload.Row(icon, entry.getValue(),
-                            Math.min(stock.getOrDefault(entry.getKey(), 0L), entry.getValue())));
-                }
+            // The recursive plan is CPU work over immutable inputs: it runs on a virtual thread and the reply
+            // goes out from the main thread when it is ready (the dialog shows "planning..." meanwhile). Without
+            // a dispatcher the plan is made here and now instead.
+            final long quantity = payload.quantity();
+            final ItemStack result = payload.result();
+            final java.util.function.Supplier<PlanPreview> preview =
+                    () -> planPreview(key, quantity, patterns, machines, stock);
+            final java.util.function.Consumer<PlanPreview> reply = made ->
+                    PacketDistributor.sendToPlayer(player, new CraftPlanPayload(result, quantity, made.rows(),
+                            made.feasible(), made.maxFeasible(), estimateTicks(level, mainframe, made.plan())));
+            final boolean queued = mainframe.submitOperation(task -> {
+                final PlanPreview made = preview.get();
+                task.onMainThread(() -> reply.accept(made));
+                return dev.jstech.core.operation.OperationResult.success();
+            }, dev.jstech.core.operation.OperationPriority.MEDIUM);
+            if (!queued) {
+                reply.accept(preview.get());
             }
-            final boolean feasible = plan.feasible();
-            final long maxFeasible = feasible ? payload.quantity()
-                    : dev.jstech.computronics.crafting.CraftPlanner
-                            .maxFeasible(key, payload.quantity(), patterns, machines, stock);
-            PacketDistributor.sendToPlayer(player, new CraftPlanPayload(
-                    payload.result(), payload.quantity(), java.util.List.copyOf(rows),
-                    feasible, maxFeasible, estimateTicks(level, mainframe, plan)));
         });
+    }
+
+    /** A plan preview: the raw-ingredient rows (need vs have), whether it is feasible, and how many are. */
+    private record PlanPreview(dev.jstech.computronics.crafting.CraftPlanner.Plan plan,
+                               java.util.List<CraftPlanPayload.Row> rows, boolean feasible, long maxFeasible) {
+    }
+
+    /** Plans {@code quantity} of {@code key} and shapes the dialog's rows; pure over its inputs. */
+    private static PlanPreview planPreview(final StorageKey key, final long quantity,
+                                           final java.util.List<dev.jstech.computronics.crafting.CraftingPattern> patterns,
+                                           final java.util.List<dev.jstech.computronics.crafting.ProcessingPattern> machines,
+                                           final java.util.Map<StorageKey, Long> stock) {
+        final var plan = dev.jstech.computronics.crafting.CraftPlanner.plan(key, quantity, patterns, machines, stock);
+        // Raw-ingredient rows: total needed (consumed + still missing) vs what the network has.
+        final java.util.Map<StorageKey, Long> need = new java.util.LinkedHashMap<>(plan.rawConsumption());
+        plan.missing().forEach((k, v) -> need.merge(k, v, Long::sum));
+        final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
+        for (final var entry : need.entrySet()) {
+            if (rows.size() >= CraftPlanPayload.MAX_ROWS) {
+                break;
+            }
+            final ItemStack icon = entry.getKey().stack(1);
+            if (!icon.isEmpty()) {
+                rows.add(new CraftPlanPayload.Row(icon, entry.getValue(),
+                        Math.min(stock.getOrDefault(entry.getKey(), 0L), entry.getValue())));
+            }
+        }
+        final boolean feasible = plan.feasible();
+        final long maxFeasible = feasible ? quantity
+                : dev.jstech.computronics.crafting.CraftPlanner.maxFeasible(key, quantity, patterns, machines, stock);
+        return new PlanPreview(plan, java.util.List.copyOf(rows), feasible, maxFeasible);
     }
 
     private static int estimateTicks(final ServerLevel level, final MainframeBlockEntity mainframe,
@@ -2417,8 +2446,11 @@ public final class ComputingPayloads {
             // The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
             // craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. The
             // multiStage flag picks the pipeline over the flat recursive path when a result has both.
-            mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(), "terminal", refresh,
-                    payload.multiStage());
+            final var op = mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(),
+                    "terminal", refresh, payload.multiStage());
+            if (op != null) {
+                op.setPriority(payload.priority());
+            }
             refresh.run();
         });
     }
@@ -2741,11 +2773,19 @@ public final class ComputingPayloads {
                     message = "ANALYZE complete - " + count + " types reconciled";
                 }
                 case TerminalMaintenancePayload.ACTION_REINDEX -> {
-                    index.rebuild(level, net);
-                    opType = OperationRecord.TYPE_REINDEX;
-                    count = index.catalogSize();
-                    icon = labelledIcon(Items.COMPASS, "index");
-                    message = "REINDEX complete - catalog rebuilt from disks";
+                    // The disks are read now; the catalog is built off the tick and swapped in later, when
+                    // the run is logged and the grid refreshed.
+                    final ItemStack reindexIcon = labelledIcon(Items.COMPASS, "index");
+                    mainframe.reindexAsync(() -> {
+                        mainframe.recordOperation(OperationRecord.TYPE_REINDEX, reindexIcon, index.catalogSize(),
+                                index.catalogSize(), OperationRecord.STATUS_COMPLETED, java.util.List.of());
+                        player.displayClientMessage(Component.literal("REINDEX complete - catalog rebuilt from disks"),
+                                true);
+                        dispatchTerminalQuery(player, net, level);
+                    });
+                    player.displayClientMessage(Component.literal("REINDEX started - rebuilding the catalog from disks"),
+                            true);
+                    return;
                 }
                 case TerminalMaintenancePayload.ACTION_VACUUM -> {
                     final int freed = index.vacuum(level, net);
@@ -2890,6 +2930,9 @@ public final class ComputingPayloads {
                     ? mainframe.submitNetworkMove(key, payload.quantity(), dest.handler(), dest.label(), sources)
                     : mainframe.submitNetworkSelect(key, payload.quantity(), dest.handler(), dest.label(), sources);
             if (op != null) {
+                if (!dest.move()) {
+                    op.abortWhen(gone(host)); // the pull lands in this computer: stop once it is gone
+                }
                 op.onSettle(() -> sendSnapshot(player, level, net));
             }
         });
@@ -3110,11 +3153,70 @@ public final class ComputingPayloads {
             final var op = dest.move()
                     ? mainframe.submitNetworkMove(payload.key(), qty, dest.handler(), dest.label(), sources)
                     : mainframe.submitNetworkSelect(payload.key(), qty, dest.handler(), dest.label(), sources);
+            if (op != null) {
+                op.setPriority(payload.priority());
+                if (!dest.move()) {
+                    op.abortWhen(gone(host)); // the pull lands in this computer: stop once it is gone
+                }
+            }
             if (op != null && host instanceof dev.jstech.computronics.os
                     .OsHost computer) {
                 op.onSettle(() -> sendNetworkInteractor(player, level, computer));
             }
         });
+    }
+
+    private static void handleSetOperationPriority(final SetOperationPriorityPayload payload,
+                                                   final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            // Any computer on the network may re-prioritise its Operations: the same proximity-to-a-linked-
+            // monitor check the other desktop requests use, so a player cannot drive a foreign network.
+            final var host = niHost(player, level, payload.host(), payload.monitorPos());
+            if (host == null || host.networkUuid() == null) {
+                return;
+            }
+            final MainframeBlockEntity mainframe = resolveMainframe(level, host.networkUuid());
+            if (mainframe == null) {
+                return;
+            }
+            mainframe.setOperationPriority(payload.operationId(), payload.priority());
+            dispatchActiveOperations(player, host.networkUuid(), level);
+        });
+    }
+
+    private static void handleCancelOperation(final CancelOperationPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            final var host = niHost(player, level, payload.host(), payload.monitorPos());
+            if (host == null || host.networkUuid() == null) {
+                return;
+            }
+            final MainframeBlockEntity mainframe = resolveMainframe(level, host.networkUuid());
+            if (mainframe == null) {
+                return;
+            }
+            mainframe.cancelOperation(payload.operationId());
+            // The cancelled Operation is logged on the Mainframe's next tick: refresh both views then.
+            mainframe.runNextTick(() -> {
+                dispatchActiveOperations(player, host.networkUuid(), level);
+                dispatchTerminalOpsLog(player, host.networkUuid(), level);
+            });
+        });
+    }
+
+    /**
+     * A stop condition for a pull into a computer's own storage: once that computer is gone from the world,
+     * nothing more is taken out of the network for it.
+     */
+    private static java.util.function.BooleanSupplier gone(final ComputerTerminalHost host) {
+        return host instanceof net.minecraft.world.level.block.entity.BlockEntity be ? be::isRemoved : () -> false;
     }
 
     private static NetworkServersPayload collectComputers(final ServerLevel level, final NetworkUuid net) {
@@ -3312,9 +3414,24 @@ public final class ComputingPayloads {
                 final String netId = net != null ? ShortId.of(net.asString()) : "";
                 PacketDistributor.sendToPlayer(player,
                         new NetworkManagerPayload(payload.hostPos(), netId, collectNodes(level, mf),
-                                collectHardware(level, mf)));
+                                collectHardware(level, mf), collectStatistics(level, mf)));
             }
         });
+    }
+
+    /** The last hour's Operation statistics of a Mainframe, by type, for the Stats tab. */
+    static NetworkManagerPayload.Statistics collectStatistics(final ServerLevel level, final MainframeBlockEntity mf) {
+        final long now = level.getGameTime();
+        final List<NetworkManagerPayload.TypeStat> types = new ArrayList<>();
+        for (final var summary : mf.statistics().summaries(now)) {
+            if (types.size() >= NetworkManagerPayload.MAX_STAT_TYPES) {
+                break;
+            }
+            types.add(new NetworkManagerPayload.TypeStat((byte) summary.type(), summary.count(),
+                    summary.shortfallPercent(), summary.averageWait(), summary.averageRun(), summary.moved()));
+        }
+        return new NetworkManagerPayload.Statistics(types, mf.statistics().peakConcurrentLastDay(now),
+                mf.statistics().movedLastHour(now));
     }
 
     private static void handleNetworkManager(final NetworkManagerPayload payload, final IPayloadContext context) {
@@ -3448,7 +3565,7 @@ public final class ComputingPayloads {
             }
         }
         return new NetworkManagerPayload.Hardware(
-                mf.orchestrationCapacity(), mf.parallelQueues(), mf.computerRamBuffer(), storage);
+                mf.orchestrationCapacity(), mf.pooledQueues(), mf.computerRamBuffer(), storage);
     }
 
     private static void handleRequestStorageInsights(final RequestStorageInsightsPayload payload,
@@ -4163,6 +4280,10 @@ public final class ComputingPayloads {
                     return;
                 }
                 final var op = mainframe.submitNetworkSelect(key, safeAmount, host.localStorage(), "ni");
+                if (op != null) {
+                    op.setPriority(payload.priority());
+                    op.abortWhen(gone(host));
+                }
                 if (op != null && host instanceof dev.jstech.computronics.os
                         .OsHost computer) {
                     op.onSettle(() -> sendNetworkInteractor(player, level, computer));
@@ -4183,6 +4304,7 @@ public final class ComputingPayloads {
                     host.localStore().insert(key, taken); // no live dispatcher: put it straight back
                     return;
                 }
+                op.setPriority(payload.priority());
                 op.onSettle(() -> {
                     final long leftover = op.leftover();
                     if (leftover > 0L) {

@@ -9,6 +9,8 @@ package dev.jstech.computronics.program.iql;
 
 import dev.jstech.computronics.program.iql.IqlLexer.Token;
 import dev.jstech.computronics.program.iql.IqlLexer.Type;
+import dev.jstech.core.operation.OperationPriority;
+
 import java.util.List;
 import java.util.Locale;
 
@@ -19,9 +21,10 @@ import java.util.Locale;
  * <p>Three statement shapes, dispatched on the verb:
  * <ul>
  *   <li><b>action</b> — {@code VERB [qty] item [FROM loc] [TO loc] [WHERE cond] [IF cond]
- *       [ORDER BY field [ASC|DESC]] [LIMIT n]} (SELECT/INSERT/DELETE/MOVE/DROP/CRAFT/COUNT/LOCK/UNLOCK),
- *       with the five-flow validation (see {@link #validateFlow}). {@code qty} is optional; when omitted
- *       it is {@link IqlOperation#NONE}.</li>
+ *       [ORDER BY field [ASC|DESC]] [LIMIT n] [PRIORITY level]}
+ *       (SELECT/INSERT/DELETE/MOVE/DROP/CRAFT/COUNT/LOCK/UNLOCK), with the five-flow validation (see
+ *       {@link #validateFlow}). {@code qty} is optional; when omitted it is {@link IqlOperation#NONE}.
+ *       {@code level} is one of LOW, MEDIUM_LOW, MEDIUM, MEDIUM_HIGH, HIGH (or NORMAL for MEDIUM).</li>
  *   <li><b>query</b> — {@code (QUERY|SHOW) object [WHERE cond] [ORDER BY ...] [LIMIT n]}: a read that
  *       names a schema object instead of an item, and has no FROM/TO/IF.</li>
  *   <li><b>maintenance</b> — {@code (ANALYZE|VACUUM|REINDEX) [object]}.</li>
@@ -99,7 +102,7 @@ public final class IqlParser {
         parseClauses(clauses, true);
         validateFlow(verb, clauses.from, clauses.to);
         return new IqlOperation(verb, quantity, item, clauses.from, clauses.to, clauses.where,
-                clauses.guard, clauses.orderBy, clauses.descending, clauses.limit);
+                clauses.guard, clauses.orderBy, clauses.descending, clauses.limit, clauses.priority);
     }
 
     private IqlOperation parseQuery(final IqlVerb verb) {
@@ -107,7 +110,7 @@ public final class IqlParser {
         final Clauses clauses = new Clauses();
         parseClauses(clauses, false);
         return new IqlOperation(verb, IqlOperation.NONE, object, "", "", clauses.where, null,
-                clauses.orderBy, clauses.descending, clauses.limit);
+                clauses.orderBy, clauses.descending, clauses.limit, OperationPriority.DEFAULT);
     }
 
     private IqlOperation parseMaintenance(final IqlVerb verb) {
@@ -119,7 +122,7 @@ public final class IqlParser {
             throw new IllegalArgumentException("unexpected token: " + tokens.get(pos).text());
         }
         return new IqlOperation(verb, IqlOperation.NONE, object, "", "", null, null, "", false,
-                IqlOperation.NO_LIMIT);
+                IqlOperation.NO_LIMIT, OperationPriority.DEFAULT);
     }
 
     /** Reads {@code qty} when the next token is a number or {@code ALL}; otherwise leaves it unset. */
@@ -154,9 +157,10 @@ public final class IqlParser {
         private String orderBy = "";
         private boolean descending;
         private int limit = IqlOperation.NO_LIMIT;
+        private OperationPriority priority = OperationPriority.DEFAULT;
     }
 
-    /** Reads {@code FROM/TO/WHERE/IF/ORDER BY/LIMIT} in any order until the tokens run out. */
+    /** Reads {@code FROM/TO/WHERE/IF/ORDER BY/LIMIT/PRIORITY} in any order until the tokens run out. */
     private void parseClauses(final Clauses acc, final boolean allowFlowClauses) {
         while (pos < tokens.size()) {
             final Token token = tokens.get(pos);
@@ -193,9 +197,22 @@ public final class IqlParser {
                     pos++;
                     acc.limit = parseLimit();
                 }
+                case "PRIORITY" -> {
+                    // A read has nothing to schedule: the clause belongs to the actions that queue work.
+                    requireFlowClause(allowFlowClauses, token);
+                    pos++;
+                    acc.priority = parsePriority();
+                }
                 default -> throw unexpected(token);
             }
         }
+    }
+
+    private OperationPriority parsePriority() {
+        final Token token = expect(Type.WORD, "a level after PRIORITY (LOW, MEDIUM_LOW, MEDIUM, MEDIUM_HIGH, HIGH)");
+        return OperationPriority.fromKeyword(token.text()).orElseThrow(() -> new IllegalArgumentException(
+                "unknown priority level: " + token.text()
+                        + " (expected LOW, MEDIUM_LOW, MEDIUM, MEDIUM_HIGH or HIGH)"));
     }
 
     private boolean parseSortDirection() {

@@ -496,12 +496,67 @@ public final class ServerCliComputer implements CliComputer {
         if (op == null) {
             return OpResult.fail("could not start the SELECT");
         }
+        op.abortWhen(hostGone());
         return OpResult.ok("SELECT queued: " + qtyLabel(quantity) + " " + key.displayName().getString()
                 + " -> local storage");
     }
 
+    /** True once this computer has left the world: a pull into its storage stops there instead of feeding a ghost. */
+    private java.util.function.BooleanSupplier hostGone() {
+        return host instanceof BlockEntity be ? be::isRemoved : () -> false;
+    }
+
+    @Override
+    public List<OperationStat> operationStats() {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return List.of();
+        }
+        final List<OperationStat> rows = new ArrayList<>();
+        for (final var summary : mainframe.statistics().summaries(level.getGameTime())) {
+            rows.add(new OperationStat(opType((byte) summary.type()), summary.count(), summary.averageWait(),
+                    summary.averageRun(), summary.shortfallPercent(), summary.moved()));
+        }
+        return rows;
+    }
+
+    @Override
+    public int peakOperationsToday() {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        return mainframe == null ? 0 : mainframe.statistics().peakConcurrentLastDay(level.getGameTime());
+    }
+
+    @Override
+    public OpResult cancelOperation(final String id) {
+        final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
+        if (mainframe == null) {
+            return OpResult.fail("the network has no running Mainframe");
+        }
+        final String wanted = id.trim().toLowerCase(java.util.Locale.ROOT);
+        if (wanted.isEmpty()) {
+            return OpResult.fail("usage: cancel <id>   (see 'ops')");
+        }
+        for (final dev.jstech.computronics.operation.NetworkOperation operation : mainframe.liveOperations()) {
+            final String full = operation.operationId().toString();
+            // The prompt shows the short id; accept it, or any longer prefix of the full id.
+            if (full.startsWith(wanted) && wanted.length() >= ShortId.of(full).length()) {
+                final OperationRecord record = operation.liveRecord();
+                if (!mainframe.cancelOperation(operation.operationId())) {
+                    return OpResult.fail("operation " + ShortId.of(full) + " has already settled");
+                }
+                return OpResult.ok("cancelled " + opType(record.type()) + " " + record.name().getString());
+            }
+        }
+        return OpResult.fail("no operation " + wanted + " in flight (see 'ops')");
+    }
+
     @Override
     public OpResult insert(final String item, final long quantity) {
+        return insert(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT);
+    }
+
+    private OpResult insert(final String item, final long quantity,
+                            final dev.jstech.core.operation.OperationPriority priority) {
         final StorageKey key = resolveKey(item);
         if (key == null) {
             return OpResult.fail("unknown item: " + item);
@@ -521,6 +576,7 @@ public final class ServerCliComputer implements CliComputer {
             host.localStore().insert(key, taken); // no dispatcher: put it straight back, never lose it
             return OpResult.fail("the network has no running Mainframe");
         }
+        op.setPriority(priority);
         op.onSettle(() -> {
             final long leftover = op.leftover();
             if (leftover > 0L) {
@@ -532,6 +588,11 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public OpResult craft(final String item, final long quantity) {
+        return craft(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT);
+    }
+
+    private OpResult craft(final String item, final long quantity,
+                           final dev.jstech.core.operation.OperationPriority priority) {
         final StorageKey key = resolveKey(item);
         if (key == null) {
             return OpResult.fail("unknown item: " + item);
@@ -546,6 +607,7 @@ public final class ServerCliComputer implements CliComputer {
         if (op == null) {
             return OpResult.fail("no pattern crafts " + key.displayName().getString());
         }
+        op.setPriority(priority);
         return OpResult.ok("CRAFT queued: " + qtyLabel(quantity) + " " + key.displayName().getString());
     }
 
@@ -607,8 +669,9 @@ public final class ServerCliComputer implements CliComputer {
         }
         final List<ActiveOp> rows = new ArrayList<>();
         for (final OperationRecord record : mainframe.activeOperationRecords()) {
-            rows.add(new ActiveOp(opType(record.type()), record.name().getString(),
-                    record.moved(), record.requested(), opStatus(record.status())));
+            rows.add(new ActiveOp(ShortId.of(record.id().toString()), opType(record.type()),
+                    record.name().getString(), record.moved(), record.requested(), opStatus(record.status()),
+                    record.priority().label()));
         }
         return rows;
     }
@@ -630,8 +693,9 @@ public final class ServerCliComputer implements CliComputer {
                 yield OpResult.ok("ANALYZE complete - " + index.catalogSize() + " types reconciled");
             }
             case "reindex" -> {
-                index.rebuild(level, net);
-                yield OpResult.ok("REINDEX complete - catalog rebuilt from disks");
+                // The disks are read now; the catalog is built off the tick and swapped in a tick or two later.
+                mainframe.reindexAsync(null);
+                yield OpResult.ok("REINDEX started - rebuilding the catalog from disks");
             }
             case "vacuum" -> {
                 final int freed = index.vacuum(level, net);
@@ -846,7 +910,7 @@ public final class ServerCliComputer implements CliComputer {
         return switch (op.verb()) {
             case SELECT -> executeSelect(op);
             case INSERT -> executeInsert(op);
-            case CRAFT -> craft(op.item(), op.quantity());
+            case CRAFT -> craft(op.item(), op.quantity(), op.priority());
             case DELETE -> executeDestroy(op, "DELETE");
             case DROP -> executeDestroy(op, "DROP");
             case MOVE -> executeMove(op);
@@ -903,7 +967,17 @@ public final class ServerCliComputer implements CliComputer {
                 return moveFromBus(op, mainframe, bus.port());
             }
         }
-        return insert(op.item(), op.quantity());
+        return insert(op.item(), op.quantity(), op.priority());
+    }
+
+    /** Applies the statement's {@code PRIORITY} to a freshly submitted Operation; a null submission passes through. */
+    @org.jetbrains.annotations.Nullable
+    private static <T extends dev.jstech.computronics.operation.NetworkOperation> T prioritize(
+            @org.jetbrains.annotations.Nullable final T operation, final IqlOperation statement) {
+        if (operation != null) {
+            operation.setPriority(statement.priority());
+        }
+        return operation;
     }
 
     private OpResult executeSelect(final IqlOperation op) {
@@ -927,11 +1001,12 @@ public final class ServerCliComputer implements CliComputer {
         for (final StorageKey key : keys) {
             // SELECT pulls from the whole network; SELECT ... FROM <server> is a move scoped to that server,
             // both landing in this computer's local storage.
-            final var operation = from == null
+            final var operation = prioritize(from == null
                     ? mainframe.submitNetworkSelect(key, demand(op.quantity()), host.localStorage(), "cli")
                     : mainframe.submitNetworkMove(key, demand(op.quantity()), host.localStorage(), "cli",
-                            java.util.Set.of(from));
+                            java.util.Set.of(from)), op);
             if (operation != null) {
+                operation.abortWhen(hostGone()); // the pull lands in this computer: stop once it is gone
                 queued++;
             }
         }
@@ -972,7 +1047,7 @@ public final class ServerCliComputer implements CliComputer {
             if (stock.getOrDefault(key, 0L) <= 0L) {
                 continue;
             }
-            if (mainframe.submitNetworkDelete(key, demand(op.quantity()), target, "cli") != null) {
+            if (prioritize(mainframe.submitNetworkDelete(key, demand(op.quantity()), target, "cli"), op) != null) {
                 queued++;
             }
         }
@@ -1016,8 +1091,8 @@ public final class ServerCliComputer implements CliComputer {
         }
         int queued = 0;
         for (final StorageKey key : keys) {
-            if (mainframe.submitNetworkMove(key, demand(op.quantity()), destSink, "cli",
-                    java.util.Set.of(source)) != null) {
+            if (prioritize(mainframe.submitNetworkMove(key, demand(op.quantity()), destSink, "cli",
+                    java.util.Set.of(source)), op) != null) {
                 queued++;
             }
         }
@@ -1042,7 +1117,7 @@ public final class ServerCliComputer implements CliComputer {
             if (stock.getOrDefault(key, 0L) <= 0L) {
                 continue;
             }
-            if (mainframe.submitNetworkDelete(key, demand(op.quantity()), port, "cli") != null) {
+            if (prioritize(mainframe.submitNetworkDelete(key, demand(op.quantity()), port, "cli"), op) != null) {
                 queued++;
             }
         }
@@ -1075,7 +1150,7 @@ public final class ServerCliComputer implements CliComputer {
                 continue;
             }
             final dev.jstech.computronics.operation.NetworkInsertOperation insert =
-                    mainframe.submitNetworkInsert(key, pulled, "cli");
+                    prioritize(mainframe.submitNetworkInsert(key, pulled, "cli"), op);
             if (insert != null) {
                 insert.onSettle(() -> {
                     final long left = insert.leftover();

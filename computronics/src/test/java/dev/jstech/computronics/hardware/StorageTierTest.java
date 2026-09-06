@@ -7,17 +7,41 @@
  */
 package dev.jstech.computronics.hardware;
 
+import dev.jstech.core.operation.OperationBalance;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class StorageTierTest {
 
+    @AfterEach
+    void restoreBalance() {
+        OperationBalance.reset();
+    }
+
     @Test
     void latencyTicks_lowerForFasterTier() {
         assertEquals(10, StorageTier.HDD.latencyTicks());
         assertEquals(3, StorageTier.SSD.latencyTicks());
         assertEquals(1, StorageTier.NVME.latencyTicks());
+    }
+
+    @Test
+    void latencyTicks_followsTheBalance() {
+        OperationBalance.setHddLatencyTicks(25);
+        OperationBalance.setSsdLatencyTicks(7);
+        OperationBalance.setNvmeLatencyTicks(0);
+        assertEquals(25, StorageTier.HDD.latencyTicks());
+        assertEquals(7, StorageTier.SSD.latencyTicks());
+        assertEquals(0, StorageTier.NVME.latencyTicks());
+    }
+
+    @Test
+    void faster_isByHardwareClassEvenWhenLatenciesAreTuned() {
+        // A pack that makes SSD seek slower than HDD does not turn the HDD into the faster class.
+        OperationBalance.setSsdLatencyTicks(30);
+        assertEquals(StorageTier.SSD, StorageTier.HDD.faster(StorageTier.SSD));
     }
 
     @Test

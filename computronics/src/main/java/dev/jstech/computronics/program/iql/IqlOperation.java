@@ -7,6 +7,8 @@
  */
 package dev.jstech.computronics.program.iql;
 
+import dev.jstech.core.operation.OperationPriority;
+
 import java.util.Objects;
 
 /**
@@ -18,7 +20,8 @@ import java.util.Objects;
  * <p>{@code item} doubles as the schema object for read verbs ({@code QUERY items}). {@code where} is the
  * {@code WHERE} filter (which items are touched); {@code guard} is the {@code IF} guard (whether the
  * action runs at all). {@code orderBy} names a sort field with {@code orderByDescending} for its
- * direction, and {@code limit} caps the rows ({@link #NO_LIMIT} when uncapped).
+ * direction, and {@code limit} caps the rows ({@link #NO_LIMIT} when uncapped). {@code priority} is the
+ * scheduling level an action asks for ({@code PRIORITY HIGH}); the default when the clause is absent.
  */
 public record IqlOperation(IqlVerb verb,
                            long quantity,
@@ -29,7 +32,8 @@ public record IqlOperation(IqlVerb verb,
                            IqlCondition guard,
                            String orderBy,
                            boolean orderByDescending,
-                           int limit) {
+                           int limit,
+                           OperationPriority priority) {
 
     /** Quantity sentinel for {@code ALL}. */
     public static final long ALL = -1L;
@@ -62,11 +66,20 @@ public record IqlOperation(IqlVerb verb,
         if (orderBy == null) {
             orderBy = "";
         }
+        if (priority == null) {
+            priority = OperationPriority.DEFAULT;
+        }
     }
 
     /** A bare action: a verb, a quantity ({@link #ALL}/{@link #NONE} or a count), and an item. */
     public static IqlOperation action(final IqlVerb verb, final long quantity, final String item) {
-        return new IqlOperation(verb, quantity, item, "", "", null, null, "", false, NO_LIMIT);
+        return new IqlOperation(verb, quantity, item, "", "", null, null, "", false, NO_LIMIT,
+                OperationPriority.DEFAULT);
+    }
+
+    /** Whether the statement asked for a level other than the default. */
+    public boolean hasPriority() {
+        return priority != OperationPriority.DEFAULT;
     }
 
     public boolean hasFrom() {

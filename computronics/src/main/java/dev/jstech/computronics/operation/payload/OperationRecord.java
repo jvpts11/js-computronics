@@ -8,7 +8,9 @@
 package dev.jstech.computronics.operation.payload;
 
 import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.core.operation.OperationPriority;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
@@ -22,12 +24,22 @@ import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * One entry in a network's Operations log, with provenance: what was moved, how much was requested vs actually moved, the final status, and the per-source moves (from which Server, how much, to where) so the terminal can show exactly where the data came from and went.
+ *
+ * <p>{@code id} is the Operation's identity while it is in flight, so a view can address it (change its
+ * priority, cancel it); an instant Operation that was never queued carries {@link #NO_ID}. {@code priority}
+ * is the level it was scheduled at. {@code waitedTicks} counts the ticks it sat queued or waiting before it
+ * could run and {@code ranTicks} the ticks it was actually running: together they are how long it took.
  */
-public record OperationRecord(byte type, StorageKey key, long requested, long moved, byte status,
-                              List<MoveRow> moves, List<SubRow> subs) {
+public record OperationRecord(UUID id, byte type, StorageKey key, long requested, long moved, byte status,
+                              OperationPriority priority, List<MoveRow> moves, List<SubRow> subs,
+                              int waitedTicks, int ranTicks) {
+
+    /** The id of a record that never had a live Operation behind it (an instant maintenance record). */
+    public static final UUID NO_ID = new UUID(0L, 0L);
 
     public static final byte TYPE_SELECT = 0;
     public static final byte TYPE_INSERT = 1;
@@ -53,13 +65,41 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
     public static final int MAX_MOVES = 32;
     public static final int MAX_SUBS = 32;
 
+    /** An instant Operation's record: no live identity, the default priority, no SubOperation rows, no time. */
     public OperationRecord(final byte type, final StorageKey key, final long requested, final long moved,
                            final byte status, final List<MoveRow> moves) {
-        this(type, key, requested, moved, status, moves, List.of());
+        this(NO_ID, type, key, requested, moved, status, OperationPriority.DEFAULT, moves, List.of(), 0, 0);
+    }
+
+    /** A live Operation's record before the scheduler stamps its timing. */
+    public OperationRecord(final UUID id, final byte type, final StorageKey key, final long requested,
+                           final long moved, final byte status, final OperationPriority priority,
+                           final List<MoveRow> moves, final List<SubRow> subs) {
+        this(id, type, key, requested, moved, status, priority, moves, subs, 0, 0);
     }
 
     public OperationRecord withStatus(final byte newStatus) {
-        return new OperationRecord(type, key, requested, moved, newStatus, moves, subs);
+        return new OperationRecord(id, type, key, requested, moved, newStatus, priority, moves, subs,
+                waitedTicks, ranTicks);
+    }
+
+    public OperationRecord withPriority(final OperationPriority newPriority) {
+        return new OperationRecord(id, type, key, requested, moved, status, newPriority, moves, subs,
+                waitedTicks, ranTicks);
+    }
+
+    public OperationRecord withTiming(final int waited, final int ran) {
+        return new OperationRecord(id, type, key, requested, moved, status, priority, moves, subs, waited, ran);
+    }
+
+    /** Whether the Operation delivered everything it was asked for. */
+    public boolean completed() {
+        return status == STATUS_COMPLETED;
+    }
+
+    /** Whether a live Operation stands behind this record (it can be addressed by {@link #id()}). */
+    public boolean hasId() {
+        return !NO_ID.equals(id);
     }
 
     public ItemStack icon() {
@@ -116,31 +156,45 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
     public static final StreamCodec<RegistryFriendlyByteBuf, OperationRecord> STREAM_CODEC =
             StreamCodec.of(
                     (buf, rec) -> {
+                        UUIDUtil.STREAM_CODEC.encode(buf, rec.id());
                         buf.writeByte(rec.type());
                         StorageKey.STREAM_CODEC.encode(buf, rec.key());
                         buf.writeVarLong(rec.requested());
                         buf.writeVarLong(rec.moved());
                         buf.writeByte(rec.status());
+                        buf.writeByte(rec.priority().ordinal());
                         MOVES_CODEC.encode(buf, rec.moves());
                         SUBS_CODEC.encode(buf, rec.subs());
+                        buf.writeVarInt(rec.waitedTicks());
+                        buf.writeVarInt(rec.ranTicks());
                     },
                     buf -> new OperationRecord(
+                            UUIDUtil.STREAM_CODEC.decode(buf),
                             buf.readByte(),
                             StorageKey.STREAM_CODEC.decode(buf),
                             buf.readVarLong(),
                             buf.readVarLong(),
                             buf.readByte(),
+                            OperationPriority.byOrdinal(buf.readByte()),
                             MOVES_CODEC.decode(buf),
-                            SUBS_CODEC.decode(buf)));
+                            SUBS_CODEC.decode(buf),
+                            buf.readVarInt(),
+                            buf.readVarInt()));
 
     public CompoundTag toNbt(final HolderLookup.Provider registries) {
         final CompoundTag tag = new CompoundTag();
+        if (hasId()) {
+            tag.putUUID("id", id);
+        }
         tag.putByte("type", type);
         StorageKey.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), key)
                 .result().ifPresent(encoded -> tag.put("icon", encoded));
         tag.putLong("requested", requested);
         tag.putLong("moved", moved);
         tag.putByte("status", status);
+        tag.putByte("priority", (byte) priority.ordinal());
+        tag.putInt("waited", waitedTicks);
+        tag.putInt("ran", ranTicks);
         final ListTag moveList = new ListTag();
         for (final MoveRow row : moves) {
             final CompoundTag m = new CompoundTag();
@@ -179,7 +233,11 @@ public record OperationRecord(byte type, StorageKey key, long requested, long mo
             final CompoundTag s = subList.getCompound(i);
             subs.add(new SubRow(s.getString("server"), s.getLong("planned"), s.getLong("moved"), s.getByte("state")));
         }
-        return new OperationRecord(tag.getByte("type"), key, tag.getLong("requested"),
-                tag.getLong("moved"), tag.getByte("status"), List.copyOf(moves), List.copyOf(subs));
+        final UUID id = tag.hasUUID("id") ? tag.getUUID("id") : NO_ID;
+        final OperationPriority priority = tag.contains("priority")
+                ? OperationPriority.byOrdinal(tag.getByte("priority")) : OperationPriority.DEFAULT;
+        return new OperationRecord(id, tag.getByte("type"), key, tag.getLong("requested"),
+                tag.getLong("moved"), tag.getByte("status"), priority, List.copyOf(moves), List.copyOf(subs),
+                tag.getInt("waited"), tag.getInt("ran"));
     }
 }

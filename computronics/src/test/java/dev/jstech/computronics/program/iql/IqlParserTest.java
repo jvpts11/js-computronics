@@ -15,9 +15,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jstech.computronics.program.iql.IqlCondition.Comparison;
 import dev.jstech.computronics.program.iql.IqlCondition.Op;
+import dev.jstech.core.operation.OperationPriority;
 import org.junit.jupiter.api.Test;
 
 class IqlParserTest {
+
+    @Test
+    void parse_priorityClause_setsTheLevel() {
+        final IqlOperation op = IqlParser.parse("SELECT 64 cobblestone PRIORITY HIGH");
+        assertEquals(OperationPriority.HIGH, op.priority());
+        assertTrue(op.hasPriority());
+    }
+
+    @Test
+    void parse_priorityDefaultsToMedium() {
+        final IqlOperation op = IqlParser.parse("SELECT 64 cobblestone");
+        assertEquals(OperationPriority.MEDIUM, op.priority());
+        assertFalse(op.hasPriority());
+    }
+
+    @Test
+    void parse_priorityAcceptsEveryLevelKeyword() {
+        assertEquals(OperationPriority.LOW, IqlParser.parse("CRAFT 4 stick PRIORITY low").priority());
+        assertEquals(OperationPriority.MEDIUM_LOW,
+                IqlParser.parse("MOVE 10 iron_ingot FROM A TO B PRIORITY medium_low").priority());
+        assertEquals(OperationPriority.MEDIUM, IqlParser.parse("INSERT 1 stone PRIORITY normal").priority());
+        assertEquals(OperationPriority.MEDIUM_HIGH,
+                IqlParser.parse("DELETE 1 stone TO Trash PRIORITY MEDIUM_HIGH").priority());
+    }
+
+    @Test
+    void parse_priorityMixesWithTheOtherClauses() {
+        final IqlOperation op = IqlParser.parse("DELETE 5 stone TO Trash WHERE qty > 3 PRIORITY LOW LIMIT 2");
+        assertEquals(OperationPriority.LOW, op.priority());
+        assertEquals("Trash", op.to());
+        assertTrue(op.hasWhere());
+        assertEquals(2, op.limit());
+    }
+
+    @Test
+    void parse_priorityRejectsAnUnknownLevel() {
+        final IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> IqlParser.parse("SELECT 1 stone PRIORITY urgent"));
+        assertTrue(error.getMessage().contains("unknown priority level"));
+    }
+
+    @Test
+    void parse_priorityNeedsALevel() {
+        assertThrows(IllegalArgumentException.class, () -> IqlParser.parse("SELECT 1 stone PRIORITY"));
+    }
+
+    @Test
+    void parse_priorityIsNotValidOnARead() {
+        assertThrows(IllegalArgumentException.class, () -> IqlParser.parse("QUERY items PRIORITY HIGH"));
+    }
+
+    @Test
+    void action_carriesTheDefaultPriority() {
+        assertEquals(OperationPriority.MEDIUM, IqlOperation.action(IqlVerb.SELECT, 1L, "stone").priority());
+    }
 
     @Test
     void parse_simpleSelect() {

@@ -8,6 +8,8 @@
 package dev.jstech.computronics.operation.payload;
 
 import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.core.operation.OperationPriority;
+import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -27,9 +29,10 @@ import net.minecraft.resources.ResourceLocation;
  * @param key        the storage key (item) clicked
  * @param amount     how many to move
  * @param mode       {@link #MODE_NET_TO_LOCAL}, {@link #MODE_LOCAL_TO_INV} or {@link #MODE_LOCAL_TO_NET}
+ * @param priority   the level the resulting network Operation is scheduled at (ignored by an instant move)
  */
 public record NiGridClickPayload(BlockPos host, BlockPos monitorPos, StorageKey key, long amount,
-                                 int mode) implements CustomPacketPayload {
+                                 int mode, OperationPriority priority) implements CustomPacketPayload {
 
     public static final int MODE_NET_TO_LOCAL = 0;
     public static final int MODE_LOCAL_TO_INV = 1;
@@ -39,6 +42,10 @@ public record NiGridClickPayload(BlockPos host, BlockPos monitorPos, StorageKey 
     public static final CustomPacketPayload.Type<NiGridClickPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("jsc", "ni_grid_click"));
 
+    /** A priority level as one byte (its ordinal), clamped on the way in so a stale value never throws. */
+    static final StreamCodec<ByteBuf, OperationPriority> PRIORITY_CODEC =
+            ByteBufCodecs.BYTE.map(OperationPriority::byOrdinal, level -> (byte) level.ordinal());
+
     public static final StreamCodec<RegistryFriendlyByteBuf, NiGridClickPayload> STREAM_CODEC =
             StreamCodec.composite(
                     BlockPos.STREAM_CODEC, NiGridClickPayload::host,
@@ -46,6 +53,7 @@ public record NiGridClickPayload(BlockPos host, BlockPos monitorPos, StorageKey 
                     StorageKey.STREAM_CODEC, NiGridClickPayload::key,
                     ByteBufCodecs.VAR_LONG, NiGridClickPayload::amount,
                     ByteBufCodecs.VAR_INT, NiGridClickPayload::mode,
+                    PRIORITY_CODEC, NiGridClickPayload::priority,
                     NiGridClickPayload::new);
 
     @Override

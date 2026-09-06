@@ -59,6 +59,8 @@ public final class BuiltinCommands {
                 new Unlock(),
                 new Locks(),
                 new Ops(),
+                new Cancel(),
+                new Stats(),
                 new Operation(),
                 new Devices(),
                 new Ssh(),
@@ -631,10 +633,79 @@ public final class BuiltinCommands {
                 return;
             }
             for (final CliComputer.ActiveOp op : ops) {
-                final String head = op.type() + " " + op.item();
-                final String tail = op.status() + " " + group(op.progress()) + "/" + group(op.total());
+                final String head = op.id() + "  " + op.type() + " " + op.item();
+                final String tail = op.priority() + " " + op.status() + " " + group(op.progress()) + "/"
+                        + group(op.total());
                 ctx.out().row(head, tail);
             }
+        }
+    }
+
+    static final class Stats implements CliCommand {
+        @Override public String name() {
+            return "stats";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("statistics");
+        }
+
+        @Override public String summary() {
+            return "the network's operations over the last hour";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.computer().onNetwork()) {
+                ctx.out().error("not on a network");
+                return;
+            }
+            final List<CliComputer.OperationStat> stats = ctx.computer().operationStats();
+            ctx.out().dim("peak " + ctx.computer().peakOperationsToday() + " in flight today");
+            if (stats.isEmpty()) {
+                ctx.out().dim("no operations settled in the last hour");
+                return;
+            }
+            for (final CliComputer.OperationStat stat : stats) {
+                final String tail = stat.count() + " ops  wait " + ticks(stat.averageWait()) + "  run "
+                        + ticks(stat.averageRun()) + "  fail " + stat.shortfallPercent() + "%  moved "
+                        + group(stat.moved());
+                ctx.out().row(stat.type(), tail);
+            }
+        }
+
+        private static String ticks(final int ticks) {
+            return ticks >= 1200 ? (ticks / 20) + "s" : ticks + "t";
+        }
+    }
+
+    static final class Cancel implements CliCommand {
+        @Override public String name() {
+            return "cancel";
+        }
+
+        @Override public List<String> aliases() {
+            return List.of("kill");
+        }
+
+        @Override public String summary() {
+            return "stop an operation in flight";
+        }
+
+        @Override public String usage() {
+            return "<id>";
+        }
+
+        @Override public void run(final CliContext ctx) {
+            if (!ctx.hasArgs()) {
+                ctx.out().error("usage: cancel <id>   (the id column of 'ops')");
+                return;
+            }
+            if (!ctx.computer().onNetwork()) {
+                ctx.out().error("not on a network");
+                return;
+            }
+            final CliComputer.OpResult result = ctx.computer().cancelOperation(ctx.arg(0));
+            ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 

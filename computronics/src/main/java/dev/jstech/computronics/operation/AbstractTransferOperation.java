@@ -11,6 +11,7 @@ import dev.jstech.computronics.hardware.StorageTier;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.operation.LatencyScheduler;
+import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.core.operation.exec.EqualShare;
 import dev.jstech.core.operation.exec.OperationProgress;
 import dev.jstech.core.operation.exec.TransferState;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Shared engine for the timed transfer Operations (SELECT and INSERT). Both split a demand into one SubOperation per server, model each disk's read/write latency as a virtual thread that flips the SubOperation ready, then stream the item over time within the Mainframe's orchestration budget and each server's hardware cap.
@@ -47,6 +49,8 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
     private int stalledTicks;
     private boolean done;
     private byte status = OperationRecord.STATUS_PARTIAL;
+    private OperationPriority priority = OperationPriority.DEFAULT;
+    private boolean cancelled;
     @Nullable
     private Runnable onSettle;
 
@@ -177,13 +181,23 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
         finish();
     }
 
-    /** Records the final status, marks the Operation done and runs the settle callback exactly once. */
+    @Override
+    public void cancel() {
+        cancelled = true;
+        finish();
+    }
+
+    /**
+     * Records the final status, marks the Operation done and runs the settle callback exactly once. A
+     * cancelled Operation that did not get all the way settles as DISCARDED whatever it would have reported.
+     */
     protected final void markSettled(final byte finalStatus) {
         if (done) {
             return;
         }
         done = true;
-        this.status = finalStatus;
+        this.status = cancelled && finalStatus != OperationRecord.STATUS_COMPLETED
+                ? OperationRecord.STATUS_DISCARDED : finalStatus;
         if (onSettle != null) {
             onSettle.run();
         }
@@ -200,6 +214,16 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
     @Override
     public boolean isDone() {
         return done;
+    }
+
+    @Override
+    public OperationPriority priority() {
+        return priority;
+    }
+
+    @Override
+    public void setPriority(final OperationPriority priority) {
+        this.priority = Objects.requireNonNull(priority, "priority");
     }
 
     public byte status() {

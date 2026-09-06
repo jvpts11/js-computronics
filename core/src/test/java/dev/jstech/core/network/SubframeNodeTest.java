@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
 package dev.jstech.core.network;
 
@@ -45,6 +45,34 @@ class SubframeNodeTest {
     void contributionFactor_isCanonical() {
         // The contribution factor is a fixed, canonical 0.6.
         assertEquals(0.6, SubframeNode.CONTRIBUTION_FACTOR);
+    }
+
+    @Test
+    void contributedQueues_countTheGpusOnlyWhileOrchestrated() {
+        final var active = new SubframeNode(NodeUuid.random(), NetworkUuid.random(), 1000L,
+                Optional.of(NodeUuid.random()), 2);
+        final var idle = new SubframeNode(NodeUuid.random(), NetworkUuid.random(), 1000L,
+                Optional.empty(), 2);
+        final var noGpu = new SubframeNode(NodeUuid.random(), NetworkUuid.random(), 1000L,
+                Optional.of(NodeUuid.random()));
+        assertEquals(2, active.contributedQueues());
+        assertEquals(0, idle.contributedQueues());
+        assertEquals(0, noGpu.contributedQueues());
+        assertThrows(IllegalArgumentException.class, () -> new SubframeNode(NodeUuid.random(),
+                NetworkUuid.random(), 1000L, Optional.empty(), -1));
+    }
+
+    @Test
+    void contributedCapacity_followsTheBalanceFactor() {
+        final var sub = new SubframeNode(NodeUuid.random(), NetworkUuid.random(), 1000L,
+                Optional.of(NodeUuid.random()));
+        try {
+            dev.jstech.core.operation.OperationBalance.setSubframeEfficiencyFactor(0.25);
+            assertEquals(250L, sub.contributedCapacity());
+        } finally {
+            dev.jstech.core.operation.OperationBalance.reset();
+        }
+        assertEquals(600L, sub.contributedCapacity());
     }
 
     @Test

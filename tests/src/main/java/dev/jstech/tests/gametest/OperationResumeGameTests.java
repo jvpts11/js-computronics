@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Tech Series.
  */
 package dev.jstech.tests.gametest;
 
@@ -78,8 +78,10 @@ public final class OperationResumeGameTests {
                             List.of(new ProcessingPattern.ProcessingInput(StorageKey.of(Items.RAW_IRON), 1L)),
                             List.of(new ProcessingPattern.ProcessingOutput(StorageKey.of(Items.IRON_INGOT), 1L, 100)),
                             "minecraft:furnace", 600);
-                    helper.assertTrue(net.mainframe().submitNetworkProcessing(pattern, 16, "resume") != null,
-                            "the processing operation is accepted");
+                    final var op = net.mainframe().submitNetworkProcessing(pattern, 16, "resume");
+                    helper.assertTrue(op != null, "the processing operation is accepted");
+                    // A level other than the default must come back with the operation after the reload.
+                    op.setPriority(dev.jstech.core.operation.OperationPriority.HIGH);
                 })
                 // Let it collect the pre-loaded ingots and feed the furnace, then take the world's snapshot.
                 .thenExecuteAfter(40, () -> {
@@ -113,6 +115,11 @@ public final class OperationResumeGameTests {
                     final boolean completed = fresh.recentOperations().stream()
                             .anyMatch(r -> r.status() == OperationRecord.STATUS_COMPLETED && r.moved() >= 16);
                     helper.assertTrue(completed, "the resumed operation must settle COMPLETED with the full yield; recent="
+                            + fresh.recentOperations());
+                    final boolean keptLevel = fresh.recentOperations().stream()
+                            .anyMatch(r -> r.status() == OperationRecord.STATUS_COMPLETED
+                                    && r.priority() == dev.jstech.core.operation.OperationPriority.HIGH);
+                    helper.assertTrue(keptLevel, "the resumed operation must keep the HIGH level it was given; recent="
                             + fresh.recentOperations());
                 })
                 .thenSucceed();

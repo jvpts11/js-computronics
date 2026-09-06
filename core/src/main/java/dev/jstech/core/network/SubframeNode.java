@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
 package dev.jstech.core.network;
 
@@ -19,9 +19,18 @@ public record SubframeNode(
         NodeUuid nodeUuid,
         NetworkUuid networkUuid,
         long ownCapacity,
-        java.util.Optional<NodeUuid> orchestratingMainframeUuid
+        java.util.Optional<NodeUuid> orchestratingMainframeUuid,
+        int parallelQueues
 ) implements ComputerNode {
-    public static final double CONTRIBUTION_FACTOR = 0.6;
+
+    /** A Subframe with no GPUs of its own: it lends capacity, not queues. */
+    public SubframeNode(final NodeUuid nodeUuid, final NetworkUuid networkUuid, final long ownCapacity,
+                        final java.util.Optional<NodeUuid> orchestratingMainframeUuid) {
+        this(nodeUuid, networkUuid, ownCapacity, orchestratingMainframeUuid, 0);
+    }
+    /** The canonical share a Subframe lends; the balance config starts from it. */
+    public static final double CONTRIBUTION_FACTOR =
+            dev.jstech.core.operation.OperationBalance.DEFAULT_SUBFRAME_EFFICIENCY_FACTOR;
 
     public SubframeNode {
         Objects.requireNonNull(nodeUuid, "nodeUuid must not be null");
@@ -33,6 +42,19 @@ public record SubframeNode(
             throw new IllegalArgumentException(
                     "ownCapacity must be >= 0; got " + ownCapacity);
         }
+        if (parallelQueues < 0) {
+            throw new IllegalArgumentException(
+                    "parallelQueues must be >= 0; got " + parallelQueues);
+        }
+    }
+
+    /**
+     * The dispatch queues this Subframe adds to its orchestrating Mainframe: one per GPU it carries, and
+     * none while it is idle. A Subframe brings no base queue of its own — the Mainframe's CPU is the one
+     * orchestrating — so a GPU-less Subframe only lends capacity.
+     */
+    public int contributedQueues() {
+        return orchestratingMainframeUuid.isEmpty() ? 0 : parallelQueues;
     }
 
     @Override
@@ -40,7 +62,8 @@ public record SubframeNode(
         if (orchestratingMainframeUuid.isEmpty()) {
             return 0; // Idle subframe contributes nothing.
         }
-        return Math.round(ownCapacity * CONTRIBUTION_FACTOR);
+        // The share is a balance value: the server config may tune it away from the canonical default.
+        return Math.round(ownCapacity * dev.jstech.core.operation.OperationBalance.subframeEfficiencyFactor());
     }
 
     @Override

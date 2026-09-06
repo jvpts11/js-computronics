@@ -283,6 +283,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     // Operations that were in flight when the world was saved, waiting for the first booted tick to resume.
     @Nullable
     private net.minecraft.nbt.ListTag pendingOperations;
+    /** The game time the pending list was written at, so the resume can tell how long it sat unresumed. */
+    private long pendingSavedAt;
     private int resumeCountdown;
     // Ticks to let the storage index and the switch surveys settle after a boot before resuming operations.
     private static final int RESUME_DELAY_TICKS = 20;
@@ -706,7 +708,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     // Operation dispatch (the virtual-thread runtime)
 
     private void runDispatch() {
-        final int queues = Math.max(1, parallelQueues());
+        final int queues = Math.max(1, pooledQueues());
         if (dispatch == null) {
             dispatch = new OperationDispatch(queues);
             dispatchQueues = queues;
@@ -727,7 +729,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      */
     private OperationDispatch ensureDispatch() {
         if (dispatch == null) {
-            final int queues = Math.max(1, parallelQueues());
+            final int queues = Math.max(1, pooledQueues());
             dispatch = new OperationDispatch(queues);
             dispatchQueues = queues;
         }
@@ -761,11 +763,19 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                     continue; // already saved with the block entity; it resumes on reload
                 }
                 operation.abandon();
+                if (operation.silent()) {
+                    continue; // its record travels with the Operation it turned into
+                }
                 recordOperation(operation.toRecord().withStatus(
                         dev.jstech.computronics.operation.payload
                                 .OperationRecord.STATUS_DISCARDED));
+                post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Discarded(
+                        net, operation.operationId(), operation.typeId()));
             }
             activeOperations.clear();
+            timing.clear();
+            deferredTicks.clear();
+            lastGranted = java.util.Set.of();
             // The index lives in RAM: powering off clears the catalog, rebuilt on the next start.
             networkIndex.clear();
         }
@@ -783,7 +793,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     public int pendingOps() {
-        final int slots = Math.max(1, parallelQueues());
+        final int slots = Math.max(1, pooledQueues());
         int used = 0;
         int queued = 0;
         for (final var operation : activeOperations) {
@@ -804,7 +814,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     public int runningOps() {
-        final int slots = Math.max(1, parallelQueues());
+        final int slots = Math.max(1, pooledQueues());
         int used = 0;
         for (final var operation : activeOperations) {
             if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation) && used < slots) {
@@ -910,7 +920,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final var operation = new dev.jstech.computronics.operation.NetworkSelectOperation(
                 serverLevel, networkUuid(), key, demand, destination, destinationLabel, recordType,
                 java.util.UUID.randomUUID(), networkIndex, ensureDispatch(), sources);
-        activeOperations.add(operation);
+        track(operation);
         return operation;
     }
 
@@ -926,7 +936,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         final var operation = new dev.jstech.computronics.operation.NetworkInsertOperation(
                 serverLevel, networkUuid(), key, demand, sourceLabel, networkIndex, ensureDispatch());
-        activeOperations.add(operation);
+        track(operation);
         return operation;
     }
 
@@ -1049,33 +1059,74 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             patterns.add(extra);
         }
         // Machine patterns take part in the plan: an ingredient no bench makes may come out of a machine.
-        final var machines = networkProcessingPatterns();
-        long target = demand;
-        var plan = dev.jstech.computronics.crafting.CraftPlanner.plan(
-                key, target, patterns, machines, stock);
-        if (plan.steps().isEmpty()) {
-            return null; // no pattern on the network produces this item
+        final var planned = dev.jstech.computronics.crafting.CraftPlanning.plan(
+                key, demand, partial, patterns, networkProcessingPatterns(), stock);
+        if (planned == null) {
+            return null; // nothing on the network makes it, or not enough of it for a full request
         }
-        if (!plan.feasible()) {
-            if (!partial) {
-                return null;
-            }
-            target = dev.jstech.computronics.crafting.CraftPlanner.maxFeasible(
-                    key, demand, patterns, machines, stock);
-            if (target <= 0) {
-                return null;
-            }
-            plan = dev.jstech.computronics.crafting.CraftPlanner.plan(
-                    key, target, patterns, machines, stock);
+        return submitPlannedCraft(key, demand, planned.plan(), requesterLabel, extra);
+    }
+
+    /**
+     * Runs an already-made plan as a craft. The record keeps the ORIGINAL request: a scaled-down partial
+     * run settles as COMPLETED_PARTIAL showing produced vs requested, exactly what the player asked to see.
+     */
+    @Nullable
+    public dev.jstech.computronics.crafting.NetworkCraftOperation submitPlannedCraft(
+            final dev.jstech.computronics.storage.StorageKey key, final long demand,
+            final dev.jstech.computronics.crafting.CraftPlanner.Plan plan, final String requesterLabel,
+            @Nullable final dev.jstech.computronics.crafting.CraftingPattern extraPattern) {
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
+                || demand <= 0 || plan.steps().isEmpty()) {
+            return null;
         }
-        // The record keeps the ORIGINAL request: a scaled-down partial run settles as
-        // COMPLETED_PARTIAL showing produced vs requested, exactly what the player asked to see.
         final var operation = new dev.jstech.computronics.crafting.NetworkCraftOperation(
                 serverLevel, networkUuid(), key, demand, plan, networkIndex,
                 java.util.UUID.randomUUID(), craftingComputerPositions(), supercomputerPositions(),
-                requesterLabel, extra, this);
-        activeOperations.add(operation);
+                requesterLabel, extraPattern, this);
+        track(operation);
         return operation;
+    }
+
+    /**
+     * Whether anything on the network produces {@code key}: a bench pattern in a Recipe ROM, or a machine
+     * recipe. The cheap answer a prompt needs at once, before the plan itself is made.
+     */
+    public boolean anythingMakes(final dev.jstech.computronics.storage.StorageKey key) {
+        for (final var pattern : networkPatterns()) {
+            if (key.equals(dev.jstech.computronics.storage.StorageKey.of(pattern.result()))) {
+                return true;
+            }
+        }
+        for (final var recipe : networkMachineRecipes()) {
+            if (key.equals(recipe.resultKey())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Plans a recursive craft on a virtual thread. The request shows at once as a pending craft; when the
+     * plan lands, the real craft takes over with the level and the settle callback given meanwhile. Returns
+     * null only when nothing on the network makes {@code key} at all, or the Mainframe cannot run crafts.
+     */
+    @Nullable
+    private dev.jstech.computronics.crafting.PendingCraftOperation submitCraftAsync(
+            final dev.jstech.computronics.storage.StorageKey key, final long demand,
+            final boolean partial, final String label) {
+        if (!isRunning() || !hasOs() || !(level instanceof ServerLevel) || networkUuid() == null
+                || demand <= 0 || !anythingMakes(key)) {
+            return null;
+        }
+        final var stock = networkIndex.snapshot();
+        final var patterns = dev.jstech.computronics.crafting.AnyTagResolver
+                .resolveAll(networkPatterns(), stock);
+        final var pending = new dev.jstech.computronics.crafting.PendingCraftOperation(
+                this, key, demand, partial, label);
+        track(pending);
+        pending.start(ensureDispatch(), patterns, networkProcessingPatterns(), stock);
+        return pending;
     }
 
     /**
@@ -1105,7 +1156,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final var operation = new dev.jstech.computronics.crafting.NetworkProcessingOperation(
                 serverLevel, networkUuid(), pattern, demand, craftingComputerPositions(),
                 java.util.UUID.randomUUID(), requesterLabel, io);
-        activeOperations.add(operation);
+        track(operation);
         return operation;
     }
 
@@ -1121,7 +1172,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 .resolve(pattern, networkIndex.snapshot());
         final var operation = new dev.jstech.computronics.crafting.NetworkMultiStageOperation(
                 this, resolved, demand, requesterLabel);
-        activeOperations.add(operation);
+        track(operation);
         return operation;
     }
 
@@ -1184,11 +1235,34 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
         }
         // No machine makes it directly (or multi-stage was declined): plan a recursive bench-and-machine craft.
-        final var op = submitNetworkCraft(key, demand, partial, label);
+        // The planning runs off the tick; the request is listed as pending until the plan lands.
+        final var op = submitCraftAsync(key, demand, partial, label);
         if (op != null && onSettle != null) {
             op.onSettle(onSettle);
         }
         return op;
+    }
+
+    /**
+     * Rebuilds the storage catalog from every disk on the network: the disks are read on this tick, the
+     * catalog is built on a virtual thread and swapped in whole on a later tick, when {@code onDone} runs.
+     * Reads keep the old catalog meanwhile. A Mainframe that is not running rebuilds on the spot instead.
+     */
+    public void reindexAsync(@Nullable final Runnable onDone) {
+        if (!(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
+            if (onDone != null) {
+                onDone.run();
+            }
+            return;
+        }
+        if (!isRunning()) {
+            networkIndex.rebuild(serverLevel, networkUuid());
+            if (onDone != null) {
+                onDone.run();
+            }
+            return;
+        }
+        networkIndex.rebuildAsync(serverLevel, networkUuid(), ensureDispatch(), onDone);
     }
 
     /** Whether the network has a multi-stage recipe whose end result is {@code key} (so a caller can offer the
@@ -1276,6 +1350,13 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         final net.minecraft.nbt.ListTag saved = pendingOperations;
         pendingOperations = null;
+        final long savedAt = pendingSavedAt;
+        pendingSavedAt = 0L;
+        // Operations that sat unresumed past the expiry have lost whoever wanted them: they are restored just far
+        // enough to hand back what they held (a craft's pool goes back to storage), then discarded and logged.
+        final long expiry = dev.jstech.core.operation.OperationBalance.orphanedOperationsExpiryTicks();
+        final boolean expired = expiry > 0L && savedAt > 0L && level.getGameTime() - savedAt >= expiry;
+        final int liveBefore = activeOperations.size();
         final HolderLookup.Provider registries = level.registryAccess();
         final java.util.Map<java.util.UUID, dev.jstech.computronics.operation.NetworkOperation>
                 byId = new java.util.HashMap<>();
@@ -1296,12 +1377,14 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                     final var op = dev.jstech.computronics.crafting.NetworkProcessingOperation
                             .restore(tag, level, networkUuid(), craftingComputerPositions(), registries);
                     if (op != null) {
-                        activeOperations.add(op);
+                        track(op);
                         byId.put(savedId, op);
                     }
                 }
                 case dev.jstech.computronics.crafting.NetworkCraftOperation.KIND -> {
-                    if (!dev.jstech.computronics.crafting.NetworkCraftOperation
+                    // An expired craft is not re-planned after its machine steps: it hands its pool back now and
+                    // is discarded with the rest, so it takes the plain restore path below.
+                    if (!expired && !dev.jstech.computronics.crafting.NetworkCraftOperation
                             .savedMachineSteps(tag).isEmpty()) {
                         craftsOnMachines.add(tag);
                         continue;
@@ -1319,7 +1402,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                     final var op = dev.jstech.computronics.crafting.NetworkMultiStageOperation
                             .restore(tag, this, registries);
                     if (op != null) {
-                        activeOperations.add(op);
+                        track(op);
                         pipelines.add(op);
                         byId.put(savedId, op);
                     }
@@ -1348,11 +1431,117 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 pipeline.adoptStage(stageId == null ? null : byId.get(stageId));
             }
         }
+        if (expired) {
+            for (int i = liveBefore; i < activeOperations.size(); i++) {
+                activeOperations.get(i).cancel(); // the next operations tick logs each one as DISCARDED
+            }
+        }
         setChanged();
+    }
+
+    /**
+     * Stops an in-flight Operation on request: it hands back what it held and is logged as DISCARDED on the
+     * next tick. Returns false when no Operation with that id is in flight any more.
+     */
+    public boolean cancelOperation(final java.util.UUID id) {
+        final var operation = findOperation(id);
+        if (operation == null || operation.isDone()) {
+            return false;
+        }
+        operation.cancel();
+        setChanged();
+        return true;
     }
 
     /** Work queued by an operation's settle callback that must run on a later tick (the index is current then). */
     private final java.util.List<Runnable> deferredWork = new java.util.ArrayList<>();
+
+    /**
+     * Ticks a ready Operation has spent without a queue slot, per Operation. Every aging period (a balance
+     * value) of deferral lifts its effective priority one level, so a long queue of
+     * higher-priority work delays a low-priority request but can never starve it outright. The count only
+     * grows while the Operation is passed over and is dropped when it settles, so a starved Operation that
+     * finally wins a slot keeps it instead of falling straight back behind the newcomers.
+     */
+    private final java.util.Map<dev.jstech.computronics.operation.NetworkOperation, Integer> deferredTicks =
+            new java.util.IdentityHashMap<>();
+    /** The Operations the last tick granted a queue slot to; the views report the rest as PENDING. */
+    private java.util.Set<dev.jstech.computronics.operation.NetworkOperation> lastGranted = java.util.Set.of();
+    /** Per in-flight Operation: ticks spent waiting (queued or on a lock) and ticks spent running. */
+    private final java.util.Map<dev.jstech.computronics.operation.NetworkOperation, int[]> timing =
+            new java.util.IdentityHashMap<>();
+    private static final int WAITED = 0;
+    private static final int RAN = 1;
+    /** The last hour of settled Operations by type, and the day's peak concurrency; RAM only. */
+    private final dev.jstech.core.operation.OperationStatistics statistics =
+            new dev.jstech.core.operation.OperationStatistics();
+
+    private void countTick(final dev.jstech.computronics.operation.NetworkOperation operation, final int slot) {
+        final int[] counted = timing.computeIfAbsent(operation, o -> new int[2]);
+        if (slot == RAN && counted[RAN] == 0) {
+            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Started(
+                    net, operation.operationId(), operation.typeId()));
+        }
+        counted[slot]++;
+    }
+
+    /**
+     * Takes an Operation into the in-flight list and announces it on the series' event bus. Every
+     * submission and every resume goes through here, so the bus sees each Operation exactly once.
+     */
+    private void track(final dev.jstech.computronics.operation.NetworkOperation operation) {
+        activeOperations.add(operation);
+        post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Created(
+                net, operation.operationId(), operation.typeId()));
+    }
+
+    /** Posts one settled Operation's outcome: completed, failed (short), or discarded. */
+    private void postSettled(final dev.jstech.computronics.operation.NetworkOperation operation,
+                             final dev.jstech.computronics.operation.payload.OperationRecord record) {
+        if (record.completed()) {
+            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Completed(net,
+                    operation.operationId(), operation.typeId(), (long) record.waitedTicks() + record.ranTicks()));
+        } else if (record.status() == dev.jstech.computronics.operation.payload.OperationRecord.STATUS_DISCARDED) {
+            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Discarded(net,
+                    operation.operationId(), operation.typeId()));
+        } else {
+            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Failed(net,
+                    operation.operationId(), operation.typeId(), settleReason(record)));
+        }
+    }
+
+    private static String settleReason(final dev.jstech.computronics.operation.payload.OperationRecord record) {
+        return switch (record.status()) {
+            case dev.jstech.computronics.operation.payload.OperationRecord.STATUS_PARTIAL ->
+                    "delivered " + record.moved() + " of " + record.requested();
+            case dev.jstech.computronics.operation.payload.OperationRecord.STATUS_RESOURCE_LOCKED ->
+                    "timed out waiting on a locked resource";
+            default -> "failed";
+        };
+    }
+
+    /**
+     * Posts a lifecycle event for this Mainframe's network. Without a network (a Mainframe that just left
+     * one, dropping its Operations on the way out) there is nobody to tell, so nothing is built or posted.
+     */
+    private void post(final java.util.function.Function<NetworkUuid,
+            dev.jstech.core.event.OperationLifecycleEvent> event) {
+        final NetworkUuid net = networkUuid();
+        if (net != null) {
+            dev.jstech.core.JsCore.events().post(event.apply(net));
+        }
+    }
+
+    /** The scheduler's timing of an in-flight Operation as {@code [waited, ran]}, zeros before its first tick. */
+    private int[] timingOf(final dev.jstech.computronics.operation.NetworkOperation operation) {
+        final int[] counted = timing.get(operation);
+        return counted == null ? new int[2] : counted;
+    }
+
+    /** The rolling statistics of this Mainframe's Operations. */
+    public dev.jstech.core.operation.OperationStatistics statistics() {
+        return statistics;
+    }
 
     /** Runs {@code work} on the next operations tick, after the storage index has caught up with this one. */
     public void runNextTick(final Runnable work) {
@@ -1366,15 +1555,19 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             work.forEach(Runnable::run);
         }
         if (activeOperations.isEmpty()) {
+            lastGranted = java.util.Set.of();
+            deferredTicks.clear();
+            timing.clear();
             return;
         }
         // Progress lives in the Operations themselves and is saved with this block entity.
         setChanged();
+        statistics.observeConcurrency(level.getGameTime(), activeOperations.size());
         // A queue processes at most the RAM buffer per tick: a buffer smaller than the CPU leaves
-        // the CPU idle waiting on RAM, so the effective rate is the lesser of the two.
-        final long effectiveCapacity = Math.min(capacity(), ramBuffer());
-        final int slots = Math.max(1, parallelQueues());
-        int used = 0;
+        // the CPU idle waiting on RAM, so the effective rate is the lesser of the two. Subframes pool
+        // their share of capacity and their GPUs' queues into the Mainframe that orchestrates them.
+        final long effectiveCapacity = Math.min(pooledCapacity(), ramBuffer());
+        final int slots = Math.max(1, pooledQueues());
         assignMachines();
         // A machine step feeds at its Crafting Computer's crafting-card throughput (card x CPU), NOT the
         // Mainframe's capacity — the card is what governs how fast any craft runs, bench or machine. That
@@ -1392,39 +1585,69 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         // Iterate a snapshot: a multi-stage operation submits its sub-stage into activeOperations mid-tick,
         // which would otherwise be a concurrent modification. The new stage simply ticks next tick.
-        for (final var operation : new java.util.ArrayList<>(activeOperations)) {
+        final java.util.List<dev.jstech.computronics.operation.NetworkOperation> snapshot =
+                new java.util.ArrayList<>(activeOperations);
+        // The queue slots go to the ready Operations by effective priority (level plus aging), submission
+        // order inside a level. Re-deciding every tick means a higher-priority request takes over a slot the
+        // next tick instead of waiting for whatever was streaming to finish.
+        final java.util.List<dev.jstech.core.operation.exec.QueueArbiter.Candidate<
+                dev.jstech.computronics.operation.NetworkOperation>> ready = new java.util.ArrayList<>();
+        for (final var operation : snapshot) {
+            if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation)) {
+                ready.add(new dev.jstech.core.operation.exec.QueueArbiter.Candidate<>(
+                        operation, operation.priority(), deferredTicks.getOrDefault(operation, 0)));
+            }
+        }
+        final java.util.Set<dev.jstech.computronics.operation.NetworkOperation> granted =
+                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        granted.addAll(dev.jstech.core.operation.exec.QueueArbiter.grant(ready, slots,
+                dev.jstech.core.operation.OperationBalance.priorityAgingTicks()));
+        lastGranted = granted;
+        for (final var operation : snapshot) {
             if (operation.isDone()) {
                 continue;
             }
             if (operation.isWaiting()) {
+                countTick(operation, WAITED);
                 operation.tick(0L); // lock retry + timeout only; holds no queue slot
             } else if (!occupiesQueue(operation)) {
                 // A craft's machine stage runs under its Crafting Computer's thread ceiling, not a Mainframe
                 // queue: it always gets its feed and never counts against the queue budget.
+                countTick(operation, RAN);
                 operation.tick(machineFeedBudget(operation, effectiveCapacity, stepsPerComputer));
-            } else if (used < slots) {
-                used++;
+            } else if (granted.contains(operation)) {
+                countTick(operation, RAN);
                 operation.tick(machineFeedBudget(operation, effectiveCapacity, stepsPerComputer));
+            } else {
+                // Ready Operations beyond the queue count stay PENDING this tick: no progress, no latency
+                // countdown — their disks have not started reading yet. Their wait is what ages them.
+                countTick(operation, WAITED);
+                deferredTicks.merge(operation, 1, Integer::sum);
             }
-            // Ready Operations beyond the queue count stay PENDING this tick: no progress,
-            // no latency countdown — their disks have not started reading yet.
         }
         final java.util.Iterator<dev.jstech.computronics.operation.NetworkOperation> it =
                 activeOperations.iterator();
         while (it.hasNext()) {
             final var operation = it.next();
             if (operation.isDone()) {
+                deferredTicks.remove(operation);
+                final int[] counted = timing.remove(operation);
+                final int waited = counted == null ? 0 : counted[WAITED];
+                final int ran = counted == null ? 0 : counted[RAN];
                 // A craft's machine steps are nested stages, not operations of their own: the parent craft logs
                 // them as its sub-operations, so don't write them to the log or the lifetime tally separately.
+                // A silent Operation (a placeholder that became a real one) leaves no trace either.
                 final boolean nested = operation instanceof dev.jstech.computronics.crafting
                         .NetworkProcessingOperation proc && proc.isNested();
-                if (!nested) {
-                    final var record = operation.toRecord();
+                if (!nested && !operation.silent()) {
+                    final var record = operation.toRecord().withTiming(waited, ran);
                     recordOperation(record);
-                    if (record.status() == dev.jstech.computronics.operation.payload
-                            .OperationRecord.STATUS_COMPLETED) {
+                    statistics.record(level.getGameTime(), record.type(), !record.completed(), waited, ran,
+                            record.moved());
+                    if (record.completed()) {
                         completedTotal++; // network Operations count toward the lifetime tally too
                     }
+                    postSettled(operation, record);
                 }
                 it.remove();
             }
@@ -1535,23 +1758,45 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public java.util.List<dev.jstech.computronics.operation.payload.OperationRecord> activeOperationRecords() {
         final java.util.List<dev.jstech.computronics.operation.payload.OperationRecord> out =
                 new java.util.ArrayList<>(activeOperations.size());
-        final int slots = Math.max(1, parallelQueues());
-        int used = 0;
         for (final var operation : activeOperations) {
-            var record = operation.liveRecord();
-            if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation)) {
-                if (used < slots) {
-                    used++;
-                } else {
-                    record = record.withStatus(dev.jstech.computronics.operation.payload
-                            .OperationRecord.STATUS_PENDING);
-                }
+            final int[] counted = timingOf(operation);
+            var record = operation.liveRecord().withTiming(counted[WAITED], counted[RAN]);
+            // A ready Operation the last tick did not grant a slot to is queued: the scheduler decides, the
+            // view only reports it. A machine stage keeps its live status (PROCESSING while it runs): it is
+            // gated by its Crafting Computer's threads, not a Mainframe queue, so it is never forced to PENDING.
+            if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation)
+                    && !lastGranted.contains(operation)) {
+                record = record.withStatus(dev.jstech.computronics.operation.payload
+                        .OperationRecord.STATUS_PENDING);
             }
-            // A machine stage keeps its live status (PROCESSING while it runs): it is gated by its Crafting
-            // Computer's threads, not a Mainframe queue, so the queue limit never forces it to PENDING.
             out.add(record);
         }
         return out;
+    }
+
+    /** The in-flight Operation with this id, or null when it has settled or never existed. */
+    @Nullable
+    public dev.jstech.computronics.operation.NetworkOperation findOperation(final java.util.UUID id) {
+        for (final var operation : activeOperations) {
+            if (id.equals(operation.operationId())) {
+                return operation;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Changes the scheduling level of an in-flight Operation; the next tick re-grants the queue slots with the
+     * new level. Returns false when no Operation with that id is in flight any more.
+     */
+    public boolean setOperationPriority(final java.util.UUID id, final OperationPriority priority) {
+        final var operation = findOperation(id);
+        if (operation == null || operation.isDone()) {
+            return false;
+        }
+        operation.setPriority(priority);
+        setChanged();
+        return true;
     }
 
     public boolean hasActiveOperations() {
@@ -1605,12 +1850,34 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     public long orchestrationCapacity() {
-        return capacity();
+        return pooledCapacity();
     }
 
     @Override
     public int computerQueues() {
-        return parallelQueues();
+        return pooledQueues();
+    }
+
+    /**
+     * The orchestration capacity the scheduler runs at: this Mainframe's own plus the share every active
+     * Subframe on the network lends it. Read from the network registry each tick, so a Subframe powering on
+     * or off changes the rate at once.
+     */
+    public long pooledCapacity() {
+        long total = capacity();
+        if (networkUuid() != null && level instanceof ServerLevel serverLevel) {
+            total += NetworkSystem.get(serverLevel).subframeCapacityOf(networkUuid());
+        }
+        return total;
+    }
+
+    /** The parallel queues the scheduler grants: this Mainframe's (CPU + GPUs) plus the Subframes' GPUs. */
+    public int pooledQueues() {
+        int total = parallelQueues();
+        if (networkUuid() != null && level instanceof ServerLevel serverLevel) {
+            total += NetworkSystem.get(serverLevel).subframeQueuesOf(networkUuid());
+        }
+        return total;
     }
 
     @Override
@@ -1836,6 +2103,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         if (tag.contains("ActiveOperations", net.minecraft.nbt.Tag.TAG_LIST)) {
             pendingOperations = tag.getList("ActiveOperations", net.minecraft.nbt.Tag.TAG_COMPOUND).copy();
+            pendingSavedAt = tag.getLong("ActiveOperationsSavedAt");
             resumeCountdown = 0;
         }
         iqlEngineInstalled = tag.getBoolean("IqlEngineInstalled");
@@ -1896,6 +2164,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         if (!inFlight.isEmpty()) {
             tag.put("ActiveOperations", inFlight);
+            // When the saved Operations resume, the time they spent unresumed decides whether they are still
+            // wanted: a list that never got to resume since it was loaded keeps its original stamp.
+            tag.putLong("ActiveOperationsSavedAt", pendingOperations != null && pendingSavedAt > 0L
+                    ? pendingSavedAt : level != null ? level.getGameTime() : 0L);
         }
         tag.putBoolean("IqlEngineInstalled", iqlEngineInstalled);
         tag.putBoolean("IqlEngineRunning", iqlEngineRunning);

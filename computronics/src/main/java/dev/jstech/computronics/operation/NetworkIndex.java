@@ -231,10 +231,22 @@ public final class NetworkIndex {
 
     private void indexServer(final ServerRackBlockEntity rack, final int slot, final NodeUuid server) {
         final StorageTier tier = tierOf(rack, slot);
-        // Caching serves reads ahead of the drives, so the index records the latency the query
-        // actually pays rather than the raw disk's. The Cache Card is hardware in the bay's gadget
-        // slot; the Predictive Cache is software staging the hot items in RAM. They stack, because
-        // one shortens the fetch and the other avoids it.
+        final int latency = latencyOf(rack, slot, tier);
+        rack.getServerStorage(slot).view().forEach((key, quantity) -> {
+            if (quantity > 0L) {
+                catalog.computeIfAbsent(key, k -> new ArrayList<>())
+                        .add(new ItemLocation(server, tier, quantity, latency));
+            }
+        });
+    }
+
+    /**
+     * A server's read latency. Caching serves reads ahead of the drives, so the index records the latency
+     * the query actually pays rather than the raw disk's. The Cache Card is hardware in the bay's gadget
+     * slot; the Predictive Cache is software staging the hot items in RAM. They stack, because one shortens
+     * the fetch and the other avoids it.
+     */
+    private static int latencyOf(final ServerRackBlockEntity rack, final int slot, final StorageTier tier) {
         int cut = 0;
         if (rack.hasCacheCard(slot)) {
             cut += dev.jstech.computronics.item.RackGadgetItem.CACHE_LATENCY_CUT_PERCENT;
@@ -242,14 +254,67 @@ public final class NetworkIndex {
         if (rack.hasService(slot, "predictive_cache")) {
             cut += PREDICTIVE_CACHE_CUT_PERCENT;
         }
-        final int latency = cut <= 0 ? tier.latencyTicks()
+        return cut <= 0 ? tier.latencyTicks()
                 : Math.max(1, tier.latencyTicks() * Math.max(0, 100 - cut) / 100);
-        rack.getServerStorage(slot).view().forEach((key, quantity) -> {
-            if (quantity > 0L) {
-                catalog.computeIfAbsent(key, k -> new ArrayList<>())
-                        .add(new ItemLocation(server, tier, quantity, latency));
+    }
+
+    /** One node's contents as read on the main thread, for a catalog built off it. */
+    private record NodeSnapshot(NodeUuid node, StorageTier tier, int latencyTicks,
+                                Map<StorageKey, Long> counts, long modCount) {
+    }
+
+    /**
+     * Rebuilds the catalog without holding the tick: every disk is read now, on the main thread, into
+     * plain count maps; a virtual thread builds the new catalog from them; the dispatcher swaps it in
+     * whole on a later tick and runs {@code onDone}. Reads meanwhile see the old catalog, and the modification
+     * counters recorded with the snapshot let the next incremental pass re-read anything that changed in
+     * between, so the swap never hides a write.
+     */
+    public void rebuildAsync(final ServerLevel level, final NetworkUuid network,
+                             final dev.jstech.core.operation.OperationDispatch dispatch,
+                             @org.jetbrains.annotations.Nullable final Runnable onDone) {
+        final List<NodeSnapshot> snapshots = new ArrayList<>();
+        final NetworkSystem system = NetworkSystem.get(level);
+        for (final ServerNode server : system.serversOf(network)) {
+            system.locationOf(server.nodeUuid()).ifPresent(loc -> {
+                if (level.getBlockEntity(BlockPos.of(loc.rackPos())) instanceof ServerRackBlockEntity rack) {
+                    final StorageTier tier = tierOf(rack, loc.slot());
+                    snapshots.add(new NodeSnapshot(server.nodeUuid(), tier, latencyOf(rack, loc.slot(), tier),
+                            new LinkedHashMap<>(rack.getServerStorage(loc.slot()).view()),
+                            rack.storageModCount(loc.slot())));
+                }
+            });
+        }
+        for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
+            if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
+                snapshots.add(new NodeSnapshot(pc.nodeUuid(), StorageTier.HDD, StorageTier.HDD.latencyTicks(),
+                        new LinkedHashMap<>(pcBe.localStore().publicView()), pcBe.storageModCount()));
             }
-        });
+        }
+        dispatch.submit(context -> {
+            final Map<StorageKey, List<ItemLocation>> built = new LinkedHashMap<>();
+            final Map<NodeUuid, Long> modCounts = new LinkedHashMap<>();
+            for (final NodeSnapshot snapshot : snapshots) {
+                snapshot.counts().forEach((key, quantity) -> {
+                    if (quantity > 0L) {
+                        built.computeIfAbsent(key, k -> new ArrayList<>()).add(
+                                new ItemLocation(snapshot.node(), snapshot.tier(), quantity, snapshot.latencyTicks()));
+                    }
+                });
+                modCounts.put(snapshot.node(), snapshot.modCount());
+            }
+            context.onMainThread(() -> {
+                catalog.clear();
+                catalog.putAll(built);
+                indexedModCounts.clear();
+                indexedModCounts.putAll(modCounts);
+                health.onFullRebuild(); // a rebuild from scratch settles every doubt the index carried
+                if (onDone != null) {
+                    onDone.run();
+                }
+            });
+            return dev.jstech.core.operation.OperationResult.success();
+        }, dev.jstech.core.operation.OperationPriority.MEDIUM_HIGH);
     }
 
     private void indexPc(final PersonalComputerBlockEntity pc, final NodeUuid node) {

@@ -12,6 +12,7 @@ import dev.jstech.computronics.operation.NetworkOperation;
 import dev.jstech.computronics.operation.PersistentOperation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.core.operation.OperationPriority;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
@@ -20,6 +21,7 @@ import net.minecraft.resources.RegistryOps;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -47,6 +49,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
     private UUID pendingStageId;
     private boolean done;
     private byte status = OperationRecord.STATUS_PROCESSING;
+    private OperationPriority priority = OperationPriority.DEFAULT;
     private Runnable onSettle;
 
     public NetworkMultiStageOperation(final MainframeBlockEntity mainframe, final MultiStagePattern pattern,
@@ -74,6 +77,11 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
     }
 
     @Override
+    public String typeId() {
+        return dev.jstech.computronics.operation.ComputingOperations.MULTI_STAGE;
+    }
+
+    @Override
     public CompoundTag saveState(final HolderLookup.Provider registries) {
         final CompoundTag tag = new CompoundTag();
         tag.putString(KIND_KEY, KIND);
@@ -82,6 +90,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
         MultiStagePattern.CODEC.encodeStart(ops, pattern).result().ifPresent(t -> tag.put("Pattern", t));
         tag.putLong("Requested", requested);
         tag.putString("Label", requesterLabel);
+        tag.putByte(NetworkCraftOperation.PRIORITY_KEY, (byte) priority.ordinal());
         tag.putInt("StageIndex", stageIndex);
         if (currentStage instanceof PersistentOperation stage && !currentStage.isDone()) {
             tag.putUUID("StageId", stage.operationId());
@@ -106,7 +115,21 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
                 tag.hasUUID(ID_KEY) ? tag.getUUID(ID_KEY) : UUID.randomUUID());
         op.stageIndex = tag.getInt("StageIndex");
         op.pendingStageId = tag.hasUUID("StageId") ? tag.getUUID("StageId") : null;
+        op.priority = NetworkCraftOperation.savedPriority(tag);
         return op;
+    }
+
+    @Override
+    public OperationPriority priority() {
+        return priority;
+    }
+
+    @Override
+    public void setPriority(final OperationPriority priority) {
+        this.priority = Objects.requireNonNull(priority, "priority");
+        if (currentStage != null && !currentStage.isDone()) {
+            currentStage.setPriority(priority); // the stage in flight is the operation holding the queue
+        }
     }
 
     /** The id of the stage this restored pipeline was waiting on, or null when it starts its next stage fresh. */
@@ -149,6 +172,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
                 finish();
                 return;
             }
+            currentStage.setPriority(priority); // a stage competes for the queue at the pipeline's level
             return;
         }
         if (currentStage.isDone()) {
@@ -240,6 +264,18 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
     }
 
     @Override
+    public void cancel() {
+        if (done) {
+            return;
+        }
+        status = OperationRecord.STATUS_DISCARDED;
+        if (currentStage != null && !currentStage.isDone()) {
+            currentStage.cancel(); // the stage is a logged operation of its own: it reads DISCARDED too
+        }
+        finish();
+    }
+
+    @Override
     public OperationRecord toRecord() {
         return buildRecord(status);
     }
@@ -250,7 +286,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
     }
 
     private OperationRecord buildRecord(final byte recordStatus) {
-        return new OperationRecord(OperationRecord.TYPE_CRAFT, resultKey, requested, stageIndex, recordStatus,
-                List.of());
+        return new OperationRecord(operationId, OperationRecord.TYPE_CRAFT, resultKey, requested, stageIndex,
+                recordStatus, priority, List.of(), List.of());
     }
 }

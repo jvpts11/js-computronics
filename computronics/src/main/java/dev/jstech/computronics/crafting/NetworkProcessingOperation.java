@@ -16,6 +16,7 @@ import dev.jstech.computronics.storage.DataPort;
 import dev.jstech.computronics.storage.ExternalDataPort;
 import dev.jstech.computronics.storage.FilteredDataPort;
 import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -65,6 +66,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     private int idleTicks;
     private int feedCooldown;
     private byte status = OperationRecord.STATUS_FAILED;
+    private OperationPriority priority = OperationPriority.DEFAULT;
     private Runnable onSettle;
     private boolean concurrencyBlocked;
     // Where inputs are drawn from and outputs returned to: the network by default; a craft's isolated pool for a
@@ -559,6 +561,11 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     }
 
     @Override
+    public String typeId() {
+        return dev.jstech.computronics.operation.ComputingOperations.PROCESSING;
+    }
+
+    @Override
     public CompoundTag saveState(final HolderLookup.Provider registries) {
         final CompoundTag tag = new CompoundTag();
         tag.putString(KIND_KEY, KIND);
@@ -571,6 +578,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         tag.putLongArray("Delivered", delivered);
         tag.putInt("IdleTicks", idleTicks);
         tag.putString("Label", requesterLabel);
+        tag.putByte(NetworkCraftOperation.PRIORITY_KEY, (byte) priority.ordinal());
         return tag;
     }
 
@@ -599,7 +607,18 @@ public final class NetworkProcessingOperation implements PersistentOperation {
             op.delivered = savedDelivered;
         }
         op.idleTicks = tag.getInt("IdleTicks");
+        op.priority = NetworkCraftOperation.savedPriority(tag);
         return op;
+    }
+
+    @Override
+    public OperationPriority priority() {
+        return priority;
+    }
+
+    @Override
+    public void setPriority(final OperationPriority priority) {
+        this.priority = java.util.Objects.requireNonNull(priority, "priority");
     }
 
     @Override
@@ -618,6 +637,18 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     }
 
     @Override
+    public void cancel() {
+        if (done) {
+            return;
+        }
+        // A run that already made everything it was asked for keeps its COMPLETED; anything short is DISCARDED.
+        if (status != OperationRecord.STATUS_COMPLETED) {
+            status = OperationRecord.STATUS_DISCARDED;
+        }
+        finish();
+    }
+
+    @Override
     public OperationRecord toRecord() {
         return buildRecord(status);
     }
@@ -632,7 +663,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     private OperationRecord buildRecord(final byte recordStatus) {
         final StorageKey key = resultKey != null ? resultKey
                 : (pattern.inputs().isEmpty() ? null : pattern.inputs().get(0).key());
-        return new OperationRecord(OperationRecord.TYPE_CRAFT, key, requested, produced, recordStatus,
-                List.of());
+        return new OperationRecord(operationId, OperationRecord.TYPE_CRAFT, key, requested, produced,
+                recordStatus, priority, List.of(), List.of());
     }
 }
