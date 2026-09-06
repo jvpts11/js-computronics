@@ -361,6 +361,22 @@ public final class BuiltIns {
                 PUBLIC_STATIC, this.stringType);
         this.method(network, "Servers", new TypeSymbol.GenericType(this.listType, List.of(server)),
                 PUBLIC_STATIC);
+
+        // Being told beats asking. A program that wants to know when the iron runs low says so once and
+        // is called when it happens, instead of asking every tick for the rest of the world's life.
+        final NamedType event = this.declare("StockEvent", NamedType.Kind.CLASS);
+        this.property(event, "Item", this.stringType, PUBLIC);
+        this.property(event, "Total", whole, PUBLIC);
+        this.property(event, "Previous", whole, PUBLIC);
+
+        final NamedType subscription = this.declare("Subscription", NamedType.Kind.CLASS);
+        this.property(subscription, "Id", TypeSymbol.Primitive.INT, PUBLIC);
+        this.property(subscription, "Item", this.stringType, PUBLIC);
+
+        final TypeSymbol told = new TypeSymbol.GenericType(this.actionOfType, List.of(event));
+        this.method(network, "Watch", subscription, PUBLIC_STATIC, this.stringType, told);
+        this.method(network, "WatchBelow", subscription, PUBLIC_STATIC, this.stringType, whole, told);
+        this.method(network, "WatchAbove", subscription, PUBLIC_STATIC, this.stringType, whole, told);
     }
 
     /**

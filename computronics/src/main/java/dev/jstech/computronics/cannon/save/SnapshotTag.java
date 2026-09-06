@@ -60,6 +60,11 @@ public final class SnapshotTag {
     private static final String SCRIPT = "script";
     private static final String CONSOLE = "console";
     private static final String WRITTEN = "written";
+    private static final String WATCHES = "watches";
+    private static final String THRESHOLD = "threshold";
+    private static final String LAST = "last";
+    private static final String ARMED = "armed";
+    private static final String SEEN = "seen";
     private static final String STATE = "state";
     private static final String MESSAGE = "message";
     private static final String SPENT = "spent";
@@ -88,6 +93,21 @@ public final class SnapshotTag {
         }
         tag.put(STATICS, statics);
         tag.put(SCRIPT, write(shot.script()));
+        final ListTag watches = new ListTag();
+        for (final Snapshot.WatchShot watch : shot.watches()) {
+            final CompoundTag each = new CompoundTag();
+            each.putInt(ID, watch.id());
+            each.putString(NAME, watch.item());
+            each.putString(KIND, watch.kind());
+            each.putLong(THRESHOLD, watch.threshold());
+            each.put(METHOD, write(watch.handler()));
+            each.put(TARGET, write(watch.token()));
+            each.putLong(LAST, watch.last());
+            each.putBoolean(ARMED, watch.armed());
+            each.putBoolean(SEEN, watch.seen());
+            watches.add(each);
+        }
+        tag.put(WATCHES, watches);
         final ListTag console = new ListTag();
         for (final String line : shot.console()) {
             console.add(StringTag.valueOf(line));
@@ -118,9 +138,18 @@ public final class SnapshotTag {
         for (int i = 0; i < lines.size(); i++) {
             console.add(lines.getString(i));
         }
+        final List<Snapshot.WatchShot> watches = new ArrayList<>();
+        final ListTag watching = tag.getList(WATCHES, Tag.TAG_COMPOUND);
+        for (int i = 0; i < watching.size(); i++) {
+            final CompoundTag each = watching.getCompound(i);
+            watches.add(new Snapshot.WatchShot(each.getInt(ID), each.getString(NAME),
+                    each.getString(KIND), each.getLong(THRESHOLD), readValue(each.getCompound(METHOD)),
+                    readValue(each.getCompound(TARGET)), each.getLong(LAST), each.getBoolean(ARMED),
+                    each.getBoolean(SEEN)));
+        }
         return new Snapshot(tag.getLong(BUDGET), held, readFrames(tag.getList(FRAMES, Tag.TAG_COMPOUND)),
                 readFrames(tag.getList(WAITING, Tag.TAG_COMPOUND)), statics,
-                readValue(tag.getCompound(SCRIPT)), console, tag.getInt(WRITTEN),
+                readValue(tag.getCompound(SCRIPT)), watches, console, tag.getInt(WRITTEN),
                 tag.getString(STATE), tag.getString(MESSAGE), tag.getInt(SPENT));
     }
 

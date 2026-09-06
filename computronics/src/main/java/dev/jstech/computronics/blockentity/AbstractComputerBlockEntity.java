@@ -1090,6 +1090,25 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return cannon;
     }
 
+    /**
+     * How much of that the network holds, for the programs watching it.
+     *
+     * <p>Off a network, everything reads as none: a watch on a machine with no cable simply never goes
+     * off, which is the truthful answer and not an error.
+     */
+    public long networkStock(final String item) {
+        if (this instanceof dev.jstech.computronics.terminal.ComputerTerminalHost terminal
+                && level instanceof ServerLevel server) {
+            long sum = 0;
+            for (final var holding
+                    : new dev.jstech.computronics.program.ServerCliComputer(terminal, server).find(item)) {
+                sum += holding.quantity();
+            }
+            return sum;
+        }
+        return 0L;
+    }
+
     /** The prompt this machine's shell would show, for giving it back when a program lets go. */
     private String shellPrompt() {
         if (this instanceof dev.jstech.computronics.terminal.ComputerTerminalHost host
@@ -1137,7 +1156,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             setChanged();
             return;
         }
-        cannon.tick(cannonBudget());
+        cannon.tick(cannonBudget(), this::networkStock);
         if (level instanceof ServerLevel server) {
             pushCannonOutput(server);
         }

@@ -223,6 +223,29 @@ public final class CannonProcesses {
      * once.
      */
     public void tick(final int budget) {
+        this.tick(budget, null);
+    }
+
+    /**
+     * The same, with a way to look up what the network holds.
+     *
+     * <p>Everything being watched is looked up once, however many programs are watching it, and the
+     * answers are handed to each of them. A machine watching nothing pays nothing for the ability.
+     */
+    public void tick(final int budget, final java.util.function.ToLongFunction<String> stock) {
+        if (stock != null && !this.live.isEmpty()) {
+            final java.util.Map<String, Long> totals = new java.util.LinkedHashMap<>();
+            for (final Live one : this.live) {
+                for (final String item : one.process().watching()) {
+                    totals.computeIfAbsent(item, stock::applyAsLong);
+                }
+            }
+            if (!totals.isEmpty()) {
+                for (final Live one : this.live) {
+                    one.process().deliver(totals);
+                }
+            }
+        }
         if (this.live.isEmpty() || budget <= 0) {
             return;
         }

@@ -366,6 +366,50 @@ public final class CannonApiGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void watch_wakesAScriptWhenTheRealNetworkRunsLow(final GameTestHelper helper) {
+        final dev.jstech.tests.testkit.TestWorldBuilder.CraftingNetwork wired =
+                dev.jstech.tests.testkit.TestWorldBuilder.forGameTest(helper).buildCraftingNetwork();
+        final CraftingComputerBlockEntity computer = wired.cc();
+        wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
+        final int[] id = new int[1];
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("low.asm", listing("""
+                            class Low : IScript {
+                                public void OnInit() {
+                                    Network.WatchBelow("minecraft:oak_log", 100, Told);
+                                }
+                                public void OnTick() { }
+                                public void Told(StockEvent e) {
+                                    Console.PrintLine("low: " + e.Previous + " -> " + e.Total);
+                                }
+                                public void OnDestroy() { }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    id[0] = started.id();
+                    // The watch is set up, and the machine now knows to look this one up each tick.
+                    computer.cannon().tick(100000, item -> 640L);
+                    helper.assertTrue(computer.cannon().byId(id[0]).process().console().isEmpty(),
+                            "nothing has happened yet");
+                })
+                .thenExecuteAfter(2, () -> {
+                    // The logs are taken away by something else on the network, as they would be.
+                    wired.rack().getServerStorage(0).extract(
+                            dev.jstech.computronics.storage.StorageKey.of(
+                                    new net.minecraft.world.item.ItemStack(
+                                            net.minecraft.world.item.Items.OAK_LOG)), 600);
+                    for (int i = 0; i < 4; i++) {
+                        computer.cannon().tick(100000, computer::networkStock);
+                    }
+                    final List<String> said = computer.cannon().byId(id[0]).process().console();
+                    helper.assertTrue(said.size() == 1 && said.getFirst().startsWith("low: "),
+                            "the script is woken once, when it crosses; got " + said);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void network_saysSoOnAMachineWithNoCableInIt(final GameTestHelper helper) {
         final BlockPos at = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity computer = computer(helper, at);

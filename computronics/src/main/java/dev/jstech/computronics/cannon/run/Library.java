@@ -181,8 +181,43 @@ public final class Library {
             case "string" -> Answer.of(this.text(named.name(), self, arguments, line));
             case "List" -> Answer.of(this.list(named.name(), self, arguments, line));
             case "Map" -> this.map(named.name(), self, arguments, line);
-            default -> this.outward(named, arguments, line);
+            default -> this.watchOrOutward(named, arguments, line);
         };
+    }
+
+    /** The process this library serves, for the few calls that are about the program rather than the world. */
+    private Process owner;
+
+    void serves(final Process process) {
+        this.owner = process;
+    }
+
+    /**
+     * Asking to be told about something is not the same as asking about it.
+     *
+     * <p>Reading the world goes out to the machine; watching it stays here, because what is being set up
+     * belongs to the program: the process holds the watch, is woken by it, pays for it, and takes it
+     * with it across a reload. The machine is only asked what the numbers are, once a tick, for
+     * everything being watched at all.
+     */
+    private Answer watchOrOutward(final Operand.Method named, final List<Object> arguments,
+                                  final int line) {
+        if (this.owner == null || !"Network".equals(named.owner()) || !named.name().startsWith("Watch")) {
+            return this.outward(named, arguments, line);
+        }
+        final Process.Watching kind = switch (named.name()) {
+            case "WatchBelow" -> Process.Watching.BELOW;
+            case "WatchAbove" -> Process.Watching.ABOVE;
+            default -> Process.Watching.CHANGE;
+        };
+        final String item = arguments.isEmpty() ? "" : String.valueOf(arguments.getFirst());
+        final long threshold = kind == Process.Watching.CHANGE || arguments.size() < 2 ? 0L
+                : Numbers.toLong(arguments.get(1));
+        final Object last = arguments.isEmpty() ? null : arguments.getLast();
+        if (!(last instanceof Values.DelegateValue handler)) {
+            throw new Halt(Halt.Reason.NO_OBJECT, line, "there is no handler to call for " + item);
+        }
+        return Answer.of(this.owner.watch(item, kind, threshold, handler, line));
     }
 
     /**

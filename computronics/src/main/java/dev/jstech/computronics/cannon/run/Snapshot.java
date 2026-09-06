@@ -23,15 +23,27 @@ import java.util.Map;
  * each other and a tree cannot say that.
  */
 public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames, List<FrameShot> waiting,
-                       Map<String, Map<String, Value>> statics, Value script, List<String> console,
-                       int written, String state, String message, int spent) {
+                       Map<String, Map<String, Value>> statics, Value script, List<WatchShot> watches,
+                       List<String> console, int written, String state, String message, int spent) {
 
     public Snapshot {
         held = List.copyOf(held);
         frames = List.copyOf(frames);
         waiting = List.copyOf(waiting);
         statics = Map.copyOf(statics);
+        watches = List.copyOf(watches);
         console = List.copyOf(console);
+    }
+
+    /**
+     * One thing the program asked to be told about.
+     *
+     * <p>{@code last} and {@code armed} travel with it, because a watch that fires on a crossing has to
+     * remember which side of the number it was on. Without them, a world that came back would tell a
+     * program the iron had just run low when it had been low for a week.
+     */
+    public record WatchShot(int id, String item, String kind, long threshold, Value handler, Value token,
+                            long last, boolean armed, boolean seen) {
     }
 
     /**
