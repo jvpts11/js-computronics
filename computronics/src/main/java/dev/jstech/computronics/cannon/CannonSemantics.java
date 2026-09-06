@@ -66,6 +66,22 @@ public final class CannonSemantics {
 
     private static Result analyse(final List<SourceFile> sources, final boolean wholeProgram) {
         final DiagnosticBag bag = new DiagnosticBag(sources.isEmpty() ? "" : sources.getFirst().name());
+        final Analysis analysis = analyse(sources, bag, wholeProgram);
+        return new Result(analysis.model(), bag.sorted(), bag.wasCapped());
+    }
+
+    /**
+     * Everything the middle of the compiler built, for the stage that writes the assembly.
+     *
+     * <p>The stage after this one needs more than the model: it has to resolve a type it meets in a
+     * cast, and ask what two numbers meet in, which is what these carry.
+     */
+    record Analysis(SemanticModel model, BuiltIns builtIns, TypeRules rules, Declarations declarations) {
+    }
+
+    /** Reads and checks into a bag the caller owns, and hands back what the next stage needs. */
+    static Analysis analyse(final List<SourceFile> sources, final DiagnosticBag bag,
+                            final boolean wholeProgram) {
         final List<CompilationUnit> units = new ArrayList<>();
         for (final SourceFile source : sources) {
             bag.setFile(source.name());
@@ -73,14 +89,14 @@ public final class CannonSemantics {
         }
 
         final SemanticModel model = new SemanticModel();
-        // A tree the parser had to guess its way through says nothing reliable about types, so the
-        // player gets the mistakes that are certainly there rather than the ones that follow from them.
-        if (bag.hasErrors()) {
-            return new Result(model, bag.sorted(), bag.wasCapped());
-        }
         final BuiltIns builtIns = new BuiltIns();
         final TypeRules rules = new TypeRules(builtIns);
         final Declarations declarations = new Declarations(builtIns, rules, bag, model);
+        // A tree the parser had to guess its way through says nothing reliable about types, so the
+        // player gets the mistakes that are certainly there rather than the ones that follow from them.
+        if (bag.hasErrors()) {
+            return new Analysis(model, builtIns, rules, declarations);
+        }
         declarations.declare(units);
         declarations.fill();
         declarations.checkInterfaces();
@@ -89,6 +105,6 @@ public final class CannonSemantics {
             bag.setFile(sources.isEmpty() ? "" : sources.getFirst().name());
             declarations.checkEntryPoint(1, 1);
         }
-        return new Result(model, bag.sorted(), bag.wasCapped());
+        return new Analysis(model, builtIns, rules, declarations);
     }
 }

@@ -100,11 +100,31 @@ public final class BodyChecker {
         this.currentType = type;
         this.begin(true, TypeSymbol.Primitive.VOID, false);
         for (final Decl.EnumConstant constant : declaration.constants()) {
-            if (constant.value() != null) {
-                this.expect(this.check(constant.value(), TypeSymbol.Primitive.INT),
-                        TypeSymbol.Primitive.INT, constant.value());
+            if (constant.value() == null) {
+                continue;
+            }
+            this.expect(this.check(constant.value(), TypeSymbol.Primitive.INT),
+                    TypeSymbol.Primitive.INT, constant.value());
+            // The number has to be there in the source, not worked out from it: an enum's numbers are
+            // what the assembly and every saved file are written with, so they are read, never computed.
+            if (numberOf(constant.value()) == null) {
+                this.report(constant.value().line(), constant.value().column(),
+                        CannonError.ENUM_VALUE_MUST_BE_WRITTEN);
             }
         }
+    }
+
+    /** The number an enum's constant was written as, or null if it was written some other way. */
+    public static Integer numberOf(final Expr expression) {
+        if (expression instanceof Expr.Literal literal && literal.value() instanceof Integer value) {
+            return value;
+        }
+        if (expression instanceof Expr.Unary unary && unary.operator() == Operator.NEGATE
+                && !unary.postfix() && unary.operand() instanceof Expr.Literal literal
+                && literal.value() instanceof Integer value) {
+            return -value;
+        }
+        return null;
     }
 
     private void checkFieldInitializer(final Decl.FieldDecl field) {
@@ -156,10 +176,12 @@ public final class BodyChecker {
     private void declareParameters(final List<Decl.Parameter> parameters) {
         for (final Decl.Parameter parameter : parameters) {
             final TypeSymbol type = this.declarations.resolve(parameter.type());
-            if (!this.scope.declare(new Binding.Variable(parameter.name(), type, true))) {
+            final Binding.Variable variable = new Binding.Variable(parameter.name(), type, true);
+            if (!this.scope.declare(variable)) {
                 this.report(parameter.line(), parameter.column(),
                         CannonError.DUPLICATE_DECLARATION, parameter.name());
             }
+            this.model.setDeclared(parameter, variable);
         }
     }
 
@@ -260,9 +282,11 @@ public final class BodyChecker {
         }
         final Scope saved = this.scope;
         this.scope = new Scope(saved);
-        if (!this.scope.declare(new Binding.Variable(loop.name(), declared, false))) {
+        final Binding.Variable variable = new Binding.Variable(loop.name(), declared, false);
+        if (!this.scope.declare(variable)) {
             this.report(loop.line(), loop.column(), CannonError.DUPLICATE_DECLARATION, loop.name());
         }
+        this.model.setDeclared(loop, variable);
         this.loopDepth++;
         this.checkStatement(loop.body());
         this.loopDepth--;
@@ -311,10 +335,12 @@ public final class BodyChecker {
 
     private void checkLocal(final Stmt.LocalDecl local) {
         final TypeSymbol declared = isInferred(local.type()) ? this.inferred(local) : this.written(local);
-        if (!this.scope.declare(new Binding.Variable(local.name(), declared, false))) {
+        final Binding.Variable variable = new Binding.Variable(local.name(), declared, false);
+        if (!this.scope.declare(variable)) {
             this.report(local.line(), local.column(),
                     CannonError.DUPLICATE_DECLARATION, local.name());
         }
+        this.model.setDeclared(local, variable);
     }
 
     // "var" takes the type of what it is given, which means it has to be given something, and
@@ -1058,10 +1084,12 @@ public final class BodyChecker {
                             CannonError.CANNOT_CONVERT, fromShape.describe(), type.describe());
                 }
             }
-            if (!this.scope.declare(new Binding.Variable(parameter.name(), type, true))) {
+            final Binding.Variable variable = new Binding.Variable(parameter.name(), type, true);
+            if (!this.scope.declare(variable)) {
                 this.report(parameter.line(), parameter.column(),
                         CannonError.DUPLICATE_DECLARATION, parameter.name());
             }
+            this.model.setDeclared(parameter, variable);
         }
     }
 
@@ -1083,6 +1111,7 @@ public final class BodyChecker {
                         CannonError.DUPLICATE_DECLARATION, argument.name());
             }
             this.model.setBinding(argument, variable);
+            this.model.setDeclared(argument, variable);
             return type;
         }
         final Binding.Variable variable = this.scope.lookup(argument.name());

@@ -20,6 +20,10 @@ import java.util.Map;
  *
  * <p>Every instruction costs one from a process's budget for the tick, except a call into the
  * library or into the world, which costs what that call is documented to cost.
+ *
+ * <p>{@code ldfn} is the one that makes a handler: it takes the object a method belongs to off the
+ * stack and leaves a delegate bound to it, which is what a method handed over without brackets, and
+ * what a lambda, both come to in the end.
  */
 public enum Opcode {
 
@@ -80,6 +84,7 @@ public enum Opcode {
 
     CALL("call", Shape.METHOD),
     CALLVIRT("callvirt", Shape.METHOD),
+    LDFN("ldfn", Shape.METHOD),
     SYS("sys", Shape.TEXT),
     RET("ret", Shape.NONE),
 

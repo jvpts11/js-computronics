@@ -8,6 +8,7 @@
 package dev.jstech.computronics.cannon.sem;
 
 import dev.jstech.computronics.cannon.ast.Expr;
+import dev.jstech.computronics.cannon.ast.Node;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -26,6 +27,7 @@ public final class SemanticModel {
     private final Map<Expr, TypeSymbol> types = new IdentityHashMap<>();
     private final Map<Expr, Binding> bindings = new IdentityHashMap<>();
     private final Map<Expr, MemberSymbol> calls = new IdentityHashMap<>();
+    private final Map<Node, Binding.Variable> places = new IdentityHashMap<>();
     private final List<NamedType> declared = new ArrayList<>();
     private NamedType entryPoint;
 
@@ -57,6 +59,23 @@ public final class SemanticModel {
     /** The method or constructor a call resolved to, or null. */
     public MemberSymbol callOf(final Expr expression) {
         return this.calls.get(expression);
+    }
+
+    /**
+     * Records where a variable comes into being: a parameter, a local, the name a foreach walks with,
+     * or a variable declared at a call that fills it in.
+     *
+     * <p>The stage that emits the assembly needs this to number the places a method keeps its values
+     * in. Every mention of the name binds to the same variable this records, so numbering the
+     * declarations is enough to number every use.
+     */
+    public void setDeclared(final Node site, final Binding.Variable variable) {
+        this.places.put(site, variable);
+    }
+
+    /** The variable a declaration site brings into being, or null. */
+    public Binding.Variable declaredAt(final Node site) {
+        return this.places.get(site);
     }
 
     /** Records a type the program declares. */

@@ -210,8 +210,14 @@ public final class TypeRules {
         return this.isAssignable(left, right) || this.isAssignable(right, left);
     }
 
-    // The common type of two numbers, or null when either is not one.
-    private TypeSymbol promote(final TypeSymbol left, final TypeSymbol right) {
+    /**
+     * The type two numbers meet in, or null when either is not a number.
+     *
+     * <p>The stage that emits the assembly asks for this as well: a comparison gives back a bool, so
+     * the type its two sides were compared as cannot be read off the result and has to be worked out
+     * the same way it was here.
+     */
+    public TypeSymbol promote(final TypeSymbol left, final TypeSymbol right) {
         if (!this.isNumeric(left) || !this.isNumeric(right)) {
             return null;
         }
