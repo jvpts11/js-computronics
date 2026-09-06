@@ -53,8 +53,13 @@ public sealed interface Decl extends Node {
     sealed interface MemberDecl extends Decl {
     }
 
-    /** One parameter of a method, a constructor, a delegate or a lambda. */
-    record Parameter(TypeRef type, String name, int line, int column) implements Node {
+    /**
+     * One parameter of a method, a constructor, a delegate or a lambda.
+     *
+     * <p>An outward parameter is one the method fills in rather than reads, which is how a method
+     * gives back an answer and a value at the same time.
+     */
+    record Parameter(boolean outward, TypeRef type, String name, int line, int column) implements Node {
     }
 
     /** A class, with the base type and interfaces it was written with. */

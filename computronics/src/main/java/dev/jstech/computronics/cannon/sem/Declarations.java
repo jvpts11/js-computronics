@@ -166,7 +166,8 @@ public final class Declarations {
     private List<MemberSymbol.ParameterSymbol> parametersOf(final List<Decl.Parameter> parameters) {
         final List<MemberSymbol.ParameterSymbol> symbols = new ArrayList<>();
         for (final Decl.Parameter parameter : parameters) {
-            symbols.add(new MemberSymbol.ParameterSymbol(parameter.name(), this.resolve(parameter.type())));
+            symbols.add(new MemberSymbol.ParameterSymbol(parameter.name(),
+                    this.resolve(parameter.type()), parameter.outward()));
         }
         return symbols;
     }

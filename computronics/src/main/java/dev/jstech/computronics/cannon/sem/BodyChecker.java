@@ -124,6 +124,7 @@ public final class BodyChecker {
         this.begin(method.modifiers().contains(Decl.Modifier.STATIC), declared, false);
         this.declareParameters(method.parameters());
         this.checkBlock(method.body(), false);
+        this.checkOutParameters(method.parameters(), method.body(), method);
         if (declared != TypeSymbol.Primitive.VOID && !alwaysReturns(method.body())) {
             this.report(method.line(), method.column(),
                     CannonError.MISSING_RETURN_VALUE, declared.describe());
@@ -139,6 +140,7 @@ public final class BodyChecker {
         if (constructor.body() != null) {
             this.checkBlock(constructor.body(), false);
         }
+        this.checkOutParameters(constructor.parameters(), constructor.body(), constructor);
     }
 
     private void checkChainedCall(final NamedType type, final Decl.ConstructorCall chained) {
@@ -406,6 +408,7 @@ public final class BodyChecker {
             case Expr.Cast cast -> this.castType(cast);
             case Expr.TypeTest test -> this.typeTestType(test);
             case Expr.Lambda lambda -> this.lambdaType(lambda, expected);
+            case Expr.OutArgument outward -> this.outArgumentType(outward, expected);
         };
         this.model.setType(expression, type);
         return type;
@@ -669,6 +672,9 @@ public final class BodyChecker {
             return false;
         }
         for (int i = 0; i < shape.parameters().size(); i++) {
+            if (shape.parameters().get(i).outward() != candidate.parameters().get(i).outward()) {
+                return false;
+            }
             final TypeSymbol wanted = this.rules.substitute(shape.parameters().get(i).type(), wantedArguments);
             final TypeSymbol given = this.rules.substitute(candidate.parameters().get(i).type(), ownArguments);
             if (!wanted.equals(given)) {
@@ -802,7 +808,7 @@ public final class BodyChecker {
         final List<MemberSymbol.ParameterSymbol> parameters = new ArrayList<>();
         for (final MemberSymbol.ParameterSymbol parameter : method.parameters()) {
             parameters.add(new MemberSymbol.ParameterSymbol(parameter.name(),
-                    this.rules.substitute(parameter.type(), arguments)));
+                    this.rules.substitute(parameter.type(), arguments), parameter.outward()));
         }
         return new MemberSymbol.MethodSymbol(method.owner(), method.name(),
                 this.rules.substitute(method.returnType(), arguments), parameters, method.modifiers());
@@ -817,13 +823,14 @@ public final class BodyChecker {
                                                final List<Expr> arguments, final String name, final Node at) {
         final List<TypeSymbol> given = new ArrayList<>();
         for (final Expr argument : arguments) {
-            final boolean waits = argument instanceof Expr.Lambda || this.isMethodGroup(argument);
+            final boolean waits = argument instanceof Expr.Lambda
+                    || waitsForItsParameter(argument) || this.isMethodGroup(argument);
             given.add(waits ? null : this.check(argument, null));
         }
         final List<MemberSymbol.MethodSymbol> fitting = new ArrayList<>();
         int best = -1;
         for (final MemberSymbol.MethodSymbol candidate : candidates) {
-            final int score = this.score(candidate, given);
+            final int score = this.score(candidate, given, arguments);
             if (score < 0) {
                 continue;
             }
@@ -880,26 +887,50 @@ public final class BodyChecker {
     private void checkAgainst(final MemberSymbol.MethodSymbol chosen, final List<Expr> arguments,
                               final List<TypeSymbol> given) {
         for (int i = 0; i < arguments.size(); i++) {
-            final TypeSymbol wanted = chosen.parameters().get(i).type();
+            final MemberSymbol.ParameterSymbol parameter = chosen.parameters().get(i);
+            final Expr argument = arguments.get(i);
+            final boolean outward = argument instanceof Expr.OutArgument;
+            if (parameter.outward() != outward) {
+                this.report(argument.line(), argument.column(), parameter.outward()
+                        ? CannonError.OUT_ARGUMENT_EXPECTED : CannonError.OUT_ARGUMENT_UNEXPECTED,
+                        parameter.name());
+                continue;
+            }
             if (given.get(i) == null) {
-                this.check(arguments.get(i), wanted);
+                this.check(argument, parameter.type());
+            } else if (outward) {
+                if (!given.get(i).equals(parameter.type())) {
+                    this.report(argument.line(), argument.column(),
+                            CannonError.OUT_TYPE_MUST_MATCH, parameter.type().describe());
+                }
             } else {
-                this.expect(given.get(i), wanted, arguments.get(i));
+                this.expect(given.get(i), parameter.type(), argument);
             }
         }
     }
 
     // How well a version fits: an exact type counts double, a conversion counts once, and anything
-    // that does not fit at all rules the version out.
-    private int score(final MemberSymbol.MethodSymbol candidate, final List<TypeSymbol> given) {
+    // that does not fit at all rules the version out. An outward argument fits only an outward
+    // parameter, and only exactly, because the method writes straight into the place it is given.
+    private int score(final MemberSymbol.MethodSymbol candidate, final List<TypeSymbol> given,
+                      final List<Expr> arguments) {
         if (candidate.parameters().size() != given.size()) {
             return -1;
         }
         int total = 0;
         for (int i = 0; i < given.size(); i++) {
-            final TypeSymbol wanted = candidate.parameters().get(i).type();
+            final MemberSymbol.ParameterSymbol parameter = candidate.parameters().get(i);
+            final boolean outward = arguments.get(i) instanceof Expr.OutArgument;
+            if (outward != parameter.outward()) {
+                return -1;
+            }
+            final TypeSymbol wanted = parameter.type();
             final TypeSymbol argument = given.get(i);
             if (argument == null) {
+                if (outward) {
+                    total += 2;
+                    continue;
+                }
                 final NamedType named = this.rules.named(wanted);
                 if (named == null || named.kind() != NamedType.Kind.DELEGATE) {
                     return -1;
@@ -907,7 +938,7 @@ public final class BodyChecker {
                 total += 1;
             } else if (argument.equals(wanted)) {
                 total += 2;
-            } else if (this.rules.isAssignable(argument, wanted)) {
+            } else if (!outward && this.rules.isAssignable(argument, wanted)) {
                 total += 1;
             } else {
                 return -1;
@@ -1004,6 +1035,7 @@ public final class BodyChecker {
                 this.expect(body, shape.returnType(), lambda.body());
             }
         }
+        this.checkOutParameters(lambda.parameters(), lambda.block(), lambda);
         this.scope = saved;
         this.returnType = savedReturn;
         return expected;
@@ -1012,6 +1044,11 @@ public final class BodyChecker {
     private void declareLambdaParameters(final Expr.Lambda lambda, final MemberSymbol.MethodSymbol shape) {
         for (int i = 0; i < lambda.parameters().size(); i++) {
             final Decl.Parameter parameter = lambda.parameters().get(i);
+            if (parameter.outward() != shape.parameters().get(i).outward()) {
+                this.report(parameter.line(), parameter.column(), shape.parameters().get(i).outward()
+                        ? CannonError.OUT_ARGUMENT_EXPECTED : CannonError.OUT_ARGUMENT_UNEXPECTED,
+                        shape.parameters().get(i).name());
+            }
             final TypeSymbol fromShape = shape.parameters().get(i).type();
             TypeSymbol type = fromShape;
             if (parameter.type() != null) {
@@ -1026,6 +1063,136 @@ public final class BodyChecker {
                         CannonError.DUPLICATE_DECLARATION, parameter.name());
             }
         }
+    }
+
+    // ---------------------------------------------------------------- outward arguments
+
+    // The place a method is being asked to write into: a local it declares here, a local that already
+    // exists, or a field. Written as var, the local takes whatever the method fills in, which is only
+    // known once the version of the method has been chosen.
+    private TypeSymbol outArgumentType(final Expr.OutArgument argument, final TypeSymbol expected) {
+        if (argument.type() != null) {
+            final TypeSymbol type = isInferred(argument.type())
+                    ? expected : this.declarations.resolve(argument.type());
+            if (type == null || this.rules.isError(type)) {
+                return TypeSymbol.Special.ERROR;
+            }
+            final Binding.Variable variable = new Binding.Variable(argument.name(), type, false);
+            if (!this.scope.declare(variable)) {
+                this.report(argument.line(), argument.column(),
+                        CannonError.DUPLICATE_DECLARATION, argument.name());
+            }
+            this.model.setBinding(argument, variable);
+            return type;
+        }
+        final Binding.Variable variable = this.scope.lookup(argument.name());
+        if (variable != null) {
+            this.model.setBinding(argument, variable);
+            return variable.type();
+        }
+        final List<MemberSymbol> members = this.currentType == null
+                ? List.of() : lookup(this.currentType, argument.name());
+        if (!members.isEmpty()) {
+            if (members.getFirst() instanceof MemberSymbol.FieldSymbol field && !field.isReadOnly()) {
+                this.model.setBinding(argument, new Binding.Member(field, field.type()));
+                return field.type();
+            }
+            this.report(argument.line(), argument.column(), CannonError.OUT_NOT_A_PLACE, argument.name());
+            return TypeSymbol.Special.ERROR;
+        }
+        this.report(argument.line(), argument.column(), CannonError.UNKNOWN_NAME, argument.name());
+        return TypeSymbol.Special.ERROR;
+    }
+
+    private static boolean waitsForItsParameter(final Expr argument) {
+        return argument instanceof Expr.OutArgument outward && isInferred(outward.type());
+    }
+
+    // An outward parameter has to be given a value on every way out of the method, because the caller
+    // is promised one. This walks the body carrying whether it has been given yet, and says so at the
+    // first way out that has not.
+    private void checkOutParameters(final List<Decl.Parameter> parameters, final Stmt.Block body,
+                                    final Node at) {
+        for (final Decl.Parameter parameter : parameters) {
+            if (!parameter.outward()) {
+                continue;
+            }
+            if (body == null || !this.flow(body, parameter.name(), false)) {
+                this.report(at.line(), at.column(), CannonError.OUT_NOT_ASSIGNED, parameter.name());
+            }
+        }
+    }
+
+    private boolean flow(final Stmt statement, final String name, final boolean assigned) {
+        return switch (statement) {
+            case Stmt.Block block -> {
+                boolean now = assigned;
+                for (final Stmt inner : block.statements()) {
+                    now = this.flow(inner, name, now);
+                }
+                yield now;
+            }
+            case Stmt.ExprStmt expression -> assigned || writesTo(expression.expression(), name);
+            case Stmt.LocalDecl local -> assigned || writesTo(local.initializer(), name);
+            case Stmt.Return give -> {
+                if (!assigned && !writesTo(give.value(), name)) {
+                    this.report(give.line(), give.column(), CannonError.OUT_NOT_ASSIGNED, name);
+                }
+                yield true;
+            }
+            case Stmt.If branch -> {
+                final boolean then = this.flow(branch.then(), name, assigned);
+                final boolean otherwise = branch.otherwise() == null
+                        ? assigned : this.flow(branch.otherwise(), name, assigned);
+                yield then && otherwise;
+            }
+            case Stmt.DoWhile loop -> this.flow(loop.body(), name, assigned);
+            case Stmt.While loop -> this.aside(loop.body(), name, assigned);
+            case Stmt.For loop -> this.aside(loop.body(), name, assigned);
+            case Stmt.ForEach loop -> this.aside(loop.body(), name, assigned);
+            case Stmt.Switch choice -> {
+                for (final Stmt.SwitchSection section : choice.sections()) {
+                    boolean now = assigned;
+                    for (final Stmt inner : section.statements()) {
+                        now = this.flow(inner, name, now);
+                    }
+                }
+                yield assigned;
+            }
+            default -> assigned;
+        };
+    }
+
+    // A body that may not run at all cannot be counted on to have given the value, but a way out
+    // inside it still has to be checked.
+    private boolean aside(final Stmt body, final String name, final boolean assigned) {
+        this.flow(body, name, assigned);
+        return assigned;
+    }
+
+    // Whether evaluating this expression gives the name a value: an assignment to it, or handing it
+    // to a method as the place to fill in. A lambda's body does not count, because it runs later.
+    private static boolean writesTo(final Expr expression, final String name) {
+        return switch (expression) {
+            case null -> false;
+            case Expr.Assign assign -> (assign.operator() == Operator.ASSIGN
+                    && assign.target() instanceof Expr.Name target && target.identifier().equals(name))
+                    || writesTo(assign.target(), name) || writesTo(assign.value(), name);
+            case Expr.OutArgument outward -> outward.name().equals(name);
+            case Expr.Binary binary -> writesTo(binary.left(), name) || writesTo(binary.right(), name);
+            case Expr.Unary unary -> writesTo(unary.operand(), name);
+            case Expr.Conditional conditional -> writesTo(conditional.condition(), name);
+            case Expr.Call call -> writesTo(call.callee(), name)
+                    || call.arguments().stream().anyMatch(argument -> writesTo(argument, name));
+            case Expr.Member member -> writesTo(member.target(), name);
+            case Expr.Index index -> writesTo(index.target(), name) || writesTo(index.index(), name);
+            case Expr.New created -> created.arguments().stream()
+                    .anyMatch(argument -> writesTo(argument, name));
+            case Expr.NewArray created -> writesTo(created.length(), name);
+            case Expr.Cast cast -> writesTo(cast.value(), name);
+            case Expr.TypeTest test -> writesTo(test.value(), name);
+            default -> false;
+        };
     }
 
     // ---------------------------------------------------------------- helpers

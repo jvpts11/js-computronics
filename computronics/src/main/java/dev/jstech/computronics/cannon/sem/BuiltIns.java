@@ -127,7 +127,7 @@ public final class BuiltIns {
                         final Set<Decl.Modifier> modifiers, final TypeSymbol... takes) {
         final List<MemberSymbol.ParameterSymbol> parameters = new ArrayList<>();
         for (int i = 0; i < takes.length; i++) {
-            parameters.add(new MemberSymbol.ParameterSymbol("a" + i, takes[i]));
+            parameters.add(MemberSymbol.ParameterSymbol.of("a" + i, takes[i]));
         }
         owner.addMember(new MemberSymbol.MethodSymbol(owner, name, returns, parameters, modifiers));
     }
@@ -184,6 +184,12 @@ public final class BuiltIns {
         this.method(this.mapType, "Put", nothing, PUBLIC, key, value);
         this.method(this.mapType, "Get", value, PUBLIC, key);
         this.method(this.mapType, "ContainsKey", TypeSymbol.Primitive.BOOL, PUBLIC, key);
+        // The one lookup that answers both questions at once: whether the key was there, and what it
+        // held. It is why the language has an outward parameter at all.
+        this.mapType.addMember(new MemberSymbol.MethodSymbol(this.mapType, "TryGet",
+                TypeSymbol.Primitive.BOOL,
+                List.of(MemberSymbol.ParameterSymbol.of("key", key),
+                        new MemberSymbol.ParameterSymbol("value", value, true)), PUBLIC));
         this.method(this.mapType, "Remove", TypeSymbol.Primitive.BOOL, PUBLIC, key);
         this.method(this.mapType, "Keys", new TypeSymbol.GenericType(this.listType, List.of(key)), PUBLIC);
         this.method(this.mapType, "Values", new TypeSymbol.GenericType(this.listType, List.of(value)), PUBLIC);
@@ -194,10 +200,10 @@ public final class BuiltIns {
                 TypeSymbol.Primitive.VOID, List.of(), PUBLIC));
         this.actionOfType.setInvoke(new MemberSymbol.MethodSymbol(this.actionOfType, "Invoke",
                 TypeSymbol.Primitive.VOID,
-                List.of(new MemberSymbol.ParameterSymbol("value", new TypeSymbol.TypeParameter("T", 0))), PUBLIC));
+                List.of(MemberSymbol.ParameterSymbol.of("value", new TypeSymbol.TypeParameter("T", 0))), PUBLIC));
         this.funcType.setInvoke(new MemberSymbol.MethodSymbol(this.funcType, "Invoke",
                 new TypeSymbol.TypeParameter("R", 1),
-                List.of(new MemberSymbol.ParameterSymbol("value", new TypeSymbol.TypeParameter("T", 0))), PUBLIC));
+                List.of(MemberSymbol.ParameterSymbol.of("value", new TypeSymbol.TypeParameter("T", 0))), PUBLIC));
     }
 
     private void fillScript() {
@@ -238,6 +244,10 @@ public final class BuiltIns {
         this.method(convert, "ToLong", TypeSymbol.Primitive.LONG, PUBLIC_STATIC, this.stringType);
         this.method(convert, "ToDouble", TypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC, this.stringType);
         this.method(convert, "ToString", this.stringType, PUBLIC_STATIC, this.objectType);
+        convert.addMember(new MemberSymbol.MethodSymbol(convert, "TryInt", TypeSymbol.Primitive.BOOL,
+                List.of(MemberSymbol.ParameterSymbol.of("text", this.stringType),
+                        new MemberSymbol.ParameterSymbol("value", TypeSymbol.Primitive.INT, true)),
+                PUBLIC_STATIC));
     }
 
     private void fillTime() {

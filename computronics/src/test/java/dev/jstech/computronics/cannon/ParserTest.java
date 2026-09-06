@@ -170,6 +170,37 @@ class ParserTest {
     }
 
     @Test
+    void parse_readsAnOutParameterAndTheThreeWaysToPassOne() {
+        final CannonFrontEnd.Result result = parse("""
+                class C {
+                    bool F(string key, out int value) { value = 0; return true; }
+                    void M() {
+                        int a;
+                        F("a", out a);
+                        F("b", out int b);
+                        F("c", out var c);
+                    }
+                }
+                """);
+        assertTrue(result.ok(), () -> String.join("\n", result.lines()));
+        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
+        final Decl.MethodDecl find = (Decl.MethodDecl) type.members().getFirst();
+        assertFalse(find.parameters().getFirst().outward());
+        assertTrue(find.parameters().get(1).outward());
+
+        final List<Stmt> statements = ((Decl.MethodDecl) type.members().get(1)).body().statements();
+        assertNull(outArgument(statements.get(1)).type());
+        assertEquals("int", outArgument(statements.get(2)).type().name());
+        assertEquals("var", outArgument(statements.get(3)).type().name());
+        assertEquals("c", outArgument(statements.get(3)).name());
+    }
+
+    private static Expr.OutArgument outArgument(final Stmt statement) {
+        final Expr.Call call = (Expr.Call) ((Stmt.ExprStmt) statement).expression();
+        return (Expr.OutArgument) call.arguments().get(1);
+    }
+
+    @Test
     void parse_splitsTheClosingAnglesOfANestedGeneric() {
         final List<Stmt> statements = body("Map<string, List<int>> m = new Map<string, List<int>>();");
         final Stmt.LocalDecl local = (Stmt.LocalDecl) statements.getFirst();

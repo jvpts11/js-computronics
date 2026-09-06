@@ -370,6 +370,132 @@ class TypeCheckTest {
     }
 
     @Test
+    void check_fillsInAnOutParameterAndPassesItThreeWays() {
+        assertClean(check("""
+                class C {
+                    bool Find(string key, out int value) {
+                        value = 0;
+                        return false;
+                    }
+
+                    void M() {
+                        int a;
+                        Find("a", out a);
+                        if (Find("b", out int b)) { int copy = b; }
+                        if (Find("c", out var c)) { int copy = c; }
+                    }
+                }
+                """));
+    }
+
+    @Test
+    void check_wantsAnOutParameterGivenAValueOnEveryWayOut() {
+        assertReports("C3037", check("class C { bool Find(out int value) { return false; } }"));
+        assertReports("C3037", check("""
+                class C {
+                    bool Find(bool ok, out int value) {
+                        if (ok) { value = 1; return true; }
+                        return false;
+                    }
+                }
+                """));
+        assertClean(check("""
+                class C {
+                    bool Find(bool ok, out int value) {
+                        if (ok) { value = 1; return true; }
+                        value = 0;
+                        return false;
+                    }
+                }
+                """));
+    }
+
+    @Test
+    void check_countsPassingItOnAsGivingItAValue() {
+        assertClean(check("""
+                class C {
+                    Map<string, int> counts = new Map<string, int>();
+                    bool Find(string key, out int value) { return counts.TryGet(key, out value); }
+                }
+                """));
+    }
+
+    @Test
+    void check_wantsOutWrittenAtTheCallAndNowhereElse() {
+        assertReports("C3034", check("""
+                class C {
+                    bool Find(out int value) { value = 0; return true; }
+                    void M() { int n = 0; Find(n); }
+                }
+                """));
+        assertReports("C3035", check("""
+                class C {
+                    void Take(int value) { }
+                    void M() { int n = 0; Take(out n); }
+                }
+                """));
+    }
+
+    @Test
+    void check_wantsAnOutArgumentToBeExactlyTheTypeAsked() {
+        assertReports("C3036", check("""
+                class C {
+                    bool Find(out int value) { value = 0; return true; }
+                    void M() { long n = 0; Find(out n); }
+                }
+                """));
+    }
+
+    @Test
+    void check_writesIntoAFieldButNotAReadOnlyOne() {
+        assertClean(check("""
+                class C {
+                    int cached = 0;
+                    bool Find(out int value) { value = 1; return true; }
+                    void M() { Find(out cached); }
+                }
+                """));
+        assertReports("C3038", check("""
+                class C {
+                    readonly int cached = 0;
+                    bool Find(out int value) { value = 1; return true; }
+                    void M() { Find(out cached); }
+                }
+                """));
+    }
+
+    @Test
+    void check_readsTheTryFormsOfTheLibrary() {
+        assertClean(body("""
+                Map<string, int> counts = new Map<string, int>();
+                if (counts.TryGet("iron", out int found)) { int copy = found; }
+                if (Convert.TryInt("42", out int parsed)) { int copy = parsed; }
+                """));
+        assertReports("C3036", body("""
+                Map<string, int> counts = new Map<string, int>();
+                counts.TryGet("iron", out string wrong);
+                """));
+    }
+
+    @Test
+    void check_hooksALambdaToADelegateThatFillsSomethingIn() {
+        assertClean(check("""
+                delegate bool Finder(string key, out int value);
+                class C {
+                    void Use(Finder f) { }
+                    void M() { Use((key, out value) => { value = 0; return true; }); }
+                }
+                """));
+        assertReports("C3034", check("""
+                delegate bool Finder(string key, out int value);
+                class C {
+                    void Use(Finder f) { }
+                    void M() { Use((key, value) => { return true; }); }
+                }
+                """));
+    }
+
+    @Test
     void check_recordsTheTypeOfEveryExpressionItChecked() {
         final CannonSemantics.Result result = check("class C { void M() { int n = 1 + 2; } }");
         assertClean(result);

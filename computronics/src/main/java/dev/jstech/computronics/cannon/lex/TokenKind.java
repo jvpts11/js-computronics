@@ -48,6 +48,7 @@ public enum TokenKind {
     FOR("for", true),
     FOREACH("foreach", true),
     IN("in", true),
+    OUT("out", true),
     DO("do", true),
     SWITCH("switch", true),
     CASE("case", true),

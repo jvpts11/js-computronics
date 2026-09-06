@@ -89,4 +89,14 @@ public sealed interface Expr extends Node {
     record Lambda(List<Decl.Parameter> parameters, Expr body, Stmt.Block block, int line, int column)
             implements Expr {
     }
+
+    /**
+     * A place handed to a method for it to fill in. Only an argument can be one of these.
+     *
+     * <p>{@code type} is null when the argument names something that already exists, and set when
+     * the variable is declared right there in the call; written as {@code var}, the variable takes
+     * whatever the method fills in.
+     */
+    record OutArgument(TypeRef type, String name, int line, int column) implements Expr {
+    }
 }

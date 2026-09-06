@@ -340,12 +340,13 @@ public final class Parser {
         while (!this.check(TokenKind.RIGHT_PAREN) && !this.atEnd()) {
             final int before = this.position;
             final Token start = this.peek();
+            final boolean outward = this.match(TokenKind.OUT);
             final TypeRef type = this.parseTypeRef();
             if (type == null) {
                 break;
             }
             final String name = this.expectIdentifier();
-            parameters.add(new Decl.Parameter(type, name, start.line(), start.column()));
+            parameters.add(new Decl.Parameter(outward, type, name, start.line(), start.column()));
             if (!this.match(TokenKind.COMMA)) {
                 break;
             }
@@ -951,7 +952,7 @@ public final class Parser {
         }
         while (!this.check(TokenKind.RIGHT_PAREN) && !this.atEnd()) {
             final int before = this.position;
-            final Expr argument = this.parseExpression();
+            final Expr argument = this.check(TokenKind.OUT) ? this.parseOutArgument() : this.parseExpression();
             if (argument != null) {
                 arguments.add(argument);
             }
@@ -964,6 +965,19 @@ public final class Parser {
         }
         this.expect(TokenKind.RIGHT_PAREN);
         return arguments;
+    }
+
+    // "out value" hands over a place that already exists; "out int value" and "out var value" declare
+    // it right there, which is where a player wants it when the call is the only reason it exists.
+    private Expr parseOutArgument() {
+        final Token start = this.advance();
+        final int afterType = this.scanType(this.position);
+        TypeRef type = null;
+        if (afterType > this.position && this.kindAt(afterType) == TokenKind.IDENTIFIER) {
+            type = this.parseTypeRef();
+        }
+        final String name = this.expectIdentifier();
+        return new Expr.OutArgument(type, name, start.line(), start.column());
     }
 
     private Expr parsePrimary() {
@@ -1025,7 +1039,7 @@ public final class Parser {
         final Token name = this.advance();
         this.advance();
         final List<Decl.Parameter> parameters = List.of(
-                new Decl.Parameter(null, name.text(), name.line(), name.column()));
+                new Decl.Parameter(false, null, name.text(), name.line(), name.column()));
         return this.finishLambda(parameters, name);
     }
 
@@ -1036,13 +1050,14 @@ public final class Parser {
         while (!this.check(TokenKind.RIGHT_PAREN) && !this.atEnd()) {
             final int before = this.position;
             final Token at = this.peek();
+            final boolean outward = this.match(TokenKind.OUT);
             final int afterType = this.scanType(this.position);
             TypeRef type = null;
             if (afterType > this.position && this.kindAt(afterType) == TokenKind.IDENTIFIER) {
                 type = this.parseTypeRef();
             }
             final String name = this.expectIdentifier();
-            parameters.add(new Decl.Parameter(type, name, at.line(), at.column()));
+            parameters.add(new Decl.Parameter(outward, type, name, at.line(), at.column()));
             if (!this.match(TokenKind.COMMA)) {
                 break;
             }

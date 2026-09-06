@@ -33,8 +33,16 @@ public sealed interface MemberSymbol {
         return this.modifiers().contains(Decl.Modifier.STATIC);
     }
 
-    /** One parameter of a method or a constructor. */
-    record ParameterSymbol(String name, TypeSymbol type) {
+    /**
+     * One parameter of a method or a constructor. An outward one is filled in by the method rather
+     * than read by it.
+     */
+    record ParameterSymbol(String name, TypeSymbol type, boolean outward) {
+
+        /** A parameter the method reads. */
+        public static ParameterSymbol of(final String name, final TypeSymbol type) {
+            return new ParameterSymbol(name, type, false);
+        }
     }
 
     /** A field. */

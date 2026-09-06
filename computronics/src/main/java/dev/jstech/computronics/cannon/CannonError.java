@@ -67,7 +67,13 @@ public enum CannonError {
     INVALID_BASE("C3031", "only a class or an interface can stand behind the colon, and '%s' is neither"),
     EVENT_NEEDS_DELEGATE("C3032", "an event's type must be a delegate, and '%s' is not one"),
     METHOD_AS_VALUE("C3033", "'%s' is a method: call it, or hand it over where a delegate of its shape "
-            + "is wanted");
+            + "is wanted"),
+    OUT_ARGUMENT_EXPECTED("C3034", "'%s' is filled in by the method, so the argument is written with out"),
+    OUT_ARGUMENT_UNEXPECTED("C3035", "'%s' is read by the method, so the argument cannot be written with out"),
+    OUT_TYPE_MUST_MATCH("C3036", "an out argument is exactly '%s', with no conversion on the way"),
+    OUT_NOT_ASSIGNED("C3037", "'%s' is filled in by this method, so it must be given a value before "
+            + "every way out"),
+    OUT_NOT_A_PLACE("C3038", "'%s' is not somewhere a method can write");
 
     private final String code;
     private final String template;
