@@ -233,6 +233,62 @@ public final class CannonApiGameTests {
                 .thenSucceed();
     }
 
+    @GameTest(template = ARENA)
+    public static void network_readsWhatTheRealNetworkIsHolding(final GameTestHelper helper) {
+        final dev.jstech.tests.testkit.TestWorldBuilder.CraftingNetwork wired =
+                dev.jstech.tests.testkit.TestWorldBuilder.forGameTest(helper).buildCraftingNetwork();
+        final CraftingComputerBlockEntity computer = wired.cc();
+        wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("stock.asm", listing("""
+                            class Stock {
+                                static void Main() {
+                                    if (!Network.Online) { Console.PrintLine("standalone"); return; }
+                                    Console.PrintLine("logs " + Network.Total("minecraft:oak_log"));
+                                    foreach (HoldingInfo where in Network.Find("minecraft:oak_log")) {
+                                        Console.PrintLine(where.Server + " " + where.Quantity);
+                                    }
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertTrue(said.size() == 2, "it reads the network and who holds it; got " + said);
+                    helper.assertTrue("logs 640".equals(said.getFirst()),
+                            "the total is what was put in; got " + said.getFirst());
+                    helper.assertTrue(said.get(1).endsWith(" 640"),
+                            "and the server holding it says how much; got " + said.get(1));
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void network_saysSoOnAMachineWithNoCableInIt(final GameTestHelper helper) {
+        final BlockPos at = new BlockPos(2, 2, 2);
+        final CraftingComputerBlockEntity computer = computer(helper, at);
+        if (computer == null) {
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("alone.asm", listing("""
+                            class Alone {
+                                static void Main() {
+                                    Console.PrintLine(Network.Online ? "networked" : "standalone");
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertTrue(said.equals(List.of("standalone")),
+                            "a machine with no cable knows it; got " + said);
+                })
+                .thenSucceed();
+    }
+
     /** Runs a program to the end on that machine and says what it spent. */
     private static int spend(final CraftingComputerBlockEntity computer, final String source) {
         final CannonProcesses.Started started =

@@ -60,6 +60,7 @@ public final class BuiltIns {
         this.fillRandom();
         this.fillFile();
         this.fillComputer();
+        this.fillNetwork();
     }
 
     /** The root of every reference type. */
@@ -325,6 +326,35 @@ public final class BuiltIns {
         this.method(computer, "Programs", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
                 PUBLIC_STATIC);
         this.method(computer, "Processes", new TypeSymbol.GenericType(this.listType, List.of(process)),
+                PUBLIC_STATIC);
+    }
+
+    /**
+     * The data network the machine is on.
+     *
+     * <p>{@code Online} and {@code Current} answer on any machine, because whether there is a network is
+     * a fair question anywhere. Everything else needs one, and says so if there is none.
+     */
+    private void fillNetwork() {
+        final TypeSymbol whole = TypeSymbol.Primitive.LONG;
+
+        final NamedType holding = this.declare("HoldingInfo", NamedType.Kind.CLASS);
+        this.property(holding, "Server", this.stringType, PUBLIC);
+        this.property(holding, "Quantity", whole, PUBLIC);
+
+        final NamedType server = this.declare("ServerInfo", NamedType.Kind.CLASS);
+        this.property(server, "Name", this.stringType, PUBLIC);
+        this.property(server, "Stored", whole, PUBLIC);
+
+        final NamedType network = this.declare("Network", NamedType.Kind.CLASS);
+        this.property(network, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        this.property(network, "Current", this.stringType, PUBLIC_STATIC);
+        this.method(network, "Total", whole, PUBLIC_STATIC, this.stringType);
+        this.method(network, "Types", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
+                PUBLIC_STATIC);
+        this.method(network, "Find", new TypeSymbol.GenericType(this.listType, List.of(holding)),
+                PUBLIC_STATIC, this.stringType);
+        this.method(network, "Servers", new TypeSymbol.GenericType(this.listType, List.of(server)),
                 PUBLIC_STATIC);
     }
 
