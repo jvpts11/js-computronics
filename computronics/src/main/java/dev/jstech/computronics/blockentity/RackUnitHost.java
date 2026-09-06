@@ -210,6 +210,12 @@ public record RackUnitHost(ServerRackBlockEntity rack, int row) implements OsHos
     }
 
     @Override
+    public boolean networkAttached() {
+        // The rack answers for its units on both sides, so a mounted server's desktop reads its own link.
+        return rack.asUnit(row, rack::networkAttached);
+    }
+
+    @Override
     public String customName() {
         return rack.asUnit(row, rack::customName);
     }

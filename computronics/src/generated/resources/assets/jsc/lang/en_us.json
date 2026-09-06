@@ -264,6 +264,8 @@
   "program.jsc.storage_insights.desc": "Where the network's storage went: biggest types, what is running low, how full each server is.",
   "program.jsc.system_monitor": "System Monitor",
   "program.jsc.system_monitor.desc": "Live load, memory and running work on this machine.",
+  "program.jsc.task_manager": "Task Manager",
+  "program.jsc.task_manager.desc": "What this machine is running, what it is spending, and how to end it.",
   "program.jsc.this_pc": "This PC",
   "program.jsc.this_pc.desc": "The machine itself: its hardware, its disks and what fills them."
 }

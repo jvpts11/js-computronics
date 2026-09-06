@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: live snapshot records of the network's in-flight Operations, pushed while a terminal is open so the Task Manager can show each one streaming with a progress bar (and the SubOperation popup can read its per-server moves). {@code scSlotsUsed}/{@code scSlotsTotal} report the network's parallel craft-slot capacity from the online supercomputers, so the Tasks view can show how many crafts can run at once.
+ * Server to client: live snapshot records of the network's in-flight Operations, pushed while a terminal is open so the Tasks view can show each one streaming with a progress bar (and the SubOperation popup can read its per-server moves). {@code scSlotsUsed}/{@code scSlotsTotal} report the network's parallel craft-slot capacity from the online supercomputers, so the Tasks view can show how many crafts can run at once.
  */
 public record ActiveOperationsPayload(List<OperationRecord> operations, int scSlotsUsed, int scSlotsTotal)
         implements CustomPacketPayload {

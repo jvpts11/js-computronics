@@ -1178,6 +1178,7 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             dev.jstech.computronics.client.os.SettingsApp.accept(payload);
             dev.jstech.computronics.client.os.SystemMonitorApp.accept(payload);
+            dev.jstech.computronics.client.os.TaskManagerApp.accept(payload);
         });
     }
 

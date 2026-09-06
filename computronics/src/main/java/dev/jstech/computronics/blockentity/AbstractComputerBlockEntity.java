@@ -77,6 +77,8 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     protected NetworkUuid networkUuid;
     @Nullable
     protected NetworkUuid registeredNetwork;
+    /** The client's copy of whether this machine is on a network; the server answers from {@code networkUuid}. */
+    private boolean clientNetworked;
 
     protected final Set<Long> linkedMonitors = new LinkedHashSet<>();
 
@@ -542,6 +544,15 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return networkUuid;
     }
 
+    /**
+     * Whether this machine is attached to a data network. On the server that is simply whether it resolved
+     * one; on the client the network's identity never travels, only this answer does.
+     */
+    @Override
+    public boolean networkAttached() {
+        return level != null && level.isClientSide ? clientNetworked : networkUuid != null;
+    }
+
     public String customName() {
         return computerName;
     }
@@ -987,10 +998,18 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             unregisterNode(system, registeredNetwork);
             registeredNetwork = null;
         }
+        final boolean wasAttached = networkUuid != null;
         networkUuid = resolved;
         if (resolved != null) {
             registerNode(system, resolved);
             registeredNetwork = resolved;
+        }
+        if (wasAttached != (resolved != null)) {
+            // The desktop's notification area shows whether this machine is on a network, so a cable cut or
+            // laid has to reach the client rather than wait for the next time the monitor is opened.
+            setChanged();
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(),
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
     }
 
@@ -1213,6 +1232,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (!computerName.isEmpty()) {
             tag.putString("ComputerName", computerName);
         }
+        // Whether this machine is on a data network: the desktop's notification area reads it, so it has to
+        // travel to the client and be refreshed when a cable comes or goes.
+        tag.putBoolean("Networked", networkUuid != null);
         return tag;
     }
 
@@ -1233,5 +1255,6 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         // (power, autostart, linked monitors) to their defaults because the update tag is intentionally minimal.
         final CompoundTag tag = packet.getTag();
         computerName = tag != null ? tag.getString("ComputerName") : "";
+        clientNetworked = tag != null && tag.getBoolean("Networked");
     }
 }

@@ -131,7 +131,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         this.hostPos = hostPos.immutable();
         this.monitorPos = monitorPos.immutable();
         // Open on the player's last-used tab; fall back to Network, and never land on the
-        // Mainframe-only Task Manager when the host is a plain computer.
+        // Mainframe-only Tasks view when the host is a plain computer.
         int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_PROCESSES ? initialTab : TAB_NETWORK;
         if ((tab == TAB_TASKS || tab == TAB_MAINTENANCE) && (host == null || !host.isMainframeHost())) {
             tab = TAB_NETWORK;
@@ -436,7 +436,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
             return;
         }
         refreshTick = 0;
-        // The Task Manager always re-syncs (so finished ops drop off); the Network grid re-queries
+        // The Tasks view always re-syncs (so finished ops drop off); the Network grid re-queries
         // only while something is in flight (its snapshot is already pushed on deposit/withdraw/settle).
         if (activeTab == TAB_TASKS || activeTab == TAB_OPS) {
             ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);

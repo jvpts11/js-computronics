@@ -13,14 +13,23 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   who holds what.
 - A balloon over the notification area carries the notices a computer raises by itself, the first being the
   one about memory.
+- The Task Manager, on every desktop, in the shape that desktop really had: the Close Program box on Frames
+  95, the four-tab manager with its menu and status bars on Frames XP, the page rail on Frames 11, and the
+  system monitor each Linux desktop's own package brings. It reads this machine — its processes and what
+  each holds, its memory, processor, disks and network link — and ends the program you pick. It has no icon
+  of its own: right-click the panel and it is one entry on the menu, the way these desktops offered it.
+- Every panel's notification area shows whether the computer is on a data network, alongside a speaker and
+  the memory bar; resting the cursor on it reads out the link and the figures.
 
 ### Changed
 - The desktop's open-program counter became a memory meter, "used/total MB", in every desktop's panel.
 - Frames XP wears its own shell again: the Start pill with its flag, task buttons carrying each program's
   icon and showing the window in front as pushed in, a Start menu that opens on the player's own face and
   name, and a wallpaper with clouds over its hill.
-- Desktop icons sit on a grid wide enough for their names, wrapped over two lines, so a long one no longer
-  runs across the icon beside it.
+- Desktop icons sit on a grid wide enough for their names, wrapped over two lines and written in the smaller
+  text, so a long one no longer runs across the icon beside it and the desktop keeps its room.
+- Task buttons share the strip out between them instead of each keeping a fixed width, so the open programs
+  stay visible however many there are.
 - An Operation's provenance rows name the computer that asked and the program it asked through, as in
   "lab-pc (Interactor)"; a bus reads as its kind and its name.
 

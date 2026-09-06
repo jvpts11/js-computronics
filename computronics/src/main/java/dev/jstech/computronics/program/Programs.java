@@ -27,6 +27,10 @@ public final class Programs {
     public static final ResourceLocation COMMAND_PROMPT =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "command_prompt");
 
+    /** The Task Manager: what the machine is running and spending, reached by right-clicking the panel. */
+    public static final ResourceLocation TASK_MANAGER =
+            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "task_manager");
+
     /** Network Management Studio: an SSMS-style operations console, installed by the player. */
     public static final ResourceLocation NMS =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");

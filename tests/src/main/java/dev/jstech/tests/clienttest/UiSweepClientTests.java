@@ -81,6 +81,22 @@ public final class UiSweepClientTests {
                 .thenAssert(2, () -> ctx.screen(DesktopScreen.class).frameBounds() != null,
                         "the rack server's desktop must frame itself whether or not the rack's era is known yet")
                 .thenScreenshot(2, "rack-server-desktop")
+                // The panel's own right-click opens its menu, and the Task Manager is one entry on it.
+                .then(2, () -> {
+                    final int[] p = ctx.screen(DesktopScreen.class).emptyPanelPoint();
+                    ctx.rightClick(p[0] + 0.5, p[1] + 0.5);
+                })
+                .thenAssert(2, () -> ctx.screen(DesktopScreen.class).isPanelMenuOpen(),
+                        "right-clicking the panel must open the panel's own menu")
+                .thenScreenshot(2, "panel-menu")
+                .then(0, () -> {
+                    final int[] p = ctx.screen(DesktopScreen.class).panelMenuPoint("Task Manager");
+                    ctx.assertTrue(p != null, "the menu must carry a Task Manager entry");
+                    ctx.click(p[0] + 0.5, p[1] + 0.5);
+                })
+                .thenAssert(4, () -> ctx.screen(DesktopScreen.class).openWindowLabels().contains("Task Manager"),
+                        "the menu's Task Manager entry must open it")
+                .thenScreenshot(4, "task-manager")
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }

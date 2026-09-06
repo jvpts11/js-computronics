@@ -193,6 +193,7 @@ public class JscLanguageProvider extends LanguageProvider {
         add("program.jsc.editor.desc", "Write and edit text files.");
         add("program.jsc.command_prompt.desc", "A shell: everything the machine can do, typed.");
         add("program.jsc.system_monitor.desc", "Live load, memory and running work on this machine.");
+        add("program.jsc.task_manager.desc", "What this machine is running, what it is spending, and how to end it.");
         add("program.jsc.calculator.desc", "A calculator.");
         add("program.jsc.network_manager.desc",
                 "The Mainframe's control room: nodes, storage and operations across the network.");

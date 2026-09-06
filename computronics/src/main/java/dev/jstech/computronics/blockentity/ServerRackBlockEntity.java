@@ -1896,6 +1896,8 @@ public class ServerRackBlockEntity extends BlockEntity
         tag.putByteArray("Units", units);
         tag.putInt("BayPowerOff", bayPowerOff);
         tag.putBoolean("ServicePanelOff", servicePanelOff);
+        // Whether the rack is on a data network, for the notification area of a mounted server's desktop.
+        tag.putBoolean("Networked", !registered.isEmpty());
         return tag;
     }
 
@@ -1934,6 +1936,15 @@ public class ServerRackBlockEntity extends BlockEntity
         System.arraycopy(units, 0, clientUnits, 0, Math.min(units.length, clientUnits.length));
         clientBayPowerOff = tag.getInt("BayPowerOff");
         clientServicePanelOff = tag.getBoolean("ServicePanelOff");
+        clientNetworked = tag.getBoolean("Networked");
+    }
+
+    /** The client's copy of whether the rack is on a network; the server answers from its registered nodes. */
+    private boolean clientNetworked;
+
+    @Override
+    public boolean networkAttached() {
+        return level != null && level.isClientSide ? clientNetworked : networkUuid() != null;
     }
 
     /** Pushes the active channel's era to watching clients, so era-dressed screens match the machine. */

@@ -435,6 +435,13 @@ public final class ClientTestContext {
         screen.mouseReleased(x, y, 0);
     }
 
+    /** Presses and releases the right mouse button at screen coordinates ({@code x}, {@code y}). */
+    public void rightClick(final double x, final double y) {
+        final Screen screen = screen(Screen.class);
+        screen.mouseClicked(x, y, 1);
+        screen.mouseReleased(x, y, 1);
+    }
+
     /** Clicks a desktop-relative point (window and app geometry, as the desktop apps report it). */
     public void clickDesktop(final int[] point) {
         final dev.jstech.computronics.client.os.DesktopScreen desktop =

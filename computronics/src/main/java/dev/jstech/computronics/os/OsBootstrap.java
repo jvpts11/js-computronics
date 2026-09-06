@@ -208,6 +208,9 @@ public final class OsBootstrap {
             // The Network Manager is pre-installed but exclusive to the Mainframe, and needs Frames XP or newer.
             ProgramSpec.of(rl("network_manager"), "netmgr", "Network Manager", true, DESKTOPS, 0, ProgramKind.APP, 2, HostScope.MAINFRAME)
                     .withHouse(SoftwareHouse.JSC),
+            // The Task Manager ships with every desktop but keeps off the desktop and the Start menu: it is
+            // reached by right-clicking the panel, the way it always was, so it is not in the bundled list.
+            ProgramSpec.of(rl("task_manager"), "taskmgr", "Task Manager", true, DESKTOPS, 0, ProgramKind.APP, 0, HostScope.ANY),
 
             // Installables. The OS rank only gates the Frames editions (a Linux distribution ranks 0, so any
             // desktop program the Mirror serves installs on it once a desktop environment is present).

@@ -67,6 +67,7 @@ public final class ProgramClient {
         register(rl("system_monitor"), (host, mon, os) -> new SystemMonitorApp(host));
         register(rl("calculator"), (host, mon, os) -> new CalculatorApp());
         register(rl("network_manager"), (host, mon, os) -> new NetworkManagerApp(host, mon));
+        register(rl("task_manager"), (host, mon, os) -> new TaskManagerApp(host, os));
         // Installable programs.
         register(rl("nms"), (host, mon, os) ->
                 new dev.jstech.computronics.client.NmsApp(host, mon));

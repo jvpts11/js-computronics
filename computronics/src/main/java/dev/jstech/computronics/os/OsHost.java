@@ -139,6 +139,14 @@ public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
     @Nullable
     dev.jstech.core.uuid.NetworkUuid networkUuid();
 
+    /**
+     * Whether this machine is attached to a data network. Unlike {@link #networkUuid()}, which is a server
+     * fact, this one is answered on both sides, so a client screen can show the machine's connection.
+     */
+    default boolean networkAttached() {
+        return networkUuid() != null;
+    }
+
     /** The player-given machine name, or an empty string. */
     String customName();
 

@@ -106,6 +106,22 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         PENDING_OPEN.add(key);
     }
 
+    /** Windows a running app asked to end (the Task Manager); drained by the active desktop. */
+    private static final java.util.List<String> PENDING_CLOSE = new java.util.ArrayList<>();
+
+    /** Lets a running app end another program's window, the way a task manager does. */
+    public static void requestClose(final String key) {
+        PENDING_CLOSE.add(key);
+    }
+
+    /** Whether the computer at {@code pos} is on a data network, as its block entity tells the client. */
+    public static boolean hostNetworked(final net.minecraft.core.BlockPos pos) {
+        final net.minecraft.world.level.Level level = Minecraft.getInstance().level;
+        return level != null
+                && level.getBlockEntity(pos) instanceof dev.jstech.computronics.os.OsHost computer
+                && computer.networkAttached();
+    }
+
     /**
      * A pending open of the explorer at a given folder, kept apart from a plain program key by a separator no
      * program id can contain.
@@ -125,6 +141,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     public static void forgetClientState() {
         SAVED_APPS.clear();
         PENDING_OPEN.clear();
+        PENDING_CLOSE.clear();
     }
 
     /** The launcher labels the active desktop can open (built-in apps plus installed programs). */
@@ -267,6 +284,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private boolean deskCtxOpen;
     private int deskCtxX;
     private int deskCtxY;
+    /** Whether the panel's own menu is up, and where it was raised. */
+    private boolean panelCtxOpen;
+    private int panelCtxX;
+    private int panelCtxY;
     private int deskCtxItem = -1; // index into desktopItems, or -1 for the empty background
 
     // Drag-and-drop of a desktop icon (a file/folder, or a program launcher) — onto a folder, an open
@@ -415,28 +436,36 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int GN_TILE_H = 34;
     // Desktop icons sit on a grid wide enough for a name on two lines. The old pitch was narrower than the
     // labels it drew, so "Command Prompt" ran across its neighbour and both names read as one word.
-    private static final int ICON_PITCH_Y = 62;
-    private static final int ICON_PITCH_X = 66;
+    private static final int ICON_PITCH_Y = 44;
+    private static final int ICON_PITCH_X = 50;
     /** The width of the Frames XP Start pill, which the task buttons and its own hit-test both clear. */
     private static final int XP_START_W = 58;
     /** Where the first icon column starts: far enough in that its cell's highlight clears the screen edge. */
-    private static final int ICON_ORIGIN_X = 22;
+    private static final int ICON_ORIGIN_X = 14;
     /** An icon's cell: the box its highlight, its drop outline and its hit-test all use. */
-    private static final int CELL_W = 58;
-    private static final int CELL_H = 50;
+    private static final int CELL_W = 46;
+    private static final int CELL_H = 40;
     /** The cell's top-left corner, relative to the icon's own: the 24px icon sits centred in the cell. */
     private static final int CELL_DX = (24 - CELL_W) / 2;
     private static final int CELL_DY = -2;
     /**
-     * How wide one line of an icon's label may run before it wraps, and how many lines it may take. Wide
-     * enough that a single long word like "Calculator" still fits whole, since nothing can wrap it.
+     * How wide one line of an icon's label may run before it wraps, how many lines it may take, and how tall
+     * a line stands. The names are drawn in the small text a dense panel uses, which is what lets a word like
+     * "Calculator" fit its cell whole without the grid having to spread out across the whole desktop.
      */
-    private static final int LABEL_W = CELL_W - 6;
+    private static final int LABEL_W = CELL_W - 2;
     private static final int LABEL_LINES = 2;
+    private static final int LABEL_LINE_H = 8;
     private static final String[] DESK_CTX_ICON = {"Open", "Rename", "Delete"};
     private static final String[] DESK_CTX_BG = {"New File", "New Folder", "Personalize", "Refresh"};
     private static final int DESK_CTX_W = 88;
     private static final int DESK_CTX_ITEM_H = 11;
+    /**
+     * The panel's own menu. Right-clicking a taskbar opens this on every desktop these imitate, and the Task
+     * Manager is one entry on it rather than the click's whole meaning. A separator sits before that entry.
+     */
+    private static final String[] PANEL_CTX = {"Cascade Windows", "Show the Desktop", "-", "Task Manager"};
+    private static final int PANEL_CTX_W = 104;
 
     /** A desktop/start-menu entry that opens an app when clicked. */
     // A launcher either opens a built-in app window (factory) or runs a custom action (e.g. open the
@@ -609,6 +638,41 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     public int desktopY() {
         return oy();
+    }
+
+    /** Whether the panel's own menu is open. */
+    public boolean isPanelMenuOpen() {
+        return panelCtxOpen;
+    }
+
+    /** Screen position of the centre of the panel menu's {@code label} entry, or null when it is not there. */
+    @org.jetbrains.annotations.Nullable
+    public int[] panelMenuPoint(final String label) {
+        if (!panelCtxOpen) {
+            return null;
+        }
+        for (int i = 0; i < PANEL_CTX.length; i++) {
+            if (PANEL_CTX[i].equals(label)) {
+                return new int[] {ox() + panelCtxX + PANEL_CTX_W / 2,
+                        oy() + panelCtxY + 1 + i * DESK_CTX_ITEM_H + DESK_CTX_ITEM_H / 2};
+            }
+        }
+        return null;
+    }
+
+    /** Screen position of a point on the panel clear of Start and of the task buttons: its empty stretch. */
+    public int[] emptyPanelPoint() {
+        return new int[] {ox() + Math.max(TASK_X, taskStripRight(sw()) - 8),
+                oy() + sh() - TASKBAR_H / 2};
+    }
+
+    /** The labels of the windows this desktop has open, in the order they were opened. */
+    public List<String> openWindowLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final DesktopWindow w : windows) {
+            out.add(w.appKey());
+        }
+        return out;
     }
 
     /** The Start menu entries, top to bottom, as labelled for the player. */
@@ -797,6 +861,31 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** Whether the machine's window layout has been applied to this desktop instance. */
     private boolean windowsRestored;
 
+    /** The layout the machine was last told about, so only a real change is pushed to it. */
+    private String pushedLayout = "";
+
+    /**
+     * Tells the machine which programs it has open, whenever that changes. Without this the machine only
+     * learned its layout when the desktop closed, so anything reading its memory ledger — the Task Manager
+     * above all — saw a computer running nothing while the player had five windows in front of them.
+     */
+    private void pushWindowsIfChanged() {
+        if (!windowsRestored || powerCycling) {
+            return;
+        }
+        final StringBuilder signature = new StringBuilder();
+        for (final DesktopWindow w : windows) {
+            signature.append(w.appKey()).append(w.minimized() ? '-' : '+').append(';');
+        }
+        final String now = signature.toString();
+        if (now.equals(pushedLayout)) {
+            return;
+        }
+        pushedLayout = now;
+        PacketDistributor.sendToServer(
+                dev.jstech.computronics.operation.payload.DesktopWindowsPayload.of(host, snapshotWindows()));
+    }
+
     /**
      * Set when this desktop is closing because the player shut the machine down or restarted it, so the
      * layout is NOT handed back to the machine on the way out: the server has just cleared it, and a
@@ -872,7 +961,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 return l.programId();
             }
         }
-        return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", "generic");
+        // A window whose program has no launcher (the Task Manager) still shows its own icon on the panel.
+        final dev.jstech.computronics.os.ProgramSpec spec = chrome == null ? null : chrome.programFor(label);
+        return spec != null ? spec.id()
+                : net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", "generic");
     }
 
     /** Whether the linked host computer's block entity is (an instance of) {@code type}. */
@@ -991,6 +1083,20 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             PENDING_OPEN.clear();
         }
+        // Drain any request to end a window (the Task Manager), newest first so ending a repeated program
+        // closes the one on top rather than the oldest copy of it.
+        if (!PENDING_CLOSE.isEmpty()) {
+            for (final String key : PENDING_CLOSE) {
+                for (int i = windows.size() - 1; i >= 0; i--) {
+                    if (windows.get(i).appKey().equals(key)) {
+                        windows.remove(i);
+                        break;
+                    }
+                }
+            }
+            PENDING_CLOSE.clear();
+        }
+        pushWindowsIfChanged();
         // Keep the inventory slots glued to the focused Network Interactor window this frame (per-frame, so a
         // dragged window does not leave its slots a tick behind).
         syncInventorySlots();
@@ -1087,27 +1193,26 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 // The name under the icon: centred, wrapped inside its own cell over at most two lines, and
                 // cut with an ellipsis past that. A name wider than the cell used to run across its neighbour,
                 // which is how "Network" and "Command Prompt" came to read as one word.
-                int ly = iy + 24;
-                final java.util.List<String> lines = wrapLabel(label, LABEL_W);
+                int ly = iy + 23;
+                final java.util.List<String> lines = wrapLabel(label, labelFontWidth());
                 for (int li = 0; li < lines.size() && li < LABEL_LINES; li++) {
                     final String line = li == LABEL_LINES - 1 && lines.size() > LABEL_LINES
-                            ? fitLabelLine(lines.get(li) + "...", LABEL_W)
-                            : fitLabelLine(lines.get(li), LABEL_W);
-                    g.drawString(font, line, ix + 12 - font.width(line) / 2, ly,
-                            theme.iconText(), theme.textShadow());
-                    ly += font.lineHeight;
+                            ? fitLabelLine(lines.get(li) + "...")
+                            : fitLabelLine(lines.get(li));
+                    drawIconLabel(g, line, ix + 12, ly, theme.iconText(), theme.textShadow());
+                    ly += LABEL_LINE_H;
                 }
             }
         }
         // Windows-style: the selected icon reveals its full name, wrapped, on a selection background.
         if (selLabelText != null) {
-            int ly = selLabelY + 24;
-            for (final String line : wrapLabel(selLabelText, LABEL_W)) {
-                final int lw = font.width(line);
+            int ly = selLabelY + 23;
+            for (final String line : wrapLabel(selLabelText, labelFontWidth())) {
+                final int lw = dev.jstech.core.client.gui.component.Texts.smallWidth(font, line);
                 final int lcx = selLabelX + 12 - lw / 2;
-                g.fill(lcx - 2, ly - 1, lcx + lw + 2, ly + font.lineHeight, 0xE0000080);
-                g.drawString(font, line, lcx, ly, 0xFFFFFFFF, false);
-                ly += font.lineHeight;
+                g.fill(lcx - 2, ly - 1, lcx + lw + 2, ly + LABEL_LINE_H, 0xE0000080);
+                dev.jstech.core.client.gui.component.Texts.small(g, font, line, lcx, ly, 0xFFFFFFFF);
+                ly += LABEL_LINE_H;
             }
         }
         g.pose().popPose();
@@ -1171,35 +1276,37 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(12, tbY + 12, 15, tbY + 15, 0xFFE6B928);
                 g.drawString(font, "Start", 18, tbY + 8, 0xFF000000, false);
             }
-            int bx = 64;
-            // Stop task buttons before the clock so they never overrun it or bleed off the right edge.
             final int taskRight = taskStripRight(sw);
+            final int btnW = taskButtonW(sw);
             final DesktopWindow taskFront = frontWindow();
-            for (final DesktopWindow w : windows) {
-                if (bx + 84 > taskRight) {
+            for (int i = 0; i < windows.size(); i++) {
+                final int bx = taskButtonX(i, sw);
+                if (bx + btnW > taskRight) {
                     break;
                 }
+                final DesktopWindow w = windows.get(i);
                 // The window in front reads as a pushed-in button, the way a taskbar has always said which
                 // program you are actually looking at.
-                taskButton(g, bx, tbY + 3, 84, TASKBAR_H - 6, osp, w == taskFront && !w.minimized());
+                taskButton(g, bx, tbY + 3, btnW, TASKBAR_H - 6, osp, w == taskFront && !w.minimized());
                 ProgramIcons.draw(g, bx + 4, tbY + 6, 12, 12, programIdForLabel(w.appKey()), iconSet());
                 // No shadow: the taskbar button name sits on a solid button, where a shadow only muddies it
                 // (a dark blob behind the dark 95 text, a halo behind the light XP text).
-                g.drawString(font, trim(w.app().title(), 10), bx + 20, tbY + 8, theme.startText(), false);
-                bx += 88;
+                g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 20, tbY + 8,
+                        theme.startText(), false);
             }
-            final String clock = clockText();
+            // The notification area, dressed in each version's own frame.
+            final int trayX = trayLeft(sw);
             if (osp.equals("frames_xp")) {
-                renderXpTray(g, tbY, sw, sh, clock);
+                g.fillGradient(trayX, tbY + 2, sw, sh - 2, 0xFF1A53C4, 0xFF0D3590);
+                g.fill(trayX, tbY + 2, trayX + 1, sh - 2, 0xFF4A83E6); // the lit left edge
+                g.fill(trayX + 1, tbY + 2, trayX + 2, sh - 2, 0xFF0A2C7A); // and its inset shadow
+                drawTray(g, tbY, sw, 0xFFFFFFFF);
+            } else if (osp.equals("frames_95")) {
+                g.fill(trayX, tbY + 3, sw - 2, sh - 3, theme.taskbar());
+                bevel(g, trayX, tbY + 3, sw - 2 - trayX, TASKBAR_H - 6, 0xFF808080, 0xFFFFFFFF); // sunken
+                drawTray(g, tbY, sw, theme.startText());
             } else {
-                final int clkW = font.width(clock) + 8;
-                final int clkX = sw - clkW - 2;
-                if (osp.equals("frames_95")) {
-                    g.fill(clkX, tbY + 3, sw - 2, sh - 3, theme.taskbar());
-                    bevel(g, clkX, tbY + 3, clkW, TASKBAR_H - 6, 0xFF808080, 0xFFFFFFFF); // sunken tray
-                }
-                g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), false);
-                drawProcMeter(g, clkX - 6, tbY + 8, theme.startText());
+                drawTray(g, tbY, sw, theme.startText());
             }
         }
         g.pose().popPose(); // close the TASKBAR layer
@@ -1211,13 +1318,23 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             renderBalloon(g, tbY, sw);
             g.pose().popPose();
         }
+        // The figures behind the notification area, while the cursor rests on it.
+        if (!topPanel()) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.TASKBAR + 8);
+            drawTrayTip(g, tbY, sw);
+            g.pose().popPose();
+        }
 
         // Menus (Start + desktop context), above the taskbar.
-        if (startOpen || deskCtxOpen) {
+        if (startOpen || deskCtxOpen || panelCtxOpen) {
             g.pose().pushPose();
             g.pose().translate(0, 0, DesktopZ.MENU);
             if (startOpen) {
                 renderStartMenu(g, tbY);
+            }
+            if (panelCtxOpen) {
+                renderPanelContext(g, lmx, lmy);
             }
             if (deskCtxOpen) {
                 renderDeskContext(g, lmx, lmy);
@@ -1584,6 +1701,85 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             g.drawString(font, items[k], mx + 4, iy + 2, k == hover ? 0xFFFFFFFF : 0xFF1A2230, false);
             iy += DESK_CTX_ITEM_H;
+        }
+    }
+
+    /**
+     * The panel's menu, drawn in the desktop's own chrome: the bevelled plate on the older Frames, a light
+     * rounded panel on the newer one and on the Linux desktops. A separator row is drawn as a rule.
+     */
+    private void renderPanelContext(final GuiGraphics g, final int hoverMx, final int hoverMy) {
+        final int mx = panelCtxX;
+        final int my = panelCtxY;
+        final int mh = PANEL_CTX.length * DESK_CTX_ITEM_H + 2;
+        final boolean light = luminance(skin.text()) > 140;
+        final int bg = light ? 0xFF262B36 : 0xFFE8E8EC;
+        final int fg = light ? 0xFFE7E9EF : 0xFF1A2230;
+        g.fill(mx - 1, my - 1, mx + PANEL_CTX_W + 1, my + mh + 1, light ? 0xFF11151E : 0xFF000000);
+        g.fill(mx, my, mx + PANEL_CTX_W, my + mh, bg);
+        g.fill(mx, my, mx + PANEL_CTX_W, my + 1, light ? 0xFF3A4150 : 0xFFFFFFFF);
+        final int hover = panelCtxItemAt(hoverMx, hoverMy);
+        int iy = my + 1;
+        for (int k = 0; k < PANEL_CTX.length; k++) {
+            if ("-".equals(PANEL_CTX[k])) {
+                g.fill(mx + 4, iy + DESK_CTX_ITEM_H / 2, mx + PANEL_CTX_W - 4,
+                        iy + DESK_CTX_ITEM_H / 2 + 1, light ? 0xFF3A4150 : 0xFFB6BAC4);
+            } else {
+                if (k == hover) {
+                    g.fill(mx + 1, iy, mx + PANEL_CTX_W - 1, iy + DESK_CTX_ITEM_H, skin.accent());
+                }
+                g.drawString(font, PANEL_CTX[k], mx + 4, iy + 2, k == hover ? 0xFFFFFFFF : fg, false);
+            }
+            iy += DESK_CTX_ITEM_H;
+        }
+    }
+
+    /** The panel-menu entry under a desktop-local point, or {@code -1}; a separator never answers. */
+    private int panelCtxItemAt(final double mx, final double my) {
+        if (!panelCtxOpen || mx < panelCtxX || mx > panelCtxX + PANEL_CTX_W) {
+            return -1;
+        }
+        final int rel = (int) Math.floor((my - (panelCtxY + 1)) / (double) DESK_CTX_ITEM_H);
+        if (rel < 0 || rel >= PANEL_CTX.length || "-".equals(PANEL_CTX[rel])) {
+            return -1;
+        }
+        return rel;
+    }
+
+    /** Raises the panel's menu at a point, clamped so it stays on the desktop. */
+    private void openPanelMenu(final int atX, final int panelY) {
+        final int mh = PANEL_CTX.length * DESK_CTX_ITEM_H + 2;
+        panelCtxOpen = true;
+        panelCtxX = Math.max(2, Math.min(sw() - PANEL_CTX_W - 2, atX));
+        // Above a bottom panel, below a top one: the menu never covers the bar it came from.
+        panelCtxY = topPanel() ? panelY + TASKBAR_H + 2 : panelY - mh - 2;
+    }
+
+    /** Runs a panel-menu entry. Every one of them does something: none is there for decoration. */
+    private void runPanelMenu(final int index) {
+        switch (PANEL_CTX[index]) {
+            case "Cascade Windows" -> cascadeWindows();
+            case "Show the Desktop" -> {
+                for (final DesktopWindow w : windows) {
+                    w.setMinimized(true);
+                }
+            }
+            case "Task Manager" -> openTaskManager();
+            default -> {
+            }
+        }
+    }
+
+    /** Steps the open windows down and to the right from the work area's corner, the way a cascade does. */
+    private void cascadeWindows() {
+        int step = 0;
+        for (final DesktopWindow w : windows) {
+            if (w.minimized()) {
+                continue;
+            }
+            w.setMaximized(false);
+            w.moveTo(16 + step * 12, workTop() + 10 + step * 12, workTop(), sw(), workBottom());
+            step++;
         }
     }
 
@@ -1954,9 +2150,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
 
-        final String clock = clockText();
-        g.drawString(font, clock, sw - font.width(clock) - 8, tbY + 8, 0xFFE6E8EC, false);
-        drawProcMeter(g, sw - font.width(clock) - 14, tbY + 8, 0xFF9AA3B2);
+        drawTray(g, tbY, sw, 0xFFE6E8EC);
     }
 
     /** The balloon's box in desktop-local coordinates, or null when none is up. Draw and hit-test share it. */
@@ -2034,68 +2228,150 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return ramUsedMb() + "/" + ramTotalMb + " MB";
     }
 
-    /** Where a panel's task buttons must stop: clear of the clock and the memory meter at its right end. */
-    private int taskStripRight(final int sw) {
-        if (is(dev.jstech.computronics.os.PanelStyle.FRAMES_XP)) {
-            return xpTrayLeft(sw) - 6;
+    // --- The notification area, the same on every panel: whether the machine is on a network, a speaker, a
+    // memory bar and the clock. It is deliberately narrow — a wordy meter here left no room for the task
+    // buttons — and the figures behind the bar are one hover away. ---
+    /** The task strip: where it starts, the gap between buttons, and the width one may run to. */
+    private static final int TASK_X = 64;
+    private static final int TASK_GAP = 4;
+    private static final int TASK_MIN_W = 44;
+    private static final int TASK_MAX_W = 84;
+
+    /**
+     * How wide each task button is: the strip shared out between the open windows, never wider than is
+     * comfortable nor narrower than a name can be read in. A taskbar that keeps one fixed width simply runs
+     * out of room, which is what hid the open programs behind the notification area.
+     */
+    private int taskButtonW(final int sw) {
+        final int strip = Math.max(0, taskStripRight(sw) - TASK_X);
+        final int count = Math.max(1, windows.size());
+        return Math.max(TASK_MIN_W, Math.min(TASK_MAX_W, strip / count - TASK_GAP));
+    }
+
+    /** The left edge of the {@code i}-th task button. */
+    private int taskButtonX(final int i, final int sw) {
+        return TASK_X + i * (taskButtonW(sw) + TASK_GAP);
+    }
+
+    /** The task button under a desktop-local x, or {@code -1} where the strip is empty or has run out. */
+    private int taskIndexAt(final double mx, final int sw) {
+        final int w = taskButtonW(sw);
+        final int idx = (int) ((mx - TASK_X) / (w + TASK_GAP));
+        if (idx < 0 || idx >= windows.size()) {
+            return -1;
         }
-        return sw - font.width(clockText()) - font.width(ramMeterText()) - 24;
+        final int bx = taskButtonX(idx, sw);
+        return mx <= bx + w && bx + w <= taskStripRight(sw) ? idx : -1;
     }
 
-    // --- The Frames XP notification area: a dark Luna block with a lit left edge holding the network and
-    // volume icons, the memory meter over its bar, and the clock. The sizes are the approved layout brought
-    // to the in-game scale: the block fills the 24 px taskbar bar two pixels of margin, 13 px icons centred
-    // in it, and the meter's bar sits under its own text. ---
-    private static final int XP_TRAY_PAD = 8;
-    private static final int XP_TRAY_ICON = 13;
-    private static final int XP_BAR_W = 65;
-    private static final int XP_BAR_H = 5;
-
-    private String xpRamText() {
-        return "RAM " + ramMeterText();
+    /** How many characters of a title fit on a task button of {@code w} pixels, after its icon. */
+    private static int taskTitleChars(final int w) {
+        return Math.max(3, (w - 24) / 6);
     }
 
-    /** The left edge of the XP tray: its icons, the meter (as wide as its text or its bar) and the clock. */
-    private int xpTrayLeft(final int sw) {
-        final int meterW = Math.max(XP_BAR_W, font.width(xpRamText()));
-        return sw - (XP_TRAY_PAD + XP_TRAY_ICON + 4 + XP_TRAY_ICON + 8 + meterW + 10 + font.width(clockText()) + 7);
+    /** The padding at each end of the notification area. */
+    private static final int TRAY_PAD = 5;
+    private static final int TRAY_ICON = 9;
+    private static final int TRAY_GAP = 4;
+    private static final int RAM_BAR_W = 26;
+    private static final int RAM_BAR_H = 6;
+
+    /** How wide the status group runs: the network icon, the speaker and the memory bar. */
+    private int trayStatusWidth() {
+        return TRAY_ICON + TRAY_GAP + TRAY_ICON + TRAY_GAP + RAM_BAR_W;
     }
 
-    private void renderXpTray(final GuiGraphics g, final int tbY, final int sw, final int sh, final String clock) {
-        final int x = xpTrayLeft(sw);
-        final int top = tbY + 2;
-        final int bottom = sh - 2;
-        g.fillGradient(x, top, sw, bottom, 0xFF1A53C4, 0xFF0D3590);
-        g.fill(x, top, x + 1, bottom, 0xFF4A83E6); // the lit left edge
-        g.fill(x + 1, top, x + 2, bottom, 0xFF0A2C7A); // and its inset shadow
-        int cx = x + XP_TRAY_PAD;
-        final int iconY = tbY + (TASKBAR_H - XP_TRAY_ICON) / 2;
-        drawXpNetworkIcon(g, cx, iconY);
-        cx += XP_TRAY_ICON + 4;
-        drawXpVolumeIcon(g, cx, iconY);
-        cx += XP_TRAY_ICON + 8;
-        final String text = xpRamText();
-        g.drawString(font, text, cx, tbY + 5, 0xFFFFFFFF, false);
-        drawXpRamBar(g, cx, tbY + 16, Math.max(XP_BAR_W, font.width(text)), XP_BAR_H);
-        g.drawString(font, clock, sw - 7 - font.width(clock), tbY + 8, 0xFFFFFFFF, false);
+    /** How wide the whole notification area runs: the status group, the clock, and the padding around them. */
+    private int trayWidth() {
+        return TRAY_PAD + trayStatusWidth() + TRAY_GAP + font.width(clockText()) + TRAY_PAD;
     }
 
-    /** The meter's bar: a dark trough with a border, filled green shading to amber, red once nearly full. */
-    private void drawXpRamBar(final GuiGraphics g, final int x, final int y, final int w, final int h) {
-        g.fill(x, y, x + w, y + h, 0xFF071F5C);
-        g.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xFF0A2C7A);
-        final int innerW = w - 2;
+    /** The left edge of the notification area on a panel {@code sw} wide. */
+    private int trayLeft(final int sw) {
+        return sw - trayWidth();
+    }
+
+    /** Where a panel's task buttons must stop: clear of the notification area at its right end. */
+    private int taskStripRight(final int sw) {
+        return trayLeft(sw) - 4;
+    }
+
+    /**
+     * The whole notification area: the status group and then the clock, right-aligned on the panel. The
+     * icons take their tone from the panel's own text, which is the one thing that already knows whether
+     * this panel is a dark band or a light one.
+     */
+    private void drawTray(final GuiGraphics g, final int panelY, final int sw, final int textColor) {
+        final int x = trayLeft(sw) + TRAY_PAD;
+        drawTrayStatus(g, x, panelY, textColor);
+        g.drawString(font, clockText(), x + trayStatusWidth() + TRAY_GAP, panelY + 8, textColor, false);
+    }
+
+    /** The status group alone, for a panel that puts its clock somewhere else of its own. */
+    private void drawTrayStatus(final GuiGraphics g, final int x, final int panelY, final int textColor) {
+        final boolean light = luminance(textColor) > 140;
+        final int iconY = panelY + (TASKBAR_H - TRAY_ICON) / 2;
+        drawNetworkIcon(g, x, iconY, networkAttached(), light);
+        drawVolumeIcon(g, x + TRAY_ICON + TRAY_GAP, iconY, light);
+        drawRamBar(g, x + 2 * (TRAY_ICON + TRAY_GAP), panelY + (TASKBAR_H - RAM_BAR_H) / 2);
+    }
+
+    /** How bright an opaque colour reads, 0 to 255, for deciding what tone sits well on it. */
+    private static int luminance(final int color) {
+        return (((color >> 16) & 0xFF) * 30 + ((color >> 8) & 0xFF) * 59 + (color & 0xFF) * 11) / 100;
+    }
+
+    /** Whether the host computer is on a data network right now, as its block entity tells the client. */
+    private boolean networkAttached() {
+        final net.minecraft.world.level.Level level = Minecraft.getInstance().level;
+        return level != null
+                && level.getBlockEntity(host) instanceof dev.jstech.computronics.os.OsHost computer
+                && computer.networkAttached();
+    }
+
+    /**
+     * The network icon: two linked machines, greyed and badged when this computer is on no network. It is
+     * the one status in the tray that says something true about the machine rather than decorating it.
+     */
+    private static void drawNetworkIcon(final GuiGraphics g, final int x, final int y, final boolean up,
+                                        final boolean light) {
+        final int frame = up ? (light ? 0xFF2058D8 : 0xFF1A3A78) : 0xFF6E7686;
+        final int screen = up ? (light ? 0xFFCFE4FF : 0xFF9FC0F0) : 0xFFB6BAC4;
+        g.fill(x + 4, y, x + 9, y + 4, frame);
+        g.fill(x + 5, y + 1, x + 8, y + 3, screen);
+        g.fill(x, y + 5, x + 5, y + 9, frame);
+        g.fill(x + 1, y + 6, x + 4, y + 8, screen);
+        if (!up) {
+            g.fill(x + 5, y + 5, x + 9, y + 9, 0xFFD03A2A);
+            g.fill(x + 6, y + 6, x + 8, y + 7, 0xFFFFFFFF);
+        }
+    }
+
+    /** The speaker, with the two arcs a volume icon has always had. */
+    private static void drawVolumeIcon(final GuiGraphics g, final int x, final int y, final boolean light) {
+        final int c = light ? 0xFFE8EEF8 : 0xFF3A4150;
+        g.fill(x, y + 3, x + 2, y + 6, c);
+        g.fill(x + 2, y + 2, x + 3, y + 7, c);
+        g.fill(x + 3, y + 1, x + 4, y + 8, c);
+        g.fill(x + 6, y + 3, x + 7, y + 6, c);
+        g.fill(x + 8, y + 1, x + 9, y + 8, c);
+    }
+
+    /** The memory bar: a dark trough filled green shading to amber, and red once the machine is nearly full. */
+    private void drawRamBar(final GuiGraphics g, final int x, final int y) {
+        g.fill(x, y, x + RAM_BAR_W, y + RAM_BAR_H, 0xFF2A2F3A);
+        g.fill(x + 1, y + 1, x + RAM_BAR_W - 1, y + RAM_BAR_H - 1, 0xFF11151E);
+        final int innerW = RAM_BAR_W - 2;
         final int used = ramUsedMb();
         if (ramTotalMb <= 0 || used <= 0) {
             return;
         }
         final int fillW = (int) Math.min(innerW, (long) innerW * used / ramTotalMb);
         final boolean nearlyFull = used * 100L >= ramTotalMb * 95L;
-        // The shade runs across the whole trough, so a fuller bar shows more of the amber end.
         for (int px = 0; px < fillW; px++) {
             final float t = innerW <= 1 ? 0f : (float) px / (innerW - 1);
-            final int color = nearlyFull && px >= innerW * 0.95f ? 0xFFEF6A5A : blend(0xFF5FE07A, 0xFFF0B23A, t);
-            g.fill(x + 1 + px, y + 1, x + 2 + px, y + h - 1, color);
+            final int color = nearlyFull ? 0xFFEF6A5A : blend(0xFF5FE07A, 0xFFF0B23A, t);
+            g.fill(x + 1 + px, y + 1, x + 2 + px, y + RAM_BAR_H - 1, color);
         }
     }
 
@@ -2107,36 +2383,21 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return 0xFF000000 | (r << 16) | (gr << 8) | b;
     }
 
-    /** Two small monitors, one behind the other: the XP network tray icon. */
-    private static void drawXpNetworkIcon(final GuiGraphics g, final int x, final int y) {
-        g.fill(x + 6, y, x + 13, y + 6, 0xFF2058D8);
-        g.fill(x + 7, y + 1, x + 12, y + 5, 0xFFCFE4FF);
-        g.fill(x + 8, y + 6, x + 11, y + 7, 0xFF2058D8);
-        g.fill(x, y + 4, x + 7, y + 10, 0xFF2058D8);
-        g.fill(x + 1, y + 5, x + 6, y + 9, 0xFFCFE4FF);
-        g.fill(x + 2, y + 10, x + 5, y + 11, 0xFF2058D8);
-    }
-
-    /** A speaker with two sound arcs: the XP volume tray icon. */
-    private static void drawXpVolumeIcon(final GuiGraphics g, final int x, final int y) {
-        final int c = 0xFFE8EEF8;
-        g.fill(x, y + 4, x + 3, y + 9, c);
-        g.fill(x + 3, y + 3, x + 4, y + 10, c);
-        g.fill(x + 4, y + 2, x + 5, y + 11, c);
-        g.fill(x + 5, y + 1, x + 6, y + 12, c);
-        g.fill(x + 8, y + 4, x + 9, y + 9, c);
-        g.fill(x + 10, y + 2, x + 11, y + 4, c);
-        g.fill(x + 11, y + 4, x + 12, y + 9, c);
-        g.fill(x + 10, y + 9, x + 11, y + 11, c);
-    }
-
-    /** Draws the memory meter right-aligned ending at {@code rightX}: amber past three quarters, red when nearly full. */
-    private void drawProcMeter(final GuiGraphics g, final int rightX, final int y, final int normalColor) {
-        final int used = ramUsedMb();
-        final String meter = ramMeterText();
-        final int color = ramTotalMb > 0 && used * 100L >= ramTotalMb * 95L ? 0xFFE06A6A
-                : ramTotalMb > 0 && used * 100L >= ramTotalMb * 75L ? 0xFFE0A020 : normalColor;
-        g.drawString(font, meter, rightX - font.width(meter), y, color, false);
+    /** The figures behind the tray, shown while the cursor rests on it: the link and the memory. */
+    private void drawTrayTip(final GuiGraphics g, final int panelY, final int sw) {
+        if (hoverY < panelY || hoverX < trayLeft(sw)) {
+            return;
+        }
+        final String link = networkAttached() ? "Network connected" : "No network";
+        final String mem = "RAM " + ramMeterText();
+        final int w = Math.max(font.width(link), font.width(mem)) + 8;
+        final int h = 22;
+        final int x = Math.max(2, sw - w - 2);
+        final int y = panelY - h - 2;
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF101318);
+        g.fill(x, y, x + w, y + h, 0xFFF2F4F8);
+        g.drawString(font, link, x + 4, y + 3, 0xFF202430, false);
+        g.drawString(font, mem, x + 4, y + 12, 0xFF505868, false);
     }
 
     /** The Windows 11 Start glyph: four solid blue panes with a thin gap. */
@@ -2364,25 +2625,25 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             g.drawString(font, "Menu", 26, tbY + 8, theme.startText(), false);
         }
         // Task buttons.
-        int bx = 64;
         final int taskRight = taskStripRight(sw);
+        final int btnW = taskButtonW(sw);
         final DesktopWindow front = frontWindow();
-        for (final DesktopWindow w : windows) {
-            if (bx + 84 > taskRight) {
+        for (int i = 0; i < windows.size(); i++) {
+            final int bx = taskButtonX(i, sw);
+            if (bx + btnW > taskRight) {
                 break;
             }
+            final DesktopWindow w = windows.get(i);
             final boolean active = w == front && !w.minimized();
-            g.fill(bx, tbY + 3, bx + 84, sh - 3, active ? 0x30FFFFFF : theme.taskButton());
+            g.fill(bx, tbY + 3, bx + btnW, sh - 3, active ? 0x30FFFFFF : theme.taskButton());
             if (active) {
-                g.fill(bx, sh - 4, bx + 84, sh - 3, theme.startButton());
+                g.fill(bx, sh - 4, bx + btnW, sh - 3, theme.startButton());
             }
             ProgramIcons.draw(g, bx + 3, tbY + 4, 16, 16, programIdForLabel(w.appKey()), iconSet());
-            g.drawString(font, trim(w.app().title(), 10), bx + 22, tbY + 8, theme.startText(), false);
-            bx += 88;
+            g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 22, tbY + 8,
+                    theme.startText(), false);
         }
-        final String clock = clockText();
-        g.drawString(font, clock, sw - 4 - font.width(clock), tbY + 8, theme.startText(), false);
-        drawProcMeter(g, sw - font.width(clock) - 12, tbY + 8, theme.startText());
+        drawTray(g, tbY, sw, theme.startText());
     }
 
     /**
@@ -2401,30 +2662,30 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 startHot, startOpen, false);
 
         // Task buttons: pressed when that window is the one in front, exactly as a period panel showed it.
-        // The 64/88 origin and pitch are the ones the taskbar click handler already tests against, so the
-        // button a player sees and the button they hit are the same rectangle.
-        int bx = 64;
+        // The strip's origin and its shared-out width are the ones the taskbar click handler tests against,
+        // so the button a player sees and the button they hit are the same rectangle.
         final int taskRight = taskStripRight(sw);
+        final int btnW = taskButtonW(sw);
         final DesktopWindow front = frontWindow();
-        for (final DesktopWindow w : windows) {
-            if (bx + 84 > taskRight) {
+        for (int i = 0; i < windows.size(); i++) {
+            final int bx = taskButtonX(i, sw);
+            if (bx + btnW > taskRight) {
                 break;
             }
+            final DesktopWindow w = windows.get(i);
             final boolean active = w == front && !w.minimized();
-            final boolean hot = lmx >= bx && lmx <= bx + 84 && lmy >= tbY;
-            skin.button(g, font, bx, tbY + 3, 84, TASKBAR_H - 6, "", hot, active, false);
+            final boolean hot = lmx >= bx && lmx <= bx + btnW && lmy >= tbY;
+            skin.button(g, font, bx, tbY + 3, btnW, TASKBAR_H - 6, "", hot, active, false);
             ProgramIcons.draw(g, bx + 3, tbY + 5, 12, 12, programIdForLabel(w.appKey()), iconSet());
-            g.drawString(font, trim(w.app().title(), 9), bx + 19, tbY + 8 + (active ? 1 : 0),
-                    skin.text(), false);
-            bx += 88;
+            g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 19,
+                    tbY + 8 + (active ? 1 : 0), skin.text(), false);
         }
 
-        // A sunken clock well on the right: the period panels all recessed the clock rather than
+        // A sunken well on the right: the period panels all recessed their status area rather than
         // floating the text on the band.
-        final String clock = clockText();
-        final int cw = font.width(clock) + 8;
-        skin.field(g, sw - cw - 3, tbY + 4, cw, TASKBAR_H - 8, false);
-        g.drawString(font, clock, sw - cw + 1, tbY + 8, skin.text(), false);
+        final int trayX = trayLeft(sw);
+        skin.field(g, trayX, tbY + 4, sw - trayX - 3, TASKBAR_H - 8, false);
+        drawTray(g, tbY, sw, skin.text());
     }
 
     /**
@@ -2441,7 +2702,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         g.drawString(font, "Activities", 8, 8, theme.startText(), false);
         final String clock = clockText();
         g.drawString(font, clock, (sw - font.width(clock)) / 2, 8, theme.startText(), false);
-        drawProcMeter(g, sw - 12, 8, theme.startText());
+        // GNOME keeps its clock in the middle, so only the status group sits at the right end.
+        drawTrayStatus(g, sw - TRAY_PAD - trayStatusWidth(), 0, theme.startText());
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -3360,12 +3622,25 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
 
+        // The panel's menu takes the next click wherever it lands: on an entry it runs it, anywhere else it
+        // just closes, which is what a menu does.
+        if (panelCtxOpen) {
+            final int entry = panelCtxItemAt(mouseX, mouseY);
+            panelCtxOpen = false;
+            if (entry >= 0) {
+                runPanelMenu(entry);
+            }
+            return true;
+        }
+
         // GNOME: the top bar's Activities corner toggles the overview; the rest of the bar is inert.
         // Only while the bar IS at the top: a period GNOME panels at the bottom, and swallowing clicks
         // along the top edge there ate the title bars of every window parked up there.
         if (topPanel() && mouseY < TASKBAR_H) {
             if (mouseX < 64) {
                 toggleStart();
+            } else if (button == 1) {
+                openPanelMenu((int) mouseX, 0);
             }
             return true;
         }
@@ -3404,10 +3679,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
 
         // Taskbar buttons: click toggles minimize / brings the window forward (Windows-style).
-        if (mouseY >= tbY + 3 && mouseX >= 64) {
-            final int idx = (int) ((mouseX - 64) / 88);
-            final int bxStart = 64 + idx * 88;
-            if (idx >= 0 && idx < windows.size() && mouseX <= bxStart + 84 && bxStart + 84 <= taskStripRight(sw())) {
+        if (mouseY >= tbY + 3 && mouseX >= TASK_X) {
+            final int idx = taskIndexAt(mouseX, sw());
+            final int bxStart = idx < 0 ? 0 : taskButtonX(idx, sw());
+            if (idx >= 0) {
                 // Right-click opens the window's own menu, so a program can be closed without first
                 // going to it — the thing every taskbar does and this one did not.
                 if (button == 1) {
@@ -3427,6 +3702,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 }
                 return true;
             }
+        }
+        // A right-click on the panel itself, clear of Start and of the buttons, opens the panel's own menu,
+        // the way every one of these desktops offers it. The Task Manager is one entry on that menu.
+        if (button == 1 && mouseY >= tbY) {
+            openPanelMenu((int) mouseX, tbY);
+            return true;
         }
 
         for (int i = windows.size() - 1; i >= 0; i--) {
@@ -3990,7 +4271,36 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 return l.factory().get();
             }
         }
-        return null;
+        // A program the desktop shows no launcher for (the Task Manager) still opens, and still comes back
+        // with the session, so it is looked up by the same label the panel calls it.
+        final dev.jstech.computronics.os.ProgramSpec spec = chrome == null ? null : chrome.programFor(key);
+        final ProgramClient.DesktopAppFactory factory = spec == null ? null : ProgramClient.factory(spec.id());
+        return factory == null ? null : factory.create(host, monitorPos, desktopId);
+    }
+
+    /**
+     * Opens the Task Manager, or brings it forward when it is already up. It is the panel's own right-click
+     * destination and has no launcher of its own, exactly as on the desktops this imitates.
+     */
+    private void openTaskManager() {
+        final dev.jstech.computronics.os.ProgramSpec spec = dev.jstech.computronics.os.OsRegistry
+                .getProgram(dev.jstech.computronics.program.Programs.TASK_MANAGER);
+        if (spec == null) {
+            return;
+        }
+        final String key = chrome != null ? chrome.launcherLabel(spec) : spec.displayName();
+        for (int i = 0; i < windows.size(); i++) {
+            if (windows.get(i).appKey().equals(key)) {
+                windows.get(i).setMinimized(false);
+                windows.add(windows.remove(i));
+                return;
+            }
+        }
+        final DesktopApp app = factoryFor(key);
+        if (app != null && allowOpen(key)) {
+            app.applySkin(skin);
+            openApp(key, app);
+        }
     }
 
     /** Starts a launcher: a built-in app opens a window; an action-based one (e.g. the NMS) runs its action. */
@@ -4011,12 +4321,32 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     /** Word-wraps a label to {@code maxW} pixels, capped at three lines, for a selected desktop icon. */
-    /** One label line, cut with an ellipsis when a single unbreakable word is wider than its cell. */
-    private String fitLabelLine(final String s, final int maxW) {
-        if (font.width(s) <= maxW) {
+    /** The width, in font units, one line of an icon label may run to before it wraps. */
+    private static int labelFontWidth() {
+        return dev.jstech.core.client.gui.component.Texts.smallFits(LABEL_W);
+    }
+
+    /**
+     * One label line, cut with an ellipsis when a single unbreakable word is wider than its cell. The test is
+     * the width the line is actually drawn at, not the width it would have at full size, or a name that fits
+     * its cell by a pixel gets cut for no reason.
+     */
+    private String fitLabelLine(final String s) {
+        if (dev.jstech.core.client.gui.component.Texts.smallWidth(font, s) <= LABEL_W) {
             return s;
         }
-        return font.plainSubstrByWidth(s, maxW - font.width("...")) + "...";
+        final int units = Math.max(1, labelFontWidth() - font.width("..."));
+        return font.plainSubstrByWidth(s, units) + "...";
+    }
+
+    /** An icon's label line, centred under the icon and drawn in the small text, with the theme's shadow. */
+    private void drawIconLabel(final GuiGraphics g, final String line, final int cx, final int y,
+                               final int color, final boolean shadow) {
+        final int lx = cx - dev.jstech.core.client.gui.component.Texts.smallWidth(font, line) / 2;
+        if (shadow) {
+            dev.jstech.core.client.gui.component.Texts.small(g, font, line, lx + 1, y + 1, 0xFF000000);
+        }
+        dev.jstech.core.client.gui.component.Texts.small(g, font, line, lx, y, color);
     }
 
     private java.util.List<String> wrapLabel(final String s, final int maxW) {

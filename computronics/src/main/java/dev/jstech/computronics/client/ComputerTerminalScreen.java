@@ -970,7 +970,8 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         };
     }
 
-    // Task Manager tab (Mainframe only): Processes / Hardware / Devices
+    // Tasks tab (Mainframe only): the network's Operations in flight. Not to be confused with the desktop's
+    // Task Manager, which is about one machine; this one is about the network the Mainframe orchestrates.
 
     // Maintenance tab (Mainframe-only): index stats + ANALYZE / VACUUM / REINDEX / DROP
 
