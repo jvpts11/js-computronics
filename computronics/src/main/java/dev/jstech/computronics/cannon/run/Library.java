@@ -150,6 +150,13 @@ public final class Library {
                 default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Time has no " + name);
             };
         }
+        if (this.host.provides(owner)) {
+            // To the machine, being asked for a value and being asked to do something are the same
+            // question with different names, so a property goes out as a call that takes nothing.
+            final Host.Reply reply = this.host.call(owner, name, List.of(), line);
+            this.owed += Math.max(0, reply.cost() - 1);
+            return this.adopt(reply.value(), line);
+        }
         throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, owner + " has no " + name);
     }
 

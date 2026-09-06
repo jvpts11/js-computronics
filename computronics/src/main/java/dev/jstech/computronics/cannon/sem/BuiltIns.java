@@ -59,6 +59,7 @@ public final class BuiltIns {
         this.fillTime();
         this.fillRandom();
         this.fillFile();
+        this.fillComputer();
     }
 
     /** The root of every reference type. */
@@ -281,6 +282,50 @@ public final class BuiltIns {
         this.method(file, "MkDir", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
         this.method(file, "List", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
                 PUBLIC_STATIC, this.stringType);
+    }
+
+    /**
+     * The machine the program is running on, and the little records it answers with.
+     *
+     * <p>These are read-only pictures taken when they are asked for, not live views: a program holds
+     * what it was told, and asks again when it wants to know again.
+     */
+    private void fillComputer() {
+        final TypeSymbol integer = TypeSymbol.Primitive.INT;
+        final TypeSymbol whole = TypeSymbol.Primitive.LONG;
+
+        final NamedType cpu = this.declare("CpuInfo", NamedType.Kind.CLASS);
+        this.property(cpu, "Mhz", integer, PUBLIC);
+        this.property(cpu, "Cores", integer, PUBLIC);
+        this.property(cpu, "Era", this.stringType, PUBLIC);
+
+        final NamedType disk = this.declare("DiskInfo", NamedType.Kind.CLASS);
+        this.property(disk, "Mount", this.stringType, PUBLIC);
+        this.property(disk, "UsedMb", whole, PUBLIC);
+        this.property(disk, "CapacityMb", whole, PUBLIC);
+
+        final NamedType os = this.declare("OsInfo", NamedType.Kind.CLASS);
+        this.property(os, "Id", this.stringType, PUBLIC);
+        this.property(os, "Name", this.stringType, PUBLIC);
+
+        final NamedType process = this.declare("ProcessInfo", NamedType.Kind.CLASS);
+        this.property(process, "Id", integer, PUBLIC);
+        this.property(process, "Name", this.stringType, PUBLIC);
+        this.property(process, "State", this.stringType, PUBLIC);
+        this.property(process, "HeldBytes", whole, PUBLIC);
+
+        final NamedType computer = this.declare("Computer", NamedType.Kind.CLASS);
+        this.property(computer, "Name", this.stringType, PUBLIC_STATIC);
+        this.property(computer, "Cpu", cpu, PUBLIC_STATIC);
+        this.property(computer, "Os", os, PUBLIC_STATIC);
+        this.property(computer, "RamMb", integer, PUBLIC_STATIC);
+        this.property(computer, "FreeRamMb", integer, PUBLIC_STATIC);
+        this.property(computer, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        this.method(computer, "Disks", new TypeSymbol.GenericType(this.listType, List.of(disk)), PUBLIC_STATIC);
+        this.method(computer, "Programs", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
+                PUBLIC_STATIC);
+        this.method(computer, "Processes", new TypeSymbol.GenericType(this.listType, List.of(process)),
+                PUBLIC_STATIC);
     }
 
     private void fillRandom() {

@@ -29,16 +29,17 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 /**
- * A Cannon program reaching its machine's drives.
+ * A Cannon program reaching out of itself on a real machine.
  *
  * <p>The language is tested on its own against a made-up machine; this is the other half, where the
- * drive is a real one with a real disk in it, and a file a program writes is a file the shell can open.
+ * drive is a real one with a real disk in it, the processor is whatever was put in the socket, and a
+ * file a program writes is the file the shell opens.
  */
 @GameTestHolder(JsTests.MODID)
 @PrefixGameTestTemplate(false)
-public final class CannonFileGameTests {
+public final class CannonApiGameTests {
 
-    private CannonFileGameTests() {
+    private CannonApiGameTests() {
     }
 
     private static final String ARENA = "empty";
@@ -166,6 +167,68 @@ public final class CannonFileGameTests {
                             "class B { static void Main() { File.Write(\"a.txt\", \"x\"); } }");
                     helper.assertTrue(loud > quiet + 50,
                             "writing to a disk is charged for; " + loud + " against " + quiet);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void computer_readsTheHardwareThatIsActuallyInTheSockets(final GameTestHelper helper) {
+        final BlockPos at = new BlockPos(2, 2, 2);
+        final CraftingComputerBlockEntity computer = computer(helper, at);
+        if (computer == null) {
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("look.asm", listing("""
+                            class Look {
+                                static void Main() {
+                                    CpuInfo cpu = Computer.Cpu;
+                                    Console.PrintLine(cpu.Cores + " at " + cpu.Mhz + " " + cpu.Era);
+                                    Console.PrintLine("os " + Computer.Os.Name);
+                                    Console.PrintLine("ram " + Computer.RamMb);
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    // The socket holds a four-core Ascent X4 965 at 3400 on a Standard board, with 8 GB
+                    // in the slot and Frames XP on the disk: what the machine reports has to be that.
+                    helper.assertTrue(said.size() == 3, "it says its three lines; got " + said);
+                    helper.assertTrue(said.get(0).equals("4 at 3400 standard"),
+                            "the processor is the one in the socket; got " + said.get(0));
+                    helper.assertTrue(said.get(1).equals("os Frames XP"),
+                            "the system is the one on the disk; got " + said.get(1));
+                    helper.assertTrue(said.get(2).equals("ram 8192"),
+                            "the memory is what is in the slot; got " + said.get(2));
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void computer_seesItselfAmongTheProgramsItIsRunning(final GameTestHelper helper) {
+        final BlockPos at = new BlockPos(2, 2, 2);
+        final CraftingComputerBlockEntity computer = computer(helper, at);
+        if (computer == null) {
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("ps.asm", listing("""
+                            class Ps {
+                                static void Main() {
+                                    foreach (ProcessInfo one in Computer.Processes()) {
+                                        Console.PrintLine(one.Id + " " + one.Name + " " + one.State);
+                                    }
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertTrue(said.equals(List.of(started.id() + " ps.asm running")),
+                            "a program listing the machine's programs finds itself, running; got " + said);
                 })
                 .thenSucceed();
     }
