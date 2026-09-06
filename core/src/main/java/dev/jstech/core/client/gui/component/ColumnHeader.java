@@ -14,7 +14,8 @@ import java.util.function.IntConsumer;
 
 /**
  * The header over a table of rows: one label per column, the sorted column marked with the direction, a
- * click on a column sorting by it and a second click turning the order around. The columns' left edges are
+ * click on a column sorting by it and a second click turning the order around. A header that only names
+ * the columns ({@link #setSortable} false) draws no arrow and takes no click. The columns' left edges are
  * given each frame, since they follow the width of the list they head.
  */
 public final class ColumnHeader extends UiComponent {
@@ -23,6 +24,7 @@ public final class ColumnHeader extends UiComponent {
     private int[] columnX = new int[0];
     private int sortColumn;
     private boolean ascending = true;
+    private boolean sortable = true;
     private IntConsumer onSort = column -> { };
 
     public ColumnHeader(final List<String> labels) {
@@ -33,6 +35,17 @@ public final class ColumnHeader extends UiComponent {
     public ColumnHeader setColumnX(final int... xs) {
         columnX = xs.clone();
         return this;
+    }
+
+    /** Whether a click sorts by the column; a header over a fixed-order table only names them. */
+    public ColumnHeader setSortable(final boolean value) {
+        sortable = value;
+        return this;
+    }
+
+    /** The left edge of column {@code index} as laid out now, where the table's rows put its text. */
+    public int columnX(final int index) {
+        return index >= 0 && index < columnX.length ? columnX[index] : x();
     }
 
     /** Fires with the column index after a click changed the sort column or its direction. */
@@ -72,13 +85,16 @@ public final class ColumnHeader extends UiComponent {
         g.fill(x(), bottom() - 1, right(), bottom(), ctx.skin().edge());
         final String arrow = ascending ? " ^" : " v";
         for (int i = 0; i < labels.size() && i < columnX.length; i++) {
-            g.drawString(ctx.font(), labels.get(i) + (i == sortColumn ? arrow : ""), columnX[i], y() + 1,
+            g.drawString(ctx.font(), labels.get(i) + (sortable && i == sortColumn ? arrow : ""), columnX[i], y() + 1,
                     ctx.skin().dim(), false);
         }
     }
 
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
+        if (!sortable) {
+            return false;
+        }
         final int column = columnAt(mx);
         if (column == sortColumn) {
             ascending = !ascending;

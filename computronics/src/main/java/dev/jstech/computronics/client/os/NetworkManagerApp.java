@@ -14,15 +14,31 @@ import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.operation.payload.RequestNetworkManagerPayload;
 import dev.jstech.computronics.operation.payload.RequestNiOperationsPayload;
 import dev.jstech.computronics.program.OperationPalette;
+import dev.jstech.core.client.gui.component.Button;
+import dev.jstech.core.client.gui.component.ColumnHeader;
+import dev.jstech.core.client.gui.component.Draw;
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.ListView;
+import dev.jstech.core.client.gui.component.Panel;
+import dev.jstech.core.client.gui.component.Popup;
+import dev.jstech.core.client.gui.component.ScrollBar;
+import dev.jstech.core.client.gui.component.TabStrip;
+import dev.jstech.core.client.gui.component.Texts;
+import dev.jstech.core.client.gui.component.UiComponent;
+import dev.jstech.core.client.gui.component.UiContext;
 import dev.jstech.core.gui.layout.DesktopZ;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * The Network Manager desktop app, exclusive to the Mainframe (the node that holds the network index).
@@ -30,10 +46,13 @@ import java.util.Locale;
  * Processes (live Operations), Hardware (the network's compute and storage totals), Map (the topology),
  * and Log (the recent Operations feed). Nodes carry the computer's name and specs; a Map node shows a
  * full tooltip on hover, and a logged Operation opens a detail dialog with its sub-operations.
+ *
+ * <p>The tabs, the tables, the hardware readout, the scrollbars and the detail dialog are components; the
+ * map is a canvas of its own, since its nodes are dragged, panned and zoomed rather than listed.
  */
 public final class NetworkManagerApp implements DesktopApp {
 
-    private static final String[] TABS = {"Devices", "Processes", "Hardware", "Map", "Log"};
+    private static final List<String> TABS = List.of("Devices", "Processes", "Hardware", "Map", "Log");
     private static final int TAB_DEVICES = 0;
     private static final int TAB_PROCESSES = 1;
     private static final int TAB_HARDWARE = 2;
@@ -41,6 +60,13 @@ public final class NetworkManagerApp implements DesktopApp {
     private static final int TAB_LOG = 4;
 
     private static final int OPS_REFRESH_FRAMES = 40;
+    private static final int DEV_ROW_H = 12;
+    private static final int PROC_ROW_H = 13;
+    private static final int LOG_ROW_H = 12;
+    private static final int HW_ROW_H = 12;
+    private static final int BAR_W = 3;
+    private static final int DETAIL_W = 240;
+    private static final int DETAIL_H = 150;
 
     private static final int C_MAINFRAME = 0xFF3A6AE0;
     private static final int C_SERVER = 0xFF12A26F;
@@ -53,12 +79,10 @@ public final class NetworkManagerApp implements DesktopApp {
     private static final int C_GREEN = 0xFF2EA043;
     private static final int C_AMBER = 0xFFE0A020;
     private static final int C_RED = 0xFFD1495B;
+    private static final int C_LINK = 0xFF9FB4E6;
 
-    private record Hit(int x, int y, int w, int h, Runnable onClick) {
-        boolean contains(final double mx, final double my) {
-            return mx >= x && mx < x + w && my >= y && my < y + h;
-        }
-    }
+    private static final double MAP_ZOOM_MIN = 0.4;
+    private static final double MAP_ZOOM_MAX = 2.5;
 
     private record NodeRect(int x, int y, int w, int h, NetworkNodeInfo node) {
         boolean contains(final double mx, final double my) {
@@ -66,32 +90,41 @@ public final class NetworkManagerApp implements DesktopApp {
         }
     }
 
-    private record OpRect(int x, int y, int w, int h, OperationRecord op) {
-        boolean contains(final double mx, final double my) {
-            return mx >= x && mx < x + w && my >= y && my < y + h;
-        }
+    /** One line of the hardware readout: what it counts, and the count read live from the snapshot. */
+    private record HardwareRow(String key, Supplier<String> value) {
+    }
+
+    /** One line of the detail dialog: what the stage or the source was, and how much went through it. */
+    private record DetailRow(String left, String right, int color) {
     }
 
     private final BlockPos host;
     private final BlockPos monitorPos;
     private OsSkin skin = OsSkin.fallback();
+    @Nullable
     private NetworkManagerPayload data;
     private List<OperationRecord> activeOps = List.of();
-    private List<OperationRecord> opsLog = List.of();
+    private List<OperationRecord> logNewestFirst = List.of();
     private int scSlotsUsed;
     private int scSlotsTotal;
     private int tab;
     private int frame;
-    private int logScroll;
-    private int procScroll;
-    private final List<Hit> hits = new ArrayList<>();
-    private final List<NodeRect> mapNodes = new ArrayList<>();
-    private final List<OpRect> logRows = new ArrayList<>();
+    private int lastX;
+    private int lastY;
+    private int lastW;
+    private int lastH;
+    private int lastMouseX;
+    private int lastMouseY;
+    @Nullable
+    private Font lastFont;
+    @Nullable
     private OperationRecord detailOp;
+    private List<DetailRow> detailRows = List.of();
 
     // Per-node drag offsets on the Map (kept only for this session, keyed by the node's short id), so the
     // player can pull crowded nodes apart. A node with no entry sits at its computed ring position.
-    private final java.util.Map<String, int[]> nodeOffsets = new java.util.HashMap<>();
+    private final Map<String, int[]> nodeOffsets = new HashMap<>();
+    @Nullable
     private String draggingNode;
     private boolean panning;
     private double lastDragX;
@@ -100,14 +133,91 @@ public final class NetworkManagerApp implements DesktopApp {
     private int mapPanX;
     private int mapPanY;
     private double mapZoom = 1.0;
-    private static final double MAP_ZOOM_MIN = 0.4;
-    private static final double MAP_ZOOM_MAX = 2.5;
+    private final List<NodeRect> mapNodes = new ArrayList<>();
 
     private static NetworkManagerApp active;
+
+    // ---- components ----
+    private final Panel root = new Panel();
+    private final TabStrip tabs;
+    private final Label loadingLabel;
+    private final Label netLabel;
+    private final ColumnHeader devColumns;
+    private final ListView<NetworkNodeInfo> devList;
+    private final Label slotsLabel;
+    private final Label liveLabel;
+    private final Label noProcLabel;
+    private final ListView<OperationRecord> procList;
+    private final ScrollBar procBar;
+    private final List<HardwareRow> hardwareRows = new ArrayList<>();
+    private final List<Label> hwKeys = new ArrayList<>();
+    private final List<Label> hwValues = new ArrayList<>();
+    private final Label nodesHeader;
+    private final MapCanvas map;
+    private final Label noLogLabel;
+    private final ListView<OperationRecord> logList;
+    private final ScrollBar logBar;
+    private final Popup detailPopup;
+    private final Label detailType;
+    private final Label detailName;
+    private final Label detailAmount;
+    private final Label detailSection;
+    private final ListView<DetailRow> detailList;
+    private final Button detailClose;
 
     public NetworkManagerApp(final BlockPos host, final BlockPos monitorPos) {
         this.host = host;
         this.monitorPos = monitorPos;
+
+        tabs = root.add(new TabStrip(TABS).fitToLabels(14).setOnSelect(this::selectTab));
+        loadingLabel = root.add(new Label("Loading network...", Label.Tone.DIM));
+        netLabel = root.add(new Label(this::networkText, Label.Tone.DIM));
+
+        devColumns = root.add(new ColumnHeader(List.of("NODE", "TYPE", "STATUS")).setSortable(false));
+        devList = root.add(new ListView<NetworkNodeInfo>(this::nodes, DEV_ROW_H, this::renderDeviceRow));
+
+        slotsLabel = root.add(new Label(() -> "Craft slots  " + scSlotsUsed + " / " + scSlotsTotal, Label.Tone.DIM));
+        liveLabel = root.add(new Label(() -> activeOps.size() + " running", Label.Tone.DIM).setAlign(Label.Align.RIGHT));
+        noProcLabel = root.add(new Label("No Operations in flight.", Label.Tone.DIM));
+        procList = root.add(new ListView<OperationRecord>(() -> activeOps, PROC_ROW_H, this::renderProcessRow));
+        procBar = root.add(new ScrollBar(() -> Math.max(0, activeOps.size() - procList.visibleRows()), procList::scroll,
+                v -> procList.setScroll(v)));
+
+        hardwareRows.add(new HardwareRow("Orchestration capacity", () -> JscOsTheme.fmt(hardware().capacity()) + " it/t"));
+        hardwareRows.add(new HardwareRow("Parallel queues", () -> String.valueOf(hardware().queues())));
+        hardwareRows.add(new HardwareRow("RAM buffer", () -> JscOsTheme.fmt(hardware().ramBuffer()) + " it"));
+        hardwareRows.add(new HardwareRow("Network storage", () -> JscOsTheme.fmt(hardware().storageItems()) + " items"));
+        hardwareRows.add(new HardwareRow("Mainframes", () -> countKind(NetworkNodeInfo.KIND_MAINFRAME)));
+        hardwareRows.add(new HardwareRow("Servers", () -> countKind(NetworkNodeInfo.KIND_SERVER)));
+        hardwareRows.add(new HardwareRow("Subframes", () -> countKind(NetworkNodeInfo.KIND_SUBFRAME)));
+        hardwareRows.add(new HardwareRow("Supercomputers", () -> countKind(NetworkNodeInfo.KIND_SUPERCOMPUTER)));
+        hardwareRows.add(new HardwareRow("Crafting computers", () -> countKind(NetworkNodeInfo.KIND_CRAFTING)));
+        hardwareRows.add(new HardwareRow("Personal computers", () -> countKind(NetworkNodeInfo.KIND_PC)));
+        hardwareRows.add(new HardwareRow("Cluster managers", () -> countKind(NetworkNodeInfo.KIND_CLUSTER_MANAGEMENT)));
+        for (final HardwareRow row : hardwareRows) {
+            hwKeys.add(root.add(new Label(row.key())));
+            hwValues.add(root.add(new Label(row.value()).setAlign(Label.Align.RIGHT)));
+        }
+        nodesHeader = root.add(new Label("NODES", Label.Tone.DIM));
+
+        map = root.add(new MapCanvas());
+
+        noLogLabel = root.add(new Label("No Operations logged yet.", Label.Tone.DIM));
+        logList = root.add(new ListView<OperationRecord>(() -> logNewestFirst, LOG_ROW_H, this::renderLogRow)
+                .setOnClick(this::logClicked));
+        logBar = root.add(new ScrollBar(() -> Math.max(0, logNewestFirst.size() - logList.visibleRows()), logList::scroll,
+                v -> logList.setScroll(v)));
+
+        detailPopup = new Popup("", DETAIL_W, DETAIL_H).setDim(0xB0000000).setLayouter(this::layoutDetail);
+        detailType = detailPopup.add(new Label(() -> detailOp == null ? "" : OperationPalette.labelFor(detailOp.type()))
+                .setColor(() -> detailOp == null ? 0 : OperationPalette.colorFor(detailOp.type())));
+        detailName = detailPopup.add(new Label(() -> detailOp == null ? "" : detailOp.name().getString()));
+        detailAmount = detailPopup.add(new Label(this::detailAmountText)
+                .setColor(() -> detailOp == null ? 0 : statusColor(detailOp.status())));
+        detailSection = detailPopup.add(new Label(this::detailSectionText, Label.Tone.DIM));
+        detailList = detailPopup.add(new ListView<DetailRow>(() -> detailRows, 10, this::renderDetailRow));
+        detailClose = detailPopup.add(new Button("Close", detailPopup::close));
+
         active = this;
         PacketDistributor.sendToServer(new RequestNetworkManagerPayload(host));
         requestOps();
@@ -129,10 +239,12 @@ public final class NetworkManagerApp implements DesktopApp {
         }
     }
 
-    /** Routes the recent Operations log to the open window. */
+    /** Routes the recent Operations log to the open window; it arrives oldest-first and is shown newest-first. */
     public static void acceptOpsLog(final List<OperationRecord> ops) {
         if (active != null) {
-            active.opsLog = ops;
+            final List<OperationRecord> reversed = new ArrayList<>(ops);
+            java.util.Collections.reverse(reversed);
+            active.logNewestFirst = reversed;
         }
     }
 
@@ -147,323 +259,376 @@ public final class NetworkManagerApp implements DesktopApp {
         requestOps();
     }
 
-    @Override public String title() {
+    @Override
+    public String title() {
         return "Network Manager";
     }
 
-    @Override public int defaultWidth() {
+    @Override
+    public int defaultWidth() {
         return 300;
     }
 
-    @Override public int defaultHeight() {
+    @Override
+    public int defaultHeight() {
         return 196;
     }
 
-    @Override public int minWidth() {
+    @Override
+    public int minWidth() {
         return 250;
     }
 
-    @Override public int minHeight() {
+    @Override
+    public int minHeight() {
         return 150;
     }
 
-    @Override public void applySkin(final OsSkin osSkin) {
+    @Override
+    public void applySkin(final OsSkin osSkin) {
         this.skin = osSkin;
         active = this;
     }
 
-    @Override
-    public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
-                              final int width, final int height, final int mouseX, final int mouseY,
-                              final float partialTick) {
-        hits.clear();
-        mapNodes.clear();
-        logRows.clear();
-        g.fill(x, y, x + width, y + height, skin.windowBg());
+    // ---- state readers ----
 
-        frame++;
-        if ((tab == TAB_PROCESSES || tab == TAB_LOG) && frame % OPS_REFRESH_FRAMES == 0) {
-            requestOps();
-        }
+    private List<NetworkNodeInfo> nodes() {
+        return data == null ? List.of() : data.nodes();
+    }
 
-        int tx = x + 2;
-        for (int i = 0; i < TABS.length; i++) {
-            final int tw = font.width(TABS[i]) + 14;
-            skin.tab(g, font, tx, y + 2, tw, 15, TABS[i], tab == i);
-            final int target = i;
-            hits.add(new Hit(tx, y + 2, tw, 15, () -> selectTab(target)));
-            tx += tw + 1;
-        }
-        g.fill(x, y + 17, x + width, y + 18, skin.edge());
+    private NetworkManagerPayload.Hardware hardware() {
+        return data == null ? NetworkManagerPayload.Hardware.EMPTY : data.hardware();
+    }
 
-        final int px = x + 6;
-        final int py = y + 22;
-        final int pw = width - 12;
-        final int ph = height - 26;
+    private String networkText() {
         if (data == null) {
-            g.drawString(font, "Loading network...", px, py + 4, skin.dim(), false);
-            return;
+            return "";
         }
-        g.drawString(font, "Network " + (data.networkId().isEmpty() ? "(none)" : data.networkId())
-                + "   -   " + data.nodes().size() + " node(s)", px, py, skin.dim(), false);
-        switch (tab) {
-            case TAB_DEVICES -> devices(g, font, px, py + 12, pw, ph - 12, mouseX, mouseY);
-            case TAB_PROCESSES -> processes(g, font, px, py + 12, pw, ph - 12, mouseX, mouseY);
-            case TAB_HARDWARE -> hardware(g, font, px, py + 12, pw, ph - 12);
-            case TAB_MAP -> map(g, font, px, py + 12, pw, ph - 12);
-            case TAB_LOG -> log(g, font, px, py + 12, pw, ph - 12, mouseX, mouseY);
-            default -> { }
+        return "Network " + (data.networkId().isEmpty() ? "(none)" : data.networkId()) + "   -   " + data.nodes().size() + " node(s)";
+    }
+
+    private String countKind(final int kind) {
+        int n = 0;
+        for (final NetworkNodeInfo node : nodes()) {
+            if (node.kind() == kind) {
+                n++;
+            }
         }
+        return String.valueOf(n);
     }
 
     private void selectTab(final int target) {
         tab = target;
-        detailOp = null;
+        detailPopup.close();
         if (target == TAB_PROCESSES || target == TAB_LOG) {
             requestOps();
         }
     }
 
-    private void devices(final GuiGraphics g, final Font font, final int x, final int top, final int w,
-                         final int h, final int mouseX, final int mouseY) {
-        final int nameX = x + 10;
-        final int typeX = x + (int) (w * 0.52);
-        final int statusX = x + w - 48;
-        final List<NetworkNodeInfo> nodes = data.nodes();
-        final int rowH = 12;
-        final int maxRows = Math.max(1, (h - 11) / rowH);
-        final int shown = Math.min(nodes.size(), maxRows);
-        final int bandBottom = top + 11 + shown * rowH;
+    // ---- rendering ----
 
-        g.drawString(font, "NODE", nameX, top, skin.dim(), false);
-        g.drawString(font, "TYPE", typeX, top, skin.dim(), false);
-        g.drawString(font, "STATUS", statusX, top, skin.dim(), false);
-        g.fill(x, top + 10, x + w, top + 11, skin.edge());
-        // Column separators so each column reads as its own lane.
-        g.fill(typeX - 5, top, typeX - 4, bandBottom, skin.edge());
-        g.fill(statusX - 5, top, statusX - 4, bandBottom, skin.edge());
-
-        int y = top + 11;
-        for (int i = 0; i < shown; i++) {
-            final NetworkNodeInfo n = nodes.get(i);
-            final boolean hov = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + rowH;
-            skin.listRow(g, x, y, w, rowH, hov, false);
-            g.fill(x + 2, y + 4, x + 6, y + 8, kindColor(n.kind()));
-            final boolean named = !n.name().isEmpty();
-            final String nm = named ? n.name() : "unnamed";
-            final int idW = font.width(n.id());
-            final String nmClipped = trim(font, nm, typeX - 6 - nameX - idW - 4);
-            g.drawString(font, nmClipped, nameX, y + 2, named ? skin.text() : skin.dim(), false);
-            g.drawString(font, n.id(), nameX + font.width(nmClipped) + 4, y + 2, skin.dim(), false);
-            g.drawString(font, trim(font, n.kindLabel(), statusX - 6 - typeX), typeX, y + 2, skin.dim(), false);
-            final String status = n.online() ? "online" : "offline";
-            g.drawString(font, status, x + w - font.width(status), y + 2, n.online() ? C_GREEN : skin.dim(), false);
-            y += rowH;
+    @Override
+    public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
+                              final int width, final int height, final int mouseX, final int mouseY,
+                              final float partialTick) {
+        lastX = x;
+        lastY = y;
+        lastW = width;
+        lastH = height;
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+        lastFont = font;
+        frame++;
+        if ((tab == TAB_PROCESSES || tab == TAB_LOG) && frame % OPS_REFRESH_FRAMES == 0) {
+            requestOps();
         }
-        if (nodes.size() > maxRows) {
-            g.drawString(font, "+ " + (nodes.size() - maxRows) + " more", x + 2, y + 1, skin.dim(), false);
+        final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
+        g.fill(x, y, x + width, y + height, skin.windowBg());
+        layout(x, y, width, height);
+        root.render(g, ctx);
+        if (devList.visible()) {
+            // Column separators, so each column reads as its own lane.
+            for (int i = 1; i < 3; i++) {
+                final int sx = devColumns.columnX(i) - 5;
+                g.fill(sx, devColumns.y(), sx + 1, devList.y() + Math.min(nodes().size(), devList.visibleRows()) * DEV_ROW_H,
+                        skin.edge());
+            }
         }
     }
 
-    private void processes(final GuiGraphics g, final Font font, final int x, final int top, final int w,
-                           final int h, final int mouseX, final int mouseY) {
-        final String slots = "Craft slots  " + scSlotsUsed + " / " + scSlotsTotal;
-        g.drawString(font, slots, x + 2, top, skin.dim(), false);
-        final String live = activeOps.size() + " running";
-        g.drawString(font, live, x + w - font.width(live), top, skin.dim(), false);
-        final int listTop = top + 12;
-        if (activeOps.isEmpty()) {
-            g.drawString(font, "No Operations in flight.", x + 2, listTop + 2, skin.dim(), false);
+    /** Places the tab's components from the content rectangle; the other tabs' components are hidden. */
+    private void layout(final int x, final int y, final int width, final int height) {
+        tabs.setBounds(x + 2, y + 2, width - 4, 15);
+        tabs.setSelected(tab);
+        final int px = x + 6;
+        final int py = y + 22;
+        final int pw = width - 12;
+        final int ph = height - 26;
+        final boolean ready = data != null;
+        loadingLabel.setVisible(!ready);
+        loadingLabel.setBounds(px, py + 4, pw, 8);
+        netLabel.setVisible(ready);
+        netLabel.setBounds(px, py, pw, 8);
+        final int top = py + 12;
+        final int h = ph - 12;
+
+        final boolean devices = ready && tab == TAB_DEVICES;
+        devColumns.setVisible(devices);
+        devList.setVisible(devices);
+        if (devices) {
+            final int typeX = px + (int) (pw * 0.52);
+            final int statusX = px + pw - 48;
+            devColumns.setBounds(px, top - 1, pw, 12);
+            devColumns.setColumnX(px + 10, typeX, statusX);
+            devList.setBounds(px, top + 11, pw, Math.max(DEV_ROW_H, h - 11));
+        }
+
+        final boolean processes = ready && tab == TAB_PROCESSES;
+        slotsLabel.setVisible(processes);
+        liveLabel.setVisible(processes);
+        noProcLabel.setVisible(processes && activeOps.isEmpty());
+        procList.setVisible(processes && !activeOps.isEmpty());
+        procBar.setVisible(procList.visible() && activeOps.size() > procList.visibleRows());
+        if (processes) {
+            slotsLabel.setBounds(px + 2, top, pw / 2, 8);
+            liveLabel.setBounds(px + pw / 2, top, pw / 2, 8);
+            noProcLabel.setBounds(px + 2, top + 14, pw, 8);
+            final int listW = pw - BAR_W;
+            procList.setBounds(px, top + 12, listW, Math.max(PROC_ROW_H, h - 12));
+            procBar.setBounds(px + pw - BAR_W, top + 12, BAR_W, procList.visibleRows() * PROC_ROW_H);
+        }
+
+        final boolean hardware = ready && tab == TAB_HARDWARE;
+        nodesHeader.setVisible(hardware);
+        int row = top + 2;
+        for (int i = 0; i < hardwareRows.size(); i++) {
+            if (i == 4) {
+                // A rule and a heading split the totals from the node counts.
+                row += 6;
+                nodesHeader.setBounds(px + 2, row + 7, pw, 8);
+                row += 19;
+            }
+            hwKeys.get(i).setVisible(hardware);
+            hwValues.get(i).setVisible(hardware);
+            hwKeys.get(i).setBounds(px + 2, row, pw / 2, 8);
+            hwValues.get(i).setBounds(px + pw / 2, row, pw / 2, 8);
+            row += HW_ROW_H;
+        }
+
+        map.setVisible(ready && tab == TAB_MAP);
+        map.setBounds(px, top, pw, h);
+
+        final boolean log = ready && tab == TAB_LOG;
+        noLogLabel.setVisible(log && logNewestFirst.isEmpty());
+        logList.setVisible(log && !logNewestFirst.isEmpty());
+        logBar.setVisible(logList.visible() && logNewestFirst.size() > logList.visibleRows());
+        if (log) {
+            noLogLabel.setBounds(px + 2, top + 2, pw, 8);
+            logList.setBounds(px, top, pw - BAR_W, Math.max(LOG_ROW_H, h));
+            logBar.setBounds(px + pw - BAR_W, top, BAR_W, logList.visibleRows() * LOG_ROW_H);
+        }
+    }
+
+    private void renderDeviceRow(final GuiGraphics g, final UiContext ctx, final NetworkNodeInfo n, final int index,
+                                 final int x, final int y, final int w, final int h, final boolean hovered,
+                                 final boolean selected) {
+        final Font font = ctx.font();
+        ctx.skin().listRow(g, x, y, w, h, hovered, false);
+        g.fill(x + 2, y + 4, x + 6, y + 8, kindColor(n.kind()));
+        final int nameX = devColumns.columnX(0);
+        final int typeX = devColumns.columnX(1);
+        final int statusX = devColumns.columnX(2);
+        final boolean named = !n.name().isEmpty();
+        final String nm = named ? n.name() : "unnamed";
+        final String nmClipped = Texts.clip(font, nm, typeX - 6 - nameX - font.width(n.id()) - 4);
+        g.drawString(font, nmClipped, nameX, y + 2, named ? ctx.skin().text() : ctx.skin().dim(), false);
+        g.drawString(font, n.id(), nameX + font.width(nmClipped) + 4, y + 2, ctx.skin().dim(), false);
+        g.drawString(font, Texts.clip(font, n.kindLabel(), statusX - 6 - typeX), typeX, y + 2, ctx.skin().dim(), false);
+        final String status = n.online() ? "online" : "offline";
+        g.drawString(font, status, x + w - font.width(status), y + 2, n.online() ? C_GREEN : ctx.skin().dim(), false);
+    }
+
+    private void renderProcessRow(final GuiGraphics g, final UiContext ctx, final OperationRecord op, final int index,
+                                  final int x, final int y, final int w, final int h, final boolean hovered,
+                                  final boolean selected) {
+        final Font font = ctx.font();
+        ctx.skin().listRow(g, x, y, w, h, hovered, false);
+        final String type = OperationPalette.labelFor(op.type());
+        g.drawString(font, type, x + 4, y + 3, OperationPalette.colorFor(op.type()), false);
+        final int nameX = x + 4 + font.width(type) + 4;
+        final int barX = x + w / 2 + 4;
+        g.drawString(font, Texts.clip(font, op.name().getString(), barX - nameX - 4), nameX, y + 3, ctx.skin().text(), false);
+        final int barLen = w / 2 - 40;
+        final double frac = op.requested() > 0 ? Math.min(1.0, (double) op.moved() / op.requested()) : 0.0;
+        g.fill(barX, y + 4, barX + barLen, y + h - 3, ctx.skin().fieldBg());
+        g.fill(barX, y + 4, barX + (int) (barLen * frac), y + h - 3, statusColor(op.status()));
+        final String st = statusLabel(op.status());
+        g.drawString(font, st, x + w - font.width(st), y + 3, statusColor(op.status()), false);
+    }
+
+    private void renderLogRow(final GuiGraphics g, final UiContext ctx, final OperationRecord op, final int index,
+                              final int x, final int y, final int w, final int h, final boolean hovered,
+                              final boolean selected) {
+        final Font font = ctx.font();
+        ctx.skin().listRow(g, x, y, w, h, hovered, false);
+        final String type = OperationPalette.labelFor(op.type());
+        g.drawString(font, type, x + 4, y + 2, OperationPalette.colorFor(op.type()), false);
+        final int nameX = x + 4 + font.width(type) + 4;
+        final String st = statusLabel(op.status());
+        g.drawString(font, Texts.clip(font, op.name().getString(), w - (nameX - x) - font.width(st) - 8), nameX, y + 2,
+                ctx.skin().text(), false);
+        g.drawString(font, st, x + w - font.width(st), y + 2, statusColor(op.status()), false);
+    }
+
+    private void logClicked(final int index, final int button, final double mx, final double my) {
+        if (button != 0 || index < 0 || index >= logNewestFirst.size()) {
             return;
         }
-        final int rowH = 13;
-        final int barW = 3;
-        final int listW = w - barW;
-        final int maxRows = Math.max(1, (h - 12) / rowH);
-        final int maxScroll = Math.max(0, activeOps.size() - maxRows);
-        procScroll = Math.max(0, Math.min(procScroll, maxScroll));
-        int y = listTop;
-        for (int i = 0; i < maxRows && procScroll + i < activeOps.size(); i++) {
-            final OperationRecord op = activeOps.get(procScroll + i);
-            final boolean hov = mouseX >= x && mouseX < x + listW && mouseY >= y && mouseY < y + rowH;
-            skin.listRow(g, x, y, listW, rowH, hov, false);
-            final String type = OperationPalette.labelFor(op.type());
-            g.drawString(font, type, x + 4, y + 3, OperationPalette.colorFor(op.type()), false);
-            final int nameX = x + 4 + font.width(type) + 4;
-            final int barX = x + listW / 2 + 4;
-            g.drawString(font, trim(font, op.name().getString(), barX - nameX - 4), nameX, y + 3, skin.text(), false);
-            final int barLen = listW / 2 - 40;
-            final double frac = op.requested() > 0 ? Math.min(1.0, (double) op.moved() / op.requested()) : 0.0;
-            g.fill(barX, y + 4, barX + barLen, y + rowH - 3, skin.fieldBg());
-            g.fill(barX, y + 4, barX + (int) (barLen * frac), y + rowH - 3, statusColor(op.status()));
-            final String st = statusLabel(op.status());
-            g.drawString(font, st, x + listW - font.width(st), y + 3, statusColor(op.status()), false);
-            y += rowH;
-        }
-        scrollbar(g, x + w - barW, listTop, barW, maxRows * rowH, activeOps.size(), maxRows, procScroll);
+        openDetail(logNewestFirst.get(index));
     }
 
-    private void hardware(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                          final int h) {
-        final NetworkManagerPayload.Hardware hw = data.hardware();
-        int row = y + 2;
-        row = hwRow(g, font, x, row, w, "Orchestration capacity", JscOsTheme.fmt(hw.capacity()) + " it/t");
-        row = hwRow(g, font, x, row, w, "Parallel queues", String.valueOf(hw.queues()));
-        row = hwRow(g, font, x, row, w, "RAM buffer", JscOsTheme.fmt(hw.ramBuffer()) + " it");
-        row = hwRow(g, font, x, row, w, "Network storage", JscOsTheme.fmt(hw.storageItems()) + " items");
-        row += 6;
-        g.fill(x, row, x + w, row + 1, skin.edge());
-        row += 6;
-        g.drawString(font, "NODES", x + 2, row, skin.dim(), false);
-        row += 12;
-        row = hwRow(g, font, x, row, w, "Mainframes", String.valueOf(countKind(NetworkNodeInfo.KIND_MAINFRAME)));
-        row = hwRow(g, font, x, row, w, "Servers", String.valueOf(countKind(NetworkNodeInfo.KIND_SERVER)));
-        row = hwRow(g, font, x, row, w, "Subframes", String.valueOf(countKind(NetworkNodeInfo.KIND_SUBFRAME)));
-        row = hwRow(g, font, x, row, w, "Supercomputers",
-                String.valueOf(countKind(NetworkNodeInfo.KIND_SUPERCOMPUTER)));
-        row = hwRow(g, font, x, row, w, "Crafting computers",
-                String.valueOf(countKind(NetworkNodeInfo.KIND_CRAFTING)));
-        row = hwRow(g, font, x, row, w, "Personal computers", String.valueOf(countKind(NetworkNodeInfo.KIND_PC)));
-        hwRow(g, font, x, row, w, "Cluster managers",
-                String.valueOf(countKind(NetworkNodeInfo.KIND_CLUSTER_MANAGEMENT)));
-    }
+    // ---- the map ----
 
-    private int hwRow(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                      final String key, final String value) {
-        g.drawString(font, key, x + 2, y, skin.text(), false);
-        g.drawString(font, value, x + w - font.width(value), y, skin.text(), false);
-        return y + 12;
-    }
+    /**
+     * The topology as a canvas: the Mainframe at the centre, the other nodes ringed around it, each a click
+     * target that can be dragged apart from its neighbours; the middle button pans and the wheel zooms.
+     */
+    private final class MapCanvas extends UiComponent {
 
-    private int countKind(final int kind) {
-        int n = 0;
-        for (final NetworkNodeInfo node : data.nodes()) {
-            if (node.kind() == kind) {
-                n++;
+        @Override
+        public void render(final GuiGraphics g, final UiContext ctx) {
+            mapNodes.clear();
+            final Font font = ctx.font();
+            final int x = x();
+            final int y = y();
+            final int w = width();
+            final int h = height();
+            g.fill(x, y, x + w, y + h, ctx.skin().fieldBg());
+            Draw.outline(g, x, y, w, h, ctx.skin().edge());
+            g.drawString(font, "drag nodes  -  middle-drag to pan  -  wheel to zoom", x + 4, y + h - 10, ctx.skin().dim(), false);
+            final List<NetworkNodeInfo> nodes = nodes();
+            int mainframe = -1;
+            for (int i = 0; i < nodes.size(); i++) {
+                if (nodes.get(i).kind() == NetworkNodeInfo.KIND_MAINFRAME) {
+                    mainframe = i;
+                    break;
+                }
+            }
+            // The Mainframe sits at the centre; the rest ring around it. Adjacent nodes alternate between two
+            // radii so labels don't collide, the ring spread scales with the zoom, and pan plus per-node drag
+            // offsets (both in screen pixels) let the player explore and arrange a large network.
+            final int vcx = x + w / 2;
+            final int vcy = y + h / 2;
+            int mcx = vcx + mapPanX;
+            int mcy = vcy + mapPanY;
+            if (mainframe >= 0) {
+                final int[] off = nodeOffsets.get(nodes.get(mainframe).id());
+                if (off != null) {
+                    mcx += off[0];
+                    mcy += off[1];
+                }
+            }
+            final int baseRadius = Math.max(28, Math.min(w, h) / 2 - 30);
+            final int others = nodes.size() - (mainframe >= 0 ? 1 : 0);
+            int placed = 0;
+            for (int i = 0; i < nodes.size(); i++) {
+                if (i == mainframe) {
+                    continue;
+                }
+                final NetworkNodeInfo n = nodes.get(i);
+                final double a = others > 0 ? (2 * Math.PI * placed / others) - Math.PI / 2 : 0;
+                final int r = baseRadius - (placed % 2) * 14;
+                int nx = vcx + mapPanX + (int) (r * Math.cos(a) * mapZoom);
+                int ny = vcy + mapPanY + (int) (r * Math.sin(a) * mapZoom);
+                final int[] off = nodeOffsets.get(n.id());
+                if (off != null) {
+                    nx += off[0];
+                    ny += off[1];
+                }
+                drawLink(g, mcx, mcy, nx, ny);
+                node(g, font, ctx, nx, ny, n);
+                placed++;
+            }
+            if (mainframe >= 0) {
+                node(g, font, ctx, mcx, mcy, nodes.get(mainframe));
             }
         }
-        return n;
-    }
 
-    private void log(final GuiGraphics g, final Font font, final int x, final int top, final int w, final int h,
-                     final int mouseX, final int mouseY) {
-        if (opsLog.isEmpty()) {
-            g.drawString(font, "No Operations logged yet.", x + 2, top + 2, skin.dim(), false);
-            return;
+        private void node(final GuiGraphics g, final Font font, final UiContext ctx, final int cx, final int cy,
+                          final NetworkNodeInfo n) {
+            final String label = n.displayName();
+            final int tw = font.width(label) + 8;
+            final int nx = cx - tw / 2;
+            final int ny = cy - 6;
+            g.fill(nx, ny, nx + tw, ny + 13, ctx.skin().windowBg());
+            Draw.outline(g, nx, ny, tw, 13, kindColor(n.kind()));
+            g.drawString(font, label, nx + 4, ny + 3, ctx.skin().text(), false);
+            mapNodes.add(new NodeRect(nx, ny, tw, 13, n));
         }
-        final int rowH = 12;
-        final int barW = 3;
-        final int listW = w - barW;
-        final int maxRows = Math.max(1, h / rowH);
-        final int maxScroll = Math.max(0, opsLog.size() - maxRows);
-        logScroll = Math.max(0, Math.min(logScroll, maxScroll));
-        // The log arrives oldest-first; show the most recent at the top, offset by the scroll position.
-        int y = top;
-        for (int i = 0; i < maxRows && logScroll + i < opsLog.size(); i++) {
-            final OperationRecord op = opsLog.get(opsLog.size() - 1 - (logScroll + i));
-            final boolean hov = mouseX >= x && mouseX < x + listW && mouseY >= y && mouseY < y + rowH;
-            skin.listRow(g, x, y, listW, rowH, hov, false);
-            final String type = OperationPalette.labelFor(op.type());
-            g.drawString(font, type, x + 4, y + 2, OperationPalette.colorFor(op.type()), false);
-            final int nameX = x + 4 + font.width(type) + 4;
-            final String st = statusLabel(op.status());
-            g.drawString(font, trim(font, op.name().getString(), listW - (nameX - x) - font.width(st) - 8),
-                    nameX, y + 2, skin.text(), false);
-            g.drawString(font, st, x + listW - font.width(st), y + 2, statusColor(op.status()), false);
-            logRows.add(new OpRect(x, y, listW, rowH, op));
-            y += rowH;
-        }
-        scrollbar(g, x + w - barW, top, barW, maxRows * rowH, opsLog.size(), maxRows, logScroll);
-    }
 
-    /** A thin scrollbar thumb down the right edge of a scrollable list. */
-    private void scrollbar(final GuiGraphics g, final int x, final int y, final int w, final int trackH,
-                           final int total, final int visible, final int scroll) {
-        if (w <= 0 || total <= visible) {
-            return;
+        /** A thin link drawn as a horizontal leg then a vertical leg (the rect drawer has no diagonals). */
+        private void drawLink(final GuiGraphics g, final int x1, final int y1, final int x2, final int y2) {
+            g.fill(Math.min(x1, x2), y1, Math.max(x1, x2), y1 + 1, C_LINK);
+            g.fill(x2, Math.min(y1, y2), x2 + 1, Math.max(y1, y2), C_LINK);
         }
-        g.fill(x, y, x + w, y + trackH, skin.fieldBg());
-        final int thumbH = Math.max(8, trackH * visible / total);
-        final int maxScroll = total - visible;
-        final int thumbY = y + (trackH - thumbH) * scroll / Math.max(1, maxScroll);
-        g.fill(x, thumbY, x + w, thumbY + thumbH, skin.accent());
-    }
 
-    private void map(final GuiGraphics g, final Font font, final int x, final int y, final int w, final int h) {
-        g.fill(x, y, x + w, y + h, skin.fieldBg());
-        OsSkin.outline(g, x, y, w, h, skin.edge());
-        g.drawString(font, "drag nodes  -  middle-drag to pan  -  wheel to zoom", x + 4, y + h - 10,
-                skin.dim(), false);
-        final List<NetworkNodeInfo> nodes = data.nodes();
-        int mainframe = -1;
-        for (int i = 0; i < nodes.size(); i++) {
-            if (nodes.get(i).kind() == NetworkNodeInfo.KIND_MAINFRAME) {
-                mainframe = i;
-                break;
+        @Override
+        public boolean mouseClicked(final double mx, final double my, final int button) {
+            lastDragX = mx;
+            lastDragY = my;
+            if (button == 2) {
+                panning = true;
+                return true;
             }
-        }
-        // The Mainframe sits at the centre; the rest ring around it. Adjacent nodes alternate between two
-        // radii so labels don't collide, the ring spread scales with the zoom, and pan plus per-node drag
-        // offsets (both in screen pixels) let the player explore and arrange a large network.
-        final int vcx = x + w / 2;
-        final int vcy = y + h / 2;
-        int mcx = vcx + mapPanX;
-        int mcy = vcy + mapPanY;
-        if (mainframe >= 0) {
-            final int[] off = nodeOffsets.get(nodes.get(mainframe).id());
-            if (off != null) {
-                mcx += off[0];
-                mcy += off[1];
+            if (button != 0) {
+                return false;
             }
-        }
-        final int baseRadius = Math.max(28, Math.min(w, h) / 2 - 30);
-        final int others = nodes.size() - (mainframe >= 0 ? 1 : 0);
-        int placed = 0;
-        for (int i = 0; i < nodes.size(); i++) {
-            if (i == mainframe) {
-                continue;
+            // Pressing a node arms a drag so the player can pull crowded nodes apart.
+            for (final NodeRect r : mapNodes) {
+                if (r.contains(mx, my)) {
+                    draggingNode = r.node().id();
+                    break;
+                }
             }
-            final NetworkNodeInfo n = nodes.get(i);
-            final double a = others > 0 ? (2 * Math.PI * placed / others) - Math.PI / 2 : 0;
-            final int r = baseRadius - (placed % 2) * 14;
-            int nx = vcx + mapPanX + (int) (r * Math.cos(a) * mapZoom);
-            int ny = vcy + mapPanY + (int) (r * Math.sin(a) * mapZoom);
-            final int[] off = nodeOffsets.get(n.id());
-            if (off != null) {
-                nx += off[0];
-                ny += off[1];
-            }
-            drawLink(g, mcx, mcy, nx, ny, 0xFF9FB4E6);
-            node(g, font, nx, ny, n);
-            placed++;
+            return true;
         }
-        if (mainframe >= 0) {
-            node(g, font, mcx, mcy, nodes.get(mainframe));
-        }
-    }
 
-    private void node(final GuiGraphics g, final Font font, final int cx, final int cy, final NetworkNodeInfo n) {
-        final String label = n.displayName();
-        final int tw = font.width(label) + 8;
-        final int nx = cx - tw / 2;
-        final int ny = cy - 6;
-        g.fill(nx, ny, nx + tw, ny + 13, skin.windowBg());
-        OsSkin.outline(g, nx, ny, tw, 13, kindColor(n.kind()));
-        g.drawString(font, label, nx + 4, ny + 3, skin.text(), false);
-        mapNodes.add(new NodeRect(nx, ny, tw, 13, n));
-    }
+        @Override
+        public boolean mouseDragged(final double mx, final double my, final int button) {
+            if (panning) {
+                mapPanX += (int) Math.round(mx - lastDragX);
+                mapPanY += (int) Math.round(my - lastDragY);
+            } else if (draggingNode != null) {
+                final int[] off = nodeOffsets.computeIfAbsent(draggingNode, k -> new int[2]);
+                off[0] += (int) Math.round(mx - lastDragX);
+                off[1] += (int) Math.round(my - lastDragY);
+            } else {
+                return false;
+            }
+            lastDragX = mx;
+            lastDragY = my;
+            return true;
+        }
 
-    /** A thin link drawn as a horizontal leg then a vertical leg (the rect drawer has no diagonals). */
-    private static void drawLink(final GuiGraphics g, final int x1, final int y1, final int x2, final int y2,
-                                 final int color) {
-        g.fill(Math.min(x1, x2), y1, Math.max(x1, x2), y1 + 1, color);
-        g.fill(x2, Math.min(y1, y2), x2 + 1, Math.max(y1, y2), color);
+        @Override
+        public boolean mouseReleased(final double mx, final double my, final int button) {
+            panning = false;
+            draggingNode = null;
+            return true;
+        }
+
+        @Override
+        public boolean mouseScrolled(final double mx, final double my, final double delta) {
+            final double factor = delta > 0 ? 1.1 : 1.0 / 1.1;
+            mapZoom = Math.max(MAP_ZOOM_MIN, Math.min(MAP_ZOOM_MAX, mapZoom * factor));
+            return true;
+        }
     }
 
     @Override
     public void renderTooltip(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY) {
-        if (tab != TAB_MAP || detailOp != null) {
+        if (tab != TAB_MAP || detailPopup.isOpen()) {
             return;
         }
         for (final NodeRect r : mapNodes) {
@@ -481,15 +646,13 @@ public final class NetworkManagerApp implements DesktopApp {
         lines.add(n.name().isEmpty() ? "unnamed" : n.name());
         lines.add(n.kindLabel() + "  -  " + (n.online() ? "online" : "offline"));
         if (n.cpuMhz() > 0) {
-            lines.add("CPU " + cpuClock(n.cpuMhz()) + (n.vramMb() > 0 ? "   VRAM " + JscOsTheme.fmt(n.vramMb())
-                    + " MB" : ""));
+            lines.add("CPU " + cpuClock(n.cpuMhz()) + (n.vramMb() > 0 ? "   VRAM " + JscOsTheme.fmt(n.vramMb()) + " MB" : ""));
         }
         if (!n.osLabel().isEmpty()) {
             lines.add("OS " + n.osLabel());
         }
         if (n.storageTotalMb() > 0) {
-            lines.add("Storage " + JscOsTheme.fmt(n.storageFreeMb()) + " / "
-                    + JscOsTheme.fmt(n.storageTotalMb()) + " MB free");
+            lines.add("Storage " + JscOsTheme.fmt(n.storageFreeMb()) + " / " + JscOsTheme.fmt(n.storageTotalMb()) + " MB free");
         } else if (n.storageFreeMb() > 0) {
             lines.add("Storage " + JscOsTheme.fmt(n.storageFreeMb()) + " MB free");
         }
@@ -515,7 +678,7 @@ public final class NetworkManagerApp implements DesktopApp {
         g.pose().pushPose();
         g.pose().translate(0, 0, DesktopZ.TOOLTIP);
         g.fill(bx, by, bx + boxW, by + boxH, 0xF00E0E12);
-        OsSkin.outline(g, bx, by, boxW, boxH, kindColor(n.kind()));
+        Draw.outline(g, bx, by, boxW, boxH, kindColor(n.kind()));
         int ly = by + 3;
         for (int i = 0; i < lines.size(); i++) {
             final int color = i == 0 ? 0xFFFFFFFF : (i == 1 ? kindColor(n.kind()) : 0xFFB7BCCB);
@@ -525,95 +688,83 @@ public final class NetworkManagerApp implements DesktopApp {
         g.pose().popPose();
     }
 
-    // --- op detail dialog (a logged Operation and its sub-operations) ---
+    // ---- the detail dialog (a logged Operation and its sub-operations) ----
+
+    private void openDetail(final OperationRecord op) {
+        detailOp = op;
+        final List<DetailRow> rows = new ArrayList<>();
+        if (!op.subs().isEmpty()) {
+            for (final OperationRecord.SubRow s : op.subs()) {
+                rows.add(new DetailRow(s.server(), s.moved() + "/" + s.planned(), subStateColor(s.state())));
+            }
+        } else {
+            for (final OperationRecord.MoveRow m : op.moves()) {
+                rows.add(new DetailRow(m.from() + " -> " + m.to(), JscOsTheme.fmt(m.qty()), skin.dim()));
+            }
+        }
+        detailRows = rows;
+        detailList.setScroll(0);
+        detailPopup.open();
+        detailPopup.placeIn(lastX, lastY, lastW, lastH);
+    }
+
+    private String detailAmountText() {
+        if (detailOp == null) {
+            return "";
+        }
+        final String reqLabel = detailOp.requested() >= 1_000_000_000L ? "all" : JscOsTheme.fmt(detailOp.requested());
+        return JscOsTheme.fmt(detailOp.moved()) + " of " + reqLabel + "   " + statusLabel(detailOp.status());
+    }
+
+    private String detailSectionText() {
+        if (detailOp == null) {
+            return "";
+        }
+        return !detailOp.subs().isEmpty() ? "STAGES" : !detailOp.moves().isEmpty() ? "SOURCES" : "No sub-operations.";
+    }
+
+    private void layoutDetail(final Popup p) {
+        final int typeW = lastFont == null ? 30 : lastFont.width(detailType.text());
+        detailType.setBounds(p.x() + 6, p.y() + 6, typeW, 8);
+        detailName.setBounds(p.x() + 6 + typeW + 4, p.y() + 6, p.width() - 16 - typeW, 8);
+        detailAmount.setBounds(p.x() + 6, p.y() + 18, p.width() - 12, 8);
+        detailSection.setBounds(p.x() + 6, p.y() + 34, p.width() - 12, 8);
+        detailList.setBounds(p.x() + 8, p.y() + 45, p.width() - 14, Math.max(10, p.height() - 45 - 24));
+        final int cw = (lastFont == null ? 30 : lastFont.width("Close")) + 12;
+        detailClose.setBounds(p.right() - cw - 4, p.bottom() - 15, cw, 13);
+    }
+
+    private void renderDetailRow(final GuiGraphics g, final UiContext ctx, final DetailRow row, final int index,
+                                 final int x, final int y, final int w, final int h, final boolean hovered,
+                                 final boolean selected) {
+        final Font font = ctx.font();
+        final int rightW = font.width(row.right());
+        g.drawString(font, Texts.clip(font, row.left(), w - rightW - 6), x, y, ctx.skin().text(), false);
+        g.drawString(font, row.right(), x + w - rightW, y, row.color(), false);
+    }
 
     @Override
     public boolean modalActive() {
-        return detailOp != null;
+        return detailPopup.isOpen();
     }
 
     @Override
     public void renderModal(final GuiGraphics g, final Font font, final int x, final int y,
                             final int width, final int height, final int mouseX, final int mouseY) {
-        if (detailOp == null) {
+        if (!detailPopup.isOpen()) {
             return;
         }
-        g.fill(x, y, x + width, y + height, 0xB0000000);
-        final int dw = Math.min(width - 12, 240);
-        final int dh = Math.min(height - 12, 150);
-        final int dx = x + (width - dw) / 2;
-        final int dy = y + (height - dh) / 2;
-        skin.panel(g, dx, dy, dw, dh);
-        OsSkin.outline(g, dx, dy, dw, dh, skin.edge());
-
-        final OperationRecord op = detailOp;
-        final String type = OperationPalette.labelFor(op.type());
-        g.drawString(font, type, dx + 6, dy + 6, OperationPalette.colorFor(op.type()), false);
-        g.drawString(font, trim(font, op.name().getString(), dw - 16 - font.width(type)),
-                dx + 6 + font.width(type) + 4, dy + 6, skin.text(), false);
-
-        final String reqLabel = op.requested() >= 1_000_000_000L ? "all" : JscOsTheme.fmt(op.requested());
-        g.drawString(font, JscOsTheme.fmt(op.moved()) + " of " + reqLabel + "   " + statusLabel(op.status()),
-                dx + 6, dy + 18, statusColor(op.status()), false);
-        g.fill(dx + 6, dy + 30, dx + dw - 6, dy + 31, skin.edge());
-
-        int ly = dy + 34;
-        final int lineMax = dy + dh - 24;
-        if (!op.subs().isEmpty()) {
-            g.drawString(font, "STAGES", dx + 6, ly, skin.dim(), false);
-            ly += 11;
-            for (final OperationRecord.SubRow s : op.subs()) {
-                if (ly > lineMax) {
-                    break;
-                }
-                g.drawString(font, trim(font, s.server(), dw - 70), dx + 8, ly, skin.text(), false);
-                g.drawString(font, s.moved() + "/" + s.planned(),
-                        dx + dw - 6 - font.width(s.moved() + "/" + s.planned()), ly, subStateColor(s.state()), false);
-                ly += 10;
-            }
-        } else if (!op.moves().isEmpty()) {
-            g.drawString(font, "SOURCES", dx + 6, ly, skin.dim(), false);
-            ly += 11;
-            for (final OperationRecord.MoveRow m : op.moves()) {
-                if (ly > lineMax) {
-                    break;
-                }
-                g.drawString(font, trim(font, m.from() + " -> " + m.to(), dw - 60), dx + 8, ly, skin.text(), false);
-                g.drawString(font, JscOsTheme.fmt(m.qty()), dx + dw - 6 - font.width(JscOsTheme.fmt(m.qty())), ly,
-                        skin.dim(), false);
-                ly += 10;
-            }
-        } else {
-            g.drawString(font, "No sub-operations.", dx + 6, ly, skin.dim(), false);
-        }
-
-        // Close hint / button along the bottom.
-        final String close = "Close";
-        final int cwd = font.width(close) + 12;
-        final int cbx = dx + dw - cwd - 4;
-        final int cby = dy + dh - 15;
-        final boolean chov = mouseX >= cbx && mouseX < cbx + cwd && mouseY >= cby && mouseY < cby + 13;
-        skin.button(g, font, cbx, cby, cwd, 13, close, chov, false, false);
+        detailPopup.renderIn(g, new UiContext(skin, font, mouseX, mouseY, 0f), x, y, width, height);
+        // The rule between the header and the stages.
+        g.fill(detailPopup.x() + 6, detailPopup.y() + 30, detailPopup.right() - 6, detailPopup.y() + 31, skin.edge());
     }
 
     private int subStateColor(final byte state) {
         return switch (state) {
-            case OperationRecord.SubRow.SUB_COMPLETED -> C_GREEN;
-            case OperationRecord.SubRow.SUB_STREAMING -> C_GREEN;
+            case OperationRecord.SubRow.SUB_COMPLETED, OperationRecord.SubRow.SUB_STREAMING -> C_GREEN;
             case OperationRecord.SubRow.SUB_READING -> C_AMBER;
             default -> skin.dim();
         };
-    }
-
-    private static String trim(final Font font, final String s, final int maxWidth) {
-        if (maxWidth <= 0 || font.width(s) <= maxWidth) {
-            return s;
-        }
-        String out = s;
-        while (!out.isEmpty() && font.width(out + "...") > maxWidth) {
-            out = out.substring(0, out.length() - 1);
-        }
-        return out + "...";
     }
 
     private static String cpuClock(final int mhz) {
@@ -637,10 +788,8 @@ public final class NetworkManagerApp implements DesktopApp {
     private int statusColor(final byte status) {
         return switch (status) {
             case OperationRecord.STATUS_PROCESSING, OperationRecord.STATUS_COMPLETED -> C_GREEN;
-            case OperationRecord.STATUS_PARTIAL, OperationRecord.STATUS_WAITING,
-                    OperationRecord.STATUS_PENDING -> C_AMBER;
-            case OperationRecord.STATUS_FAILED, OperationRecord.STATUS_RESOURCE_LOCKED,
-                    OperationRecord.STATUS_DISCARDED -> C_RED;
+            case OperationRecord.STATUS_PARTIAL, OperationRecord.STATUS_WAITING, OperationRecord.STATUS_PENDING -> C_AMBER;
+            case OperationRecord.STATUS_FAILED, OperationRecord.STATUS_RESOURCE_LOCKED, OperationRecord.STATUS_DISCARDED -> C_RED;
             default -> skin.text();
         };
     }
@@ -657,93 +806,58 @@ public final class NetworkManagerApp implements DesktopApp {
         };
     }
 
+    // ---- input ----
+
     @Override
-    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
-        if (detailOp != null) {
-            // Any click while the detail dialog is up dismisses it.
-            detailOp = null;
+    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        if (detailPopup.isOpen()) {
+            detailPopup.mouseClicked(mouseX, mouseY, button);
             return;
         }
-        if (tab == TAB_MAP && button == 2) {
-            // Middle-drag pans the map.
-            panning = true;
-            lastDragX = mouseX;
-            lastDragY = mouseY;
-            return;
-        }
-        if (button != 0) {
-            return;
-        }
-        for (final Hit hit : hits) {
-            if (hit.contains(mouseX, mouseY)) {
-                hit.onClick().run();
-                return;
-            }
-        }
-        if (tab == TAB_MAP) {
-            // Pressing a node arms a drag so the player can pull crowded nodes apart.
-            for (final NodeRect r : mapNodes) {
-                if (r.contains(mouseX, mouseY)) {
-                    draggingNode = r.node().id();
-                    lastDragX = mouseX;
-                    lastDragY = mouseY;
-                    return;
-                }
-            }
-        }
-        if (tab == TAB_LOG) {
-            for (final OpRect r : logRows) {
-                if (r.contains(mouseX, mouseY)) {
-                    detailOp = r.op();
-                    return;
-                }
-            }
+        root.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public void mouseDragged(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        if (detailPopup.isOpen()) {
+            detailPopup.mouseDragged(mouseX, mouseY, button);
+        } else {
+            root.mouseDragged(mouseX, mouseY, button);
         }
     }
 
     @Override
-    public void mouseDragged(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
-        if (panning) {
-            mapPanX += (int) Math.round(mouseX - lastDragX);
-            mapPanY += (int) Math.round(mouseY - lastDragY);
-            lastDragX = mouseX;
-            lastDragY = mouseY;
-            return;
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        if (detailPopup.isOpen()) {
+            detailPopup.mouseReleased(mouseX, mouseY, button);
+        } else {
+            root.mouseReleased(mouseX, mouseY, button);
         }
-        if (draggingNode == null) {
-            return;
-        }
-        final int[] off = nodeOffsets.computeIfAbsent(draggingNode, k -> new int[2]);
-        off[0] += (int) Math.round(mouseX - lastDragX);
-        off[1] += (int) Math.round(mouseY - lastDragY);
-        lastDragX = mouseX;
-        lastDragY = mouseY;
-    }
-
-    @Override
-    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY,
-                              final int button) {
-        panning = false;
-        draggingNode = null;
     }
 
     @Override
     public boolean mouseScrolled(final double delta) {
-        if (tab == TAB_MAP) {
-            final double factor = delta > 0 ? 1.1 : 1.0 / 1.1;
-            mapZoom = Math.max(MAP_ZOOM_MIN, Math.min(MAP_ZOOM_MAX, mapZoom * factor));
+        if (detailPopup.isOpen()) {
+            return detailPopup.mouseScrolled(lastMouseX, lastMouseY, delta);
+        }
+        if (root.mouseScrolled(lastMouseX, lastMouseY, delta)) {
             return true;
         }
+        // The wheel anywhere in the window moves the tab's list.
+        final int step = delta > 0 ? -1 : 1;
         if (tab == TAB_LOG) {
-            logScroll = Math.max(0, logScroll - (int) Math.signum(delta));
+            logList.setScroll(logList.scroll() + step);
             return true;
         }
         if (tab == TAB_PROCESSES) {
-            procScroll = Math.max(0, procScroll - (int) Math.signum(delta));
+            procList.setScroll(procList.scroll() + step);
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
+        return detailPopup.isOpen() && detailPopup.keyPressed(key, scanCode, modifiers);
     }
 }
