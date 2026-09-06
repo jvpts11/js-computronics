@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to J's Computronics are recorded here, newest first. The format follows
+All notable changes to the J's Tech Series are recorded here, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers and phase letters follow
 [docs/RELEASING.md](docs/RELEASING.md).
 
@@ -86,6 +86,6 @@ The mod is in alpha: computing is the only module, and it is still growing.
 - Breaking a drive that still holds a disc removes the drive.
 - A rack server's desktop no longer crashes the monitor before the rack's era has reached the client.
 
-[Unreleased]: https://github.com/jvpts11/js-computronics/compare/v0.2.0a...HEAD
-[0.2.0a]: https://github.com/jvpts11/js-computronics/releases/tag/v0.2.0a
-[0.1.0a]: https://github.com/jvpts11/js-computronics/releases/tag/v0.1.0a
+[Unreleased]: https://github.com/jvpts11/js-tech-series/compare/v0.2.0a...HEAD
+[0.2.0a]: https://github.com/jvpts11/js-tech-series/releases/tag/v0.2.0a
+[0.1.0a]: https://github.com/jvpts11/js-tech-series/releases/tag/v0.1.0a

@@ -5,7 +5,7 @@ computer network of J's Computronics is the backbone that ties the areas togethe
 other mod end up as data on that network, stored, moved and driven by the computers you build.
 
 The series is in alpha. See [what a version means](docs/RELEASING.md), [what changed](CHANGELOG.md) and the
-[releases page](https://github.com/jvpts11/js-computronics/releases) for the builds.
+[releases page](https://github.com/jvpts11/js-tech-series/releases) for the builds.
 
 ## The mods
 
@@ -39,8 +39,8 @@ One repository, several mods, all built at the same version:
 ## Building from source
 
 ```
-git clone https://github.com/jvpts11/js-computronics.git
-cd js-computronics
+git clone https://github.com/jvpts11/js-tech-series.git
+cd js-tech-series
 ./gradlew build
 ```
 
