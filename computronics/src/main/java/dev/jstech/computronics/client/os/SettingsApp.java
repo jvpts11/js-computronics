@@ -7,66 +7,136 @@
  */
 package dev.jstech.computronics.client.os;
 
+import dev.jstech.computronics.operation.payload.RequestFirmwarePayload;
 import dev.jstech.computronics.operation.payload.RequestSettingsPayload;
 import dev.jstech.computronics.operation.payload.SetSettingPayload;
 import dev.jstech.computronics.operation.payload.SettingsSnapshotPayload;
+import dev.jstech.computronics.operation.payload.UninstallProgramPayload;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.ProgramSpec;
+import dev.jstech.core.client.gui.component.Button;
+import dev.jstech.core.client.gui.component.Draw;
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.ListView;
+import dev.jstech.core.client.gui.component.Panel;
+import dev.jstech.core.client.gui.component.ProgressBar;
+import dev.jstech.core.client.gui.component.TextField;
+import dev.jstech.core.client.gui.component.UiComponent;
+import dev.jstech.core.client.gui.component.UiContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.BooleanSupplier;
 
 /**
  * The Settings desktop app: one per-computer control panel, drawn through the running OS skin so its
  * form changes with the OS (a basic bevel on Frames 95, the richest layout on Frames 11). A left nav
- * lists eight pages — six live, two placeholders — and the right pane edits or shows each one.
+ * lists eight pages, six live and two placeholders, and the right pane edits or shows each one.
  *
  * <p>All editable knobs round-trip through the server: opening the app requests a
- * {@link SettingsSnapshotPayload}, and every change sends a {@link SetSettingPayload} and redraws
- * from the refreshed snapshot the server replies with.
+ * {@link SettingsSnapshotPayload}, and every change sends a {@link SetSettingPayload} and rebuilds the
+ * page from the refreshed snapshot the server replies with.
  */
 public final class SettingsApp implements DesktopApp {
 
-    private static final String[] NAV = {
-            "Personalize", "System", "Network", "Storage", "Display", "Programs", "Sound", "Users"};
+    private static final List<String> NAV = List.of(
+            "Personalize", "System", "Network", "Storage", "Display", "Programs", "Sound", "Users");
     private static final int FIRST_SOON = 6;
+    private static final int NAV_W = 78;
+    private static final int NAV_ROW_H = 15;
+    private static final int BTN_H = 13;
+    private static final int NAME_MAX = 24;
 
     private static final int[] ACCENTS = {
             0xFF3A6AE0, 0xFF12A26F, 0xFFD1633F, 0xFF7B52C9, 0xFFC93D6A, 0xFFC98320};
     private static final String[] THEMES = {"system", "ocean", "slate"};
 
-    /** One clickable region built during render and hit-tested on click. */
-    private record Hit(int x, int y, int w, int h, Runnable onClick) {
-        boolean contains(final double mx, final double my) {
-            return mx >= x && mx < x + w && my >= y && my < y + h;
-        }
-    }
-
     private final BlockPos host;
     private OsSkin skin = OsSkin.fallback();
+    @Nullable
     private SettingsSnapshotPayload data;
     private int page;
-    private final List<Hit> hits = new ArrayList<>();
-
-    private boolean editingName;
-    private final StringBuilder nameBuf = new StringBuilder();
+    private int snapshots;
 
     private static SettingsApp active;
 
     /** The monitor this desktop runs on (the firmware restart reopens setup there); null when unknown. */
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     private BlockPos monitorPos;
 
+    // ---- components ----
+    private final Panel root = new Panel();
+    private final ListView<String> nav;
+    private final Panel pagePanel = new Panel();
+    private final Label loadingLabel;
+    /** What the page was last built for; a change in any part rebuilds it. */
+    private String builtFor = "";
+    @Nullable
+    private TextField nameField;
+    @Nullable
+    private Font lastFont;
+
+    /** A wallpaper style or an accent colour as a small square that a click chooses. */
+    private final class Swatch extends UiComponent {
+
+        @Nullable
+        private final String style;
+        private final int color;
+        private final BooleanSupplier on;
+        private final Runnable onClick;
+
+        Swatch(@Nullable final String style, final int color, final BooleanSupplier on, final Runnable onClick) {
+            this.style = style;
+            this.color = color;
+            this.on = on;
+            this.onClick = onClick;
+        }
+
+        @Override
+        public void render(final GuiGraphics g, final UiContext ctx) {
+            if (style != null) {
+                wallpaperSwatch(g, x(), y(), width(), height(), style);
+                if (on.getAsBoolean()) {
+                    Draw.outline(g, x() - 1, y() - 1, width() + 2, height() + 2, ctx.skin().accent());
+                } else {
+                    Draw.outline(g, x(), y(), width(), height(), ctx.skin().edge());
+                }
+                return;
+            }
+            g.fill(x(), y(), right(), bottom(), color);
+            final int grow = on.getAsBoolean() ? 1 : 0;
+            Draw.outline(g, x() - grow, y() - grow, width() + grow * 2, height() + grow * 2,
+                    on.getAsBoolean() ? ctx.skin().text() : ctx.skin().edge());
+        }
+
+        @Override
+        public boolean mouseClicked(final double mx, final double my, final int button) {
+            if (button != 0) {
+                return false;
+            }
+            onClick.run();
+            return true;
+        }
+    }
+
     /** The desktop form: knows its monitor, so "Restart to firmware" can reopen the setup on it. */
-    public SettingsApp(final BlockPos host, @org.jetbrains.annotations.Nullable final BlockPos monitorPos) {
+    public SettingsApp(final BlockPos host, @Nullable final BlockPos monitorPos) {
         this(host);
         this.monitorPos = monitorPos;
     }
 
     public SettingsApp(final BlockPos host) {
         this.host = host;
+        nav = root.add(new ListView<String>(() -> NAV, NAV_ROW_H, this::renderNavRow).setOnClick(this::navClicked));
+        loadingLabel = root.add(new Label("Loading...", Label.Tone.DIM));
+        root.add(pagePanel);
         active = this;
         PacketDistributor.sendToServer(new RequestSettingsPayload(host));
     }
@@ -81,33 +151,40 @@ public final class SettingsApp implements DesktopApp {
     public static void accept(final SettingsSnapshotPayload payload) {
         if (active != null && active.host.equals(payload.hostPos())) {
             active.data = payload;
+            active.snapshots++;
             // Reflect accent, brightness, clock, wallpaper, taskbar layout and dark mode on the live desktop now.
             DesktopScreen.applyLivePrefs(payload.accent(), payload.brightness(), payload.clock12h(),
                     payload.wallpaper(), payload.taskbarCentered(), payload.darkMode());
         }
     }
 
-    @Override public String title() {
+    @Override
+    public String title() {
         return "Settings";
     }
 
-    @Override public int defaultWidth() {
+    @Override
+    public int defaultWidth() {
         return 262;
     }
 
-    @Override public int defaultHeight() {
+    @Override
+    public int defaultHeight() {
         return 224;
     }
 
-    @Override public int minWidth() {
+    @Override
+    public int minWidth() {
         return 236;
     }
 
-    @Override public int minHeight() {
+    @Override
+    public int minHeight() {
         return 160;
     }
 
-    @Override public void applySkin(final OsSkin osSkin) {
+    @Override
+    public void applySkin(final OsSkin osSkin) {
         this.skin = osSkin;
     }
 
@@ -115,304 +192,283 @@ public final class SettingsApp implements DesktopApp {
         PacketDistributor.sendToServer(new SetSettingPayload(host, key, value));
     }
 
-    // -------------------------------------------------------------------------
-    // Render
-    // -------------------------------------------------------------------------
+    private void navClicked(final int index, final int button, final double mx, final double my) {
+        if (button == 0 && index >= 0 && index < NAV.size()) {
+            page = index;
+        }
+    }
+
+    private void renderNavRow(final GuiGraphics g, final UiContext ctx, final String item, final int index, final int x,
+                              final int y, final int w, final int h, final boolean hovered, final boolean selected) {
+        final boolean sel = page == index;
+        ctx.skin().listRow(g, x, y, w, h, hovered, sel);
+        final int tc = sel ? ctx.skin().listRowText(true) : (index >= FIRST_SOON ? ctx.skin().dim() : ctx.skin().text());
+        g.drawString(ctx.font(), item, x + 5, y + 4, tc, false);
+    }
+
+    // ---- rendering ----
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
-        hits.clear();
+        lastFont = font;
+        final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
         g.fill(x, y, x + width, y + height, skin.windowBg());
+        nav.setBounds(x + 3, y + 4, NAV_W, NAV.size() * NAV_ROW_H);
+        g.fill(x + NAV_W + 5, y + 3, x + NAV_W + 6, y + height - 3, skin.edge());
 
-        // Left navigation.
-        final int navW = 78;
-        final int rowH = 15;
-        for (int i = 0; i < NAV.length; i++) {
-            final int ry = y + 4 + i * rowH;
-            final boolean soon = i >= FIRST_SOON;
-            final boolean sel = page == i;
-            final boolean hov = inRect(mouseX, mouseY, x + 3, ry, navW, rowH);
-            skin.listRow(g, x + 3, ry, navW, rowH, hov, sel);
-            final int tc = sel ? skin.listRowText(true) : (soon ? skin.dim() : skin.text());
-            g.drawString(font, NAV[i], x + 8, ry + 4, tc, false);
-            final int target = i;
-            hits.add(new Hit(x + 3, ry, navW, rowH, () -> {
-                page = target;
-                editingName = false;
-            }));
+        final int px = x + NAV_W + 11;
+        final int py = y + 6;
+        final int pw = width - NAV_W - 15;
+        final int ph = height - 12;
+        loadingLabel.setVisible(data == null);
+        loadingLabel.setBounds(px, y + 8, pw, 8);
+        pagePanel.setBounds(px, py, pw, ph);
+        ensurePage(px, py, pw, ph, font);
+        root.render(g, ctx);
+    }
+
+    /** Rebuilds the page's components when the page, the snapshot, the skin or the space changed. */
+    private void ensurePage(final int px, final int py, final int pw, final int ph, final Font font) {
+        final String key = page + "|" + snapshots + "|" + skin.form() + "|" + (monitorPos != null) + "|" + px + "," + py + "," + pw + "," + ph;
+        if (key.equals(builtFor)) {
+            return;
         }
-        // Divider.
-        g.fill(x + navW + 5, y + 3, x + navW + 6, y + height - 3, skin.edge());
-
-        final int px = x + navW + 11;
-        final int pw = width - navW - 15;
+        if (nameField != null && nameField.isFocused() && key.startsWith(builtFor.substring(0, Math.min(builtFor.length(), 1)))) {
+            // A name being typed survives a resize; the snapshot that follows its commit rebuilds the page.
+            if (!builtFor.isEmpty() && builtFor.split("\\|")[1].equals(String.valueOf(snapshots)) && page == 1) {
+                return;
+            }
+        }
+        builtFor = key;
+        pagePanel.clear();
+        nameField = null;
         if (data == null) {
-            g.drawString(font, "Loading...", px, y + 8, skin.dim(), false);
             return;
         }
         switch (page) {
-            case 0 -> personalize(g, font, px, y + 6, pw, mouseX, mouseY);
-            case 1 -> system(g, font, px, y + 6, pw, mouseX, mouseY);
-            case 2 -> network(g, font, px, y + 6, pw, mouseX, mouseY);
-            case 3 -> storage(g, font, px, y + 6, pw, mouseX, mouseY);
-            case 4 -> display(g, font, px, y + 6, pw, mouseX, mouseY);
-            case 5 -> programs(g, font, px, y + 6, pw, mouseX, mouseY);
-            default -> comingSoon(g, font, px, y + 6, pw, height - 12);
+            case 0 -> personalize(px, py, pw, font);
+            case 1 -> system(px, py, pw, font);
+            case 2 -> network(px, py, pw, font);
+            case 3 -> storage(px, py, pw, font);
+            case 4 -> display(px, py, pw, font);
+            case 5 -> programs(px, py, pw, font);
+            default -> comingSoon(px, py, pw, ph);
         }
     }
 
-    private void heading(final GuiGraphics g, final Font font, final String title, final int x, final int y) {
-        // No shadow: on the light XP/11 panels a dark-on-light shadow reads as a muddy duplicate.
-        g.drawString(font, title, x, y, skin.text(), false);
+    private Label heading(final String title, final int x, final int y, final int w) {
+        final Label label = pagePanel.add(new Label(title));
+        label.setBounds(x, y, w, 8);
+        return label;
     }
 
-    private void personalize(final GuiGraphics g, final Font font, final int x, int y, final int w,
-                             final int mouseX, final int mouseY) {
-        heading(g, font, "Personalize", x, y);
+    private Label caption(final String text, final int x, final int y, final int w) {
+        final Label label = pagePanel.add(new Label(text, Label.Tone.DIM));
+        label.setBounds(x, y, w, 8);
+        return label;
+    }
+
+    private void personalize(final int x, final int top, final int w, final Font font) {
+        final SettingsSnapshotPayload d = data;
+        int y = top;
+        heading("Personalize", x, y, w);
         y += 13;
-        g.drawString(font, "Wallpaper", x, y, skin.dim(), false);
+        caption("Wallpaper", x, y, w);
         y += 10;
         final int tw = 34;
         final int th = 21;
         for (int i = 0; i < WallpaperPainter.STYLES.length; i++) {
-            final int sx = x + i * (tw + 4);
             final String style = WallpaperPainter.STYLES[i];
-            wallpaperSwatch(g, sx, y, tw, th, style);
-            if (style.equals(data.wallpaper())) {
-                OsSkin.outline(g, sx - 1, y - 1, tw + 2, th + 2, skin.accent());
-            } else {
-                OsSkin.outline(g, sx, y, tw, th, skin.edge());
-            }
-            hits.add(new Hit(sx, y, tw, th, () -> set("wallpaper", style)));
+            pagePanel.add(new Swatch(style, 0, () -> style.equals(d.wallpaper()), () -> set("wallpaper", style)))
+                    .setBounds(x + i * (tw + 4), y, tw, th);
         }
         y += th + 8;
 
         // Accent and theme only on the richer skins (scales with the OS).
         if (skin.form() != OsSkin.Form.BEVEL) {
-            g.drawString(font, "Accent", x, y, skin.dim(), false);
+            caption("Accent", x, y, w);
             y += 10;
             for (int i = 0; i < ACCENTS.length; i++) {
-                final int sx = x + i * 18;
-                g.fill(sx, y, sx + 14, y + 14, ACCENTS[i]);
-                final boolean on = (data.accent() & 0xFFFFFF) == (ACCENTS[i] & 0xFFFFFF);
-                OsSkin.outline(g, sx - (on ? 1 : 0), y - (on ? 1 : 0), 14 + (on ? 2 : 0), 14 + (on ? 2 : 0),
-                        on ? skin.text() : skin.edge());
                 final int argb = ACCENTS[i];
-                hits.add(new Hit(sx, y, 14, 14, () -> set("accent", String.format(java.util.Locale.ROOT,
-                        "%06X", argb & 0xFFFFFF))));
+                pagePanel.add(new Swatch(null, argb, () -> (d.accent() & 0xFFFFFF) == (argb & 0xFFFFFF),
+                        () -> set("accent", String.format(Locale.ROOT, "%06X", argb & 0xFFFFFF)))).setBounds(x + i * 18, y, 14, 14);
             }
             y += 22;
-            g.drawString(font, "Theme", x, y, skin.dim(), false);
+            caption("Theme", x, y, w);
             y += 10;
             int tx = x;
+            final String current = d.themePreset().isEmpty() ? "system" : d.themePreset();
             for (final String theme : THEMES) {
-                final boolean on = theme.equals(data.themePreset().isEmpty() ? "system" : data.themePreset());
                 final int bw = font.width(theme) + 12;
-                skin.button(g, font, tx, y, bw, 13, theme, inRect(mouseX, mouseY, tx, y, bw, 13), false, on);
-                hits.add(new Hit(tx, y, bw, 13, () -> set("theme", theme)));
+                pagePanel.add(new Button(theme, () -> set("theme", theme)).setPrimary(theme.equals(current))).setBounds(tx, y, bw, BTN_H);
                 tx += bw + 4;
             }
             y += 19;
         }
-        g.drawString(font, "Clock", x, y, skin.dim(), false);
+        caption("Clock", x, y, w);
         y += 10;
-        toggleButtons(g, font, x, y, w, mouseX, mouseY, "24-hour", "12-hour", !data.clock12h(),
-                () -> set("clock", "24h"), () -> set("clock", "12h"));
+        toggleButtons(x, y, font, "24-hour", "12-hour", !d.clock12h(), () -> set("clock", "24h"), () -> set("clock", "12h"));
         y += 19;
 
         // Taskbar alignment and dark mode are Frames 11 concepts only, so they appear exclusively on the flat skin.
         if (skin.form() == OsSkin.Form.FLAT) {
-            g.drawString(font, "Taskbar", x, y, skin.dim(), false);
+            caption("Taskbar", x, y, w);
             y += 10;
-            toggleButtons(g, font, x, y, w, mouseX, mouseY, "Center", "Left", data.taskbarCentered(),
-                    () -> set("taskbar", "center"), () -> set("taskbar", "left"));
+            toggleButtons(x, y, font, "Center", "Left", d.taskbarCentered(), () -> set("taskbar", "center"), () -> set("taskbar", "left"));
             y += 19;
-            g.drawString(font, "Appearance", x, y, skin.dim(), false);
+            caption("Appearance", x, y, w);
             y += 10;
-            toggleButtons(g, font, x, y, w, mouseX, mouseY, "Light", "Dark", !data.darkMode(),
-                    () -> set("darkmode", "off"), () -> set("darkmode", "on"));
+            toggleButtons(x, y, font, "Light", "Dark", !d.darkMode(), () -> set("darkmode", "off"), () -> set("darkmode", "on"));
         }
     }
 
-    private void system(final GuiGraphics g, final Font font, final int x, int y, final int w,
-                        final int mouseX, final int mouseY) {
-        heading(g, font, "System", x, y);
+    private void system(final int x, final int top, final int w, final Font font) {
+        final SettingsSnapshotPayload d = data;
+        int y = top;
+        heading("System", x, y, w);
         y += 13;
-        g.drawString(font, "Computer name", x, y, skin.dim(), false);
+        caption("Computer name", x, y, w);
         y += 10;
-        final int fw = Math.min(w, 130);
-        skin.field(g, x, y, fw, 13, editingName);
-        final String shown = editingName ? nameBuf + "_"
-                : (data.computerName().isEmpty() ? "(unnamed)" : data.computerName());
-        g.drawString(font, shown, x + 4, y + 3, skin.text(), false);
-        hits.add(new Hit(x, y, fw, 13, () -> {
-            editingName = true;
-            nameBuf.setLength(0);
-            nameBuf.append(data.computerName());
-        }));
+        final TextField field = pagePanel.add(new TextField(NAME_MAX).setPlaceholder("(unnamed)")
+                .setOnCommit(name -> set("name", name)));
+        field.sync(d.computerName());
+        field.setBounds(x, y, Math.min(w, 130), 13);
+        nameField = field;
         y += 20;
 
-        heading(g, font, "About", x, y);
+        heading("About", x, y, w);
         y += 12;
-        y = specRow(g, font, x, y, w, "Processor", data.cpuLabel() + " - " + data.cpuMhz() + " MHz");
-        if (data.ramMb() > 0) {
-            y = specRow(g, font, x, y, w, "Memory", group(data.ramMb()) + " it");
+        y = specRow(x, y, w, "Processor", d.cpuLabel() + " - " + d.cpuMhz() + " MHz");
+        if (d.ramMb() > 0) {
+            y = specRow(x, y, w, "Memory", group(d.ramMb()) + " it");
         }
-        if (data.vramMb() > 0) {
-            y = specRow(g, font, x, y, w, "Graphics", data.vramMb() + " MB VRAM");
+        if (d.vramMb() > 0) {
+            y = specRow(x, y, w, "Graphics", d.vramMb() + " MB VRAM");
         }
-        y = specRow(g, font, x, y, w, "System", prettyOs(data.osLabel()));
-        y = specRow(g, font, x, y, w, "Platform", data.platform());
+        y = specRow(x, y, w, "System", prettyOs(d.osLabel()));
+        y = specRow(x, y, w, "Platform", d.platform());
         // Restart into the firmware setup (the boot manager): the way to reach it once an OS is installed.
-        if (monitorPos != null) {
+        final BlockPos monitor = monitorPos;
+        if (monitor != null) {
             y += 4;
             final String label = "Restart to firmware";
-            final int bw = font.width(label) + 12;
-            skin.button(g, font, x, y, bw, 13, label, inRect(mouseX, mouseY, x, y, bw, 13), false, false);
-            hits.add(new Hit(x, y, bw, 13, () -> PacketDistributor.sendToServer(
-                    new dev.jstech.computronics.operation.payload.RequestFirmwarePayload(
-                            host, monitorPos))));
+            pagePanel.add(new Button(label, () -> PacketDistributor.sendToServer(new RequestFirmwarePayload(host, monitor))))
+                    .setBounds(x, y, font.width(label) + 12, BTN_H);
         }
     }
 
-    private void network(final GuiGraphics g, final Font font, final int x, int y, final int w,
-                         final int mouseX, final int mouseY) {
-        heading(g, font, "Network", x, y);
+    private void network(final int x, final int top, final int w, final Font font) {
+        final SettingsSnapshotPayload d = data;
+        int y = top;
+        heading("Network", x, y, w);
         y += 13;
-        g.drawString(font, "System disk public share", x, y, skin.dim(), false);
+        caption("System disk public share", x, y, w);
         y += 11;
-        final int permille = data.netshare();
-        final String label = String.format(java.util.Locale.ROOT, "%.1f%% (%d/1000)", permille / 10.0, permille);
-        stepper(g, font, x, y, mouseX, mouseY, label,
+        final int permille = d.netshare();
+        stepper(x, y, font, String.format(Locale.ROOT, "%.1f%% (%d/1000)", permille / 10.0, permille),
                 () -> set("netshare", Integer.toString(Math.max(0, permille - 50))),
                 () -> set("netshare", Integer.toString(Math.min(1000, permille + 50))));
         y += 20;
-        // A share bar.
-        g.fill(x, y, x + Math.min(w, 150), y + 6, skin.fieldBg());
-        g.fill(x, y, x + Math.min(w, 150) * permille / 1000, y + 6, skin.accent());
-        OsSkin.outline(g, x, y, Math.min(w, 150), 6, skin.edge());
+        pagePanel.add(new ProgressBar(() -> permille / 10)).setBounds(x, y, Math.min(w, 150), 6);
         y += 16;
-        g.drawString(font, "Link: on the data network", x, y, skin.dim(), false);
+        caption("Link: on the data network", x, y, w);
     }
 
-    private void storage(final GuiGraphics g, final Font font, final int x, int y, final int w,
-                         final int mouseX, final int mouseY) {
-        heading(g, font, "Storage", x, y);
+    private void storage(final int x, final int top, final int w, final Font font) {
+        final SettingsSnapshotPayload d = data;
+        int y = top;
+        heading("Storage", x, y, w);
         y += 13;
-        for (final SettingsSnapshotPayload.DiskUse d : data.disks()) {
-            final String cap = (d.capMb() >= 1000 ? (d.capMb() / 1000) + " GB" : d.capMb() + " MB");
-            g.drawString(font, d.label() + (d.system() ? "  [sys]" : ""), x, y, skin.text(), false);
-            g.drawString(font, cap, x + w - font.width(cap), y, skin.dim(), false);
+        for (final SettingsSnapshotPayload.DiskUse disk : d.disks()) {
+            final String cap = disk.capMb() >= 1000 ? (disk.capMb() / 1000) + " GB" : disk.capMb() + " MB";
+            pagePanel.add(new Label(disk.label() + (disk.system() ? "  [sys]" : ""))).setBounds(x, y, w - font.width(cap) - 4, 8);
+            pagePanel.add(new Label(cap, Label.Tone.DIM).setAlign(Label.Align.RIGHT)).setBounds(x, y, w, 8);
             y += 10;
-            final int barW = Math.min(w, 150);
-            g.fill(x, y, x + barW, y + 5, skin.fieldBg());
-            final long frac = d.capMb() > 0 ? Math.min(barW, barW * d.usedMb() / d.capMb()) : 0;
-            g.fill(x, y, x + (int) frac, y + 5, skin.accent());
-            OsSkin.outline(g, x, y, barW, 5, skin.edge());
+            final int percent = disk.capMb() > 0 ? (int) Math.min(100, 100 * disk.usedMb() / disk.capMb()) : 0;
+            pagePanel.add(new ProgressBar(() -> percent)).setBounds(x, y, Math.min(w, 150), 5);
             y += 11;
         }
-        if (data.disks().isEmpty()) {
-            g.drawString(font, "No disks installed", x, y, skin.dim(), false);
+        if (d.disks().isEmpty()) {
+            caption("No disks installed", x, y, w);
         }
     }
 
-    private void display(final GuiGraphics g, final Font font, final int x, int y, final int w,
-                         final int mouseX, final int mouseY) {
-        heading(g, font, "Display", x, y);
+    private void display(final int x, final int top, final int w, final Font font) {
+        final SettingsSnapshotPayload d = data;
+        int y = top;
+        heading("Display", x, y, w);
         y += 13;
-        g.drawString(font, "Brightness", x, y, skin.dim(), false);
+        caption("Brightness", x, y, w);
         y += 10;
-        final int b = data.brightness();
-        stepper(g, font, x, y, mouseX, mouseY, b + "%",
+        final int b = d.brightness();
+        stepper(x, y, font, b + "%",
                 () -> set("brightness", Integer.toString(Math.max(0, b - 10))),
                 () -> set("brightness", Integer.toString(Math.min(100, b + 10))));
         y += 20;
-        g.drawString(font, "Monitor: linked display", x, y, skin.dim(), false);
+        caption("Monitor: linked display", x, y, w);
     }
 
-    private void programs(final GuiGraphics g, final Font font, final int x, int y, final int w,
-                          final int mouseX, final int mouseY) {
-        heading(g, font, "Programs", x, y);
+    private void programs(final int x, final int top, final int w, final Font font) {
+        final SettingsSnapshotPayload d = data;
+        int y = top;
+        heading("Programs", x, y, w);
         y += 13;
-        if (data.installed().isEmpty()) {
-            g.drawString(font, "No programs installed", x, y, skin.dim(), false);
+        if (d.installed().isEmpty()) {
+            caption("No programs installed", x, y, w);
             return;
         }
-        for (final String id : data.installed()) {
-            final net.minecraft.resources.ResourceLocation rl =
-                    net.minecraft.resources.ResourceLocation.tryParse(id);
-            final dev.jstech.computronics.os.ProgramSpec spec =
-                    rl == null ? null : dev.jstech.computronics.os.OsRegistry.getProgram(rl);
-            final String name = spec != null ? spec.displayName()
-                    : (id.contains(":") ? id.substring(id.indexOf(':') + 1) : id);
-            g.drawString(font, "- " + name, x, y, skin.text(), false);
+        final String btn = "Uninstall";
+        final int bw = font.width(btn) + 8;
+        for (final String id : d.installed()) {
+            final ResourceLocation rl = ResourceLocation.tryParse(id);
+            final ProgramSpec spec = rl == null ? null : OsRegistry.getProgram(rl);
+            final String name = spec != null ? spec.displayName() : (id.contains(":") ? id.substring(id.indexOf(':') + 1) : id);
+            pagePanel.add(new Label("- " + name)).setBounds(x, y + 1, w - bw - 4, 8);
             // Per-row uninstall: the desktop counterpart of the shell's package removal.
-            final String btn = "[Uninstall]";
-            final int bw = font.width(btn);
-            final int bx = x + w - bw;
-            final boolean hover = mouseX >= bx && mouseX < bx + bw && mouseY >= y - 1 && mouseY < y + 10;
-            g.drawString(font, btn, bx, y, hover ? skin.text() : skin.dim(), false);
-            hits.add(new Hit(bx, y - 1, bw, 11, () -> {
-                PacketDistributor.sendToServer(
-                        new dev.jstech.computronics.operation.payload.UninstallProgramPayload(host, id));
+            pagePanel.add(new Button(btn, () -> {
+                PacketDistributor.sendToServer(new UninstallProgramPayload(host, id));
                 // The uninstall lands before these refreshes are processed (same connection, in order).
                 PacketDistributor.sendToServer(new RequestSettingsPayload(host));
                 DesktopScreen.refreshActive();
-            }));
+            }).setLabelScale(0.85f)).setBounds(x + w - bw, y - 1, bw, 11);
             y += 12;
         }
     }
 
-    private void comingSoon(final GuiGraphics g, final Font font, final int x, final int y,
-                            final int w, final int h) {
-        final String a = NAV[page];
-        final String line1 = a;
-        final String line2 = "Coming in a future update";
-        g.drawString(font, line1, x + (w - font.width(line1)) / 2, y + h / 2 - 10, skin.text(), false);
-        g.drawString(font, line2, x + (w - font.width(line2)) / 2, y + h / 2 + 2, skin.dim(), false);
+    private void comingSoon(final int x, final int y, final int w, final int h) {
+        pagePanel.add(new Label(NAV.get(page)).setAlign(Label.Align.CENTER)).setBounds(x, y + h / 2 - 10, w, 8);
+        pagePanel.add(new Label("Coming in a future update", Label.Tone.DIM).setAlign(Label.Align.CENTER)).setBounds(x, y + h / 2 + 2, w, 8);
     }
 
-    // -------------------------------------------------------------------------
-    // Small controls
-    // -------------------------------------------------------------------------
+    // ---- small controls ----
 
-    private int specRow(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                        final String label, final String value) {
-        g.drawString(font, label, x, y, skin.dim(), false);
-        g.drawString(font, value, x + w - font.width(value), y, skin.text(), false);
+    private int specRow(final int x, final int y, final int w, final String label, final String value) {
+        pagePanel.add(new Label(label, Label.Tone.DIM)).setBounds(x, y, w / 2, 8);
+        pagePanel.add(new Label(value).setAlign(Label.Align.RIGHT)).setBounds(x + w / 2, y, w - w / 2, 8);
         return y + 11;
     }
 
-    private void toggleButtons(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                               final int mouseX, final int mouseY, final String a, final String b,
-                               final boolean aOn, final Runnable onA, final Runnable onB) {
+    /** Two buttons of which one is lit: the setting's two states. */
+    private void toggleButtons(final int x, final int y, final Font font, final String a, final String b, final boolean aOn,
+                               final Runnable onA, final Runnable onB) {
         final int aw = font.width(a) + 12;
         final int bw = font.width(b) + 12;
-        skin.button(g, font, x, y, aw, 13, a, inRect(mouseX, mouseY, x, y, aw, 13), false, aOn);
-        skin.button(g, font, x + aw + 4, y, bw, 13, b, inRect(mouseX, mouseY, x + aw + 4, y, bw, 13), false, !aOn);
-        hits.add(new Hit(x, y, aw, 13, onA));
-        hits.add(new Hit(x + aw + 4, y, bw, 13, onB));
+        pagePanel.add(new Button(a, onA).setPrimary(aOn)).setBounds(x, y, aw, BTN_H);
+        pagePanel.add(new Button(b, onB).setPrimary(!aOn)).setBounds(x + aw + 4, y, bw, BTN_H);
     }
 
-    private void stepper(final GuiGraphics g, final Font font, final int x, final int y,
-                         final int mouseX, final int mouseY, final String value,
-                         final Runnable dec, final Runnable inc) {
-        skin.button(g, font, x, y, 15, 13, "-", inRect(mouseX, mouseY, x, y, 15, 13), false, false);
-        hits.add(new Hit(x, y, 15, 13, dec));
-        g.drawString(font, value, x + 21, y + 3, skin.text(), false);
-        final int ix = x + 21 + Math.max(38, font.width(value) + 6);
-        skin.button(g, font, ix, y, 15, 13, "+", inRect(mouseX, mouseY, ix, y, 15, 13), false, false);
-        hits.add(new Hit(ix, y, 15, 13, inc));
-    }
-
-    private boolean inRect(final int mx, final int my, final int x, final int y, final int w, final int h) {
-        return mx >= x && mx < x + w && my >= y && my < y + h;
+    /** A value between a minus and a plus button. */
+    private void stepper(final int x, final int y, final Font font, final String value, final Runnable dec, final Runnable inc) {
+        pagePanel.add(new Button("-", dec)).setBounds(x, y, 15, BTN_H);
+        final int valueW = Math.max(38, font.width(value) + 6);
+        pagePanel.add(new Label(value)).setBounds(x + 21, y + 3, valueW, 8);
+        pagePanel.add(new Button("+", inc)).setBounds(x + 21 + valueW, y, 15, BTN_H);
     }
 
     private static String group(final long n) {
-        return String.format(java.util.Locale.ROOT, "%,d", n);
+        return String.format(Locale.ROOT, "%,d", n);
     }
 
     /** A representative wallpaper preview that always fits the thumbnail (the real painter overflows small sizes). */
@@ -440,52 +496,29 @@ public final class SettingsApp implements DesktopApp {
         };
     }
 
-    // -------------------------------------------------------------------------
-    // Input
-    // -------------------------------------------------------------------------
+    // ---- input ----
 
     @Override
-    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
-        if (button != 0) {
-            return;
-        }
-        for (final Hit h : hits) {
-            if (h.contains(mouseX, mouseY)) {
-                h.onClick().run();
-                return;
-            }
-        }
-        editingName = false;
+    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public boolean charTyped(final char c) {
-        if (editingName && c >= 32 && c != 127 && nameBuf.length() < 24) {
-            nameBuf.append(c);
-            return true;
-        }
-        return false;
+        return root.charTyped(c);
     }
 
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
-        if (!editingName) {
-            return false;
+        if (key == GLFW.GLFW_KEY_ESCAPE && nameField != null && nameField.isFocused()) {
+            // Escape drops the edit through the field's own handling and keeps the window open.
+            return root.keyPressed(key, scanCode, modifiers);
         }
-        if (key == 259 && nameBuf.length() > 0) { // backspace
-            nameBuf.deleteCharAt(nameBuf.length() - 1);
-            return true;
-        }
-        if (key == 257 || key == 335) { // enter
-            set("name", nameBuf.toString());
-            editingName = false;
-            return true;
-        }
-        if (key == 256) { // esc cancels the edit
-            editingName = false;
-            return true;
-        }
-        return false;
+        return root.keyPressed(key, scanCode, modifiers);
     }
 }

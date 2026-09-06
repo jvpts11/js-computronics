@@ -10,8 +10,11 @@ package dev.jstech.core.client.gui.component;
 import dev.jstech.core.client.gui.logic.ScrollState;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
 
 /**
@@ -50,6 +53,7 @@ public final class CellGrid extends UiComponent {
     private CellClick onClick = (index, button, shift) -> { };
     private IntPredicate marked = index -> false;
     private IntPredicate selected = index -> false;
+    private IntFunction<List<Component>> tooltips = index -> List.of();
     private Cues cues = Cues.NONE;
 
     /** A grid of {@code columns} by {@code visibleRows} square cells of {@code cell} pixels; {@code totalRows} in all. */
@@ -136,6 +140,18 @@ public final class CellGrid extends UiComponent {
     public CellGrid setCues(final Cues value) {
         cues = value;
         return this;
+    }
+
+    /** The tooltip lines for a cell, shown while the cursor rests on it. */
+    public CellGrid setTooltip(final IntFunction<List<Component>> value) {
+        tooltips = value;
+        return this;
+    }
+
+    @Override
+    public List<Component> tooltip(final double mx, final double my) {
+        final int index = cellAt(mx, my);
+        return index < 0 ? List.of() : tooltips.apply(index);
     }
 
     public CellGrid setTotalRows(final int value) {
