@@ -9,6 +9,11 @@ package dev.jstech.computronics.client.os;
 
 import dev.jstech.computronics.operation.payload.RemoteControlPayload;
 import dev.jstech.computronics.operation.payload.RemoteHostsPayload;
+import dev.jstech.core.client.gui.component.Button;
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.ListView;
+import dev.jstech.core.client.gui.component.Panel;
+import dev.jstech.core.client.gui.component.UiContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -17,15 +22,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.List;
 
 /**
- * Remote Control: the graphical route to the network's other machines. It lists what is reachable —
- * the rack servers above all, which have no screen of their own — and takes over the one you pick,
- * putting its session (POST, firmware, terminal or full desktop) on this monitor. The shell route is
- * {@code ssh}; this is the same reach for players who would rather point and click.
+ * Remote Control: the graphical route to the network's other machines. It lists what is reachable, the
+ * rack servers above all, which have no screen of their own, and takes over the one you pick, putting its
+ * session (POST, firmware, terminal or full desktop) on this monitor. The shell route is {@code ssh}; this
+ * is the same reach for players who would rather point and click.
  */
 public final class RemoteControlApp implements DesktopApp {
 
     private static final int ROW_H = 22;
     private static final int REFRESH_FRAMES = 60;
+    private static final int C_UP = 0xFF3FA34D;
+    private static final int C_DOWN = 0xFFC04A3E;
 
     private final BlockPos host;
     private final BlockPos monitorPos;
@@ -33,17 +40,29 @@ public final class RemoteControlApp implements DesktopApp {
     private List<RemoteHostsPayload.Entry> hosts = List.of();
     private int selected = -1;
     private int frame;
-    // The content rectangle of the last frame, so clicks hit what the player actually saw.
-    private int lastX;
-    private int lastY;
-    private int lastW;
-    private int lastH;
+    private int lastMouseX;
+    private int lastMouseY;
 
     private static RemoteControlApp active;
+
+    private final Panel root = new Panel();
+    private final Label header;
+    private final ListView<RemoteHostsPayload.Entry> hostList;
+    private final Label emptyLabel;
+    private final Button connect;
 
     public RemoteControlApp(final BlockPos host, final BlockPos monitorPos) {
         this.host = host;
         this.monitorPos = monitorPos;
+        header = root.add(new Label("Machines on this network", Label.Tone.DIM));
+        hostList = root.add(new ListView<RemoteHostsPayload.Entry>(() -> hosts, ROW_H, this::renderHostRow)
+                .setOnClick((index, button, mx, my) -> {
+                    if (index >= 0) {
+                        selected = index;
+                    }
+                }));
+        emptyLabel = root.add(new Label("No other machine is reachable.", Label.Tone.DIM));
+        connect = root.add(new Button(() -> canConnect() ? "Take over" : "Select a machine", this::takeOver));
         active = this;
         request();
     }
@@ -59,8 +78,18 @@ public final class RemoteControlApp implements DesktopApp {
     }
 
     private void request() {
-        PacketDistributor.sendToServer(new RemoteControlPayload(host, monitorPos, 0L,
-                RemoteControlPayload.ACTION_LIST));
+        PacketDistributor.sendToServer(new RemoteControlPayload(host, monitorPos, 0L, RemoteControlPayload.ACTION_LIST));
+    }
+
+    private boolean canConnect() {
+        return selected >= 0 && selected < hosts.size() && hosts.get(selected).running();
+    }
+
+    private void takeOver() {
+        if (canConnect()) {
+            PacketDistributor.sendToServer(new RemoteControlPayload(host, monitorPos, hosts.get(selected).pos(),
+                    RemoteControlPayload.ACTION_CONNECT));
+        }
     }
 
     @Override
@@ -90,65 +119,49 @@ public final class RemoteControlApp implements DesktopApp {
         if (++frame % REFRESH_FRAMES == 0) {
             request();
         }
-        lastX = x;
-        lastY = y;
-        lastW = width;
-        lastH = height;
-        g.drawString(font, "Machines on this network", x + 4, y + 4, skin.dim(), false);
-
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+        final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
+        header.setBounds(x + 4, y + 4, width - 8, 8);
         final int listY = y + 16;
         final int listH = height - 16 - 24;
         skin.panel(g, x + 2, listY, width - 4, listH);
-        if (hosts.isEmpty()) {
-            g.drawString(font, "No other machine is reachable.", x + 8, listY + 8, skin.dim(), false);
-        }
-        for (int i = 0; i < hosts.size(); i++) {
-            final int rowY = listY + 2 + i * ROW_H;
-            if (rowY + ROW_H > listY + listH) {
-                break; // the rest waits for a bigger window
-            }
-            final RemoteHostsPayload.Entry entry = hosts.get(i);
-            final boolean hovered = mouseX >= x + 4 && mouseX < x + width - 6
-                    && mouseY >= rowY && mouseY < rowY + ROW_H;
-            if (i == selected || hovered) {
-                g.fill(x + 4, rowY, x + width - 6, rowY + ROW_H, skin.listHover());
-            }
-            g.drawString(font, entry.hostname(), x + 8, rowY + 3, skin.listRowText(i == selected), false);
-            final String detail = entry.type() + (entry.os().isEmpty() ? "" : "  -  " + entry.os());
-            g.drawString(font, detail, x + 8, rowY + 12, skin.dim(), false);
-            final String state = entry.running() ? "up" : "off";
-            g.drawString(font, state, x + width - 10 - font.width(state), rowY + 7,
-                    entry.running() ? 0xFF3FA34D : 0xFFC04A3E, false);
-        }
+        hostList.setVisible(!hosts.isEmpty());
+        hostList.setBounds(x + 4, listY + 2, width - 10, Math.max(ROW_H, listH - 4));
+        emptyLabel.setVisible(hosts.isEmpty());
+        emptyLabel.setBounds(x + 8, listY + 8, width - 16, 8);
+        connect.setBounds(x + width - 90, y + height - 20, 86, 16);
+        connect.setEnabled(canConnect());
+        connect.setPrimary(canConnect());
+        root.render(g, ctx);
+    }
 
-        final boolean canConnect = selected >= 0 && selected < hosts.size() && hosts.get(selected).running();
-        skin.button(g, font, x + width - 90, y + height - 20, 86, 16,
-                canConnect ? "Take over" : "Select a machine",
-                mouseX >= x + width - 90 && mouseX < x + width - 4
-                        && mouseY >= y + height - 20 && mouseY < y + height - 4,
-                false, canConnect);
+    private void renderHostRow(final GuiGraphics g, final UiContext ctx, final RemoteHostsPayload.Entry entry, final int index,
+                               final int x, final int y, final int w, final int h, final boolean hovered, final boolean selectedRow) {
+        final Font font = ctx.font();
+        final boolean sel = index == selected;
+        if (sel || hovered) {
+            g.fill(x, y, x + w, y + h, ctx.skin().listHover());
+        }
+        g.drawString(font, entry.hostname(), x + 4, y + 3, ctx.skin().listRowText(sel), false);
+        final String detail = entry.type() + (entry.os().isEmpty() ? "" : "  -  " + entry.os());
+        g.drawString(font, detail, x + 4, y + 12, ctx.skin().dim(), false);
+        final String state = entry.running() ? "up" : "off";
+        g.drawString(font, state, x + w - 4 - font.width(state), y + 7, entry.running() ? C_UP : C_DOWN, false);
     }
 
     @Override
-    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
-        final int x = lastX;
-        final int y = lastY;
-        final int width = lastW;
-        final int height = lastH;
-        final int listY = y + 16;
-        for (int i = 0; i < hosts.size(); i++) {
-            final int rowY = listY + 2 + i * ROW_H;
-            if (mouseX >= x + 4 && mouseX < x + width - 6 && mouseY >= rowY && mouseY < rowY + ROW_H) {
-                selected = i;
-                return;
-            }
-        }
-        if (mouseX >= x + width - 90 && mouseX < x + width - 4
-                && mouseY >= y + height - 20 && mouseY < y + height - 4
-                && selected >= 0 && selected < hosts.size() && hosts.get(selected).running()) {
-            PacketDistributor.sendToServer(new RemoteControlPayload(host, monitorPos,
-                    hosts.get(selected).pos(), RemoteControlPayload.ACTION_CONNECT));
-        }
+    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(final double delta) {
+        return root.mouseScrolled(lastMouseX, lastMouseY, delta);
     }
 }

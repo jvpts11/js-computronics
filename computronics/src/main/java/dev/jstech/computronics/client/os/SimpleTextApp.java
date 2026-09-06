@@ -7,22 +7,24 @@
  */
 package dev.jstech.computronics.client.os;
 
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.UiContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * A minimal placeholder desktop app: a titled window showing a single line of body text. Used for
- * desktop programs whose full implementation lands later (File Explorer, Text Editor).
+ * desktop programs whose full implementation lands later.
  */
 public final class SimpleTextApp implements DesktopApp {
 
     private final String title;
-    private final String body;
+    private final Label body;
     private OsSkin skin = OsSkin.fallback();
 
     public SimpleTextApp(final String title, final String body) {
         this.title = title;
-        this.body = body;
+        this.body = new Label(body);
     }
 
     @Override
@@ -49,6 +51,7 @@ public final class SimpleTextApp implements DesktopApp {
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
-        g.drawString(font, body, x, y, skin.text(), false);
+        body.setBounds(x, y, width, 8);
+        body.render(g, new UiContext(skin, font, mouseX, mouseY, partialTick));
     }
 }
