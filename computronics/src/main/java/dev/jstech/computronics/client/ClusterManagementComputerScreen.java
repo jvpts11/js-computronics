@@ -1,0 +1,181 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jstech.computronics.client;
+
+import dev.jstech.computronics.gui.layout.ClusterManagementComputerLayout;
+import dev.jstech.computronics.menu.ClusterManagementComputerMenu;
+import dev.jstech.computronics.operation.payload.RenamePcPayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
+import dev.jstech.core.tier.HardwareEra;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+/**
+ * The Cluster Management Computer's assembly surface: hardware on the left, and on the right what makes
+ * it a cluster master — whether the interface card is in, how many clusters the network reaches, and
+ * whether the Cluster Manager is on its disk. Everything about the clusters themselves lives in that
+ * program on the linked monitor, not here.
+ */
+public class ClusterManagementComputerScreen extends AbstractAssemblyScreen<ClusterManagementComputerMenu> {
+
+    private static final int COL_R = ClusterManagementComputerLayout.COL_R;
+    private static final int COL_R_W = ClusterManagementComputerLayout.COL_R_W;
+    private static final int BTN_H = ClusterManagementComputerLayout.BTN_H;
+    private static final int TILE_H = ClusterManagementComputerLayout.TILE_H;
+    private static final int TILE_Y0 = ClusterManagementComputerLayout.TILE_Y0;
+    private static final int TILE_Y1 = ClusterManagementComputerLayout.TILE_Y1;
+    private static final int TILE_Y2 = ClusterManagementComputerLayout.TILE_Y2;
+    private static final int TILE_Y3 = ClusterManagementComputerLayout.TILE_Y3;
+    private static final int POWER_X = ClusterManagementComputerLayout.POWER_X;
+    private static final int POWER_Y = ClusterManagementComputerLayout.POWER_Y;
+    private static final int AUTO_X = ClusterManagementComputerLayout.AUTO_X;
+    private static final int AUTO_Y = ClusterManagementComputerLayout.AUTO_Y;
+    private static final int INV_X = ClusterManagementComputerLayout.INV_X;
+    private static final int INV_Y = ClusterManagementComputerLayout.INV_Y;
+
+    public ClusterManagementComputerScreen(final ClusterManagementComputerMenu menu, final Inventory inventory,
+                                           final Component title) {
+        super(menu, inventory, title);
+        this.imageWidth = ClusterManagementComputerLayout.WIDTH;
+        this.imageHeight = ClusterManagementComputerLayout.HEIGHT;
+        this.titleLabelX = -10000;
+        this.inventoryLabelY = -10000;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        setupNameBox(28, 8, 126, RenamePcPayload.MAX_LEN,
+                Component.literal("Name this computer...").withStyle(ChatFormatting.DARK_GRAY),
+                menu.customName(),
+                s -> PacketDistributor.sendToServer(new RenamePcPayload(menu.computerPos(), s)));
+    }
+
+    @Override
+    protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
+        final int x = leftPos;
+        final int y = topPos;
+        JsTechTheme.window(g, x, y, imageWidth, imageHeight);
+        JsTechTheme.headerBar(g, x + 6, y + 6, 232);
+        g.fill(x + 26, y + 7, x + 158, y + 19, 0xFF11161D);
+        g.fill(x + 26, y + 18, x + 158, y + 19, 0xFF24323C);
+        JsTechTheme.vLine(g, x + COL_R - 5, y + 24, 108);
+        JsTechTheme.slot(g, x + ClusterManagementComputerLayout.MOBO_X, y + ClusterManagementComputerLayout.MOBO_Y);
+        JsTechTheme.slot(g, x + ClusterManagementComputerLayout.PSU_X, y + ClusterManagementComputerLayout.PSU_Y);
+        if (menu.boardCpuSlots() > 0) {
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X, y + ClusterManagementComputerLayout.CPU_Y);
+        }
+        for (int i = 0; i < menu.boardRamSlots(); i++) {
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X + i * 18, y + ClusterManagementComputerLayout.RAM_Y);
+        }
+        for (int i = 0; i < menu.boardPcieSlots(); i++) {
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X + i * 18, y + ClusterManagementComputerLayout.PCIE_Y);
+        }
+        for (int i = 0; i < menu.boardDiskSlots(); i++) {
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.MOBO_X + i * 18, y + ClusterManagementComputerLayout.DISK_Y);
+        }
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y0, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y1, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y2, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y3, COL_R_W, TILE_H);
+        final boolean auto = menu.isAutoStart();
+        JsTechTheme.button(g, x + POWER_X, y + POWER_Y, COL_R_W, BTN_H,
+                !auto && hover(mouseX, mouseY, POWER_X, POWER_Y, COL_R_W, BTN_H));
+        JsTechTheme.button(g, x + AUTO_X, y + AUTO_Y, COL_R_W, BTN_H,
+                hover(mouseX, mouseY, AUTO_X, AUTO_Y, COL_R_W, BTN_H));
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                JsTechTheme.slot(g, x + INV_X + col * 18, y + INV_Y + row * 18);
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            JsTechTheme.slot(g, x + INV_X + col * 18, y + INV_Y + 58);
+        }
+    }
+
+    @Override
+    protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
+        JsTechTheme.text(g, font, "CMC", 12, 11, JsTechTheme.text());
+        final String status;
+        final int statusColor;
+        if (!menu.buildValid()) {
+            status = "OFFLINE";
+            statusColor = JsTechTheme.red();
+        } else if (menu.isRunning()) {
+            status = "ONLINE";
+            statusColor = JsTechTheme.green();
+        } else {
+            status = "READY";
+            statusColor = JsTechTheme.amber();
+        }
+        final int pillX = 232 - font.width(status);
+        JsTechTheme.text(g, font, status, pillX, 11, statusColor);
+        g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
+
+        JsTechTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JsTechTheme.accent() : JsTechTheme.dim());
+        JsTechTheme.text(g, font, "CPU", 44, 27, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "PSU", 8, 60, JsTechTheme.dim());
+        g.fill(30, 61, 34, 65, !menu.hasPsu() ? JsTechTheme.dim() : menu.buildValid() ? JsTechTheme.green() : JsTechTheme.amber());
+        JsTechTheme.text(g, font, "RAM", 44, 60, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "DISK", 8, 93, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "PCIE", 44, 93, menu.hasCard() ? JsTechTheme.accent() : JsTechTheme.dim());
+
+        // Small-font tiles: four fit where the crafting computer keeps three.
+        JsTechTheme.tileTextS(g, font, COL_R, TILE_Y0, "CAPACITY", JsTechTheme.fmt(menu.capacity()) + " it/t · "
+                + JsTechTheme.fmt(menu.ramBuffer()) + " it", JsTechTheme.text());
+        JsTechTheme.tileTextS(g, font, COL_R, TILE_Y1, "NETWORK", menu.isOnNetwork() ? "LINKED" : "no link",
+                menu.isOnNetwork() ? JsTechTheme.green() : JsTechTheme.dim());
+        if (!menu.hasCard()) {
+            JsTechTheme.tileTextS(g, font, COL_R, TILE_Y2, "CLUSTERS IN REACH", "no interface card", JsTechTheme.amber());
+        } else {
+            JsTechTheme.tileTextS(g, font, COL_R, TILE_Y2, "CLUSTERS IN REACH", menu.supercomputers() + " SC · "
+                    + menu.datacenters() + " DC · " + menu.lanes() + " lanes", JsTechTheme.text());
+        }
+        JsTechTheme.tileTextS(g, font, COL_R, TILE_Y3, "MANAGEMENT",
+                menu.managerInstalled() ? "Cluster Manager · installed" : "Cluster Manager · not installed",
+                menu.managerInstalled() ? JsTechTheme.accent() : JsTechTheme.dim());
+
+        final boolean auto = menu.isAutoStart();
+        final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
+        JsTechTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4,
+                auto ? JsTechTheme.dim() : JsTechTheme.accent());
+        JsTechTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
+                auto ? JsTechTheme.accent() : JsTechTheme.dim());
+    }
+
+    @Override
+    public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
+        if (nameBox != null) {
+            if (nameBox.isMouseOver(mouseX, mouseY)) {
+                setFocused(nameBox);
+                nameBox.setFocused(true);
+                return nameBox.mouseClicked(mouseX, mouseY, button);
+            }
+            nameBox.setFocused(false);
+        }
+        if (button == 0) {
+            if (!menu.isAutoStart() && hover((int) mouseX, (int) mouseY, POWER_X, POWER_Y, COL_R_W, BTN_H)) {
+                sendButton(ClusterManagementComputerMenu.BUTTON_POWER);
+                return true;
+            }
+            if (hover((int) mouseX, (int) mouseY, AUTO_X, AUTO_Y, COL_R_W, BTN_H)) {
+                sendButton(ClusterManagementComputerMenu.BUTTON_AUTOSTART);
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    protected HardwareEra screenEra() {
+        return menu.hardwareEra();
+    }
+}

@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "jsindustrial:block/macerator",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "jsindustrial:block/macerator"
+    },
+    "facing=south": {
+      "model": "jsindustrial:block/macerator",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "jsindustrial:block/macerator",
+      "y": 270
+    }
+  }
+}

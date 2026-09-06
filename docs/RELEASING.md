@@ -69,7 +69,9 @@ release says which phase begins.
 3. Move the `Unreleased` entries of `CHANGELOG.md` under the new version and date; note a phase change
    there if the release crosses a gate.
 4. Tag the commit `v<version>` (for example `v0.1.0a`).
-5. Build the release jar from that tag with `./gradlew build -Prelease`; it is named
-   `jsc-<minecraft version>-<version>.jar`.
-6. Keep a copy of the jar in a local `releases/` folder (ignored by git); every version stays there.
-7. Publish the tag and the jar on GitHub.
+5. Build the release jars from that tag with `./gradlew build -Prelease`; each mod's jar lands in its own
+   `build/libs`, named `<mod id>-<minecraft version>-<version>.jar` (`jscore-…`, `jsc-…`, `jsindustrial-…`).
+   The `tests` subproject's jar is a development tool, never a release: it is not attached, not offered,
+   and not to be installed by anyone.
+6. Keep a copy of the jars in a local `releases/` folder (ignored by git); every version stays there.
+7. Publish the tag and the jars on GitHub.

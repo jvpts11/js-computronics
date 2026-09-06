@@ -1,0 +1,10 @@
+{
+  "type": "jsindustrial:macerating",
+  "ingredient": {
+    "tag": "c:ingots/iron"
+  },
+  "result": {
+    "count": 1,
+    "id": "jscore:iron_dust"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "jsindustrial:block/macerator_front",
+    "side": "jsindustrial:block/macerator_side",
+    "top": "jsindustrial:block/macerator_top"
+  }
+}

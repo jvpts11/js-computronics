@@ -1,0 +1,75 @@
+// J's Industrial: the industrial mod of the series. Depends on the core only, never on the computing mod.
+plugins {
+    id 'net.neoforged.moddev'
+}
+
+// The data run below reaches into the core's source set, so it must be configured first.
+evaluationDependsOn(':core')
+
+base {
+    archivesName = "${mod_id}-${minecraft_version}"
+}
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+    exclude("**/*.bbmodel")
+    exclude("src/generated/**/.cache")
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        data {
+            data()
+            gameDirectory = rootProject.file('run')
+            programArguments.addAll '--mod', project.mod_id, '--all',
+                    '--output', file('src/generated/resources/').getAbsolutePath(),
+                    '--existing', file('src/main/resources/').getAbsolutePath(),
+                    '--existing', rootProject.file('core/src/main/resources/').getAbsolutePath()
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    // Which source sets belong to which mod: the data run loads this mod and the core it depends on.
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+        jscore {
+            sourceSet(rootProject.project(':core').sourceSets.main)
+        }
+    }
+}
+
+dependencies {
+    implementation project(':core')
+}
+
+// Expands the declared properties into the mod metadata template. A missing property is an error.
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : project.version.toString(),
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
