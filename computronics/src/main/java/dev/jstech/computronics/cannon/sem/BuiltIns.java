@@ -61,6 +61,7 @@ public final class BuiltIns {
         this.fillFile();
         this.fillComputer();
         this.fillNetwork();
+        this.fillMainframe();
     }
 
     /** The root of every reference type. */
@@ -358,6 +359,31 @@ public final class BuiltIns {
         this.method(network, "Find", new TypeSymbol.GenericType(this.listType, List.of(holding)),
                 PUBLIC_STATIC, this.stringType);
         this.method(network, "Servers", new TypeSymbol.GenericType(this.listType, List.of(server)),
+                PUBLIC_STATIC);
+    }
+
+    /**
+     * The machine that orchestrates the network, and what it remembers of the work it has done.
+     *
+     * <p>A kind of work the network has not done reads as zeroes, so a script can add up and compare
+     * without first asking whether there is anything to add up.
+     */
+    private void fillMainframe() {
+        final TypeSymbol integer = TypeSymbol.Primitive.INT;
+
+        final NamedType stat = this.declare("WorkStat", NamedType.Kind.CLASS);
+        this.property(stat, "Type", this.stringType, PUBLIC);
+        this.property(stat, "Count", integer, PUBLIC);
+        this.property(stat, "AverageWait", integer, PUBLIC);
+        this.property(stat, "AverageRun", integer, PUBLIC);
+        this.property(stat, "ShortfallPercent", integer, PUBLIC);
+        this.property(stat, "Moved", TypeSymbol.Primitive.LONG, PUBLIC);
+
+        final NamedType mainframe = this.declare("Mainframe", NamedType.Kind.CLASS);
+        this.property(mainframe, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        this.property(mainframe, "PeakToday", integer, PUBLIC_STATIC);
+        this.method(mainframe, "Stats", stat, PUBLIC_STATIC, this.stringType);
+        this.method(mainframe, "Work", new TypeSymbol.GenericType(this.listType, List.of(stat)),
                 PUBLIC_STATIC);
     }
 

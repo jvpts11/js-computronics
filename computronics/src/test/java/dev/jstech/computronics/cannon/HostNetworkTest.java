@@ -60,7 +60,7 @@ class HostNetworkTest {
 
         @Override
         public boolean provides(final String owner) {
-            return "Network".equals(owner);
+            return "Network".equals(owner) || "Mainframe".equals(owner);
         }
 
         @Override
@@ -76,6 +76,16 @@ class HostNetworkTest {
                 throw new Halt(Halt.Reason.NO_NETWORK, line, "this computer is not on a network");
             }
             final String item = arguments.isEmpty() ? "" : String.valueOf(arguments.getFirst());
+            if ("Stats".equals(member)) {
+                final Values.Obj made = new Values.Obj("WorkStat");
+                made.set("Type", item);
+                made.set("Count", "select".equals(item) ? 12 : 0);
+                made.set("AverageWait", "select".equals(item) ? 3 : 0);
+                made.set("AverageRun", 0);
+                made.set("ShortfallPercent", 0);
+                made.set("Moved", "select".equals(item) ? 640L : 0L);
+                return Reply.of(made, 50);
+            }
             return switch (member) {
                 case "Total" -> {
                     long sum = 0;
@@ -226,6 +236,20 @@ class HostNetworkTest {
         process.step(PLENTY);
         assertEquals(Process.State.HALTED, process.state());
         assertTrue(process.message().contains("out of memory"), process.message());
+    }
+
+    @Test
+    void mainframe_readsWhatTheNetworkHasBeenDoing() {
+        final Process process = run(stocked(), """
+                        WorkStat select = Mainframe.Stats("select");
+                        Console.PrintLine(select.Count + " selects, " + select.Moved + " moved");
+                        WorkStat craft = Mainframe.Stats("craft");
+                        Console.PrintLine("crafts " + craft.Count);
+                """);
+        assertEquals(Process.State.FINISHED, process.state(), String.valueOf(process.message()));
+        // A kind of work the network has not done reads as zero, not as nothing, so a script can add up
+        // without asking first whether there is anything to add up.
+        assertEquals(List.of("12 selects, 640 moved", "crafts 0"), process.console());
     }
 
     @Test

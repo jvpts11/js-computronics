@@ -297,6 +297,33 @@ public final class CannonApiGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void mainframe_readsWhatTheRealOrchestratorHasBeenDoing(final GameTestHelper helper) {
+        final dev.jstech.tests.testkit.TestWorldBuilder.CraftingNetwork wired =
+                dev.jstech.tests.testkit.TestWorldBuilder.forGameTest(helper).buildCraftingNetwork();
+        final CraftingComputerBlockEntity computer = wired.cc();
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("watch.asm", listing("""
+                            class Watch {
+                                static void Main() {
+                                    Console.PrintLine(Mainframe.Online ? "orchestrated" : "headless");
+                                    WorkStat select = Mainframe.Stats("select");
+                                    Console.PrintLine("selects " + select.Count);
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertTrue(said.size() == 2 && "orchestrated".equals(said.getFirst()),
+                            "it finds the Mainframe on its network; got " + said);
+                    helper.assertTrue(said.get(1).startsWith("selects "),
+                            "and reads a kind of work it has not done as zero; got " + said.get(1));
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void network_saysSoOnAMachineWithNoCableInIt(final GameTestHelper helper) {
         final BlockPos at = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity computer = computer(helper, at);

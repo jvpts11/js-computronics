@@ -42,7 +42,8 @@ public record MachineHost(BlockEntity machine) implements Host {
 
     @Override
     public boolean provides(final String owner) {
-        return HostFiles.handles(owner) || HostComputer.handles(owner) || HostNetwork.handles(owner);
+        return HostFiles.handles(owner) || HostComputer.handles(owner)
+                || HostNetwork.handles(owner) || HostMainframe.handles(owner);
     }
 
     @Override
@@ -64,6 +65,9 @@ public record MachineHost(BlockEntity machine) implements Host {
         }
         if (HostNetwork.handles(owner)) {
             return HostNetwork.call(computer, member, arguments, line);
+        }
+        if (HostMainframe.handles(owner)) {
+            return HostMainframe.call(computer, member, arguments, line);
         }
         throw new dev.jstech.computronics.cannon.run.Halt(
                 dev.jstech.computronics.cannon.run.Halt.Reason.NO_SUCH_MEMBER, line,
