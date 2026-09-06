@@ -65,7 +65,7 @@ class HostNetworkTest {
 
         @Override
         public Reply call(final String owner, final String member, final List<Object> arguments,
-                          final int line) {
+                          final String caller, final int line) {
             if ("Online".equals(member)) {
                 return Reply.of(this.linked, 10);
             }

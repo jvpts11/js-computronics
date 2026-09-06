@@ -56,7 +56,7 @@ class HostComputerTest {
 
         @Override
         public Reply call(final String owner, final String member, final List<Object> arguments,
-                          final int line) {
+                          final String caller, final int line) {
             return switch (member) {
                 case "Name" -> Reply.of("Workshop", 5);
                 case "RamMb" -> Reply.of(4096, 5);

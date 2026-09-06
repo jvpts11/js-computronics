@@ -42,9 +42,17 @@ public final class Library {
     private final Random random = new Random(0);
     private int written;
 
+    /** The class this process was started from, which is how the world knows which program asked. */
+    private final String caller;
+
     public Library(final Heap heap, final Host host) {
+        this(heap, host, "");
+    }
+
+    public Library(final Heap heap, final Host host, final String caller) {
         this.heap = heap;
         this.host = host;
+        this.caller = caller == null ? "" : caller;
     }
 
     /**
@@ -153,7 +161,7 @@ public final class Library {
         if (this.host.provides(owner)) {
             // To the machine, being asked for a value and being asked to do something are the same
             // question with different names, so a property goes out as a call that takes nothing.
-            final Host.Reply reply = this.host.call(owner, name, List.of(), line);
+            final Host.Reply reply = this.host.call(owner, name, List.of(), this.caller, line);
             this.owed += Math.max(0, reply.cost() - 1);
             return this.adopt(reply.value(), line);
         }
@@ -189,7 +197,8 @@ public final class Library {
             throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line,
                     "the runtime does not answer for " + named.owner());
         }
-        final Host.Reply reply = this.host.call(named.owner(), named.name(), arguments, line);
+        final Host.Reply reply =
+                this.host.call(named.owner(), named.name(), arguments, this.caller, line);
         this.owed += Math.max(0, reply.cost() - 1);
         final List<Object> filled = new ArrayList<>();
         for (final Object one : reply.filled()) {

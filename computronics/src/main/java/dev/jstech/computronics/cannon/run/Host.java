@@ -58,9 +58,15 @@ public interface Host {
      *
      * <p>Only ever asked for an owner {@link #provides} said yes to. Throw {@link Halt} for anything the
      * program did wrong; returning null is a fine answer for a method that gives nothing back.
+     *
+     * <p>One host serves every program on its machine, so {@code caller} says which of them is asking.
+     * Most calls have no use for it; the ones that leave a mark on the world outside do, because a
+     * record of who did what is worth nothing if it only ever says "a program".
+     *
+     * @param caller the name of the class the asking program was started from
      */
     default Reply call(final String owner, final String member, final java.util.List<Object> arguments,
-                       final int line) {
+                       final String caller, final int line) {
         throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "this computer cannot reach " + owner);
     }
 

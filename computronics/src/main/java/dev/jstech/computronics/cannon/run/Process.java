@@ -97,7 +97,7 @@ public final class Process {
     private Process(final Loaded program, final long heapBytes, final Host host, final boolean fresh) {
         this.program = program;
         this.heap = new Heap(heapBytes);
-        this.library = new Library(this.heap, host);
+        this.library = new Library(this.heap, host, program.entryPoint());
         if (!fresh) {
             return;
         }

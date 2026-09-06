@@ -29,6 +29,17 @@ public final class MoveLabels {
     /** The Cluster Manager on a Cluster Management Computer. */
     public static final String CLUSTER_MANAGER = "Cluster Manager";
 
+    /**
+     * A program written by the player, named by the script that asked.
+     *
+     * <p>A base can have many of them running at once, so "a script did it" is not enough to act on:
+     * the row has to say which one, or a player looking at four hundred pulls of iron cannot tell which
+     * of their programs to go and fix.
+     */
+    public static String cannon(final String script) {
+        return script == null || script.isBlank() ? "Cannon" : "Cannon: " + script;
+    }
+
     /** The host name of a computer that has no name of its own anywhere. */
     public static final String DEFAULT_HOSTNAME = "computer";
 

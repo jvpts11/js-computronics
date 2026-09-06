@@ -62,6 +62,7 @@ public final class BuiltIns {
         this.fillComputer();
         this.fillNetwork();
         this.fillMainframe();
+        this.fillOperations();
     }
 
     /** The root of every reference type. */
@@ -384,6 +385,39 @@ public final class BuiltIns {
         this.property(mainframe, "PeakToday", integer, PUBLIC_STATIC);
         this.method(mainframe, "Stats", stat, PUBLIC_STATIC, this.stringType);
         this.method(mainframe, "Work", new TypeSymbol.GenericType(this.listType, List.of(stat)),
+                PUBLIC_STATIC);
+    }
+
+    /**
+     * Asking the network to move things.
+     *
+     * <p>Asking can fail without the program being wrong: there may be no Mainframe running, or nothing
+     * that crafts the thing. So an ask answers whether it was taken and why not, and a script carries on
+     * and tries something else rather than stopping.
+     */
+    private void fillOperations() {
+        final TypeSymbol whole = TypeSymbol.Primitive.LONG;
+
+        final NamedType asked = this.declare("AskResult", NamedType.Kind.CLASS);
+        this.property(asked, "Ok", TypeSymbol.Primitive.BOOL, PUBLIC);
+        this.property(asked, "Message", this.stringType, PUBLIC);
+
+        final NamedType operation = this.declare("OperationInfo", NamedType.Kind.CLASS);
+        this.property(operation, "Id", this.stringType, PUBLIC);
+        this.property(operation, "Type", this.stringType, PUBLIC);
+        this.property(operation, "Item", this.stringType, PUBLIC);
+        this.property(operation, "Moved", whole, PUBLIC);
+        this.property(operation, "Requested", whole, PUBLIC);
+        this.property(operation, "Status", this.stringType, PUBLIC);
+        this.property(operation, "Priority", this.stringType, PUBLIC);
+
+        final NamedType operations = this.declare("Operations", NamedType.Kind.CLASS);
+        this.method(operations, "Pull", asked, PUBLIC_STATIC, this.stringType, whole);
+        this.method(operations, "Push", asked, PUBLIC_STATIC, this.stringType, whole);
+        this.method(operations, "Craft", asked, PUBLIC_STATIC, this.stringType, whole);
+        this.method(operations, "Cancel", asked, PUBLIC_STATIC, this.stringType);
+        this.method(operations, "Get", operation, PUBLIC_STATIC, this.stringType);
+        this.method(operations, "List", new TypeSymbol.GenericType(this.listType, List.of(operation)),
                 PUBLIC_STATIC);
     }
 

@@ -96,6 +96,29 @@ public interface CliComputer {
     /** Ask the network to craft the named item. */
     OpResult craft(String item, long quantity);
 
+    /**
+     * The same three, saying who asked.
+     *
+     * <p>Every one of these ends up as a row in the network's log, and the row names where it came
+     * from. The prompt says so by default; anything else that submits work says what it is, so a player
+     * reading the log can tell a script's pull from one they made themselves.
+     *
+     * @param origin what to put on the row, from {@link dev.jstech.computronics.operation.MoveLabels}
+     */
+    default OpResult select(final String item, final long quantity, final String origin) {
+        return select(item, quantity);
+    }
+
+    /** Push, saying who asked. */
+    default OpResult insert(final String item, final long quantity, final String origin) {
+        return insert(item, quantity);
+    }
+
+    /** Craft, saying who asked. */
+    default OpResult craft(final String item, final long quantity, final String origin) {
+        return craft(item, quantity);
+    }
+
     /** Place a standing hold on the named item so concurrent operations WAIT on it. */
     OpResult lock(String item, long quantity);
 

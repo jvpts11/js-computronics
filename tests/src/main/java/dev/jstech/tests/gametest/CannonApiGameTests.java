@@ -324,6 +324,48 @@ public final class CannonApiGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void operations_pullsFromTheRealNetworkAndSaysWhichScriptAsked(final GameTestHelper helper) {
+        final dev.jstech.tests.testkit.TestWorldBuilder.CraftingNetwork wired =
+                dev.jstech.tests.testkit.TestWorldBuilder.forGameTest(helper).buildCraftingNetwork();
+        final CraftingComputerBlockEntity computer = wired.cc();
+        wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final CannonProcesses.Started started = computer.cannon().start("restock.asm", listing("""
+                            class Restock : IScript {
+                                public void OnInit() {
+                                    AskResult asked = Operations.Pull("minecraft:oak_log", 64);
+                                    Console.PrintLine(asked.Ok ? "asked" : asked.Message);
+                                }
+                                public void OnTick() { }
+                                public void OnDestroy() { }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertTrue(said.equals(List.of("asked")),
+                            "the network takes the ask; got " + said);
+                })
+                .thenExecuteAfter(20, () -> {
+                    // The row the network wrote down has to name the script, not just say a program did
+                    // it: a base runs many at once and the player has to know which one to go and fix.
+                    final List<dev.jstech.computronics.operation.payload.OperationRecord> log =
+                            wired.mainframe().recentOperations();
+                    helper.assertFalse(log.isEmpty(), "the network wrote the work down");
+                    boolean named = false;
+                    for (final var record : log) {
+                        for (final var move : record.moves()) {
+                            named = named || move.to().contains("Cannon: Restock")
+                                    || move.from().contains("Cannon: Restock");
+                        }
+                    }
+                    helper.assertTrue(named, "a row names the script that asked; got " + log);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void network_saysSoOnAMachineWithNoCableInIt(final GameTestHelper helper) {
         final BlockPos at = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity computer = computer(helper, at);

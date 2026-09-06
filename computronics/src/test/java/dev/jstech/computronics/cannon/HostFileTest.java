@@ -62,7 +62,7 @@ class HostFileTest {
 
         @Override
         public Reply call(final String owner, final String member, final List<Object> arguments,
-                          final int line) {
+                          final String caller, final int line) {
             final String path = arguments.isEmpty() ? "" : String.valueOf(arguments.getFirst());
             return switch (member) {
                 case "Exists" -> Reply.of(this.files.containsKey(path), 10);

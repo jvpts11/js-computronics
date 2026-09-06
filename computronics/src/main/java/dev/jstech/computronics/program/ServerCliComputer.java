@@ -513,6 +513,11 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public OpResult select(final String item, final long quantity) {
+        return select(item, quantity, MoveLabels.SHELL);
+    }
+
+    @Override
+    public OpResult select(final String item, final long quantity, final String origin) {
         final StorageKey key = resolveKey(item);
         if (key == null) {
             return OpResult.fail("unknown item: " + item);
@@ -522,7 +527,7 @@ public final class ServerCliComputer implements CliComputer {
             return OpResult.fail("the network has no running Mainframe");
         }
         final var op = mainframe.submitNetworkSelect(key, demand(quantity), host.localStorage(),
-                host.originLabel(MoveLabels.SHELL));
+                host.originLabel(origin));
         if (op == null) {
             return OpResult.fail("could not start the SELECT");
         }
@@ -582,11 +587,17 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public OpResult insert(final String item, final long quantity) {
-        return insert(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT);
+        return insert(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT, MoveLabels.SHELL);
+    }
+
+    @Override
+    public OpResult insert(final String item, final long quantity, final String origin) {
+        return insert(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT, origin);
     }
 
     private OpResult insert(final String item, final long quantity,
-                            final dev.jstech.core.operation.OperationPriority priority) {
+                            final dev.jstech.core.operation.OperationPriority priority,
+                            final String origin) {
         final StorageKey key = resolveKey(item);
         if (key == null) {
             return OpResult.fail("unknown item: " + item);
@@ -602,7 +613,7 @@ public final class ServerCliComputer implements CliComputer {
         }
         final MainframeBlockEntity mainframe = mainframe(host.networkUuid());
         final var op = mainframe == null ? null
-                : mainframe.submitNetworkInsert(key, taken, host.originLabel(MoveLabels.SHELL));
+                : mainframe.submitNetworkInsert(key, taken, host.originLabel(origin));
         if (op == null) {
             host.localStore().insert(key, taken); // no dispatcher: put it straight back, never lose it
             return OpResult.fail("the network has no running Mainframe");
@@ -619,11 +630,17 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public OpResult craft(final String item, final long quantity) {
-        return craft(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT);
+        return craft(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT, MoveLabels.SHELL);
+    }
+
+    @Override
+    public OpResult craft(final String item, final long quantity, final String origin) {
+        return craft(item, quantity, dev.jstech.core.operation.OperationPriority.DEFAULT, origin);
     }
 
     private OpResult craft(final String item, final long quantity,
-                           final dev.jstech.core.operation.OperationPriority priority) {
+                           final dev.jstech.core.operation.OperationPriority priority,
+                           final String origin) {
         final StorageKey key = resolveKey(item);
         if (key == null) {
             return OpResult.fail("unknown item: " + item);
@@ -635,7 +652,7 @@ public final class ServerCliComputer implements CliComputer {
         // Route through the shared entry point so the CLI and IQL craft a machine or multi-stage recipe
         // directly (not only a bench-planned tree), exactly as the terminal and Network Interactor do.
         final var op = mainframe.submitCraftRequest(key, demand(quantity), true,
-                host.originLabel(MoveLabels.SHELL), null);
+                host.originLabel(origin), null);
         if (op == null) {
             return OpResult.fail("no pattern crafts " + key.displayName().getString());
         }
@@ -942,7 +959,7 @@ public final class ServerCliComputer implements CliComputer {
         return switch (op.verb()) {
             case SELECT -> executeSelect(op);
             case INSERT -> executeInsert(op);
-            case CRAFT -> craft(op.item(), op.quantity(), op.priority());
+            case CRAFT -> craft(op.item(), op.quantity(), op.priority(), MoveLabels.IQL);
             case DELETE -> executeDestroy(op, "DELETE");
             case DROP -> executeDestroy(op, "DROP");
             case MOVE -> executeMove(op);
@@ -999,7 +1016,7 @@ public final class ServerCliComputer implements CliComputer {
                 return moveFromBus(op, mainframe, bus.port());
             }
         }
-        return insert(op.item(), op.quantity(), op.priority());
+        return insert(op.item(), op.quantity(), op.priority(), MoveLabels.IQL);
     }
 
     /** Applies the statement's {@code PRIORITY} to a freshly submitted Operation; a null submission passes through. */
