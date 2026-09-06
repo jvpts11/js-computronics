@@ -67,8 +67,11 @@ public final class HostFiles {
                 final CliComputer.FsResult listing = computer.listDisk(path);
                 if (listing.ok()) {
                     for (final CliComputer.FsEntry entry : listing.entries()) {
-                        names.items().add(entry.isDir() ? entry.name()
-                                : entry.name() + (entry.ext().isEmpty() ? "" : "." + entry.ext()));
+                        // The name is the whole last segment of the path, extension included, so a name
+                        // a program is handed is a name it can turn round and open. A folder ends in a
+                        // slash, because a program walking a tree has to be able to tell which is which
+                        // and asking it to try opening each one to find out would be a poor answer.
+                        names.items().add(entry.isDir() ? entry.name() + "/" : entry.name());
                     }
                 }
                 yield Host.Reply.of(names, READ);

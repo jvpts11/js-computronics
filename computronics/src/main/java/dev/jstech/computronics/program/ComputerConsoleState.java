@@ -310,6 +310,42 @@ public final class ComputerConsoleState {
         iconCells.remove(key);
     }
 
+    /**
+     * A program written by a player and installed from the Mirror.
+     *
+     * <p>It is not a {@code ProgramSpec}: those are the mod's own and are registered when the game
+     * starts, and there is no registering something a player wrote yesterday on a server. So the little
+     * the desktop needs in order to give it an icon and run it is kept here, with the machine that
+     * installed it.
+     *
+     * @param entry the listing to run, as a path on this machine's disk
+     */
+    public record Community(String name, String version, String house, String icon, String entry) {
+    }
+
+    private final Map<String, Community> community = new LinkedHashMap<>();
+
+    /** Every player-written program installed here. */
+    public java.util.Collection<Community> community() {
+        return java.util.List.copyOf(community.values());
+    }
+
+    /** One of them, or null. */
+    @org.jetbrains.annotations.Nullable
+    public Community communityProgram(final String name) {
+        return community.get(name);
+    }
+
+    /** Records one as installed. */
+    public void addCommunity(final Community program) {
+        community.put(program.name(), program);
+    }
+
+    /** Forgets one; false when it was not installed. */
+    public boolean removeCommunity(final String name) {
+        return community.remove(name) != null;
+    }
+
     public void save(final CompoundTag tag) {
         final ListTag historyTag = new ListTag();
         for (final String line : history) {
@@ -325,6 +361,19 @@ public final class ComputerConsoleState {
             final CompoundTag versions = new CompoundTag();
             installedVersions.forEach(versions::putString);
             tag.put("InstalledVersions", versions);
+        }
+        if (!community.isEmpty()) {
+            final ListTag written = new ListTag();
+            for (final Community one : community.values()) {
+                final CompoundTag each = new CompoundTag();
+                each.putString("Name", one.name());
+                each.putString("Version", one.version());
+                each.putString("House", one.house());
+                each.putString("Icon", one.icon());
+                each.putString("Entry", one.entry());
+                written.add(each);
+            }
+            tag.put("Community", written);
         }
         if (!pendingBuilds.isEmpty()) {
             final CompoundTag builds = new CompoundTag();
@@ -402,6 +451,13 @@ public final class ComputerConsoleState {
         installed.clear();
         for (final Tag entry : tag.getList("Installed", Tag.TAG_STRING)) {
             installed.add(entry.getAsString());
+        }
+        community.clear();
+        for (final Tag entry : tag.getList("Community", Tag.TAG_COMPOUND)) {
+            final CompoundTag each = (CompoundTag) entry;
+            community.put(each.getString("Name"), new Community(each.getString("Name"),
+                    each.getString("Version"), each.getString("House"), each.getString("Icon"),
+                    each.getString("Entry")));
         }
         installedVersions.clear();
         if (tag.contains("InstalledVersions")) {

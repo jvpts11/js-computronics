@@ -29,10 +29,10 @@ import java.util.Map;
 public final class CannonCommands {
 
     /** The id of the compiler package, as the Mirror serves it. */
-    static final String COMPILER = "jsc:cannonc";
+    public static final String COMPILER = "jsc:cannonc";
 
     /** The id of the runtime package. */
-    static final String RUNTIME = "jsc:cannonrt";
+    public static final String RUNTIME = "jsc:cannonrt";
 
     /** The extension a program is written in, and the one it is compiled to. */
     private static final String SOURCE = ".can";
@@ -47,7 +47,7 @@ public final class CannonCommands {
     }
 
     /** Whether that package is installed on the computer. */
-    static boolean installed(final CliComputer computer, final String id) {
+    public static boolean installed(final CliComputer computer, final String id) {
         for (final CliComputer.ProgramInfo program : computer.programs()) {
             if (id.equalsIgnoreCase(program.id())) {
                 return true;

@@ -1665,12 +1665,69 @@ public final class ServerCliComputer implements CliComputer {
         return OpResult.ok("took " + name + " off the Mirror");
     }
 
+    /**
+     * The folder a player's package is unpacked into.
+     *
+     * <p>One folder each, named after the package, so two of them cannot quietly overwrite each other's
+     * files and removing one takes exactly its own files with it.
+     */
+    private static final String COMMUNITY_DIR = "PROGRAMS";
+
+    /**
+     * Installs a package a player published, if that is what this name is.
+     *
+     * <p>Returns null when the name belongs to something else, so the usual path carries on.
+     */
+    @org.jetbrains.annotations.Nullable
+    private OpResult installCommunity(final String wanted) {
+        final MainframeBlockEntity mirror = mirrorMainframe();
+        final String held = mirror == null ? null : mirror.shelvedPackage(wanted);
+        if (held == null) {
+            return null;
+        }
+        final dev.jstech.computronics.cannon.pack.Packed packed =
+                dev.jstech.computronics.cannon.pack.Packed.read(held);
+        if (packed == null || !packed.problems().isEmpty()) {
+            return OpResult.fail(wanted + ": the Mirror's copy of this package is not readable");
+        }
+        if (!dev.jstech.computronics.program.cli.CannonCommands.installed(this,
+                dev.jstech.computronics.program.cli.CannonCommands.RUNTIME)) {
+            return OpResult.fail(wanted + " is a Cannon program; install cannonrt first");
+        }
+        final dev.jstech.computronics.program.ComputerConsoleState console = host.console();
+        if (console == null) {
+            return OpResult.fail("no system disk to install onto");
+        }
+        // Its own folder, made before anything is written into it.
+        final String folder = COMMUNITY_DIR + "/" + wanted;
+        makeDir(COMMUNITY_DIR);
+        if (!makeDir(folder).ok() && listDisk(folder).entries().isEmpty()) {
+            return OpResult.fail(wanted + ": this system has no folders to install into");
+        }
+        for (final var file : packed.files().entrySet()) {
+            final FsResult written = writeFile(folder + "/" + file.getKey(), file.getValue());
+            if (!written.ok()) {
+                return OpResult.fail(wanted + ": " + written.message());
+            }
+        }
+        console.addCommunity(new dev.jstech.computronics.program.ComputerConsoleState.Community(
+                wanted, packed.manifest().version(), packed.manifest().house(),
+                packed.manifest().icon(), folder + "/" + packed.manifest().entry()));
+        hostBlock.setChanged();
+        return OpResult.ok("installed " + packed.manifest().label() + " into " + folder);
+    }
+
     @Override
     public OpResult packageInstall(final String name) {
         settleBuilds();
         final dev.jstech.computronics.os.PackageManagerKind manager = packageManager();
         if (manager == dev.jstech.computronics.os.PackageManagerKind.NONE) {
             return OpResult.fail("this system installs programs from install media, not a package manager");
+        }
+        final OpResult community =
+                installCommunity(name == null ? "" : name.trim().toLowerCase(java.util.Locale.ROOT));
+        if (community != null) {
+            return community;
         }
         if (mirrorMainframe() == null) {
             return OpResult.fail("could not resolve mirror:// - connect this computer to a network whose Mainframe"
@@ -1800,6 +1857,18 @@ public final class ServerCliComputer implements CliComputer {
     public OpResult packageRemove(final String name) {
         settleBuilds();
         final String wanted = name == null ? "" : name.trim().toLowerCase(java.util.Locale.ROOT);
+        final dev.jstech.computronics.program.ComputerConsoleState theirs = host.console();
+        if (theirs != null && theirs.communityProgram(wanted) != null) {
+            // Its own files and nothing else: what was written when it was installed.
+            for (final CliComputer.FsEntry file
+                    : listDisk(COMMUNITY_DIR + "/" + wanted).entries()) {
+                // The listing's name is the whole last segment, extension and all.
+                deleteFile(COMMUNITY_DIR + "/" + wanted + "/" + file.name());
+            }
+            theirs.removeCommunity(wanted);
+            hostBlock.setChanged();
+            return OpResult.ok("removed " + wanted);
+        }
         dev.jstech.computronics.os.ProgramSpec spec = null;
         for (final dev.jstech.computronics.os.ProgramSpec candidate : OsRegistry.programs()) {
             if (candidate.installable()

@@ -154,6 +154,50 @@ public final class CannonApiGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void file_listsNamesAProgramCouldTurnRoundAndOpen(final GameTestHelper helper) {
+        final BlockPos at = new BlockPos(2, 2, 2);
+        final CraftingComputerBlockEntity computer = computer(helper, at);
+        if (computer == null) {
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var shell = new dev.jstech.computronics.program.ServerCliComputer(
+                            computer, helper.getLevel());
+                    shell.writeFile("notes.txt", "one");
+                    // A name that comes back from a listing has to be the name that opens the file. It
+                    // is the only thing a program can do with it.
+                    final CannonProcesses.Started started = computer.cannon().start("ls.asm", listing("""
+                            class Ls {
+                                static void Main() {
+                                    foreach (string name in File.List("C:\\\\")) {
+                                        if (name.EndsWith("/")) {
+                                            Console.PrintLine("folder " + name);
+                                        } else if (File.Exists(name)) {
+                                            Console.PrintLine("open " + name);
+                                        } else {
+                                            Console.PrintLine("cannot open " + name);
+                                        }
+                                    }
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertFalse(said.isEmpty(), "it lists something");
+                    boolean sawFile = false;
+                    for (final String line : said) {
+                        helper.assertFalse(line.startsWith("cannot open "),
+                                "every name a listing gives back can be acted on; got " + line);
+                        sawFile = sawFile || line.startsWith("open ");
+                    }
+                    helper.assertTrue(sawFile, "including the file that was just written; got " + said);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void file_theDriveCostsTheProgramMoreThanItsOwnArithmetic(final GameTestHelper helper) {
         final BlockPos at = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity computer = computer(helper, at);
@@ -453,6 +497,26 @@ public final class CannonApiGameTests {
                             wired.mainframe().shelvedPackage("stockwatch"));
                     helper.assertTrue(back != null && back.files().equals(packed.files()),
                             "and it comes back unchanged");
+
+                    // And a computer on the network installs it: the files land in a folder of its own,
+                    // and the machine knows it has a program a player wrote.
+                    computer.console().install(
+                            dev.jstech.computronics.program.cli.CannonCommands.RUNTIME);
+                    final var installed = shell.packageInstall("stockwatch");
+                    helper.assertTrue(installed.ok(), "it installs: " + installed.message());
+                    final var known = computer.console().communityProgram("stockwatch");
+                    helper.assertTrue(known != null, "the machine knows it has it");
+                    helper.assertTrue("PROGRAMS/stockwatch/stockwatch.asm".equals(known.entry()),
+                            "and knows what to run; got " + (known == null ? "" : known.entry()));
+                    helper.assertTrue(shell.readFile(known.entry()).ok(),
+                            "the listing is on the disk where it says it is");
+
+                    final var removed = shell.packageRemove("stockwatch");
+                    helper.assertTrue(removed.ok(), "it uninstalls: " + removed.message());
+                    helper.assertTrue(computer.console().communityProgram("stockwatch") == null,
+                            "and the machine forgets it");
+                    helper.assertFalse(shell.readFile("PROGRAMS/stockwatch/stockwatch.asm").ok(),
+                            "taking its files with it");
 
                     helper.assertTrue(shell.unpublishPackage("stockwatch").ok(), "it comes back off");
                     helper.assertTrue(wired.mainframe().shelvedPackage("stockwatch") == null,
