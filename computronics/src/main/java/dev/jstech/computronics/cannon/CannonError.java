@@ -31,7 +31,43 @@ public enum CannonError {
             + "can be used as a statement"),
     DUPLICATE_MODIFIER("C2007", "'%s' was given twice"),
     INVALID_ASSIGNMENT_TARGET("C2008", "the left side of an assignment must be a variable, a field, "
-            + "a property or an element");
+            + "a property or an element"),
+
+    UNKNOWN_NAME("C3001", "'%s' does not name anything here"),
+    DUPLICATE_DECLARATION("C3002", "'%s' is already declared here"),
+    CANNOT_CONVERT("C3003", "cannot convert '%s' to '%s'"),
+    NO_SUCH_MEMBER("C3004", "'%s' has no member called '%s'"),
+    NO_MATCHING_OVERLOAD("C3005", "no version of '%s' takes those arguments"),
+    AMBIGUOUS_CALL("C3006", "the call to '%s' fits more than one version of it"),
+    OPERATOR_ON_TYPES("C3007", "'%s' cannot be applied to '%s' and '%s'"),
+    OPERATOR_ON_TYPE("C3008", "'%s' cannot be applied to '%s'"),
+    CONDITION_MUST_BE_BOOL("C3009", "a condition is a bool, not '%s'"),
+    BREAK_OUTSIDE_LOOP("C3010", "'break' only means something inside a loop or a switch"),
+    CONTINUE_OUTSIDE_LOOP("C3011", "'continue' only means something inside a loop"),
+    MISSING_RETURN_VALUE("C3012", "a method that gives back '%s' must return a value"),
+    UNEXPECTED_RETURN_VALUE("C3013", "a method that gives back nothing cannot return a value"),
+    THIS_IN_STATIC("C3014", "'%s' is not available in a static member"),
+    NO_BASE_CLASS("C3015", "'%s' has no base class"),
+    CANNOT_ASSIGN_READONLY("C3016", "'%s' is readonly, so it can only be written where it is declared "
+            + "or in a constructor"),
+    ENTRY_POINT("C3017", "a program needs exactly one class that implements IScript, and this one has %s"),
+    MISSING_INTERFACE_MEMBER("C3018", "'%s' says it is a '%s' but does not have '%s'"),
+    WRONG_TYPE_ARGUMENT_COUNT("C3019", "'%s' takes %s type arguments"),
+    STATIC_THROUGH_INSTANCE("C3020", "'%s' belongs to the type, not to one of its objects"),
+    INSTANCE_THROUGH_TYPE("C3021", "'%s' belongs to an object, not to the type"),
+    CANNOT_DISPOSE("C3022", "only an object can be disposed, not '%s'"),
+    NOT_A_COLLECTION("C3023", "foreach walks an array or a list, not '%s'"),
+    CANNOT_INDEX("C3024", "'%s' cannot be indexed by '%s'"),
+    CANNOT_CALL("C3025", "'%s' is not something that can be called"),
+    CANNOT_CREATE("C3026", "'%s' cannot be made with new"),
+    LAMBDA_SHAPE("C3027", "this lambda does not have the shape '%s' takes"),
+    NOT_A_TYPE("C3028", "'%s' does not name a type"),
+    DUPLICATE_SWITCH_LABEL("C3029", "this switch already has that label"),
+    EVENT_OUTSIDE_ITS_TYPE("C3030", "an event can only be raised inside the type that declares it"),
+    INVALID_BASE("C3031", "only a class or an interface can stand behind the colon, and '%s' is neither"),
+    EVENT_NEEDS_DELEGATE("C3032", "an event's type must be a delegate, and '%s' is not one"),
+    METHOD_AS_VALUE("C3033", "'%s' is a method: call it, or hand it over where a delegate of its shape "
+            + "is wanted");
 
     private final String code;
     private final String template;

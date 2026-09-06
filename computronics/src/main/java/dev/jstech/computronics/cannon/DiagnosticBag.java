@@ -24,11 +24,21 @@ public final class DiagnosticBag {
     /** Past this many, further messages are almost always the same mistake echoing. */
     public static final int MAX_DIAGNOSTICS = 100;
 
-    private final String file;
     private final List<Diagnostic> diagnostics = new ArrayList<>();
+    private String file;
     private boolean capped;
 
     public DiagnosticBag(final String file) {
+        this.file = file;
+    }
+
+    /**
+     * Names the file the next messages belong to.
+     *
+     * <p>A compilation can span several files, and the stages after the parser walk types rather
+     * than files, so the walker says which file it is in as it moves between them.
+     */
+    public void setFile(final String file) {
         this.file = file;
     }
 
@@ -67,10 +77,12 @@ public final class DiagnosticBag {
         return this.diagnostics.size();
     }
 
-    /** Everything recorded, earliest position first, in the order it was reported within a position. */
+    /** Everything recorded, by file and then by position, in the order it was reported within one. */
     public List<Diagnostic> sorted() {
         final List<Diagnostic> copy = new ArrayList<>(this.diagnostics);
-        copy.sort(Comparator.comparingInt(Diagnostic::line).thenComparingInt(Diagnostic::column));
+        copy.sort(Comparator.comparing(Diagnostic::file)
+                .thenComparingInt(Diagnostic::line)
+                .thenComparingInt(Diagnostic::column));
         return Collections.unmodifiableList(copy);
     }
 }

@@ -58,8 +58,18 @@ public final class CannonFrontEnd {
     /** Reads one file as far as it can, reporting everything wrong with it on the way. */
     public static Result parse(final SourceFile source) {
         final DiagnosticBag bag = new DiagnosticBag(source.name());
-        final List<Token> tokens = new Lexer(source, bag).tokenize();
-        final CompilationUnit unit = new Parser(tokens, bag).parse(source.name());
+        final CompilationUnit unit = parse(source, bag);
         return new Result(unit, bag.sorted(), bag.wasCapped());
+    }
+
+    /**
+     * Reads one file into a tree, reporting into a bag the caller owns.
+     *
+     * <p>This is the form the rest of the compiler uses, because a compilation can span several
+     * files and everything they have to say belongs in one list, in one order.
+     */
+    public static CompilationUnit parse(final SourceFile source, final DiagnosticBag diagnostics) {
+        final List<Token> tokens = new Lexer(source, diagnostics).tokenize();
+        return new Parser(tokens, diagnostics).parse(source.name());
     }
 }
