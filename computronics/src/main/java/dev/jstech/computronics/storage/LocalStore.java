@@ -127,6 +127,20 @@ public final class LocalStore implements WeightedStore {
                 ? diskCapacity(disks.get(index)) * StorageKey.MB_EQ_PER_ITEM : 0L;
     }
 
+    /**
+     * How many items this computer has published to the network, counting each disk's own share.
+     *
+     * <p>A disk kept entirely private adds nothing: the network's capacity is what the network may
+     * actually fill, not what the machine happens to have installed.
+     */
+    public long publicCapacity() {
+        long sum = 0L;
+        for (int i = 0; i < disks.size(); i++) {
+            sum += diskCapacityWeight(i) / StorageKey.MB_EQ_PER_ITEM * diskPublicPermille(i) / 1000L;
+        }
+        return sum;
+    }
+
     /** The union of every disk's public view — what the network may read from this computer. */
     public Map<StorageKey, Long> publicView() {
         final Map<StorageKey, Long> merged = new LinkedHashMap<>();

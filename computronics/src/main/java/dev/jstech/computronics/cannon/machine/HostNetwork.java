@@ -32,13 +32,14 @@ public final class HostNetwork {
     private static final int READ = 50;
 
     /**
-     * The most rows one call hands back.
+     * How many rows one call may gather.
      *
-     * <p>A big network holds tens of thousands of kinds of thing, and a program that asked for all of
-     * them would be handed a list that does not fit in any heap it is likely to have. The cap keeps the
-     * answer to a size a script can actually work with; the ones with the most in them come first.
+     * <p>It is not a cap on the answer, which is why it is set far past any real network: a program that
+     * asks what a hundred thousand kinds of thing there are is handed all of them and pays for all of
+     * them, in instructions and in memory. If the list does not fit, the program runs out of memory and
+     * says so, which is the right answer and the one that tells the player to put more in the machine.
      */
-    public static final int MOST_ROWS = 1024;
+    private static final int EVERYTHING = 1_000_000;
 
     private HostNetwork() {
     }
@@ -61,12 +62,29 @@ public final class HostNetwork {
             throw new Halt(Halt.Reason.NO_NETWORK, line, "this computer is not on a network");
         }
         return switch (member) {
+            case "Capacity" -> Host.Reply.of(computer.networkUse().capacity(), READ);
+            case "Used" -> Host.Reply.of(computer.networkUse().stored(), READ);
             case "Total" -> Host.Reply.of(total(computer, name(arguments)), READ);
-            case "Types" -> Host.Reply.of(types(computer), READ);
-            case "Find" -> Host.Reply.of(find(computer, name(arguments)), READ);
-            case "Servers" -> Host.Reply.of(servers(computer), READ);
+            case "Types" -> rows(types(computer));
+            case "Find" -> rows(find(computer, name(arguments)));
+            case "Servers" -> rows(servers(computer));
             default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Network has no " + member);
         };
+    }
+
+    /** A list, priced by how long it is. */
+    private static Host.Reply rows(final Values.ListValue all) {
+        return Host.Reply.of(all, priceOf(all.size()));
+    }
+
+    /**
+     * What gathering that many rows is worth.
+     *
+     * <p>Asking for one thing and asking for a hundred thousand are not the same question, and charging
+     * the same for both would let a program sweep the whole network every tick for nothing.
+     */
+    public static int priceOf(final int rows) {
+        return READ + Math.max(0, rows);
     }
 
     /** How much of that the whole network holds, counting every server that has any. */
@@ -80,7 +98,7 @@ public final class HostNetwork {
 
     private static Values.ListValue types(final CliComputer computer) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CliComputer.StoredItem item : computer.query(null, "", MOST_ROWS)) {
+        for (final CliComputer.StoredItem item : computer.query(null, "", EVERYTHING)) {
             all.items().add(item.name());
         }
         return all;
@@ -99,10 +117,11 @@ public final class HostNetwork {
 
     private static Values.ListValue servers(final CliComputer computer) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CliComputer.StoredItem row : computer.queryObject("servers", null, "", MOST_ROWS)) {
+        for (final CliComputer.ServerUse row : computer.servers()) {
             final Values.Obj made = new Values.Obj("ServerInfo");
             made.set("Name", row.name());
-            made.set("Stored", row.quantity());
+            made.set("Stored", row.stored());
+            made.set("Capacity", row.capacity());
             all.items().add(made);
         }
         return all;

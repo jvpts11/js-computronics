@@ -48,4 +48,14 @@ final class ServerNodeStore implements NodeStore {
     public long insert(final StorageKey key, final long amount) {
         return store.insert(key, amount);
     }
+
+    @Override
+    public long capacity() {
+        return store.capacity();
+    }
+
+    @Override
+    public long used() {
+        return store.used();
+    }
 }

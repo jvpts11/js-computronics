@@ -27,4 +27,15 @@ interface NodeStore {
 
     /** Inserts up to {@code amount}; a read-only source (a PC's public area) accepts nothing. */
     long insert(StorageKey key, long amount);
+
+    /**
+     * How many items this node can hold for the network.
+     *
+     * <p>For a server that is the whole of its drives. For a personal computer it is only the share its
+     * owner published, because the rest of that machine's disks are not the network's to fill.
+     */
+    long capacity();
+
+    /** How many it is holding, counted the same way. */
+    long used();
 }

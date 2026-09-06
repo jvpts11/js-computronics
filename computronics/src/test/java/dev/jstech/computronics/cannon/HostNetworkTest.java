@@ -104,7 +104,7 @@ class HostNetworkTest {
         }
     }
 
-    private static Process run(final Net net, final String body) {
+    private static Loaded compile(final String body) {
         final String source = "class Monitor : IScript {\n"
                 + "    public void OnInit() { }\n"
                 + "    public void OnTick() {\n" + body + "\n    }\n"
@@ -116,7 +116,11 @@ class HostNetworkTest {
         final AsmProgram written = new AsmReader(built.assembly(), bag).read();
         assertFalse(bag.hasErrors(), () -> String.join("\n",
                 bag.sorted().stream().map(Diagnostic::format).toList()));
-        final Loaded program = Loaded.of(written);
+        return Loaded.of(written);
+    }
+
+    private static Process run(final Net net, final String body) {
+        final Loaded program = compile(body);
         final Process process = new Process(program, ROOM, net);
         process.begin(process.create(program.entryPoint()), "OnTick");
         process.step(PLENTY);
@@ -182,6 +186,46 @@ class HostNetworkTest {
         final Process asking = run(net, "        long n = Network.Total(\"minecraft:iron_ingot\");");
         assertTrue(asking.spent() > quiet.spent() + 40,
                 "asking the network is charged; " + asking.spent() + " against " + quiet.spent());
+    }
+
+    @Test
+    void priceOf_chargesForHowMuchWasGatheredNotJustForAsking() {
+        // A sweep of the whole network is not the same question as asking after one thing, and a program
+        // doing it every tick should feel the difference.
+        assertTrue(dev.jstech.computronics.cannon.machine.HostNetwork.priceOf(300)
+                >= dev.jstech.computronics.cannon.machine.HostNetwork.priceOf(0) + 300,
+                "a longer answer costs more");
+        assertEquals(dev.jstech.computronics.cannon.machine.HostNetwork.priceOf(0),
+                dev.jstech.computronics.cannon.machine.HostNetwork.priceOf(-1),
+                "and nothing is charged twice for being empty");
+    }
+
+    @Test
+    void network_theProcessPaysWhatTheMachineSaidTheAnswerWasWorth() {
+        final Net dear = new Net(true);
+        dear.holdings.put("a", new LinkedHashMap<>(Map.of("Server A", 1L)));
+        final Process quiet = run(dear, "        long n = 1 + 1;");
+        final Process asking = run(dear, "        long n = Network.Total(\"a\");");
+        // The machine said fifty; the tick is charged fifty, not one.
+        assertTrue(asking.spent() >= quiet.spent() + 45,
+                "the price the machine named is charged; " + asking.spent() + " against " + quiet.spent());
+    }
+
+    @Test
+    void network_runsAProgramOutOfMemoryRatherThanTruncatingWhatItAskedFor() {
+        final Net huge = new Net(true);
+        for (int i = 0; i < 4000; i++) {
+            huge.holdings.put("a rather long name for kind number " + i,
+                    new LinkedHashMap<>(Map.of("Server A", 1L)));
+        }
+        // A small machine asking a big network for everything is told it does not fit, which is the
+        // honest answer and the one that says to put more memory in.
+        final Loaded program = compile("        List<string> t = Network.Types();");
+        final Process process = new Process(program, 8L * 1024, huge);
+        process.begin(process.create(program.entryPoint()), "OnTick");
+        process.step(PLENTY);
+        assertEquals(Process.State.HALTED, process.state());
+        assertTrue(process.message().contains("out of memory"), process.message());
     }
 
     @Test

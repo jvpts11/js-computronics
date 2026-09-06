@@ -54,4 +54,18 @@ final class PcPublicNodeStore implements NodeStore {
     public long insert(final StorageKey key, final long amount) {
         return 0L; // a PC's public area is a SELECT-source only, never an INSERT target
     }
+
+    @Override
+    public long capacity() {
+        return store.publicCapacity();
+    }
+
+    @Override
+    public long used() {
+        long sum = 0L;
+        for (final Long held : store.publicView().values()) {
+            sum += held;
+        }
+        return sum;
+    }
 }

@@ -470,6 +470,31 @@ public final class ServerCliComputer implements CliComputer {
     }
 
     @Override
+    public List<ServerUse> servers() {
+        final NetworkUuid net = host.networkUuid();
+        if (net == null) {
+            return List.of();
+        }
+        final NetworkStorage storage = NetworkStorage.of(level, net);
+        final List<ServerUse> rows = new ArrayList<>();
+        for (final dev.jstech.core.network.ServerNode server : NetworkSystem.get(level).serversOf(net)) {
+            rows.add(new ServerUse(ComputingPayloads.serverLabel(level, server.nodeUuid()),
+                    storage.usedOf(server.nodeUuid()), storage.capacityOf(server.nodeUuid())));
+        }
+        return rows;
+    }
+
+    @Override
+    public ServerUse networkUse() {
+        final NetworkUuid net = host.networkUuid();
+        if (net == null) {
+            return new ServerUse("", 0L, 0L);
+        }
+        final NetworkStorage storage = NetworkStorage.of(level, net);
+        return new ServerUse(networkId(), storage.used(), storage.capacity());
+    }
+
+    @Override
     public List<Holding> find(final String item) {
         final NetworkUuid net = host.networkUuid();
         final StorageKey key = resolveKey(item);

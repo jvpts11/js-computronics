@@ -119,6 +119,39 @@ public final class NetworkStorage {
         return new NetworkStorage(entries);
     }
 
+    /**
+     * How many items the whole network can hold: every server's drives, plus whatever share the personal
+     * computers on it have published.
+     */
+    public long capacity() {
+        long sum = 0L;
+        for (final Entry entry : entries) {
+            sum += entry.store().capacity();
+        }
+        return sum;
+    }
+
+    /** How many it is holding, counted the same way, so the two are always comparable. */
+    public long used() {
+        long sum = 0L;
+        for (final Entry entry : entries) {
+            sum += entry.store().used();
+        }
+        return sum;
+    }
+
+    /** The same pair for one node, or zeroes when it is not on this network. */
+    public long capacityOf(final NodeUuid node) {
+        final Entry entry = byNode.get(node);
+        return entry == null ? 0L : entry.store().capacity();
+    }
+
+    /** How many items that node is holding. */
+    public long usedOf(final NodeUuid node) {
+        final Entry entry = byNode.get(node);
+        return entry == null ? 0L : entry.store().used();
+    }
+
     public Map<StorageKey, Long> query() {
         final Map<StorageKey, Long> totals = new HashMap<>();
         for (final Entry entry : entries) {

@@ -68,6 +68,25 @@ public interface CliComputer {
     /** Which servers hold the named item and how much each has. */
     List<Holding> find(String item);
 
+    /**
+     * One server of the network: what it is called, how many items it is holding and how many it could.
+     *
+     * <p>{@code capacity} counts only what the network may fill, so a personal computer that published a
+     * tenth of its disks contributes a tenth of them and no more.
+     */
+    record ServerUse(String name, long stored, long capacity) {
+    }
+
+    /** Every server on the network, with what each is holding; empty when this machine is on none. */
+    default List<ServerUse> servers() {
+        return List.of();
+    }
+
+    /** What the whole network is holding, and what it could hold. */
+    default ServerUse networkUse() {
+        return new ServerUse("", 0L, 0L);
+    }
+
     /** Pull items from the network into this computer's local storage. */
     OpResult select(String item, long quantity);
 

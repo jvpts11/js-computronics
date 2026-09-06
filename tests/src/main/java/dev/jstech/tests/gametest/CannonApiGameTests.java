@@ -265,6 +265,38 @@ public final class CannonApiGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void network_readsWhatTheRealNetworkCanHold(final GameTestHelper helper) {
+        final dev.jstech.tests.testkit.TestWorldBuilder.CraftingNetwork wired =
+                dev.jstech.tests.testkit.TestWorldBuilder.forGameTest(helper).buildCraftingNetwork();
+        final CraftingComputerBlockEntity computer = wired.cc();
+        wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final long capacity = dev.jstech.computronics.operation.NetworkStorage.of(
+                            helper.getLevel(), wired.mainframe().networkUuid()).capacity();
+                    helper.assertTrue(capacity > 0, "the network has drives to fill; got " + capacity);
+                    final CannonProcesses.Started started = computer.cannon().start("room.asm", listing("""
+                            class Room {
+                                static void Main() {
+                                    Console.PrintLine(Network.Used + " of " + Network.Capacity);
+                                    foreach (ServerInfo server in Network.Servers()) {
+                                        Console.PrintLine(server.Stored + "/" + server.Capacity);
+                                    }
+                                }
+                            }
+                            """), 1, computer.cannonHost());
+                    helper.assertTrue(started.ok(), "the program starts: " + started.message());
+                    computer.cannon().tick(100000);
+                    final List<String> said = computer.cannon().byId(started.id()).process().console();
+                    helper.assertTrue(said.getFirst().equals("640 of " + capacity),
+                            "the program reads what the network holds and could hold; got " + said.getFirst());
+                    helper.assertTrue(said.size() > 1 && said.get(1).startsWith("640/"),
+                            "and the same for the server holding it; got " + said);
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void network_saysSoOnAMachineWithNoCableInIt(final GameTestHelper helper) {
         final BlockPos at = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity computer = computer(helper, at);

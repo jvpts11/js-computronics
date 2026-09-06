@@ -345,10 +345,13 @@ public final class BuiltIns {
         final NamedType server = this.declare("ServerInfo", NamedType.Kind.CLASS);
         this.property(server, "Name", this.stringType, PUBLIC);
         this.property(server, "Stored", whole, PUBLIC);
+        this.property(server, "Capacity", whole, PUBLIC);
 
         final NamedType network = this.declare("Network", NamedType.Kind.CLASS);
         this.property(network, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
         this.property(network, "Current", this.stringType, PUBLIC_STATIC);
+        this.property(network, "Capacity", whole, PUBLIC_STATIC);
+        this.property(network, "Used", whole, PUBLIC_STATIC);
         this.method(network, "Total", whole, PUBLIC_STATIC, this.stringType);
         this.method(network, "Types", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
                 PUBLIC_STATIC);
