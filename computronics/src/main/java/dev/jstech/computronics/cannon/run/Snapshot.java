@@ -24,7 +24,7 @@ import java.util.Map;
  */
 public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames, List<FrameShot> waiting,
                        Map<String, Map<String, Value>> statics, Value script, List<String> console,
-                       String state, String message, int spent) {
+                       int written, String state, String message, int spent) {
 
     public Snapshot {
         held = List.copyOf(held);

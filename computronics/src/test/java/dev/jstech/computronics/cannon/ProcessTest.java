@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
 import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.Library;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Values;
@@ -185,6 +186,20 @@ class ProcessTest {
                 """, ROOM);
         assertFinished(process);
         assertEquals(List.of("kept 5"), process.console());
+    }
+
+    @Test
+    void run_keepsOnlyTheLastOfWhatAChattyProgramPrints() {
+        final Process process = run("""
+                        for (int i = 0; i < 260; i++) {
+                            Console.PrintLine("line " + i);
+                        }
+                """);
+        assertFinished(process);
+        final List<String> said = process.console();
+        assertEquals(Library.CONSOLE_LINES, said.size());
+        assertEquals("line 60", said.getFirst());
+        assertEquals("line 259", said.getLast());
     }
 
     @Test

@@ -787,8 +787,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             desktopWire.add(new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload
                     .WireLine(line.text(), line.style()));
         }
+        // Every reply says whether a program has the terminal, notices included: one that said otherwise
+        // would hand the keyboard back while a program was still using it.
         final var desktop = new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload(
-                false, "", desktopWire);
+                false, cannon.held() != 0, "", desktopWire);
         for (final net.minecraft.server.level.ServerPlayer viewer : viewers) {
             if (viewer.containerMenu instanceof dev.jstech.computronics.menu.DesktopMenu) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(viewer, desktop);
@@ -1088,6 +1090,15 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return cannon;
     }
 
+    /** The prompt this machine's shell would show, for giving it back when a program lets go. */
+    private String shellPrompt() {
+        if (this instanceof dev.jstech.computronics.terminal.ComputerTerminalHost host
+                && level instanceof ServerLevel server) {
+            return new dev.jstech.computronics.program.ServerCliComputer(host, server).prompt();
+        }
+        return "";
+    }
+
     /** The clock those programs read, which is this machine's own world. */
     public dev.jstech.computronics.cannon.run.Host cannonHost() {
         return cannonHost;
@@ -1127,6 +1138,61 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             return;
         }
         cannon.tick(cannonBudget());
+        if (level instanceof ServerLevel server) {
+            pushCannonOutput(server);
+        }
+    }
+
+    /**
+     * Sends what the program in front has printed to whoever is at this machine's terminal.
+     *
+     * <p>This is what makes a program at a terminal behave like one anywhere else: its lines appear as
+     * it prints them rather than all at once when it is over, and the prompt comes back the moment it
+     * returns. A program nobody is watching still runs; there is simply nowhere for its lines to go.
+     */
+    private void pushCannonOutput(final ServerLevel level) {
+        if (cannon.held() == 0) {
+            return;
+        }
+        final var one = cannon.byId(cannon.held());
+        if (one == null) {
+            cannon.release();
+            return;
+        }
+        final var state = one.process().state();
+        final boolean over = state != dev.jstech.computronics.cannon.run.Process.State.RUNNING
+                && state != dev.jstech.computronics.cannon.run.Process.State.PARKED;
+        final java.util.List<String> fresh = cannon.unseen();
+        final String halt = over && state == dev.jstech.computronics.cannon.run.Process.State.HALTED
+                ? one.process().message() : null;
+        if (over) {
+            cannon.release();
+            setChanged();
+        }
+        if (fresh.isEmpty() && halt == null && !over) {
+            return;
+        }
+        final java.util.List<net.minecraft.server.level.ServerPlayer> viewers = consoleViewers(level);
+        if (viewers.isEmpty()) {
+            return;
+        }
+        final java.util.List<dev.jstech.computronics.operation.payload.DesktopShellOutputPayload
+                .WireLine> wire = new java.util.ArrayList<>();
+        for (final String line : fresh) {
+            wire.add(new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload.WireLine(
+                    line, dev.jstech.computronics.program.cli.CliStyle.PLAIN.ordinal()));
+        }
+        if (halt != null) {
+            wire.add(new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload.WireLine(
+                    halt, dev.jstech.computronics.program.cli.CliStyle.ERROR.ordinal()));
+        }
+        final var payload = new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload(
+                false, !over, over ? shellPrompt() : "", wire);
+        for (final net.minecraft.server.level.ServerPlayer viewer : viewers) {
+            if (viewer.containerMenu instanceof dev.jstech.computronics.menu.DesktopMenu) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(viewer, payload);
+            }
+        }
     }
 
     /**

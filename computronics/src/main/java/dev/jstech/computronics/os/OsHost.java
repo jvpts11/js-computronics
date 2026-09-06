@@ -236,7 +236,7 @@ public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
         final dev.jstech.computronics.cannon.machine.CannonProcesses scripts = cannon();
         if (scripts != null) {
             for (final dev.jstech.computronics.cannon.machine.CannonProcesses.Live one : scripts.all()) {
-                ledger.add(one.name(), one.heapMb(), RamLedger.Kind.PROCESS);
+                ledger.add(one.name(), one.heapMb(), RamLedger.Kind.PROCESS, one.id());
             }
         }
         for (final OpenWindow window : openWindows()) {

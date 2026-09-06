@@ -10,6 +10,7 @@ package dev.jstech.computronics.program;
 import dev.jstech.computronics.blockentity.AbstractComputerBlockEntity;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.cannon.machine.CannonProcesses;
+import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
 import dev.jstech.computronics.operation.MoveLabels;
@@ -2415,6 +2416,20 @@ public final class ServerCliComputer implements CliComputer {
 
     // Script processes — the Cannon programs this machine is running.
 
+    /**
+     * The machine's programs when one of them has the terminal, or null when the prompt is free.
+     *
+     * <p>A machine has one prompt, so it has at most one program in front of it; whoever is at the
+     * keyboard is typing at that program until it returns.
+     */
+    @org.jetbrains.annotations.Nullable
+    public CannonProcesses foreground() {
+        if (hostBlock instanceof AbstractComputerBlockEntity computer && computer.cannon().held() != 0) {
+            return computer.cannon();
+        }
+        return null;
+    }
+
     @Override
     public OpResult startCannon(final String path, final int heapMb) {
         if (!(hostBlock instanceof AbstractComputerBlockEntity computer)) {
@@ -2439,6 +2454,13 @@ public final class ServerCliComputer implements CliComputer {
             return OpResult.fail(started.message());
         }
         computer.setChanged();
+        final CannonProcesses.Live one = computer.cannon().byId(started.id());
+        if (one != null && one.process().shape() == Shape.CONSOLE) {
+            // A program that runs at a terminal takes the one that started it, the way it does on any
+            // machine: the prompt is its, and comes back when it returns.
+            computer.cannon().hold(started.id());
+            return OpResult.ok("");
+        }
         return OpResult.ok(started.message());
     }
 

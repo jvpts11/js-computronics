@@ -11,6 +11,7 @@ import dev.jstech.computronics.cannon.CannonCompiler;
 import dev.jstech.computronics.cannon.SourceFile;
 import dev.jstech.computronics.cannon.machine.CannonProcesses;
 import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.Library;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.tests.JsTests;
 import java.util.List;
@@ -121,6 +122,81 @@ public final class CannonProcessGameTests {
         helper.assertTrue(processes.isEmpty(), "and is gone from the list");
         helper.assertTrue(running.console().contains("down"),
                 "having said goodbye; got " + running.console());
+        helper.succeed();
+    }
+
+    /** A program that runs at a terminal: it starts at Main, prints, and is done. */
+    private static final String HELLO = """
+            class Hello {
+                static void Main() {
+                    for (int i = 0; i < 3; i++) { Console.PrintLine("hi " + i); }
+                }
+            }
+            """;
+
+    @GameTest(template = ARENA)
+    public static void cannon_runsATerminalProgramOnceAndIsDoneWithIt(final GameTestHelper helper) {
+        final CannonProcesses processes = new CannonProcesses();
+        final CannonProcesses.Started started =
+                processes.start("hello.asm", listing(HELLO), 1, Host.still());
+        helper.assertTrue(started.ok(), "it starts: " + started.message());
+        final Process running = only(processes);
+        processes.tick(512);
+        helper.assertTrue(running.console().equals(List.of("hi 0", "hi 1", "hi 2")),
+                "it says its piece; got " + running.console());
+        processes.tick(512);
+        helper.assertTrue(processes.isEmpty(),
+                "and is gone, not asked again; " + processes.all().size() + " left");
+        helper.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannon_keepsAFinishedTerminalProgramWhileTheTerminalHasIt(final GameTestHelper helper) {
+        final CannonProcesses processes = new CannonProcesses();
+        final int id = processes.start("hello.asm", listing(HELLO), 1, Host.still()).id();
+        processes.hold(id);
+        processes.tick(512);
+        processes.tick(512);
+        helper.assertTrue(processes.all().size() == 1, "it waits to be read");
+        helper.assertTrue(only(processes).state() == Process.State.FINISHED, "having finished");
+        processes.release();
+        helper.assertTrue(processes.isEmpty(), "and goes once the terminal lets it");
+        helper.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannon_handsTheTerminalEachLineOnceAndOnlyOnce(final GameTestHelper helper) {
+        final CannonProcesses processes = new CannonProcesses();
+        final int id = processes.start("hello.asm", listing(HELLO), 1, Host.still()).id();
+        processes.hold(id);
+        helper.assertTrue(processes.unseen().isEmpty(), "nothing has been printed yet");
+        processes.tick(512);
+        final List<String> first = processes.unseen();
+        helper.assertTrue(first.equals(List.of("hi 0", "hi 1", "hi 2")),
+                "it hands over what was printed; got " + first);
+        helper.assertTrue(processes.unseen().isEmpty(), "and does not hand the same lines twice");
+        helper.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void cannon_givesTheTerminalTheLastOfALoudProgramWhenItScrolled(final GameTestHelper helper) {
+        final CannonProcesses processes = new CannonProcesses();
+        final int id = processes.start("loud.asm", listing("""
+                class Loud {
+                    static void Main() {
+                        for (int i = 0; i < 260; i++) { Console.PrintLine("line " + i); }
+                    }
+                }
+                """), 1, Host.still()).id();
+        processes.hold(id);
+        processes.tick(100000);
+        final List<String> seen = processes.unseen();
+        // What fell off the end while nobody looked is gone, as it is on any terminal; what is left is
+        // the newest, in order, and the newest of all is the last thing the program said.
+        helper.assertTrue(seen.size() == Library.CONSOLE_LINES,
+                "it hands over everything still kept; got " + seen.size());
+        helper.assertTrue("line 259".equals(seen.getLast()), "ending with the last; got " + seen.getLast());
+        helper.assertTrue("line 60".equals(seen.getFirst()), "starting where it scrolled; got " + seen.getFirst());
         helper.succeed();
     }
 

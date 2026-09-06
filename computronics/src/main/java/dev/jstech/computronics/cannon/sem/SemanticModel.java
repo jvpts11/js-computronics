@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.cannon.sem;
 
+import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.ast.Expr;
 import dev.jstech.computronics.cannon.ast.Node;
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ public final class SemanticModel {
     private final Map<Node, Binding.Variable> places = new IdentityHashMap<>();
     private final List<NamedType> declared = new ArrayList<>();
     private NamedType entryPoint;
+    private Shape shape = Shape.SCRIPT;
 
     /** Records what an expression's type is. */
     public void setType(final Expr expression, final TypeSymbol type) {
@@ -98,13 +100,19 @@ public final class SemanticModel {
         return null;
     }
 
-    /** The class the runtime instantiates to start the program, or null when there is not exactly one. */
+    /** The class the runtime starts the program from, or null when there is not exactly one. */
     public NamedType entryPoint() {
         return this.entryPoint;
     }
 
-    /** Records the class the runtime starts from. */
-    public void setEntryPoint(final NamedType entryPoint) {
+    /** Whether that class is a program that runs at a terminal or one that stays up. */
+    public Shape shape() {
+        return this.shape;
+    }
+
+    /** Records the class the runtime starts from, and which kind of program it makes. */
+    public void setEntryPoint(final NamedType entryPoint, final Shape shape) {
         this.entryPoint = entryPoint;
+        this.shape = shape;
     }
 }

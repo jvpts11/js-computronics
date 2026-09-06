@@ -9,6 +9,7 @@ package dev.jstech.computronics.cannon.sem;
 
 import dev.jstech.computronics.cannon.CannonError;
 import dev.jstech.computronics.cannon.DiagnosticBag;
+import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.ast.CompilationUnit;
 import dev.jstech.computronics.cannon.ast.Decl;
 import dev.jstech.computronics.cannon.ast.Node;
@@ -293,20 +294,50 @@ public final class Declarations {
     }
 
     /**
-     * Finds the class the runtime starts from. A program is exactly one of them: none and there is
-     * nothing to run, more than one and there is no saying which.
+     * Finds where the runtime starts, and which of the two kinds of program this is.
+     *
+     * <p>A class that implements the script interface is one that stays up; a class with a static
+     * {@code Main} that takes nothing and returns nothing is one that runs at a terminal. A program is
+     * exactly one of those: none and there is nothing to run, more than one and there is no saying
+     * which. A class that does both is a script, because implementing the interface is the deliberate
+     * act and a method called Main is only a name.
      */
     public void checkEntryPoint(final int line, final int column) {
-        final List<NamedType> candidates = new ArrayList<>();
+        final List<NamedType> scripts = new ArrayList<>();
+        final List<NamedType> consoles = new ArrayList<>();
         for (final NamedType type : this.declared.values()) {
-            if (type.kind() == NamedType.Kind.CLASS && type.isOrDescendsFrom(this.builtIns.scriptType())) {
-                candidates.add(type);
+            if (type.kind() != NamedType.Kind.CLASS) {
+                continue;
+            }
+            if (type.isOrDescendsFrom(this.builtIns.scriptType())) {
+                scripts.add(type);
+            } else if (mainOf(type) != null) {
+                consoles.add(type);
             }
         }
-        if (candidates.size() == 1) {
-            this.model.setEntryPoint(candidates.getFirst());
+        if (scripts.size() + consoles.size() != 1) {
+            this.diagnostics.error(line, column, CannonError.ENTRY_POINT,
+                    scripts.size() + consoles.size());
             return;
         }
-        this.diagnostics.error(line, column, CannonError.ENTRY_POINT, candidates.size());
+        this.model.setEntryPoint(scripts.isEmpty() ? consoles.getFirst() : scripts.getFirst(),
+                scripts.isEmpty() ? Shape.CONSOLE : Shape.SCRIPT);
     }
+
+    /** That class's {@code static void Main()}, or null when it has none of that exact shape. */
+    public static MemberSymbol.MethodSymbol mainOf(final NamedType type) {
+        for (final MemberSymbol member : type.members()) {
+            if (member instanceof MemberSymbol.MethodSymbol method
+                    && MAIN.equals(method.name())
+                    && method.isStatic()
+                    && method.parameters().isEmpty()
+                    && method.returnType() == TypeSymbol.Primitive.VOID) {
+                return method;
+            }
+        }
+        return null;
+    }
+
+    /** The name a program that runs at a terminal starts at. */
+    public static final String MAIN = "Main";
 }

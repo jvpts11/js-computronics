@@ -33,7 +33,8 @@ public final class AsmWriter {
         final StringBuilder text = new StringBuilder();
         text.append(".asm ").append(program.version()).append('\n');
         if (program.entryPoint() != null) {
-            text.append(".start ").append(program.entryPoint()).append('\n');
+            text.append(".start ").append(program.entryPoint())
+                    .append(' ').append(program.shape().written()).append('\n');
         }
         for (final AsmType type : program.types()) {
             text.append('\n');

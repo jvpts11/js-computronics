@@ -90,6 +90,61 @@ class CannonSemanticsTest {
     }
 
     @Test
+    void checkProgram_takesAStaticMainAsAProgramThatRunsAtATerminal() {
+        final CannonSemantics.Result result =
+                CannonSemantics.checkProgram(List.of(new SourceFile("Hello.can", """
+                        class Hello {
+                            static void Main() { Console.PrintLine("hi"); }
+                        }
+                        """)));
+        assertClean(result);
+        assertEquals("Hello", result.model().entryPoint().name());
+        assertEquals(Shape.CONSOLE, result.model().shape());
+    }
+
+    @Test
+    void checkProgram_refusesAFileThatIsBothKindsOfProgram() {
+        final CannonSemantics.Result result =
+                CannonSemantics.checkProgram(List.of(new SourceFile("Both.can", """
+                        class Hello { static void Main() { } }
+                        class Watch : IScript {
+                            public void OnInit() { }
+                            public void OnTick() { }
+                            public void OnDestroy() { }
+                        }
+                        """)));
+        assertReports("C3017", result);
+    }
+
+    @Test
+    void checkProgram_takesAScriptWithAMainAsAScript() {
+        final CannonSemantics.Result result =
+                CannonSemantics.checkProgram(List.of(new SourceFile("Watch.can", """
+                        class Watch : IScript {
+                            static void Main() { }
+                            public void OnInit() { }
+                            public void OnTick() { }
+                            public void OnDestroy() { }
+                        }
+                        """)));
+        assertClean(result);
+        assertEquals(Shape.SCRIPT, result.model().shape());
+    }
+
+    @Test
+    void checkProgram_doesNotTakeAMainOfTheWrongShapeAsOne() {
+        final CannonSemantics.Result result =
+                CannonSemantics.checkProgram(List.of(new SourceFile("Nearly.can", """
+                        class Nearly {
+                            void Main() { }
+                            static int Main(int n) { return n; }
+                        }
+                        """)));
+        assertReports("C3017", result);
+        assertNull(result.model().entryPoint());
+    }
+
+    @Test
     void check_readsTypesInWhateverOrderTheyWereWritten() {
         assertClean(check("""
                 class Uses { Made held = new Made(); }

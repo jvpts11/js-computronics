@@ -255,7 +255,18 @@ class EmitterTest {
     }
 
     @Test
-    void emit_namesTheClassTheRuntimeStartsFrom() {
-        assertTrue(compile("").startsWith(".asm 1\n.start Monitor\n"));
+    void emit_namesTheClassTheRuntimeStartsFromAndWhatKindOfProgramItIs() {
+        assertTrue(compile("").startsWith(".asm 1\n.start Monitor script\n"));
+    }
+
+    @Test
+    void emit_marksAProgramThatRunsAtATerminalAsOne() {
+        final CannonCompiler.Result built = CannonCompiler.compile(List.of(new SourceFile("Hello.can", """
+                class Hello {
+                    static void Main() { Console.PrintLine("hi"); }
+                }
+                """)));
+        assertTrue(built.ok(), () -> String.join("\n", built.lines()));
+        assertTrue(built.assembly().startsWith(".asm 1\n.start Hello console\n"), built.assembly());
     }
 }

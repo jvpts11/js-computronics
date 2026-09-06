@@ -50,7 +50,8 @@ public enum CannonError {
     NO_BASE_CLASS("C3015", "'%s' has no base class"),
     CANNOT_ASSIGN_READONLY("C3016", "'%s' is readonly, so it can only be written where it is declared "
             + "or in a constructor"),
-    ENTRY_POINT("C3017", "a program needs exactly one class that implements IScript, and this one has %s"),
+    ENTRY_POINT("C3017", "a program needs exactly one place to start, either a class that implements "
+            + "IScript or a class with a static Main, and this one has %s"),
     MISSING_INTERFACE_MEMBER("C3018", "'%s' says it is a '%s' but does not have '%s'"),
     WRONG_TYPE_ARGUMENT_COUNT("C3019", "'%s' takes %s type arguments"),
     STATIC_THROUGH_INSTANCE("C3020", "'%s' belongs to the type, not to one of its objects"),

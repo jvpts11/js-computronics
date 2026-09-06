@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
+import dev.jstech.computronics.operation.payload.ComputingPayloads;
 import dev.jstech.computronics.operation.payload.DesktopShellOutputPayload;
 import dev.jstech.computronics.operation.payload.DesktopShellRunPayload;
 import dev.jstech.computronics.os.DesktopEnvironmentDef;
@@ -58,6 +59,13 @@ public final class ShellApp implements DesktopApp {
 
     /** The shell prompt, synced from the server after each command so it tracks the current directory. */
     private String prompt;
+    /**
+     * Whether a program has this terminal.
+     *
+     * <p>While it does there is no prompt and nothing can be typed: the keyboard belongs to the program,
+     * which listens for one thing, the ask to stop.
+     */
+    private boolean busy;
     /** Whether the host desktop is a Linux one, so the window speaks bash instead of the DOS prompt. */
     private final boolean posix;
     /** The window title: the desktop environment's own terminal name (Konsole, Terminal, Megashell...). */
@@ -105,7 +113,10 @@ public final class ShellApp implements DesktopApp {
         output = root.add(new ListView<Line>(() -> wrapCache, LINE_H, this::renderLine));
         scrolledTag = root.add(new Label(() -> scrollOffset > 0 ? "scrolled +" + scrollOffset : "").setColor(TAG_COLOR)
                 .setAlign(Label.Align.RIGHT));
-        console = root.add(new CommandLine(DesktopShellRunPayload.MAX_LEN - 1, this::submit).setPrompt(() -> prompt));
+        // No prompt is drawn while a program is running, because on a real terminal there is none: the
+        // program has the screen until it returns.
+        console = root.add(new CommandLine(DesktopShellRunPayload.MAX_LEN - 1, this::submit)
+                .setPrompt(() -> busy ? "" : prompt));
         root.focus(console);
         // Sync the real prompt (and any pending build notices) before the player types anything.
         PacketDistributor.sendToServer(new DesktopShellRunPayload(host, ""));
@@ -127,6 +138,7 @@ public final class ShellApp implements DesktopApp {
         if (!payload.prompt().isEmpty()) {
             active.prompt = payload.prompt();
         }
+        active.busy = payload.busy();
         // Any command may have installed or removed a program (apt install, uninstall, ...): refresh the
         // desktop's launcher state so the change shows up without closing the monitor.
         DesktopScreen.refreshActive();
@@ -249,11 +261,20 @@ public final class ShellApp implements DesktopApp {
 
     @Override
     public boolean charTyped(final char c) {
-        return root.charTyped(c);
+        // While a program has the terminal the keyboard is its, and it listens for one thing only.
+        return busy || root.charTyped(c);
     }
 
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
+        if (busy) {
+            if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_C
+                    && net.minecraft.client.gui.screens.Screen.hasControlDown()) {
+                PacketDistributor.sendToServer(
+                        new DesktopShellRunPayload(host, ComputingPayloads.INTERRUPT));
+            }
+            return true;
+        }
         return root.keyPressed(key, scanCode, modifiers);
     }
 

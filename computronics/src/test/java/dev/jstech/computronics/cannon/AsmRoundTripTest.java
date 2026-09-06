@@ -45,7 +45,7 @@ class AsmRoundTripTest {
     /** A program using every directive and a spread of operand shapes. */
     private static AsmProgram sample() {
         final AsmProgram program = new AsmProgram();
-        program.setEntryPoint("Monitor");
+        program.setEntryPoint("Monitor", Shape.SCRIPT);
 
         final AsmType script = new AsmType(AsmType.Kind.INTERFACE, "IScript");
         script.addMethod(new AsmMethod("OnInit", "void", List.of(), false, 0, null));
@@ -103,7 +103,7 @@ class AsmRoundTripTest {
     /** A small program whose listing is short enough to write out line by line. */
     private static AsmProgram golden() {
         final AsmProgram program = new AsmProgram();
-        program.setEntryPoint("Monitor");
+        program.setEntryPoint("Monitor", Shape.SCRIPT);
         final AsmType monitor = new AsmType(AsmType.Kind.CLASS, "Monitor");
         monitor.addBase("IScript");
         monitor.addField(new AsmType.Field("threshold", "int", false));
@@ -126,7 +126,7 @@ class AsmRoundTripTest {
     void write_laysTheListingOutInColumnsAPlayerCanFollow() {
         final String[] lines = AsmWriter.write(golden()).split("\n", -1);
         assertEquals(".asm 1", lines[0]);
-        assertEquals(".start Monitor", lines[1]);
+        assertEquals(".start Monitor script", lines[1]);
         assertEquals("", lines[2]);
         assertEquals(".class Monitor : IScript", lines[3]);
         assertEquals(".field int threshold", lines[4]);

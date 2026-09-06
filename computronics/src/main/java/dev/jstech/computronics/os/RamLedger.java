@@ -30,8 +30,18 @@ public final class RamLedger {
     /** What an entry of the ledger is. */
     public enum Kind { SYSTEM, DESKTOP, SERVICE, WINDOW, PROCESS }
 
-    /** One thing holding memory: a label to show, its megabytes and what it is. */
-    public record Entry(String name, int mb, Kind kind) {
+    /**
+     * One thing holding memory: a label to show, its megabytes, what it is, and the number it answers to
+     * where it has one.
+     *
+     * <p>Only a script process has a number: two of them can be started from the same file, so the name
+     * alone cannot say which is which when one of them is to be ended.
+     */
+    public record Entry(String name, int mb, Kind kind, int id) {
+
+        public Entry(final String name, final int mb, final Kind kind) {
+            this(name, mb, kind, 0);
+        }
     }
 
     private final int totalMb;
@@ -43,8 +53,13 @@ public final class RamLedger {
 
     /** Records {@code mb} held by {@code name}; nothing is recorded for a zero or negative size. */
     public RamLedger add(final String name, final int mb, final Kind kind) {
+        return add(name, mb, kind, 0);
+    }
+
+    /** The same, for something that answers to a number of its own. */
+    public RamLedger add(final String name, final int mb, final Kind kind, final int id) {
         if (mb > 0) {
-            entries.add(new Entry(name, mb, kind));
+            entries.add(new Entry(name, mb, kind, id));
         }
         return this;
     }

@@ -38,26 +38,54 @@ public final class Library {
     private final Host host;
     private final List<String> console = new ArrayList<>();
     private final Random random = new Random(0);
+    private int written;
 
     public Library(final Heap heap, final Host host) {
         this.heap = heap;
         this.host = host;
     }
 
-    /** What the process has written, line by line. */
+    /**
+     * How many lines of its own output a process keeps.
+     *
+     * <p>There has to be a limit: what a process has written is part of what is saved with the machine
+     * it runs on, and a program printing once a tick would otherwise grow that file for as long as the
+     * world exists. What a program said thousands of lines ago is not what anyone reads anyway.
+     */
+    public static final int CONSOLE_LINES = 200;
+
+    /** What the process has written, line by line, oldest of the ones it still keeps first. */
     public List<String> console() {
         return List.copyOf(this.console);
     }
 
-    /** Writes a line to the process's console. */
+    /**
+     * How many lines the process has written since it started, the ones already dropped included.
+     *
+     * <p>A terminal showing what a program prints needs to know what it has not shown yet, and the count
+     * of what is kept cannot say that once the oldest lines start falling off the end.
+     */
+    public int written() {
+        return this.written;
+    }
+
+    /** Writes a line to the process's console, dropping the oldest once it is full. */
     public void write(final String line) {
         this.console.add(line);
+        this.written++;
+        while (this.console.size() > CONSOLE_LINES) {
+            this.console.removeFirst();
+        }
     }
 
     /** Puts back what a process had written before it was put away. */
-    public void restore(final List<String> lines) {
+    public void restore(final List<String> lines, final int written) {
         this.console.clear();
         this.console.addAll(lines);
+        while (this.console.size() > CONSOLE_LINES) {
+            this.console.removeFirst();
+        }
+        this.written = Math.max(written, this.console.size());
     }
 
     /** Whether the runtime, rather than the program, answers for this type. */
@@ -134,7 +162,7 @@ public final class Library {
 
     private Answer console(final String name, final List<Object> arguments) {
         switch (name) {
-            case "Print", "PrintLine" -> this.console.add(String.valueOf(arguments.getFirst()));
+            case "Print", "PrintLine" -> this.write(String.valueOf(arguments.getFirst()));
             default -> this.console.clear();
         }
         return Answer.of(null);

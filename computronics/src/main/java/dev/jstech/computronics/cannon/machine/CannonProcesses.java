@@ -9,6 +9,7 @@ package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.computronics.cannon.Diagnostic;
 import dev.jstech.computronics.cannon.DiagnosticBag;
+import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
 import dev.jstech.computronics.cannon.run.Host;
@@ -46,6 +47,7 @@ public final class CannonProcesses {
     /** What a program is allowed to spend on its farewell before the machine stops waiting. */
     private static final int FAREWELL = 4096;
 
+    private static final String MAIN = "Main";
     private static final String WHEN_STARTED = "OnInit";
     private static final String EVERY_TICK = "OnTick";
     private static final String WHEN_STOPPED = "OnDestroy";
@@ -68,6 +70,53 @@ public final class CannonProcesses {
 
     private final List<Live> live = new ArrayList<>();
     private int next = 1;
+    private int held;
+    private int shown;
+
+    /**
+     * The program the terminal is holding, or 0.
+     *
+     * <p>A machine has one prompt, so it has at most one program in front of it. That program keeps its
+     * place in the list after it returns, because what it printed last is not read until the terminal
+     * has had its turn; every other finished program is cleared away as soon as it is done.
+     */
+    public int held() {
+        return this.held;
+    }
+
+    /** Says the terminal is now waiting on that program. */
+    public void hold(final int id) {
+        this.held = id;
+        this.shown = 0;
+    }
+
+    /**
+     * What the held program has printed since this was last asked, and never the same line twice.
+     *
+     * <p>A program that printed more than its console keeps while nobody was looking has scrolled: what
+     * fell off the end is gone, the way it is gone from any terminal nobody was watching.
+     */
+    public List<String> unseen() {
+        final Live one = this.byId(this.held);
+        if (one == null) {
+            return List.of();
+        }
+        final List<String> kept = one.process().console();
+        final int written = one.process().written();
+        final int fresh = Math.min(written - this.shown, kept.size());
+        this.shown = written;
+        return fresh <= 0 ? List.of() : List.copyOf(kept.subList(kept.size() - fresh, kept.size()));
+    }
+
+    /** Lets the terminal go, clearing the program away if it had already finished. */
+    public void release() {
+        final Live one = this.byId(this.held);
+        this.held = 0;
+        if (one != null && one.process().state() != Process.State.RUNNING
+                && one.process().state() != Process.State.PARKED) {
+            this.live.remove(one);
+        }
+    }
 
     /** Everything running, in the order it was started. */
     public List<Live> all() {
@@ -118,11 +167,17 @@ public final class CannonProcesses {
         }
         final int room = Math.clamp(heapMb <= 0 ? DEFAULT_HEAP_MB : heapMb, 1, MAX_HEAP_MB);
         final Process process = new Process(program, (long) room * 1024 * 1024, host);
-        final Values.Obj script = process.create(program.entryPoint());
-        if (script == null) {
-            return Started.failed(name + ": " + program.entryPoint() + " cannot be made");
+        if (program.shape() == Shape.CONSOLE) {
+            // Nothing is made: a program that runs at a terminal starts at a static method, the way one
+            // does anywhere else, and has no instance of itself to be called on.
+            process.beginStatic(program.entryPoint(), MAIN);
+        } else {
+            final Values.Obj script = process.create(program.entryPoint());
+            if (script == null) {
+                return Started.failed(name + ": " + program.entryPoint() + " cannot be made");
+            }
+            process.begin(script, WHEN_STARTED);
         }
-        process.begin(script, WHEN_STARTED);
         final int id = this.next++;
         this.live.add(new Live(id, name, assembly, room, process));
         return new Started(id, name + " started as " + id);
@@ -146,6 +201,9 @@ public final class CannonProcesses {
             one.process().step(FAREWELL);
         }
         this.live.remove(one);
+        if (this.held == id) {
+            this.held = 0;
+        }
         return true;
     }
 
@@ -169,16 +227,26 @@ public final class CannonProcesses {
             return;
         }
         final List<Live> ready = new ArrayList<>();
+        final List<Live> done = new ArrayList<>();
         for (final Live one : this.live) {
-            if (one.process().state() == Process.State.HALTED) {
+            final Process.State state = one.process().state();
+            final boolean console = one.process().shape() == Shape.CONSOLE;
+            if (state == Process.State.HALTED || state == Process.State.FINISHED) {
+                // A program that runs at a terminal is done when it returns, and is asked nothing more;
+                // one that stays up is asked again, which is what makes it stay up. Either way, a
+                // finished terminal program only leaves once whoever was waiting on it has read it.
+                if (console && one.id() != this.held) {
+                    done.add(one);
+                } else if (!console && state == Process.State.FINISHED
+                        && one.process().script() != null) {
+                    one.process().begin(one.process().script(), EVERY_TICK);
+                    ready.add(one);
+                }
                 continue;
-            }
-            final Values.Obj script = one.process().script();
-            if (one.process().state() == Process.State.FINISHED && script != null) {
-                one.process().begin(script, EVERY_TICK);
             }
             ready.add(one);
         }
+        this.live.removeAll(done);
         if (ready.isEmpty()) {
             return;
         }
@@ -198,6 +266,8 @@ public final class CannonProcesses {
     private static final String ASSEMBLY = "assembly";
     private static final String HEAP = "heap";
     private static final String STATE = "state";
+    private static final String HELD = "held";
+    private static final String SHOWN = "shown";
 
     /** Writes every running program down. */
     public void save(final CompoundTag tag) {
@@ -213,12 +283,16 @@ public final class CannonProcesses {
         }
         tag.put(PROCESSES, written);
         tag.putInt(NEXT, this.next);
+        tag.putInt(HELD, this.held);
+        tag.putInt(SHOWN, this.shown);
     }
 
     /** Reads them back, each one carrying on from the instruction it had reached. */
     public void load(final CompoundTag tag, final Host host) {
         this.live.clear();
         this.next = Math.max(1, tag.getInt(NEXT));
+        this.held = tag.getInt(HELD);
+        this.shown = tag.getInt(SHOWN);
         final ListTag written = tag.getList(PROCESSES, Tag.TAG_COMPOUND);
         for (int i = 0; i < written.size(); i++) {
             final CompoundTag each = written.getCompound(i);

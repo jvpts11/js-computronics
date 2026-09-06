@@ -50,6 +50,7 @@ public final class TaskManagerApp implements DesktopApp {
     private static final String KIND_SYSTEM = "SYSTEM";
     private static final String KIND_DESKTOP = "DESKTOP";
     private static final String KIND_SERVICE = "SERVICE";
+    private static final String KIND_PROCESS = "PROCESS";
 
     private final BlockPos host;
     private final Form form;
@@ -157,16 +158,26 @@ public final class TaskManagerApp implements DesktopApp {
      */
     private void endSelected() {
         final RamUse use = selectedRow();
-        if (use != null && KIND_WINDOW.equals(use.kind())) {
-            DesktopScreen.requestClose(use.label());
-            selected = -1;
-            PacketDistributor.sendToServer(new RequestSettingsPayload(host));
+        if (use == null) {
+            return;
         }
+        if (KIND_WINDOW.equals(use.kind())) {
+            DesktopScreen.requestClose(use.label());
+        } else if (KIND_PROCESS.equals(use.kind())) {
+            // A script is ended by its number: two of them can have come from the same file, and the
+            // machine is the one that knows which is which.
+            PacketDistributor.sendToServer(
+                    new dev.jstech.computronics.operation.payload.EndProcessPayload(host, use.id()));
+        } else {
+            return;
+        }
+        selected = -1;
+        PacketDistributor.sendToServer(new RequestSettingsPayload(host));
     }
 
     private boolean canEnd() {
         final RamUse use = selectedRow();
-        return use != null && KIND_WINDOW.equals(use.kind());
+        return use != null && (KIND_WINDOW.equals(use.kind()) || KIND_PROCESS.equals(use.kind()));
     }
 
     private int totalMb() {
@@ -679,6 +690,7 @@ public final class TaskManagerApp implements DesktopApp {
             case KIND_DESKTOP -> "desktop";
             case KIND_SERVICE -> "service";
             case KIND_WINDOW -> "program";
+            case KIND_PROCESS -> "script";
             default -> kind.toLowerCase(Locale.ROOT);
         };
     }

@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.cannon.run;
 
+import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.asm.AsmType;
 import dev.jstech.computronics.cannon.asm.Instruction;
 import dev.jstech.computronics.cannon.asm.Opcode;
@@ -124,6 +125,11 @@ public final class Process {
         return this.library.console();
     }
 
+    /** How many lines it has written since it started, the ones no longer kept included. */
+    public int written() {
+        return this.library.written();
+    }
+
     /** What it is holding, to the byte. */
     public Heap heap() {
         return this.heap;
@@ -159,6 +165,25 @@ public final class Process {
      */
     public Values.Obj script() {
         return this.script;
+    }
+
+    /** Whether this is a program that runs at a terminal or one that stays up. */
+    public Shape shape() {
+        return this.program.shape();
+    }
+
+    /**
+     * Puts a call on a type itself in the queue, for a program that starts at a static method and so
+     * never has an instance of anything to be called on.
+     */
+    public void beginStatic(final String owner, final String method) {
+        final Loaded.Method found = this.program.method(owner, method, List.of());
+        if (found == null) {
+            this.halt(new Halt(Halt.Reason.NO_SUCH_MEMBER, 0, owner + " has no " + method + " to run"));
+            return;
+        }
+        this.waiting.add(new Frame(found, null));
+        this.state = State.RUNNING;
     }
 
     /** Puts a call on that object in the queue, to be run by the slices that follow. */
@@ -310,7 +335,7 @@ public final class Process {
             kept.put(entry.getKey(), fields(entry.getValue(), numbers));
         }
         return new Snapshot(this.heap.budget(), held, frames, queued, kept, value(this.script, numbers),
-                this.library.console(), this.state.name(),
+                this.library.console(), this.library.written(), this.state.name(),
                 this.message == null ? "" : this.message, this.spent);
     }
 
@@ -359,7 +384,7 @@ public final class Process {
         if (value(shot.script(), byNumber) instanceof Values.Obj script) {
             process.script = script;
         }
-        process.library.restore(shot.console());
+        process.library.restore(shot.console(), shot.written());
         process.state = State.valueOf(shot.state());
         process.message = shot.message().isEmpty() ? null : shot.message();
         process.spent = shot.spent();

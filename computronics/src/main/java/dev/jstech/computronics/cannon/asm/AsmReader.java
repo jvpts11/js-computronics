@@ -9,6 +9,7 @@ package dev.jstech.computronics.cannon.asm;
 
 import dev.jstech.computronics.cannon.CannonError;
 import dev.jstech.computronics.cannon.DiagnosticBag;
+import dev.jstech.computronics.cannon.Shape;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -79,7 +80,13 @@ public final class AsmReader {
         final String word = space < 0 ? text.substring(1) : text.substring(1, space);
         final String rest = space < 0 ? "" : text.substring(space + 1).trim();
         switch (word) {
-            case "start" -> program.setEntryPoint(rest);
+            case "start" -> {
+                // "<Type> <shape>"; a listing that names no shape is a script, which is what the only
+                // kind of program there used to be would have been.
+                final int split = rest.indexOf(' ');
+                program.setEntryPoint(split < 0 ? rest : rest.substring(0, split),
+                        Shape.of(split < 0 ? "" : rest.substring(split + 1).trim()));
+            }
             case "class", "interface", "enum" -> {
                 this.closeMethod();
                 this.type = this.readTypeHead(AsmType.Kind.written(word), rest);

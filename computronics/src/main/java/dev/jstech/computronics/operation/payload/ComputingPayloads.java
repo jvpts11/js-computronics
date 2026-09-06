@@ -202,6 +202,8 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRequestSettings);
         registrar.playToServer(SetSettingPayload.TYPE, SetSettingPayload.STREAM_CODEC,
                 ComputingPayloads::handleSetSetting);
+        registrar.playToServer(EndProcessPayload.TYPE, EndProcessPayload.STREAM_CODEC,
+                ComputingPayloads::handleEndProcess);
         registrar.playToClient(SettingsSnapshotPayload.TYPE, SettingsSnapshotPayload.STREAM_CODEC,
                 ComputingPayloads::handleSettingsSnapshot);
         registrar.playToServer(SetIconPositionPayload.TYPE, SetIconPositionPayload.STREAM_CODEC,
@@ -1156,6 +1158,20 @@ public final class ComputingPayloads {
         });
     }
 
+    private static void handleEndProcess(final EndProcessPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jstech.computronics.blockentity.AbstractComputerBlockEntity computer
+                    && computer.cannon().stop(payload.id())) {
+                computer.setChanged();
+                PacketDistributor.sendToPlayer(player, buildSettingsSnapshot(
+                        (dev.jstech.computronics.os.OsHost) computer, payload.hostPos()));
+            }
+        });
+    }
+
     private static void handleSetSetting(final SetSettingPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player
@@ -1221,7 +1237,8 @@ public final class ComputingPayloads {
         final dev.jstech.computronics.os.RamLedger ledger = computer.ramLedger();
         final List<SettingsSnapshotPayload.RamUse> ramUses = new ArrayList<>();
         for (final dev.jstech.computronics.os.RamLedger.Entry entry : ledger.entries()) {
-            ramUses.add(new SettingsSnapshotPayload.RamUse(entry.name(), entry.mb(), entry.kind().name()));
+            ramUses.add(new SettingsSnapshotPayload.RamUse(
+                    entry.name(), entry.mb(), entry.kind().name(), entry.id()));
         }
         return new SettingsSnapshotPayload(pos, console.wallpaper(), console.computerName(),
                 st.accent(), st.clock12h(), st.guiScale(), st.brightness(),
@@ -1550,6 +1567,7 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             final java.util.List<DesktopShellOutputPayload.WireLine> wire = new java.util.ArrayList<>();
             boolean clear = false;
+            boolean busy = false;
             String prompt = "C:\\>";
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
@@ -1557,6 +1575,14 @@ public final class ComputingPayloads {
                             instanceof dev.jstech.computronics.terminal.ComputerTerminalHost host) {
                 final var computer =
                         new dev.jstech.computronics.program.ServerCliComputer(host, level);
+                // A program has the terminal: everything typed goes to it, not to the shell, and what it
+                // printed since the last time keeps coming until it returns.
+                final var running = computer.foreground();
+                if (running != null) {
+                    busy = drainForeground(running, payload.line(), wire);
+                    context.reply(new DesktopShellOutputPayload(false, busy, computer.prompt(), wire));
+                    return;
+                }
                 final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(
                         computer, CLI_WIDTH);
                 final var response = shell.run(payload.line(), computer);
@@ -1565,6 +1591,9 @@ public final class ComputingPayloads {
                     wire.add(new DesktopShellOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
                 }
                 prompt = computer.prompt();
+                // The command just run may have been one that starts a program at this terminal, in
+                // which case the prompt does not come back with this reply.
+                busy = computer.foreground() != null;
                 // The reboot verbs work from the desktop's terminal window too: the desktop closes and the
                 // monitor either replays the POST (plain reboot) or enters the firmware setup.
                 final BlockPos monitorPos = player.containerMenu
@@ -1586,8 +1615,38 @@ public final class ComputingPayloads {
                     return;
                 }
             }
-            context.reply(new DesktopShellOutputPayload(clear, prompt, wire));
+            context.reply(new DesktopShellOutputPayload(clear, busy, prompt, wire));
         });
+    }
+
+    /**
+     * What the shell sends when the player asks the program in front to stop.
+     *
+     * <p>The value is the single byte U+0003, the one a terminal has always sent for this and one no
+     * keyboard puts into a line of text, so nothing a player writes can be mistaken for it. An empty
+     * line means something else entirely: the shell asking whether there is more output to show.
+     */
+    public static final String INTERRUPT = "";
+
+    /**
+     * Answers a line typed while a program has the terminal, and says whether it still has it.
+     *
+     * <p>What a program prints reaches the terminal from the machine's own tick, so nothing is
+     * collected here: this is only the keyboard, and while a program is in front the one thing the
+     * keyboard can say to it is to stop.
+     */
+    private static boolean drainForeground(
+            final dev.jstech.computronics.cannon.machine.CannonProcesses processes, final String typed,
+            final java.util.List<DesktopShellOutputPayload.WireLine> wire) {
+        if (!INTERRUPT.equals(typed)) {
+            return true;
+        }
+        final int id = processes.held();
+        processes.release();
+        processes.stop(id);
+        wire.add(new DesktopShellOutputPayload.WireLine("^C",
+                dev.jstech.computronics.program.cli.CliStyle.DIM.ordinal()));
+        return false;
     }
 
     private static void handleDesktopShellOutput(final DesktopShellOutputPayload payload,

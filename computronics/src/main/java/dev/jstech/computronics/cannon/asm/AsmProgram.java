@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.cannon.asm;
 
+import dev.jstech.computronics.cannon.Shape;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +26,7 @@ public final class AsmProgram {
     private final int version;
     private final List<AsmType> types = new ArrayList<>();
     private String entryPoint;
+    private Shape shape = Shape.SCRIPT;
 
     public AsmProgram() {
         this(VERSION);
@@ -54,14 +56,20 @@ public final class AsmProgram {
         return null;
     }
 
-    /** The class the runtime instantiates to start the program, or null for a library. */
+    /** The class the runtime starts the program from, or null for a library. */
     public String entryPoint() {
         return this.entryPoint;
     }
 
-    /** Names the class the runtime starts from. */
-    public void setEntryPoint(final String entryPoint) {
+    /** Whether this is a program that runs at a terminal or one that stays up. */
+    public Shape shape() {
+        return this.shape;
+    }
+
+    /** Names the class the runtime starts from, and says which kind of program it is. */
+    public void setEntryPoint(final String entryPoint, final Shape shape) {
         this.entryPoint = entryPoint;
+        this.shape = shape;
     }
 
     /** Adds a type. */

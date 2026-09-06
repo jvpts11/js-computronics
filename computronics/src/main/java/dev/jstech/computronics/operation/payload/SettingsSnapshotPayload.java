@@ -55,7 +55,14 @@ public record SettingsSnapshotPayload(
     public record DiskUse(String label, long capMb, long usedMb, boolean system) {}
 
     /** One holder of RAM for the System Monitor: what it is called, its megabytes and its kind's name. */
-    public record RamUse(String label, int mb, String kind) {}
+    /**
+     * One thing holding memory: what to call it, how many megabytes, what kind it is, and the number it
+     * answers to if it is something that can be ended.
+     *
+     * <p>A window is ended by its name, but two scripts can be started from the same file and only the
+     * number tells them apart, so the number travels for those and is 0 for everything else.
+     */
+    public record RamUse(String label, int mb, String kind, int id) {}
 
     public static final int MAX = 64;
 
@@ -109,6 +116,7 @@ public record SettingsSnapshotPayload(
             buf.writeUtf(r.label(), 48);
             buf.writeVarInt(r.mb());
             buf.writeUtf(r.kind(), 16);
+            buf.writeVarInt(r.id());
         }
     }
 
@@ -146,7 +154,7 @@ public record SettingsSnapshotPayload(
         final int ramUseCount = Math.min(buf.readVarInt(), MAX);
         final List<RamUse> ramUses = new ArrayList<>(ramUseCount);
         for (int i = 0; i < ramUseCount; i++) {
-            ramUses.add(new RamUse(buf.readUtf(48), buf.readVarInt(), buf.readUtf(16)));
+            ramUses.add(new RamUse(buf.readUtf(48), buf.readVarInt(), buf.readUtf(16), buf.readVarInt()));
         }
         return new SettingsSnapshotPayload(pos, wallpaper, computerName, accent, clock12h, guiScale, brightness,
                 saveDrive, removableAutoOpen, themePreset, taskbarCentered, darkMode, netshare, cpuLabel, cpuMhz,

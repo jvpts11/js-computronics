@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.cannon.run;
 
+import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.asm.AsmMethod;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmType;
@@ -71,9 +72,11 @@ public final class Loaded {
 
     private final Map<String, Type> types = new LinkedHashMap<>();
     private final String entryPoint;
+    private final Shape shape;
 
     private Loaded(final AsmProgram program) {
         this.entryPoint = program.entryPoint();
+        this.shape = program.shape();
         for (final AsmType type : program.types()) {
             this.types.put(type.name(), load(type));
         }
@@ -92,6 +95,11 @@ public final class Loaded {
     /** The class the runtime starts from, or null for a library. */
     public String entryPoint() {
         return this.entryPoint;
+    }
+
+    /** Whether this is a program that runs at a terminal or one that stays up. */
+    public Shape shape() {
+        return this.shape;
     }
 
     /** Every type the program declares. */

@@ -75,7 +75,7 @@ public final class Emitter {
     public AsmProgram emit() {
         final AsmProgram program = new AsmProgram();
         if (this.model.entryPoint() != null) {
-            program.setEntryPoint(this.model.entryPoint().name());
+            program.setEntryPoint(this.model.entryPoint().name(), this.model.shape());
         }
         for (final NamedType type : this.model.declaredTypes()) {
             final Decl.TypeDecl source = this.declarations.source(type);
