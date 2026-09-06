@@ -21,6 +21,8 @@ public final class DesktopWindow {
 
     public static final int TITLE_H = 14;
     private static final int BTN = 11;
+    /** The program icon in the title bar, sized to sit inside the bar with a pixel of air above and below. */
+    private static final int ICON = 10;
     private static final int GRIP = 6;
     /** How far from an edge the cursor still grabs that edge for a resize. */
     private static final int BORDER_MARGIN = 4;
@@ -362,12 +364,24 @@ public final class DesktopWindow {
         }
         skin.windowFrame(g, wx, wy, ww, wh);
         skin.titleBar(g, wx, wy, ww, TITLE_H, focused);
+        // The program's own icon at the left of the bar, the way every desktop of these generations marked
+        // which program a window belongs to. A key nothing answers to simply gets no icon.
+        final dev.jstech.computronics.os.DesktopEnvironmentDef desktop =
+                dev.jstech.computronics.os.OsRegistry.getDesktop(
+                        net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", skin.osPath()));
+        final dev.jstech.computronics.os.ProgramSpec program =
+                desktop == null ? null : desktop.programFor(appKey);
+        final boolean titleIcon = program != null && !skin.titleCentered();
+        if (titleIcon) {
+            ProgramIcons.draw(g, wx + 3, wy + 2, ICON, ICON, program.iconId(), skin.iconSet());
+        }
         // Where the title sits is part of the skin's identity, not a constant: the GNOME form centres it,
         // and the title is clamped short of the controls so a long one never runs under them.
         final String title = app.title();
+        final int textLeft = wx + (titleIcon ? 3 + ICON + 3 : 4);
         final int titleX = skin.titleCentered()
                 ? Math.max(wx + 4, Math.min(wx + (ww - font.width(title)) / 2, minX() - font.width(title) - 4))
-                : wx + 4;
+                : textLeft;
         g.drawString(font, title, titleX, wy + 3,
                 focused ? skin.titleText() : 0xFF5B6674, focused && skin.textShadow());
         // The focused window also carries an accent outline, so "which one am I typing into" reads

@@ -249,6 +249,16 @@ public final class OsSkin implements Skin {
         return desktopPath;
     }
 
+    /**
+     * The program-icon set this skin draws with: its own desktop's, and the period set for the two Legacy
+     * Unix desktops, which have artwork of their own age.
+     */
+    public String iconSet() {
+        return form == Form.KDE2 || form == Form.GNOME1
+                ? desktopPath + ProgramIcons.PERIOD_SUFFIX
+                : desktopPath;
+    }
+
     public DesktopTheme theme() {
         return theme;
     }

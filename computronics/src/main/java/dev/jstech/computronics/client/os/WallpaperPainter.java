@@ -99,19 +99,70 @@ final class WallpaperPainter {
 
     /** Frames XP: a Bliss-style sky fading to the horizon over a rolling green hill. */
     private static void paintXp(final GuiGraphics g, final int w, final int h) {
-        final int horizon = (int) (h * 0.62);
-        // Sky: deeper blue up top, fading to a pale band near the horizon.
-        g.fillGradient(0, 0, w, horizon, 0xFF3E72B4, 0xFFBFD8F2);
+        final int horizon = (int) (h * 0.60);
+        // Sky: deep blue overhead fading to a pale band at the horizon, with soft clouds drifting in it.
+        g.fillGradient(0, 0, w, horizon, 0xFF1F5FC0, 0xFFC4DFF6);
+        cloud(g, (int) (w * 0.22), (int) (h * 0.21), (int) (w * 0.19), (int) (h * 0.065));
+        cloud(g, (int) (w * 0.33), (int) (h * 0.15), (int) (w * 0.11), (int) (h * 0.045));
+        cloud(g, (int) (w * 0.75), (int) (h * 0.25), (int) (w * 0.21), (int) (h * 0.065));
+        cloud(g, (int) (w * 0.87), (int) (h * 0.18), (int) (w * 0.12), (int) (h * 0.045));
         // Grass: bright near the horizon down to a deeper green at the bottom.
-        g.fillGradient(0, horizon, w, h, 0xFF6FA63C, 0xFF34611C);
-        // A rolling hill rising above the flat horizon (a soft sine bump) in the grass colour,
-        // with a thin sunlit rim along its crest.
+        g.fillGradient(0, horizon, w, h, 0xFF74AE3E, 0xFF2F5A18);
+        // The hill the whole picture is named after: a broad crest left of centre, its sunlit rim along the
+        // top and a second, nearer rise on the right, so the field reads as land instead of a flat band.
+        final int crest = Math.max(4, (int) (h * 0.15));
         for (int x = 0; x < w; x += 2) {
-            final int rise = (int) (10.0 * Math.sin(Math.PI * x / w));
+            final double t = (double) x / Math.max(1, w - 1);
+            final int rise = (int) (crest * Math.sin(Math.PI * Math.pow(t, 0.75)));
+            if (rise <= 0) {
+                continue;
+            }
             final int top = horizon - rise;
             final int x2 = Math.min(x + 2, w);
-            g.fill(x, top, x2, horizon, 0xFF5E9433);
-            g.fill(x, top, x2, top + 1, 0xFF8FC65A);
+            g.fill(x, top, x2, horizon, 0xFF63A032);
+            g.fill(x, top, x2, top + 1, 0xFF9BD164);
+        }
+        final int near = Math.max(3, (int) (h * 0.09));
+        for (int x = w / 2; x < w; x += 2) {
+            final double t = (double) (x - w / 2) / Math.max(1, w / 2 - 1);
+            final int rise = (int) (near * Math.sin(Math.PI * t));
+            if (rise <= 0) {
+                continue;
+            }
+            final int top = horizon - rise;
+            final int x2 = Math.min(x + 2, w);
+            // No lit rim on this one: it is the nearer rise, and its edge reads as a silhouette against the
+            // hill behind it. A bright line there would look like a scratch across the field.
+            g.fill(x, top, x2, horizon, 0xFF4E8B26);
+        }
+        // A shade settling into the field just under the horizon, the way the far grass falls into shadow.
+        g.fillGradient(0, horizon, w, horizon + Math.max(2, h / 40), 0x00000000, 0x2A0E2A08);
+    }
+
+    /**
+     * One soft cloud. Each row is three nested spans of the same thin white, so the alpha piles up towards
+     * the middle both across and down the shape: it fades out at every edge instead of showing the rings a
+     * few stacked ellipses would leave.
+     */
+    private static void cloud(final GuiGraphics g, final int cx, final int cy, final int rx, final int ry) {
+        if (rx <= 0 || ry <= 0) {
+            return;
+        }
+        for (int dy = -ry; dy <= ry; dy++) {
+            final double k = 1.0 - (double) (dy * dy) / (double) (ry * ry);
+            if (k <= 0.0) {
+                continue;
+            }
+            final int half = (int) (rx * Math.sqrt(k));
+            if (half <= 0) {
+                continue;
+            }
+            final int row = cy + dy;
+            g.fill(cx - half, row, cx + half, row + 1, 0x14FFFFFF);
+            final int mid = half * 72 / 100;
+            g.fill(cx - mid, row, cx + mid, row + 1, 0x14FFFFFF);
+            final int core = half * 42 / 100;
+            g.fill(cx - core, row, cx + core, row + 1, 0x18FFFFFF);
         }
     }
 
