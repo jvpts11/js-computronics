@@ -388,8 +388,11 @@ public final class BuiltinCommands {
                         && !info.description().toLowerCase(Locale.ROOT).contains(needle)) {
                     continue;
                 }
+                // Something another player wrote says so. Whether to install it is then an informed
+                // choice rather than a guess about where it came from.
                 final String state = info.building() ? "building"
-                        : info.installed() ? "installed" : "available";
+                        : info.installed() ? "installed"
+                                : info.community() ? "community" : "available";
                 ctx.out().row("  " + info.name() + "  [" + state + "]", info.description());
                 shown++;
             }

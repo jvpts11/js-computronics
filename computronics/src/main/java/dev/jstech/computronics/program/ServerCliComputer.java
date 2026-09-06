@@ -1605,7 +1605,64 @@ public final class ServerCliComputer implements CliComputer {
                     + (spec.kind() == dev.jstech.computronics.os.ProgramKind.SERVICE ? " (service)" : ""),
                     hasPackage(spec), building));
         }
+        // Then whatever players on this network have published, marked as theirs.
+        final MainframeBlockEntity mirror = mirrorMainframe();
+        if (mirror != null) {
+            for (final var shelved : mirror.shelvedPackages().entrySet()) {
+                final dev.jstech.computronics.cannon.pack.Packed packed =
+                        dev.jstech.computronics.cannon.pack.Packed.read(shelved.getValue());
+                if (packed == null) {
+                    continue;
+                }
+                final String about = packed.manifest().about();
+                out.add(new PackageInfo(shelved.getKey(),
+                        (about.isBlank() ? packed.manifest().label() : about)
+                                + " - " + packed.manifest().house(),
+                        false, false, true));
+            }
+        }
         return out;
+    }
+
+    @Override
+    public OpResult publishPackage(final String path) {
+        final MainframeBlockEntity mirror = mirrorMainframe();
+        if (mirror == null) {
+            return OpResult.fail("could not resolve mirror:// - connect this computer to a network whose"
+                    + " Mainframe runs the Mirror service");
+        }
+        final FsResult read = readFile(path);
+        if (!read.ok()) {
+            return OpResult.fail(read.message());
+        }
+        final dev.jstech.computronics.cannon.pack.Packed packed =
+                dev.jstech.computronics.cannon.pack.Packed.read(read.message());
+        if (packed == null) {
+            return OpResult.fail(path + ": this is not a package (build one with 'canpack build')");
+        }
+        final java.util.List<String> wrong = packed.problems();
+        if (!wrong.isEmpty()) {
+            return OpResult.fail(path + ": " + wrong.getFirst());
+        }
+        final String name = packed.manifest().name();
+        final boolean replacing = mirror.shelvedPackage(name) != null;
+        if (!mirror.shelve(name, read.message())) {
+            return OpResult.fail("the Mirror is full (" + MainframeBlockEntity.SHELF_MAX + " packages)");
+        }
+        return OpResult.ok((replacing ? "replaced " : "published ") + packed.manifest().label()
+                + " on the Mirror");
+    }
+
+    @Override
+    public OpResult unpublishPackage(final String name) {
+        final MainframeBlockEntity mirror = mirrorMainframe();
+        if (mirror == null) {
+            return OpResult.fail("could not resolve mirror://");
+        }
+        if (!mirror.unshelve(name == null ? "" : name.trim())) {
+            return OpResult.fail("the Mirror is not serving " + name);
+        }
+        return OpResult.ok("took " + name + " off the Mirror");
     }
 
     @Override

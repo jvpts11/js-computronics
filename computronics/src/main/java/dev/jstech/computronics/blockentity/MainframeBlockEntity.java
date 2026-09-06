@@ -2110,6 +2110,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         iqlEngineRunning = !tag.contains("IqlEngineRunning") || tag.getBoolean("IqlEngineRunning");
         automationEngineInstalled = tag.getBoolean("AutomationEngineInstalled");
         mirrorInstalled = tag.getBoolean("MirrorInstalled");
+        shelved.clear();
+        final CompoundTag shelf = tag.getCompound("MirrorShelf");
+        for (final String name : shelf.getAllKeys()) {
+            shelved.put(name, shelf.getString(name));
+        }
         iqlCatalog.clear();
         final net.minecraft.nbt.ListTag catalog = tag.getList("IqlCatalog", net.minecraft.nbt.Tag.TAG_COMPOUND);
         for (int i = 0; i < catalog.size(); i++) {
@@ -2173,6 +2178,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         tag.putBoolean("IqlEngineRunning", iqlEngineRunning);
         tag.putBoolean("AutomationEngineInstalled", automationEngineInstalled);
         tag.putBoolean("MirrorInstalled", mirrorInstalled);
+        if (!shelved.isEmpty()) {
+            final CompoundTag shelf = new CompoundTag();
+            shelved.forEach(shelf::putString);
+            tag.put("MirrorShelf", shelf);
+        }
         if (!iqlCatalog.isEmpty()) {
             final net.minecraft.nbt.ListTag catalog = new net.minecraft.nbt.ListTag();
             for (final dev.jstech.computronics.program.iql.IqlSavedObject object : iqlCatalog.all()) {
@@ -2275,6 +2285,56 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             return false;
         }
         mirrorInstalled = true;
+        setChanged();
+        return true;
+    }
+
+    /**
+     * The packages players on this network have published to the Mirror, by name.
+     *
+     * <p>They live with the Mainframe, not with the machine that built them: that is what a Mirror is
+     * for. Each is the whole package as text, so what a player installs is exactly what the player who
+     * published it could read on their own screen.
+     */
+    private final java.util.Map<String, String> shelved = new java.util.LinkedHashMap<>();
+
+    /** How many packages one network's Mirror will hold, so a shelf cannot grow without end. */
+    public static final int SHELF_MAX = 64;
+
+    /** Everything on the shelf, by name. */
+    public java.util.Map<String, String> shelvedPackages() {
+        return java.util.Map.copyOf(shelved);
+    }
+
+    /** One of them, or null. */
+    @Nullable
+    public String shelvedPackage(final String name) {
+        return shelved.get(name);
+    }
+
+    /**
+     * Puts one on the shelf, replacing any build of it already there.
+     *
+     * <p>Replacing rather than refusing is deliberate: publishing again is how a player releases a fix,
+     * and making them take the old one down first would only mean a moment when the network has none.
+     */
+    public boolean shelve(final String name, final String text) {
+        if (name == null || name.isBlank() || text == null || text.isBlank()) {
+            return false;
+        }
+        if (!shelved.containsKey(name) && shelved.size() >= SHELF_MAX) {
+            return false;
+        }
+        shelved.put(name, text);
+        setChanged();
+        return true;
+    }
+
+    /** Takes one off the shelf; false when it was not there. */
+    public boolean unshelve(final String name) {
+        if (shelved.remove(name) == null) {
+            return false;
+        }
         setChanged();
         return true;
     }

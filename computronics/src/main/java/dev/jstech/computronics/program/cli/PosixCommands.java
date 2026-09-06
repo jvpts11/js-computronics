@@ -171,7 +171,9 @@ public final class PosixCommands {
                     continue;
                 }
                 any = true;
-                ctx.out().row(p.name() + (p.installed() ? "  [installed]" : p.building() ? "  [building]" : ""),
+                ctx.out().row(p.name() + (p.installed() ? "  [installed]"
+                                : p.building() ? "  [building]"
+                                        : p.community() ? "  [community]" : ""),
                         p.description());
             }
             if (!any) {

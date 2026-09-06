@@ -410,6 +410,58 @@ public final class CannonApiGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void canpack_publishesToTheMirrorAndTheNetworkOffersIt(final GameTestHelper helper) {
+        final dev.jstech.tests.testkit.TestWorldBuilder.CraftingNetwork wired =
+                dev.jstech.tests.testkit.TestWorldBuilder.forGameTest(helper).buildCraftingNetwork();
+        final CraftingComputerBlockEntity computer = wired.cc();
+        wired.mainframe().installMirror();
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var shell = new dev.jstech.computronics.program.ServerCliComputer(
+                            computer, helper.getLevel());
+                    // A package as it would come off 'canpack build'.
+                    final var manifest = new dev.jstech.computronics.cannon.pack.Manifest(
+                            "stockwatch", "1.0.0", "jvpts11", "stockwatch.asm", "bell", 1,
+                            List.of("stockwatch.asm"), "Tells you when the iron runs low");
+                    final var packed = new dev.jstech.computronics.cannon.pack.Packed(manifest,
+                            java.util.Map.of("stockwatch.asm", listing("""
+                                    class Watcher : IScript {
+                                        public void OnInit() { }
+                                        public void OnTick() { }
+                                        public void OnDestroy() { }
+                                    }
+                                    """)));
+                    helper.assertTrue(shell.writeFile(packed.fileName(), packed.write()).ok(),
+                            "the package is on the disk");
+
+                    final var published = shell.publishPackage(packed.fileName());
+                    helper.assertTrue(published.ok(), "it publishes: " + published.message());
+                    helper.assertTrue(wired.mainframe().shelvedPackage("stockwatch") != null,
+                            "the Mirror is holding it");
+
+                    // Anyone on the network sees it on the shelf, marked as a player's own.
+                    boolean offered = false;
+                    for (final var info : shell.packagesAvailable()) {
+                        if ("stockwatch".equals(info.name())) {
+                            offered = info.community();
+                        }
+                    }
+                    helper.assertTrue(offered, "the network offers it, marked as the community's");
+
+                    // What comes back off the shelf is what went on it, line for line.
+                    final var back = dev.jstech.computronics.cannon.pack.Packed.read(
+                            wired.mainframe().shelvedPackage("stockwatch"));
+                    helper.assertTrue(back != null && back.files().equals(packed.files()),
+                            "and it comes back unchanged");
+
+                    helper.assertTrue(shell.unpublishPackage("stockwatch").ok(), "it comes back off");
+                    helper.assertTrue(wired.mainframe().shelvedPackage("stockwatch") == null,
+                            "and the shelf is clear");
+                })
+                .thenSucceed();
+    }
+
+    @GameTest(template = ARENA)
     public static void network_saysSoOnAMachineWithNoCableInIt(final GameTestHelper helper) {
         final BlockPos at = new BlockPos(2, 2, 2);
         final CraftingComputerBlockEntity computer = computer(helper, at);

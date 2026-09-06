@@ -246,7 +246,33 @@ public interface CliComputer {
     }
 
     /** One package the mirror offers: its name, description, and whether this computer already has it. */
-    record PackageInfo(String name, String description, boolean installed, boolean building) {
+    /**
+     * One package on the shelf.
+     *
+     * <p>{@code community} marks one a player wrote and published, as against one that came with the
+     * machines. Both install the same way; a player is entitled to know which is which.
+     */
+    record PackageInfo(String name, String description, boolean installed, boolean building,
+                       boolean community) {
+
+        public PackageInfo(final String name, final String description, final boolean installed,
+                           final boolean building) {
+            this(name, description, installed, building, false);
+        }
+    }
+
+    /**
+     * Puts a built package on the network's Mirror, for anyone on the network to install.
+     *
+     * @param path the package file on this computer's disk
+     */
+    default OpResult publishPackage(final String path) {
+        return OpResult.fail("could not resolve mirror://");
+    }
+
+    /** Takes one back off the Mirror. */
+    default OpResult unpublishPackage(final String name) {
+        return OpResult.fail("could not resolve mirror://");
     }
 
     /** The packages the network mirror offers this computer (empty when no mirror is reachable). */

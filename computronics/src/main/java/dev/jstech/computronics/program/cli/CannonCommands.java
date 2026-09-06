@@ -269,7 +269,7 @@ public final class CannonCommands {
 
         @Override
         public String usage() {
-            return "init [name] | build";
+            return "init [name] | build | publish [file] | unpublish <name>";
         }
 
         @Override
@@ -282,10 +282,14 @@ public final class CannonCommands {
             switch (ctx.arg(0).toLowerCase(Locale.ROOT)) {
                 case "init" -> this.init(ctx);
                 case "build" -> this.build(ctx);
+                case "publish" -> this.publish(ctx);
+                case "unpublish" -> this.unpublish(ctx);
                 default -> {
                     ctx.out().error("usage: canpack " + this.usage());
-                    ctx.out().line("  init [name]   write a " + Manifest.FILE + " to fill in");
-                    ctx.out().line("  build         make the package the manifest describes");
+                    ctx.out().line("  init [name]       write a " + Manifest.FILE + " to fill in");
+                    ctx.out().line("  build             make the package the manifest describes");
+                    ctx.out().line("  publish [file]    put it on the network's Mirror");
+                    ctx.out().line("  unpublish <name>  take it back off");
                 }
             }
         }
@@ -348,6 +352,42 @@ public final class CannonCommands {
             }
             ctx.out().ok("built " + packed.fileName() + " (" + files.size() + " files, "
                     + packed.size() + " bytes)");
+        }
+
+        /**
+         * Puts a built package on the network's Mirror.
+         *
+         * <p>With no file named, it works out which one from the manifest here, so the usual way to
+         * release something is two words after building it.
+         */
+        private void publish(final CliContext ctx) {
+            String file = ctx.argCount() > 1 ? ctx.arg(1) : "";
+            if (file.isEmpty()) {
+                final CliComputer.FsResult read = ctx.computer().readFile(Manifest.FILE);
+                if (!read.ok()) {
+                    ctx.out().error("name the package to publish, or run this beside a " + Manifest.FILE);
+                    return;
+                }
+                final Manifest manifest = Manifest.read(read.message());
+                file = new Packed(manifest, Map.of()).fileName();
+            }
+            report(ctx, ctx.computer().publishPackage(file));
+        }
+
+        private void unpublish(final CliContext ctx) {
+            if (ctx.argCount() < 2) {
+                ctx.out().error("usage: canpack unpublish <name>");
+                return;
+            }
+            report(ctx, ctx.computer().unpublishPackage(ctx.arg(1)));
+        }
+
+        private static void report(final CliContext ctx, final CliComputer.OpResult result) {
+            if (result.ok()) {
+                ctx.out().ok(result.message());
+            } else {
+                ctx.out().error(result.message());
+            }
         }
     }
 }
