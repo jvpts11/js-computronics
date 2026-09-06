@@ -73,7 +73,18 @@ public enum CannonError {
     OUT_TYPE_MUST_MATCH("C3036", "an out argument is exactly '%s', with no conversion on the way"),
     OUT_NOT_ASSIGNED("C3037", "'%s' is filled in by this method, so it must be given a value before "
             + "every way out"),
-    OUT_NOT_A_PLACE("C3038", "'%s' is not somewhere a method can write");
+    OUT_NOT_A_PLACE("C3038", "'%s' is not somewhere a method can write"),
+
+    MISSING_VERSION_LINE("C4001", "the listing has to begin with a version line"),
+    VERSION_TOO_NEW("C4002", "this runtime reads assembly version %s, and this listing is version %s"),
+    UNKNOWN_INSTRUCTION("C4003", "'%s' is not an instruction"),
+    MISSING_OPERAND("C4004", "'%s' needs something after it"),
+    UNEXPECTED_OPERAND("C4005", "'%s' takes nothing after it"),
+    MALFORMED_OPERAND("C4006", "'%s' is not what '%s' takes"),
+    UNKNOWN_DIRECTIVE("C4007", "'%s' is not a line this format has"),
+    INSTRUCTION_OUTSIDE_METHOD("C4008", "an instruction has to be inside a method"),
+    DIRECTIVE_OUTSIDE_TYPE("C4009", "'%s' has to be inside a type"),
+    UNKNOWN_LABEL("C4010", "nothing in this method is labelled '%s'");
 
     private final String code;
     private final String template;
