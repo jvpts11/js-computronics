@@ -54,6 +54,12 @@ public final class Library {
         this.console.add(line);
     }
 
+    /** Puts back what a process had written before it was put away. */
+    public void restore(final List<String> lines) {
+        this.console.clear();
+        this.console.addAll(lines);
+    }
+
     /** Whether the runtime, rather than the program, answers for this type. */
     public boolean answersFor(final String owner) {
         return switch (owner) {

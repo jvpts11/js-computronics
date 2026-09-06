@@ -14,6 +14,7 @@ import dev.jstech.computronics.cannon.asm.Operand;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,9 +89,16 @@ public final class Process {
     private int spent;
 
     public Process(final Loaded program, final long heapBytes, final Host host) {
+        this(program, heapBytes, host, true);
+    }
+
+    private Process(final Loaded program, final long heapBytes, final Host host, final boolean fresh) {
         this.program = program;
         this.heap = new Heap(heapBytes);
         this.library = new Library(this.heap, host);
+        if (!fresh) {
+            return;
+        }
         // Putting the starting values in a type's own fields is the program's work like any other, so
         // it waits its turn and is paid for out of the budget rather than run on the spot.
         for (final Loaded.Type type : program.types()) {
@@ -247,6 +255,263 @@ public final class Process {
         this.message = halt.getMessage();
         this.library.write(halt.getMessage());
         this.frames.clear();
+    }
+
+    // ---------------------------------------------------------------- putting it away and back
+
+    /**
+     * Writes the whole process down: what it has allocated, what each call was doing, and where each
+     * of them had got to.
+     *
+     * <p>Two names for one object come back as two names for one object, because everything allocated
+     * is written under a number and every reference is written as that number.
+     */
+    public Snapshot save() {
+        final Map<Object, Integer> numbers = new IdentityHashMap<>();
+        final List<Object> things = this.heap.everything();
+        for (int i = 0; i < things.size(); i++) {
+            numbers.put(things.get(i), i);
+        }
+        final List<Snapshot.Held> held = new ArrayList<>();
+        for (int i = 0; i < things.size(); i++) {
+            held.add(this.freeze(things.get(i), i, numbers));
+        }
+        // The frames are a stack, so they come out top first; they are written bottom first, which is
+        // the order they have to be put back in.
+        final List<Frame> stack = new ArrayList<>(this.frames);
+        java.util.Collections.reverse(stack);
+        final List<Snapshot.FrameShot> frames = new ArrayList<>();
+        for (final Frame frame : stack) {
+            frames.add(freeze(frame, numbers));
+        }
+        final List<Snapshot.FrameShot> queued = new ArrayList<>();
+        for (final Frame frame : this.waiting) {
+            queued.add(freeze(frame, numbers));
+        }
+        final Map<String, Map<String, Snapshot.Value>> kept = new LinkedHashMap<>();
+        for (final Map.Entry<String, Values.Obj> entry : this.statics.entrySet()) {
+            kept.put(entry.getKey(), fields(entry.getValue(), numbers));
+        }
+        return new Snapshot(this.heap.budget(), held, frames, queued, kept, this.library.console(),
+                this.state.name(), this.message == null ? "" : this.message, this.spent);
+    }
+
+    /** Reads a process back out of what {@link #save()} wrote, ready to carry on where it stopped. */
+    public static Process restore(final Loaded program, final Snapshot shot, final Host host) {
+        final Process process = new Process(program, shot.heapBudget(), host, false);
+        final Map<Integer, Object> byNumber = new LinkedHashMap<>();
+        for (final Snapshot.Held written : shot.held()) {
+            byNumber.put(written.id(), shell(written));
+        }
+        // Handlers are settled before anything is filled in, because one cannot be changed after it is
+        // made and whatever points at one has to point at the one that stays.
+        for (final Snapshot.Held written : shot.held()) {
+            if (written instanceof Snapshot.Held.Handler handler) {
+                final List<Values.Bound> chain = new ArrayList<>();
+                for (final Snapshot.BoundShot bound : handler.chain()) {
+                    chain.add(new Values.Bound(value(bound.target(), byNumber), bound.owner(),
+                            bound.method(), bound.parameters(), bound.returns()));
+                }
+                byNumber.put(handler.id(), new Values.DelegateValue(handler.type(), chain));
+            }
+        }
+        for (final Snapshot.Held written : shot.held()) {
+            fill(written, byNumber);
+            process.heap.restore(byNumber.get(written.id()), written.bytes(), written.line(),
+                    written.freed());
+        }
+        for (final Snapshot.FrameShot written : shot.frames()) {
+            final Frame frame = thaw(program, written, byNumber);
+            if (frame != null) {
+                process.frames.push(frame);
+            }
+        }
+        for (final Snapshot.FrameShot written : shot.waiting()) {
+            final Frame frame = thaw(program, written, byNumber);
+            if (frame != null) {
+                process.waiting.add(frame);
+            }
+        }
+        for (final Map.Entry<String, Map<String, Snapshot.Value>> entry : shot.statics().entrySet()) {
+            final Values.Obj holder = process.statics(entry.getKey());
+            for (final Map.Entry<String, Snapshot.Value> field : entry.getValue().entrySet()) {
+                holder.set(field.getKey(), value(field.getValue(), byNumber));
+            }
+        }
+        process.library.restore(shot.console());
+        process.state = State.valueOf(shot.state());
+        process.message = shot.message().isEmpty() ? null : shot.message();
+        process.spent = shot.spent();
+        return process;
+    }
+
+    private Snapshot.Held freeze(final Object thing, final int number, final Map<Object, Integer> numbers) {
+        final long bytes = this.heap.bytesOf(thing);
+        final int line = this.heap.lineOf(thing);
+        final boolean freed = this.heap.isFreed(thing);
+        if (thing instanceof String text) {
+            return new Snapshot.Held.Text(number, bytes, line, freed, text);
+        }
+        if (thing instanceof Values.Obj object) {
+            return new Snapshot.Held.Object(number, bytes, line, freed, object.type(),
+                    fields(object, numbers));
+        }
+        if (thing instanceof Values.Arr array) {
+            return new Snapshot.Held.Array(number, bytes, line, freed, array.element(),
+                    values(array.all(), numbers));
+        }
+        if (thing instanceof Values.ListValue list) {
+            return new Snapshot.Held.Listing(number, bytes, line, freed, values(list.items(), numbers));
+        }
+        if (thing instanceof Values.MapValue map) {
+            return new Snapshot.Held.Keyed(number, bytes, line, freed,
+                    values(new ArrayList<>(map.entries().keySet()), numbers),
+                    values(new ArrayList<>(map.entries().values()), numbers));
+        }
+        final Values.DelegateValue delegate = (Values.DelegateValue) thing;
+        final List<Snapshot.BoundShot> chain = new ArrayList<>();
+        for (final Values.Bound bound : delegate.chain()) {
+            chain.add(new Snapshot.BoundShot(value(bound.target(), numbers), bound.owner(),
+                    bound.method(), bound.parameters(), bound.returns()));
+        }
+        return new Snapshot.Held.Handler(number, bytes, line, freed, delegate.type(), chain);
+    }
+
+    private static Object shell(final Snapshot.Held written) {
+        return switch (written) {
+            case Snapshot.Held.Text text -> new String(text.value().toCharArray());
+            case Snapshot.Held.Object object -> new Values.Obj(object.type());
+            case Snapshot.Held.Array array -> new Values.Arr(array.element(), array.values().size());
+            case Snapshot.Held.Listing ignored -> new Values.ListValue();
+            case Snapshot.Held.Keyed ignored -> new Values.MapValue();
+            case Snapshot.Held.Handler handler -> new Values.DelegateValue(handler.type(), List.of());
+        };
+    }
+
+    // A later pass, because two things can point at each other and neither can be filled in until both
+    // exist.
+    private static void fill(final Snapshot.Held written, final Map<Integer, Object> byNumber) {
+        final Object thing = byNumber.get(written.id());
+        switch (written) {
+            case Snapshot.Held.Object object -> {
+                for (final Map.Entry<String, Snapshot.Value> field : object.fields().entrySet()) {
+                    ((Values.Obj) thing).set(field.getKey(), value(field.getValue(), byNumber));
+                }
+            }
+            case Snapshot.Held.Array array -> {
+                for (int i = 0; i < array.values().size(); i++) {
+                    ((Values.Arr) thing).set(i, value(array.values().get(i), byNumber), 0);
+                }
+            }
+            case Snapshot.Held.Listing list -> {
+                for (final Snapshot.Value item : list.items()) {
+                    ((Values.ListValue) thing).items().add(value(item, byNumber));
+                }
+            }
+            case Snapshot.Held.Keyed keyed -> {
+                for (int i = 0; i < keyed.keys().size(); i++) {
+                    ((Values.MapValue) thing).entries().put(value(keyed.keys().get(i), byNumber),
+                            value(keyed.values().get(i), byNumber));
+                }
+            }
+            default -> { }
+        }
+    }
+
+    private static Snapshot.FrameShot freeze(final Frame frame, final Map<Object, Integer> numbers) {
+        return new Snapshot.FrameShot(frame.method.owner(), frame.method.name(),
+                frame.method.parameters(), frame.at, value(frame.self, numbers),
+                values(java.util.Arrays.asList(frame.slots), numbers), values(frame.stack, numbers),
+                frame.discard);
+    }
+
+    private static Frame thaw(final Loaded program, final Snapshot.FrameShot written,
+                              final Map<Integer, Object> byNumber) {
+        final Loaded.Method method = found(program, written);
+        if (method == null) {
+            return null;
+        }
+        final Frame frame = new Frame(method, value(written.self(), byNumber));
+        for (int i = 0; i < written.slots().size() && i < frame.slots.length; i++) {
+            frame.slots[i] = value(written.slots().get(i), byNumber);
+        }
+        for (final Snapshot.Value held : written.stack()) {
+            frame.push(value(held, byNumber));
+        }
+        frame.at = written.at();
+        frame.discard = written.discard();
+        return frame;
+    }
+
+    /**
+     * The method a frame was in.
+     *
+     * <p>The one that puts a type's own starting values in place is not among the methods that can be
+     * called by name, so it is asked for separately: a process put away before it ran would otherwise
+     * come back without it.
+     */
+    private static Loaded.Method found(final Loaded program, final Snapshot.FrameShot written) {
+        final Loaded.Method named =
+                program.method(written.owner(), written.name(), written.parameters());
+        if (named != null) {
+            return named;
+        }
+        final Loaded.Type type = program.type(written.owner());
+        if (type == null || type.setUp() == null) {
+            return null;
+        }
+        final Loaded.Method setUp = type.setUp();
+        return setUp.name().equals(written.name()) && setUp.parameters().equals(written.parameters())
+                ? setUp : null;
+    }
+
+    private static Map<String, Snapshot.Value> fields(final Values.Obj object,
+                                                      final Map<Object, Integer> numbers) {
+        final Map<String, Snapshot.Value> written = new LinkedHashMap<>();
+        for (final Map.Entry<String, Object> field : object.all().entrySet()) {
+            written.put(field.getKey(), value(field.getValue(), numbers));
+        }
+        return written;
+    }
+
+    private static List<Snapshot.Value> values(final List<Object> things,
+                                               final Map<Object, Integer> numbers) {
+        final List<Snapshot.Value> written = new ArrayList<>();
+        for (final Object thing : things) {
+            written.add(value(thing, numbers));
+        }
+        return written;
+    }
+
+    private static Snapshot.Value value(final Object thing,
+                                        final Map<Object, Integer> numbers) {
+        return switch (thing) {
+            case null -> new Snapshot.Value.Nothing();
+            case Integer number -> new Snapshot.Value.I4(number);
+            case Long number -> new Snapshot.Value.I8(number);
+            case Float number -> new Snapshot.Value.R4(number);
+            case Double number -> new Snapshot.Value.R8(number);
+            case Boolean flag -> new Snapshot.Value.Bool(flag);
+            case Character letter -> new Snapshot.Value.Ch(letter);
+            default -> {
+                final Integer number = numbers.get(thing);
+                yield number == null ? new Snapshot.Value.Nothing() : new Snapshot.Value.Ref(number);
+            }
+        };
+    }
+
+    private static Object value(final Snapshot.Value written,
+                                          final Map<Integer, Object> byNumber) {
+        return switch (written) {
+            case Snapshot.Value.Nothing ignored -> null;
+            case Snapshot.Value.I4 number -> number.value();
+            case Snapshot.Value.I8 number -> number.value();
+            case Snapshot.Value.R4 number -> number.value();
+            case Snapshot.Value.R8 number -> number.value();
+            case Snapshot.Value.Bool flag -> flag.value();
+            case Snapshot.Value.Ch letter -> letter.value();
+            case Snapshot.Value.Ref reference -> byNumber.get(reference.id());
+        };
     }
 
     // ---------------------------------------------------------------- one instruction

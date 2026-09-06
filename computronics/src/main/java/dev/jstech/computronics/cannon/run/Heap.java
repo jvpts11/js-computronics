@@ -49,6 +49,9 @@ public final class Heap {
     }
 
     private final Map<Object, Entry> live = new IdentityHashMap<>();
+    // Kept beside the map because two objects are told apart by being themselves, and a map that does
+    // that has no order of its own. Writing a process down needs one, so this is it.
+    private final List<Object> order = new ArrayList<>();
     private final long budget;
     private long used;
 
@@ -81,7 +84,41 @@ public final class Heap {
         }
         this.used += bytes;
         this.live.put(value, new Entry(bytes, line));
+        this.order.add(value);
         return value;
+    }
+
+    /** Everything ever allocated, in the order it was, freed things included. */
+    public List<Object> everything() {
+        return List.copyOf(this.order);
+    }
+
+    /** What that thing costs, or 0 if the heap never saw it. */
+    public long bytesOf(final Object value) {
+        final Entry entry = this.live.get(value);
+        return entry == null ? 0 : entry.bytes;
+    }
+
+    /** The line that thing was made on, or 0. */
+    public int lineOf(final Object value) {
+        final Entry entry = this.live.get(value);
+        return entry == null ? 0 : entry.line;
+    }
+
+    /**
+     * Puts something back exactly as it was, for a process being read out of a save.
+     *
+     * <p>It goes back with the size and the line it had, and freed if it was freed, so what the player
+     * sees after the world comes back is what they saw before it went away.
+     */
+    public void restore(final Object value, final long bytes, final int line, final boolean freed) {
+        final Entry entry = new Entry(bytes, line);
+        entry.freed = freed;
+        this.live.put(value, entry);
+        this.order.add(value);
+        if (!freed) {
+            this.used += bytes;
+        }
     }
 
     /** Makes something already recorded bigger or smaller, as a collection does when it changes. */

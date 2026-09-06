@@ -49,6 +49,11 @@ public final class Values {
             this.fields.put(name, value);
         }
 
+        /** Everything it holds, for writing the object down. */
+        public Map<String, Object> all() {
+            return new LinkedHashMap<>(this.fields);
+        }
+
         @Override
         public String toString() {
             return this.type;
@@ -93,6 +98,11 @@ public final class Values {
                 throw new Halt(Halt.Reason.OUT_OF_RANGE, line,
                         "there is no place " + index + " in an array of " + this.values.length);
             }
+        }
+
+        /** Everything it holds, in order, for writing the array down. */
+        public List<Object> all() {
+            return new ArrayList<>(java.util.Arrays.asList(this.values));
         }
     }
 
