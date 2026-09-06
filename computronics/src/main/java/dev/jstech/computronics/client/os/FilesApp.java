@@ -1059,8 +1059,9 @@ public final class FilesApp implements DesktopApp {
         if (target != null && target.file() != null) {
             final boolean dat = target.file().projectsItem();
             final boolean setup = isSetup(target);
+            final boolean program = target.kind() == Kind.FILE && isProgram(target.file());
             final boolean editable = target.kind() == Kind.FILE && !dat && !setup && isText(target.file());
-            items.add(new ContextMenu.Item(setup ? "Run" : "Open", true, () -> open(target)));
+            items.add(new ContextMenu.Item(setup || program ? "Run" : "Open", true, () -> open(target)));
             if (target.kind() == Kind.FILE) {
                 items.add(new ContextMenu.Item("Open with Editor", editable, () -> openInEditor(target)));
             }
@@ -1094,6 +1095,11 @@ public final class FilesApp implements DesktopApp {
             case "bin", "exe", "sh", "dat" -> false;
             default -> true;
         };
+    }
+
+    /** Whether this is something the machine can run: a compiled listing. */
+    private static boolean isProgram(final DiskFilesPayload.WireFile f) {
+        return "asm".equalsIgnoreCase(f.ext());
     }
 
     private boolean isSetup(final Row r) {
@@ -1320,6 +1326,10 @@ public final class FilesApp implements DesktopApp {
                 }
                 if (isSetup(r)) {
                     runSetup(r.file().path());
+                } else if (isProgram(r.file())) {
+                    // A compiled program is run, not read: it gets a terminal, the way one does anywhere
+                    // else, and prints into it.
+                    DesktopScreen.requestRunAtTerminal(r.file().path());
                 } else if (!r.file().projectsItem() && isText(r.file())) {
                     openInEditor(r);
                 }

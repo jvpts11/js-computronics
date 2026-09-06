@@ -204,6 +204,8 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleSetSetting);
         registrar.playToServer(EndProcessPayload.TYPE, EndProcessPayload.STREAM_CODEC,
                 ComputingPayloads::handleEndProcess);
+        registrar.playToServer(RunProgramPayload.TYPE, RunProgramPayload.STREAM_CODEC,
+                ComputingPayloads::handleRunProgram);
         registrar.playToClient(SettingsSnapshotPayload.TYPE, SettingsSnapshotPayload.STREAM_CODEC,
                 ComputingPayloads::handleSettingsSnapshot);
         registrar.playToServer(SetIconPositionPayload.TYPE, SetIconPositionPayload.STREAM_CODEC,
@@ -2135,27 +2137,83 @@ public final class ComputingPayloads {
                     && level.getBlockEntity(payload.hostPos())
                             instanceof dev.jstech.computronics.os
                                     .OsHost computer) {
-                final String path = payload.path();
-                final boolean media = path.startsWith("media:");
-                final net.minecraft.world.item.ItemStack vol =
-                        media ? mediaStackFor(level, computer, path) : computer.systemDisk();
-                if (!vol.isEmpty()) {
-                    // A projected file on an installer (its readme, manifest or autorun) has no stored
-                    // bytes to read: its text is generated from the medium's stamp.
-                    final java.util.Optional<String> projected = media
-                            ? dev.jstech.computronics.os.media.InstallerProjection.text(
-                                    vol, mediaSubPath(path))
-                            : java.util.Optional.empty();
-                    final var read = projected.isPresent() ? projected
-                            : dev.jstech.computronics.os.fs.DiskFilesystem
-                                    .read(vol, media ? mediaSubPath(path) : path);
-                    if (read.isPresent()) {
-                        content = read.get();
-                        exists = true;
-                    }
+                final java.util.Optional<String> read = readDiskFile(level, computer, payload.path());
+                if (read.isPresent()) {
+                    content = read.get();
+                    exists = true;
                 }
             }
             context.reply(new FileContentPayload(payload.path(), content, exists));
+        });
+    }
+
+    /**
+     * Reads a file the file explorer named, which is a path from the root of a disk rather than one
+     * relative to wherever a shell happens to be.
+     */
+    private static java.util.Optional<String> readDiskFile(
+            final ServerLevel level, final dev.jstech.computronics.os.OsHost computer, final String path) {
+        final boolean media = path.startsWith("media:");
+        final net.minecraft.world.item.ItemStack vol =
+                media ? mediaStackFor(level, computer, path) : computer.systemDisk();
+        if (vol.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        // A projected file on an installer (its readme, manifest or autorun) has no stored bytes to
+        // read: its text is generated from the medium's stamp.
+        final java.util.Optional<String> projected = media
+                ? dev.jstech.computronics.os.media.InstallerProjection.text(vol, mediaSubPath(path))
+                : java.util.Optional.empty();
+        return projected.isPresent() ? projected
+                : dev.jstech.computronics.os.fs.DiskFilesystem.read(vol, media ? mediaSubPath(path) : path);
+    }
+
+    private static void handleRunProgram(final RunProgramPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)
+                    || !(level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jstech.computronics.blockentity.AbstractComputerBlockEntity computer)) {
+                return;
+            }
+            final String name = dev.jstech.computronics.os.fs.FsPaths.fileName(payload.path());
+            final java.util.List<DesktopShellOutputPayload.WireLine> wire = new java.util.ArrayList<>();
+            final java.util.Optional<String> listing = readDiskFile(level, computer, payload.path());
+            if (listing.isEmpty()) {
+                wire.add(new DesktopShellOutputPayload.WireLine(name + ": file not found",
+                        dev.jstech.computronics.program.cli.CliStyle.ERROR.ordinal()));
+                PacketDistributor.sendToPlayer(player,
+                        new DesktopShellOutputPayload(false, false, "", wire));
+                return;
+            }
+            final int room = dev.jstech.computronics.cannon.machine.CannonProcesses.DEFAULT_HEAP_MB;
+            if (!computer.ramLedger().fits(room)) {
+                wire.add(new DesktopShellOutputPayload.WireLine(name + ": not enough memory to run it",
+                        dev.jstech.computronics.program.cli.CliStyle.ERROR.ordinal()));
+                PacketDistributor.sendToPlayer(player,
+                        new DesktopShellOutputPayload(false, false, "", wire));
+                return;
+            }
+            final var started = computer.cannon().start(name, listing.get(), room, computer.cannonHost());
+            if (!started.ok()) {
+                wire.add(new DesktopShellOutputPayload.WireLine(started.message(),
+                        dev.jstech.computronics.program.cli.CliStyle.ERROR.ordinal()));
+                PacketDistributor.sendToPlayer(player,
+                        new DesktopShellOutputPayload(false, false, "", wire));
+                return;
+            }
+            computer.setChanged();
+            final var one = computer.cannon().byId(started.id());
+            final boolean console = one != null
+                    && one.process().shape() == dev.jstech.computronics.cannon.Shape.CONSOLE;
+            if (console) {
+                computer.cannon().hold(started.id());
+            } else {
+                wire.add(new DesktopShellOutputPayload.WireLine(started.message(),
+                        dev.jstech.computronics.program.cli.CliStyle.OK.ordinal()));
+            }
+            PacketDistributor.sendToPlayer(player,
+                    new DesktopShellOutputPayload(false, console, "", wire));
         });
     }
 

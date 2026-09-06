@@ -128,6 +128,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private static final String OPEN_FILES_AT = "Files\0";
 
+    /** A pending run of a compiled program, kept apart the same way. */
+    private static final String RUN_AT_TERMINAL = "Terminal\0";
+
+    /**
+     * Opens this desktop's terminal and has it run that program, which is what double-clicking one does.
+     *
+     * <p>A program of the console kind needs a terminal to print into, so it is given one; the window is
+     * whatever this desktop calls its terminal, because that is the one the machine has.
+     */
+    public static void requestRunAtTerminal(final String path) {
+        PENDING_OPEN.add(RUN_AT_TERMINAL + path);
+    }
+
     /** Lets a running app open the explorer already navigated to {@code dir} (a drive, a folder). */
     public static void requestOpenFiles(final String dir) {
         PENDING_OPEN.add(OPEN_FILES_AT + dir);
@@ -676,6 +689,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     /** The Start menu entries, top to bottom, as labelled for the player. */
+    /** What this desktop calls its terminal, or an empty string when it has none installed. */
+    private String terminalLabel() {
+        for (final Launcher l : launchers) {
+            if (dev.jstech.computronics.program.Programs.COMMAND_PROMPT.equals(l.programId())) {
+                return l.label();
+            }
+        }
+        return "";
+    }
+
     public List<String> launcherLabels() {
         final List<String> out = new ArrayList<>();
         for (final Launcher l : launchers) {
@@ -1074,6 +1097,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                         openApp("Files", new FilesApp(host, desktopId.getPath(),
                                 key.substring(OPEN_FILES_AT.length()), monitorPos));
                     }
+                    continue;
+                }
+                if (key.startsWith(RUN_AT_TERMINAL)) {
+                    // The Files window asked for a program to be run. It gets this desktop's terminal,
+                    // whatever this desktop calls it, and the command goes in as if it had been typed.
+                    final String terminal = terminalLabel();
+                    final DesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
+                    if (shell != null && allowOpen(terminal)) {
+                        openApp(terminal, shell);
+                    }
+                    ShellApp.runWhenReady(key.substring(RUN_AT_TERMINAL.length()));
                     continue;
                 }
                 final DesktopApp app = factoryFor(key);

@@ -10,6 +10,7 @@ package dev.jstech.computronics.client.os;
 import dev.jstech.computronics.operation.payload.ComputingPayloads;
 import dev.jstech.computronics.operation.payload.DesktopShellOutputPayload;
 import dev.jstech.computronics.operation.payload.DesktopShellRunPayload;
+import dev.jstech.computronics.operation.payload.RunProgramPayload;
 import dev.jstech.computronics.os.DesktopEnvironmentDef;
 import dev.jstech.computronics.os.OsRegistry;
 import dev.jstech.computronics.os.PanelStyle;
@@ -120,7 +121,26 @@ public final class ShellApp implements DesktopApp {
         root.focus(console);
         // Sync the real prompt (and any pending build notices) before the player types anything.
         PacketDistributor.sendToServer(new DesktopShellRunPayload(host, ""));
+        if (!pendingProgram.isEmpty()) {
+            final String path = pendingProgram;
+            pendingProgram = "";
+            push(prompt + " " + path, colorOf(CliStyle.PROMPT.ordinal()));
+            PacketDistributor.sendToServer(new RunProgramPayload(host, path));
+        }
     }
+
+    /**
+     * Has the next terminal window to open run that program.
+     *
+     * <p>It is how opening one in the file explorer reaches a terminal: the window has to exist before
+     * anything the program prints can land in it, so the run waits for the window rather than racing it.
+     */
+    public static void runWhenReady(final String path) {
+        pendingProgram = path;
+    }
+
+    /** A program the next terminal window runs as it opens, or empty. */
+    private static String pendingProgram = "";
 
     /** Routes a server output reply to the open Shell window. */
     public static void accept(final DesktopShellOutputPayload payload) {
