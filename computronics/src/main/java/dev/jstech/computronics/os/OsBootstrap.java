@@ -275,6 +275,13 @@ public final class OsBootstrap {
             // absence teaching the package manager: 'command not found' until you apt/dnf/pacman/emerge it).
             ProgramSpec.of(rl("screenfetch"), "screenfetch", "screenfetch", false, LINUX_ONLY, 4, ProgramKind.APP, 0, HostScope.ANY)
                     .withEra(LEGACY).withHouse(SoftwareHouse.ARCH_COLLECTIVE).withRam(1),
+            // The Cannon toolchain: the compiler and the runtime, two packages the Mirror serves to any
+            // machine of the Legacy generation or later running Frames XP or a Linux. Neither has a window
+            // of its own; both are verbs at the prompt, which is where a program is written and run from.
+            ProgramSpec.of(rl("cannonc"), "cannonc", "Cannon Compiler", false, ALL_PLATFORMS, 8, ProgramKind.APP, 2, HostScope.ANY)
+                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.CANNON_FOUNDATION).withRam(16),
+            ProgramSpec.of(rl("cannonrt"), "cannon", "Cannon Runtime", false, ALL_PLATFORMS, 12, ProgramKind.SERVICE, 2, HostScope.ANY)
+                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.CANNON_FOUNDATION).withRam(24),
             // The Linux desktop environments: packages that turn a TTY distribution into a graphical desktop.
             // Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest), and so is
             // the RAM each holds once it is up, on top of the distribution's own share.

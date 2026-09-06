@@ -77,6 +77,8 @@ public final class BuiltinCommands {
                 new Config(),
                 new Reboot(),
                 new ClusterCommand(),
+                new CannonCommands.Compile(),
+                new CannonCommands.Run(),
                 new MirrorCommand(),
                 new Uninstall(),
                 new Format(),

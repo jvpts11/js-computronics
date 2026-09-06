@@ -226,6 +226,10 @@ public class JscLanguageProvider extends LanguageProvider {
         add("program.jsc.mirror.desc",
                 "The network's package repository. Every package manager installs from it.");
         add("program.jsc.screenfetch.desc", "Prints the system's identity, with its distribution's logo.");
+        add("program.jsc.cannonc.desc",
+                "Compiles a Cannon program into the assembly the runtime reads.");
+        add("program.jsc.cannonrt.desc",
+                "Runs compiled Cannon programs, and brings the 'cannon' command to the prompt.");
         add("program.jsc.kde_plasma.desc", "The KDE Plasma desktop environment.");
         add("program.jsc.gnome.desc", "The GNOME desktop environment.");
         add("program.jsc.cinnamon.desc", "The Cinnamon desktop environment.");

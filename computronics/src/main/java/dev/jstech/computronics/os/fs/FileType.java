@@ -10,7 +10,7 @@ package dev.jstech.computronics.os.fs;
 import java.util.Optional;
 
 /**
- * The eight file types the filesystem recognises, each bound to a lowercase extension.
+ * The file types the filesystem recognises, each bound to a lowercase extension.
  *
  * <p>Two flags describe how a type is handled:
  * <ul>
@@ -59,7 +59,18 @@ public enum FileType {
     /** Setup information beside the installer, the way a disc of the era carried it. */
     INF("inf", false, true),
     /** Opaque installer payload (a cabinet, an image, a kernel): listed, never opened. */
-    BIN("bin", false, true);
+    BIN("bin", false, true),
+
+    /** Cannon source — user-editable, and what the compiler reads. */
+    CAN("can", true, false),
+
+    /**
+     * The assembly the compiler writes — user-editable, and meant to be read.
+     *
+     * <p>It is text on purpose: a player can open what their program was turned into and follow it a
+     * line at a time, which is the whole reason the compiler does not keep it to itself.
+     */
+    ASM("asm", true, false);
 
     private final String extension;
     private final boolean userEditable;
@@ -78,7 +89,7 @@ public enum FileType {
 
     /**
      * Whether the player can open and edit files of this type in the Text Editor.
-     * True for IQL, TXT, CFG, CSV, and CMD; false for LOG, CRAFT, and DAT.
+     * True for the ones written by hand or meant to be read, false for logs, patterns and payloads.
      */
     public boolean userEditable() {
         return userEditable;

@@ -623,6 +623,33 @@ public interface CliComputer {
     record ProgramInfo(String name, String id) {
     }
 
+    /**
+     * One Cannon program this computer is running: what it is called, how it is getting on, and how much
+     * of the room it was given it is holding.
+     */
+    record CannonProcess(int id, String name, String state, long heldBytes, long heapBytes) {
+    }
+
+    /** The Cannon programs running here, oldest first. */
+    default List<CannonProcess> cannonProcesses() {
+        return List.of();
+    }
+
+    /**
+     * Starts a compiled Cannon program from a file on this computer's disk.
+     *
+     * @param path   the assembly file to run
+     * @param heapMb how much room to give it, or 0 for what the computer decides
+     */
+    default OpResult startCannon(final String path, final int heapMb) {
+        return OpResult.fail("cannon: not installed");
+    }
+
+    /** Stops one of the Cannon programs running here. */
+    default OpResult stopCannon(final int id) {
+        return OpResult.fail("cannon: not installed");
+    }
+
     /** A service the computer hosts and its state, for the process/service manager (e.g. "running"). */
     record ServiceStatus(String name, String state) {
     }
