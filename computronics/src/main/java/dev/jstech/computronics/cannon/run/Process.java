@@ -217,6 +217,12 @@ public final class Process {
             } catch (final Halt halt) {
                 this.halt(halt);
             }
+            // Reaching into the machine costs more than moving a number about, and the difference is
+            // charged to this tick rather than hidden, so a program that talks to the world all the time
+            // gets through less of itself than one that does its own arithmetic.
+            final int reached = this.library.drawCost();
+            used += reached;
+            this.spent += reached;
         }
         if (this.frames.isEmpty() && this.waiting.isEmpty() && this.state == State.RUNNING) {
             this.state = State.FINISHED;

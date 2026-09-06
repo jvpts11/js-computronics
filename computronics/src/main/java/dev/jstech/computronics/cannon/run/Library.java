@@ -9,7 +9,9 @@ package dev.jstech.computronics.cannon.run;
 
 import dev.jstech.computronics.cannon.asm.Operand;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -92,9 +94,18 @@ public final class Library {
     public boolean answersFor(final String owner) {
         return switch (owner) {
             case "string", "List", "Map", "Math", "Console", "Convert", "Time", "Random", "Delegate" -> true;
-            default -> false;
+            default -> this.host.provides(owner);
         };
     }
+
+    /** What the last call cost beyond the one instruction every call costs, and clears it. */
+    public int drawCost() {
+        final int owed = this.owed;
+        this.owed = 0;
+        return owed;
+    }
+
+    private int owed;
 
     /** Whether a call of this needs the thing it is called on to be on the stack under its arguments. */
     public boolean takesTarget(final String owner, final String name) {
@@ -155,9 +166,71 @@ public final class Library {
             case "string" -> Answer.of(this.text(named.name(), self, arguments, line));
             case "List" -> Answer.of(this.list(named.name(), self, arguments, line));
             case "Map" -> this.map(named.name(), self, arguments, line);
-            default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line,
-                    "the runtime does not answer for " + named.owner());
+            default -> this.outward(named, arguments, line);
         };
+    }
+
+    /**
+     * Hands a call to the machine, and takes what comes back onto the program's heap.
+     *
+     * <p>The machine knows nothing of heaps or budgets: it answers with plain values and says what the
+     * answer was worth. Everything else about it is settled here, in the one place that already knows how
+     * much a thing costs to hold.
+     */
+    private Answer outward(final Operand.Method named, final List<Object> arguments, final int line) {
+        if (!this.host.provides(named.owner())) {
+            throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line,
+                    "the runtime does not answer for " + named.owner());
+        }
+        final Host.Reply reply = this.host.call(named.owner(), named.name(), arguments, line);
+        this.owed += Math.max(0, reply.cost() - 1);
+        final List<Object> filled = new ArrayList<>();
+        for (final Object one : reply.filled()) {
+            filled.add(this.adopt(one, line));
+        }
+        return new Answer(this.adopt(reply.value(), line), filled);
+    }
+
+    /**
+     * Puts something the machine made onto the program's heap, contents and all.
+     *
+     * <p>What a program is handed is the program's to hold and to free, and it has to weigh what it
+     * weighs. Anything already on the heap is left where it is, so handing back something the program
+     * gave in the first place does not charge it twice.
+     */
+    private Object adopt(final Object made, final int line) {
+        if (made == null || this.heap.bytesOf(made) > 0) {
+            return made;
+        }
+        switch (made) {
+            case String text -> this.heap.allocate(text, Heap.sizeOfText(text), line);
+            case Values.ListValue list -> {
+                for (int i = 0; i < list.items().size(); i++) {
+                    list.items().set(i, this.adopt(list.items().get(i), line));
+                }
+                this.heap.allocate(list, list.bytes(), line);
+            }
+            case Values.MapValue map -> {
+                final Map<Object, Object> adopted = new LinkedHashMap<>();
+                for (final Map.Entry<Object, Object> entry : map.entries().entrySet()) {
+                    adopted.put(this.adopt(entry.getKey(), line), this.adopt(entry.getValue(), line));
+                }
+                map.entries().clear();
+                map.entries().putAll(adopted);
+                this.heap.allocate(map, map.bytes(), line);
+            }
+            case Values.Obj object -> {
+                for (final Map.Entry<String, Object> field : object.all().entrySet()) {
+                    object.set(field.getKey(), this.adopt(field.getValue(), line));
+                }
+                this.heap.allocate(object, Heap.HEADER
+                        + (long) Heap.REFERENCE * object.all().size(), line);
+            }
+            default -> {
+                // A number, a bool or a character: a value, which weighs nothing of its own.
+            }
+        }
+        return made;
     }
 
     private Answer console(final String name, final List<Object> arguments) {

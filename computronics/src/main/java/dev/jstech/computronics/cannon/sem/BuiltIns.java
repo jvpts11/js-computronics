@@ -58,6 +58,7 @@ public final class BuiltIns {
         this.fillConvert();
         this.fillTime();
         this.fillRandom();
+        this.fillFile();
     }
 
     /** The root of every reference type. */
@@ -257,6 +258,29 @@ public final class BuiltIns {
         this.property(time, "DayTime", ticks, PUBLIC_STATIC);
         this.property(time, "Day", ticks, PUBLIC_STATIC);
         this.method(time, "Ticks", ticks, PUBLIC_STATIC, TypeSymbol.Primitive.INT);
+    }
+
+    /**
+     * The machine's own drives, reached with the paths the shell uses.
+     *
+     * <p>Writing can fail without the program being wrong: a disk fills up. So the writes answer whether
+     * they happened rather than stopping the program, and reading something that is not there is asked
+     * for with the try form.
+     */
+    private void fillFile() {
+        final NamedType file = this.declare("File", NamedType.Kind.CLASS);
+        this.method(file, "Exists", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
+        this.method(file, "Read", this.stringType, PUBLIC_STATIC, this.stringType);
+        file.addMember(new MemberSymbol.MethodSymbol(file, "TryRead", TypeSymbol.Primitive.BOOL,
+                List.of(MemberSymbol.ParameterSymbol.of("path", this.stringType),
+                        new MemberSymbol.ParameterSymbol("text", this.stringType, true)),
+                PUBLIC_STATIC));
+        this.method(file, "Write", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType, this.stringType);
+        this.method(file, "Append", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType, this.stringType);
+        this.method(file, "Delete", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
+        this.method(file, "MkDir", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
+        this.method(file, "List", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
+                PUBLIC_STATIC, this.stringType);
     }
 
     private void fillRandom() {
