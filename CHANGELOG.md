@@ -11,9 +11,16 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one
   what its generation weighs, so a modern tool needs the gigabytes a modern machine has. The System Monitor lists
   who holds what.
+- A balloon over the notification area carries the notices a computer raises by itself, the first being the
+  one about memory.
 
 ### Changed
 - The desktop's open-program counter became a memory meter, "used/total MB", in every desktop's panel.
+- Frames XP wears its own shell again: the Start pill with its flag, task buttons carrying each program's
+  icon and showing the window in front as pushed in, a Start menu that opens on the player's own face and
+  name, and a wallpaper with clouds over its hill.
+- Desktop icons sit on a grid wide enough for their names, wrapped over two lines, so a long one no longer
+  runs across the icon beside it.
 - An Operation's provenance rows name the computer that asked and the program it asked through, as in
   "lab-pc (Interactor)"; a bus reads as its kind and its name.
 

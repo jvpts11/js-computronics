@@ -191,6 +191,24 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         this.popup = new DesktopPopup(title, message, this.font);
     }
 
+    /** A notice from the system itself: it rises over the notification area and goes away on its own. */
+    private record Balloon(String title, String body, long until) {
+    }
+
+    /** How long a balloon stays up before it fades away, in milliseconds. */
+    private static final long BALLOON_MS = 9_000L;
+    private static final int BALLOON_W = 152;
+    @org.jetbrains.annotations.Nullable
+    private Balloon balloon;
+
+    /**
+     * Raises a tray balloon. Unlike {@link #showError}, it takes nothing over: the machine is telling the
+     * player something, not asking them to answer, so the desktop stays usable underneath it.
+     */
+    void showBalloon(final String title, final String body) {
+        this.balloon = new Balloon(title, body, System.currentTimeMillis() + BALLOON_MS);
+    }
+
     private boolean startOpen;
     /** The Frames 11 Start search box: when non-empty, the pinned grid is replaced by a filtered result list. */
     private final StringBuilder startSearch = new StringBuilder();
@@ -281,7 +299,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int ix = iconXForCell(slotCells[i]);
             final int iy = iconYForCell(slotCells[i]);
             // The icon's clickable cell, the same box the hover highlight uses.
-            if (ix - 3 < r[0] + r[2] && ix + 27 > r[0] && iy - 2 < r[1] + r[3] && iy + 32 > r[1]) {
+            if (ix + CELL_DX < r[0] + r[2] && ix + CELL_DX + CELL_W > r[0]
+                    && iy + CELL_DY < r[1] + r[3] && iy + CELL_DY + CELL_H > r[1]) {
                 selectedIcons.add(i);
             }
         }
@@ -359,10 +378,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int MENU_ITEM_H = 18;
     // Frames XP Start: a two-column panel (programs left, system "places" right) with a header and a footer band.
     private static final int XP_MENU_W = 202;
-    private static final int XP_HEADER_H = 20;
+    private static final int XP_HEADER_H = 26;
+    /** The orange band the Luna Start menu ran under its user header. */
+    private static final int XP_ORANGE_H = 2;
     private static final int XP_FOOTER_H = 18;
     private static final int XP_ROW_H = 16;
     private static final int XP_LEFT_W = 120;
+    /** The gap a separator sits in, between the pinned block and the rest of the left column. */
+    private static final int XP_SEP_H = 5;
+    /** How many of the left column's entries are drawn as pinned (bold) at its top. */
+    private static final int XP_PINNED = 2;
+    private static final int XP_ALL_ROW_H = 15;
     // Frames 11 Start: a compact floating panel with a search box, a pinned-app grid, and a footer power button.
     // Kept small (5 columns, tight tiles) so even a Mainframe's full app set fits above the taskbar.
     private static final int W11_MENU_W = 172;
@@ -387,8 +413,26 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int GN_COLS = 6;
     private static final int GN_TILE_W = 40;
     private static final int GN_TILE_H = 34;
-    private static final int ICON_PITCH_Y = 42;
-    private static final int ICON_PITCH_X = 46;
+    // Desktop icons sit on a grid wide enough for a name on two lines. The old pitch was narrower than the
+    // labels it drew, so "Command Prompt" ran across its neighbour and both names read as one word.
+    private static final int ICON_PITCH_Y = 62;
+    private static final int ICON_PITCH_X = 66;
+    /** The width of the Frames XP Start pill, which the task buttons and its own hit-test both clear. */
+    private static final int XP_START_W = 58;
+    /** Where the first icon column starts: far enough in that its cell's highlight clears the screen edge. */
+    private static final int ICON_ORIGIN_X = 22;
+    /** An icon's cell: the box its highlight, its drop outline and its hit-test all use. */
+    private static final int CELL_W = 58;
+    private static final int CELL_H = 50;
+    /** The cell's top-left corner, relative to the icon's own: the 24px icon sits centred in the cell. */
+    private static final int CELL_DX = (24 - CELL_W) / 2;
+    private static final int CELL_DY = -2;
+    /**
+     * How wide one line of an icon's label may run before it wraps, and how many lines it may take. Wide
+     * enough that a single long word like "Calculator" still fits whole, since nothing can wrap it.
+     */
+    private static final int LABEL_W = CELL_W - 6;
+    private static final int LABEL_LINES = 2;
     private static final String[] DESK_CTX_ICON = {"Open", "Rename", "Delete"};
     private static final String[] DESK_CTX_BG = {"New File", "New Folder", "Personalize", "Refresh"};
     private static final int DESK_CTX_W = 88;
@@ -493,8 +537,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             crashing = true;
             crashUntil = System.currentTimeMillis() + 4200;
         } else {
-            showError("Out of memory", key + " needs " + need + " MB and only " + Math.max(0, free) + " MB of "
-                    + ramTotalMb + " MB are free. Close a program, or install more RAM.");
+            // A refusal the machine can simply report: the desktop is still there, so a balloon says it the
+            // way the notification area always did, instead of taking the screen over with a dialog.
+            showBalloon("Low on memory", "This computer is running out of RAM for programs. " + key
+                    + " needs " + need + " MB and only " + Math.max(0, free) + " MB are free.");
         }
         return false;
     }
@@ -502,6 +548,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** Reboots after a crash: the session is lost (windows and their saved state), back to an empty desktop. */
     private void reboot() {
         crashing = false;
+        balloon = null;
         windows.clear();
         SAVED_APPS.remove(host);
         startOpen = false;
@@ -625,9 +672,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (panel == dev.jstech.computronics.os.PanelStyle.FRAMES_XP
                 && index >= 0 && index < launchers.size()) {
             final Launcher target = launchers.get(index);
-            final List<Launcher> column = XP_PLACES.contains(target.label()) ? xpRightLaunchers() : xpLeftLaunchers();
+            final boolean place = XP_PLACES.contains(target.label());
+            final List<Launcher> column = place ? xpRightLaunchers() : xpLeftLaunchers();
             final int row = Math.max(0, column.indexOf(target));
-            return oy() + tbY - startMenuHeight() + XP_HEADER_H + 3 + row * XP_ROW_H + XP_ROW_H / 2;
+            // The left column has a separator under its pinned block, so its rows are not a plain multiple.
+            final int rowY = place ? row * XP_ROW_H : xpLeftRowY(row);
+            return oy() + tbY - startMenuHeight() + XP_HEADER_H + XP_ORANGE_H + 3 + rowY + XP_ROW_H / 2;
         }
         return oy() + tbY - startMenuHeight() + 4 + index * MENU_ITEM_H + MENU_ITEM_H / 2;
     }
@@ -999,21 +1049,24 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int iy = iconYForCell(slotCells[i]);
             // Icons draw at DesktopZ.ICONS and the Start menu at DesktopZ.MENU, so the menu covers them via the
             // depth buffer — the icons behind it stay drawn (they must not vanish) and just sit under the panel.
+            final int cellX = ix + CELL_DX;
+            final int cellY = iy + CELL_DY;
             if (i == selectedIcon || selectedIcons.contains(i)) {
-                g.fill(ix - 3, iy - 2, ix + 27, iy + 32, 0x66000080);
-            } else if (lmx >= ix - 3 && lmx < ix + 27 && lmy >= iy - 2 && lmy < iy + 32 && !deskDragging) {
+                g.fill(cellX, cellY, cellX + CELL_W, cellY + CELL_H, 0x66000080);
+            } else if (lmx >= cellX && lmx < cellX + CELL_W && lmy >= cellY && lmy < cellY + CELL_H
+                    && !deskDragging) {
                 // Hover feedback so the player sees which icon the cursor is over.
-                g.fill(ix - 3, iy - 2, ix + 27, iy + 32, 0x28FFFFFF);
+                g.fill(cellX, cellY, cellX + CELL_W, cellY + CELL_H, 0x28FFFFFF);
             }
             // Green drop-target outline on the folder under the cursor while dragging a real
             // file/folder icon (a launcher has no file to move into a folder, so it lights none).
             if (deskDragging && deskDragSlot >= launchers.size()
                     && i == deskDropTarget && i >= launchers.size() && i != deskDragSlot
                     && desktopItems.get(i - launchers.size()).directory()) {
-                g.fill(ix - 3, iy - 2, ix + 27, iy - 1, 0xFF49E07A);
-                g.fill(ix - 3, iy + 31, ix + 27, iy + 32, 0xFF49E07A);
-                g.fill(ix - 3, iy - 2, ix - 2, iy + 32, 0xFF49E07A);
-                g.fill(ix + 26, iy - 2, ix + 27, iy + 32, 0xFF49E07A);
+                g.fill(cellX, cellY, cellX + CELL_W, cellY + 1, 0xFF49E07A);
+                g.fill(cellX, cellY + CELL_H - 1, cellX + CELL_W, cellY + CELL_H, 0xFF49E07A);
+                g.fill(cellX, cellY, cellX + 1, cellY + CELL_H, 0xFF49E07A);
+                g.fill(cellX + CELL_W - 1, cellY, cellX + CELL_W, cellY + CELL_H, 0xFF49E07A);
             }
             final String label;
             if (i < launchers.size()) {
@@ -1031,16 +1084,25 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 selLabelX = ix;
                 selLabelY = iy;
             } else {
-                // Centered, trimmed label under the icon so it stays in its cell and never sprawls.
-                final String lbl = trim(label, 9);
-                g.drawString(font, lbl, ix + 12 - font.width(lbl) / 2, iy + 24,
-                        theme.iconText(), theme.textShadow());
+                // The name under the icon: centred, wrapped inside its own cell over at most two lines, and
+                // cut with an ellipsis past that. A name wider than the cell used to run across its neighbour,
+                // which is how "Network" and "Command Prompt" came to read as one word.
+                int ly = iy + 24;
+                final java.util.List<String> lines = wrapLabel(label, LABEL_W);
+                for (int li = 0; li < lines.size() && li < LABEL_LINES; li++) {
+                    final String line = li == LABEL_LINES - 1 && lines.size() > LABEL_LINES
+                            ? fitLabelLine(lines.get(li) + "...", LABEL_W)
+                            : fitLabelLine(lines.get(li), LABEL_W);
+                    g.drawString(font, line, ix + 12 - font.width(line) / 2, ly,
+                            theme.iconText(), theme.textShadow());
+                    ly += font.lineHeight;
+                }
             }
         }
         // Windows-style: the selected icon reveals its full name, wrapped, on a selection background.
         if (selLabelText != null) {
             int ly = selLabelY + 24;
-            for (final String line : wrapLabel(selLabelText, 74)) {
+            for (final String line : wrapLabel(selLabelText, LABEL_W)) {
                 final int lw = font.width(line);
                 final int lcx = selLabelX + 12 - lw / 2;
                 g.fill(lcx - 2, ly - 1, lcx + lw + 2, ly + font.lineHeight, 0xE0000080);
@@ -1096,13 +1158,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(0, tbY, sw, tbY + 1, 0xFFFFFFFF);
             }
             // Start button — distinct per Frames version, each with its own glyph.
-            final int sbW = 54;
             if (osp.equals("frames_xp")) {
-                // Glossy green orb with a highlighted top half.
-                g.fillGradient(4, tbY + 2, 4 + sbW, sh - 2, 0xFF8FDB78, 0xFF1F7A22);
-                g.fill(6, tbY + 3, 4 + sbW - 2, tbY + 9, 0x4DFFFFFF);
-                g.drawString(font, "start", 16, tbY + 8, 0xFFFFFFFF, true);
+                drawXpStart(g, tbY, sh);
             } else {
+                final int sbW = 54;
                 g.fill(4, tbY + 3, 4 + sbW, sh - 3, theme.startButton());
                 bevel(g, 4, tbY + 3, sbW, TASKBAR_H - 6, 0xFFFFFFFF, 0xFF808080);
                 // Four-pane flag logo.
@@ -1115,14 +1174,18 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             int bx = 64;
             // Stop task buttons before the clock so they never overrun it or bleed off the right edge.
             final int taskRight = taskStripRight(sw);
+            final DesktopWindow taskFront = frontWindow();
             for (final DesktopWindow w : windows) {
                 if (bx + 84 > taskRight) {
                     break;
                 }
-                taskButton(g, bx, tbY + 3, 84, TASKBAR_H - 6, osp);
+                // The window in front reads as a pushed-in button, the way a taskbar has always said which
+                // program you are actually looking at.
+                taskButton(g, bx, tbY + 3, 84, TASKBAR_H - 6, osp, w == taskFront && !w.minimized());
+                ProgramIcons.draw(g, bx + 4, tbY + 6, 12, 12, programIdForLabel(w.appKey()), iconSet());
                 // No shadow: the taskbar button name sits on a solid button, where a shadow only muddies it
                 // (a dark blob behind the dark 95 text, a halo behind the light XP text).
-                g.drawString(font, trim(w.app().title(), 12), bx + 5, tbY + 8, theme.startText(), false);
+                g.drawString(font, trim(w.app().title(), 10), bx + 20, tbY + 8, theme.startText(), false);
                 bx += 88;
             }
             final String clock = clockText();
@@ -1140,6 +1203,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
         g.pose().popPose(); // close the TASKBAR layer
+
+        // A tray balloon sits above the panel and under the menus, so opening Start covers it.
+        if (balloon != null) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.TASKBAR + 10);
+            renderBalloon(g, tbY, sw);
+            g.pose().popPose();
+        }
 
         // Menus (Start + desktop context), above the taskbar.
         if (startOpen || deskCtxOpen) {
@@ -1164,10 +1235,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 final int cell = cellAt(deskDragX, deskDragY, perCol);
                 final int cx = iconXForCell(cell);
                 final int cy = iconYForCell(cell);
-                g.fill(cx - 3, cy - 2, cx + 27, cy - 1, 0x804C84F0);
-                g.fill(cx - 3, cy + 31, cx + 27, cy + 32, 0x804C84F0);
-                g.fill(cx - 3, cy - 2, cx - 2, cy + 32, 0x804C84F0);
-                g.fill(cx + 26, cy - 2, cx + 27, cy + 32, 0x804C84F0);
+                final int gx = cx + CELL_DX;
+                final int gy = cy + CELL_DY;
+                g.fill(gx, gy, gx + CELL_W, gy + 1, 0x804C84F0);
+                g.fill(gx, gy + CELL_H - 1, gx + CELL_W, gy + CELL_H, 0x804C84F0);
+                g.fill(gx, gy, gx + 1, gy + CELL_H, 0x804C84F0);
+                g.fill(gx + CELL_W - 1, gy, gx + CELL_W, gy + CELL_H, 0x804C84F0);
             }
             // Drag ghost: a label trailing the cursor for the icon being moved.
             // (the rubber band is drawn below, outside the icon-drag branch)
@@ -1304,7 +1377,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     private static int iconXForCell(final int packedCell) {
-        return 10 + DesktopIconLayout.col(packedCell) * ICON_PITCH_X;
+        return ICON_ORIGIN_X + DesktopIconLayout.col(packedCell) * ICON_PITCH_X;
     }
 
     private int iconYForCell(final int packedCell) {
@@ -1317,7 +1390,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         for (int i = 0; i < cells.length; i++) {
             final int ix = iconXForCell(cells[i]);
             final int iy = iconYForCell(cells[i]);
-            if (mx >= ix - 3 && mx <= ix + 27 && my >= iy - 2 && my <= iy + 34) {
+            if (mx >= ix + CELL_DX && mx <= ix + CELL_DX + CELL_W
+                    && my >= iy + CELL_DY && my <= iy + CELL_DY + CELL_H) {
                 return i;
             }
         }
@@ -1326,7 +1400,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** The packed grid cell ({@code col << 16 | row}) under a desktop-local point, clamped to the grid. */
     private int cellAt(final double mx, final double my, final int perCol) {
-        final int col = Math.max(0, (int) Math.floor((mx - (10 - ICON_PITCH_X / 2.0)) / ICON_PITCH_X));
+        final int col = Math.max(0, (int) Math.floor((mx - (ICON_ORIGIN_X - ICON_PITCH_X / 2.0)) / ICON_PITCH_X));
         final int row = Math.max(0, Math.min(perCol - 1,
                 (int) Math.floor((my - workTop() - (10 - ICON_PITCH_Y / 2.0)) / ICON_PITCH_Y)));
         return DesktopIconLayout.pack(col, row);
@@ -1717,10 +1791,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         return switch (desktopId.getPath()) {
             // Two columns: the taller of programs (left) and places (right) sets the body height.
-            case "frames_xp" -> {
-                final int rows = Math.max(xpLeftLaunchers().size(), xpRightLaunchers().size());
-                yield XP_HEADER_H + rows * XP_ROW_H + XP_FOOTER_H + 6;
-            }
+            case "frames_xp" -> XP_HEADER_H + XP_ORANGE_H
+                    + Math.max(xpLeftColumnH(), xpRightLaunchers().size() * XP_ROW_H)
+                    + XP_FOOTER_H + 6;
             // A pinned grid sized to the full app set (so the panel does not resize as the search filters it).
             // Layout: 6 top pad + search + 5 + 9 (Pinned label) + rows + 5 + footer + 5 bottom pad.
             case "frames_11" -> {
@@ -1785,6 +1858,33 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
         return out;
+    }
+
+    /** The y of the {@code i}-th left-column row, measured from the top of the Start menu's body. */
+    private int xpLeftRowY(final int i) {
+        final int n = xpLeftLaunchers().size();
+        final int pinned = Math.min(XP_PINNED, n);
+        return i * XP_ROW_H + (i >= pinned && n > pinned ? XP_SEP_H : 0);
+    }
+
+    /** The y of the "All Programs" row, measured from the top of the Start menu's body. */
+    private int xpAllRowY() {
+        return xpLeftRowY(xpLeftLaunchers().size()) + XP_SEP_H;
+    }
+
+    /** How tall the left column runs: its rows, its separators, and the "All Programs" row under them. */
+    private int xpLeftColumnH() {
+        return xpAllRowY() + XP_ALL_ROW_H;
+    }
+
+    /** The left edge of the footer's "Turn Off Computer" entry, shared by the drawing and the hit-test. */
+    private int xpFooterOffX(final int x, final int w) {
+        return x + w - 6 - (font.width("Turn Off Computer") + 14);
+    }
+
+    /** The left edge of the footer's "Log Off" entry, immediately before the Turn Off one. */
+    private int xpFooterLogX(final int x, final int w) {
+        return xpFooterOffX(x, w) - 8 - (font.width("Log Off") + 14);
     }
 
     /** The launchers shown in the XP right "places" column: the fixed system entries, in launcher order. */
@@ -1857,6 +1957,76 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final String clock = clockText();
         g.drawString(font, clock, sw - font.width(clock) - 8, tbY + 8, 0xFFE6E8EC, false);
         drawProcMeter(g, sw - font.width(clock) - 14, tbY + 8, 0xFF9AA3B2);
+    }
+
+    /** The balloon's box in desktop-local coordinates, or null when none is up. Draw and hit-test share it. */
+    @org.jetbrains.annotations.Nullable
+    private int[] balloonRect(final int tbY, final int sw) {
+        if (balloon == null) {
+            return null;
+        }
+        final int lines = font.split(Component.literal(balloon.body()), BALLOON_W - 12).size();
+        final int h = 15 + lines * 9 + 5;
+        final int x = Math.max(4, sw - BALLOON_W - 6);
+        return new int[] {x, tbY - h - 7, BALLOON_W, h};
+    }
+
+    /** The classic notification balloon: pale yellow, a blue "i", a title, a line or two, and a close box. */
+    private void renderBalloon(final GuiGraphics g, final int tbY, final int sw) {
+        if (balloon != null && System.currentTimeMillis() > balloon.until()) {
+            balloon = null;
+        }
+        final int[] r = balloonRect(tbY, sw);
+        if (r == null || balloon == null) {
+            return;
+        }
+        final int x = r[0];
+        final int y = r[1];
+        final int w = r[2];
+        final int h = r[3];
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF000000);
+        g.fill(x, y, x + w, y + h, 0xFFFFFFE1);
+        // The tail, pointing down at the notification area it came from: a bordered wedge, drawn as an
+        // outline first and the pale fill inset into it, so it carries the same 1px edge as the box.
+        final int tail = x + w - 42;
+        for (int i = 0; i < 7; i++) {
+            g.fill(tail + i - 1, y + h + i, tail + 14 - i, y + h + i + 1, 0xFF000000);
+        }
+        for (int i = 0; i < 6; i++) {
+            g.fill(tail + i, y + h + i, tail + 12 - i, y + h + i + 1, 0xFFFFFFE1);
+        }
+        g.fill(tail, y + h - 1, tail + 12, y + h, 0xFFFFFFE1); // the tail opens into the balloon
+        // The round blue "i" and the title beside it.
+        g.fill(x + 6, y + 5, x + 14, y + 13, 0xFF1C53C9);
+        g.fill(x + 7, y + 4, x + 13, y + 14, 0xFF1C53C9);
+        g.fill(x + 9, y + 6, x + 11, y + 7, 0xFFFFFFFF);
+        g.fill(x + 9, y + 8, x + 11, y + 12, 0xFFFFFFFF);
+        g.drawString(font, Component.literal(balloon.title()).withStyle(net.minecraft.ChatFormatting.BOLD),
+                x + 18, y + 5, 0xFF000000, false);
+        int ly = y + 16;
+        for (final net.minecraft.util.FormattedCharSequence line
+                : font.split(Component.literal(balloon.body()), w - 12)) {
+            g.drawString(font, line, x + 6, ly, 0xFF303030, false);
+            ly += 9;
+        }
+        // The close box, the one part of a balloon anyone ever clicked.
+        final int bx = x + w - 12;
+        g.fill(bx, y + 4, bx + 8, y + 12, 0xFFE8E8CA);
+        outline(g, bx, y + 4, 8, 8, 0xFF6A6A55);
+        g.drawString(font, "x", bx + 2, y + 5, 0xFF303030, false);
+    }
+
+    /** A click on a live balloon: its close box dismisses it, and the rest of it absorbs the click. */
+    private boolean balloonClick(final double mx, final double my, final int tbY, final int sw) {
+        final int[] r = balloonRect(tbY, sw);
+        if (r == null) {
+            return false;
+        }
+        if (mx < r[0] || mx > r[0] + r[2] || my < r[1] || my > r[1] + r[3]) {
+            return false;
+        }
+        balloon = null;
+        return true;
     }
 
     /** The memory meter's text, "used/total MB", shared by the panels so they can keep room for it. */
@@ -1980,15 +2150,74 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Draws a taskbar window button in the OS's style (95 bevelled, XP gradient, 11 flat). */
     private void taskButton(final GuiGraphics g, final int x, final int y, final int w, final int h,
-                            final String osp) {
+                            final String osp, final boolean active) {
         switch (osp) {
-            case "frames_xp" -> g.fillGradient(x, y, x + w, y + h, 0xFF5B95DD, 0xFF2C5FA8);
+            case "frames_xp" -> {
+                if (active) {
+                    // Pushed in: the gradient runs the other way, with a shadow along the top edge.
+                    g.fillGradient(x, y, x + w, y + h, 0xFF1E4FBC, 0xFF3670DC);
+                    g.fill(x, y, x + w, y + 1, 0x40000000);
+                } else {
+                    g.fillGradient(x, y, x + w, y + h, 0xFF5B95DD, 0xFF2C5FA8);
+                    g.fill(x, y, x + w, y + 1, 0x33FFFFFF);
+                }
+                outline(g, x, y, w, h, 0xFF1A4CBF);
+            }
             case "frames_11" -> g.fill(x, y, x + w, y + h, 0xFFE3E5EE);
             default -> {
                 g.fill(x, y, x + w, y + h, theme.taskButton());
-                bevel(g, x, y, w, h, 0xFFFFFFFF, 0xFF808080);
+                // The classic bevel inverts when the button is pressed: dark on top, light underneath.
+                bevel(g, x, y, w, h, active ? 0xFF808080 : 0xFFFFFFFF, active ? 0xFFFFFFFF : 0xFF808080);
             }
         }
+    }
+
+    /**
+     * The Frames XP Start button: a glossy green pill flush with the left edge and rounded at its right end,
+     * carrying the four-pane flag and the word in italics. It is the one control of that desktop everybody
+     * pictures, and a plain green rectangle never read as it.
+     */
+    private void drawXpStart(final GuiGraphics g, final int tbY, final int sh) {
+        final int top = tbY + 1;
+        final int bottom = sh - 1;
+        final int h = bottom - top;
+        final int round = 6;
+        xpStartBand(g, 0, top, XP_START_W - round, h);
+        for (int i = 0; i < round; i++) {
+            final double d = i + 1;
+            final int inset = (int) Math.round(round - Math.sqrt(Math.max(0.0, round * round - d * d)));
+            xpStartBand(g, XP_START_W - round + i, top + inset, 1, h - inset * 2);
+        }
+        g.fill(2, top + 1, XP_START_W - round, top + 1 + h / 3, 0x3AFFFFFF); // the gloss along the top
+        // The flag: four panes, the top row lifted a pixel so the whole thing leans the way it always did.
+        final int fx = 7;
+        final int fy = tbY + 8;
+        g.fill(fx, fy + 1, fx + 4, fy + 4, 0xFFE0454A);
+        g.fill(fx + 5, fy, fx + 9, fy + 3, 0xFF49B84B);
+        g.fill(fx, fy + 5, fx + 4, fy + 8, 0xFF3C74D6);
+        g.fill(fx + 5, fy + 4, fx + 9, fy + 7, 0xFFE6B928);
+        g.drawString(font, net.minecraft.network.chat.Component.literal("start")
+                        .withStyle(net.minecraft.ChatFormatting.BOLD, net.minecraft.ChatFormatting.ITALIC),
+                fx + 13, tbY + 8, 0xFFFFFFFF, true);
+    }
+
+    /** One vertical slice of the Start pill: light crown, body, and a darker foot, as the Luna button had. */
+    private static void xpStartBand(final GuiGraphics g, final int x, final int y, final int w, final int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        final int q = Math.max(1, h / 4);
+        g.fillGradient(x, y, x + w, y + q, 0xFF8FDD72, 0xFF57C04B);
+        g.fillGradient(x, y + q, x + w, y + h - q, 0xFF4CB745, 0xFF2E9A33);
+        g.fillGradient(x, y + h - q, x + w, y + h, 0xFF2E9A33, 0xFF24802A);
+    }
+
+    /** Whether a desktop-local point is on the bottom panel's Start button. */
+    private boolean startButtonHit(final double mx, final double my, final int tbY) {
+        if (is(dev.jstech.computronics.os.PanelStyle.FRAMES_XP)) {
+            return my >= tbY && mx >= 0 && mx <= XP_START_W;
+        }
+        return my >= tbY + 3 && mx >= 4 && mx <= 58;
     }
 
     /** A 1px 3D bevel: light top/left, dark bottom/right (the classic raised look). */
@@ -2519,42 +2748,113 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // Panel with a thin border.
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF13315F);
         g.fill(x, y, x + w, y + h, theme.menuBg());
-        // Header band: a blue gradient with the OS name, like the XP user header.
+        // Header band: the player's own face and name over the Luna blue, the way this menu always opened.
         g.fillGradient(x, y, x + w, y + XP_HEADER_H, 0xFF3B7BD4, 0xFF1E4E9E);
-        g.drawString(font, osBandLabel(), x + 6, y + (XP_HEADER_H - 8) / 2, 0xFFFFFFFF, true);
+        drawPlayerFace(g, x + 4, y + 3, XP_HEADER_H - 6);
+        g.drawString(font, playerName(), x + 4 + XP_HEADER_H - 6 + 5, y + (XP_HEADER_H - 8) / 2,
+                0xFFFFFFFF, true);
+        // The orange rule under the header, lit along its top edge.
+        g.fill(x, y + XP_HEADER_H, x + w, y + XP_HEADER_H + 1, 0xFFFFD268);
+        g.fill(x, y + XP_HEADER_H + 1, x + w, y + XP_HEADER_H + XP_ORANGE_H, 0xFFF4A11E);
         // Body: left programs column over white, right places column over a tinted panel.
-        final int bodyTop = y + XP_HEADER_H;
+        final int bodyTop = y + XP_HEADER_H + XP_ORANGE_H;
         final int bodyBot = y + h - XP_FOOTER_H;
         final int split = x + XP_LEFT_W;
         g.fill(x, bodyTop, split, bodyBot, 0xFFFFFFFF);
         g.fill(split, bodyTop, x + w, bodyBot, 0xFFDCE7F6);
         g.fill(split, bodyTop, split + 1, bodyBot, 0xFFB6C6E0);
-        drawXpColumn(g, xpLeftLaunchers(), x + 3, bodyTop + 3, XP_LEFT_W - 6, theme.menuText());
-        drawXpColumn(g, xpRightLaunchers(), split + 3, bodyTop + 3, w - XP_LEFT_W - 6, 0xFF1A3A70);
-        // Footer band with a Turn Off entry (mirrors the header gradient).
+        drawXpLeftColumn(g, x + 3, bodyTop + 3, XP_LEFT_W - 6);
+        drawXpColumn(g, xpRightLaunchers(), split + 3, bodyTop + 3, w - XP_LEFT_W - 6, 0xFF1A3A70, 0, false);
+        // Footer band: log off and turn off, right-aligned, mirroring the header gradient.
         final int footY = bodyBot;
         g.fillGradient(x, footY, x + w, y + h, 0xFF3B7BD4, 0xFF1E4E9E);
-        final int offX = x + w - 74;
-        final boolean offHov = hoverY >= footY && hoverX >= offX && hoverX < x + w - 4;
-        if (offHov) {
+        final int offX = xpFooterOffX(x, w);
+        final int logX = xpFooterLogX(x, w);
+        final int textY = footY + (XP_FOOTER_H - 8) / 2;
+        if (hoverY >= footY && hoverX >= logX && hoverX < offX - 4) {
+            g.fill(logX - 2, footY + 2, offX - 6, y + h - 2, 0x33FFFFFF);
+        }
+        g.fill(logX, footY + 5, logX + 8, footY + 13, 0xFFE0A020);
+        g.fill(logX + 3, footY + 8, logX + 8, footY + 10, 0xFFFFFFFF);
+        g.drawString(font, "Log Off", logX + 12, textY, 0xFFFFFFFF, true);
+        if (hoverY >= footY && hoverX >= offX && hoverX < x + w - 2) {
             g.fill(offX - 2, footY + 2, x + w - 3, y + h - 2, 0x33FFFFFF);
         }
         g.fill(offX, footY + 5, offX + 8, footY + 13, 0xFFE24C4C);
         g.fill(offX + 3, footY + 3, offX + 5, footY + 9, 0xFFFFFFFF);
-        g.drawString(font, "Turn Off", offX + 12, footY + (XP_FOOTER_H - 8) / 2, 0xFFFFFFFF, true);
+        g.drawString(font, "Turn Off Computer", offX + 12, textY, 0xFFFFFFFF, true);
     }
 
-    /** Draws one XP Start column as an icon+label list, with a hover highlight on the row under the cursor. */
+    /** The name shown on the Start menu's header: the player's own. */
+    private static String playerName() {
+        return Minecraft.getInstance().getUser().getName();
+    }
+
+    /**
+     * The player's face from their own skin, hat layer included, at {@code size} pixels square. A client
+     * without a player yet falls back to a plain plate, so the header never renders as a hole.
+     */
+    private static void drawPlayerFace(final GuiGraphics g, final int x, final int y, final int size) {
+        g.fill(x - 1, y - 1, x + size + 1, y + size + 1, 0xFFFFFFFF); // the little white frame XP drew
+        final net.minecraft.client.player.AbstractClientPlayer player = Minecraft.getInstance().player;
+        if (player == null) {
+            g.fill(x, y, x + size, y + size, 0xFF2F6FD6);
+            return;
+        }
+        final net.minecraft.resources.ResourceLocation skin = player.getSkin().texture();
+        g.blit(skin, x, y, size, size, 8.0F, 8.0F, 8, 8, 64, 64);
+        g.blit(skin, x, y, size, size, 40.0F, 8.0F, 8, 8, 64, 64);
+    }
+
+    /**
+     * The XP Start menu's left column: the pinned entries in bold, a separator, the rest, and the
+     * "All Programs" row that opens the page listing everything installed, services included.
+     */
+    private void drawXpLeftColumn(final GuiGraphics g, final int colX, final int colY, final int colW) {
+        final List<Launcher> items = xpLeftLaunchers();
+        final int pinned = Math.min(XP_PINNED, items.size());
+        drawXpColumn(g, items, colX, colY, colW, theme.menuText(), pinned, true);
+        if (items.size() > pinned) {
+            final int sepY = colY + pinned * XP_ROW_H + XP_SEP_H / 2;
+            g.fill(colX + 3, sepY, colX + colW - 3, sepY + 1, 0xFF9FBBE6);
+        }
+        final int afterRows = colY + xpLeftRowY(items.size());
+        g.fill(colX + 3, afterRows + XP_SEP_H / 2, colX + colW - 3, afterRows + XP_SEP_H / 2 + 1, 0xFF9FBBE6);
+        final int allY = colY + xpAllRowY();
+        if (hoverY >= allY && hoverY < allY + XP_ALL_ROW_H && hoverX >= colX && hoverX < colX + colW) {
+            g.fill(colX, allY, colX + colW, allY + XP_ALL_ROW_H, 0x333B7BD4);
+        }
+        g.drawString(font, Component.literal("All Programs").withStyle(net.minecraft.ChatFormatting.BOLD),
+                colX + 4, allY + 4, theme.menuText(), false);
+        // The green chevron that always sat at the end of this row.
+        final int ax = colX + colW - 10;
+        for (int i = 0; i < 5; i++) {
+            g.fill(ax + i, allY + 3 + i, ax + i + 1, allY + 12 - i, 0xFF2F9A33);
+        }
+    }
+
+    /**
+     * Draws one XP Start column as an icon+label list, with a hover highlight on the row under the cursor.
+     * The first {@code boldCount} entries are the pinned ones and are drawn in bold. The left column's rows
+     * are spaced by {@link #xpLeftRowY(int)}, which leaves the gap its separator sits in.
+     */
     private void drawXpColumn(final GuiGraphics g, final List<Launcher> items, final int colX, final int colY,
-                              final int colW, final int textColor) {
-        int my = colY;
-        for (final Launcher l : items) {
+                              final int colW, final int textColor, final int boldCount,
+                              final boolean leftColumn) {
+        for (int i = 0; i < items.size(); i++) {
+            final Launcher l = items.get(i);
+            final int my = colY + (leftColumn ? xpLeftRowY(i) : i * XP_ROW_H);
             if (hoverY >= my && hoverY < my + XP_ROW_H && hoverX >= colX && hoverX < colX + colW) {
                 g.fill(colX, my, colX + colW, my + XP_ROW_H, 0x333B7BD4);
             }
             ProgramIcons.draw(g, colX + 1, my, 14, 12, l.programId(), iconSet());
-            g.drawString(font, trim(l.label(), (colW - 20) / 6), colX + 18, my + 4, textColor, false);
-            my += XP_ROW_H;
+            final String label = trim(l.label(), (colW - 20) / 6);
+            if (i < boldCount) {
+                g.drawString(font, Component.literal(label).withStyle(net.minecraft.ChatFormatting.BOLD),
+                        colX + 18, my + 4, textColor, false);
+            } else {
+                g.drawString(font, label, colX + 18, my + 4, textColor, false);
+            }
         }
     }
 
@@ -2923,23 +3223,55 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (mx < x || mx > x + w || my < y || my > y + h) {
             return false;
         }
-        final int bodyTop = y + XP_HEADER_H;
+        final int bodyTop = y + XP_HEADER_H + XP_ORANGE_H;
         final int bodyBot = y + h - XP_FOOTER_H;
         final int split = x + XP_LEFT_W;
         if (my >= bodyTop && my < bodyBot) {
-            final int row = (my - (bodyTop + 3)) / XP_ROW_H;
-            final List<Launcher> col = mx < split ? xpLeftLaunchers() : xpRightLaunchers();
-            if (row >= 0 && row < col.size()) {
-                runLauncher(col.get(row));
+            final int dy = my - (bodyTop + 3);
+            if (mx < split) {
+                // The left column's rows are spaced around a separator, so they are walked, not divided.
+                final List<Launcher> col = xpLeftLaunchers();
+                for (int i = 0; i < col.size(); i++) {
+                    final int ry = xpLeftRowY(i);
+                    if (dy >= ry && dy < ry + XP_ROW_H) {
+                        runLauncher(col.get(i));
+                        closeStart();
+                        return true;
+                    }
+                }
+                final int allY = xpAllRowY();
+                if (dy >= allY && dy < allY + XP_ALL_ROW_H) {
+                    openAllPrograms();
+                }
+            } else {
+                final List<Launcher> col = xpRightLaunchers();
+                final int row = dy / XP_ROW_H;
+                if (row >= 0 && row < col.size()) {
+                    runLauncher(col.get(row));
+                }
             }
         } else if (my >= bodyBot) {
-            // The footer's Turn Off button occupies the right side of the band.
-            if (mx >= x + w - 76) {
+            // The footer: log off leaves the machine, turn off asks the power dialog.
+            if (mx >= xpFooterOffX(x, w)) {
                 openPowerDialog();
+            } else if (mx >= xpFooterLogX(x, w)) {
+                closeStart();
+                onClose();
+                return true;
             }
         }
         closeStart();
         return true;
+    }
+
+    /** "All Programs": the page that lists everything installed on this machine, services included. */
+    private void openAllPrograms() {
+        for (final Launcher l : launchers) {
+            if (l.programId().getPath().equals("settings")) {
+                runLauncher(l);
+                return;
+            }
+        }
     }
 
     private boolean handleStartClick11(final int mx, final int my, final int tbY) {
@@ -3023,6 +3355,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final double mouseY = mouseYAbs - oy();
         final int tbY = sh() - TASKBAR_H;
 
+        // A balloon is dismissed by clicking it, and it swallows that click so nothing under it reacts.
+        if (balloonClick(mouseX, mouseY, tbY, sw())) {
+            return true;
+        }
+
         // GNOME: the top bar's Activities corner toggles the overview; the rest of the bar is inert.
         // Only while the bar IS at the top: a period GNOME panels at the bottom, and swallowing clicks
         // along the top edge there ate the title bars of every window parked up there.
@@ -3055,7 +3392,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
 
-        if (mouseY >= tbY + 3 && mouseX >= 4 && mouseX <= 58) {
+        if (startButtonHit(mouseX, mouseY, tbY)) {
             toggleStart();
             return true;
         }
@@ -3674,6 +4011,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     /** Word-wraps a label to {@code maxW} pixels, capped at three lines, for a selected desktop icon. */
+    /** One label line, cut with an ellipsis when a single unbreakable word is wider than its cell. */
+    private String fitLabelLine(final String s, final int maxW) {
+        if (font.width(s) <= maxW) {
+            return s;
+        }
+        return font.plainSubstrByWidth(s, maxW - font.width("...")) + "...";
+    }
+
     private java.util.List<String> wrapLabel(final String s, final int maxW) {
         final java.util.List<String> out = new java.util.ArrayList<>();
         StringBuilder cur = new StringBuilder();
