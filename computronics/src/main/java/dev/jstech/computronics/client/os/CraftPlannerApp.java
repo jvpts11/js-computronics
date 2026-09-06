@@ -13,11 +13,19 @@ import dev.jstech.computronics.operation.payload.CraftPlanPayload;
 import dev.jstech.computronics.operation.payload.CraftPlannerPayload;
 import dev.jstech.computronics.operation.payload.NiCraftPayload;
 import dev.jstech.computronics.operation.payload.RequestCraftPlannerPayload;
+import dev.jstech.core.client.gui.component.Button;
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.ListView;
+import dev.jstech.core.client.gui.component.Panel;
+import dev.jstech.core.client.gui.component.SearchField;
+import dev.jstech.core.client.gui.component.Texts;
+import dev.jstech.core.client.gui.component.UiContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,32 +43,88 @@ public final class CraftPlannerApp implements DesktopApp {
     private static final int REFRESH_FRAMES = 60;
     private static final int C_GOOD = 0xFF2EA043;
     private static final int C_CRIT = 0xFFD1495B;
-
-    private record Hit(int x, int y, int w, int h, Runnable onClick) {
-        boolean contains(final double mx, final double my) {
-            return mx >= x && mx < x + w && my >= y && my < y + h;
-        }
-    }
+    private static final int C_AMBER = 0xFFE0A020;
+    private static final int CATALOG_ROW_H = 15;
+    private static final int STAGE_ROW_H = 10;
+    private static final int INGREDIENT_ROW_H = 11;
+    private static final int TREE_ROW_H = 11;
+    private static final int SEARCH_MAX = 32;
 
     private final BlockPos host;
     private final BlockPos monitorPos;
     private OsSkin skin = OsSkin.fallback();
     private List<CraftCatalogPayload.Entry> catalog = List.of();
+    @Nullable
     private CraftPlannerPayload plan;
     private ItemStack selected = ItemStack.EMPTY;
     private long qty = 1;
     private boolean treeMode;
-    private int treeScroll;
-    private String search = "";
-    private int catScroll;
     private int frame;
-    private final List<Hit> hits = new ArrayList<>();
+    private int lastMouseX;
+    private int lastMouseY;
 
     private static CraftPlannerApp active;
+
+    // ---- components ----
+    private final Panel root = new Panel();
+    private final SearchField search;
+    private final ListView<CraftCatalogPayload.Entry> catalogList;
+    private final Label catalogEmpty;
+    private final Label pickLabel;
+    private final Label nameLabel;
+    private final Button qtyMinus;
+    private final Label qtyLabel;
+    private final Button qtyPlus;
+    private final Label planningLabel;
+    private final Label notCraftableLabel;
+    private final Label pillLabel;
+    private final Label summaryLabel;
+    private final Button viewToggle;
+    private final Label stagesHeader;
+    private final ListView<CraftPlannerPayload.Stage> stageList;
+    private final Label ingredientsHeader;
+    private final ListView<CraftPlanPayload.Row> ingredientList;
+    private final Label treeHeader;
+    private final Label treeHint;
+    private final ListView<CraftPlannerPayload.TreeNode> treeList;
+    private final Button craft;
 
     public CraftPlannerApp(final BlockPos host, final BlockPos monitorPos) {
         this.host = host;
         this.monitorPos = monitorPos;
+
+        search = root.add(new SearchField(SEARCH_MAX));
+        search.setPlaceholder("search item...");
+        catalogList = root.add(new ListView<CraftCatalogPayload.Entry>(this::filtered, CATALOG_ROW_H, this::renderCatalogRow)
+                .setOnClick(this::catalogClicked));
+        search.setOnEdit(() -> catalogList.setScroll(0));
+        catalogEmpty = root.add(new Label(() -> catalog.isEmpty() ? "loading..." : "no match", Label.Tone.DIM));
+
+        pickLabel = root.add(new Label("Pick an item to plan.", Label.Tone.DIM));
+        nameLabel = root.add(new Label(() -> selected.getHoverName().getString()));
+        qtyMinus = root.add(new Button("-", () -> setQty(qty - step())));
+        qtyLabel = root.add(new Label(() -> String.valueOf(qty)).setAlign(Label.Align.CENTER));
+        qtyPlus = root.add(new Button("+", () -> setQty(qty + step())));
+        planningLabel = root.add(new Label("planning...", Label.Tone.DIM));
+        notCraftableLabel = root.add(new Label("No pattern on the network makes this.").setColor(C_CRIT));
+        pillLabel = root.add(new Label(() -> plan != null && plan.feasible() ? "Craftable" : "Partial")
+                .setColor(() -> plan != null && plan.feasible() ? C_GOOD : C_AMBER));
+        summaryLabel = root.add(new Label(() -> plan == null ? ""
+                : "max " + JscOsTheme.fmt(plan.maxFeasible()) + "  -  " + plan.stages().size() + " stages", Label.Tone.DIM));
+        viewToggle = root.add(new Button(() -> treeMode ? "Steps" : "Tree", () -> treeMode = !treeMode));
+        stagesHeader = root.add(new Label("STAGES", Label.Tone.DIM));
+        stageList = root.add(new ListView<CraftPlannerPayload.Stage>(() -> plan == null ? List.of() : plan.stages(), STAGE_ROW_H,
+                this::renderStageRow));
+        ingredientsHeader = root.add(new Label("INGREDIENTS", Label.Tone.DIM));
+        ingredientList = root.add(new ListView<CraftPlanPayload.Row>(() -> plan == null ? List.of() : plan.ingredients(),
+                INGREDIENT_ROW_H, this::renderIngredientRow));
+        treeHeader = root.add(new Label("CRAFT TREE", Label.Tone.DIM));
+        treeHint = root.add(new Label("wheel to scroll", Label.Tone.DIM).setAlign(Label.Align.RIGHT));
+        treeList = root.add(new ListView<CraftPlannerPayload.TreeNode>(() -> plan == null ? List.of() : plan.tree(), TREE_ROW_H,
+                this::renderTreeRow));
+        craft = root.add(new Button(() -> "Craft " + qty, this::craft));
+
+        root.focus(search);
         active = this;
         PacketDistributor.sendToServer(new RequestCraftPlannerPayload(host, monitorPos, ItemStack.EMPTY, 0));
     }
@@ -91,202 +155,200 @@ public final class CraftPlannerApp implements DesktopApp {
         requestPlan();
     }
 
-    @Override public String title() {
+    @Override
+    public String title() {
         return "Craft Planner";
     }
 
-    @Override public int defaultWidth() {
+    @Override
+    public int defaultWidth() {
         return 320;
     }
 
-    @Override public int defaultHeight() {
+    @Override
+    public int defaultHeight() {
         return 200;
     }
 
-    @Override public int minWidth() {
+    @Override
+    public int minWidth() {
         return 280;
     }
 
-    @Override public int minHeight() {
+    @Override
+    public int minHeight() {
         return 170;
     }
 
-    @Override public void applySkin(final OsSkin osSkin) {
+    @Override
+    public void applySkin(final OsSkin osSkin) {
         this.skin = osSkin;
         active = this;
     }
+
+    // ---- rendering ----
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
-        hits.clear();
-        g.fill(x, y, x + width, y + height, skin.windowBg());
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
         frame++;
         if (frame % REFRESH_FRAMES == 0) {
             requestPlan();
         }
+        final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
+        g.fill(x, y, x + width, y + height, skin.windowBg());
         final int px = x + 6;
         final int py = y + 6;
         final int ph = height - 12;
         final int leftW = Math.max(96, (int) (width * 0.38));
-        catalogList(g, font, px, py, leftW - 6, ph, mouseX, mouseY);
+        layout(font, px, py, width - 12, ph, leftW);
         g.fill(px + leftW - 3, py, px + leftW - 2, py + ph, skin.edge());
-        planPanel(g, font, px + leftW, py, width - 12 - leftW, ph, mouseX, mouseY);
+        if (!selected.isEmpty()) {
+            itemIcon(g, selected, px + leftW, py, 16);
+            if (pillLabel.visible()) {
+                final int pillW = font.width(pillLabel.text()) + 8;
+                g.fill(pillLabel.x() - 4, pillLabel.y() - 2, pillLabel.x() - 4 + pillW, pillLabel.y() + 9,
+                        plan != null && plan.feasible() ? 0x2E2EA043 : 0x33E0A020);
+                g.fill(px + leftW, pillLabel.y() + 12, px + leftW + width - 12 - leftW, pillLabel.y() + 13, skin.edge());
+            }
+        }
+        root.render(g, ctx);
     }
 
-    private void catalogList(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                             final int h, final int mouseX, final int mouseY) {
-        // Search field.
-        skin.field(g, x, y, w, 13, false);
-        final String shown = search.isEmpty() ? "search item..." : search;
-        g.drawString(font, trim(font, shown, w - 6), x + 3, y + 3, search.isEmpty() ? skin.dim() : skin.text(), false);
+    private void layout(final Font font, final int x, final int y, final int w, final int h, final int leftW) {
+        final int catW = leftW - 6;
+        search.setBounds(x, y, catW, 13);
+        catalogList.setBounds(x, y + 16, catW, Math.max(CATALOG_ROW_H, h - 16));
+        final boolean noCatalog = filtered().isEmpty();
+        catalogList.setVisible(!noCatalog);
+        catalogEmpty.setVisible(noCatalog);
+        catalogEmpty.setBounds(x + 2, y + 18, catW - 4, 8);
 
-        final List<CraftCatalogPayload.Entry> filtered = filtered();
-        final int rowH = 15;
-        final int top = y + 16;
-        final int maxRows = Math.max(1, (h - 16) / rowH);
-        catScroll = Math.max(0, Math.min(catScroll, Math.max(0, filtered.size() - maxRows)));
-        int ry = top;
-        for (int i = catScroll; i < filtered.size() && ry + rowH <= y + h; i++) {
-            final CraftCatalogPayload.Entry e = filtered.get(i);
-            final boolean sel = ItemStack.isSameItemSameComponents(e.result(), selected);
-            final boolean hov = mouseX >= x && mouseX < x + w && mouseY >= ry && mouseY < ry + rowH;
-            skin.listRow(g, x, ry, w, rowH, hov, sel);
-            itemIcon(g, e.result(), x + 1, ry, 12);
-            g.drawString(font, trim(font, e.title(), w - 18),
-                    x + 15, ry + 3, sel ? skin.accent() : skin.text(), false);
-            final ItemStack pick = e.result().copy();
-            hits.add(new Hit(x, ry, w, rowH, () -> select(pick)));
-            ry += rowH;
+        final int rx = x + leftW;
+        final int rw = w - leftW;
+        final boolean picked = !selected.isEmpty();
+        pickLabel.setVisible(!picked);
+        pickLabel.setBounds(rx + 2, y + 4, rw - 4, 8);
+        for (final var c : List.of(nameLabel, qtyMinus, qtyLabel, qtyPlus)) {
+            c.setVisible(picked);
         }
-        if (filtered.isEmpty()) {
-            g.drawString(font, catalog.isEmpty() ? "loading..." : "no match", x + 2, top + 2, skin.dim(), false);
+        final boolean planned = picked && plan != null;
+        planningLabel.setVisible(picked && plan == null);
+        final boolean craftable = planned && plan.craftable();
+        notCraftableLabel.setVisible(planned && !plan.craftable());
+        for (final var c : List.of(pillLabel, summaryLabel, viewToggle, craft)) {
+            c.setVisible(craftable);
         }
-    }
-
-    private void planPanel(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                           final int h, final int mouseX, final int mouseY) {
-        if (selected.isEmpty()) {
-            g.drawString(font, "Pick an item to plan.", x + 2, y + 4, skin.dim(), false);
+        final boolean steps = craftable && !treeMode;
+        final boolean tree = craftable && treeMode;
+        for (final var c : List.of(stagesHeader, stageList, ingredientsHeader, ingredientList)) {
+            c.setVisible(steps);
+        }
+        treeHeader.setVisible(tree);
+        treeList.setVisible(tree);
+        treeHint.setVisible(tree && plan.tree().size() > treeList.visibleRows());
+        if (!picked) {
             return;
         }
         // Header: icon + name + quantity stepper.
-        itemIcon(g, selected, x, y, 16);
-        g.drawString(font, trim(font, selected.getHoverName().getString(), w - 84), x + 20, y + 4, skin.text(), false);
-        final int stepX = x + w - 56;
-        stepButton(g, font, stepX, y, "-", () -> setQty(qty - step()));
-        g.drawString(font, String.valueOf(qty), stepX + 16 + (24 - font.width(String.valueOf(qty))) / 2, y + 3,
-                skin.text(), false);
-        stepButton(g, font, stepX + 44, y, "+", () -> setQty(qty + step()));
-
+        final int stepX = rx + rw - 56;
+        nameLabel.setBounds(rx + 20, y + 4, stepX - (rx + 20) - 4, 8);
+        qtyMinus.setBounds(stepX, y, 14, 12);
+        qtyLabel.setBounds(stepX + 16, y + 3, 24, 8);
+        qtyPlus.setBounds(stepX + 44, y, 14, 12);
         int row = y + 20;
-        if (plan == null) {
-            g.drawString(font, "planning...", x + 2, row, skin.dim(), false);
+        planningLabel.setBounds(rx + 2, row, rw - 4, 8);
+        notCraftableLabel.setBounds(rx + 2, row, rw - 4, 8);
+        if (!craftable) {
             return;
         }
-        if (!plan.craftable()) {
-            g.drawString(font, "No pattern on the network makes this.", x + 2, row, C_CRIT, false);
-            return;
-        }
-        // Status line: feasible pill + max + stage count.
-        final String pill = plan.feasible() ? "Craftable" : "Partial";
-        final int pillW = font.width(pill) + 8;
-        g.fill(x, row, x + pillW, row + 11, plan.feasible() ? 0x2E2EA043 : 0x33E0A020);
-        g.drawString(font, pill, x + 4, row + 2, plan.feasible() ? C_GOOD : 0xFFE0A020, false);
-        g.drawString(font, "max " + JscOsTheme.fmt(plan.maxFeasible()) + "  -  " + plan.stages().size() + " stages",
-                x + pillW + 6, row + 2, skin.dim(), false);
-        // Steps/Tree toggle on the right of the status line.
-        final String tog = treeMode ? "Steps" : "Tree";
-        final int togW = font.width(tog) + 10;
-        final int togX = x + w - togW;
-        final boolean togHov = mouseX >= togX && mouseX < togX + togW && mouseY >= row && mouseY < row + 11;
-        skin.button(g, font, togX, row - 1, togW, 11, tog, togHov, false, false);
-        hits.add(new Hit(togX, row - 1, togW, 11, () -> treeMode = !treeMode));
-        row += 14;
-        g.fill(x, row, x + w, row + 1, skin.edge());
-        row += 3;
-
+        // Status line: feasible pill + max + stage count, and the Steps/Tree toggle on the right.
+        final int pillW = font.width(pillLabel.text()) + 8;
+        pillLabel.setBounds(rx + 4, row + 2, pillW - 8, 8);
+        final int togW = font.width(viewToggle.label()) + 10;
+        viewToggle.setBounds(rx + rw - togW, row - 1, togW, 11);
+        summaryLabel.setBounds(rx + pillW + 6, row + 2, rw - pillW - 6 - togW - 4, 8);
+        row += 17;
         final int bottom = y + h - 16;
-        if (treeMode) {
-            renderTree(g, font, x, row, w, bottom - row);
-            drawCraftButton(g, font, x, y, w, h, mouseX, mouseY);
+        final String cap = craft.label();
+        final int cw = font.width(cap) + 14;
+        craft.setBounds(rx + rw - cw, y + h - 13, cw, 13);
+        craft.setPrimary(true);
+        if (tree) {
+            treeHeader.setBounds(rx + 2, row, rw / 2, 8);
+            treeHint.setBounds(rx + rw / 2, row, rw / 2, 8);
+            treeList.setBounds(rx, row + 11, rw, Math.max(TREE_ROW_H, bottom - (row + 11)));
             return;
         }
         // Stages then ingredients, sharing the remaining height.
         final int half = (bottom - row) / 2;
-        g.drawString(font, "STAGES", x + 2, row, skin.dim(), false);
-        int sy = row + 11;
-        for (final CraftPlannerPayload.Stage s : plan.stages()) {
-            if (sy + 10 > row + half) {
-                break;
-            }
-            g.drawString(font, trim(font, s.name(), w - 60), x + 4, sy, skin.text(), false);
-            final String tag = (s.machine() ? "machine" : "bench") + " x" + s.runs();
-            g.drawString(font, tag, x + w - font.width(tag), sy, skin.dim(), false);
-            sy += 10;
-        }
-        int iy = row + half + 2;
-        g.drawString(font, "INGREDIENTS", x + 2, iy, skin.dim(), false);
-        iy += 11;
-        for (final CraftPlanPayload.Row r : plan.ingredients()) {
-            if (iy + 11 > bottom) {
-                break;
-            }
-            final boolean ok = r.have() >= r.need();
-            itemIcon(g, r.item(), x + 1, iy - 1, 11);
-            g.drawString(font, trim(font, r.item().getHoverName().getString(), w - 76), x + 15, iy, skin.text(), false);
-            final String s = ok ? "have " + JscOsTheme.fmt(r.have()) : "short " + JscOsTheme.fmt(r.need() - r.have());
-            g.drawString(font, s, x + w - font.width(s), iy, ok ? C_GOOD : C_CRIT, false);
-            iy += 11;
-        }
-        drawCraftButton(g, font, x, y, w, h, mouseX, mouseY);
+        stagesHeader.setBounds(rx + 2, row, rw - 4, 8);
+        stageList.setBounds(rx, row + 11, rw, Math.max(STAGE_ROW_H, half - 11));
+        final int iy = row + half + 2;
+        ingredientsHeader.setBounds(rx + 2, iy, rw - 4, 8);
+        ingredientList.setBounds(rx, iy + 11, rw, Math.max(INGREDIENT_ROW_H, bottom - (iy + 11)));
     }
 
-    /** The recipe dependency tree, flattened in pre-order and drawn indented by depth. */
-    private void renderTree(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                            final int h) {
-        g.drawString(font, "CRAFT TREE", x + 2, y, skin.dim(), false);
-        final List<CraftPlannerPayload.TreeNode> tree = plan.tree();
-        final int rowH = 11;
-        final int top = y + 11;
-        final int maxRows = Math.max(1, (h - 11) / rowH);
-        treeScroll = Math.max(0, Math.min(treeScroll, Math.max(0, tree.size() - maxRows)));
-        int ry = top;
-        for (int i = treeScroll; i < tree.size() && ry + rowH <= y + h; i++) {
-            final CraftPlannerPayload.TreeNode n = tree.get(i);
-            final int ix = x + 2 + n.depth() * 9;
-            if (n.depth() > 0) {
-                g.fill(x + 2 + (n.depth() - 1) * 9 + 3, ry + 4, ix - 1, ry + 5, skin.edge());
-            }
-            itemIcon(g, n.item(), ix, ry - 1, 10);
-            final String label = JscOsTheme.fmt(n.qty()) + "x " + n.item().getHoverName().getString();
-            g.drawString(font, trim(font, label, w - (ix - x) - 13 - 40), ix + 12, ry, skin.text(), false);
-            if (!n.craftable()) {
-                g.drawString(font, "raw", x + w - font.width("raw"), ry, skin.dim(), false);
-            }
-            ry += rowH;
-        }
-        if (tree.size() > maxRows) {
-            g.drawString(font, "wheel to scroll", x + w - font.width("wheel to scroll"), y, skin.dim(), false);
+    private void renderCatalogRow(final GuiGraphics g, final UiContext ctx, final CraftCatalogPayload.Entry e, final int index,
+                                  final int x, final int y, final int w, final int h, final boolean hovered, final boolean selectedRow) {
+        final boolean sel = ItemStack.isSameItemSameComponents(e.result(), selected);
+        ctx.skin().listRow(g, x, y, w, h, hovered, sel);
+        itemIcon(g, e.result(), x + 1, y, 12);
+        g.drawString(ctx.font(), Texts.clip(ctx.font(), e.title(), w - 18), x + 15, y + 3,
+                sel ? ctx.skin().accent() : ctx.skin().text(), false);
+    }
+
+    private void catalogClicked(final int index, final int button, final double mx, final double my) {
+        final List<CraftCatalogPayload.Entry> shown = filtered();
+        if (button == 0 && index >= 0 && index < shown.size()) {
+            select(shown.get(index).result().copy());
         }
     }
 
-    private void drawCraftButton(final GuiGraphics g, final Font font, final int x, final int y, final int w,
-                                 final int h, final int mouseX, final int mouseY) {
-        final String cap = "Craft " + qty;
-        final int cw = font.width(cap) + 14;
-        final int cbx = x + w - cw;
-        final int cby = y + h - 13;
-        final boolean chov = mouseX >= cbx && mouseX < cbx + cw && mouseY >= cby && mouseY < cby + 13;
-        skin.button(g, font, cbx, cby, cw, 13, cap, chov, false, plan.craftable());
-        hits.add(new Hit(cbx, cby, cw, 13, this::craft));
+    private void renderStageRow(final GuiGraphics g, final UiContext ctx, final CraftPlannerPayload.Stage s, final int index,
+                                final int x, final int y, final int w, final int h, final boolean hovered, final boolean selectedRow) {
+        final Font font = ctx.font();
+        g.drawString(font, Texts.clip(font, s.name(), w - 60), x + 4, y, ctx.skin().text(), false);
+        final String tag = (s.machine() ? "machine" : "bench") + " x" + s.runs();
+        g.drawString(font, tag, x + w - font.width(tag), y, ctx.skin().dim(), false);
     }
+
+    private void renderIngredientRow(final GuiGraphics g, final UiContext ctx, final CraftPlanPayload.Row r, final int index,
+                                     final int x, final int y, final int w, final int h, final boolean hovered, final boolean selectedRow) {
+        final Font font = ctx.font();
+        final boolean ok = r.have() >= r.need();
+        itemIcon(g, r.item(), x + 1, y - 1, 11);
+        g.drawString(font, Texts.clip(font, r.item().getHoverName().getString(), w - 76), x + 15, y, ctx.skin().text(), false);
+        final String s = ok ? "have " + JscOsTheme.fmt(r.have()) : "short " + JscOsTheme.fmt(r.need() - r.have());
+        g.drawString(font, s, x + w - font.width(s), y, ok ? C_GOOD : C_CRIT, false);
+    }
+
+    /** One node of the recipe dependency tree, flattened in pre-order and drawn indented by depth. */
+    private void renderTreeRow(final GuiGraphics g, final UiContext ctx, final CraftPlannerPayload.TreeNode n, final int index,
+                               final int x, final int y, final int w, final int h, final boolean hovered, final boolean selectedRow) {
+        final Font font = ctx.font();
+        final int ix = x + 2 + n.depth() * 9;
+        if (n.depth() > 0) {
+            g.fill(x + 2 + (n.depth() - 1) * 9 + 3, y + 4, ix - 1, y + 5, ctx.skin().edge());
+        }
+        itemIcon(g, n.item(), ix, y - 1, 10);
+        final String label = JscOsTheme.fmt(n.qty()) + "x " + n.item().getHoverName().getString();
+        g.drawString(font, Texts.clip(font, label, w - (ix - x) - 13 - 40), ix + 12, y, ctx.skin().text(), false);
+        if (!n.craftable()) {
+            g.drawString(font, "raw", x + w - font.width("raw"), y, ctx.skin().dim(), false);
+        }
+    }
+
+    // ---- state ----
 
     private void select(final ItemStack stack) {
         this.selected = stack;
         this.qty = 1;
         this.plan = null;
+        treeList.setScroll(0);
         requestPlan();
     }
 
@@ -307,10 +369,10 @@ public final class CraftPlannerApp implements DesktopApp {
     }
 
     private List<CraftCatalogPayload.Entry> filtered() {
-        if (search.isEmpty()) {
+        final String q = search.query();
+        if (q.isEmpty()) {
             return catalog;
         }
-        final String q = search.toLowerCase(Locale.ROOT);
         final List<CraftCatalogPayload.Entry> out = new ArrayList<>();
         for (final CraftCatalogPayload.Entry e : catalog) {
             if (e.title().toLowerCase(Locale.ROOT).contains(q)
@@ -334,63 +396,44 @@ public final class CraftPlannerApp implements DesktopApp {
         g.pose().popPose();
     }
 
-    private void stepButton(final GuiGraphics g, final Font font, final int x, final int y, final String label,
-                            final Runnable onClick) {
-        skin.button(g, font, x, y, 14, 12, label, false, false, false);
-        hits.add(new Hit(x, y, 14, 12, onClick));
-    }
+    // ---- input ----
 
-    private static String trim(final Font font, final String s, final int maxWidth) {
-        if (maxWidth <= 0 || font.width(s) <= maxWidth) {
-            return s;
+    @Override
+    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseClicked(mouseX, mouseY, button);
+        if (root.focusedChild() == null) {
+            // Typing filters the catalogue whenever nothing else holds the keyboard.
+            root.focus(search);
         }
-        String out = s;
-        while (!out.isEmpty() && font.width(out + "...") > maxWidth) {
-            out = out.substring(0, out.length() - 1);
-        }
-        return out + "...";
     }
 
     @Override
-    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,
-                             final int button) {
-        if (button != 0) {
-            return;
-        }
-        for (final Hit hit : hits) {
-            if (hit.contains(mouseX, mouseY)) {
-                hit.onClick().run();
-                return;
-            }
-        }
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(final double delta) {
-        if (treeMode && !selected.isEmpty()) {
-            treeScroll = Math.max(0, treeScroll - (int) Math.signum(delta));
+        if (root.mouseScrolled(lastMouseX, lastMouseY, delta)) {
+            return true;
+        }
+        // The wheel elsewhere moves the tree when it is shown, else the catalogue.
+        final int step = delta > 0 ? -1 : 1;
+        if (treeList.visible()) {
+            treeList.setScroll(treeList.scroll() + step);
         } else {
-            catScroll = Math.max(0, catScroll - (int) Math.signum(delta));
+            catalogList.setScroll(catalogList.scroll() + step);
         }
         return true;
     }
 
     @Override
     public boolean charTyped(final char c) {
-        if (c >= ' ' && c != 127) {
-            search += c;
-            catScroll = 0;
-            return true;
-        }
-        return false;
+        return root.charTyped(c);
     }
 
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
-        if (key == 259 && !search.isEmpty()) { // backspace
-            search = search.substring(0, search.length() - 1);
-            return true;
-        }
-        return false;
+        return root.keyPressed(key, scanCode, modifiers);
     }
 }

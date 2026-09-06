@@ -10,17 +10,28 @@ package dev.jstech.computronics.client.os;
 import dev.jstech.computronics.operation.payload.DesktopShellOutputPayload;
 import dev.jstech.computronics.operation.payload.DesktopShellRunPayload;
 import dev.jstech.computronics.os.DesktopEnvironmentDef;
+import dev.jstech.computronics.os.OsRegistry;
+import dev.jstech.computronics.os.PanelStyle;
+import dev.jstech.computronics.os.ProgramSpec;
+import dev.jstech.computronics.program.Programs;
 import dev.jstech.computronics.program.cli.CliStyle;
+import dev.jstech.core.client.gui.component.CommandLine;
+import dev.jstech.core.client.gui.component.Label;
+import dev.jstech.core.client.gui.component.ListView;
+import dev.jstech.core.client.gui.component.Panel;
+import dev.jstech.core.client.gui.component.UiContext;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * A terminal window for the desktop: the same CLI as the Command Prompt (dir, type, write, del, run,
@@ -28,19 +39,20 @@ import java.util.List;
  * Command Prompt directly, still reaches the filesystem and the network from the keyboard.
  *
  * <p>A typed line is echoed and sent to the server with {@link DesktopShellRunPayload}; the styled reply
- * routes back through {@link #accept}. Input is single-line with Up/Down history, like a real shell.
+ * routes back through {@link #accept}. The input is a command line with Up/Down history, like a real
+ * shell; the output above it is a list of the scrollback wrapped to the window's width.
  */
 public final class ShellApp implements DesktopApp {
 
     private static final int LINE_H = 9;
     private static final int PAD = 3;
     private static final int MAX_SCROLLBACK = 256;
+    private static final int INPUT_TEXT = 0xFFCDD6E2;
+    private static final int TAG_COLOR = 0xFF5A6678;
 
     private final BlockPos host;
     private final Deque<Line> scrollback = new ArrayDeque<>();
-    private final StringBuilder input = new StringBuilder();
-    private final List<String> history = new ArrayList<>();
-    private int historyIndex = -1;
+    /** How many lines up from the bottom the output is scrolled. */
     private int scrollOffset;
     private OsSkin skin = OsSkin.fallback();
 
@@ -56,25 +68,27 @@ public final class ShellApp implements DesktopApp {
     private record Line(String text, int color) {
     }
 
+    private final Panel root = new Panel();
+    private final ListView<Line> output;
+    private final Label scrolledTag;
+    private final CommandLine console;
+
     public ShellApp(final BlockPos host) {
         this(host, null);
     }
 
-    public ShellApp(final BlockPos host, final ResourceLocation desktopId) {
+    public ShellApp(final BlockPos host, @Nullable final ResourceLocation desktopId) {
         this.host = host;
         active = this;
-        final DesktopEnvironmentDef chrome = desktopId == null
-                ? null : dev.jstech.computronics.os.OsRegistry.getDesktop(desktopId);
+        final DesktopEnvironmentDef chrome = desktopId == null ? null : OsRegistry.getDesktop(desktopId);
         this.posix = chrome != null && switch (chrome.panelStyle()) {
             case KDE, GNOME, CINNAMON -> true;
             default -> false;
         };
-        final dev.jstech.computronics.os.ProgramSpec promptSpec =
-                dev.jstech.computronics.program.Programs.get(
-                        dev.jstech.computronics.program.Programs.COMMAND_PROMPT);
+        final ProgramSpec promptSpec = Programs.get(Programs.COMMAND_PROMPT);
         // Frames 11 ships its own modern shell ("Megashell"); every other desktop names the window after its
         // native terminal (Konsole on KDE, Terminal on GNOME/Cinnamon, Command Prompt on the older Frames).
-        if (chrome != null && chrome.panelStyle() == dev.jstech.computronics.os.PanelStyle.FRAMES_11) {
+        if (chrome != null && chrome.panelStyle() == PanelStyle.FRAMES_11) {
             this.title = "Megashell";
         } else {
             this.title = chrome != null && promptSpec != null ? chrome.nameOf(promptSpec) : "Command Prompt";
@@ -88,6 +102,11 @@ public final class ShellApp implements DesktopApp {
             push("J's Computronics Shell", colorOf(CliStyle.ACCENT.ordinal()));
             push("type a command and press ENTER", colorOf(CliStyle.DIM.ordinal()));
         }
+        output = root.add(new ListView<Line>(() -> wrapCache, LINE_H, this::renderLine));
+        scrolledTag = root.add(new Label(() -> scrollOffset > 0 ? "scrolled +" + scrollOffset : "").setColor(TAG_COLOR)
+                .setAlign(Label.Align.RIGHT));
+        console = root.add(new CommandLine(DesktopShellRunPayload.MAX_LEN - 1, this::submit).setPrompt(() -> prompt));
+        root.focus(console);
         // Sync the real prompt (and any pending build notices) before the player types anything.
         PacketDistributor.sendToServer(new DesktopShellRunPayload(host, ""));
     }
@@ -182,7 +201,7 @@ public final class ShellApp implements DesktopApp {
         this.skin = osSkin;
     }
 
-    /** The console background — kept dark like a real terminal, tinted to the OS (DOS black / XP navy / 11 grey). */
+    /** The console background, kept dark like a real terminal, tinted to the OS (DOS black / XP navy / 11 grey). */
     private int consoleBg() {
         return switch (skin.form()) {
             case BEVEL -> 0xFF000000;
@@ -199,67 +218,43 @@ public final class ShellApp implements DesktopApp {
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
+        final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
         g.fill(x, y, x + width, y + height, consoleBg());
-
-        // No own scissor here: app content is drawn inside the desktop's translate, where enableScissor (which
-        // takes absolute coordinates) would clip the wrong region and hide the text. Lines wrap below to the
-        // window's current width, so nothing leaks past the frame however the window is resized.
+        // Lines wrap to the window's current width, so nothing leaks past the frame however it is resized.
+        final List<Line> all = wrapped(font, Math.max(40, width - PAD * 2 - 2));
         final int inputY = y + height - LINE_H;
         final int visible = Math.max(1, (height - PAD - LINE_H - 2) / LINE_H);
-        final List<Line> all = wrapped(font, Math.max(40, width - PAD * 2 - 2));
-        final int total = all.size();
-        final int maxScroll = Math.max(0, total - visible);
-        if (scrollOffset > maxScroll) {
-            scrollOffset = maxScroll;
-        }
-        final int end = total - scrollOffset;
-        final int start = Math.max(0, end - visible);
-        int row = y + PAD;
-        for (int i = start; i < end; i++) {
-            g.drawString(font, all.get(i).text(), x + PAD, row, all.get(i).color(), false);
-            row += LINE_H;
-        }
-        if (scrollOffset > 0) {
-            final String tag = "scrolled +" + scrollOffset;
-            g.drawString(font, tag, x + width - font.width(tag) - 3, inputY, 0xFF5A6678, false);
-        }
-        g.drawString(font, prompt + " " + input + "_", x + PAD, inputY, 0xFFCDD6E2, false);
+        final int maxScroll = Math.max(0, all.size() - visible);
+        scrollOffset = Math.min(scrollOffset, maxScroll);
+        // The output is anchored to its bottom: the scroll offset counts lines up from the newest.
+        output.setBounds(x + PAD, y + PAD, width - PAD * 2, visible * LINE_H);
+        output.setScroll(maxScroll - scrollOffset);
+        scrolledTag.setBounds(x + PAD, inputY, width - PAD * 2 - 1, 8);
+        console.setBounds(x, inputY - 2, width, LINE_H + 2);
+        console.setStyle(consoleBg(), INPUT_TEXT);
+        root.render(g, ctx);
+    }
+
+    private void renderLine(final GuiGraphics g, final UiContext ctx, final Line line, final int index, final int x,
+                            final int y, final int w, final int h, final boolean hovered, final boolean selected) {
+        g.drawString(ctx.font(), line.text(), x, y, line.color(), false);
+    }
+
+    @Override
+    public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        root.mouseClicked(mouseX, mouseY, button);
+        // Typing always goes to the command line: a click on the output must not take the keyboard away.
+        root.focus(console);
     }
 
     @Override
     public boolean charTyped(final char c) {
-        if (c >= 32 && c != 127 && input.length() < DesktopShellRunPayload.MAX_LEN - 1) {
-            input.append(c);
-            return true;
-        }
-        return false;
+        return root.charTyped(c);
     }
 
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
-        switch (key) {
-            case 257, 335 -> { // Enter / numpad Enter
-                submit();
-                return true;
-            }
-            case 259 -> { // Backspace
-                if (input.length() > 0) {
-                    input.deleteCharAt(input.length() - 1);
-                }
-                return true;
-            }
-            case 265 -> { // Up — older history
-                recall(-1);
-                return true;
-            }
-            case 264 -> { // Down — newer history
-                recall(1);
-                return true;
-            }
-            default -> {
-                return false;
-            }
-        }
+        return root.keyPressed(key, scanCode, modifiers);
     }
 
     @Override
@@ -268,21 +263,12 @@ public final class ShellApp implements DesktopApp {
         return true;
     }
 
-    private void submit() {
-        final String line = input.toString().trim();
-        input.setLength(0);
-        historyIndex = -1;
+    private void submit(final String line) {
         scrollOffset = 0;
         push(prompt + " " + line, colorOf(CliStyle.PROMPT.ordinal()));
-        if (line.isEmpty()) {
-            return;
-        }
-        if (history.isEmpty() || !history.get(history.size() - 1).equals(line)) {
-            history.add(line);
-        }
         // "run/start/open <program>" launches a desktop window client-side (the server shell has no windows).
         final String[] parts = line.split("\\s+", 2);
-        final String verb = parts[0].toLowerCase(java.util.Locale.ROOT);
+        final String verb = parts[0].toLowerCase(Locale.ROOT);
         if (verb.equals("run") || verb.equals("start") || verb.equals("open")) {
             handleRun(parts.length > 1 ? parts[1].trim() : "");
             return;
@@ -292,37 +278,21 @@ public final class ShellApp implements DesktopApp {
 
     /** Opens an installed program's window by name, or lists what can be opened. */
     private void handleRun(final String name) {
-        final java.util.List<String> labels = DesktopScreen.openableLabels();
+        final List<String> labels = DesktopScreen.openableLabels();
         if (name.isEmpty()) {
             push("Programs: " + String.join(", ", labels), 0xFFB7BCCB);
             push("Usage: run <program>", 0xFF7A8496);
             return;
         }
-        final String norm = name.toLowerCase(java.util.Locale.ROOT).replace(" ", "");
+        final String norm = name.toLowerCase(Locale.ROOT).replace(" ", "");
         for (final String label : labels) {
-            if (label.equalsIgnoreCase(name) || label.toLowerCase(java.util.Locale.ROOT).replace(" ", "").equals(norm)) {
+            if (label.equalsIgnoreCase(name) || label.toLowerCase(Locale.ROOT).replace(" ", "").equals(norm)) {
                 DesktopScreen.requestOpen(label);
                 push("Opening " + label + "...", 0xFF8FE0A8);
                 return;
             }
         }
         push("No such program: " + name + " (type 'run' to list them)", 0xFFE06A6A);
-    }
-
-    private void recall(final int direction) {
-        if (history.isEmpty()) {
-            return;
-        }
-        if (historyIndex == -1) {
-            historyIndex = history.size();
-        }
-        historyIndex = Math.max(0, Math.min(history.size(), historyIndex + direction));
-        input.setLength(0);
-        if (historyIndex >= history.size()) {
-            historyIndex = -1;
-        } else {
-            input.append(history.get(historyIndex));
-        }
     }
 
     private static int colorOf(final int ordinal) {

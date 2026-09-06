@@ -31,8 +31,11 @@ public final class CommandLine extends UiComponent {
     private final StringBuilder input = new StringBuilder();
     private final List<String> history = new ArrayList<>();
     private int historyIndex = -1;
+    private Supplier<String> prompt = () -> ">";
     private Supplier<String> idleText = () -> "";
     private IntSupplier idleColor = () -> PROMPT;
+    private int background = BACKGROUND;
+    private int textColor = PROMPT;
 
     public CommandLine(final int maxLength, final java.util.function.Consumer<String> onSubmit) {
         this.maxLength = Math.max(1, maxLength);
@@ -43,6 +46,19 @@ public final class CommandLine extends UiComponent {
     public CommandLine setIdle(final Supplier<String> text, final IntSupplier color) {
         idleText = text;
         idleColor = color;
+        return this;
+    }
+
+    /** The prompt in front of what is typed: a shell's current directory, a bare {@code >} by default. */
+    public CommandLine setPrompt(final Supplier<String> value) {
+        prompt = value;
+        return this;
+    }
+
+    /** The strip's colours, for a terminal that tints its console to the desktop it runs on. */
+    public CommandLine setStyle(final int backgroundArgb, final int textArgb) {
+        background = backgroundArgb;
+        textColor = textArgb;
         return this;
     }
 
@@ -58,14 +74,14 @@ public final class CommandLine extends UiComponent {
 
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
-        g.fill(x(), y(), right(), bottom(), BACKGROUND);
+        g.fill(x(), y(), right(), bottom(), background);
         final String idle = idleText.get();
         if (isFocused() && input.isEmpty() && !idle.isEmpty()) {
             g.drawString(ctx.font(), Texts.trim(ctx.font(), idle, width() - 6), x() + 3, y() + 2, idleColor.getAsInt(), false);
             return;
         }
-        final String line = "> " + input + (isFocused() ? "_" : "");
-        g.drawString(ctx.font(), Texts.tail(ctx.font(), line, width() - 6), x() + 3, y() + 2, PROMPT, false);
+        final String line = prompt.get() + " " + input + (isFocused() ? "_" : "");
+        g.drawString(ctx.font(), Texts.tail(ctx.font(), line, width() - 6), x() + 3, y() + 2, textColor, false);
     }
 
     @Override
