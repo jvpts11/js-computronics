@@ -10,6 +10,7 @@ package dev.jstech.computronics.client;
 import dev.jstech.computronics.gui.layout.ClusterManagementComputerLayout;
 import dev.jstech.computronics.menu.ClusterManagementComputerMenu;
 import dev.jstech.computronics.operation.payload.RenamePcPayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -62,92 +63,92 @@ public class ClusterManagementComputerScreen extends AbstractAssemblyScreen<Clus
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
-        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
-        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
+        JsTechTheme.window(g, x, y, imageWidth, imageHeight);
+        JsTechTheme.headerBar(g, x + 6, y + 6, 232);
         g.fill(x + 26, y + 7, x + 158, y + 19, 0xFF11161D);
         g.fill(x + 26, y + 18, x + 158, y + 19, 0xFF24323C);
-        JscOsTheme.vLine(g, x + COL_R - 5, y + 24, 108);
-        JscOsTheme.slot(g, x + ClusterManagementComputerLayout.MOBO_X, y + ClusterManagementComputerLayout.MOBO_Y);
-        JscOsTheme.slot(g, x + ClusterManagementComputerLayout.PSU_X, y + ClusterManagementComputerLayout.PSU_Y);
+        JsTechTheme.vLine(g, x + COL_R - 5, y + 24, 108);
+        JsTechTheme.slot(g, x + ClusterManagementComputerLayout.MOBO_X, y + ClusterManagementComputerLayout.MOBO_Y);
+        JsTechTheme.slot(g, x + ClusterManagementComputerLayout.PSU_X, y + ClusterManagementComputerLayout.PSU_Y);
         if (menu.boardCpuSlots() > 0) {
-            JscOsTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X, y + ClusterManagementComputerLayout.CPU_Y);
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X, y + ClusterManagementComputerLayout.CPU_Y);
         }
         for (int i = 0; i < menu.boardRamSlots(); i++) {
-            JscOsTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X + i * 18, y + ClusterManagementComputerLayout.RAM_Y);
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X + i * 18, y + ClusterManagementComputerLayout.RAM_Y);
         }
         for (int i = 0; i < menu.boardPcieSlots(); i++) {
-            JscOsTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X + i * 18, y + ClusterManagementComputerLayout.PCIE_Y);
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.RIGHT_X + i * 18, y + ClusterManagementComputerLayout.PCIE_Y);
         }
         for (int i = 0; i < menu.boardDiskSlots(); i++) {
-            JscOsTheme.slot(g, x + ClusterManagementComputerLayout.MOBO_X + i * 18, y + ClusterManagementComputerLayout.DISK_Y);
+            JsTechTheme.slot(g, x + ClusterManagementComputerLayout.MOBO_X + i * 18, y + ClusterManagementComputerLayout.DISK_Y);
         }
-        JscOsTheme.panel(g, x + COL_R, y + TILE_Y0, COL_R_W, TILE_H);
-        JscOsTheme.panel(g, x + COL_R, y + TILE_Y1, COL_R_W, TILE_H);
-        JscOsTheme.panel(g, x + COL_R, y + TILE_Y2, COL_R_W, TILE_H);
-        JscOsTheme.panel(g, x + COL_R, y + TILE_Y3, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y0, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y1, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y2, COL_R_W, TILE_H);
+        JsTechTheme.panel(g, x + COL_R, y + TILE_Y3, COL_R_W, TILE_H);
         final boolean auto = menu.isAutoStart();
-        JscOsTheme.button(g, x + POWER_X, y + POWER_Y, COL_R_W, BTN_H,
+        JsTechTheme.button(g, x + POWER_X, y + POWER_Y, COL_R_W, BTN_H,
                 !auto && hover(mouseX, mouseY, POWER_X, POWER_Y, COL_R_W, BTN_H));
-        JscOsTheme.button(g, x + AUTO_X, y + AUTO_Y, COL_R_W, BTN_H,
+        JsTechTheme.button(g, x + AUTO_X, y + AUTO_Y, COL_R_W, BTN_H,
                 hover(mouseX, mouseY, AUTO_X, AUTO_Y, COL_R_W, BTN_H));
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + INV_X + col * 18, y + INV_Y + row * 18);
+                JsTechTheme.slot(g, x + INV_X + col * 18, y + INV_Y + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + INV_X + col * 18, y + INV_Y + 58);
+            JsTechTheme.slot(g, x + INV_X + col * 18, y + INV_Y + 58);
         }
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "CMC", 12, 11, JscOsTheme.text());
+        JsTechTheme.text(g, font, "CMC", 12, 11, JsTechTheme.text());
         final String status;
         final int statusColor;
         if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.red();
+            statusColor = JsTechTheme.red();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.green();
+            statusColor = JsTechTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.amber();
+            statusColor = JsTechTheme.amber();
         }
         final int pillX = 232 - font.width(status);
-        JscOsTheme.text(g, font, status, pillX, 11, statusColor);
+        JsTechTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.dim());
-        g.fill(30, 61, 34, 65, !menu.hasPsu() ? JscOsTheme.dim() : menu.buildValid() ? JscOsTheme.green() : JscOsTheme.amber());
-        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "DISK", 8, 93, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "PCIE", 44, 93, menu.hasCard() ? JscOsTheme.accent() : JscOsTheme.dim());
+        JsTechTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JsTechTheme.accent() : JsTechTheme.dim());
+        JsTechTheme.text(g, font, "CPU", 44, 27, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "PSU", 8, 60, JsTechTheme.dim());
+        g.fill(30, 61, 34, 65, !menu.hasPsu() ? JsTechTheme.dim() : menu.buildValid() ? JsTechTheme.green() : JsTechTheme.amber());
+        JsTechTheme.text(g, font, "RAM", 44, 60, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "DISK", 8, 93, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "PCIE", 44, 93, menu.hasCard() ? JsTechTheme.accent() : JsTechTheme.dim());
 
         // Small-font tiles: four fit where the crafting computer keeps three.
-        JscOsTheme.tileTextS(g, font, COL_R, TILE_Y0, "CAPACITY", JscOsTheme.fmt(menu.capacity()) + " it/t · "
-                + JscOsTheme.fmt(menu.ramBuffer()) + " it", JscOsTheme.text());
-        JscOsTheme.tileTextS(g, font, COL_R, TILE_Y1, "NETWORK", menu.isOnNetwork() ? "LINKED" : "no link",
-                menu.isOnNetwork() ? JscOsTheme.green() : JscOsTheme.dim());
+        JsTechTheme.tileTextS(g, font, COL_R, TILE_Y0, "CAPACITY", JsTechTheme.fmt(menu.capacity()) + " it/t · "
+                + JsTechTheme.fmt(menu.ramBuffer()) + " it", JsTechTheme.text());
+        JsTechTheme.tileTextS(g, font, COL_R, TILE_Y1, "NETWORK", menu.isOnNetwork() ? "LINKED" : "no link",
+                menu.isOnNetwork() ? JsTechTheme.green() : JsTechTheme.dim());
         if (!menu.hasCard()) {
-            JscOsTheme.tileTextS(g, font, COL_R, TILE_Y2, "CLUSTERS IN REACH", "no interface card", JscOsTheme.amber());
+            JsTechTheme.tileTextS(g, font, COL_R, TILE_Y2, "CLUSTERS IN REACH", "no interface card", JsTechTheme.amber());
         } else {
-            JscOsTheme.tileTextS(g, font, COL_R, TILE_Y2, "CLUSTERS IN REACH", menu.supercomputers() + " SC · "
-                    + menu.datacenters() + " DC · " + menu.lanes() + " lanes", JscOsTheme.text());
+            JsTechTheme.tileTextS(g, font, COL_R, TILE_Y2, "CLUSTERS IN REACH", menu.supercomputers() + " SC · "
+                    + menu.datacenters() + " DC · " + menu.lanes() + " lanes", JsTechTheme.text());
         }
-        JscOsTheme.tileTextS(g, font, COL_R, TILE_Y3, "MANAGEMENT",
+        JsTechTheme.tileTextS(g, font, COL_R, TILE_Y3, "MANAGEMENT",
                 menu.managerInstalled() ? "Cluster Manager · installed" : "Cluster Manager · not installed",
-                menu.managerInstalled() ? JscOsTheme.accent() : JscOsTheme.dim());
+                menu.managerInstalled() ? JsTechTheme.accent() : JsTechTheme.dim());
 
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
-        JscOsTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4,
-                auto ? JscOsTheme.dim() : JscOsTheme.accent());
-        JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
-                auto ? JscOsTheme.accent() : JscOsTheme.dim());
+        JsTechTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4,
+                auto ? JsTechTheme.dim() : JsTechTheme.accent());
+        JsTechTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
+                auto ? JsTechTheme.accent() : JsTechTheme.dim());
     }
 
     @Override

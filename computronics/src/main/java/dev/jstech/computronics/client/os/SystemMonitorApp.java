@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
-import dev.jstech.computronics.client.JscOsTheme;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.computronics.operation.payload.RequestSettingsPayload;
 import dev.jstech.computronics.operation.payload.SettingsSnapshotPayload;
 import dev.jstech.computronics.operation.payload.SettingsSnapshotPayload.DiskUse;
@@ -69,9 +69,9 @@ public final class SystemMonitorApp implements DesktopApp {
         osLabel = root.add(new Label(() -> data == null ? "" : data.osLabel() + "  (" + data.platform() + ")", Label.Tone.DIM)
                 .setAlign(Label.Align.RIGHT));
         spec(0, "Processor", () -> data == null || data.cpuLabel().isEmpty() ? "-" : data.cpuLabel(), () -> cpuClock(data == null ? 0 : data.cpuMhz()));
-        spec(1, "Memory", () -> "RAM buffer", () -> JscOsTheme.fmt(data == null ? 0 : data.ramMb()) + " MB");
+        spec(1, "Memory", () -> "RAM buffer", () -> JsTechTheme.fmt(data == null ? 0 : data.ramMb()) + " MB");
         spec(2, "Graphics", () -> data != null && data.vramMb() > 0 ? "VRAM" : "no GPU",
-                () -> data != null && data.vramMb() > 0 ? JscOsTheme.fmt(data.vramMb()) + " MB" : "-");
+                () -> data != null && data.vramMb() > 0 ? JsTechTheme.fmt(data.vramMb()) + " MB" : "-");
         storageHeader = root.add(new Label("STORAGE", Label.Tone.DIM));
         programsLabel = root.add(new Label(() -> data == null ? "" : data.installed().size() + " programs installed", Label.Tone.DIM)
                 .setAlign(Label.Align.RIGHT));
@@ -176,7 +176,7 @@ public final class SystemMonitorApp implements DesktopApp {
         g.drawString(font, tag, x, y, ctx.skin().text(), false);
         final long cap = Math.max(1L, disk.capMb());
         final double frac = Math.min(1.0, (double) disk.usedMb() / cap);
-        final String usage = JscOsTheme.fmt(disk.usedMb()) + " / " + JscOsTheme.fmt(disk.capMb()) + " MB";
+        final String usage = JsTechTheme.fmt(disk.usedMb()) + " / " + JsTechTheme.fmt(disk.capMb()) + " MB";
         g.drawString(font, usage, x + w - font.width(usage), y, ctx.skin().dim(), false);
         final int barY = y + 10;
         g.fill(x, barY, x + w, barY + BAR_H, ctx.skin().fieldBg());

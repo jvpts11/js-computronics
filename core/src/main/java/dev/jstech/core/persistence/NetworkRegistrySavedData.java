@@ -24,7 +24,7 @@ import java.util.UUID;
 /**
  * SavedData binding for the per-dimension network registry.
  */
-public final class NetworkRegistrySavedData extends JscSavedData{
+public final class NetworkRegistrySavedData extends CoreSavedData{
 
     public static final String DATA_NAME = "jstech_network_registry";
 

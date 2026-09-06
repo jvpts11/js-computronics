@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
-import dev.jstech.computronics.client.JscOsTheme;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.computronics.operation.payload.NetworkManagerPayload;
 import dev.jstech.computronics.operation.payload.NetworkNodeInfo;
 import dev.jstech.computronics.operation.payload.OperationRecord;
@@ -183,10 +183,10 @@ public final class NetworkManagerApp implements DesktopApp {
         procBar = root.add(new ScrollBar(() -> Math.max(0, activeOps.size() - procList.visibleRows()), procList::scroll,
                 v -> procList.setScroll(v)));
 
-        hardwareRows.add(new HardwareRow("Orchestration capacity", () -> JscOsTheme.fmt(hardware().capacity()) + " it/t"));
+        hardwareRows.add(new HardwareRow("Orchestration capacity", () -> JsTechTheme.fmt(hardware().capacity()) + " it/t"));
         hardwareRows.add(new HardwareRow("Parallel queues", () -> String.valueOf(hardware().queues())));
-        hardwareRows.add(new HardwareRow("RAM buffer", () -> JscOsTheme.fmt(hardware().ramBuffer()) + " it"));
-        hardwareRows.add(new HardwareRow("Network storage", () -> JscOsTheme.fmt(hardware().storageItems()) + " items"));
+        hardwareRows.add(new HardwareRow("RAM buffer", () -> JsTechTheme.fmt(hardware().ramBuffer()) + " it"));
+        hardwareRows.add(new HardwareRow("Network storage", () -> JsTechTheme.fmt(hardware().storageItems()) + " items"));
         hardwareRows.add(new HardwareRow("Mainframes", () -> countKind(NetworkNodeInfo.KIND_MAINFRAME)));
         hardwareRows.add(new HardwareRow("Servers", () -> countKind(NetworkNodeInfo.KIND_SERVER)));
         hardwareRows.add(new HardwareRow("Subframes", () -> countKind(NetworkNodeInfo.KIND_SUBFRAME)));
@@ -646,15 +646,15 @@ public final class NetworkManagerApp implements DesktopApp {
         lines.add(n.name().isEmpty() ? "unnamed" : n.name());
         lines.add(n.kindLabel() + "  -  " + (n.online() ? "online" : "offline"));
         if (n.cpuMhz() > 0) {
-            lines.add("CPU " + cpuClock(n.cpuMhz()) + (n.vramMb() > 0 ? "   VRAM " + JscOsTheme.fmt(n.vramMb()) + " MB" : ""));
+            lines.add("CPU " + cpuClock(n.cpuMhz()) + (n.vramMb() > 0 ? "   VRAM " + JsTechTheme.fmt(n.vramMb()) + " MB" : ""));
         }
         if (!n.osLabel().isEmpty()) {
             lines.add("OS " + n.osLabel());
         }
         if (n.storageTotalMb() > 0) {
-            lines.add("Storage " + JscOsTheme.fmt(n.storageFreeMb()) + " / " + JscOsTheme.fmt(n.storageTotalMb()) + " MB free");
+            lines.add("Storage " + JsTechTheme.fmt(n.storageFreeMb()) + " / " + JsTechTheme.fmt(n.storageTotalMb()) + " MB free");
         } else if (n.storageFreeMb() > 0) {
-            lines.add("Storage " + JscOsTheme.fmt(n.storageFreeMb()) + " MB free");
+            lines.add("Storage " + JsTechTheme.fmt(n.storageFreeMb()) + " MB free");
         }
         if (n.publicPermille() >= 0) {
             lines.add("Private " + (100 - n.publicPermille() / 10) + "%");
@@ -699,7 +699,7 @@ public final class NetworkManagerApp implements DesktopApp {
             }
         } else {
             for (final OperationRecord.MoveRow m : op.moves()) {
-                rows.add(new DetailRow(m.from() + " -> " + m.to(), JscOsTheme.fmt(m.qty()), skin.dim()));
+                rows.add(new DetailRow(m.from() + " -> " + m.to(), JsTechTheme.fmt(m.qty()), skin.dim()));
             }
         }
         detailRows = rows;
@@ -712,8 +712,8 @@ public final class NetworkManagerApp implements DesktopApp {
         if (detailOp == null) {
             return "";
         }
-        final String reqLabel = detailOp.requested() >= 1_000_000_000L ? "all" : JscOsTheme.fmt(detailOp.requested());
-        return JscOsTheme.fmt(detailOp.moved()) + " of " + reqLabel + "   " + statusLabel(detailOp.status());
+        final String reqLabel = detailOp.requested() >= 1_000_000_000L ? "all" : JsTechTheme.fmt(detailOp.requested());
+        return JsTechTheme.fmt(detailOp.moved()) + " of " + reqLabel + "   " + statusLabel(detailOp.status());
     }
 
     private String detailSectionText() {

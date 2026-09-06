@@ -14,7 +14,7 @@ import java.util.Objects;
 /**
  * Cancellable event fired when a network UUID is about to propagate through a newly-placed cable into adjacent components.
  */
-public final class NetworkPropagatingEvent implements JscEvent.Cancellable{
+public final class NetworkPropagatingEvent implements CoreEvent.Cancellable{
 
     private final NetworkUuid networkUuid;
     private final long fromPos;

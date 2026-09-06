@@ -7,7 +7,7 @@
  */
 package dev.jstech.core.network;
 
-import dev.jstech.core.registry.JscAttachments;
+import dev.jstech.core.registry.CoreAttachments;
 import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.core.uuid.NodeUuid;
 
@@ -76,7 +76,7 @@ public final class NetworkSystem {
     // Per-level acquisition (Phase 1+)
 
     public static NetworkSystem get(final ServerLevel level) {
-        return level.getData(JscAttachments.NETWORK_SYSTEM.get());
+        return level.getData(CoreAttachments.NETWORK_SYSTEM.get());
     }
 
     // ConnectivityIndex facade — works in Phase 0

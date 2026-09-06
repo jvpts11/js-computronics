@@ -11,6 +11,7 @@ import dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity;
 import dev.jstech.computronics.gui.layout.CraftingSwitchLayout;
 import dev.jstech.computronics.menu.CraftingSwitchMenu;
 import dev.jstech.computronics.operation.payload.SetCraftingSwitchFacePayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -366,11 +367,11 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
                     y + CraftingSwitchLayout.MACHINE_LABEL_Y, ACCENT, false);
             g.drawString(this.font, "NAME", dx + 4, y + CraftingSwitchLayout.NAME_LABEL_Y, DIM, false);
             // Absolute coordinates, tucked between the name field and the active toggle.
-            JscOsTheme.textS(g, this.font, "AT " + line.machinePos().getX() + ", " + line.machinePos().getY()
+            JsTechTheme.textS(g, this.font, "AT " + line.machinePos().getX() + ", " + line.machinePos().getY()
                             + ", " + line.machinePos().getZ(),
                     dx + 4, y + CraftingSwitchLayout.NAME_Y + CraftingSwitchLayout.NAME_H + 2, TEXT);
             if (selViaBus.size() > 1) {
-                JscOsTheme.textSRight(g, this.font, "+" + (selViaBus.size() - 1) + " more",
+                JsTechTheme.textSRight(g, this.font, "+" + (selViaBus.size() - 1) + " more",
                         dx + CraftingSwitchLayout.DETAIL_W - 2,
                         y + CraftingSwitchLayout.MACHINE_LABEL_Y + 1, DIM);
             }
@@ -384,12 +385,12 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
         // nothing drawn behind them and the inventory looks like it vanished.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + CraftingSwitchLayout.INV_X + col * 18,
+                JsTechTheme.slot(g, x + CraftingSwitchLayout.INV_X + col * 18,
                         y + CraftingSwitchLayout.INV_Y + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + CraftingSwitchLayout.INV_X + col * 18, y + CraftingSwitchLayout.HOTBAR_Y);
+            JsTechTheme.slot(g, x + CraftingSwitchLayout.INV_X + col * 18, y + CraftingSwitchLayout.HOTBAR_Y);
         }
     }
 
@@ -438,11 +439,11 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
             if (hovered) {
                 g.fill(px + 3, ry, px + CP_W - 3, ry + CP_ROW_H, SEL);
             }
-            JscOsTheme.textS(g, font, category.isEmpty() ? "none" : category, px + 8, ry + 2,
+            JsTechTheme.textS(g, font, category.isEmpty() ? "none" : category, px + 8, ry + 2,
                     hovered ? TEXT : DIM);
         }
         if (list.size() > CP_VIS_ROWS) {
-            JscOsTheme.textSRight(g, font, (categoryScroll + 1) + "-"
+            JsTechTheme.textSRight(g, font, (categoryScroll + 1) + "-"
                             + Math.min(list.size(), categoryScroll + CP_VIS_ROWS) + "/" + list.size(),
                     px + CP_W - 6, py + 4, DIM);
         }

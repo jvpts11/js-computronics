@@ -8,6 +8,10 @@
 package dev.jstech.computronics.client.theme;
 
 import dev.jstech.computronics.client.os.OsSkin;
+import dev.jstech.core.client.gui.theme.EraPalette;
+import dev.jstech.core.client.gui.theme.EraStyle;
+import dev.jstech.core.client.gui.theme.EraTheme;
+import dev.jstech.core.client.gui.theme.EraThemes;
 import dev.jstech.core.tier.HardwareEra;
 import org.jetbrains.annotations.Nullable;
 

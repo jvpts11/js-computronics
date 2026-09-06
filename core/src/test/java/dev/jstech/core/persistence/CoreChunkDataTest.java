@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class JscChunkDataTest {
+class CoreChunkDataTest {
 
     private static NetworkUuid net() {
         return new NetworkUuid(UUID.randomUUID());
@@ -27,7 +27,7 @@ class JscChunkDataTest {
 
     @Test
     void empty_hasNoNetworks() {
-        JscChunkData data = JscChunkData.empty();
+        CoreChunkData data = CoreChunkData.empty();
         assertTrue(data.isEmpty());
         assertEquals(0, data.size());
     }
@@ -35,14 +35,14 @@ class JscChunkDataTest {
     @Test
     void withNetwork_addsNetwork() {
         NetworkUuid uuid = net();
-        JscChunkData data = JscChunkData.empty().withNetwork(uuid);
+        CoreChunkData data = CoreChunkData.empty().withNetwork(uuid);
         assertTrue(data.contains(uuid));
     }
 
     @Test
     void withNetwork_immutable() {
-        JscChunkData original = JscChunkData.empty();
-        JscChunkData modified = original.withNetwork(net());
+        CoreChunkData original = CoreChunkData.empty();
+        CoreChunkData modified = original.withNetwork(net());
         assertTrue(original.isEmpty());
         assertEquals(1, modified.size());
     }
@@ -50,20 +50,20 @@ class JscChunkDataTest {
     @Test
     void withNetwork_idempotent_sameInstance() {
         NetworkUuid uuid = net();
-        JscChunkData data = JscChunkData.empty().withNetwork(uuid);
+        CoreChunkData data = CoreChunkData.empty().withNetwork(uuid);
         assertSame(data, data.withNetwork(uuid));
     }
 
     @Test
     void withoutNetwork_removes() {
         NetworkUuid uuid = net();
-        JscChunkData data = JscChunkData.empty().withNetwork(uuid).withoutNetwork(uuid);
+        CoreChunkData data = CoreChunkData.empty().withNetwork(uuid).withoutNetwork(uuid);
         assertFalse(data.contains(uuid));
     }
 
     @Test
     void withoutNetwork_absent_sameInstance() {
-        JscChunkData data = JscChunkData.empty();
+        CoreChunkData data = CoreChunkData.empty();
         assertSame(data, data.withoutNetwork(net()));
     }
 
@@ -71,14 +71,14 @@ class JscChunkDataTest {
     void of_defensiveCopy() {
         var set = new java.util.LinkedHashSet<NetworkUuid>();
         set.add(net());
-        JscChunkData data = JscChunkData.of(set);
+        CoreChunkData data = CoreChunkData.of(set);
         set.add(net());
         assertEquals(1, data.size());
     }
 
     @Test
     void networks_immutable() {
-        JscChunkData data = JscChunkData.empty().withNetwork(net());
+        CoreChunkData data = CoreChunkData.empty().withNetwork(net());
         assertThrows(UnsupportedOperationException.class,
                 () -> data.networks().add(net()));
     }
@@ -87,15 +87,15 @@ class JscChunkDataTest {
     void equals_structural() {
         NetworkUuid a = net();
         assertEquals(
-                JscChunkData.empty().withNetwork(a),
-                JscChunkData.empty().withNetwork(a));
+                CoreChunkData.empty().withNetwork(a),
+                CoreChunkData.empty().withNetwork(a));
     }
 
     @Test
     void of_storesMultipleNetworksInOneChunk() {
         NetworkUuid a = net();
         NetworkUuid b = net();
-        JscChunkData data = JscChunkData.of(Set.of(a, b));
+        CoreChunkData data = CoreChunkData.of(Set.of(a, b));
         assertEquals(2, data.size());
         assertTrue(data.contains(a));
         assertTrue(data.contains(b));

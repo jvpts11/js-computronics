@@ -3,12 +3,10 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
-package dev.jstech.computronics.client;
+package dev.jstech.core.client.gui.theme;
 
-import dev.jstech.computronics.client.theme.EraTheme;
-import dev.jstech.computronics.client.theme.EraThemes;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -22,9 +20,9 @@ import net.minecraft.client.gui.GuiGraphics;
  * the fallback for any screen without a valid build — the helpers run the exact fill sequences the flat-dark theme
  * always did, so the default GUI is byte-identical to before.
  */
-public final class JscOsTheme {
+public final class JsTechTheme {
 
-    private JscOsTheme() {
+    private JsTechTheme() {
     }
 
     private static EraTheme active = EraThemes.STANDARD;

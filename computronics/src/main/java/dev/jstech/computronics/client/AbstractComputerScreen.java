@@ -7,8 +7,9 @@
  */
 package dev.jstech.computronics.client;
 
-import dev.jstech.computronics.client.theme.EraTheme;
-import dev.jstech.computronics.client.theme.EraThemes;
+import dev.jstech.core.client.gui.theme.EraTheme;
+import dev.jstech.core.client.gui.theme.EraThemes;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -71,12 +72,12 @@ public abstract class AbstractComputerScreen<T extends AbstractContainerMenu> ex
         // default afterwards, so any unthemed draw stays on the frozen STANDARD look. A subclass that overrides
         // render still routes through here via super.render(), so its background and widgets get the bound skin;
         // its post-super draws are tooltips (vanilla-styled, palette-agnostic) so they are unaffected by the skin.
-        JscOsTheme.bind(theme);
+        JsTechTheme.bind(theme);
         try {
             super.render(graphics, mouseX, mouseY, partialTick);
             renderTooltip(graphics, mouseX, mouseY);
         } finally {
-            JscOsTheme.unbind();
+            JsTechTheme.unbind();
         }
     }
 

@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
-import dev.jstech.computronics.client.JscOsTheme;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.computronics.operation.payload.CraftCatalogPayload;
 import dev.jstech.computronics.operation.payload.CraftPlanPayload;
 import dev.jstech.computronics.operation.payload.CraftPlannerPayload;
@@ -110,7 +110,7 @@ public final class CraftPlannerApp implements DesktopApp {
         pillLabel = root.add(new Label(() -> plan != null && plan.feasible() ? "Craftable" : "Partial")
                 .setColor(() -> plan != null && plan.feasible() ? C_GOOD : C_AMBER));
         summaryLabel = root.add(new Label(() -> plan == null ? ""
-                : "max " + JscOsTheme.fmt(plan.maxFeasible()) + "  -  " + plan.stages().size() + " stages", Label.Tone.DIM));
+                : "max " + JsTechTheme.fmt(plan.maxFeasible()) + "  -  " + plan.stages().size() + " stages", Label.Tone.DIM));
         viewToggle = root.add(new Button(() -> treeMode ? "Steps" : "Tree", () -> treeMode = !treeMode));
         stagesHeader = root.add(new Label("STAGES", Label.Tone.DIM));
         stageList = root.add(new ListView<CraftPlannerPayload.Stage>(() -> plan == null ? List.of() : plan.stages(), STAGE_ROW_H,
@@ -322,7 +322,7 @@ public final class CraftPlannerApp implements DesktopApp {
         final boolean ok = r.have() >= r.need();
         itemIcon(g, r.item(), x + 1, y - 1, 11);
         g.drawString(font, Texts.clip(font, r.item().getHoverName().getString(), w - 76), x + 15, y, ctx.skin().text(), false);
-        final String s = ok ? "have " + JscOsTheme.fmt(r.have()) : "short " + JscOsTheme.fmt(r.need() - r.have());
+        final String s = ok ? "have " + JsTechTheme.fmt(r.have()) : "short " + JsTechTheme.fmt(r.need() - r.have());
         g.drawString(font, s, x + w - font.width(s), y, ok ? C_GOOD : C_CRIT, false);
     }
 
@@ -335,7 +335,7 @@ public final class CraftPlannerApp implements DesktopApp {
             g.fill(x + 2 + (n.depth() - 1) * 9 + 3, y + 4, ix - 1, y + 5, ctx.skin().edge());
         }
         itemIcon(g, n.item(), ix, y - 1, 10);
-        final String label = JscOsTheme.fmt(n.qty()) + "x " + n.item().getHoverName().getString();
+        final String label = JsTechTheme.fmt(n.qty()) + "x " + n.item().getHoverName().getString();
         g.drawString(font, Texts.clip(font, label, w - (ix - x) - 13 - 40), ix + 12, y, ctx.skin().text(), false);
         if (!n.craftable()) {
             g.drawString(font, "raw", x + w - font.width("raw"), y, ctx.skin().dim(), false);

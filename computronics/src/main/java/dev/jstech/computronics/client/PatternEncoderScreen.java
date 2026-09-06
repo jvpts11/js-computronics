@@ -8,11 +8,11 @@
 package dev.jstech.computronics.client;
 
 import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
-import dev.jstech.computronics.client.theme.EraTheme;
-import dev.jstech.computronics.client.theme.EraThemes;
 import dev.jstech.computronics.gui.layout.PatternEncoderLayout;
 import dev.jstech.computronics.menu.PatternEncoderMenu;
 import dev.jstech.computronics.os.VolumeLabel;
+import dev.jstech.core.client.gui.theme.EraTheme;
+import dev.jstech.core.client.gui.theme.EraThemes;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

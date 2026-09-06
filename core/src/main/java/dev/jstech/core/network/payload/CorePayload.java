@@ -10,7 +10,7 @@ package dev.jstech.core.network.payload;
 /**
  * Marker for all custom network payloads defined by the mod.
  */
-public interface JscPayload {
+public interface CorePayload {
 
     String payloadId();
 }

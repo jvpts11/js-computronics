@@ -7,8 +7,6 @@
  */
 package dev.jstech.computronics.client;
 
-import dev.jstech.computronics.client.theme.EraTheme;
-import dev.jstech.computronics.client.theme.EraThemes;
 import dev.jstech.computronics.gui.layout.ServerRackLayout;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.item.ServerItem;
@@ -17,6 +15,9 @@ import dev.jstech.computronics.operation.payload.RackBayPowerPayload;
 import dev.jstech.computronics.rack.RackChassis;
 import dev.jstech.computronics.rack.RackLayout;
 import dev.jstech.computronics.rack.RaidMode;
+import dev.jstech.core.client.gui.theme.EraTheme;
+import dev.jstech.core.client.gui.theme.EraThemes;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -232,7 +233,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
                 final int barW = ServerRackLayout.PWR_X - ServerRackLayout.STATUS_X - 4;
                 final int barY = top + ServerRackLayout.SLOT - 4;
                 g.fill(barX, barY, barX + barW, barY + 2, 0xFF232834);
-                g.fill(barX, barY, barX + barW * rebuild / 1000, barY + 2, JscOsTheme.amber());
+                g.fill(barX, barY, barX + barW * rebuild / 1000, barY + 2, JsTechTheme.amber());
             }
             // The power switch on a mounted unit's top row, with the bay's own status lamp.
             if (!covered && menu.serverInBay(row).getItem() instanceof ServerItem) {
@@ -243,7 +244,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
                         on ? mat.pwrOnTop() : mat.pwrOffTop(), on ? mat.pwrOnBottom() : mat.pwrOffBottom(),
                         on ? 0xFF3F6B4B : 0xFF6B3F3F, on ? 0xFF4F7A5B : 0xFF7A4F4F);
                 led(g, x + ServerRackLayout.STATUS_X - 8, top + 7,
-                        on ? JscOsTheme.green() : JscOsTheme.red());
+                        on ? JsTechTheme.green() : JsTechTheme.red());
             }
         }
 
@@ -263,7 +264,7 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         final boolean linked = menu.networkLinked();
-        JscOsTheme.text(g, font, cabinetName(), 12, 11, JscOsTheme.text());
+        JsTechTheme.text(g, font, cabinetName(), 12, 11, JsTechTheme.text());
         // The header carries the cabinet summary beside the link pill: used rack units and whether
         // the rack's rear cable sits on a network.
         int usedU = 0;
@@ -279,30 +280,30 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
         final String pill = throttle < 100
                 ? usedU + "/" + ROWS + "U  THROTTLED " + throttle + "%"
                 : usedU + "/" + ROWS + "U  " + (linked ? "LINKED" : "OFFLINE");
-        final int pillColor = throttle < 100 ? JscOsTheme.amber()
-                : linked ? JscOsTheme.green() : JscOsTheme.red();
+        final int pillColor = throttle < 100 ? JsTechTheme.amber()
+                : linked ? JsTechTheme.green() : JsTechTheme.red();
         final int pillX = 232 - font.width(pill);
-        JscOsTheme.text(g, font, pill, pillX, 11, pillColor);
+        JsTechTheme.text(g, font, pill, pillX, 11, pillColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, pillColor);
 
         for (int row = 0; row < ROWS; row++) {
             final int top = ServerRackLayout.rowY(row);
-            JscOsTheme.textS(g, font, (row + 1) + "U", ServerRackLayout.RULER_X + 2, top + 6,
-                    JscOsTheme.dim());
+            JsTechTheme.textS(g, font, (row + 1) + "U", ServerRackLayout.RULER_X + 2, top + 6,
+                    JsTechTheme.dim());
             for (int column = 0; column < ServerRackLayout.FRONT_SLOTS; column++) {
                 final RackLayout.SlotRole role =
                         menu.frontSlotRole(row * RackLayout.SLOTS_PER_U + column);
                 if ((role == RackLayout.SlotRole.BLOCKED_NO_UNIT
                         || role == RackLayout.SlotRole.BLOCKED_BUDGET)
                         && menu.frontSlotStack(row * RackLayout.SLOTS_PER_U + column).isEmpty()) {
-                    JscOsTheme.textS(g, font, "x", ServerRackLayout.frontSlotX(column) + 7, top + 6,
+                    JsTechTheme.textS(g, font, "x", ServerRackLayout.frontSlotX(column) + 7, top + 6,
                             mat.blockedText());
                 }
             }
             final int covered = coveredBy(row);
             if (covered >= 0) {
-                JscOsTheme.textS(g, font, "^ " + (covered + 1) + "U", ServerRackLayout.STATUS_X,
-                        top + 6, JscOsTheme.dim());
+                JsTechTheme.textS(g, font, "^ " + (covered + 1) + "U", ServerRackLayout.STATUS_X,
+                        top + 6, JsTechTheme.dim());
                 continue;
             }
             final ItemStack server = menu.serverInBay(row);
@@ -314,33 +315,33 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
             final int color;
             if (build == null) {
                 state = "INCOMPLETE";
-                color = JscOsTheme.red();
+                color = JsTechTheme.red();
             } else if (!menu.bayPowerOn(row)) {
                 state = "OFF";
-                color = JscOsTheme.dim();
+                color = JsTechTheme.dim();
             } else if (linked) {
                 state = "ONLINE";
-                color = JscOsTheme.green();
+                color = JsTechTheme.green();
             } else {
                 state = "READY";
-                color = JscOsTheme.amber();
+                color = JsTechTheme.amber();
             }
             // An array replaces the plain machine state in the row: its health is what matters here.
             final String raid = menu.raidLabel(row);
             final int rebuild = menu.rebuildPermille(row);
             if (rebuild > 0 && build != null) {
-                JscOsTheme.textS(g, font, "REBUILD " + rebuild / 10 + "%",
-                        ServerRackLayout.STATUS_X, top + 6, JscOsTheme.amber());
+                JsTechTheme.textS(g, font, "REBUILD " + rebuild / 10 + "%",
+                        ServerRackLayout.STATUS_X, top + 6, JsTechTheme.amber());
             } else if (raid != null && build != null) {
-                final int raidColor = raid.endsWith("FAILED") ? JscOsTheme.red()
-                        : raid.endsWith("DEGRADED") ? JscOsTheme.amber() : JscOsTheme.green();
-                JscOsTheme.textS(g, font, raid, ServerRackLayout.STATUS_X, top + 6, raidColor);
+                final int raidColor = raid.endsWith("FAILED") ? JsTechTheme.red()
+                        : raid.endsWith("DEGRADED") ? JsTechTheme.amber() : JsTechTheme.green();
+                JsTechTheme.textS(g, font, raid, ServerRackLayout.STATUS_X, top + 6, raidColor);
             } else {
-                JscOsTheme.textS(g, font, state, ServerRackLayout.STATUS_X, top + 6, color);
+                JsTechTheme.textS(g, font, state, ServerRackLayout.STATUS_X, top + 6, color);
             }
-            JscOsTheme.textS(g, font, "PWR", ServerRackLayout.PWR_X + 3,
+            JsTechTheme.textS(g, font, "PWR", ServerRackLayout.PWR_X + 3,
                     top + ServerRackLayout.PWR_DY + 2,
-                    menu.bayPowerOn(row) ? JscOsTheme.green() : JscOsTheme.red());
+                    menu.bayPowerOn(row) ? JsTechTheme.green() : JsTechTheme.red());
         }
     }
 
@@ -370,13 +371,13 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         // The cabinet's labels are drawn in its era's skin, and the default is always restored so an
         // unthemed draw elsewhere still gets the frozen Standard look.
-        JscOsTheme.bind(theme);
+        JsTechTheme.bind(theme);
         try {
             super.render(g, mouseX, mouseY, partialTick);
             renderTooltip(g, mouseX, mouseY);
             renderRackTooltip(g, mouseX, mouseY);
         } finally {
-            JscOsTheme.unbind();
+            JsTechTheme.unbind();
         }
     }
 

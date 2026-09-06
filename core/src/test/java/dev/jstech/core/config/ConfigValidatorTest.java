@@ -264,7 +264,7 @@ class ConfigValidatorTest {
 
     @Test
     void registry_registerAndLookup_returnsKey() {
-        JscConfigRegistry registry = new JscConfigRegistry();
+        CoreConfigRegistry registry = new CoreConfigRegistry();
         ConfigKey<Long> key = ConfigKey.of(
                 List.of("balance", "x"), Long.class, 100L);
         registry.register(key);
@@ -275,14 +275,14 @@ class ConfigValidatorTest {
 
     @Test
     void registry_unknownPath_returnsEmpty() {
-        JscConfigRegistry registry = new JscConfigRegistry();
+        CoreConfigRegistry registry = new CoreConfigRegistry();
         assertTrue(registry.lookup("unknown.path").isEmpty());
         assertEquals(false, registry.isWhitelisted("unknown.path"));
     }
 
     @Test
     void registry_duplicateRegistration_throws() {
-        JscConfigRegistry registry = new JscConfigRegistry();
+        CoreConfigRegistry registry = new CoreConfigRegistry();
         ConfigKey<Long> a = ConfigKey.of(List.of("x"), Long.class, 1L);
         ConfigKey<Long> b = ConfigKey.of(List.of("x"), Long.class, 2L);
         registry.register(a);
@@ -291,7 +291,7 @@ class ConfigValidatorTest {
 
     @Test
     void registry_size_tracksRegistrations() {
-        JscConfigRegistry registry = new JscConfigRegistry();
+        CoreConfigRegistry registry = new CoreConfigRegistry();
         registry.register(ConfigKey.of(List.of("a"), Long.class, 1L));
         registry.register(ConfigKey.of(List.of("b"), Long.class, 2L));
         registry.register(ConfigKey.of(List.of("c"), Long.class, 3L));
@@ -300,7 +300,7 @@ class ConfigValidatorTest {
 
     @Test
     void registry_allKeys_returnsImmutableInsertionOrder() {
-        JscConfigRegistry registry = new JscConfigRegistry();
+        CoreConfigRegistry registry = new CoreConfigRegistry();
         ConfigKey<Long> a = ConfigKey.of(List.of("aaa"), Long.class, 1L);
         ConfigKey<Long> b = ConfigKey.of(List.of("bbb"), Long.class, 2L);
         registry.register(a);

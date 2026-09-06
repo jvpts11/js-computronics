@@ -11,6 +11,7 @@ import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.item.ServerHardwareHandler;
 import dev.jstech.computronics.menu.ServerAssemblyMenu;
 import dev.jstech.computronics.operation.payload.RenameServerPayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.format.Unit;
 import dev.jstech.core.format.UnitFormatter;
 import dev.jstech.core.tier.HardwareEra;
@@ -66,8 +67,8 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
-        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
-        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
+        JsTechTheme.window(g, x, y, imageWidth, imageHeight);
+        JsTechTheme.headerBar(g, x + 6, y + 6, 232);
         // Name field background (the field itself is an EditBox drawn over this).
         g.fill(x + 50, y + 7, x + 158, y + 19, 0xFF11161D);
         g.fill(x + 50, y + 18, x + 158, y + 19, 0xFF24323C);
@@ -75,37 +76,37 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
         final ComputerBuild build = menu.currentBuild();
 
         // Spec tiles (4 across).
-        JscOsTheme.panel(g, x + 8, y + 26, 55, 18);
-        JscOsTheme.panel(g, x + 67, y + 26, 55, 18);
-        JscOsTheme.panel(g, x + 126, y + 26, 55, 18);
-        JscOsTheme.panel(g, x + 185, y + 26, 51, 18);
+        JsTechTheme.panel(g, x + 8, y + 26, 55, 18);
+        JsTechTheme.panel(g, x + 67, y + 26, 55, 18);
+        JsTechTheme.panel(g, x + 126, y + 26, 55, 18);
+        JsTechTheme.panel(g, x + 185, y + 26, 51, 18);
 
         // Power-headroom track. There is no storage track any more: drives live in the rack's
         // hotswap bays, so the assembly has no storage of its own to meter.
         final int draw = build == null ? 0 : build.powerDraw();
         final int watt = build == null ? 0 : build.psu().wattage();
         final double pf = watt <= 0 ? 0.0 : Math.min(1.0, (double) draw / watt);
-        JscOsTheme.track(g, x + 52, y + 49, 130, pf, draw > watt ? JscOsTheme.red() : JscOsTheme.green());
+        JsTechTheme.track(g, x + 52, y + 49, 130, pf, draw > watt ? JsTechTheme.red() : JsTechTheme.green());
 
         // Problems strip.
-        JscOsTheme.panel(g, x + 8, y + 68, 228, 12);
+        JsTechTheme.panel(g, x + 8, y + 68, 228, 12);
 
         // Draw a cell behind every ACTIVE hardware slot, reading the menu's own slot positions. The
         for (int i = 0; i < ServerHardwareHandler.SLOTS; i++) {
             final var slot = menu.getSlot(i);
             if (slot.isActive()) {
-                JscOsTheme.slot(g, x + slot.x, y + slot.y);
+                JsTechTheme.slot(g, x + slot.x, y + slot.y);
             }
         }
 
         // Player inventory.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + 8 + col * 18, y + 214 + row * 18);
+                JsTechTheme.slot(g, x + 8 + col * 18, y + 214 + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + 8 + col * 18, y + 272);
+            JsTechTheme.slot(g, x + 8 + col * 18, y + 272);
         }
     }
 
@@ -113,67 +114,67 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         final ComputerBuild build = menu.currentBuild();
 
-        JscOsTheme.text(g, font, "SERVER", 12, 11, JscOsTheme.text());
+        JsTechTheme.text(g, font, "SERVER", 12, 11, JsTechTheme.text());
         final String status;
         final int statusColor;
         if (build == null) {
             status = "UNASSEMBLED";
-            statusColor = JscOsTheme.dim();
+            statusColor = JsTechTheme.dim();
         } else if (!build.validate().valid()) {
             status = "ERROR";
-            statusColor = JscOsTheme.red();
+            statusColor = JsTechTheme.red();
         } else if (build.rams().isEmpty()) {
             status = "WARN";
-            statusColor = JscOsTheme.amber();
+            statusColor = JsTechTheme.amber();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.green();
+            statusColor = JsTechTheme.green();
         }
         final int pillX = 232 - font.width(status);
-        JscOsTheme.text(g, font, status, pillX, 11, statusColor);
+        JsTechTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
         // Spec tiles.
-        JscOsTheme.tileTextS(g, font, 8, 26, "ORCH", build == null ? "0" : fmt.compact(build.totalCapacity(), Unit.IT_PER_TICK), JscOsTheme.text());
-        JscOsTheme.tileTextS(g, font, 67, 26, "QUEUES", build == null ? "0" : String.valueOf(build.parallelQueues()), JscOsTheme.text());
-        JscOsTheme.tileTextS(g, font, 126, 26, "RAM BUF", build == null ? "0" : JscOsTheme.fmt(build.ramBuffer()), JscOsTheme.text());
-        JscOsTheme.tileTextS(g, font, 185, 26, "DRAW", build == null ? "0" : build.powerDraw() + "W", JscOsTheme.text());
+        JsTechTheme.tileTextS(g, font, 8, 26, "ORCH", build == null ? "0" : fmt.compact(build.totalCapacity(), Unit.IT_PER_TICK), JsTechTheme.text());
+        JsTechTheme.tileTextS(g, font, 67, 26, "QUEUES", build == null ? "0" : String.valueOf(build.parallelQueues()), JsTechTheme.text());
+        JsTechTheme.tileTextS(g, font, 126, 26, "RAM BUF", build == null ? "0" : JsTechTheme.fmt(build.ramBuffer()), JsTechTheme.text());
+        JsTechTheme.tileTextS(g, font, 185, 26, "DRAW", build == null ? "0" : build.powerDraw() + "W", JsTechTheme.text());
 
         // Track labels + values.
         final int draw = build == null ? 0 : build.powerDraw();
         final int watt = build == null ? 0 : build.psu().wattage();
-        JscOsTheme.textS(g, font, "POWER", 8, 49, JscOsTheme.text());
-        JscOsTheme.textSRight(g, font, build == null ? "-- W" : draw + "/" + watt + "W", 236, 49,
-                draw > watt ? JscOsTheme.red() : JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "POWER", 8, 49, JsTechTheme.text());
+        JsTechTheme.textSRight(g, font, build == null ? "-- W" : draw + "/" + watt + "W", 236, 49,
+                draw > watt ? JsTechTheme.red() : JsTechTheme.dim());
         // Drives live in the rack's hotswap bays since the racks rework, so the assembly has no
         // storage of its own to report — point the player at the right place instead.
-        JscOsTheme.textS(g, font, "STORAGE", 8, 59, JscOsTheme.text());
-        JscOsTheme.textSRight(g, font, "drives mount in the rack bays", 236, 59, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "STORAGE", 8, 59, JsTechTheme.text());
+        JsTechTheme.textSRight(g, font, "drives mount in the rack bays", 236, 59, JsTechTheme.dim());
 
         // Problems strip.
         renderProblems(g, build);
 
         // Hardware bay labels (names only — the slots show installed vs available).
-        JscOsTheme.textS(g, font, "BOARD", 8, 87, JscOsTheme.dim());
-        JscOsTheme.textS(g, font, "CPU", 52, 87, JscOsTheme.dim());
-        JscOsTheme.textS(g, font, "RAM", 52, 117, JscOsTheme.dim());
-        JscOsTheme.textS(g, font, "GPU", 52, 165, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "BOARD", 8, 87, JsTechTheme.dim());
+        JsTechTheme.textS(g, font, "CPU", 52, 87, JsTechTheme.dim());
+        JsTechTheme.textS(g, font, "RAM", 52, 117, JsTechTheme.dim());
+        JsTechTheme.textS(g, font, "GPU", 52, 165, JsTechTheme.dim());
     }
 
     private void renderProblems(final GuiGraphics g, final ComputerBuild build) {
         if (build == null) {
-            JscOsTheme.textS(g, font, "Insert a motherboard and PSU to begin", 12, 71, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, "Insert a motherboard and PSU to begin", 12, 71, JsTechTheme.dim());
             return;
         }
         final List<String> problems = build.validate().problems();
         if (problems.isEmpty()) {
-            JscOsTheme.textS(g, font, "All checks passed", 12, 71, JscOsTheme.green());
+            JsTechTheme.textS(g, font, "All checks passed", 12, 71, JsTechTheme.green());
             return;
         }
         final String first = font.plainSubstrByWidth(problems.get(0), 250);
-        JscOsTheme.textS(g, font, first, 12, 71, JscOsTheme.red());
+        JsTechTheme.textS(g, font, first, 12, 71, JsTechTheme.red());
         if (problems.size() > 1) {
-            JscOsTheme.textSRight(g, font, "+" + (problems.size() - 1) + " more", 234, 71, JscOsTheme.amber());
+            JsTechTheme.textSRight(g, font, "+" + (problems.size() - 1) + " more", 234, 71, JsTechTheme.amber());
         }
     }
 

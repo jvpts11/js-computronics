@@ -14,9 +14,9 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * Central registration point for all mod custom payloads.
  */
-public final class JscPacketHandlerRegistry {
+public final class CorePacketHandlerRegistry {
 
-    private JscPacketHandlerRegistry() {
+    private CorePacketHandlerRegistry() {
     }
 
     public static final String PROTOCOL_VERSION = "1";
@@ -27,7 +27,7 @@ public final class JscPacketHandlerRegistry {
         registrar.playBidirectional(
                 PingPayload.TYPE,
                 PingPayload.STREAM_CODEC,
-                JscPacketHandlerRegistry::handlePing);
+                CorePacketHandlerRegistry::handlePing);
     }
 
     private static void handlePing(

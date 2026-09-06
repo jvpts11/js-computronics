@@ -3,9 +3,9 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
-package dev.jstech.computronics.client.theme;
+package dev.jstech.core.client.gui.theme;
 
 import dev.jstech.core.tier.HardwareEra;
 import org.junit.jupiter.api.Test;

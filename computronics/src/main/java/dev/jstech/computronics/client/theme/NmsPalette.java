@@ -7,6 +7,9 @@
  */
 package dev.jstech.computronics.client.theme;
 
+import dev.jstech.core.client.gui.theme.EraPalette;
+import dev.jstech.core.client.gui.theme.EraTheme;
+
 /**
  * The Network Management Studio's color palette, kept apart from {@link NmsThemes} so it stays pure (an
  * {@link EraPalette} is plain data, while {@link NmsThemes} drags in Minecraft through {@link EraTheme}).

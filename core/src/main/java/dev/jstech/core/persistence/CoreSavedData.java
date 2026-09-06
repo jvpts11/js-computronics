@@ -14,7 +14,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 /**
  * Base class for all {@link SavedData} implementations in the mod.
  */
-public abstract class JscSavedData extends SavedData {
+public abstract class CoreSavedData extends SavedData {
 
     @Override
     public abstract CompoundTag save(CompoundTag tag, HolderLookup.Provider registries);

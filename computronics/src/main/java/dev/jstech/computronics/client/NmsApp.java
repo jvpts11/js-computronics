@@ -10,7 +10,6 @@ package dev.jstech.computronics.client;
 import dev.jstech.computronics.blockentity.AbstractComputerBlockEntity;
 import dev.jstech.computronics.client.os.DesktopApp;
 import dev.jstech.computronics.client.os.DesktopWindow;
-import dev.jstech.computronics.client.theme.EraTheme;
 import dev.jstech.computronics.client.theme.NmsThemes;
 import dev.jstech.computronics.gui.layout.NmsLayout;
 import dev.jstech.computronics.operation.payload.IqlFileContentPayload;
@@ -23,6 +22,8 @@ import dev.jstech.computronics.operation.payload.RequestNmsSchemaPayload;
 import dev.jstech.computronics.operation.payload.RunIqlPayload;
 import dev.jstech.computronics.operation.payload.SaveIqlFilePayload;
 import dev.jstech.computronics.program.ProgramKeybinds;
+import dev.jstech.core.client.gui.theme.EraTheme;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -526,7 +527,7 @@ public final class NmsApp implements DesktopApp {
     }
 
     private int fileLabelW() {
-        return JscOsTheme.widthS(font, "File") + 8;
+        return JsTechTheme.widthS(font, "File") + 8;
     }
 
     private int hoveredFileItem(final int mlx, final int mly) {
@@ -567,7 +568,7 @@ public final class NmsApp implements DesktopApp {
 
         final int mlx = mouseX - x;
         final int mly = mouseY - y;
-        JscOsTheme.bind(theme);
+        JsTechTheme.bind(theme);
         g.pose().pushPose();
         g.pose().translate(x, y, 0);
         try {
@@ -575,51 +576,51 @@ public final class NmsApp implements DesktopApp {
             drawForeground(g, mlx, mly);
         } finally {
             g.pose().popPose();
-            JscOsTheme.unbind();
+            JsTechTheme.unbind();
         }
     }
 
     private void drawBackground(final GuiGraphics g, final int mlx, final int mly) {
         final int w = viewW;
-        JscOsTheme.window(g, 0, 0, w, viewH);
+        JsTechTheme.window(g, 0, 0, w, viewH);
 
         // No internal title bar: the DesktopWindow already draws the program's title bar (TITLE_H = 0). The
         // menu bar is the top strip.
         strip(g, NmsLayout.MENU_Y, NmsLayout.MENU_H);
         strip(g, NmsLayout.TOOLBAR_Y, NmsLayout.TOOLBAR_H);
         final boolean execHover = inRect(mlx, mly, EXEC_X, NmsLayout.TOOLBAR_Y + 2, EXEC_W, 10);
-        JscOsTheme.button(g, EXEC_X, NmsLayout.TOOLBAR_Y + 2, EXEC_W, 10, execHover);
+        JsTechTheme.button(g, EXEC_X, NmsLayout.TOOLBAR_Y + 2, EXEC_W, 10, execHover);
         playTri(g, EXEC_X + 5, NmsLayout.TOOLBAR_Y + 4);
 
-        g.fill(0, NmsLayout.BODY_Y, explorerW, statusY(), JscOsTheme.panel());
-        g.fill(0, NmsLayout.BODY_Y, explorerW, NmsLayout.BODY_Y + NmsLayout.EX_HEAD_H, JscOsTheme.rail());
+        g.fill(0, NmsLayout.BODY_Y, explorerW, statusY(), JsTechTheme.panel());
+        g.fill(0, NmsLayout.BODY_Y, explorerW, NmsLayout.BODY_Y + NmsLayout.EX_HEAD_H, JsTechTheme.rail());
 
-        g.fill(rightX(), NmsLayout.BODY_Y, w, NmsLayout.BODY_Y + NmsLayout.TABS_H, JscOsTheme.rail());
+        g.fill(rightX(), NmsLayout.BODY_Y, w, NmsLayout.BODY_Y + NmsLayout.TABS_H, JsTechTheme.rail());
         final int tabW = Math.min(TAB_W, rightW());
-        g.fill(rightX(), NmsLayout.BODY_Y, rightX() + tabW, NmsLayout.BODY_Y + NmsLayout.TABS_H, JscOsTheme.tabOn());
-        g.fill(rightX(), NmsLayout.BODY_Y, rightX() + tabW, NmsLayout.BODY_Y + 1, JscOsTheme.accent());
-        g.fill(rightX(), NmsLayout.EDITOR_Y, w, hsplitY(), JscOsTheme.panel());
-        g.fill(rightX(), NmsLayout.EDITOR_Y, rightX() + GUTTER_W, hsplitY(), JscOsTheme.rail());
-        g.fill(rightX(), resTabsY(), w, resTabsY() + NmsLayout.RES_TABS_H, JscOsTheme.rail());
-        g.fill(rightX(), gridY(), w, statusY(), JscOsTheme.panel());
-        g.fill(rightX(), gridY(), w, gridY() + 9, JscOsTheme.rail());
+        g.fill(rightX(), NmsLayout.BODY_Y, rightX() + tabW, NmsLayout.BODY_Y + NmsLayout.TABS_H, JsTechTheme.tabOn());
+        g.fill(rightX(), NmsLayout.BODY_Y, rightX() + tabW, NmsLayout.BODY_Y + 1, JsTechTheme.accent());
+        g.fill(rightX(), NmsLayout.EDITOR_Y, w, hsplitY(), JsTechTheme.panel());
+        g.fill(rightX(), NmsLayout.EDITOR_Y, rightX() + GUTTER_W, hsplitY(), JsTechTheme.rail());
+        g.fill(rightX(), resTabsY(), w, resTabsY() + NmsLayout.RES_TABS_H, JsTechTheme.rail());
+        g.fill(rightX(), gridY(), w, statusY(), JsTechTheme.panel());
+        g.fill(rightX(), gridY(), w, gridY() + 9, JsTechTheme.rail());
 
         splitV(g, vsplitX(), NmsLayout.BODY_Y, bodyH(), dragging == DRAG_V || overVSplitLocal(mlx, mly));
         splitH(g, rightX(), hsplitY(), rightW(), dragging == DRAG_H || overHSplitLocal(mlx, mly));
 
-        g.fill(0, statusY(), w, viewH, JscOsTheme.accent());
+        g.fill(0, statusY(), w, viewH, JsTechTheme.accent());
 
         if (fileMenuOpen) {
             final int dx = NmsLayout.FILE_DROP_X;
             final int dy = NmsLayout.FILE_DROP_Y;
-            g.fill(dx, dy, dx + NmsLayout.FILE_DROP_W, dy + NmsLayout.FILE_DROP_H, JscOsTheme.panel());
+            g.fill(dx, dy, dx + NmsLayout.FILE_DROP_W, dy + NmsLayout.FILE_DROP_H, JsTechTheme.panel());
             frameBox(g, dx, dy, NmsLayout.FILE_DROP_W, NmsLayout.FILE_DROP_H);
             final int hovered = hoveredFileItem(mlx, mly);
             for (int i = 0; i < FILE_ITEMS.length; i++) {
                 if (i == hovered) {
                     g.fill(dx + 1, dy + 1 + i * NmsLayout.FILE_DROP_ITEM_H,
                             dx + NmsLayout.FILE_DROP_W - 1,
-                            dy + 1 + (i + 1) * NmsLayout.FILE_DROP_ITEM_H, JscOsTheme.hover());
+                            dy + 1 + (i + 1) * NmsLayout.FILE_DROP_ITEM_H, JsTechTheme.hover());
                 }
             }
         }
@@ -629,22 +630,22 @@ public final class NmsApp implements DesktopApp {
             final int dh = NmsLayout.DIALOG_H_SAVE;
             final int dx = NmsLayout.DIALOG_X;
             final int dy = NmsLayout.DIALOG_SAVE_Y;
-            g.fill(dx, dy, dx + dw, dy + dh, JscOsTheme.panel());
+            g.fill(dx, dy, dx + dw, dy + dh, JsTechTheme.panel());
             frameBox(g, dx, dy, dw, dh);
-            g.fill(dx, dy, dx + dw, dy + NmsLayout.DIALOG_HEADER_H, JscOsTheme.rail());
+            g.fill(dx, dy, dx + dw, dy + NmsLayout.DIALOG_HEADER_H, JsTechTheme.rail());
             // Inline name field.
             final int bx = NmsLayout.SAVE_EDIT_X;
             final int by = NmsLayout.SAVE_EDIT_Y;
-            g.fill(bx, by, bx + NmsLayout.SAVE_EDIT_W, by + NmsLayout.SAVE_EDIT_H, JscOsTheme.panel());
+            g.fill(bx, by, bx + NmsLayout.SAVE_EDIT_W, by + NmsLayout.SAVE_EDIT_H, JsTechTheme.panel());
             frameBox(g, bx, by, NmsLayout.SAVE_EDIT_W, NmsLayout.SAVE_EDIT_H);
         } else if (dialogMode == DIALOG_OPEN) {
             final int dw = NmsLayout.DIALOG_W;
             final int dh = NmsLayout.DIALOG_H_OPEN;
             final int dx = NmsLayout.DIALOG_X;
             final int dy = NmsLayout.DIALOG_OPEN_Y;
-            g.fill(dx, dy, dx + dw, dy + dh, JscOsTheme.panel());
+            g.fill(dx, dy, dx + dw, dy + dh, JsTechTheme.panel());
             frameBox(g, dx, dy, dw, dh);
-            g.fill(dx, dy, dx + dw, dy + NmsLayout.DIALOG_HEADER_H, JscOsTheme.rail());
+            g.fill(dx, dy, dx + dw, dy + NmsLayout.DIALOG_HEADER_H, JsTechTheme.rail());
             final int listTop = dy + NmsLayout.PICKER_LIST_OFFSET_Y;
             final int clamped = Math.max(0, Math.min(pickerScroll,
                     Math.max(0, iqlFiles.size() - NmsLayout.PICKER_VISIBLE)));
@@ -653,39 +654,39 @@ public final class NmsApp implements DesktopApp {
                 final boolean rowHover = mlx >= dx + 1 && mlx < dx + dw - 1
                         && mly >= ry && mly < ry + NmsLayout.PICKER_ROW_H;
                 if (rowHover) {
-                    g.fill(dx + 1, ry, dx + dw - 1, ry + NmsLayout.PICKER_ROW_H, JscOsTheme.hover());
+                    g.fill(dx + 1, ry, dx + dw - 1, ry + NmsLayout.PICKER_ROW_H, JsTechTheme.hover());
                 }
             }
             final int cancelY = dy + NmsLayout.CANCEL_BTN_REL_Y;
             g.fill(dx + NmsLayout.CANCEL_BTN_REL_X, cancelY,
                     dx + NmsLayout.CANCEL_BTN_REL_X + NmsLayout.CANCEL_BTN_W,
-                    cancelY + NmsLayout.CANCEL_BTN_H, JscOsTheme.rail());
+                    cancelY + NmsLayout.CANCEL_BTN_H, JsTechTheme.rail());
         }
     }
 
     private void strip(final GuiGraphics g, final int yTop, final int h) {
-        g.fill(0, yTop, viewW, yTop + h, JscOsTheme.rail());
-        g.fill(0, yTop + h - 1, viewW, yTop + h, JscOsTheme.line());
+        g.fill(0, yTop, viewW, yTop + h, JsTechTheme.rail());
+        g.fill(0, yTop + h - 1, viewW, yTop + h, JsTechTheme.line());
     }
 
     private static void frameBox(final GuiGraphics g, final int x, final int y, final int w, final int h) {
-        g.fill(x, y, x + w, y + 1, JscOsTheme.line());
-        g.fill(x, y, x + 1, y + h, JscOsTheme.line());
-        g.fill(x + w - 1, y, x + w, y + h, JscOsTheme.line());
-        g.fill(x, y + h - 1, x + w, y + h, JscOsTheme.line());
+        g.fill(x, y, x + w, y + 1, JsTechTheme.line());
+        g.fill(x, y, x + 1, y + h, JsTechTheme.line());
+        g.fill(x + w - 1, y, x + w, y + h, JsTechTheme.line());
+        g.fill(x, y + h - 1, x + w, y + h, JsTechTheme.line());
     }
 
     private void playTri(final GuiGraphics g, final int x, final int y) {
         for (int i = 0; i < 4; i++) {
-            g.fill(x + i, y + i, x + i + 1, y + 7 - i, JscOsTheme.green());
+            g.fill(x + i, y + i, x + i + 1, y + 7 - i, JsTechTheme.green());
         }
     }
 
     private void splitV(final GuiGraphics g, final int x, final int yTop, final int h, final boolean activeSplit) {
-        g.fill(x, yTop, x + NmsLayout.VSPLIT_W, yTop + h, activeSplit ? JscOsTheme.hover() : JscOsTheme.rail());
-        g.fill(x, yTop, x + 1, yTop + h, JscOsTheme.line());
-        g.fill(x + NmsLayout.VSPLIT_W - 1, yTop, x + NmsLayout.VSPLIT_W, yTop + h, JscOsTheme.line());
-        final int gripColor = activeSplit ? JscOsTheme.accent() : JscOsTheme.dim();
+        g.fill(x, yTop, x + NmsLayout.VSPLIT_W, yTop + h, activeSplit ? JsTechTheme.hover() : JsTechTheme.rail());
+        g.fill(x, yTop, x + 1, yTop + h, JsTechTheme.line());
+        g.fill(x + NmsLayout.VSPLIT_W - 1, yTop, x + NmsLayout.VSPLIT_W, yTop + h, JsTechTheme.line());
+        final int gripColor = activeSplit ? JsTechTheme.accent() : JsTechTheme.dim();
         final int gy = yTop + h / 2 - 6;
         for (int i = 0; i < 4; i++) {
             g.fill(x + 1, gy + i * 4, x + 2, gy + i * 4 + 1, gripColor);
@@ -693,10 +694,10 @@ public final class NmsApp implements DesktopApp {
     }
 
     private void splitH(final GuiGraphics g, final int x, final int yTop, final int w, final boolean activeSplit) {
-        g.fill(x, yTop, x + w, yTop + NmsLayout.HSPLIT_H, activeSplit ? JscOsTheme.hover() : JscOsTheme.rail());
-        g.fill(x, yTop, x + w, yTop + 1, JscOsTheme.line());
-        g.fill(x, yTop + NmsLayout.HSPLIT_H - 1, x + w, yTop + NmsLayout.HSPLIT_H, JscOsTheme.line());
-        final int gripColor = activeSplit ? JscOsTheme.accent() : JscOsTheme.dim();
+        g.fill(x, yTop, x + w, yTop + NmsLayout.HSPLIT_H, activeSplit ? JsTechTheme.hover() : JsTechTheme.rail());
+        g.fill(x, yTop, x + w, yTop + 1, JsTechTheme.line());
+        g.fill(x, yTop + NmsLayout.HSPLIT_H - 1, x + w, yTop + NmsLayout.HSPLIT_H, JsTechTheme.line());
+        final int gripColor = activeSplit ? JsTechTheme.accent() : JsTechTheme.dim();
         final int gx = x + w / 2 - 6;
         for (int i = 0; i < 4; i++) {
             g.fill(gx + i * 4, yTop + 2, gx + i * 4 + 1, yTop + 3, gripColor);
@@ -708,72 +709,72 @@ public final class NmsApp implements DesktopApp {
         int mx = 6;
         fileMenuLabelX = mx;
         for (final String item : MENU) {
-            final int color = (item.equals("File") && fileMenuOpen) ? JscOsTheme.accent2() : JscOsTheme.text();
-            JscOsTheme.textS(g, font, item, mx, NmsLayout.MENU_Y + 2, color);
-            mx += JscOsTheme.widthS(font, item) + 8;
+            final int color = (item.equals("File") && fileMenuOpen) ? JsTechTheme.accent2() : JsTechTheme.text();
+            JsTechTheme.textS(g, font, item, mx, NmsLayout.MENU_Y + 2, color);
+            mx += JsTechTheme.widthS(font, item) + 8;
         }
-        JscOsTheme.textS(g, font, "Execute", EXEC_X + 12, NmsLayout.TOOLBAR_Y + 5, JscOsTheme.text());
-        JscOsTheme.textS(g, font, "network: " + networkLabel, EXEC_X + EXEC_W + 8, NmsLayout.TOOLBAR_Y + 5,
-                JscOsTheme.accent2());
+        JsTechTheme.textS(g, font, "Execute", EXEC_X + 12, NmsLayout.TOOLBAR_Y + 5, JsTechTheme.text());
+        JsTechTheme.textS(g, font, "network: " + networkLabel, EXEC_X + EXEC_W + 8, NmsLayout.TOOLBAR_Y + 5,
+                JsTechTheme.accent2());
         final String engineState = liveEngine.state();
-        final int engineColor = "running".equals(engineState) ? JscOsTheme.green()
-                : "stopped".equals(engineState) ? JscOsTheme.amber() : JscOsTheme.red();
-        JscOsTheme.textSRight(g, font, "engine: " + engineState, w - 6, NmsLayout.TOOLBAR_Y + 5, engineColor);
+        final int engineColor = "running".equals(engineState) ? JsTechTheme.green()
+                : "stopped".equals(engineState) ? JsTechTheme.amber() : JsTechTheme.red();
+        JsTechTheme.textSRight(g, font, "engine: " + engineState, w - 6, NmsLayout.TOOLBAR_Y + 5, engineColor);
 
-        JscOsTheme.textS(g, font, fit("OBJECT EXPLORER", explorerW - 8), 6, NmsLayout.BODY_Y + 2, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, fit("OBJECT EXPLORER", explorerW - 8), 6, NmsLayout.BODY_Y + 2, JsTechTheme.dim());
         drawTree(g, mlx, mly);
 
         final int tabW = Math.min(TAB_W, rightW());
         final String tabLabel = currentFile != null ? currentFile : networkLabel + ".query 1";
-        JscOsTheme.textS(g, font, fit(tabLabel, tabW - 8), rightX() + 6, NmsLayout.BODY_Y + 2, JscOsTheme.tabLabelOn());
+        JsTechTheme.textS(g, font, fit(tabLabel, tabW - 8), rightX() + 6, NmsLayout.BODY_Y + 2, JsTechTheme.tabLabelOn());
         drawEditor(g);
 
-        JscOsTheme.textS(g, font, "Results", rightX() + 6, resTabsY() + 2,
-                showMessages ? JscOsTheme.dim() : JscOsTheme.text());
-        JscOsTheme.textS(g, font, "Messages", rightX() + 44, resTabsY() + 2,
-                showMessages ? JscOsTheme.text() : JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "Results", rightX() + 6, resTabsY() + 2,
+                showMessages ? JsTechTheme.dim() : JsTechTheme.text());
+        JsTechTheme.textS(g, font, "Messages", rightX() + 44, resTabsY() + 2,
+                showMessages ? JsTechTheme.text() : JsTechTheme.dim());
         if (showMessages) {
             drawMessages(g);
         } else {
             drawGrid(g);
         }
 
-        JscOsTheme.textS(g, font, status, 6, statusY() + 5, statusOk ? 0xFFFFFFFF : 0xFFFFD2D2);
-        JscOsTheme.textSRight(g, font, "F5 to run", w - 6, statusY() + 5, 0xFFE0ECF8);
+        JsTechTheme.textS(g, font, status, 6, statusY() + 5, statusOk ? 0xFFFFFFFF : 0xFFFFD2D2);
+        JsTechTheme.textSRight(g, font, "F5 to run", w - 6, statusY() + 5, 0xFFE0ECF8);
 
         if (fileMenuOpen) {
             for (int i = 0; i < FILE_ITEMS.length; i++) {
-                JscOsTheme.textS(g, font, FILE_ITEMS[i], NmsLayout.FILE_DROP_X + 4,
-                        NmsLayout.FILE_DROP_Y + 1 + i * NmsLayout.FILE_DROP_ITEM_H + 1, JscOsTheme.text());
+                JsTechTheme.textS(g, font, FILE_ITEMS[i], NmsLayout.FILE_DROP_X + 4,
+                        NmsLayout.FILE_DROP_Y + 1 + i * NmsLayout.FILE_DROP_ITEM_H + 1, JsTechTheme.text());
             }
         }
 
         if (dialogMode == DIALOG_SAVE_AS) {
             final int dxL = NmsLayout.DIALOG_X;
             final int dyL = NmsLayout.DIALOG_SAVE_Y;
-            JscOsTheme.textS(g, font, "Save As", dxL + 4, dyL + 2, JscOsTheme.dim());
-            JscOsTheme.textS(g, font, "File name:", dxL + 4, dyL + 14, JscOsTheme.text());
-            JscOsTheme.textS(g, font, fit(saveAsName + "_", NmsLayout.SAVE_EDIT_W - 6),
-                    NmsLayout.SAVE_EDIT_X + 3, NmsLayout.SAVE_EDIT_Y + 3, JscOsTheme.text());
-            JscOsTheme.textS(g, font, "Enter = save   Esc = cancel", dxL + 4,
-                    dyL + NmsLayout.DIALOG_H_SAVE - 10, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, "Save As", dxL + 4, dyL + 2, JsTechTheme.dim());
+            JsTechTheme.textS(g, font, "File name:", dxL + 4, dyL + 14, JsTechTheme.text());
+            JsTechTheme.textS(g, font, fit(saveAsName + "_", NmsLayout.SAVE_EDIT_W - 6),
+                    NmsLayout.SAVE_EDIT_X + 3, NmsLayout.SAVE_EDIT_Y + 3, JsTechTheme.text());
+            JsTechTheme.textS(g, font, "Enter = save   Esc = cancel", dxL + 4,
+                    dyL + NmsLayout.DIALOG_H_SAVE - 10, JsTechTheme.dim());
         } else if (dialogMode == DIALOG_OPEN) {
             final int dxL = NmsLayout.DIALOG_X;
             final int dyL = NmsLayout.DIALOG_OPEN_Y;
-            JscOsTheme.textS(g, font, "Open IQL File", dxL + 4, dyL + 2, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, "Open IQL File", dxL + 4, dyL + 2, JsTechTheme.dim());
             final int listTop = dyL + NmsLayout.PICKER_LIST_OFFSET_Y;
             if (iqlFiles.isEmpty()) {
-                JscOsTheme.textS(g, font, "no .iql files on disk", dxL + 4, listTop + 2, JscOsTheme.dim());
+                JsTechTheme.textS(g, font, "no .iql files on disk", dxL + 4, listTop + 2, JsTechTheme.dim());
             } else {
                 final int clamped = Math.max(0, Math.min(pickerScroll,
                         Math.max(0, iqlFiles.size() - NmsLayout.PICKER_VISIBLE)));
                 for (int i = 0; i < NmsLayout.PICKER_VISIBLE && clamped + i < iqlFiles.size(); i++) {
-                    JscOsTheme.textS(g, font, fit(iqlFiles.get(clamped + i), NmsLayout.DIALOG_W - 8),
-                            dxL + 4, listTop + i * NmsLayout.PICKER_ROW_H + 2, JscOsTheme.text());
+                    JsTechTheme.textS(g, font, fit(iqlFiles.get(clamped + i), NmsLayout.DIALOG_W - 8),
+                            dxL + 4, listTop + i * NmsLayout.PICKER_ROW_H + 2, JsTechTheme.text());
                 }
             }
-            JscOsTheme.textS(g, font, "Cancel", NmsLayout.DIALOG_X + NmsLayout.CANCEL_BTN_REL_X,
-                    NmsLayout.DIALOG_OPEN_Y + NmsLayout.CANCEL_BTN_REL_Y, JscOsTheme.text());
+            JsTechTheme.textS(g, font, "Cancel", NmsLayout.DIALOG_X + NmsLayout.CANCEL_BTN_REL_X,
+                    NmsLayout.DIALOG_OPEN_Y + NmsLayout.CANCEL_BTN_REL_Y, JsTechTheme.text());
         }
     }
 
@@ -781,8 +782,8 @@ public final class NmsApp implements DesktopApp {
         final int rows = Math.max(1, (editorH - 6) / EDITOR_LINE_H);
         final int yTop = NmsLayout.EDITOR_Y + 4;
         for (int i = 0; i < rows && editor().scrollLine() + i < editor().lineCount(); i++) {
-            JscOsTheme.textSRight(g, font, String.valueOf(editor().scrollLine() + i + 1),
-                    rightX() + GUTTER_W - 2, yTop + i * EDITOR_LINE_H + 2, JscOsTheme.dim());
+            JsTechTheme.textSRight(g, font, String.valueOf(editor().scrollLine() + i + 1),
+                    rightX() + GUTTER_W - 2, yTop + i * EDITOR_LINE_H + 2, JsTechTheme.dim());
         }
         editor().render(g, rightX() + GUTTER_W + 4, yTop, EDITOR_LINE_H, rows);
     }
@@ -795,11 +796,11 @@ public final class NmsApp implements DesktopApp {
             final Node node = vn.node();
             final int ry = NmsLayout.EX_TREE_Y + i * TREE_PITCH;
             if (start + i == hoverRow) {
-                g.fill(1, ry - 1, explorerW - 1, ry + TREE_PITCH - 1, JscOsTheme.hover());
+                g.fill(1, ry - 1, explorerW - 1, ry + TREE_PITCH - 1, JsTechTheme.hover());
             }
             final int indent = 4 + vn.depth() * 7;
             if (node.expandable()) {
-                JscOsTheme.textS(g, font, node.expanded ? "v" : ">", indent - 4, ry, JscOsTheme.dim());
+                JsTechTheme.textS(g, font, node.expanded ? "v" : ">", indent - 4, ry, JsTechTheme.dim());
             }
             drawIcon(g, node.icon, indent + 4, ry);
             String label = node.label;
@@ -807,13 +808,13 @@ public final class NmsApp implements DesktopApp {
                 label = label + " (" + node.children.size() + ")";
             }
             final int labelX = indent + 13;
-            JscOsTheme.textS(g, font, fit(label, explorerW - labelX - 2), labelX, ry, JscOsTheme.text());
+            JsTechTheme.textS(g, font, fit(label, explorerW - labelX - 2), labelX, ry, JsTechTheme.text());
         }
     }
 
     private String fit(final String text, final int maxWidth) {
         String t = text;
-        while (!t.isEmpty() && JscOsTheme.widthS(font, t) > maxWidth) {
+        while (!t.isEmpty() && JsTechTheme.widthS(font, t) > maxWidth) {
             t = t.substring(0, t.length() - 1);
         }
         return t;
@@ -822,21 +823,21 @@ public final class NmsApp implements DesktopApp {
     private void drawIcon(final GuiGraphics g, final int type, final int x, final int y) {
         final int s = 7;
         switch (type) {
-            case DB -> g.fill(x, y, x + s, y + s, JscOsTheme.accent2());
-            case FOLDER -> g.fill(x, y, x + s, y + s, JscOsTheme.amber());
+            case DB -> g.fill(x, y, x + s, y + s, JsTechTheme.accent2());
+            case FOLDER -> g.fill(x, y, x + s, y + s, JsTechTheme.amber());
             case TABLE -> {
-                g.fill(x, y, x + s, y + s, JscOsTheme.line());
-                g.fill(x + 1, y + 1, x + s - 1, y + s - 1, JscOsTheme.panel());
-                g.fill(x + 1, y + 1, x + s - 1, y + 3, JscOsTheme.amber());
+                g.fill(x, y, x + s, y + s, JsTechTheme.line());
+                g.fill(x + 1, y + 1, x + s - 1, y + s - 1, JsTechTheme.panel());
+                g.fill(x + 1, y + 1, x + s - 1, y + 3, JsTechTheme.amber());
             }
-            case COLUMN -> g.fill(x + 1, y + 1, x + s - 1, y + s - 1, JscOsTheme.dim());
+            case COLUMN -> g.fill(x + 1, y + 1, x + s - 1, y + s - 1, JsTechTheme.dim());
             case VIEW -> g.fill(x, y, x + s, y + s, ICON_VIEW);
             case PROC -> g.fill(x, y, x + s, y + s, ICON_PROC);
             case JOB -> g.fill(x, y, x + s, y + s, ICON_JOB);
             case SERVER -> {
-                g.fill(x, y, x + s, y + s, JscOsTheme.dim());
-                g.fill(x + 1, y + 1, x + s - 1, y + 2, JscOsTheme.green());
-                g.fill(x + 1, y + 3, x + s - 1, y + 4, JscOsTheme.green());
+                g.fill(x, y, x + s, y + s, JsTechTheme.dim());
+                g.fill(x + 1, y + 1, x + s - 1, y + 2, JsTechTheme.green());
+                g.fill(x + 1, y + 3, x + s - 1, y + 4, JsTechTheme.green());
             }
             default -> { /* no icon */ }
         }
@@ -846,8 +847,8 @@ public final class NmsApp implements DesktopApp {
         final int left = rightX() + 6;
         final int qtyRight = viewW - 6;
         final int nameMax = qtyRight - left - 30;
-        JscOsTheme.textS(g, font, "item", left, gridY() + 1, JscOsTheme.dim());
-        JscOsTheme.textSRight(g, font, "qty", qtyRight, gridY() + 1, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "item", left, gridY() + 1, JsTechTheme.dim());
+        JsTechTheme.textSRight(g, font, "qty", qtyRight, gridY() + 1, JsTechTheme.dim());
         final int top = gridY() + 10;
         final int bottom = statusY() - 1;
         final int visibleRows = (bottom - top) / NmsLayout.ROW_H;
@@ -855,28 +856,28 @@ public final class NmsApp implements DesktopApp {
         for (int i = 0; i < visibleRows && clamped + i < rows.size(); i++) {
             final IqlResultPayload.Row row = rows.get(clamped + i);
             final int ry = top + i * NmsLayout.ROW_H;
-            JscOsTheme.textS(g, font, fit(row.label(), nameMax), left, ry, JscOsTheme.text());
-            JscOsTheme.textSRight(g, font, JscOsTheme.fmt(row.quantity()), qtyRight, ry, JscOsTheme.accent2());
+            JsTechTheme.textS(g, font, fit(row.label(), nameMax), left, ry, JsTechTheme.text());
+            JsTechTheme.textSRight(g, font, JsTechTheme.fmt(row.quantity()), qtyRight, ry, JsTechTheme.accent2());
         }
         if (rows.isEmpty()) {
-            JscOsTheme.textS(g, font, "no result set", left, top, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, "no result set", left, top, JsTechTheme.dim());
         }
     }
 
     private void drawMessages(final GuiGraphics g) {
         final int left = rightX() + 6;
-        JscOsTheme.textS(g, font, "message", left, gridY() + 1, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "message", left, gridY() + 1, JsTechTheme.dim());
         final int top = gridY() + 10;
         final int bottom = statusY() - 1;
         final int visibleRows = Math.max(1, (bottom - top) / NmsLayout.ROW_H);
         final int start = Math.max(0, messages.size() - visibleRows);
         for (int i = 0; start + i < messages.size() && i < visibleRows; i++) {
             final MsgLine line = messages.get(start + i);
-            JscOsTheme.textS(g, font, fit(line.text(), viewW - left - 6), left, top + i * NmsLayout.ROW_H,
-                    line.ok() ? JscOsTheme.text() : 0xFFCC2222);
+            JsTechTheme.textS(g, font, fit(line.text(), viewW - left - 6), left, top + i * NmsLayout.ROW_H,
+                    line.ok() ? JsTechTheme.text() : 0xFFCC2222);
         }
         if (messages.isEmpty()) {
-            JscOsTheme.textS(g, font, "no messages yet", left, top, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, "no messages yet", left, top, JsTechTheme.dim());
         }
     }
 

@@ -8,6 +8,7 @@
 package dev.jstech.computronics.client;
 
 import dev.jstech.computronics.menu.ComputerTerminalMenu;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -33,26 +34,26 @@ abstract class AbstractTerminalTab implements TerminalTab {
     }
 
     // ---- Palette -------------------------------------------------------------------------
-    // Delegating to JscOsTheme is semantically identical to reading the cached palette fields
+    // Delegating to JsTechTheme is semantically identical to reading the cached palette fields
     // on the screen: the era skin is bound for the entire render pass, so the values match.
 
-    protected int OUTER() { return JscOsTheme.outer(); }
-    protected int SCREEN_COL() { return JscOsTheme.screen(); }
-    protected int RAIL() { return JscOsTheme.rail(); }
-    protected int PANEL() { return JscOsTheme.panel(); }
-    protected int LINE() { return JscOsTheme.line(); }
-    protected int TRACK() { return JscOsTheme.track(); }
-    protected int SLOT_BG() { return JscOsTheme.slotBg(); }
-    protected int SLOT_EDGE() { return JscOsTheme.slotEdge(); }
-    protected int ACCENT() { return JscOsTheme.accent(); }
-    protected int ACCENT2() { return JscOsTheme.accent2(); }
-    protected int GREEN() { return JscOsTheme.green(); }
-    protected int AMBER() { return JscOsTheme.amber(); }
-    protected int RED() { return JscOsTheme.red(); }
-    protected int TEXT() { return JscOsTheme.text(); }
-    protected int DIM() { return JscOsTheme.dim(); }
-    protected int TAB_ON() { return JscOsTheme.tabOn(); }
-    protected int HOVER() { return JscOsTheme.hover(); }
+    protected int OUTER() { return JsTechTheme.outer(); }
+    protected int SCREEN_COL() { return JsTechTheme.screen(); }
+    protected int RAIL() { return JsTechTheme.rail(); }
+    protected int PANEL() { return JsTechTheme.panel(); }
+    protected int LINE() { return JsTechTheme.line(); }
+    protected int TRACK() { return JsTechTheme.track(); }
+    protected int SLOT_BG() { return JsTechTheme.slotBg(); }
+    protected int SLOT_EDGE() { return JsTechTheme.slotEdge(); }
+    protected int ACCENT() { return JsTechTheme.accent(); }
+    protected int ACCENT2() { return JsTechTheme.accent2(); }
+    protected int GREEN() { return JsTechTheme.green(); }
+    protected int AMBER() { return JsTechTheme.amber(); }
+    protected int RED() { return JsTechTheme.red(); }
+    protected int TEXT() { return JsTechTheme.text(); }
+    protected int DIM() { return JsTechTheme.dim(); }
+    protected int TAB_ON() { return JsTechTheme.tabOn(); }
+    protected int HOVER() { return JsTechTheme.hover(); }
 
     // ---- Shared rendering helpers (delegating to package-private methods on the screen) ---
 

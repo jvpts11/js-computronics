@@ -17,45 +17,45 @@ import java.util.Set;
 /**
  * Immutable per-chunk data: which networks have cables passing through this chunk.
  */
-public final class JscChunkData {
+public final class CoreChunkData {
 
     private final Set<NetworkUuid> networksInChunk;
 
-    private JscChunkData(final Set<NetworkUuid> networksInChunk) {
+    private CoreChunkData(final Set<NetworkUuid> networksInChunk) {
         this.networksInChunk =
                 Collections.unmodifiableSet(new LinkedHashSet<>(networksInChunk));
     }
 
-    public static JscChunkData empty() {
-        return new JscChunkData(new LinkedHashSet<>());
+    public static CoreChunkData empty() {
+        return new CoreChunkData(new LinkedHashSet<>());
     }
 
-    public static JscChunkData of(final Set<NetworkUuid> networks) {
+    public static CoreChunkData of(final Set<NetworkUuid> networks) {
         Objects.requireNonNull(networks, "networks must not be null");
         for (final NetworkUuid uuid : networks) {
             Objects.requireNonNull(uuid, "network UUID must not be null");
         }
-        return new JscChunkData(networks);
+        return new CoreChunkData(networks);
     }
 
-    public JscChunkData withNetwork(final NetworkUuid uuid) {
+    public CoreChunkData withNetwork(final NetworkUuid uuid) {
         Objects.requireNonNull(uuid, "uuid must not be null");
         if (networksInChunk.contains(uuid)) {
             return this;
         }
         final Set<NetworkUuid> next = new LinkedHashSet<>(networksInChunk);
         next.add(uuid);
-        return new JscChunkData(next);
+        return new CoreChunkData(next);
     }
 
-    public JscChunkData withoutNetwork(final NetworkUuid uuid) {
+    public CoreChunkData withoutNetwork(final NetworkUuid uuid) {
         Objects.requireNonNull(uuid, "uuid must not be null");
         if (!networksInChunk.contains(uuid)) {
             return this;
         }
         final Set<NetworkUuid> next = new LinkedHashSet<>(networksInChunk);
         next.remove(uuid);
-        return new JscChunkData(next);
+        return new CoreChunkData(next);
     }
 
     public boolean contains(final NetworkUuid uuid) {
@@ -79,7 +79,7 @@ public final class JscChunkData {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof JscChunkData other)) {
+        if (!(o instanceof CoreChunkData other)) {
             return false;
         }
         return networksInChunk.equals(other.networksInChunk);
@@ -92,6 +92,6 @@ public final class JscChunkData {
 
     @Override
     public String toString() {
-        return "JscChunkData" + networksInChunk;
+        return "CoreChunkData" + networksInChunk;
     }
 }

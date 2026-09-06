@@ -9,6 +9,7 @@ package dev.jstech.computronics.client.theme;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.jstech.core.client.gui.theme.EraPalette;
 import dev.jstech.core.gui.ColorContrast;
 import org.junit.jupiter.api.Test;
 

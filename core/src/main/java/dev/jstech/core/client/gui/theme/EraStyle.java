@@ -3,9 +3,9 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
-package dev.jstech.computronics.client.theme;
+package dev.jstech.core.client.gui.theme;
 
 /**
  * Style flags layered on top of a {@link EraPalette}. These drive the optional, era-specific surface overlays —
@@ -19,7 +19,7 @@ package dev.jstech.computronics.client.theme;
  * @param bevelDark      ARGB of the bevel shadow edge ({@code 0} = off)
  * @param scanlineColor  ARGB (low alpha) of the scanline lines ({@code 0} = off)
  * @param glowColor      ARGB (low alpha) of the accent glow halo ({@code 0} = off)
- * @param fontScaleSmall the scale factor for the small-text helpers (the former {@code JscOsTheme.SMALL})
+ * @param fontScaleSmall the scale factor for the small-text helpers (the former {@code JsTechTheme.SMALL})
  */
 public record EraStyle(
         boolean scanlines,

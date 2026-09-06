@@ -3,12 +3,12 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
-package dev.jstech.computronics.client.theme;
+package dev.jstech.core.client.gui.theme;
 
 /**
- * The full ARGB color palette of one GUI skin. Every color {@code JscOsTheme} historically exposed as a
+ * The full ARGB color palette of one GUI skin. Every color {@code JsTechTheme} historically exposed as a
  * {@code public static final int} constant lives here as a field, so a palette is a complete, self-contained
  * description of how a computing screen is painted. Pure data — no Minecraft types — so it can be selected and
  * compared without a running client.

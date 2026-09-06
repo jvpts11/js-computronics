@@ -10,14 +10,14 @@ package dev.jstech.core.event;
 /**
  * Marker for all custom events fired by the mod.
  */
-public interface JscEvent {
+public interface CoreEvent {
 
     String eventId();
 
     /**
      * Marker for events whose listeners can prevent the action that fired them.
      */
-    interface Cancellable extends JscEvent {
+    interface Cancellable extends CoreEvent {
 
         boolean isCancelled();
 

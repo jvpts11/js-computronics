@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
-import dev.jstech.computronics.client.JscOsTheme;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.computronics.operation.payload.ItemDetailPayload;
 import dev.jstech.computronics.operation.payload.ItemDetailPayload.BusRef;
 import dev.jstech.computronics.operation.payload.NetworkItemEntry;
@@ -115,7 +115,7 @@ public final class StorageInsightsApp implements DesktopApp {
         search = root.add(new SearchField(SEARCH_MAX));
         search.setPlaceholder("search item...");
         typesTile = root.add(new Label(() -> "TYPES " + (data == null ? 0 : data.typeCount()), Label.Tone.DIM));
-        totalTile = root.add(new Label(() -> "TOTAL " + JscOsTheme.fmt(data == null ? 0 : data.totalItems()), Label.Tone.DIM));
+        totalTile = root.add(new Label(() -> "TOTAL " + JsTechTheme.fmt(data == null ? 0 : data.totalItems()), Label.Tone.DIM));
         lowTile = root.add(new Label(() -> "LOW " + lowBelowThreshold().size(), Label.Tone.DIM)
                 .setColor(() -> lowBelowThreshold().isEmpty() ? 0 : C_CRIT));
         topHeader = root.add(new Label("TOP ITEMS", Label.Tone.DIM));
@@ -137,7 +137,7 @@ public final class StorageInsightsApp implements DesktopApp {
         }));
         detailLoading = root.add(new Label("Loading item...", Label.Tone.DIM));
         detailName = root.add(new Label(() -> detail == null ? "" : detail.item().getHoverName().getString()));
-        detailTotal = root.add(new Label(() -> detail == null ? "" : JscOsTheme.fmt(detail.total()) + " total", Label.Tone.DIM)
+        detailTotal = root.add(new Label(() -> detail == null ? "" : JsTechTheme.fmt(detail.total()) + " total", Label.Tone.DIM)
                 .setAlign(Label.Align.RIGHT));
         storedHeader = root.add(new Label("STORED IN", Label.Tone.DIM));
         storedList = root.add(new ListView<StorageShare>(() -> detail == null ? List.of() : detail.storedIn(), DETAIL_ROW_H, this::renderStoredRow));
@@ -373,7 +373,7 @@ public final class StorageInsightsApp implements DesktopApp {
         final int barW = Math.max(10, w - 96 - qtyW - 4);
         g.fill(barX, y + 4, barX + barW, y + 10, ctx.skin().fieldBg());
         g.fill(barX, y + 4, barX + (int) (barW * Math.min(1.0, (double) e.total() / max)), y + 10, ctx.skin().accent());
-        final String q = JscOsTheme.fmt(e.total());
+        final String q = JsTechTheme.fmt(e.total());
         g.drawString(font, q, x + w - font.width(q), y + 2, ctx.skin().dim(), false);
     }
 
@@ -421,13 +421,13 @@ public final class StorageInsightsApp implements DesktopApp {
         final int bw = Math.max(8, w - 46 - 30);
         g.fill(bx, y, bx + bw, y + 6, ctx.skin().fieldBg());
         g.fill(bx, y, bx + (int) (bw * Math.min(1.0, (double) s.qty() / smax)), y + 6, ctx.skin().accent());
-        final String q = JscOsTheme.fmt(s.qty());
+        final String q = JsTechTheme.fmt(s.qty());
         g.drawString(font, q, x + w - font.width(q), y - 1, ctx.skin().dim(), false);
     }
 
     private void renderStoredRow(final GuiGraphics g, final UiContext ctx, final StorageShare s, final int index, final int x,
                                  final int y, final int w, final int h, final boolean hovered, final boolean selected) {
-        g.drawString(ctx.font(), Texts.clip(ctx.font(), s.label() + "  " + JscOsTheme.fmt(s.qty()), w - 4), x, y, ctx.skin().text(), false);
+        g.drawString(ctx.font(), Texts.clip(ctx.font(), s.label() + "  " + JsTechTheme.fmt(s.qty()), w - 4), x, y, ctx.skin().text(), false);
     }
 
     private void renderBusRow(final GuiGraphics g, final UiContext ctx, final BusRef b, final int index, final int x,

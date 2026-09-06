@@ -13,6 +13,7 @@ import dev.jstech.computronics.operation.payload.ConsoleInitPayload;
 import dev.jstech.computronics.operation.payload.RequestConsoleInitPayload;
 import dev.jstech.computronics.operation.payload.RunCommandPayload;
 import dev.jstech.computronics.program.cli.CliStyle;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -293,23 +294,23 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
             g.fill(x, y, x + imageWidth, y + imageHeight, 0xFF000000);
             return;
         }
-        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
-        JscOsTheme.headerBar(g, x + 6, y + 6, imageWidth - 12);
+        JsTechTheme.window(g, x, y, imageWidth, imageHeight);
+        JsTechTheme.headerBar(g, x + 6, y + 6, imageWidth - 12);
         // The console panel.
         final int top = y + 26;
         final int bottom = y + imageHeight - 22;
         g.fill(x + 6, top, x + imageWidth - 6, bottom, CONSOLE);
-        g.fill(x + 6, top, x + imageWidth - 6, top + 1, JscOsTheme.line());
+        g.fill(x + 6, top, x + imageWidth - 6, top + 1, JsTechTheme.line());
         // Input strip.
-        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 8, JscOsTheme.panel());
-        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 19, JscOsTheme.line());
+        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 8, JsTechTheme.panel());
+        g.fill(x + 6, y + imageHeight - 20, x + imageWidth - 6, y + imageHeight - 19, JsTechTheme.line());
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         if (!bareTerminal()) {
-            JscOsTheme.text(g, font, "COMMAND PROMPT", 12, 11, JscOsTheme.text());
-            JscOsTheme.textRight(g, font, "PROGRAM", imageWidth - 10, 11, JscOsTheme.accent());
+            JsTechTheme.text(g, font, "COMMAND PROMPT", 12, 11, JsTechTheme.text());
+            JsTechTheme.textRight(g, font, "PROGRAM", imageWidth - 10, 11, JsTechTheme.accent());
         }
 
         // Console scrollback, newest at the bottom, honoring the scroll offset.
@@ -327,11 +328,11 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
             row++;
         }
         if (scrollOffset > 0) {
-            JscOsTheme.textSRight(g, font, "scrolled +" + scrollOffset, imageWidth - 10, bottom - 7, JscOsTheme.dim());
+            JsTechTheme.textSRight(g, font, "scrolled +" + scrollOffset, imageWidth - 10, bottom - 7, JsTechTheme.dim());
         }
 
         // Prompt glyph before the input box.
-        JscOsTheme.text(g, font, prompt(), 10, imageHeight - 18, JscOsTheme.accent());
+        JsTechTheme.text(g, font, prompt(), 10, imageHeight - 18, JsTechTheme.accent());
 
         // Usage hint: once the verb is recognised, show how it is used, dimmed on the right.
         final String typed = input == null ? "" : input.getValue().trim();
@@ -346,19 +347,19 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
             final int room = imageWidth - 10 - (10 + promptW + typedW + 12);
             if (room >= 40) {
                 String hint = verb + " " + usage;
-                if (JscOsTheme.widthS(font, hint) > room) {
+                if (JsTechTheme.widthS(font, hint) > room) {
                     String cut = hint;
-                    while (cut.length() > 3 && JscOsTheme.widthS(font, cut + "..") > room) {
+                    while (cut.length() > 3 && JsTechTheme.widthS(font, cut + "..") > room) {
                         cut = cut.substring(0, cut.length() - 1);
                     }
                     hint = cut + "..";
                 }
-                JscOsTheme.textSRight(g, font, hint, imageWidth - 10, imageHeight - 17, JscOsTheme.dim());
+                JsTechTheme.textSRight(g, font, hint, imageWidth - 10, imageHeight - 17, JsTechTheme.dim());
             }
         }
 
-        JscOsTheme.textS(g, font, "ENTER run    UP/DOWN history    wheel scroll    ESC close",
-                10, imageHeight - 7, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "ENTER run    UP/DOWN history    wheel scroll    ESC close",
+                10, imageHeight - 7, JsTechTheme.dim());
     }
 
     private void drawSmall(final GuiGraphics g, final String text, final int x, final int y, final int color) {

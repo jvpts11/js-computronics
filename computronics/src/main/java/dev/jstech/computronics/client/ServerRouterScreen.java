@@ -10,6 +10,7 @@ package dev.jstech.computronics.client;
 import dev.jstech.computronics.datacenter.LoadBalanceMode;
 import dev.jstech.computronics.menu.ServerRouterMenu;
 import dev.jstech.computronics.operation.payload.RenameServerRouterPayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -49,7 +50,7 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
         nameBox = new EditBox(font, leftPos + 10, topPos + 39, 170, 10, Component.literal("Name"));
         nameBox.setBordered(false);
         nameBox.setMaxLength(RenameServerRouterPayload.MAX_LEN);
-        nameBox.setTextColor(JscOsTheme.text());
+        nameBox.setTextColor(JsTechTheme.text());
         nameBox.setValue(menu.initialName());
         nameBox.setResponder(s ->
                 PacketDistributor.sendToServer(new RenameServerRouterPayload(menu.routerPos(), s)));
@@ -60,61 +61,61 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
-        JscOsTheme.window(g, x, y, W, H);
-        JscOsTheme.headerBar(g, x + 6, y + 6, W - 12);
+        JsTechTheme.window(g, x, y, W, H);
+        JsTechTheme.headerBar(g, x + 6, y + 6, W - 12);
 
         // Name field background (the EditBox is drawn over this).
-        g.fill(x + 8, y + 36, x + W - 8, y + 50, JscOsTheme.slotBg());
-        g.fill(x + 8, y + 36, x + W - 8, y + 37, JscOsTheme.line());
+        g.fill(x + 8, y + 36, x + W - 8, y + 50, JsTechTheme.slotBg());
+        g.fill(x + 8, y + 36, x + W - 8, y + 37, JsTechTheme.line());
 
         // Two status tiles.
-        JscOsTheme.panel(g, x + 8, y + 56, 84, 22);
-        JscOsTheme.panel(g, x + 98, y + 56, 84, 22);
+        JsTechTheme.panel(g, x + 8, y + 56, 84, 22);
+        JsTechTheme.panel(g, x + 98, y + 56, 84, 22);
 
         // Section list separator.
-        JscOsTheme.hLine(g, x + 8, y + 93, W - 16);
+        JsTechTheme.hLine(g, x + 8, y + 93, W - 16);
 
         // One mode button per section row.
         for (int i = 0; i < menu.sectionCount(); i++) {
             final int by = y + ROW_Y0 + i * ROW_PITCH;
             final boolean hovered = mouseX >= x + MODE_X && mouseX < x + MODE_X + MODE_W
                     && mouseY >= by && mouseY < by + MODE_H;
-            JscOsTheme.button(g, x + MODE_X, by, MODE_W, MODE_H, hovered);
+            JsTechTheme.button(g, x + MODE_X, by, MODE_W, MODE_H, hovered);
         }
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         // Header.
-        JscOsTheme.text(g, font, "SERVER ROUTER", 12, 10, JscOsTheme.text());
-        JscOsTheme.textRight(g, font, "T3", W - 12, 10, JscOsTheme.accent());
+        JsTechTheme.text(g, font, "SERVER ROUTER", 12, 10, JsTechTheme.text());
+        JsTechTheme.textRight(g, font, "T3", W - 12, 10, JsTechTheme.accent());
 
-        JscOsTheme.textS(g, font, "NAME", 10, 28, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "NAME", 10, 28, JsTechTheme.dim());
 
         // Input + rack-budget tiles.
         final Direction in = menu.inputFace();
-        JscOsTheme.tileTextS(g, font, 8, 56, "INPUT", in == null ? "—" : title(in.getName()), JscOsTheme.accent2());
+        JsTechTheme.tileTextS(g, font, 8, 56, "INPUT", in == null ? "—" : title(in.getName()), JsTechTheme.accent2());
         final int max = menu.maxRacks();
         final String racks = menu.managedRacks() + " / " + max;
-        JscOsTheme.tileTextS(g, font, 98, 56, "RACKS",
-                racks, menu.overCapacity() ? JscOsTheme.red() : JscOsTheme.green());
+        JsTechTheme.tileTextS(g, font, 98, 56, "RACKS",
+                racks, menu.overCapacity() ? JsTechTheme.red() : JsTechTheme.green());
 
-        JscOsTheme.textS(g, font, "SECTIONS", 10, 84, JscOsTheme.dim());
+        JsTechTheme.textS(g, font, "SECTIONS", 10, 84, JsTechTheme.dim());
 
         final int count = menu.sectionCount();
         if (count == 0) {
-            JscOsTheme.textS(g, font, "No datacenter sections", 12, ROW_Y0 + 3, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, "No datacenter sections", 12, ROW_Y0 + 3, JsTechTheme.dim());
             return;
         }
         for (int i = 0; i < count; i++) {
             final int ry = ROW_Y0 + i * ROW_PITCH;
             final Direction face = menu.sectionFace(i);
-            JscOsTheme.textS(g, font, face == null ? "?" : face.getName().toUpperCase(java.util.Locale.ROOT),
-                    10, ry + 3, JscOsTheme.text());
-            JscOsTheme.textS(g, font, menu.sectionRacks(i) + "R · " + menu.sectionServers(i) + "S",
-                    40, ry + 3, JscOsTheme.dim());
+            JsTechTheme.textS(g, font, face == null ? "?" : face.getName().toUpperCase(java.util.Locale.ROOT),
+                    10, ry + 3, JsTechTheme.text());
+            JsTechTheme.textS(g, font, menu.sectionRacks(i) + "R · " + menu.sectionServers(i) + "S",
+                    40, ry + 3, JsTechTheme.dim());
             final LoadBalanceMode mode = menu.sectionMode(i);
-            JscOsTheme.textSCenter(g, font, modeLabel(mode), MODE_X + MODE_W / 2, ry + 3, modeColor(mode));
+            JsTechTheme.textSCenter(g, font, modeLabel(mode), MODE_X + MODE_W / 2, ry + 3, modeColor(mode));
         }
     }
 
@@ -153,9 +154,9 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
 
     private static int modeColor(final LoadBalanceMode mode) {
         return switch (mode) {
-            case ROUND_ROBIN -> JscOsTheme.accent2();
-            case LEAST_LOADED -> JscOsTheme.amber();
-            case MANUAL -> JscOsTheme.dim();
+            case ROUND_ROBIN -> JsTechTheme.accent2();
+            case LEAST_LOADED -> JsTechTheme.amber();
+            case MANUAL -> JsTechTheme.dim();
         };
     }
 

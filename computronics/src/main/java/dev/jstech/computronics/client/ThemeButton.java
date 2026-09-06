@@ -7,13 +7,14 @@
  */
 package dev.jstech.computronics.client;
 
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
 /**
- * A {@link Button} that paints itself through {@link JscOsTheme} instead of the vanilla 9-slice texture, so every
+ * A {@link Button} that paints itself through {@link JsTechTheme} instead of the vanilla 9-slice texture, so every
  * clickable control matches the active era's skin. Behaviour (press handling, narration, visibility, focus) is the
  * vanilla button's; only the look changes. Screens use this everywhere a button is needed rather than the default
  * {@code Button.builder(...)}.
@@ -28,10 +29,10 @@ public class ThemeButton extends Button {
     @Override
     protected void renderWidget(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         final boolean hovered = this.isHovered();
-        JscOsTheme.button(g, getX(), getY(), getWidth(), getHeight(), hovered && this.active);
-        final int color = !this.active ? JscOsTheme.dim()
-                : hovered ? JscOsTheme.text() : JscOsTheme.accent();
-        JscOsTheme.textCenter(g, Minecraft.getInstance().font, getMessage().getString(),
+        JsTechTheme.button(g, getX(), getY(), getWidth(), getHeight(), hovered && this.active);
+        final int color = !this.active ? JsTechTheme.dim()
+                : hovered ? JsTechTheme.text() : JsTechTheme.accent();
+        JsTechTheme.textCenter(g, Minecraft.getInstance().font, getMessage().getString(),
                 getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, color);
     }
 }

@@ -16,14 +16,14 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
  *
  * <p>Industrial machines do not carry a hardware era, so this class intentionally omits the
  * {@code EraTheme} binding present in computing screens. It inherits the standard dark panel
- * background and correct render ordering from {@link JscContainerScreen} and adds lightweight
+ * background and correct render ordering from {@link CoreContainerScreen} and adds lightweight
  * utility methods shared by all machine GUIs: a local-space hover test and a menu-button
  * send helper.
  *
  * <p>Subclasses implement {@link #renderBg} and, when needed, {@link #renderLabels}.
  */
 public abstract class AbstractMachineScreen<T extends AbstractContainerMenu>
-        extends JscContainerScreen<T> {
+        extends CoreContainerScreen<T> {
 
     protected AbstractMachineScreen(
             final T menu,

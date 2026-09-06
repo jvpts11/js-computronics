@@ -14,9 +14,9 @@ import net.minecraft.network.chat.Component;
 /**
  * Base screen for mod GUIs that are NOT bound to a container menu.
  */
-public abstract class JscScreen extends Screen {
+public abstract class CoreScreen extends Screen {
 
-    protected JscScreen(final Component title) {
+    protected CoreScreen(final Component title) {
         super(title);
     }
 

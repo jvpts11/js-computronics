@@ -17,7 +17,7 @@ import java.util.Optional;
 /**
  * Canonical registry of all {@link ConfigKey}s used by the mod.
  */
-public final class JscConfigRegistry {
+public final class CoreConfigRegistry {
 
     private final Map<String, ConfigKey<?>> keysByPath = new LinkedHashMap<>();
 

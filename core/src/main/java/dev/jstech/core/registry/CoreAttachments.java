@@ -10,7 +10,7 @@ package dev.jstech.core.registry;
 import com.mojang.serialization.Codec;
 import dev.jstech.core.JsCore;
 import dev.jstech.core.network.NetworkSystem;
-import dev.jstech.core.persistence.JscChunkData;
+import dev.jstech.core.persistence.CoreChunkData;
 import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.core.UUIDUtil;
 import net.neoforged.bus.api.IEventBus;
@@ -25,17 +25,17 @@ import java.util.function.Supplier;
 /**
  * Registers the mod's {@link AttachmentType}s.
  */
-public final class JscAttachments {
+public final class CoreAttachments {
 
-    private JscAttachments() {
+    private CoreAttachments() {
     }
 
     private static final Codec<NetworkUuid> NETWORK_UUID_CODEC =
             UUIDUtil.CODEC.xmap(NetworkUuid::new, NetworkUuid::value);
 
-    private static final Codec<JscChunkData> CHUNK_DATA_CODEC =
+    private static final Codec<CoreChunkData> CHUNK_DATA_CODEC =
             NETWORK_UUID_CODEC.listOf().xmap(
-                    list -> JscChunkData.of(new LinkedHashSet<>(list)),
+                    list -> CoreChunkData.of(new LinkedHashSet<>(list)),
                     data -> List.copyOf(data.networks()));
 
     public static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES =
@@ -45,9 +45,9 @@ public final class JscAttachments {
             ATTACHMENT_TYPES.register("network_system",
                     () -> AttachmentType.builder(NetworkSystem::new).build());
 
-    public static final Supplier<AttachmentType<JscChunkData>> CHUNK_NETWORKS =
+    public static final Supplier<AttachmentType<CoreChunkData>> CHUNK_NETWORKS =
             ATTACHMENT_TYPES.register("chunk_networks",
-                    () -> AttachmentType.builder(JscChunkData::empty)
+                    () -> AttachmentType.builder(CoreChunkData::empty)
                             .serialize(CHUNK_DATA_CODEC)
                             .build());
 

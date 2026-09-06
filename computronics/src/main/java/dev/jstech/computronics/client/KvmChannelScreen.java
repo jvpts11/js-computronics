@@ -10,6 +10,7 @@ package dev.jstech.computronics.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.jstech.computronics.operation.payload.KvmSelectPayload;
 import dev.jstech.computronics.operation.payload.OpenKvmPayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -92,11 +93,11 @@ public final class KvmChannelScreen extends Screen {
         renderBackground(g, mouseX, mouseY, partialTick);
         final int x = left();
         final int y = top();
-        JscOsTheme.window(g, x, y, W, panelHeight());
-        JscOsTheme.headerBar(g, x + 6, y + 6, W - 12);
-        JscOsTheme.text(g, font, "KVM SWITCH", x + 12, y + 11, JscOsTheme.text());
+        JsTechTheme.window(g, x, y, W, panelHeight());
+        JsTechTheme.headerBar(g, x + 6, y + 6, W - 12);
+        JsTechTheme.text(g, font, "KVM SWITCH", x + 12, y + 11, JsTechTheme.text());
         final String count = channels.size() + " machines";
-        JscOsTheme.text(g, font, count, x + W - 12 - font.width(count), y + 11, JscOsTheme.dim());
+        JsTechTheme.text(g, font, count, x + W - 12 - font.width(count), y + 11, JsTechTheme.dim());
 
         for (int i = 0; i < channels.size(); i++) {
             final OpenKvmPayload.Channel channel = channels.get(i);
@@ -104,17 +105,17 @@ public final class KvmChannelScreen extends Screen {
             final boolean hovered = mouseX >= x + PAD && mouseX < x + W - PAD
                     && mouseY >= rowY && mouseY < rowY + ROW_H - 2;
             final boolean active = channel.slot() == activeChannel;
-            JscOsTheme.panel(g, x + PAD, rowY, W - PAD * 2, ROW_H - 2);
+            JsTechTheme.panel(g, x + PAD, rowY, W - PAD * 2, ROW_H - 2);
             if (hovered || active) {
                 g.fill(x + PAD, rowY, x + PAD + 2, rowY + ROW_H - 2,
-                        active ? JscOsTheme.accent() : JscOsTheme.dim());
+                        active ? JsTechTheme.accent() : JsTechTheme.dim());
             }
-            JscOsTheme.text(g, font, "F" + (i + 1), x + PAD + 8, rowY + 6,
-                    active ? JscOsTheme.accent() : JscOsTheme.dim());
-            JscOsTheme.text(g, font, channel.name(), x + PAD + 34, rowY + 6, JscOsTheme.text());
+            JsTechTheme.text(g, font, "F" + (i + 1), x + PAD + 8, rowY + 6,
+                    active ? JsTechTheme.accent() : JsTechTheme.dim());
+            JsTechTheme.text(g, font, channel.name(), x + PAD + 34, rowY + 6, JsTechTheme.text());
             final String state = channel.running() ? "ONLINE" : "OFF";
-            JscOsTheme.text(g, font, state, x + W - PAD - 8 - font.width(state), rowY + 6,
-                    channel.running() ? JscOsTheme.green() : JscOsTheme.red());
+            JsTechTheme.text(g, font, state, x + W - PAD - 8 - font.width(state), rowY + 6,
+                    channel.running() ? JsTechTheme.green() : JsTechTheme.red());
         }
     }
 

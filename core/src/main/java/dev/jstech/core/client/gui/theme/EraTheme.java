@@ -3,20 +3,20 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Core.
  */
-package dev.jstech.computronics.client.theme;
+package dev.jstech.core.client.gui.theme;
 
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * One immutable GUI skin: a {@link EraPalette} plus the {@link EraStyle} overlay flags, with the palette-coupled
- * drawing helpers that used to be the {@code static} methods on {@code JscOsTheme}. A computing screen resolves the
+ * drawing helpers that used to be the {@code static} methods on {@code JsTechTheme}. A computing screen resolves the
  * theme of its host computer's {@code HardwareEra} and paints through it, so the same screen code renders in the
  * skin of whatever era it is running on.
  *
  * <p>The STANDARD theme's style is {@linkplain EraStyle#flat flat} (every overlay off), so its helpers execute the
- * identical {@code g.fill(...)} sequence the original {@code JscOsTheme} did — byte-for-byte the same pixels.
+ * identical {@code g.fill(...)} sequence the original {@code JsTechTheme} did — byte-for-byte the same pixels.
  */
 public final class EraTheme {
 

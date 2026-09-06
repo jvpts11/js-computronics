@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class JscEventDispatcherTest {
+class CoreEventDispatcherTest {
 
     private static NetworkUuid net() {
         return new NetworkUuid(UUID.randomUUID());
@@ -28,7 +28,7 @@ class JscEventDispatcherTest {
 
     @Test
     void singleListener_receivesEvent() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         List<OperationLifecycleEvent.Created> received = new ArrayList<>();
         dispatcher.subscribe(OperationLifecycleEvent.Created.class, received::add);
 
@@ -42,7 +42,7 @@ class JscEventDispatcherTest {
 
     @Test
     void noListeners_postIsNoOp() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         OperationLifecycleEvent.Created event =
                 new OperationLifecycleEvent.Created(net(), 1L);
         // Must not throw; just returns.
@@ -52,7 +52,7 @@ class JscEventDispatcherTest {
 
     @Test
     void postReturnsEvent_forFluentChaining() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         OperationLifecycleEvent.Created event =
                 new OperationLifecycleEvent.Created(net(), 1L);
         assertEquals(event, dispatcher.post(event));
@@ -60,7 +60,7 @@ class JscEventDispatcherTest {
 
     @Test
     void multipleListeners_invokedInRegistrationOrder() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         List<Integer> order = new ArrayList<>();
         dispatcher.subscribe(OperationLifecycleEvent.Started.class,
                 e -> order.add(1));
@@ -76,7 +76,7 @@ class JscEventDispatcherTest {
 
     @Test
     void subscribeToSealedRoot_receivesAllChildren() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
         dispatcher.subscribe(OperationLifecycleEvent.class, e -> count.incrementAndGet());
 
@@ -90,7 +90,7 @@ class JscEventDispatcherTest {
 
     @Test
     void subscribeToConcreteType_doesNotReceiveSiblings() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger createdCount = new AtomicInteger();
         dispatcher.subscribe(OperationLifecycleEvent.Created.class,
                 e -> createdCount.incrementAndGet());
@@ -103,7 +103,7 @@ class JscEventDispatcherTest {
 
     @Test
     void cancelledEvent_skipsLaterListeners() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         List<Integer> order = new ArrayList<>();
 
         dispatcher.subscribe(NetworkPropagatingEvent.class, e -> {
@@ -122,7 +122,7 @@ class JscEventDispatcherTest {
 
     @Test
     void uncancelledEvent_runsAllListeners() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
         dispatcher.subscribe(NetworkPropagatingEvent.class,
                 e -> count.incrementAndGet());
@@ -149,27 +149,27 @@ class JscEventDispatcherTest {
 
     @Test
     void subscribeWithNullClass_throws() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         assertThrows(NullPointerException.class, () ->
                 dispatcher.subscribe(null, e -> { }));
     }
 
     @Test
     void subscribeWithNullListener_throws() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         assertThrows(NullPointerException.class, () ->
                 dispatcher.subscribe(OperationLifecycleEvent.Created.class, null));
     }
 
     @Test
     void postNullEvent_throws() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         assertThrows(NullPointerException.class, () -> dispatcher.post(null));
     }
 
     @Test
     void subscribedClassCount_reflectsRegistrations() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         assertEquals(0, dispatcher.subscribedClassCount());
         dispatcher.subscribe(OperationLifecycleEvent.Created.class, e -> { });
         dispatcher.subscribe(OperationLifecycleEvent.Started.class, e -> { });
@@ -178,7 +178,7 @@ class JscEventDispatcherTest {
 
     @Test
     void clear_removesAllSubscriptions() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
         dispatcher.subscribe(OperationLifecycleEvent.Created.class,
                 e -> count.incrementAndGet());
@@ -222,11 +222,11 @@ class JscEventDispatcherTest {
 
     @Test
     void post_deliversToAncestorInterfaceSubscriber() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        // JscEvent is a SUPERinterface of the event's direct interface (OperationLifecycleEvent), so it
+        // CoreEvent is a SUPERinterface of the event's direct interface (OperationLifecycleEvent), so it
         // is only reached once the whole interface graph is walked, not just the direct interfaces.
-        dispatcher.subscribe(JscEvent.class, e -> count.incrementAndGet());
+        dispatcher.subscribe(CoreEvent.class, e -> count.incrementAndGet());
 
         dispatcher.post(new OperationLifecycleEvent.Created(net(), 1L));
 
@@ -235,7 +235,7 @@ class JscEventDispatcherTest {
 
     @Test
     void post_allowsAListenerToMutateSubscriptionsMidDispatch() {
-        JscEventDispatcher dispatcher = new JscEventDispatcher();
+        CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
         dispatcher.subscribe(OperationLifecycleEvent.Created.class, e -> {
             count.incrementAndGet();

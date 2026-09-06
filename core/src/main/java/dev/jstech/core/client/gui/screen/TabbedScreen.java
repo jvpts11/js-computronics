@@ -14,9 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A {@link JscScreen} that hosts a row of {@link GuiTab}s with a content area below the tab bar.
+ * A {@link CoreScreen} that hosts a row of {@link GuiTab}s with a content area below the tab bar.
  */
-public abstract class TabbedScreen extends JscScreen {
+public abstract class TabbedScreen extends CoreScreen {
 
     private final List<GuiTab> tabs = new ArrayList<>();
     private int activeTabIndex = 0;

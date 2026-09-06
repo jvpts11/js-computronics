@@ -17,12 +17,12 @@ import java.util.function.Consumer;
 /**
  * Pure-Java event dispatcher used in Phase 0 and as the abstraction layer for Phase 1+ NeoForge integration.
  */
-public class JscEventDispatcher {
+public class CoreEventDispatcher {
 
-    private final Map<Class<? extends JscEvent>, List<Consumer<? extends JscEvent>>>
+    private final Map<Class<? extends CoreEvent>, List<Consumer<? extends CoreEvent>>>
             listenersByClass = new HashMap<>();
 
-    public <E extends JscEvent> void subscribe(
+    public <E extends CoreEvent> void subscribe(
             final Class<E> eventClass,
             final Consumer<E> listener) {
         Objects.requireNonNull(eventClass, "eventClass must not be null");
@@ -33,24 +33,24 @@ public class JscEventDispatcher {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public <E extends JscEvent> E post(final E event) {
+    public <E extends CoreEvent> E post(final E event) {
         Objects.requireNonNull(event, "event must not be null");
 
-        // Every JscEvent type this event is assignable to: its whole class chain AND its whole interface
+        // Every CoreEvent type this event is assignable to: its whole class chain AND its whole interface
         // graph (superinterfaces included), de-duplicated and most-specific first. Collecting the full
         // graph — not just the direct interfaces — is what lets a listener on an ancestor interface
-        // (e.g. JscEvent itself) be reached.
+        // (e.g. CoreEvent itself) be reached.
         final java.util.Set<Class<?>> types = new java.util.LinkedHashSet<>();
         collectEventTypes(event.getClass(), types);
 
         for (final Class<?> type : types) {
-            final List<Consumer<? extends JscEvent>> listeners = listenersByClass.get(type);
+            final List<Consumer<? extends CoreEvent>> listeners = listenersByClass.get(type);
             if (listeners == null) {
                 continue;
             }
             // Iterate a snapshot so a listener may subscribe or clear during dispatch without a CME.
             for (final Consumer listener : new ArrayList<>(listeners)) {
-                if (event instanceof JscEvent.Cancellable cancellable && cancellable.isCancelled()) {
+                if (event instanceof CoreEvent.Cancellable cancellable && cancellable.isCancelled()) {
                     return event;
                 }
                 listener.accept(event);
@@ -60,7 +60,7 @@ public class JscEventDispatcher {
     }
 
     private static void collectEventTypes(final Class<?> type, final java.util.Set<Class<?>> out) {
-        if (type == null || !JscEvent.class.isAssignableFrom(type) || !out.add(type)) {
+        if (type == null || !CoreEvent.class.isAssignableFrom(type) || !out.add(type)) {
             return;
         }
         collectEventTypes(type.getSuperclass(), out);

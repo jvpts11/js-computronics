@@ -23,6 +23,7 @@ import dev.jstech.computronics.operation.payload.TerminalLocalWithdrawPayload;
 import dev.jstech.computronics.operation.payload.TerminalMaintenancePayload;
 import dev.jstech.computronics.operation.payload.TerminalSelectPayload;
 import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -71,24 +72,24 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     /** Refreshes the palette fields from the bound era theme. Called at the top of every draw pass. */
     private void syncPalette() {
-        OUTER = JscOsTheme.outer();
-        SCREEN = JscOsTheme.screen();
-        RAIL = JscOsTheme.rail();
-        PANEL = JscOsTheme.panel();
-        LINE = JscOsTheme.line();
-        TRACK = JscOsTheme.track();
-        SLOT_BG = JscOsTheme.slotBg();
-        SLOT_EDGE = JscOsTheme.slotEdge();
-        ACCENT = JscOsTheme.accent();
-        ACCENT2 = JscOsTheme.accent2();
-        GREEN = JscOsTheme.green();
-        AMBER = JscOsTheme.amber();
-        RED = JscOsTheme.red();
-        TEXT = JscOsTheme.text();
-        DIM = JscOsTheme.dim();
-        TAB_ON = JscOsTheme.tabOn();
-        TAB_LABEL_ON = JscOsTheme.tabLabelOn();
-        HOVER = JscOsTheme.hover();
+        OUTER = JsTechTheme.outer();
+        SCREEN = JsTechTheme.screen();
+        RAIL = JsTechTheme.rail();
+        PANEL = JsTechTheme.panel();
+        LINE = JsTechTheme.line();
+        TRACK = JsTechTheme.track();
+        SLOT_BG = JsTechTheme.slotBg();
+        SLOT_EDGE = JsTechTheme.slotEdge();
+        ACCENT = JsTechTheme.accent();
+        ACCENT2 = JsTechTheme.accent2();
+        GREEN = JsTechTheme.green();
+        AMBER = JsTechTheme.amber();
+        RED = JsTechTheme.red();
+        TEXT = JsTechTheme.text();
+        DIM = JsTechTheme.dim();
+        TAB_ON = JsTechTheme.tabOn();
+        TAB_LABEL_ON = JsTechTheme.tabLabelOn();
+        HOVER = JsTechTheme.hover();
     }
 
     private static final int RAIL_X = 4;

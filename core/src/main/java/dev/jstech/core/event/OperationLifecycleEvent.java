@@ -14,7 +14,7 @@ import java.util.Objects;
 /**
  * Canonical events fired during the lifecycle of an Operation.
  */
-public sealed interface OperationLifecycleEvent extends JscEvent
+public sealed interface OperationLifecycleEvent extends CoreEvent
         permits OperationLifecycleEvent.Created,
         OperationLifecycleEvent.Started,
         OperationLifecycleEvent.Completed,

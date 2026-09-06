@@ -9,6 +9,7 @@ package dev.jstech.computronics.client;
 
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.menu.MainframeMenu;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.network.FailoverRole;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.client.gui.GuiGraphics;
@@ -52,13 +53,13 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
-        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
-        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
-        JscOsTheme.vLine(g, x + COL_R - 5, y + 24, 134);
+        JsTechTheme.window(g, x, y, imageWidth, imageHeight);
+        JsTechTheme.headerBar(g, x + 6, y + 6, 232);
+        JsTechTheme.vLine(g, x + COL_R - 5, y + 24, 134);
 
         // Hardware cells, only up to the count the installed board exposes.
-        JscOsTheme.slot(g, x + 8, y + 40);   // motherboard
-        JscOsTheme.slot(g, x + 8, y + 73);   // psu
+        JsTechTheme.slot(g, x + 8, y + 40);   // motherboard
+        JsTechTheme.slot(g, x + 8, y + 73);   // psu
         // The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
         // screen draws exactly what the menu exposes — one source of truth, no duplicated cap literal.
         final int cpu = menu.boardCpuSlots();
@@ -66,115 +67,115 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
         final int gpu = menu.boardPcieSlots();
         final int disk = menu.boardDiskSlots();
         for (int i = 0; i < cpu; i++) {
-            JscOsTheme.slot(g, x + 44 + i * 18, y + 40);
+            JsTechTheme.slot(g, x + 44 + i * 18, y + 40);
         }
         for (int i = 0; i < ram; i++) {
-            JscOsTheme.slot(g, x + 44 + (i % 4) * 18, y + 73 + (i / 4) * 18);
+            JsTechTheme.slot(g, x + 44 + (i % 4) * 18, y + 73 + (i / 4) * 18);
         }
         for (int i = 0; i < gpu; i++) {
-            JscOsTheme.slot(g, x + 44 + (i % 3) * 18, y + 124 + (i / 3) * 18);
+            JsTechTheme.slot(g, x + 44 + (i % 3) * 18, y + 124 + (i / 3) * 18);
         }
         for (int i = 0; i < disk; i++) {
-            JscOsTheme.slot(g, x + 8 + (i % 2) * 18, y + 124 + (i / 2) * 18);
+            JsTechTheme.slot(g, x + 8 + (i % 2) * 18, y + 124 + (i / 2) * 18);
         }
 
         // Right spec column.
-        JscOsTheme.panel(g, x + COL_R, y + 27, COL_R_W, 22);   // CAPACITY
-        JscOsTheme.panel(g, x + COL_R, y + 52, COL_R_W, 18);   // QUEUES
-        JscOsTheme.panel(g, x + COL_R, y + 73, COL_R_W, 18);   // RAM BUFFER
-        JscOsTheme.panel(g, x + COL_R, y + 108, COL_R_W, 42);  // OPERATIONS
+        JsTechTheme.panel(g, x + COL_R, y + 27, COL_R_W, 22);   // CAPACITY
+        JsTechTheme.panel(g, x + COL_R, y + 52, COL_R_W, 18);   // QUEUES
+        JsTechTheme.panel(g, x + COL_R, y + 73, COL_R_W, 18);   // RAM BUFFER
+        JsTechTheme.panel(g, x + COL_R, y + 108, COL_R_W, 42);  // OPERATIONS
 
         final boolean auto = menu.isAutoStart();
-        JscOsTheme.button(g, x + POWER_X, y + BTN_Y, BTN_W, BTN_H,
+        JsTechTheme.button(g, x + POWER_X, y + BTN_Y, BTN_W, BTN_H,
                 !auto && hover(mouseX, mouseY, POWER_X, BTN_Y, BTN_W, BTN_H));
-        JscOsTheme.button(g, x + AUTO_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, AUTO_X, BTN_Y, BTN_W, BTN_H));
-        JscOsTheme.button(g, x + FAILOVER_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, FAILOVER_X, BTN_Y, BTN_W, BTN_H));
+        JsTechTheme.button(g, x + AUTO_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, AUTO_X, BTN_Y, BTN_W, BTN_H));
+        JsTechTheme.button(g, x + FAILOVER_X, y + BTN_Y, BTN_W, BTN_H, hover(mouseX, mouseY, FAILOVER_X, BTN_Y, BTN_W, BTN_H));
 
         // Player inventory.
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + 8 + col * 18, y + 182 + row * 18);
+                JsTechTheme.slot(g, x + 8 + col * 18, y + 182 + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + 8 + col * 18, y + 240);
+            JsTechTheme.slot(g, x + 8 + col * 18, y + 240);
         }
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "MAINFRAME", 12, 11, JscOsTheme.text());
+        JsTechTheme.text(g, font, "MAINFRAME", 12, 11, JsTechTheme.text());
         final String status;
         final int statusColor;
         if (menu.networkState() == MainframeBlockEntity.NET_STATE_CONFLICT) {
             status = "CONFLICT";
-            statusColor = JscOsTheme.red();
+            statusColor = JsTechTheme.red();
         } else if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.red();
+            statusColor = JsTechTheme.red();
         } else if (menu.isRunning() && menu.failoverRole() == FailoverRole.PASSIVE.ordinal()) {
             status = "STANDBY"; // a Passive Failover member: powered and synced, not orchestrating
-            statusColor = JscOsTheme.amber();
+            statusColor = JsTechTheme.amber();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.green();
+            statusColor = JsTechTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.amber();
+            statusColor = JsTechTheme.amber();
         }
         final int pillX = 232 - font.width(status);
-        JscOsTheme.text(g, font, status, pillX, 11, statusColor);
+        JsTechTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
         // Hardware group labels (no counters — the drawn cells show installed vs available).
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.dim());
+        JsTechTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JsTechTheme.accent() : JsTechTheme.dim());
+        JsTechTheme.text(g, font, "CPU", 44, 27, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "PSU", 8, 60, JsTechTheme.dim());
         g.fill(30, 61, 34, 65, psuColor());
-        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "DISK", 8, 111, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "GPU", 44, 111, JscOsTheme.dim());
+        JsTechTheme.text(g, font, "RAM", 44, 60, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "DISK", 8, 111, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "GPU", 44, 111, JsTechTheme.dim());
 
         // Right column: spec tiles.
-        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.text());
-        JscOsTheme.tileText(g, font, COL_R, 52, "QUEUES", String.valueOf(menu.parallelQueues()), "", JscOsTheme.text());
-        JscOsTheme.tileText(g, font, COL_R, 73, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.text());
+        JsTechTheme.tileText(g, font, COL_R, 27, "CAPACITY", JsTechTheme.fmt(menu.capacity()), "it/t", JsTechTheme.text());
+        JsTechTheme.tileText(g, font, COL_R, 52, "QUEUES", String.valueOf(menu.parallelQueues()), "", JsTechTheme.text());
+        JsTechTheme.tileText(g, font, COL_R, 73, "RAM BUFFER", JsTechTheme.fmt(menu.ramBuffer()), "it", JsTechTheme.text());
 
-        JscOsTheme.text(g, font, "NETWORK", COL_R, 96, JscOsTheme.dim());
+        JsTechTheme.text(g, font, "NETWORK", COL_R, 96, JsTechTheme.dim());
         final int net = menu.networkState();
         final String netStr = net == MainframeBlockEntity.NET_STATE_CONFLICT ? "CONFLICT"
                 : net == MainframeBlockEntity.NET_STATE_LINKED ? "LINKED" : "--";
-        final int netColor = net == MainframeBlockEntity.NET_STATE_CONFLICT ? JscOsTheme.red()
-                : net == MainframeBlockEntity.NET_STATE_LINKED ? JscOsTheme.green() : JscOsTheme.dim();
-        JscOsTheme.textRight(g, font, netStr, COL_R + COL_R_W, 96, netColor);
+        final int netColor = net == MainframeBlockEntity.NET_STATE_CONFLICT ? JsTechTheme.red()
+                : net == MainframeBlockEntity.NET_STATE_LINKED ? JsTechTheme.green() : JsTechTheme.dim();
+        JsTechTheme.textRight(g, font, netStr, COL_R + COL_R_W, 96, netColor);
 
         // Operations dispatch — one row per metric (label left, value right).
         final int running = menu.runningOps();
-        opRow(g, "QUEUED", String.valueOf(menu.pendingOps()), 113, JscOsTheme.text());
-        opRow(g, "RUNNING", String.valueOf(running), 124, running > 0 ? JscOsTheme.green() : JscOsTheme.text());
-        opRow(g, "DONE", JscOsTheme.fmt(menu.completedOps()), 135, JscOsTheme.text());
+        opRow(g, "QUEUED", String.valueOf(menu.pendingOps()), 113, JsTechTheme.text());
+        opRow(g, "RUNNING", String.valueOf(running), 124, running > 0 ? JsTechTheme.green() : JsTechTheme.text());
+        opRow(g, "DONE", JsTechTheme.fmt(menu.completedOps()), 135, JsTechTheme.text());
 
         // Control row captions.
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isManualOn() ? "TURN OFF" : "TURN ON");
-        JscOsTheme.textCenter(g, font, powerCap, POWER_X + BTN_W / 2, BTN_Y + 4, auto ? JscOsTheme.dim() : JscOsTheme.accent());
-        JscOsTheme.textCenter(g, font, "AUTO " + (auto ? "ON" : "OFF"), AUTO_X + BTN_W / 2, BTN_Y + 4,
-                auto ? JscOsTheme.accent() : JscOsTheme.dim());
+        JsTechTheme.textCenter(g, font, powerCap, POWER_X + BTN_W / 2, BTN_Y + 4, auto ? JsTechTheme.dim() : JsTechTheme.accent());
+        JsTechTheme.textCenter(g, font, "AUTO " + (auto ? "ON" : "OFF"), AUTO_X + BTN_W / 2, BTN_Y + 4,
+                auto ? JsTechTheme.accent() : JsTechTheme.dim());
         final boolean failover = menu.failoverEnabled();
-        JscOsTheme.textCenter(g, font, "FAIL " + (failover ? "ON" : "OFF"), FAILOVER_X + BTN_W / 2, BTN_Y + 4,
-                failover ? JscOsTheme.accent() : JscOsTheme.dim());
+        JsTechTheme.textCenter(g, font, "FAIL " + (failover ? "ON" : "OFF"), FAILOVER_X + BTN_W / 2, BTN_Y + 4,
+                failover ? JsTechTheme.accent() : JsTechTheme.dim());
     }
 
     private void opRow(final GuiGraphics g, final String key, final String value, final int y, final int valueColor) {
-        JscOsTheme.text(g, font, key, COL_R + 4, y, JscOsTheme.dim());
-        JscOsTheme.textRight(g, font, value, COL_R + COL_R_W - 4, y, valueColor);
+        JsTechTheme.text(g, font, key, COL_R + 4, y, JsTechTheme.dim());
+        JsTechTheme.textRight(g, font, value, COL_R + COL_R_W - 4, y, valueColor);
     }
 
     private int psuColor() {
         if (!menu.hasPsu()) {
-            return JscOsTheme.dim();
+            return JsTechTheme.dim();
         }
-        return menu.buildValid() ? JscOsTheme.green() : JscOsTheme.amber();
+        return menu.buildValid() ? JsTechTheme.green() : JsTechTheme.amber();
     }
 
     @Override

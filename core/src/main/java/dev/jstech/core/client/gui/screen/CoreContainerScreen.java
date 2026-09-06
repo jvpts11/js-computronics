@@ -14,12 +14,12 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
 /**
- * Base screen for mod GUIs that ARE bound to a container menu (slots / inventory): machines with input/output slots, computers with drive bays, etc. Counterpart to {@link JscScreen} (which is menu-less).
+ * Base screen for mod GUIs that ARE bound to a container menu (slots / inventory): machines with input/output slots, computers with drive bays, etc. Counterpart to {@link CoreScreen} (which is menu-less).
  */
-public abstract class JscContainerScreen<T extends AbstractContainerMenu>
+public abstract class CoreContainerScreen<T extends AbstractContainerMenu>
         extends AbstractContainerScreen<T> {
 
-    protected JscContainerScreen(
+    protected CoreContainerScreen(
             final T menu,
             final Inventory playerInventory,
             final Component title) {

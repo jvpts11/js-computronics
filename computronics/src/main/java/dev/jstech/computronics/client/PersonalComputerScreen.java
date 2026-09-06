@@ -9,6 +9,7 @@ package dev.jstech.computronics.client;
 
 import dev.jstech.computronics.menu.PersonalComputerMenu;
 import dev.jstech.computronics.operation.payload.RenamePcPayload;
+import dev.jstech.core.client.gui.theme.JsTechTheme;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
@@ -53,17 +54,17 @@ public class PersonalComputerScreen extends AbstractAssemblyScreen<PersonalCompu
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
         final int x = leftPos;
         final int y = topPos;
-        JscOsTheme.window(g, x, y, imageWidth, imageHeight);
-        JscOsTheme.headerBar(g, x + 6, y + 6, 232);
+        JsTechTheme.window(g, x, y, imageWidth, imageHeight);
+        JsTechTheme.headerBar(g, x + 6, y + 6, 232);
         // Name field background (the EditBox is drawn over this).
         g.fill(x + 26, y + 7, x + 158, y + 19, 0xFF11161D);
         g.fill(x + 26, y + 18, x + 158, y + 19, 0xFF24323C);
-        JscOsTheme.vLine(g, x + COL_R - 5, y + 24, 108);
+        JsTechTheme.vLine(g, x + COL_R - 5, y + 24, 108);
 
-        JscOsTheme.slot(g, x + 8, y + 40);  // motherboard
-        JscOsTheme.slot(g, x + 8, y + 73);  // psu
+        JsTechTheme.slot(g, x + 8, y + 40);  // motherboard
+        JsTechTheme.slot(g, x + 8, y + 73);  // psu
         if (menu.boardCpuSlots() > 0) {
-            JscOsTheme.slot(g, x + 44, y + 40);
+            JsTechTheme.slot(g, x + 44, y + 40);
         }
         // The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
         // screen draws exactly what the menu exposes — one source of truth, no duplicated cap literal.
@@ -71,84 +72,84 @@ public class PersonalComputerScreen extends AbstractAssemblyScreen<PersonalCompu
         final int gpu = menu.boardPcieSlots();
         final int disk = menu.boardDiskSlots();
         for (int i = 0; i < ram; i++) {
-            JscOsTheme.slot(g, x + 44 + i * 18, y + 73);
+            JsTechTheme.slot(g, x + 44 + i * 18, y + 73);
         }
         for (int i = 0; i < gpu; i++) {
-            JscOsTheme.slot(g, x + 44 + i * 18, y + 106);
+            JsTechTheme.slot(g, x + 44 + i * 18, y + 106);
         }
         for (int i = 0; i < disk; i++) {
-            JscOsTheme.slot(g, x + 8 + i * 18, y + 106);
+            JsTechTheme.slot(g, x + 8 + i * 18, y + 106);
         }
 
-        JscOsTheme.panel(g, x + COL_R, y + 27, COL_R_W, 22);  // CAPACITY
-        JscOsTheme.panel(g, x + COL_R, y + 52, COL_R_W, 18);  // RAM BUFFER
+        JsTechTheme.panel(g, x + COL_R, y + 27, COL_R_W, 22);  // CAPACITY
+        JsTechTheme.panel(g, x + COL_R, y + 52, COL_R_W, 18);  // RAM BUFFER
 
         final boolean auto = menu.isAutoStart();
-        JscOsTheme.button(g, x + POWER_X, y + POWER_Y, COL_R_W, BTN_H,
+        JsTechTheme.button(g, x + POWER_X, y + POWER_Y, COL_R_W, BTN_H,
                 !auto && hover(mouseX, mouseY, POWER_X, POWER_Y, COL_R_W, BTN_H));
-        JscOsTheme.button(g, x + AUTO_X, y + AUTO_Y, COL_R_W, BTN_H, hover(mouseX, mouseY, AUTO_X, AUTO_Y, COL_R_W, BTN_H));
+        JsTechTheme.button(g, x + AUTO_X, y + AUTO_Y, COL_R_W, BTN_H, hover(mouseX, mouseY, AUTO_X, AUTO_Y, COL_R_W, BTN_H));
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                JscOsTheme.slot(g, x + 8 + col * 18, y + 138 + row * 18);
+                JsTechTheme.slot(g, x + 8 + col * 18, y + 138 + row * 18);
             }
         }
         for (int col = 0; col < 9; col++) {
-            JscOsTheme.slot(g, x + 8 + col * 18, y + 196);
+            JsTechTheme.slot(g, x + 8 + col * 18, y + 196);
         }
     }
 
     @Override
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
-        JscOsTheme.text(g, font, "PC", 12, 11, JscOsTheme.text());
+        JsTechTheme.text(g, font, "PC", 12, 11, JsTechTheme.text());
         final String status;
         final int statusColor;
         if (!menu.buildValid()) {
             status = "OFFLINE";
-            statusColor = JscOsTheme.red();
+            statusColor = JsTechTheme.red();
         } else if (menu.isRunning()) {
             status = "ONLINE";
-            statusColor = JscOsTheme.green();
+            statusColor = JsTechTheme.green();
         } else {
             status = "READY";
-            statusColor = JscOsTheme.amber();
+            statusColor = JsTechTheme.amber();
         }
         final int pillX = 232 - font.width(status);
-        JscOsTheme.text(g, font, status, pillX, 11, statusColor);
+        JsTechTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
-        JscOsTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JscOsTheme.accent() : JscOsTheme.dim());
-        JscOsTheme.text(g, font, "CPU", 44, 27, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "PSU", 8, 60, JscOsTheme.dim());
+        JsTechTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JsTechTheme.accent() : JsTechTheme.dim());
+        JsTechTheme.text(g, font, "CPU", 44, 27, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "PSU", 8, 60, JsTechTheme.dim());
         g.fill(30, 61, 34, 65, psuColor());
-        JscOsTheme.text(g, font, "RAM", 44, 60, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "DISK", 8, 93, JscOsTheme.dim());
-        JscOsTheme.text(g, font, "GPU", 44, 93, JscOsTheme.dim());
+        JsTechTheme.text(g, font, "RAM", 44, 60, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "DISK", 8, 93, JsTechTheme.dim());
+        JsTechTheme.text(g, font, "GPU", 44, 93, JsTechTheme.dim());
 
-        JscOsTheme.tileText(g, font, COL_R, 27, "CAPACITY", JscOsTheme.fmt(menu.capacity()), "it/t", JscOsTheme.text());
-        JscOsTheme.tileText(g, font, COL_R, 52, "RAM BUFFER", JscOsTheme.fmt(menu.ramBuffer()), "it", JscOsTheme.text());
+        JsTechTheme.tileText(g, font, COL_R, 27, "CAPACITY", JsTechTheme.fmt(menu.capacity()), "it/t", JsTechTheme.text());
+        JsTechTheme.tileText(g, font, COL_R, 52, "RAM BUFFER", JsTechTheme.fmt(menu.ramBuffer()), "it", JsTechTheme.text());
 
-        JscOsTheme.text(g, font, "NETWORK", COL_R, 74, JscOsTheme.dim());
+        JsTechTheme.text(g, font, "NETWORK", COL_R, 74, JsTechTheme.dim());
         if (menu.isOnNetwork()) {
-            JscOsTheme.textRight(g, font, "LINKED", COL_R + COL_R_W, 74, JscOsTheme.green());
+            JsTechTheme.textRight(g, font, "LINKED", COL_R + COL_R_W, 74, JsTechTheme.green());
             final int n = menu.networkServerCount();
-            JscOsTheme.textRight(g, font, n + (n == 1 ? " server" : " servers"), COL_R + COL_R_W, 85, JscOsTheme.dim());
+            JsTechTheme.textRight(g, font, n + (n == 1 ? " server" : " servers"), COL_R + COL_R_W, 85, JsTechTheme.dim());
         } else {
-            JscOsTheme.textRight(g, font, "--", COL_R + COL_R_W, 74, JscOsTheme.dim());
+            JsTechTheme.textRight(g, font, "--", COL_R + COL_R_W, 74, JsTechTheme.dim());
         }
 
         final boolean auto = menu.isAutoStart();
         final String powerCap = auto ? "AUTO" : (menu.isRunning() ? "TURN OFF" : "TURN ON");
-        JscOsTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4, auto ? JscOsTheme.dim() : JscOsTheme.accent());
-        JscOsTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
-                auto ? JscOsTheme.accent() : JscOsTheme.dim());
+        JsTechTheme.textCenter(g, font, powerCap, POWER_X + COL_R_W / 2, POWER_Y + 4, auto ? JsTechTheme.dim() : JsTechTheme.accent());
+        JsTechTheme.textCenter(g, font, "AUTO: " + (auto ? "ON" : "OFF"), AUTO_X + COL_R_W / 2, AUTO_Y + 4,
+                auto ? JsTechTheme.accent() : JsTechTheme.dim());
     }
 
     private int psuColor() {
         if (!menu.hasPsu()) {
-            return JscOsTheme.dim();
+            return JsTechTheme.dim();
         }
-        return menu.buildValid() ? JscOsTheme.green() : JscOsTheme.amber();
+        return menu.buildValid() ? JsTechTheme.green() : JsTechTheme.amber();
     }
 
     @Override
