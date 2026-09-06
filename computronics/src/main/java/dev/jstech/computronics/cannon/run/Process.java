@@ -84,6 +84,7 @@ public final class Process {
     private final Deque<Frame> frames = new ArrayDeque<>();
     private final Deque<Frame> waiting = new ArrayDeque<>();
     private final Map<String, Values.Obj> statics = new LinkedHashMap<>();
+    private Values.Obj script;
     private State state = State.RUNNING;
     private String message;
     private int spent;
@@ -141,7 +142,23 @@ public final class Process {
      */
     public Values.Obj create(final String type) {
         final Object made = this.instance(type, List.of(), 0);
-        return made instanceof Values.Obj object ? object : null;
+        if (!(made instanceof Values.Obj object)) {
+            return null;
+        }
+        if (this.script == null) {
+            this.script = object;
+        }
+        return object;
+    }
+
+    /**
+     * The script this process is running, which is the first object it was asked to make.
+     *
+     * <p>Whatever runs the process needs it back to call the script again on the next tick, and needs it
+     * back after a reload as well, so it is remembered here rather than by the caller.
+     */
+    public Values.Obj script() {
+        return this.script;
     }
 
     /** Puts a call on that object in the queue, to be run by the slices that follow. */
@@ -292,8 +309,9 @@ public final class Process {
         for (final Map.Entry<String, Values.Obj> entry : this.statics.entrySet()) {
             kept.put(entry.getKey(), fields(entry.getValue(), numbers));
         }
-        return new Snapshot(this.heap.budget(), held, frames, queued, kept, this.library.console(),
-                this.state.name(), this.message == null ? "" : this.message, this.spent);
+        return new Snapshot(this.heap.budget(), held, frames, queued, kept, value(this.script, numbers),
+                this.library.console(), this.state.name(),
+                this.message == null ? "" : this.message, this.spent);
     }
 
     /** Reads a process back out of what {@link #save()} wrote, ready to carry on where it stopped. */
@@ -337,6 +355,9 @@ public final class Process {
             for (final Map.Entry<String, Snapshot.Value> field : entry.getValue().entrySet()) {
                 holder.set(field.getKey(), value(field.getValue(), byNumber));
             }
+        }
+        if (value(shot.script(), byNumber) instanceof Values.Obj script) {
+            process.script = script;
         }
         process.library.restore(shot.console());
         process.state = State.valueOf(shot.state());

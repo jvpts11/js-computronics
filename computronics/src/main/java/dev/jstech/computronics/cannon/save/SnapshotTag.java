@@ -57,6 +57,7 @@ public final class SnapshotTag {
     private static final String FRAMES = "frames";
     private static final String WAITING = "waiting";
     private static final String STATICS = "statics";
+    private static final String SCRIPT = "script";
     private static final String CONSOLE = "console";
     private static final String STATE = "state";
     private static final String MESSAGE = "message";
@@ -85,6 +86,7 @@ public final class SnapshotTag {
             statics.add(owner);
         }
         tag.put(STATICS, statics);
+        tag.put(SCRIPT, write(shot.script()));
         final ListTag console = new ListTag();
         for (final String line : shot.console()) {
             console.add(StringTag.valueOf(line));
@@ -115,7 +117,8 @@ public final class SnapshotTag {
             console.add(lines.getString(i));
         }
         return new Snapshot(tag.getLong(BUDGET), held, readFrames(tag.getList(FRAMES, Tag.TAG_COMPOUND)),
-                readFrames(tag.getList(WAITING, Tag.TAG_COMPOUND)), statics, console,
+                readFrames(tag.getList(WAITING, Tag.TAG_COMPOUND)), statics,
+                readValue(tag.getCompound(SCRIPT)), console,
                 tag.getString(STATE), tag.getString(MESSAGE), tag.getInt(SPENT));
     }
 

@@ -154,7 +154,7 @@ public final class CannonSnapshotGameTests {
                 List.of(new Snapshot.FrameShot("Counter", "Counter", List.of(), 0,
                         new Snapshot.Value.Nothing(), List.of(), List.of(), true)),
                 Map.of("Counter", Map.of("seen", new Snapshot.Value.I4(2))),
-                List.of("first", "second"), "RUNNING", "", 91);
+                new Snapshot.Value.Ref(1), List.of("first", "second"), "RUNNING", "", 91);
         final Snapshot read = SnapshotTag.read(SnapshotTag.write(written));
         helper.assertTrue(read.equals(written), "what came back out of the tag is what went in; got " + read);
         helper.succeed();

@@ -988,6 +988,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
 
     protected void tickNode(final ServerLevel level) {
         tickBuildProgress(level);
+        tickCannon();
         final NetworkSystem system = NetworkSystem.get(level);
         NetworkUuid resolved = null;
         if (isRunning()) {
@@ -1072,6 +1073,61 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
 
     private final dev.jstech.computronics.program.ComputerConsoleState console =
             new dev.jstech.computronics.program.ComputerConsoleState();
+
+    // Script processes — the Cannon programs this machine is running, which live with the machine
+    // rather than with its system disk: they are what it is doing, not what it has installed.
+
+    private final dev.jstech.computronics.cannon.machine.CannonProcesses cannon =
+            new dev.jstech.computronics.cannon.machine.CannonProcesses();
+
+    private final dev.jstech.computronics.cannon.run.Host cannonHost =
+            new dev.jstech.computronics.cannon.machine.MachineHost(this);
+
+    /** The Cannon programs this machine is running. */
+    public dev.jstech.computronics.cannon.machine.CannonProcesses cannon() {
+        return cannon;
+    }
+
+    /** The clock those programs read, which is this machine's own world. */
+    public dev.jstech.computronics.cannon.run.Host cannonHost() {
+        return cannonHost;
+    }
+
+    /**
+     * How many instructions this machine's processors are worth in one tick.
+     *
+     * <p>A machine with no build is worth nothing, which is the honest answer for one whose parts have
+     * been taken out from under a running program.
+     */
+    protected int cannonBudget() {
+        final ComputerBuild build = currentBuild();
+        if (build == null) {
+            return 0;
+        }
+        long coreMegahertz = 0;
+        for (final dev.jstech.computronics.hardware.CpuSpec cpu : build.cpus()) {
+            coreMegahertz += (long) cpu.cores() * cpu.freqMhz();
+        }
+        return dev.jstech.computronics.cannon.machine.CannonProcesses.budgetFor(coreMegahertz);
+    }
+
+    /**
+     * Runs whatever scripts the machine has, or stops them all if it is no longer up.
+     *
+     * <p>A computer that has been switched off is not running programs, so they are told so and given
+     * their chance to say goodbye rather than being left frozen for whenever it comes back on.
+     */
+    private void tickCannon() {
+        if (cannon.isEmpty()) {
+            return;
+        }
+        if (!isRunning()) {
+            cannon.stopAll();
+            setChanged();
+            return;
+        }
+        cannon.tick(cannonBudget());
+    }
 
     /**
      * The disk stack {@link #console} was read from, or null when nothing has been read yet. Identity,
@@ -1176,6 +1232,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (tag.contains("Studio")) {
             studio.load(tag.getCompound("Studio"), registries);
         }
+        if (tag.contains("Cannon")) {
+            cannon.load(tag.getCompound("Cannon"), cannonHost);
+        }
         // A world saved before the software moved onto the disk still carries the old block-level tag;
         // adopt it once so the machine keeps what it had, and it lands on the disk at the next save.
         if (tag.contains("Console")) {
@@ -1218,6 +1277,11 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         final CompoundTag studioTag = new CompoundTag();
         studio.save(studioTag, registries);
         tag.put("Studio", studioTag);
+        if (!cannon.isEmpty()) {
+            final CompoundTag cannonTag = new CompoundTag();
+            cannon.save(cannonTag);
+            tag.put("Cannon", cannonTag);
+        }
         if (!linkedMonitors.isEmpty()) {
             tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }

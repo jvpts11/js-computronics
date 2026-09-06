@@ -7,7 +7,9 @@
  */
 package dev.jstech.computronics.program;
 
+import dev.jstech.computronics.blockentity.AbstractComputerBlockEntity;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computronics.cannon.machine.CannonProcesses;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
 import dev.jstech.computronics.operation.MoveLabels;
@@ -2409,5 +2411,59 @@ public final class ServerCliComputer implements CliComputer {
         return dot >= 0 && dot < path.length() - 1
                 ? path.substring(dot + 1).toLowerCase(java.util.Locale.ROOT)
                 : "";
+    }
+
+    // Script processes — the Cannon programs this machine is running.
+
+    @Override
+    public OpResult startCannon(final String path, final int heapMb) {
+        if (!(hostBlock instanceof AbstractComputerBlockEntity computer)) {
+            return OpResult.fail("cannon: this machine cannot run programs");
+        }
+        if (!"asm".equals(extensionOf(path))) {
+            return OpResult.fail(path + ": only a compiled listing can be run (compile it with cannonc)");
+        }
+        final FsResult read = readFile(path);
+        if (!read.ok()) {
+            return OpResult.fail(read.message());
+        }
+        final int room = heapMb <= 0 ? CannonProcesses.DEFAULT_HEAP_MB
+                : Math.min(heapMb, CannonProcesses.MAX_HEAP_MB);
+        if (!computer.ramLedger().fits(room)) {
+            return OpResult.fail("cannon: " + room + " MB will not fit in "
+                    + computer.ramLedger().freeMb() + " MB of free memory");
+        }
+        final CannonProcesses.Started started = computer.cannon()
+                .start(FsPaths.fileName(path), read.message(), room, computer.cannonHost());
+        if (!started.ok()) {
+            return OpResult.fail(started.message());
+        }
+        computer.setChanged();
+        return OpResult.ok(started.message());
+    }
+
+    @Override
+    public OpResult stopCannon(final int id) {
+        if (!(hostBlock instanceof AbstractComputerBlockEntity computer)) {
+            return OpResult.fail("cannon: this machine cannot run programs");
+        }
+        if (!computer.cannon().stop(id)) {
+            return OpResult.fail("cannon: nothing is running as " + id);
+        }
+        computer.setChanged();
+        return OpResult.ok("stopped " + id);
+    }
+
+    @Override
+    public List<CannonProcess> cannonProcesses() {
+        if (!(hostBlock instanceof AbstractComputerBlockEntity computer)) {
+            return List.of();
+        }
+        final List<CannonProcess> running = new java.util.ArrayList<>();
+        for (final CannonProcesses.Live one : computer.cannon().all()) {
+            running.add(new CannonProcess(one.id(), one.name(), one.process().state().name().toLowerCase(
+                    java.util.Locale.ROOT), one.process().heap().used(), one.process().heap().budget()));
+        }
+        return running;
     }
 }

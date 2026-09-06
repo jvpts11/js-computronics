@@ -188,6 +188,16 @@ public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
         return null;
     }
 
+    /**
+     * The script processes this machine is running, or null on a host that cannot run any.
+     *
+     * <p>They hold memory like anything else the machine is doing, which is why the ledger asks for them.
+     */
+    @Nullable
+    default dev.jstech.computronics.cannon.machine.CannonProcesses cannon() {
+        return null;
+    }
+
     /** The installed RAM in megabytes: the modules' marketed sizes, read off the buffer items they stage. */
     default int ramTotalMb() {
         return (int) Math.min(Integer.MAX_VALUE, ramBuffer() * RamLedger.MB_PER_BUFFER_ITEM);
@@ -221,6 +231,12 @@ public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
                 if (spec.kind() == ProgramKind.SERVICE && console.isInstalled(spec.id().getPath())) {
                     ledger.add(spec.displayName(), spec.ramMbOn(os), RamLedger.Kind.SERVICE);
                 }
+            }
+        }
+        final dev.jstech.computronics.cannon.machine.CannonProcesses scripts = cannon();
+        if (scripts != null) {
+            for (final dev.jstech.computronics.cannon.machine.CannonProcesses.Live one : scripts.all()) {
+                ledger.add(one.name(), one.heapMb(), RamLedger.Kind.PROCESS);
             }
         }
         for (final OpenWindow window : openWindows()) {

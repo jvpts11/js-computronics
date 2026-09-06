@@ -23,7 +23,7 @@ import java.util.Map;
  * each other and a tree cannot say that.
  */
 public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames, List<FrameShot> waiting,
-                       Map<String, Map<String, Value>> statics, List<String> console,
+                       Map<String, Map<String, Value>> statics, Value script, List<String> console,
                        String state, String message, int spent) {
 
     public Snapshot {
