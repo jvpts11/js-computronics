@@ -6,6 +6,46 @@ All notable changes to J's Computronics are recorded here, newest first. The for
 
 ## [Unreleased]
 
+## [0.2.0a] - 2026-09-06
+
+The mod became a series. The code every module shares now lives in a library mod of its own, J's Core,
+and the industrial machines in their own mod, J's Industrial; J's Computronics keeps the computers, the
+network and the programs. The three ship together at one version. Worlds from 0.1.0a do not carry over:
+the industrial blocks and the material items changed their ids.
+
+### Added
+- J's Core (`jscore`), the library every mod of the series requires: the hardware eras and the industrial
+  tiers, the material catalogue, the data network, the Operations framework, energy, peripheral links,
+  multiblocks, configuration, the event bus, persistence, the unit formatter and the screen toolkit.
+- J's Industrial (`jsindustrial`), the machines and their recipes, with a creative tab of their own; the
+  Pattern Studio pairs its recipes with the Macerator, the Compressor and the Electric Furnace.
+- Priorities for network Operations: a level from LOW to HIGH, chosen in the Network Interactor's request
+  and craft dialogs or with an IQL `PRIORITY` clause, and changed on a live Operation from the Task Manager.
+  A queued Operation gains a level while it waits, so none starves.
+- Cancelling an Operation in flight, from the Task Manager or with `cancel <id>` at the prompt; `ops` now
+  lists each Operation's id.
+- The time every Operation waited and ran on its log entry, the last hour's statistics per type in a Stats
+  tab of the Network Manager, and a `stats` prompt command.
+- One server config for the engine's balance, `jstech-balance.toml`: the disk latencies, the waiting
+  timeout, the priority aging period, the Subframe share and the orphan expiry, clamped on load.
+- A registry of Operation types and lifecycle events on the core's event bus, for mods that follow or drive
+  the network's work.
+- A README for the series and one per mod, and a page on the interface components the programs are built
+  from.
+
+### Changed
+- Every desktop program and dialog draws from one set of interface components; the desktop's error dialog
+  is one of them.
+- Subframes lend their share of capacity and their GPUs' queues to the Mainframe orchestrating them.
+- A REINDEX reads the disks on its tick and rebuilds the catalog off it; a craft request is listed as
+  pending while its plan is made off the tick.
+- Saved Operations left unresumed for longer than the orphan expiry are discarded on reload instead of
+  resumed.
+- The server config `jsc-server.toml` is replaced by `jstech-balance.toml`.
+
+### Fixed
+- A pull into a computer that was broken mid-transfer no longer keeps taking items out of the network.
+
 ## [0.1.0a] - 2026-09-05
 
 The first numbered version. Everything before it was the unversioned groundwork of the `0.0.x` line.
@@ -46,5 +86,6 @@ The mod is in alpha: computing is the only module, and it is still growing.
 - Breaking a drive that still holds a disc removes the drive.
 - A rack server's desktop no longer crashes the monitor before the rack's era has reached the client.
 
-[Unreleased]: https://github.com/jvpts11/js-computronics/compare/v0.1.0a...HEAD
+[Unreleased]: https://github.com/jvpts11/js-computronics/compare/v0.2.0a...HEAD
+[0.2.0a]: https://github.com/jvpts11/js-computronics/releases/tag/v0.2.0a
 [0.1.0a]: https://github.com/jvpts11/js-computronics/releases/tag/v0.1.0a
