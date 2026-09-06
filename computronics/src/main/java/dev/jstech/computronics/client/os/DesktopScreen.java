@@ -1228,8 +1228,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (popup != null) {
             g.pose().pushPose();
             g.pose().translate(0, 0, DesktopZ.POPUP);
-            g.fill(0, 0, sw, sh, 0x80000000);
-            popup.render(g, font, sw, sh, lmx, lmy);
+            popup.renderIn(g, new dev.jstech.core.client.gui.component.UiContext(skin, font, lmx, lmy, 0f), 0, 0, sw, sh);
             g.pose().popPose();
         }
         // The power dialog rides at the same height: it is the one choice that ends the session.
@@ -2892,7 +2891,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // A modal dialog swallows every click; only its OK button dismisses it.
         if (popup != null) {
-            if (popup.okClicked(mouseXAbs - ox(), mouseYAbs - oy())) {
+            popup.mouseClicked(mouseXAbs - ox(), mouseYAbs - oy(), button);
+            if (!popup.isOpen()) {
                 popup = null;
             }
             return true;
@@ -3170,6 +3170,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     @Override
     public boolean mouseReleased(final double mouseX, final double mouseY, final int button) {
         if (popup != null) {
+            popup.mouseReleased(mouseX - ox(), mouseY - oy(), button);
             return true;
         }
         // Letting go ends the sweep; whatever it covered stays selected.
@@ -3265,7 +3266,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
         // A modal dialog swallows every key; Enter or Escape dismisses it, nothing leaks behind it.
         if (popup != null) {
-            if (key == 257 || key == 335 || key == 256) { // Enter / numpad Enter / Escape
+            popup.keyPressed(key, scanCode, modifiers);
+            if (!popup.isOpen()) {
                 popup = null;
             }
             return true;

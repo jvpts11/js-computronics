@@ -18,7 +18,8 @@ The things two or more mods of the series need, or that define the language they
 - The energy network (FE), the point-to-point links between a computer and its peripherals, and the
   capabilities a block exposes to take part in any of that.
 - Multiblock shapes and validation, the configuration system, the series' internal event bus, persistence
-  helpers, the unit formatter, and the GUI toolkit the screens of every mod are drawn with.
+  helpers, the unit formatter, and the GUI toolkit the screens of every mod are drawn with, including the
+  [components](../docs/UI_COMPONENTS.md) desktop programs are composed from.
 
 ## For addon authors
 

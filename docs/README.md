@@ -8,5 +8,7 @@ repository for the first time. What each mod does is on its own page: [J's Core]
 - [Code style](CODE_STYLE.md): headers, naming, modelling, imports, comments and commit messages.
 - [Versions, phases and releases](RELEASING.md): what a version number means, the development phases
   and their gates, snapshot builds, and how a release is cut.
+- [UI components](UI_COMPONENTS.md): the component model the desktop programs and dialogs are built from,
+  and how to write a program on it.
 
 Design documents and balancing notes are not part of the repository.
