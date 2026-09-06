@@ -51,8 +51,10 @@ bin/
 # ============================================================
 # NeoForge / Minecraft runtime
 # ============================================================
-run/
-runs/
+# Anchored to the root on purpose: an unanchored "run/" also matches a source
+# package of that name, which would drop it from the repository without a word.
+/run/
+/runs/
 logs/
 
 # ============================================================
