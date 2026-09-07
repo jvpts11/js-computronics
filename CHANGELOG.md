@@ -7,6 +7,32 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 ## [Unreleased]
 
 ### Added
+- The computers can be programmed. Cannon is a language of the world: you write it at the machine, compile
+  it there with `cannonc`, and run what comes out. The compiler produces a listing you can open and read a
+  line at a time, because a program you cannot look inside is one you cannot trust.
+- A program is one of two things, and says which by how it is written. One with a `Main` runs at the
+  terminal that started it, holds the prompt, prints as it goes and is gone when it returns. One that
+  implements `IScript` stays up: set up once, called every tick, told when it is stopped, and still running
+  after the world has been away and come back.
+- A program spends only what the machine's processors are worth in a tick, so an old computer really does
+  print line by line where a fast one finishes at once, and one that loops forever costs its machine the
+  same tick as one that does nothing.
+- What a program can reach: the machine's own drives, with the same paths the prompt uses; what the machine
+  is made of and what it is running; what the network holds, could hold, and which servers hold it; what the
+  Mainframe has been doing this past hour; and the network itself, to pull, push, craft and cancel. Every row
+  it leaves in the network's log names the program that asked.
+- A program can ask to be told instead of asking. It says once that it wants to know when something runs
+  low, and is called when it does — on the crossing, not for as long as it stays crossed.
+- Programs can be handed to other people. `canpack` wraps one up with everything it needs into a single
+  readable file, publishes it to the network's Mirror, and anyone on that network installs it like any other
+  package, marked as a player's own. An installed one gets an icon on the desktop and a terminal to run in.
+- A program's memory is counted like everything else the machine holds, so the Task Manager lists it beside
+  the windows and services, and a machine without the memory for one says so instead of trying.
+- The file explorer knows a source file, a compiled program and a package on sight, and running one is a
+  double-click.
+- Mods may add a programming language of their own, and remove this one. A language that registers itself
+  gets the prompt, the terminal, the task manager, saving and the tick budget without writing any of them.
+
 - Every system, desktop, service and program holds a share of the computer's RAM, in megabytes, and a program
   opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one
   what its generation weighs, so a modern tool needs the gigabytes a modern machine has. The System Monitor lists
@@ -22,6 +48,11 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   the memory bar; resting the cursor on it reads out the link and the figures.
 
 ### Changed
+- The Task Manager ends a program you wrote, as it ends a window. What the machine itself is made of still
+  cannot be ended, because that is the machine and not something you started.
+- The network knows how much it could hold, not only how much it does: a server offers its drives, a
+  personal computer the share its owner published.
+- Work asked for through IQL says so in the network's log. It was reading as the shell's.
 - The desktop's open-program counter became a memory meter, "used/total MB", in every desktop's panel.
 - Frames XP wears its own shell again: the Start pill with its flag, task buttons carrying each program's
   icon and showing the window in front as pushed in, a Start menu that opens on the player's own face and
