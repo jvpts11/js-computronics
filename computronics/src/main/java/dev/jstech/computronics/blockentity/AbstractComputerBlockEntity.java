@@ -1079,14 +1079,14 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     // Script processes — the Cannon programs this machine is running, which live with the machine
     // rather than with its system disk: they are what it is doing, not what it has installed.
 
-    private final dev.jstech.computronics.cannon.machine.CannonProcesses cannon =
-            new dev.jstech.computronics.cannon.machine.CannonProcesses();
+    private final dev.jstech.computronics.cannon.machine.MachinePrograms cannon =
+            new dev.jstech.computronics.cannon.machine.MachinePrograms();
 
     private final dev.jstech.computronics.cannon.run.Host cannonHost =
             new dev.jstech.computronics.cannon.machine.MachineHost(this);
 
     /** The Cannon programs this machine is running. */
-    public dev.jstech.computronics.cannon.machine.CannonProcesses cannon() {
+    public dev.jstech.computronics.cannon.machine.MachinePrograms cannon() {
         return cannon;
     }
 
@@ -1138,7 +1138,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         for (final dev.jstech.computronics.hardware.CpuSpec cpu : build.cpus()) {
             coreMegahertz += (long) cpu.cores() * cpu.freqMhz();
         }
-        return dev.jstech.computronics.cannon.machine.CannonProcesses.budgetFor(coreMegahertz);
+        return dev.jstech.computronics.cannon.machine.MachinePrograms.budgetFor(coreMegahertz);
     }
 
     /**
@@ -1179,10 +1179,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             return;
         }
         final var state = one.process().state();
-        final boolean over = state != dev.jstech.computronics.cannon.run.Process.State.RUNNING
-                && state != dev.jstech.computronics.cannon.run.Process.State.PARKED;
+        final boolean over = state != dev.jstech.core.language.LanguageProcess.State.RUNNING
+                && state != dev.jstech.core.language.LanguageProcess.State.PARKED;
         final java.util.List<String> fresh = cannon.unseen();
-        final String halt = over && state == dev.jstech.computronics.cannon.run.Process.State.HALTED
+        final String halt = over && state == dev.jstech.core.language.LanguageProcess.State.HALTED
                 ? one.process().message() : null;
         if (over) {
             cannon.release();
@@ -1318,7 +1318,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             studio.load(tag.getCompound("Studio"), registries);
         }
         if (tag.contains("Cannon")) {
-            cannon.load(tag.getCompound("Cannon"), cannonHost);
+            cannon.load(tag.getCompound("Cannon"), this);
         }
         // A world saved before the software moved onto the disk still carries the old block-level tag;
         // adopt it once so the machine keeps what it had, and it lands on the disk at the next save.

@@ -194,7 +194,7 @@ public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
      * <p>They hold memory like anything else the machine is doing, which is why the ledger asks for them.
      */
     @Nullable
-    default dev.jstech.computronics.cannon.machine.CannonProcesses cannon() {
+    default dev.jstech.computronics.cannon.machine.MachinePrograms cannon() {
         return null;
     }
 
@@ -233,9 +233,9 @@ public interface OsHost extends dev.jstech.core.peripheral.PeripheralOwner {
                 }
             }
         }
-        final dev.jstech.computronics.cannon.machine.CannonProcesses scripts = cannon();
+        final dev.jstech.computronics.cannon.machine.MachinePrograms scripts = cannon();
         if (scripts != null) {
-            for (final dev.jstech.computronics.cannon.machine.CannonProcesses.Live one : scripts.all()) {
+            for (final dev.jstech.computronics.cannon.machine.MachinePrograms.Live one : scripts.all()) {
                 ledger.add(one.name(), one.heapMb(), RamLedger.Kind.PROCESS, one.id());
             }
         }

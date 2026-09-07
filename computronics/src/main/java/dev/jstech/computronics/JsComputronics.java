@@ -31,6 +31,11 @@ public class JsComputronics {
         // The Operation types the network runs, declared in the core registry for every other mod to see.
         dev.jstech.computronics.operation.ComputingOperations.register();
 
+        // Cannon is a language like any other as far as the machines are concerned: it goes in the same
+        // registry an addon would use, and can be taken out of it by one.
+        dev.jstech.core.JsCore.languages().register(
+                dev.jstech.computronics.cannon.machine.CannonLanguage.INSTANCE);
+
         ComputingModule.register(modEventBus);
         JscCreativeModeTabs.register(modEventBus);
 

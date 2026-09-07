@@ -9,7 +9,7 @@ package dev.jstech.computronics.program;
 
 import dev.jstech.computronics.blockentity.AbstractComputerBlockEntity;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.cannon.machine.CannonProcesses;
+import dev.jstech.computronics.cannon.machine.MachinePrograms;
 import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
@@ -2618,7 +2618,7 @@ public final class ServerCliComputer implements CliComputer {
      * keyboard is typing at that program until it returns.
      */
     @org.jetbrains.annotations.Nullable
-    public CannonProcesses foreground() {
+    public MachinePrograms foreground() {
         if (hostBlock instanceof AbstractComputerBlockEntity computer && computer.cannon().held() != 0) {
             return computer.cannon();
         }
@@ -2637,20 +2637,20 @@ public final class ServerCliComputer implements CliComputer {
         if (!read.ok()) {
             return OpResult.fail(read.message());
         }
-        final int room = heapMb <= 0 ? CannonProcesses.DEFAULT_HEAP_MB
-                : Math.min(heapMb, CannonProcesses.MAX_HEAP_MB);
+        final int room = heapMb <= 0 ? MachinePrograms.DEFAULT_HEAP_MB
+                : Math.min(heapMb, MachinePrograms.MAX_HEAP_MB);
         if (!computer.ramLedger().fits(room)) {
             return OpResult.fail("cannon: " + room + " MB will not fit in "
                     + computer.ramLedger().freeMb() + " MB of free memory");
         }
-        final CannonProcesses.Started started = computer.cannon()
-                .start(FsPaths.fileName(path), read.message(), room, computer.cannonHost());
+        final MachinePrograms.Started started = computer.cannon()
+                .start(FsPaths.fileName(path), read.message(), room, computer);
         if (!started.ok()) {
             return OpResult.fail(started.message());
         }
         computer.setChanged();
-        final CannonProcesses.Live one = computer.cannon().byId(started.id());
-        if (one != null && one.process().shape() == Shape.CONSOLE) {
+        final MachinePrograms.Live one = computer.cannon().byId(started.id());
+        if (one != null && !one.process().isService()) {
             // A program that runs at a terminal takes the one that started it, the way it does on any
             // machine: the prompt is its, and comes back when it returns.
             computer.cannon().hold(started.id());
@@ -2677,9 +2677,9 @@ public final class ServerCliComputer implements CliComputer {
             return List.of();
         }
         final List<CannonProcess> running = new java.util.ArrayList<>();
-        for (final CannonProcesses.Live one : computer.cannon().all()) {
+        for (final MachinePrograms.Live one : computer.cannon().all()) {
             running.add(new CannonProcess(one.id(), one.name(), one.process().state().name().toLowerCase(
-                    java.util.Locale.ROOT), one.process().heap().used(), one.process().heap().budget()));
+                    java.util.Locale.ROOT), one.process().heldBytes(), one.process().heapBytes()));
         }
         return running;
     }

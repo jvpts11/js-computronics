@@ -32,6 +32,8 @@ public final class JsCore {
 
     private static final CoreEventDispatcher EVENTS = new CoreEventDispatcher();
     private static final OperationTypeRegistry OPERATIONS = new OperationTypeRegistry();
+    private static final dev.jstech.core.language.LanguageRegistry LANGUAGES =
+            new dev.jstech.core.language.LanguageRegistry();
 
     /**
      * The series' internal event bus: an orchestrator posts the lifecycle of its Operations here and any mod
@@ -44,6 +46,16 @@ public final class JsCore {
     /** The Operation types the mods of the series (and addons) declare, by id such as {@code jsc:select}. */
     public static OperationTypeRegistry operations() {
         return OPERATIONS;
+    }
+
+    /**
+     * The languages the computers of this world can be programmed in.
+     *
+     * <p>An addon may add one and may take one away, this series' own included: everything that deals in
+     * programs resolves through here by extension rather than by naming a language.
+     */
+    public static dev.jstech.core.language.LanguageRegistry languages() {
+        return LANGUAGES;
     }
 
     public JsCore(final IEventBus modEventBus, final ModContainer modContainer) {

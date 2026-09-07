@@ -1651,7 +1651,7 @@ public final class ComputingPayloads {
      * keyboard can say to it is to stop.
      */
     private static boolean drainForeground(
-            final dev.jstech.computronics.cannon.machine.CannonProcesses processes, final String typed,
+            final dev.jstech.computronics.cannon.machine.MachinePrograms processes, final String typed,
             final java.util.List<DesktopShellOutputPayload.WireLine> wire) {
         if (!INTERRUPT.equals(typed)) {
             return true;
@@ -2199,7 +2199,7 @@ public final class ComputingPayloads {
                         new DesktopShellOutputPayload(false, false, "", wire));
                 return;
             }
-            final int room = dev.jstech.computronics.cannon.machine.CannonProcesses.DEFAULT_HEAP_MB;
+            final int room = dev.jstech.computronics.cannon.machine.MachinePrograms.DEFAULT_HEAP_MB;
             if (!computer.ramLedger().fits(room)) {
                 wire.add(new DesktopShellOutputPayload.WireLine(name + ": not enough memory to run it",
                         dev.jstech.computronics.program.cli.CliStyle.ERROR.ordinal()));
@@ -2207,7 +2207,7 @@ public final class ComputingPayloads {
                         new DesktopShellOutputPayload(false, false, "", wire));
                 return;
             }
-            final var started = computer.cannon().start(name, listing.get(), room, computer.cannonHost());
+            final var started = computer.cannon().start(name, listing.get(), room, computer);
             if (!started.ok()) {
                 wire.add(new DesktopShellOutputPayload.WireLine(started.message(),
                         dev.jstech.computronics.program.cli.CliStyle.ERROR.ordinal()));
@@ -2217,8 +2217,7 @@ public final class ComputingPayloads {
             }
             computer.setChanged();
             final var one = computer.cannon().byId(started.id());
-            final boolean console = one != null
-                    && one.process().shape() == dev.jstech.computronics.cannon.Shape.CONSOLE;
+            final boolean console = one != null && !one.process().isService();
             if (console) {
                 computer.cannon().hold(started.id());
             } else {

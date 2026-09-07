@@ -110,12 +110,12 @@ public final class HostComputer {
 
     private static Values.ListValue processes(final AbstractComputerBlockEntity machine) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CannonProcesses.Live one : machine.cannon().all()) {
+        for (final MachinePrograms.Live one : machine.cannon().all()) {
             final Values.Obj made = new Values.Obj("ProcessInfo");
             made.set("Id", one.id());
             made.set("Name", one.name());
             made.set("State", one.process().state().name().toLowerCase(Locale.ROOT));
-            made.set("HeldBytes", one.process().heap().used());
+            made.set("HeldBytes", one.process().heldBytes());
             all.items().add(made);
         }
         return all;

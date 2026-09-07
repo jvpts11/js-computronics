@@ -12,7 +12,7 @@ import dev.jstech.computronics.JsComputronics;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.cannon.CannonCompiler;
 import dev.jstech.computronics.cannon.SourceFile;
-import dev.jstech.computronics.cannon.machine.CannonProcesses;
+import dev.jstech.computronics.cannon.machine.MachinePrograms;
 import dev.jstech.computronics.hardware.DiskSize;
 import dev.jstech.computronics.hardware.StorageTier;
 import dev.jstech.computronics.os.fs.DiskFilesystem;
@@ -92,7 +92,7 @@ public final class CannonApiGameTests {
                     final var direct = new dev.jstech.computronics.program.ServerCliComputer(
                             computer, helper.getLevel()).writeFile("direct.txt", "by the shell");
                     helper.assertTrue(direct.ok(), "the shell itself can write here: " + direct.message());
-                    final CannonProcesses.Started started = computer.cannon().start("writer.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("writer.asm", listing("""
                             class Writer {
                                 static void Main() {
                                     if (File.Write("stock.txt", "iron 64")) {
@@ -102,7 +102,7 @@ public final class CannonApiGameTests {
                                     }
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -133,7 +133,7 @@ public final class CannonApiGameTests {
                     DiskFilesystem.write(computer.systemDisk(), "note.txt",
                             dev.jstech.computronics.os.fs.FileType.TXT, "written by hand", Long.MAX_VALUE,
                             dev.jstech.computronics.os.FilesystemKind.FLAT);
-                    final CannonProcesses.Started started = computer.cannon().start("reader.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("reader.asm", listing("""
                             class Reader {
                                 static void Main() {
                                     if (File.TryRead("note.txt", out string held)) {
@@ -143,7 +143,7 @@ public final class CannonApiGameTests {
                                     }
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -167,7 +167,7 @@ public final class CannonApiGameTests {
                     shell.writeFile("notes.txt", "one");
                     // A name that comes back from a listing has to be the name that opens the file. It
                     // is the only thing a program can do with it.
-                    final CannonProcesses.Started started = computer.cannon().start("ls.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("ls.asm", listing("""
                             class Ls {
                                 static void Main() {
                                     foreach (string name in File.List("C:\\\\")) {
@@ -181,7 +181,7 @@ public final class CannonApiGameTests {
                                     }
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -224,7 +224,7 @@ public final class CannonApiGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("look.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("look.asm", listing("""
                             class Look {
                                 static void Main() {
                                     CpuInfo cpu = Computer.Cpu;
@@ -233,7 +233,7 @@ public final class CannonApiGameTests {
                                     Console.PrintLine("ram " + Computer.RamMb);
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -259,7 +259,7 @@ public final class CannonApiGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("ps.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("ps.asm", listing("""
                             class Ps {
                                 static void Main() {
                                     foreach (ProcessInfo one in Computer.Processes()) {
@@ -267,7 +267,7 @@ public final class CannonApiGameTests {
                                     }
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -285,7 +285,7 @@ public final class CannonApiGameTests {
         wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("stock.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("stock.asm", listing("""
                             class Stock {
                                 static void Main() {
                                     if (!Network.Online) { Console.PrintLine("standalone"); return; }
@@ -295,7 +295,7 @@ public final class CannonApiGameTests {
                                     }
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -319,7 +319,7 @@ public final class CannonApiGameTests {
                     final long capacity = dev.jstech.computronics.operation.NetworkStorage.of(
                             helper.getLevel(), wired.mainframe().networkUuid()).capacity();
                     helper.assertTrue(capacity > 0, "the network has drives to fill; got " + capacity);
-                    final CannonProcesses.Started started = computer.cannon().start("room.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("room.asm", listing("""
                             class Room {
                                 static void Main() {
                                     Console.PrintLine(Network.Used + " of " + Network.Capacity);
@@ -328,7 +328,7 @@ public final class CannonApiGameTests {
                                     }
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -347,7 +347,7 @@ public final class CannonApiGameTests {
         final CraftingComputerBlockEntity computer = wired.cc();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("watch.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("watch.asm", listing("""
                             class Watch {
                                 static void Main() {
                                     Console.PrintLine(Mainframe.Online ? "orchestrated" : "headless");
@@ -355,7 +355,7 @@ public final class CannonApiGameTests {
                                     Console.PrintLine("selects " + select.Count);
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -375,7 +375,7 @@ public final class CannonApiGameTests {
         wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("restock.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("restock.asm", listing("""
                             class Restock : IScript {
                                 public void OnInit() {
                                     AskResult asked = Operations.Pull("minecraft:oak_log", 64);
@@ -384,7 +384,7 @@ public final class CannonApiGameTests {
                                 public void OnTick() { }
                                 public void OnDestroy() { }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -418,7 +418,7 @@ public final class CannonApiGameTests {
         final int[] id = new int[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("low.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("low.asm", listing("""
                             class Low : IScript {
                                 public void OnInit() {
                                     Network.WatchBelow("minecraft:oak_log", 100, Told);
@@ -429,7 +429,7 @@ public final class CannonApiGameTests {
                                 }
                                 public void OnDestroy() { }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     id[0] = started.id();
                     // The watch is set up, and the machine now knows to look this one up each tick.
@@ -534,13 +534,13 @@ public final class CannonApiGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final CannonProcesses.Started started = computer.cannon().start("alone.asm", listing("""
+                    final MachinePrograms.Started started = computer.cannon().start("alone.asm", listing("""
                             class Alone {
                                 static void Main() {
                                     Console.PrintLine(Network.Online ? "networked" : "standalone");
                                 }
                             }
-                            """), 1, computer.cannonHost());
+                            """), 1, computer);
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
@@ -552,10 +552,10 @@ public final class CannonApiGameTests {
 
     /** Runs a program to the end on that machine and says what it spent. */
     private static int spend(final CraftingComputerBlockEntity computer, final String source) {
-        final CannonProcesses.Started started =
-                computer.cannon().start("one.asm", listing(source), 1, computer.cannonHost());
+        final MachinePrograms.Started started =
+                computer.cannon().start("one.asm", listing(source), 1, computer);
         computer.cannon().tick(100000);
-        final CannonProcesses.Live one = computer.cannon().byId(started.id());
+        final MachinePrograms.Live one = computer.cannon().byId(started.id());
         final int spent = one == null ? 0 : one.process().spent();
         computer.cannon().stop(started.id());
         return spent;
