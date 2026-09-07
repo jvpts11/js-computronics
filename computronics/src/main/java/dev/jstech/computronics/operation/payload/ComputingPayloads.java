@@ -1126,9 +1126,22 @@ public final class ComputingPayloads {
             context.reply(DesktopWindowsPayload.of(payload.hostPos(),
                     context.player().level().getBlockEntity(payload.hostPos()) instanceof OsHost machine
                             ? machine.openWindows() : java.util.List.of()));
+            // Programs the player installed from the Mirror get a launcher of their own, so the icon on
+            // the desktop is not only for what came with the machines.
+            final java.util.List<DesktopFilesPayload.WireCommunity> community = new java.util.ArrayList<>();
+            if (context.player().level().getBlockEntity(payload.hostPos())
+                    instanceof dev.jstech.computronics.terminal.ComputerTerminalHost terminal) {
+                final var console = terminal.console();
+                if (console != null) {
+                    for (final var one : console.community()) {
+                        community.add(new DesktopFilesPayload.WireCommunity(
+                                one.name(), one.icon(), one.entry()));
+                    }
+                }
+            }
             context.reply(new DesktopFilesPayload(wire, prefs[0], prefs[1], programs, iconCells,
                     new DesktopFilesPayload.Prefs(deskPrefs[0], deskPrefs[1], deskPrefs[2] != 0,
-                            deskPrefs[3] != 0, deskPrefs[4] != 0)));
+                            deskPrefs[3] != 0, deskPrefs[4] != 0), community));
         });
     }
 

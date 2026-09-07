@@ -26,11 +26,24 @@ import java.util.List;
  */
 public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String wallpaper,
                                   String computerName, List<String> programs,
-                                  List<WireIconCell> iconCells, Prefs prefs) implements CustomPacketPayload {
+                                  List<WireIconCell> iconCells, Prefs prefs,
+                                  List<WireCommunity> community) implements CustomPacketPayload {
 
     public static final int MAX_FILES = 256;
     public static final int MAX_PROGRAMS = 16;
     public static final int MAX_ICON_CELLS = 256;
+
+    /** How many player-written programs one desktop shows; the same cap the Mirror's shelf has. */
+    public static final int MAX_COMMUNITY = 64;
+
+    /**
+     * A program the player installed from the Mirror, as the desktop needs it.
+     *
+     * <p>Only what it takes to put an icon on the desktop and start the thing: what it is called, which
+     * icon it asked for, and the listing to run. Everything else about it stays on the server.
+     */
+    public record WireCommunity(String name, String icon, String entry) {
+    }
 
     /**
      * The desktop-relevant per-computer settings the chrome applies: accent override, brightness, clock,
@@ -61,18 +74,46 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
     public static final CustomPacketPayload.Type<DesktopFilesPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("jsc", "desktop_files"));
 
+    // Written out by hand: composite takes six pairs and this carries seven things. The alternative was
+    // to bundle two of them into a record nobody else wants, which would have cost a reader more than
+    // these two short methods do.
     public static final StreamCodec<RegistryFriendlyByteBuf, DesktopFilesPayload> STREAM_CODEC =
-            StreamCodec.composite(
-                    DiskFilesPayload.WireFile.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_FILES)),
-                    DesktopFilesPayload::files,
-                    ByteBufCodecs.stringUtf8(48), DesktopFilesPayload::wallpaper,
-                    ByteBufCodecs.stringUtf8(48), DesktopFilesPayload::computerName,
-                    ByteBufCodecs.stringUtf8(32).apply(ByteBufCodecs.list(MAX_PROGRAMS)),
-                    DesktopFilesPayload::programs,
-                    WireIconCell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_ICON_CELLS)),
-                    DesktopFilesPayload::iconCells,
-                    Prefs.STREAM_CODEC, DesktopFilesPayload::prefs,
-                    DesktopFilesPayload::new);
+            StreamCodec.of(DesktopFilesPayload::encode, DesktopFilesPayload::decode);
+
+    private static void encode(final RegistryFriendlyByteBuf buf, final DesktopFilesPayload payload) {
+        DiskFilesPayload.WireFile.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_FILES))
+                .encode(buf, payload.files);
+        buf.writeUtf(payload.wallpaper, 48);
+        buf.writeUtf(payload.computerName, 48);
+        ByteBufCodecs.stringUtf8(32).apply(ByteBufCodecs.list(MAX_PROGRAMS)).encode(buf, payload.programs);
+        WireIconCell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_ICON_CELLS)).encode(buf, payload.iconCells);
+        Prefs.STREAM_CODEC.encode(buf, payload.prefs);
+        buf.writeVarInt(Math.min(payload.community.size(), MAX_COMMUNITY));
+        for (int i = 0; i < payload.community.size() && i < MAX_COMMUNITY; i++) {
+            final WireCommunity one = payload.community.get(i);
+            buf.writeUtf(one.name(), 32);
+            buf.writeUtf(one.icon(), 16);
+            buf.writeUtf(one.entry(), 128);
+        }
+    }
+
+    private static DesktopFilesPayload decode(final RegistryFriendlyByteBuf buf) {
+        final List<DiskFilesPayload.WireFile> files =
+                DiskFilesPayload.WireFile.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_FILES)).decode(buf);
+        final String wallpaper = buf.readUtf(48);
+        final String computerName = buf.readUtf(48);
+        final List<String> programs =
+                ByteBufCodecs.stringUtf8(32).apply(ByteBufCodecs.list(MAX_PROGRAMS)).decode(buf);
+        final List<WireIconCell> cells =
+                WireIconCell.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_ICON_CELLS)).decode(buf);
+        final Prefs prefs = Prefs.STREAM_CODEC.decode(buf);
+        final int count = Math.min(buf.readVarInt(), MAX_COMMUNITY);
+        final List<WireCommunity> community = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            community.add(new WireCommunity(buf.readUtf(32), buf.readUtf(16), buf.readUtf(128)));
+        }
+        return new DesktopFilesPayload(files, wallpaper, computerName, programs, cells, prefs, community);
+    }
 
     @Override
     public CustomPacketPayload.Type<DesktopFilesPayload> type() {

@@ -484,8 +484,20 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     // A launcher either opens a built-in app window (factory) or runs a custom action (e.g. open the
     // NMS, which is a server-side menu rather than a desktop window). Exactly one is non-null.
     /** A desktop launcher: its display label, the program id (icon + identity), and the window factory. */
+    /**
+     * One thing on the desktop that can be started.
+     *
+     * <p>{@code runs} is the listing a player's own program starts at. Those have no window of their
+     * own: like any console program they get a terminal and print into it, which is the same thing that
+     * happens when one is opened in the file explorer.
+     */
     private record Launcher(String label, net.minecraft.resources.ResourceLocation programId,
-                            java.util.function.Supplier<DesktopApp> factory) {
+                            java.util.function.Supplier<DesktopApp> factory, String runs) {
+
+        Launcher(final String label, final net.minecraft.resources.ResourceLocation programId,
+                 final java.util.function.Supplier<DesktopApp> factory) {
+            this(label, programId, factory, "");
+        }
     }
 
     /** The desktop environment drawn: the OS's bundled one (Frames) or the Linux package installed. */
@@ -975,7 +987,23 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             launchers.add(new Launcher(launcherLabel(spec), spec.id(),
                     () -> factory.create(host, monitorPos, desktopId)));
         }
+        // Then whatever the player installed from the Mirror. These are not the mod's programs and have
+        // no window of their own: starting one gets it a terminal, exactly as opening it in the file
+        // explorer would. The icon id is one the artwork can grow into; until it does they wear the
+        // generic one, which is what ProgramIcons falls back to.
+        for (final CommunityLauncher one : communityPrograms) {
+            launchers.add(new Launcher(one.name(),
+                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+                            dev.jstech.computronics.JsComputronics.MODID, "cannon_" + one.icon()),
+                    null, one.entry()));
+        }
     }
+
+    /** A player's own program on this desktop: what to call it, what to draw, and what to run. */
+    private record CommunityLauncher(String name, String icon, String entry) {
+    }
+
+    private final List<CommunityLauncher> communityPrograms = new ArrayList<>();
 
     /** The program id for an open window's app key (its launcher label), for the taskbar icon; generic if none. */
     private net.minecraft.resources.ResourceLocation programIdForLabel(final String label) {
@@ -1062,9 +1090,15 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // Refresh the installed-program launchers whenever the installed set changes, so ANY installable
         // program (NMS, Minesweeper, Storage Insights, ...) gets its launcher the moment it is installed.
         final java.util.Set<String> before = new java.util.HashSet<>(active.installedPrograms);
+        final List<CommunityLauncher> theirsBefore = List.copyOf(active.communityPrograms);
         active.installedPrograms.clear();
         active.installedPrograms.addAll(payload.programs());
-        if (!before.equals(new java.util.HashSet<>(active.installedPrograms))) {
+        active.communityPrograms.clear();
+        for (final DesktopFilesPayload.WireCommunity one : payload.community()) {
+            active.communityPrograms.add(new CommunityLauncher(one.name(), one.icon(), one.entry()));
+        }
+        if (!before.equals(new java.util.HashSet<>(active.installedPrograms))
+                || !theirsBefore.equals(active.communityPrograms)) {
             active.buildLaunchers();
         }
         // Enter rename on a freshly created item once it appears in the listing.
@@ -4339,6 +4373,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Starts a launcher: a built-in app opens a window; an action-based one (e.g. the NMS) runs its action. */
     private void runLauncher(final Launcher l) {
+        if (!l.runs().isEmpty()) {
+            requestRunAtTerminal(l.runs());
+            return;
+        }
         if (allowOpen(l.label())) {
             openApp(l.label(), l.factory().get());
         }
