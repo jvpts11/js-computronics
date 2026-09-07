@@ -16,7 +16,7 @@ import dev.jstech.computronics.cannon.machine.MachinePrograms;
 import dev.jstech.computronics.cannon.run.Library;
 import dev.jstech.computronics.hardware.DiskSize;
 import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.core.language.LanguageProcess;
+import dev.jstech.core.language.ILanguageProcess;
 import dev.jstech.tests.JsTests;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -96,7 +96,7 @@ public final class CannonProcessGameTests {
         return computer;
     }
 
-    private static LanguageProcess only(final MachinePrograms programs) {
+    private static ILanguageProcess only(final MachinePrograms programs) {
         return programs.all().getFirst().process();
     }
 
@@ -185,7 +185,7 @@ public final class CannonProcessGameTests {
                     final MachinePrograms programs = computer.cannon();
                     final int id = programs.start("counter.asm", listing(COUNTER), 1, computer).id();
                     programs.tick(512);
-                    final LanguageProcess running = only(programs);
+                    final ILanguageProcess running = only(programs);
                     helper.assertTrue(programs.stop(id), "it stops");
                     helper.assertTrue(programs.isEmpty(), "and is gone from the list");
                     helper.assertTrue(running.console().contains("down"),
@@ -206,7 +206,7 @@ public final class CannonProcessGameTests {
                     final MachinePrograms.Started started =
                             programs.start("hello.asm", listing(HELLO), 1, computer);
                     helper.assertTrue(started.ok(), "it starts: " + started.message());
-                    final LanguageProcess running = only(programs);
+                    final ILanguageProcess running = only(programs);
                     programs.tick(512);
                     helper.assertTrue(running.console().equals(List.of("hi 0", "hi 1", "hi 2")),
                             "it says its piece; got " + running.console());
@@ -231,7 +231,7 @@ public final class CannonProcessGameTests {
                     programs.tick(512);
                     programs.tick(512);
                     helper.assertTrue(programs.all().size() == 1, "it waits to be read");
-                    helper.assertTrue(only(programs).state() == LanguageProcess.State.FINISHED,
+                    helper.assertTrue(only(programs).state() == ILanguageProcess.State.FINISHED,
                             "having finished");
                     programs.release();
                     helper.assertTrue(programs.isEmpty(), "and goes once the terminal lets it");

@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class LanguageRegistry {
 
-    private final Map<ResourceLocation, ProgrammingLanguage> byId = new LinkedHashMap<>();
+    private final Map<ResourceLocation, IProgrammingLanguage> byId = new LinkedHashMap<>();
 
     /**
      * Adds one, replacing any already registered under that id.
@@ -34,7 +34,7 @@ public final class LanguageRegistry {
      * <p>Replacing rather than refusing lets an addon improve a language in place, which is the same
      * gesture as adding one and needs no separate ceremony.
      */
-    public void register(final ProgrammingLanguage language) {
+    public void register(final IProgrammingLanguage language) {
         if (language != null && language.id() != null) {
             byId.put(language.id(), language);
         }
@@ -47,7 +47,7 @@ public final class LanguageRegistry {
 
     /** The one with that id, or null. */
     @Nullable
-    public ProgrammingLanguage get(final ResourceLocation id) {
+    public IProgrammingLanguage get(final ResourceLocation id) {
         return byId.get(id);
     }
 
@@ -58,12 +58,12 @@ public final class LanguageRegistry {
      * and for the thing built from it alike.
      */
     @Nullable
-    public ProgrammingLanguage byExtension(final String extension) {
+    public IProgrammingLanguage byExtension(final String extension) {
         if (extension == null || extension.isBlank()) {
             return null;
         }
         final String wanted = extension.toLowerCase(Locale.ROOT);
-        for (final ProgrammingLanguage language : byId.values()) {
+        for (final IProgrammingLanguage language : byId.values()) {
             if (language.sourceExtensions().contains(wanted)
                     || language.binaryExtensions().contains(wanted)) {
                 return language;
@@ -74,12 +74,12 @@ public final class LanguageRegistry {
 
     /** The language that RUNS files ending in that extension, or null. */
     @Nullable
-    public ProgrammingLanguage runnerOf(final String extension) {
+    public IProgrammingLanguage runnerOf(final String extension) {
         if (extension == null || extension.isBlank()) {
             return null;
         }
         final String wanted = extension.toLowerCase(Locale.ROOT);
-        for (final ProgrammingLanguage language : byId.values()) {
+        for (final IProgrammingLanguage language : byId.values()) {
             if (language.binaryExtensions().contains(wanted)) {
                 return language;
             }
@@ -88,7 +88,7 @@ public final class LanguageRegistry {
     }
 
     /** Every language there is, in the order they were registered. */
-    public List<ProgrammingLanguage> all() {
+    public List<IProgrammingLanguage> all() {
         return List.copyOf(byId.values());
     }
 }

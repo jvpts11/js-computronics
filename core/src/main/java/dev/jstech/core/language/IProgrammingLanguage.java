@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * memory or instructions: a language that compiles to something else entirely, or interprets its source
  * directly, fits this just as well.
  */
-public interface ProgrammingLanguage {
+public interface IProgrammingLanguage {
 
     /** What this language is called, as a machine names it. */
     ResourceLocation id();
@@ -117,9 +117,9 @@ public interface ProgrammingLanguage {
      * @return the running program, or null when the text cannot be run at all
      */
     @Nullable
-    LanguageProcess start(String binary, long heapBytes, BlockEntity machine);
+    ILanguageProcess start(String binary, long heapBytes, BlockEntity machine);
 
-    /** Reads a program back out of what {@link LanguageProcess#save} wrote. */
+    /** Reads a program back out of what {@link ILanguageProcess#save} wrote. */
     @Nullable
-    LanguageProcess restore(String binary, CompoundTag saved, BlockEntity machine);
+    ILanguageProcess restore(String binary, CompoundTag saved, BlockEntity machine);
 }

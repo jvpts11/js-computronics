@@ -11,7 +11,7 @@ import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Values;
 import dev.jstech.computronics.cannon.save.SnapshotTag;
-import dev.jstech.core.language.LanguageProcess;
+import dev.jstech.core.language.ILanguageProcess;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.nbt.CompoundTag;
@@ -23,7 +23,7 @@ import net.minecraft.nbt.CompoundTag;
  * and everything on the other side is the language's. The three lifecycle calls are the translation:
  * a machine says "another tick has come", and only here does that mean {@code OnTick}.
  */
-final class CannonProgram implements LanguageProcess {
+final class CannonProgram implements ILanguageProcess {
 
     /** What a program is allowed to spend on its farewell, out of nobody's tick. */
     private static final int FAREWELL = 4096;

@@ -8,8 +8,8 @@
 package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.core.JsCore;
-import dev.jstech.core.language.LanguageProcess;
-import dev.jstech.core.language.ProgrammingLanguage;
+import dev.jstech.core.language.ILanguageProcess;
+import dev.jstech.core.language.IProgrammingLanguage;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,7 +45,7 @@ public final class MachinePrograms {
     private static final int FAREWELL = 4096;
 
     /** One program the machine is running: what it is called, what it was started from, and where it is. */
-    public record Live(int id, String name, String binary, int heapMb, LanguageProcess process) {
+    public record Live(int id, String name, String binary, int heapMb, ILanguageProcess process) {
 
         /** The extension its file ended in, which is how the language that runs it is found again. */
         public String extension() {
@@ -122,8 +122,8 @@ public final class MachinePrograms {
     public void release() {
         final Live one = this.byId(this.held);
         this.held = 0;
-        if (one != null && one.process().state() != LanguageProcess.State.RUNNING
-                && one.process().state() != LanguageProcess.State.PARKED) {
+        if (one != null && one.process().state() != ILanguageProcess.State.RUNNING
+                && one.process().state() != ILanguageProcess.State.PARKED) {
             this.live.remove(one);
         }
     }
@@ -156,12 +156,12 @@ public final class MachinePrograms {
                          final BlockEntity machine) {
         final int dot = name.lastIndexOf('.');
         final String extension = dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
-        final ProgrammingLanguage language = JsCore.languages().runnerOf(extension);
+        final IProgrammingLanguage language = JsCore.languages().runnerOf(extension);
         if (language == null) {
             return Started.failed(name + ": nothing installed runs a ." + extension);
         }
         final int room = Math.clamp(heapMb <= 0 ? DEFAULT_HEAP_MB : heapMb, 1, MAX_HEAP_MB);
-        final LanguageProcess process =
+        final ILanguageProcess process =
                 language.start(binary, (long) room * 1024 * 1024, machine);
         if (process == null) {
             return Started.failed(name + ": this is not something " + language.displayName() + " can run");
@@ -233,14 +233,16 @@ public final class MachinePrograms {
         final List<Live> ready = new ArrayList<>();
         final List<Live> done = new ArrayList<>();
         for (final Live one : this.live) {
-            final LanguageProcess.State state = one.process().state();
-            if (state == LanguageProcess.State.HALTED || state == LanguageProcess.State.FINISHED) {
-                // A program that runs at a terminal is done when it returns, and is asked nothing more;
-                // one that stays up is asked again. Either way, a finished terminal program only leaves
-                // once whoever was waiting on it has read it.
+            final ILanguageProcess.State state = one.process().state();
+            if (state == ILanguageProcess.State.HALTED || state == ILanguageProcess.State.FINISHED) {
+                /*
+                 * A program that runs at a terminal is done when it returns, and is asked nothing more;
+                 * one that stays up is asked again. Either way, a finished terminal program only leaves
+                 * once whoever was waiting on it has read it.
+                 */
                 if (!one.process().isService() && one.id() != this.held) {
                     done.add(one);
-                } else if (one.process().isService() && state == LanguageProcess.State.FINISHED) {
+                } else if (one.process().isService() && state == ILanguageProcess.State.FINISHED) {
                     one.process().onTick();
                     ready.add(one);
                 }
@@ -302,14 +304,16 @@ public final class MachinePrograms {
             final CompoundTag each = written.getCompound(i);
             final String name = each.getString(NAME);
             final int dot = name.lastIndexOf('.');
-            final ProgrammingLanguage language = JsCore.languages()
+            final IProgrammingLanguage language = JsCore.languages()
                     .runnerOf(dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT));
             if (language == null) {
-                // The language that ran this is no longer installed. Dropping the program is better than
-                // refusing to load the machine it was on.
+                /*
+                 * The language that ran this is no longer installed. Dropping the program is better
+                 * than refusing to load the machine it was on.
+                 */
                 continue;
             }
-            final LanguageProcess process = language.restore(each.getString(BINARY),
+            final ILanguageProcess process = language.restore(each.getString(BINARY),
                     each.getCompound(STATE), machine);
             if (process != null) {
                 this.live.add(new Live(each.getInt(ID), name, each.getString(BINARY),

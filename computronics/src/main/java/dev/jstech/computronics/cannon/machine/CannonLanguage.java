@@ -20,8 +20,8 @@ import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Values;
 import dev.jstech.computronics.cannon.save.SnapshotTag;
-import dev.jstech.core.language.LanguageProcess;
-import dev.jstech.core.language.ProgrammingLanguage;
+import dev.jstech.core.language.ILanguageProcess;
+import dev.jstech.core.language.IProgrammingLanguage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
  * pack that would rather its computers spoke something else takes this out of the registry and puts its
  * own in, and every part of the machines carries on working.
  */
-public final class CannonLanguage implements ProgrammingLanguage {
+public final class CannonLanguage implements IProgrammingLanguage {
 
     /** The one instance; the registry holds it and everything else asks the registry. */
     public static final CannonLanguage INSTANCE = new CannonLanguage();
@@ -87,19 +87,23 @@ public final class CannonLanguage implements ProgrammingLanguage {
     }
 
     @Override
-    public List<ProgrammingLanguage.Token> tokenize(final String text) {
-        // An editor mostly colours text that does not compile, so whatever the lexer complains about is
-        // thrown away and the pieces it did make sense of are handed back.
+    public List<IProgrammingLanguage.Token> tokenize(final String text) {
+        /*
+         * An editor mostly colours text that does not compile, so whatever the lexer complains about is
+         * thrown away and the pieces it did make sense of are handed back.
+         */
         final DiagnosticBag bag = new DiagnosticBag("editor");
-        final List<ProgrammingLanguage.Token> out = new ArrayList<>();
-        // Both Token and Kind are names this interface itself declares, so the language's own are
-        // written out in full rather than imported into a fight with them.
+        final List<IProgrammingLanguage.Token> out = new ArrayList<>();
+        /*
+         * Both Token and Kind are names this interface itself declares, so the language's own are
+         * written out in full rather than imported into a fight with them.
+         */
         for (final dev.jstech.computronics.cannon.lex.Token token
                 : new Lexer(new SourceFile("editor", text), bag).tokenize()) {
             if (token.kind() == dev.jstech.computronics.cannon.lex.TokenKind.END_OF_FILE) {
                 break;
             }
-            out.add(new ProgrammingLanguage.Token(token.line(), token.column(),
+            out.add(new IProgrammingLanguage.Token(token.line(), token.column(),
                     token.text().length(), kindOf(token.kind())));
         }
         return out;
@@ -120,7 +124,7 @@ public final class CannonLanguage implements ProgrammingLanguage {
 
     @Override
     @Nullable
-    public LanguageProcess start(final String binary, final long heapBytes, final BlockEntity machine) {
+    public ILanguageProcess start(final String binary, final long heapBytes, final BlockEntity machine) {
         final Loaded program = read(binary);
         if (program == null || program.entryPoint() == null) {
             return null;
@@ -140,7 +144,7 @@ public final class CannonLanguage implements ProgrammingLanguage {
 
     @Override
     @Nullable
-    public LanguageProcess restore(final String binary, final CompoundTag saved, final BlockEntity machine) {
+    public ILanguageProcess restore(final String binary, final CompoundTag saved, final BlockEntity machine) {
         final Loaded program = read(binary);
         if (program == null) {
             return null;

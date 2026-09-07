@@ -1179,10 +1179,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             return;
         }
         final var state = one.process().state();
-        final boolean over = state != dev.jstech.core.language.LanguageProcess.State.RUNNING
-                && state != dev.jstech.core.language.LanguageProcess.State.PARKED;
+        final boolean over = state != dev.jstech.core.language.ILanguageProcess.State.RUNNING
+                && state != dev.jstech.core.language.ILanguageProcess.State.PARKED;
         final java.util.List<String> fresh = cannon.unseen();
-        final String halt = over && state == dev.jstech.core.language.LanguageProcess.State.HALTED
+        final String halt = over && state == dev.jstech.core.language.ILanguageProcess.State.HALTED
                 ? one.process().message() : null;
         if (over) {
             cannon.release();

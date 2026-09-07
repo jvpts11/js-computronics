@@ -2630,8 +2630,13 @@ public final class ServerCliComputer implements CliComputer {
         if (!(hostBlock instanceof AbstractComputerBlockEntity computer)) {
             return OpResult.fail("cannon: this machine cannot run programs");
         }
-        if (!"asm".equals(extensionOf(path))) {
-            return OpResult.fail(path + ": only a compiled listing can be run (compile it with cannonc)");
+        /*
+         * Whether this can be run is a question for the languages the machines know, not for a list of
+         * extensions kept here.
+         */
+        if (dev.jstech.core.JsCore.languages().runnerOf(extensionOf(path)) == null) {
+            return OpResult.fail(path + ": nothing installed runs a program of this kind"
+                    + " (compile a source file first)");
         }
         final FsResult read = readFile(path);
         if (!read.ok()) {
@@ -2651,8 +2656,10 @@ public final class ServerCliComputer implements CliComputer {
         computer.setChanged();
         final MachinePrograms.Live one = computer.cannon().byId(started.id());
         if (one != null && !one.process().isService()) {
-            // A program that runs at a terminal takes the one that started it, the way it does on any
-            // machine: the prompt is its, and comes back when it returns.
+            /*
+             * A program that runs at a terminal takes the one that started it, the way it does on any
+             * machine: the prompt is its, and comes back when it returns.
+             */
             computer.cannon().hold(started.id());
             return OpResult.ok("");
         }

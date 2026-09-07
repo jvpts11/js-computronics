@@ -60,9 +60,11 @@ public record Packed(Manifest manifest, Map<String, String> files) {
             return null;
         }
         final String[] lines = text.split("\n", -1);
-        // A text ending in a newline splits with an empty piece after it. That piece is the end of the
-        // last line, not a blank line of its own, and counting it would grow every package by one line
-        // each time it went through a Mirror.
+        /*
+         * A text ending in a newline splits with an empty piece after it. That piece is the end of the
+         * last line, not a blank line of its own, and counting it would grow every package by one line
+         * each time it went through a Mirror.
+         */
         final int last = text.endsWith("\n") ? lines.length - 1 : lines.length;
         final StringBuilder head = new StringBuilder();
         final Map<String, String> files = new LinkedHashMap<>();

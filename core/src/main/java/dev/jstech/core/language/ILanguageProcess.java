@@ -21,7 +21,7 @@ import net.minecraft.nbt.CompoundTag;
  * <p>Nothing here may block. A machine runs its programs on the server thread, so a step spends the
  * instructions it was given and returns, however far through the program that leaves it.
  */
-public interface LanguageProcess {
+public interface ILanguageProcess {
 
     /** Where a program is up to. */
     enum State {

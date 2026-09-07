@@ -187,7 +187,8 @@ public final class FilesApp implements DesktopApp {
 
     private enum SortBy { NAME, TYPE, SIZE }
 
-    private enum IconType { UP, FOLDER, HOME, IQL, DOC, DAT, EXE, PKG, INF, BIN, CFG, LOG, CRAFT }
+    private enum IconType { UP, FOLDER, HOME, IQL, DOC, DAT, EXE, PKG, INF, BIN, CFG, LOG, CRAFT,
+        SOURCE, PROGRAM, BUNDLE }
 
     private record Row(Kind kind, String name, String type, String size, IconType icon,
                        @Nullable DiskFilesPayload.WireFile file, @Nullable ItemStack item) {
@@ -579,7 +580,12 @@ public final class FilesApp implements DesktopApp {
             case "pkg" -> "Package manifest";
             case "inf" -> "Setup information";
             case "bin" -> "Installer data";
-            default -> f.ext().isEmpty() ? "File" : f.ext().toUpperCase(Locale.ROOT) + " file";
+            case "cpk" -> "Program package";
+            /*
+             * A language names its own files. Whatever is registered gets this for nothing, and the
+             * explorer stops needing to know which language the machines happen to speak.
+             */
+            default -> languageLabel(f.ext());
         };
     }
 
@@ -1097,9 +1103,14 @@ public final class FilesApp implements DesktopApp {
         };
     }
 
-    /** Whether this is something the machine can run: a compiled listing. */
+    /**
+     * Whether this is something the machine can run.
+     *
+     * <p>Asked of the languages the machines know rather than of a list of extensions here, so opening a
+     * file written in a language an addon brought does the same thing as opening one of ours.
+     */
     private static boolean isProgram(final DiskFilesPayload.WireFile f) {
-        return "asm".equalsIgnoreCase(f.ext());
+        return dev.jstech.core.JsCore.languages().runnerOf(f.ext().toLowerCase(Locale.ROOT)) != null;
     }
 
     private boolean isSetup(final Row r) {
@@ -1675,8 +1686,24 @@ public final class FilesApp implements DesktopApp {
 
     // ---- icons and helpers -----------------------------------------------------------------
 
+    /** What to call a file of a language the machines know, or a plain description when they know none. */
+    private static String languageLabel(final String ext) {
+        final String lower = ext.toLowerCase(Locale.ROOT);
+        final var language = dev.jstech.core.JsCore.languages().byExtension(lower);
+        if (language != null) {
+            return language.displayName()
+                    + (language.sourceExtensions().contains(lower) ? " source" : " program");
+        }
+        return lower.isEmpty() ? "File" : lower.toUpperCase(Locale.ROOT) + " file";
+    }
+
     private static IconType iconFor(final String ext) {
-        return switch (ext.toLowerCase(Locale.ROOT)) {
+        final String lower = ext.toLowerCase(Locale.ROOT);
+        final var language = dev.jstech.core.JsCore.languages().byExtension(lower);
+        if (language != null) {
+            return language.sourceExtensions().contains(lower) ? IconType.SOURCE : IconType.PROGRAM;
+        }
+        return switch (lower) {
             case "iql" -> IconType.IQL;
             case "dat" -> IconType.DAT;
             case "exe", "sh" -> IconType.EXE;
@@ -1686,6 +1713,7 @@ public final class FilesApp implements DesktopApp {
             case "cfg" -> IconType.CFG;
             case "log" -> IconType.LOG;
             case "craft" -> IconType.CRAFT;
+            case "cpk" -> IconType.BUNDLE;
             default -> IconType.DOC;
         };
     }
@@ -1732,6 +1760,24 @@ public final class FilesApp implements DesktopApp {
             case CFG -> doc(g, x, y, 0xFFE3E0F5, 0xFF6C5FB0);
             case LOG -> doc(g, x, y, 0xFFF0E6D6, 0xFFA0865A);
             case CRAFT -> doc(g, x, y, 0xFFFFD9B0, 0xFFC26A1A);
+            // Something a person writes: a page with two lines of writing on it.
+            case SOURCE -> {
+                doc(g, x, y, 0xFFCFE6D8, 0xFF2E7D5B);
+                g.fill(x + 3, y + 4, x + 8, y + 5, 0xFF2E7D5B);
+                g.fill(x + 3, y + 6, x + 7, y + 7, 0xFF2E7D5B);
+            }
+            // Something a machine runs: the same page with the play mark an installer wears.
+            case PROGRAM -> {
+                doc(g, x, y, 0xFFD8E6CF, 0xFF4C7D2E);
+                g.fill(x + 4, y + 3, x + 6, y + 8, 0xFF4C7D2E);
+                g.fill(x + 6, y + 4, x + 8, y + 7, 0xFF4C7D2E);
+            }
+            // Something with other things inside it: a page with a band across it, like a parcel.
+            case BUNDLE -> {
+                doc(g, x, y, 0xFFE6DCCF, 0xFF7D5B2E);
+                g.fill(x + 1, y + 5, x + 10, y + 6, 0xFF7D5B2E);
+                g.fill(x + 5, y + 2, x + 6, y + 9, 0xFF7D5B2E);
+            }
             case DOC -> doc(g, x, y, 0xFFDFE3EA, 0xFF8A93A6);
         }
     }
