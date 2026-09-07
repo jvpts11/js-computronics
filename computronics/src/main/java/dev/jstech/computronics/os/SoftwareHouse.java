@@ -53,6 +53,9 @@ public record SoftwareHouse(String name, String legalName) {
     /** The open house behind the Cannon compiler and its runtime, owned by nobody who sells hardware. */
     public static final SoftwareHouse CANNON_FOUNDATION =
             new SoftwareHouse("Cannon Foundation", "the Cannon Foundation");
+    /** The house behind Exposure, the editor that shows you every complaint at once. */
+    public static final SoftwareHouse DAYLIGHT_FOUNDATION =
+            new SoftwareHouse("Daylight Foundation", "the Daylight Foundation");
 
     /** Not a house: the program is credited to the system or desktop that ships it. */
     public static final SoftwareHouse BUNDLED = new SoftwareHouse("", "");

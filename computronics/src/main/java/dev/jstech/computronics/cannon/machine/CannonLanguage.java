@@ -15,6 +15,7 @@ import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.SourceFile;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
+import dev.jstech.computronics.cannon.edit.CommentSpans;
 import dev.jstech.computronics.cannon.lex.Lexer;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
@@ -23,6 +24,7 @@ import dev.jstech.computronics.cannon.save.SnapshotTag;
 import dev.jstech.core.language.ILanguageProcess;
 import dev.jstech.core.language.IProgrammingLanguage;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.nbt.CompoundTag;
@@ -106,6 +108,16 @@ public final class CannonLanguage implements IProgrammingLanguage {
             out.add(new IProgrammingLanguage.Token(token.line(), token.column(),
                     token.text().length(), kindOf(token.kind())));
         }
+        /*
+         * The lexer drops comments the way it drops spaces, because nothing that runs a program cares
+         * where they were. An editor is the one caller that does, so they are found over the raw text
+         * and added here, leaving the compiler's own reading exactly as it was.
+         */
+        for (final CommentSpans.Span span : CommentSpans.find(text)) {
+            out.add(new IProgrammingLanguage.Token(span.line(), span.column(), span.length(), Kind.COMMENT));
+        }
+        out.sort(Comparator.comparingInt(IProgrammingLanguage.Token::line)
+                .thenComparingInt(IProgrammingLanguage.Token::column));
         return out;
     }
 
