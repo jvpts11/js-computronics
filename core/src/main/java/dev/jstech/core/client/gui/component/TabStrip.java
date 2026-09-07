@@ -11,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
 
 import java.util.List;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 
 /**
  * A row of tabs, one of them selected, with the skin's separator under the row. The tabs share the width
@@ -18,7 +19,7 @@ import java.util.function.IntConsumer;
  */
 public final class TabStrip extends UiComponent {
 
-    private final List<String> labels;
+    private final Supplier<List<String>> labels;
     private int selected;
     private IntConsumer onSelect = i -> { };
     private boolean underline = true;
@@ -26,8 +27,23 @@ public final class TabStrip extends UiComponent {
     /** The widths of the tabs as last drawn; equal shares until the first frame measures the labels. */
     private int[] widths = new int[0];
 
+    /** A strip whose tabs never change: the sections of a screen. */
     public TabStrip(final List<String> labels) {
-        this.labels = List.copyOf(labels);
+        final List<String> fixed = List.copyOf(labels);
+        this.labels = () -> fixed;
+    }
+
+    /**
+     * A strip whose tabs come and go: the files an editor has open. The labels are read as they are
+     * drawn, so opening or closing one needs nothing said here.
+     */
+    public TabStrip(final Supplier<List<String>> labels) {
+        this.labels = labels;
+    }
+
+    private List<String> labels() {
+        final List<String> current = this.labels.get();
+        return current == null ? List.of() : current;
     }
 
     /** Gives each tab the width of its label plus {@code padding}, instead of an equal share of the strip. */
@@ -53,12 +69,12 @@ public final class TabStrip extends UiComponent {
 
     /** Selects a tab without firing the callback, as a state refresh from outside does. */
     public TabStrip setSelected(final int index) {
-        selected = Math.max(0, Math.min(labels.size() - 1, index));
+        selected = Math.max(0, Math.min(labels().size() - 1, index));
         return this;
     }
 
     public int count() {
-        return labels.size();
+        return labels().size();
     }
 
     /** The width of tab {@code index} as laid out now. */
@@ -66,7 +82,7 @@ public final class TabStrip extends UiComponent {
         if (labelPadding >= 0 && index < widths.length) {
             return widths[index];
         }
-        return Math.max(1, width() / Math.max(1, labels.size()));
+        return Math.max(1, width() / Math.max(1, labels().size()));
     }
 
     /** The left edge of tab {@code index} as laid out now. */
@@ -85,15 +101,16 @@ public final class TabStrip extends UiComponent {
 
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
+        final List<String> current = labels();
         if (labelPadding >= 0) {
-            final int[] measured = new int[labels.size()];
-            for (int i = 0; i < labels.size(); i++) {
-                measured[i] = ctx.font().width(labels.get(i)) + labelPadding;
+            final int[] measured = new int[current.size()];
+            for (int i = 0; i < current.size(); i++) {
+                measured[i] = ctx.font().width(current.get(i)) + labelPadding;
             }
             widths = measured;
         }
-        for (int i = 0; i < labels.size(); i++) {
-            ctx.skin().tab(g, ctx.font(), tabX(i), y(), tabWidth(i), height(), labels.get(i), i == selected);
+        for (int i = 0; i < current.size(); i++) {
+            ctx.skin().tab(g, ctx.font(), tabX(i), y(), tabWidth(i), height(), current.get(i), i == selected);
         }
         if (underline) {
             g.fill(x(), y() + height() - 1, x() + width(), y() + height(), ctx.skin().edge());
@@ -102,8 +119,13 @@ public final class TabStrip extends UiComponent {
 
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
-        int index = labels.size() - 1;
-        for (int i = 0; i < labels.size(); i++) {
+        final List<String> current = labels();
+        if (current.isEmpty()) {
+            // A strip whose tabs come and go can be empty, and an empty strip has nothing to select.
+            return true;
+        }
+        int index = current.size() - 1;
+        for (int i = 0; i < current.size(); i++) {
             if (mx < tabX(i) + tabWidth(i)) {
                 index = i;
                 break;

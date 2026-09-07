@@ -45,6 +45,15 @@ public interface IDesktopApp {
     }
 
     /**
+     * Called as this app's window is closed, before it leaves the desktop.
+     *
+     * <p>An app that told something it was waiting for an answer says here that it is not, so a reply
+     * that arrives after the window is gone is not handed to a window nobody is looking at.
+     */
+    default void onClosed() {
+    }
+
+    /**
      * Called when this app's window comes back with the machine's layout on a desktop entered again: the
      * instance outlived the screen it was created on, so whatever it fetched from the server when it started
      * may be stale (a disc put in a drive, a recipe loaded, a job finished in the meantime). An app that shows

@@ -1197,6 +1197,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             for (final String key : PENDING_CLOSE) {
                 for (int i = windows.size() - 1; i >= 0; i--) {
                     if (windows.get(i).appKey().equals(key)) {
+                        windows.get(i).app().onClosed();
                         windows.remove(i);
                         break;
                     }
@@ -3491,7 +3492,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     }
                     w.setMinimized(false);
                 }
-                default -> windows.remove(index);
+                default -> {
+                    windows.get(index).app().onClosed();
+                    windows.remove(index);
+                }
             }
             return true;
         }
@@ -4114,6 +4118,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             pressedBtnWindow = null;
             if (btn != 0 && pb.buttonAt(mouseX - ox(), mouseY - oy()) == btn) {
                 if (btn == 3) {
+                    pb.app().onClosed();
                     windows.remove(pb);
                 } else if (btn == 1) {
                     pb.setMinimized(true);
