@@ -37,6 +37,8 @@ public final class ContextMenu extends UiComponent {
     private final int itemHeight;
     private List<Item> items = List.of();
     private boolean open;
+    /** The item the keyboard is on, or -1 while the menu is being driven by the mouse alone. */
+    private int selected = -1;
 
     public ContextMenu(final int itemWidth, final int itemHeight) {
         this.itemWidth = itemWidth;
@@ -63,10 +65,44 @@ public final class ContextMenu extends UiComponent {
         final int my = Math.max(boundY, Math.min(y, boundY + boundH - h - 1));
         setBounds(mx, my, itemWidth, h);
         open = true;
+        selected = next(-1, 1);
     }
 
     public void close() {
         open = false;
+        selected = -1;
+    }
+
+    /** The item the keyboard is on, or -1 when the menu is driven by the mouse alone. */
+    public int selected() {
+        return selected;
+    }
+
+    /** Puts the keyboard on an item, ignoring an index that is a separator or disabled. */
+    public ContextMenu setSelected(final int index) {
+        if (index >= 0 && index < items.size() && usable(items.get(index))) {
+            selected = index;
+        }
+        return this;
+    }
+
+    private boolean usable(final Item item) {
+        return item.enabled() && !item.isSeparator();
+    }
+
+    /** The next item that can be chosen from {@code from}, walking by {@code step} and wrapping. */
+    private int next(final int from, final int step) {
+        if (items.isEmpty()) {
+            return -1;
+        }
+        int at = from;
+        for (int i = 0; i < items.size(); i++) {
+            at = Math.floorMod(at + step, items.size());
+            if (usable(items.get(at))) {
+                return at;
+            }
+        }
+        return -1;
     }
 
     /** The index of the item under the point, or -1. */
@@ -97,7 +133,8 @@ public final class ContextMenu extends UiComponent {
             if (item.isSeparator()) {
                 g.fill(x() + 3, iy + itemHeight / 2, right() - 3, iy + itemHeight / 2 + 1, ctx.skin().edge());
             } else {
-                final boolean lit = i == hover && item.enabled();
+                // The mouse lights what it is over; with the mouse elsewhere the keyboard's item stays lit.
+                final boolean lit = item.enabled() && (i == hover || (hover < 0 && i == selected));
                 if (lit) {
                     g.fill(x() + 1, iy, right() - 1, iy + itemHeight, ctx.skin().accent());
                 }
@@ -124,12 +161,30 @@ public final class ContextMenu extends UiComponent {
         return true;
     }
 
+    /**
+     * Drives the menu from the keyboard: up and down walk it, wrapping and stepping over separators and
+     * anything disabled; Enter or Tab takes what is on; Escape leaves without taking anything.
+     */
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
-        if (open && key == GLFW.GLFW_KEY_ESCAPE) {
-            close();
-            return true;
+        if (!open) {
+            return false;
         }
-        return false;
+        switch (key) {
+            case GLFW.GLFW_KEY_ESCAPE -> close();
+            case GLFW.GLFW_KEY_UP -> selected = next(selected, -1);
+            case GLFW.GLFW_KEY_DOWN -> selected = next(selected, 1);
+            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_TAB -> {
+                final int chosen = selected;
+                close();
+                if (chosen >= 0 && chosen < items.size()) {
+                    items.get(chosen).action().run();
+                }
+            }
+            default -> {
+                return false;
+            }
+        }
+        return true;
     }
 }

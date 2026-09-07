@@ -221,6 +221,25 @@ public final class CodeArea extends UiComponent {
         }
     }
 
+    /**
+     * Where the caret is on the screen, as {@code x, y} of its top-left, or null before the first frame
+     * has measured the font. What an owner needs to put something beside it.
+     */
+    public int[] caretPixel() {
+        if (this.lastFont == null) {
+            return null;
+        }
+        final String line = this.doc.line(this.doc.cursorLine());
+        final int col = Math.min(this.doc.cursorCol(), line.length());
+        final int cx = x() + gutterWidth(this.lastFont) + INSET + this.lastFont.width(line.substring(0, col));
+        return new int[] {cx, y() + 1 + (this.doc.cursorLine() - this.scroll) * LINE_H};
+    }
+
+    /** The height of one row, which is what an owner leaves clear when it draws beside the caret. */
+    public static int lineHeight() {
+        return LINE_H;
+    }
+
     /** What the compiler said about the row under the cursor, for the owner to show as a tooltip. */
     public String messageAt(final double mx, final double my) {
         if (this.lastFont == null || !contains(mx, my)) {

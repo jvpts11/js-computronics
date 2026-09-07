@@ -59,6 +59,7 @@ public final class AuralStudioCodeApp implements IDesktopApp {
     private final TabStrip panelTabs;
     private final ListView<IProgrammingLanguage.Complaint> problems;
     private final ShellView terminal;
+    private final CodeCompletions completions = new CodeCompletions();
 
     public AuralStudioCodeApp(final BlockPos host) {
         this.workspace = new CodeWorkspace(host);
@@ -219,6 +220,8 @@ public final class AuralStudioCodeApp implements IDesktopApp {
             drawEmpty(g, font, codeX, bodyY, codeW, codeH);
         }
         drawStatus(g, font, x, y + height - STATUS_H, width, doc);
+        // The list of what could follow belongs over everything else the window drew.
+        this.completions.render(g, ctx);
     }
 
     /**
@@ -279,6 +282,11 @@ public final class AuralStudioCodeApp implements IDesktopApp {
          * The keyboard follows the last click: into the terminal to run something, back into the code to
          * write it. Both are always drawn, so which one is typed into has to be said somewhere.
          */
+        if (this.completions.mouseClicked(mouseX, mouseY, button)) {
+            this.workspace.edited();
+            return;
+        }
+        this.completions.close();
         if (this.terminal.contains(mouseX, mouseY)) {
             this.typingInTerminal = true;
         }
@@ -297,11 +305,18 @@ public final class AuralStudioCodeApp implements IDesktopApp {
             return this.terminal.charTyped(c);
         }
         final CodeWorkspace.Doc doc = this.workspace.current();
-        if (doc != null && doc.area().charTyped(c)) {
-            this.workspace.edited();
-            return true;
+        if (doc == null || !doc.area().charTyped(c)) {
+            return false;
         }
-        return false;
+        this.workspace.edited();
+        /*
+         * A dot is a question, so it is answered without being asked; while a list is up the letters
+         * that follow narrow it, and a character that could not be part of a name puts it away.
+         */
+        if (c == '.' || this.completions.isOpen()) {
+            offerCompletions(doc);
+        }
+        return true;
     }
 
     @Override
@@ -313,12 +328,34 @@ public final class AuralStudioCodeApp implements IDesktopApp {
         if (this.typingInTerminal) {
             return this.terminal.keyPressed(key, scanCode, modifiers);
         }
-        final CodeWorkspace.Doc doc = this.workspace.current();
-        if (doc != null && doc.area().keyPressed(key, scanCode, modifiers)) {
+        // While the list is up it has the keys it uses: the arrows, Enter, Tab and Escape.
+        if (this.completions.keyPressed(key, scanCode, modifiers)) {
             this.workspace.edited();
             return true;
         }
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc == null) {
+            return false;
+        }
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0 && key == GLFW.GLFW_KEY_SPACE) {
+            offerCompletions(doc);
+            return true;
+        }
+        if (doc.area().keyPressed(key, scanCode, modifiers)) {
+            this.workspace.edited();
+            if (this.completions.isOpen()) {
+                offerCompletions(doc);
+            }
+            return true;
+        }
         return false;
+    }
+
+    /** Offers what could follow what is written at the caret, inside the code column. */
+    private void offerCompletions(final CodeWorkspace.Doc doc) {
+        final CodeArea area = doc.area();
+        this.completions.offer(area, doc.path(),
+                new int[] {area.x(), area.y(), area.width(), area.height()});
     }
 
     @Override
