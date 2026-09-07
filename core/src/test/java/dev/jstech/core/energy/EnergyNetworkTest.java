@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EnergyNetworkTest {
 
-    // Arbitrary deterministic positions — in production these are BlockPos.asLong().
+    // Arbitrary deterministic positions; in production these are BlockPos.asLong().
     private static final long GEN_A = 1_000_000L;
     private static final long GEN_B = 2_000_000L;
     private static final long CONS_A = 3_000_000L;
@@ -120,7 +120,7 @@ class EnergyNetworkTest {
 
     @Test
     void seriesCables_bottleneckIsTheMiddleCable() {
-        // GEN -> T3 -> T1 -> T3 -> CONS — middle T1 caps at 500.
+        // GEN -> T3 -> T1 -> T3 -> CONS, middle T1 caps at 500.
         EnergyNetwork net = new EnergyNetwork();
         net.addNode(GEN_A, TestNode.generator(1000L));
         net.addCable(CABLE_1, new TestCable(EnergyTier.T3_HIGH_CAPACITY));
@@ -162,10 +162,12 @@ class EnergyNetworkTest {
 
     @Test
     void sharedBottleneckCable_neverExceedsItsThroughput() {
-        // GEN(supply >> cap) -> ONE T1 cable (500 FE/t) -> two consumers each demanding far more than the cap.
-        // The proportional split caps each consumer at the cable's full throughput independently, so before
-        // the fix the single shared cable carried 2x its rating (energy created from nothing). The total
-        // through the cable must stay within its rated throughput, and no more than that can be delivered.
+        /*
+         * GEN(supply >> cap) -> ONE T1 cable (500 FE/t) -> two consumers each demanding far more than the cap.
+         * The proportional split caps each consumer at the cable's full throughput independently, so before
+         * the fix the single shared cable carried 2x its rating (energy created from nothing). The total
+         * through the cable must stay within its rated throughput, and no more than that can be delivered.
+         */
         EnergyNetwork net = new EnergyNetwork();
         net.addNode(GEN_A, TestNode.generator(100_000L));
         net.addCable(CABLE_1, new TestCable(EnergyTier.T1_COPPER));

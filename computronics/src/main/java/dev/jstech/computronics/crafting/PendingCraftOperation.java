@@ -26,8 +26,8 @@ import java.util.UUID;
  * A craft request whose plan is still being worked out. Planning a recursive craft is CPU work over
  * immutable inputs (the patterns, the machines, a stock snapshot), so it runs on a virtual thread while the
  * request already shows in the task list as a pending craft. When the plan lands on the main thread the
- * real {@link NetworkCraftOperation} takes over — carrying the level and the settle callback this
- * placeholder collected meanwhile — and the placeholder steps aside without a log entry of its own. A
+ * real {@link NetworkCraftOperation} takes over (carrying the level and the settle callback this
+ * placeholder collected meanwhile) and the placeholder steps aside without a log entry of its own. A
  * request nothing can make settles FAILED here, and one cancelled while planning settles DISCARDED.
  */
 public final class PendingCraftOperation implements INetworkOperation {

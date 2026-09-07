@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Pure GUI logic — scroll math, pagination, radial geometry, graph scaling — with no Minecraft dependency.
+ * Pure GUI logic (scroll math, pagination, radial geometry, graph scaling) with no Minecraft dependency.
  */
 package dev.jstech.core.client.gui.logic;

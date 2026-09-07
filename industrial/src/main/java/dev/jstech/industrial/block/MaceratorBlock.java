@@ -34,7 +34,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The Macerator — a Tier-1 industrial machine that grinds ores into dust (ore doubling).
+ * The Macerator, a Tier-1 industrial machine that grinds ores into dust (ore doubling).
  */
 public class MaceratorBlock extends HorizontalDirectionalBlock implements EntityBlock {
 

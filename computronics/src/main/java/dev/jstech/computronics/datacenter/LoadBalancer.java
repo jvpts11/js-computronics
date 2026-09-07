@@ -68,8 +68,10 @@ public final class LoadBalancer {
         }
         return switch (mode) {
             case LEAST_LOADED -> {
-                // Rotate first, then sort: the sort is stable, so servers with equally free drives take turns
-                // instead of the first one in the list always winning the tie.
+                /*
+                 * Rotate first, then sort: the sort is stable, so servers with equally free drives take turns
+                 * instead of the first one in the list always winning the tie.
+                 */
                 final List<ServerStore> sorted = rotate(stores, start);
                 sorted.sort(Comparator.comparingLong(ServerStore::freeWeight).reversed());
                 yield sequential(sorted, key, amount);
@@ -79,7 +81,7 @@ public final class LoadBalancer {
         };
     }
 
-    /** The same servers, beginning at {@code start} — a fresh list, so the caller's order is untouched. */
+    /** The same servers, beginning at {@code start}, as a fresh list, so the caller's order is untouched. */
     private static List<ServerStore> rotate(final List<ServerStore> stores, final int start) {
         final int n = stores.size();
         final int from = n == 0 ? 0 : Math.floorMod(start, n);
@@ -103,8 +105,10 @@ public final class LoadBalancer {
 
     private static long roundRobin(final List<ServerStore> stores, final StorageKey key, final long amount) {
         long remaining = amount;
-        // An even share each, not a stack each: a stack-sized batch meant one deposit of 64 went entirely to
-        // the first server, so round-robin behaved exactly like manual for everything a player carries.
+        /*
+         * An even share each, not a stack each: a stack-sized batch meant one deposit of 64 went entirely to
+         * the first server, so round-robin behaved exactly like manual for everything a player carries.
+         */
         final long batch = Math.max(1L, (amount + stores.size() - 1) / stores.size());
         boolean progress = true;
         while (remaining > 0L && progress) {

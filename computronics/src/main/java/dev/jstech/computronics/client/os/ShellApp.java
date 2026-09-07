@@ -95,16 +95,20 @@ public final class ShellApp implements IDesktopApp {
             default -> false;
         };
         final ProgramSpec promptSpec = Programs.get(Programs.COMMAND_PROMPT);
-        // Frames 11 ships its own modern shell ("Megashell"); every other desktop names the window after its
-        // native terminal (Konsole on KDE, Terminal on GNOME/Cinnamon, Command Prompt on the older Frames).
+        /*
+         * Frames 11 ships its own modern shell ("Megashell"); every other desktop names the window after its
+         * native terminal (Konsole on KDE, Terminal on GNOME/Cinnamon, Command Prompt on the older Frames).
+         */
         if (chrome != null && chrome.panelStyle() == PanelStyle.FRAMES_11) {
             this.title = "Megashell";
         } else {
             this.title = chrome != null && promptSpec != null ? chrome.nameOf(promptSpec) : "Command Prompt";
         }
         if (posix) {
-            // A real Linux terminal opens on a bare prompt; the immediate empty round-trip below replaces
-            // this placeholder with the server's user@host one.
+            /*
+             * A real Linux terminal opens on a bare prompt; the immediate empty round-trip below replaces
+             * this placeholder with the server's user@host one.
+             */
             this.prompt = "$";
         } else {
             this.prompt = "C:\\>";
@@ -114,8 +118,10 @@ public final class ShellApp implements IDesktopApp {
         output = root.add(new ListView<Line>(() -> wrapCache, LINE_H, this::renderLine));
         scrolledTag = root.add(new Label(() -> scrollOffset > 0 ? "scrolled +" + scrollOffset : "").setColor(TAG_COLOR)
                 .setAlign(Label.Align.RIGHT));
-        // No prompt is drawn while a program is running, because on a real terminal there is none: the
-        // program has the screen until it returns.
+        /*
+         * No prompt is drawn while a program is running, because on a real terminal there is none: the
+         * program has the screen until it returns.
+         */
         console = root.add(new CommandLine(DesktopShellRunPayload.MAX_LEN - 1, this::submit)
                 .setPrompt(() -> busy ? "" : prompt));
         root.focus(console);
@@ -159,8 +165,10 @@ public final class ShellApp implements IDesktopApp {
             active.prompt = payload.prompt();
         }
         active.busy = payload.busy();
-        // Any command may have installed or removed a program (apt install, uninstall, ...): refresh the
-        // desktop's launcher state so the change shows up without closing the monitor.
+        /*
+         * Any command may have installed or removed a program (apt install, uninstall, ...): refresh the
+         * desktop's launcher state so the change shows up without closing the monitor.
+         */
         DesktopScreen.refreshActive();
     }
 
@@ -172,8 +180,10 @@ public final class ShellApp implements IDesktopApp {
         generation++;
     }
 
-    // The window is freely resizable, so lines wrap at render time to the current content width; the
-    // wrapped view is cached per (width, scrollback generation) so a static console costs nothing per frame.
+    /*
+     * The window is freely resizable, so lines wrap at render time to the current content width; the
+     * wrapped view is cached per (width, scrollback generation) so a static console costs nothing per frame.
+     */
     private int generation;
     private List<Line> wrapCache = List.of();
     private int wrapCacheW = -1;
@@ -239,8 +249,10 @@ public final class ShellApp implements IDesktopApp {
             case BEVEL -> 0xFF000000;
             case LUNA -> 0xFF0A1A30;
             case FLAT -> 0xFF1E1F23;
-            // The period Unix terminals were not pure black: xterm-era consoles carried a slight cast
-            // from the desktop they ran on.
+            /*
+             * The period Unix terminals were not pure black: xterm-era consoles carried a slight cast
+             * from the desktop they ran on.
+             */
             case KDE2 -> 0xFF0C1420;
             case GNOME1 -> 0xFF1A141E;
         };

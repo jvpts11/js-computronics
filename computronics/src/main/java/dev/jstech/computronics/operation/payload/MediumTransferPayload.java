@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * Client to server: the player dragged a {@code .dat} file onto a removable medium in the Files
  * explorer. A {@code .dat} is a read-only projection of an item stored in the computer's disks, so
- * this is the one sanctioned way to move that item by hand — not a byte copy of a file, but an
+ * this is the one sanctioned way to move that item by hand, not a byte copy of a file, but an
  * atomic item transfer.
  *
  * <p>The server resolves {@code datPath} back to its {@link dev.jstech.computronics

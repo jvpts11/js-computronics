@@ -34,7 +34,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The Coal Generator — a Tier-1 FE source that burns furnace fuel.
+ * The Coal Generator, a Tier-1 FE source that burns furnace fuel.
  */
 public class CoalGeneratorBlock extends HorizontalDirectionalBlock implements EntityBlock {
 

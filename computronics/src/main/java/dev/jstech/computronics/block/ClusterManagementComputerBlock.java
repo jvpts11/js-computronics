@@ -43,7 +43,7 @@ import java.util.Set;
 /**
  * The Cluster Management Computer: a full computer whose job is the racks. It sits on the data network
  * like any other machine and, with a Cluster Interface Card installed, drives every supercomputer
- * fabric and datacenter section its network reaches — installing systems and programs on all their
+ * fabric and datacenter section its network reaches, installing systems and programs on all their
  * nodes, switching bays, watching queues. Without the card it is an ordinary computer. A cluster
  * works without one; the computer makes it one machine to run.
  */
@@ -78,8 +78,10 @@ public class ClusterManagementComputerBlock extends HorizontalDirectionalBlock
 
     @Override
     public Set<DataTier> acceptedCableTiers() {
-        // A management machine lives on the backbone: Ethernet through a router, or the bandwidth
-        // and fibre cables directly. Never the compute fabric — the racks are reached over the network.
+        /*
+         * A management machine lives on the backbone: Ethernet through a router, or the bandwidth
+         * and fibre cables directly. Never the compute fabric; the racks are reached over the network.
+         */
         return Set.of(DataTier.T1_ETHERNET, DataTier.T2_HBW, DataTier.T3_FIBER);
     }
 

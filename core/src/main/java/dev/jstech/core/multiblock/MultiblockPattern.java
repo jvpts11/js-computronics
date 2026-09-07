@@ -166,7 +166,7 @@ public final class MultiblockPattern {
             if (!unmappedChars.isEmpty()) {
                 throw new IllegalStateException(
                         "Pattern contains unmapped chars: " + unmappedChars
-                                + " — call .where(c, matcher) for each");
+                                + ". Call .where(c, matcher) for each");
             }
 
             return new MultiblockPattern(

@@ -14,7 +14,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: request the Crafting Manager state for a Crafting Computer — the list of
+ * Client to server: request the Crafting Manager state for a Crafting Computer: the list of
  * {@code .craft} files on the first inserted medium and the patterns currently in the Recipe ROM.
  * The server replies with a {@link CraftManagerStatePayload}.
  *

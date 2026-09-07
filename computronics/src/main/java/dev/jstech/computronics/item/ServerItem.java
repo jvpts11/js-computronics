@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * A Server: a complete computer in item form. Since the racks rework the item carries no drives — a
+ * A Server: a complete computer in item form. Since the racks rework the item carries no drives, and a
  * server's disks live in the rack's front-panel hotswap slots (its chassis decides how many it cables),
  * so storage moves with the bay, never with this item.
  */

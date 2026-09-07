@@ -69,16 +69,20 @@ public class CraftingComputerBlock extends HorizontalDirectionalBlock
 
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
-        // Data via Ethernet (rear port, through a Personal Router to the backbone) plus the crafting cable
-        // that runs to the Crafting Switches.
+        /*
+         * Data via Ethernet (rear port, through a Personal Router to the backbone) plus the crafting cable
+         * that runs to the Crafting Switches.
+         */
         return java.util.Set.of(DataTier.T1_ETHERNET, DataTier.CRAFTING);
     }
 
     @Override
     public boolean connectsOnFace(final net.minecraft.world.level.block.state.BlockState state,
                                   final net.minecraft.core.Direction face, final DataTier tier) {
-        // The crafting cable attaches on any face (the machine-delivery search walks out of all six);
-        // the data cable keeps the rear-only port.
+        /*
+         * The crafting cable attaches on any face (the machine-delivery search walks out of all six);
+         * the data cable keeps the rear-only port.
+         */
         return tier == DataTier.CRAFTING || connectsOnFace(state, face);
     }
 

@@ -40,7 +40,7 @@ public class ServerRouterBlock extends net.minecraft.world.level.block.Horizonta
 
     public ServerRouterBlock(final Properties properties) {
         super(properties);
-        // Facing is purely cosmetic (the port banks) — sections still bind per face regardless.
+        // Facing is purely cosmetic (the port banks); sections still bind per face regardless.
         registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH));
     }
 

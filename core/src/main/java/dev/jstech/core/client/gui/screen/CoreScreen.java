@@ -36,8 +36,10 @@ public abstract class CoreScreen extends Screen {
 
     @Override
     public boolean isPauseScreen() {
-        // Mod screens do not pause singleplayer — a running computer or
-        // machine keeps ticking while its GUI is open.
+        /*
+         * Mod screens do not pause singleplayer; a running computer or
+         * machine keeps ticking while its GUI is open.
+         */
         return false;
     }
 }

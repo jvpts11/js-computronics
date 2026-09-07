@@ -132,8 +132,10 @@ class NetworkSystemTest {
 
     @Test
     void totalCapacity_canonicalExample() {
-        // Worked example: a Threadkiller mainframe (38,400) plus 3 identical
-        // subframes. Expected: 38,400 + (3 × 38,400 × 0.6) = 38,400 + 69,120 = 107,520.
+        /*
+         * Worked example: a Threadkiller mainframe (38,400) plus 3 identical
+         * subframes. Expected: 38,400 + (3 × 38,400 × 0.6) = 38,400 + 69,120 = 107,520.
+         */
         var mf = standaloneMainframe(38_400L);
         system.registerMainframe(mf);
         var mfUuid = mf.nodeUuid();
@@ -153,8 +155,10 @@ class NetworkSystemTest {
 
     @Test
     void totalCapacity_passiveMainframeContributesZero() {
-        // A PASSIVE Mainframe is pure overhead (50% standby, but NOT
-        // a contribution to usable capacity).
+        /*
+         * A PASSIVE Mainframe is pure overhead (50% standby, but NOT
+         * a contribution to usable capacity).
+         */
         var partnerUuid = NodeUuid.random();
         var passive = mainframe(FailoverRole.PASSIVE, partnerUuid, 38_400L);
         system.registerMainframe(passive);
@@ -194,8 +198,10 @@ class NetworkSystemTest {
 
     @Test
     void unregisterMainframe_ignoresForeignNode() {
-        // If another mainframe has taken the network over, a stale unregister
-        // from the old node must not evict the current owner.
+        /*
+         * If another mainframe has taken the network over, a stale unregister
+         * from the old node must not evict the current owner.
+         */
         var owner = standaloneMainframe(38_400L);
         system.registerMainframe(owner);
         system.unregisterMainframe(net, NodeUuid.random()); // some other node

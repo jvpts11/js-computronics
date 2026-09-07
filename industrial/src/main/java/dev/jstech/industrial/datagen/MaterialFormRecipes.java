@@ -62,8 +62,10 @@ public final class MaterialFormRecipes {
                                 200),
                         null));
 
-        // BOLT, ROD, GEAR: production routes not yet established.
-        // Add one entry here per form when input, machine and ratio are defined.
+        /*
+         * BOLT, ROD, GEAR: production routes not yet established.
+         * Add one entry here per form when input, machine and ratio are defined.
+         */
     }
 
     private MaterialFormRecipes() {}

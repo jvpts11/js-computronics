@@ -197,8 +197,10 @@ public final class OperationCancelGameTests {
         final ServerCliComputer cli = new ServerCliComputer((IComputerTerminalHost) computer, helper.getLevel());
         final CliShell shell = CliCommands.newShell(50);
         helper.startSequence()
-                // Seed a tick ahead of the prompt: the index catalogues the stock on the next tick, and a pull
-                // planned against an index that does not know the items yet settles FAILED on the spot.
+                /*
+                 * Seed a tick ahead of the prompt: the index catalogues the stock on the next tick, and a pull
+                 * planned against an index that does not know the items yet settles FAILED on the spot.
+                 */
                 .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))
                 .thenExecuteAfter(2, () -> {
                     helper.assertTrue(cliContains(shell.run("operation select 30 cobblestone", cli), "SELECT queued"),

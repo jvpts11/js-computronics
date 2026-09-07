@@ -223,8 +223,10 @@ public final class OperationSchedulingGameTests {
         final ServerRackBlockEntity rackBe = world.blockEntity(rack, ServerRackBlockEntity.class);
         TestWorldBuilder.mountDefaultServer(rackBe, 0);
         helper.startSequence()
-                // Seed a tick ahead of the prompt: the index catalogues the stock on the next tick, and a pull
-                // planned against an index that does not know the items yet settles FAILED on the spot.
+                /*
+                 * Seed a tick ahead of the prompt: the index catalogues the stock on the next tick, and a pull
+                 * planned against an index that does not know the items yet settles FAILED on the spot.
+                 */
                 .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))
                 .thenExecuteAfter(2, () -> {
                     final ServerCliComputer cli = new ServerCliComputer((IComputerTerminalHost) computer, helper.getLevel());

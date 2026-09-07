@@ -55,10 +55,12 @@ public class CoreEventDispatcher {
     public <E extends ICoreEvent> E post(final E event) {
         Objects.requireNonNull(event, "event must not be null");
 
-        // Every ICoreEvent type this event is assignable to: its whole class chain AND its whole interface
-        // graph (superinterfaces included), de-duplicated and most-specific first. Collecting the full
-        // graph — not just the direct interfaces — is what lets a listener on an ancestor interface
-        // (e.g. ICoreEvent itself) be reached.
+        /*
+         * Every ICoreEvent type this event is assignable to: its whole class chain AND its whole interface
+         * graph (superinterfaces included), de-duplicated and most-specific first. Collecting the full
+         * graph (not just the direct interfaces) is what lets a listener on an ancestor interface
+         * (e.g. ICoreEvent itself) be reached.
+         */
         final java.util.Set<Class<?>> types = new java.util.LinkedHashSet<>();
         collectEventTypes(event.getClass(), types);
 

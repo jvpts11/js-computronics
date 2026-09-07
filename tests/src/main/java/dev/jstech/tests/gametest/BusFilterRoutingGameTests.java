@@ -40,7 +40,7 @@ import java.util.List;
 /**
  * The two per-face routing behaviors: a bus carrying a filter restricts its face to that one key so the crafting
  * engine can drive a machine whose ingredients enter through different faces, and bus auto-placement snaps onto a
- * face that offers any kind of data — a fluid- or chemical-only machine face, not just an inventory.
+ * face that offers any kind of data, such as a fluid- or chemical-only machine face, not just an inventory.
  */
 @GameTestHolder(JsTests.MODID)
 @PrefixGameTestTemplate(false)
@@ -118,13 +118,17 @@ public final class BusFilterRoutingGameTests {
                         helper.fail("no data cable at " + cablePos);
                         return;
                     }
-                    // The tank offers a chemical face toward the cable but no inventory there, so the old
-                    // item-only auto-placement would have missed it. It is the cable's only data neighbor.
+                    /*
+                     * The tank offers a chemical face toward the cable but no inventory there, so the old
+                     * item-only auto-placement would have missed it. It is the cable's only data neighbor.
+                     */
                     helper.assertTrue(!cable.neighborPort(Direction.SOUTH).isEmpty(),
                             "the cable must see the tank's chemical face as a data neighbor");
 
-                    // Right-click the Import Bus onto the cable's top face: auto-placement must snap it onto the
-                    // chemical face (south), not the clicked face, exactly as it would onto an inventory.
+                    /*
+                     * Right-click the Import Bus onto the cable's top face: auto-placement must snap it onto the
+                     * chemical face (south), not the clicked face, exactly as it would onto an inventory.
+                     */
                     final Player player = helper.makeMockPlayer(GameType.CREATIVE);
                     final BlockPos absCable = world.absolute(cablePos);
                     player.setPos(absCable.getX() + 0.5, absCable.getY() + 1.0, absCable.getZ() + 0.5);

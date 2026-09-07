@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: every Server on the network with its display name and free space — the destination picker in the request popup's advanced mode (where a MOVE can target a specific Server).
+ * Server to client: every Server on the network with its display name and free space, for the destination picker in the request popup's advanced mode (where a MOVE can target a specific Server).
  */
 public record NetworkServersPayload(List<ServerEntry> servers) implements CustomPacketPayload {
 

@@ -8,7 +8,7 @@
 package dev.jstech.computronics.storage;
 
 /**
- * A destination that accepts a quantity of one data type — an item OR a fluid — without caring which.
+ * A destination that accepts a quantity of one data type (an item OR a fluid) without caring which.
  */
 public interface IDataSink {
 

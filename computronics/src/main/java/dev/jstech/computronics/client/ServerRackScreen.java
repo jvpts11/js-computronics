@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Screen for the Server Rack: physical only, by design — a rack-unit ruler, one row per unit with
+ * Screen for the Server Rack: physical only, by design: a rack-unit ruler, one row per unit with
  * the server slot and the rack's five hotswap slots, and a power switch per bay. No console and no
  * terminal live here: software access always goes through a monitor cabled to the rack.
  */
@@ -65,13 +65,15 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
         return -1;
     }
 
-    // ---- The cabinet's own look ------------------------------------------------------------------
-    //
-    // The rack is drawn as a piece of equipment rather than a flat panel: a brushed body, side rails
-    // the rows sit between, relief on every bay, and status lights. Rack hardware is the one screen in
-    // the mod that IS a physical object, so it wears the cabinet's OWN material — and a cabinet built
-    // in 1994 is not made of the same metal as one built today, so there is a set per era, matching the
-    // colours of that era's block model. The labels follow the era skin like every other screen.
+    /*
+     * The cabinet's own look
+     *
+     * The rack is drawn as a piece of equipment rather than a flat panel: a brushed body, side rails
+     * the rows sit between, relief on every bay, and status lights. Rack hardware is the one screen in
+     * the mod that IS a physical object, so it wears the cabinet's OWN material, and a cabinet built
+     * in 1994 is not made of the same metal as one built today, so there is a set per era, matching the
+     * colours of that era's block model. The labels follow the era skin like every other screen.
+     */
 
     /** Everything the cabinet is made of, so one set of values can be swapped for another era's. */
     private record Materials(int bodyTop, int bodyBottom, int bodyEdge, int bodyGloss,
@@ -187,8 +189,10 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
             // Row separator, so eight units read as eight shelves.
             g.fill(x + 8, top + ServerRackLayout.SLOT, x + imageWidth - 8,
                     top + ServerRackLayout.SLOT + 1, mat.rowRule());
-            // The server slot: a mounted unit's top row shows the machine; a covered row is part
-            // of the chassis above, so its cell reads as continuation rather than a free slot.
+            /*
+             * The server slot: a mounted unit's top row shows the machine; a covered row is part
+             * of the chassis above, so its cell reads as continuation rather than a free slot.
+             */
             final boolean covered = coveredBy(row) >= 0;
             if (covered) {
                 g.fill(x + ServerRackLayout.SERVER_X, top,
@@ -265,8 +269,10 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     protected void renderLabels(final GuiGraphics g, final int mouseX, final int mouseY) {
         final boolean linked = menu.networkLinked();
         JsTechTheme.text(g, font, cabinetName(), 12, 11, JsTechTheme.text());
-        // The header carries the cabinet summary beside the link pill: used rack units and whether
-        // the rack's rear cable sits on a network.
+        /*
+         * The header carries the cabinet summary beside the link pill: used rack units and whether
+         * the rack's rear cable sits on a network.
+         */
         int usedU = 0;
         for (int i = 0; i < ROWS; i++) {
             final RackChassis chassis = ServerItem.chassisOf(menu.serverInBay(i));
@@ -274,8 +280,10 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
                 usedU += chassis.heightU();
             }
         }
-        // A cabinet past its thermal budget says so where the link state would sit: it is the thing
-        // the player most needs to know about this rack right now.
+        /*
+         * A cabinet past its thermal budget says so where the link state would sit: it is the thing
+         * the player most needs to know about this rack right now.
+         */
         final int throttle = menu.throttlePercent();
         final String pill = throttle < 100
                 ? usedU + "/" + ROWS + "U  THROTTLED " + throttle + "%"
@@ -345,9 +353,11 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
         }
     }
 
-    // The rack GUI stays physical: it REPORTS the array's health but never configures it. A RAID
-    // controller is set up in its own firmware setup at power-on, like the real thing — see the
-    // machine's STORAGE page in the BIOS.
+    /*
+     * The rack GUI stays physical: it REPORTS the array's health but never configures it. A RAID
+     * controller is set up in its own firmware setup at power-on, like the real thing; see the
+     * machine's STORAGE page in the BIOS.
+     */
 
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
@@ -369,8 +379,10 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        // The cabinet's labels are drawn in its era's skin, and the default is always restored so an
-        // unthemed draw elsewhere still gets the frozen Standard look.
+        /*
+         * The cabinet's labels are drawn in its era's skin, and the default is always restored so an
+         * unthemed draw elsewhere still gets the frozen Standard look.
+         */
         JsTechTheme.bind(theme);
         try {
             super.render(g, mouseX, mouseY, partialTick);
@@ -384,8 +396,10 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
     private void renderRackTooltip(final GuiGraphics g, final int mouseX, final int mouseY) {
         final int relX = mouseX - leftPos;
         final int relY = mouseY - topPos;
-        // A chassis this cabinet does not seat says so the moment it is carried over a row, instead of
-        // the slot silently refusing it — the player learns which cabinet it belongs in before letting go.
+        /*
+         * A chassis this cabinet does not seat says so the moment it is carried over a row, instead of
+         * the slot silently refusing it, so the player learns which cabinet it belongs in before letting go.
+         */
         final net.minecraft.world.item.ItemStack carried = menu.getCarried();
         final dev.jstech.computronics.rack.RackChassis carriedChassis =
                 dev.jstech.computronics.item.ServerItem.chassisOf(carried);
@@ -427,8 +441,10 @@ public class ServerRackScreen extends AbstractContainerScreen<ServerRackMenu> {
                     }
                 }
                 if (menu.frontSlotRole(index) == RackLayout.SlotRole.GADGET) {
-                    // Point at where a controller is actually configured, so the player is never
-                    // left clicking a gadget hoping something opens.
+                    /*
+                     * Point at where a controller is actually configured, so the player is never
+                     * left clicking a gadget hoping something opens.
+                     */
                     g.renderTooltip(font, Component.literal(
                             "Gadget bay - a RAID Controller is configured in the machine's firmware (STORAGE)"),
                             mouseX, mouseY);

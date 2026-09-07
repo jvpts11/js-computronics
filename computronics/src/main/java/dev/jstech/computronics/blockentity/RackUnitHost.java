@@ -25,8 +25,8 @@ import java.util.Set;
 /**
  * One machine in a rack, addressed as a host of its own. A rack answers machine questions for the
  * unit its monitor's channel is showing; this view pins every such call to {@code row} instead, so a
- * caller that must reach a specific node — the Supercomputer Console installing a system on all of
- * them — does not have to touch the KVM. Stateless: it holds nothing but the rack and the row, and
+ * caller that must reach a specific node (the Supercomputer Console installing a system on all of
+ * them) does not have to touch the KVM. Stateless: it holds nothing but the rack and the row, and
  * every call runs through the rack's own code path.
  */
 public record RackUnitHost(ServerRackBlockEntity rack, int row) implements IOsHost {

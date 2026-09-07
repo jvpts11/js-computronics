@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * An item that can be mounted in a rack and occupies rack units: a server chassis, or one of the
  * rack units that serve the cabinet itself (a KVM switch, a UPS, a cooling unit). Rack units are
- * what makes a rack a puzzle — servers, storage, cooling, power and access all bid for the same
+ * what makes a rack a puzzle: servers, storage, cooling, power and access all bid for the same
  * eight U.
  */
 public interface IMountableRackUnit {

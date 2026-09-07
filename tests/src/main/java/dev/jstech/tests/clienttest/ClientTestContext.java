@@ -126,7 +126,7 @@ public final class ClientTestContext {
 
     /**
      * As {@link #thenWaitUntil(BooleanSupplier, int, String)}, with {@code diagnostics} evaluated only on
-     * timeout and appended to the failure — for the state that explains why the wait never ended.
+     * timeout and appended to the failure, for the state that explains why the wait never ended.
      */
     public ClientTestContext thenWaitUntil(final BooleanSupplier condition, final int maxTicks, final String what,
                                            final java.util.function.Supplier<String> diagnostics) {
@@ -213,7 +213,7 @@ public final class ClientTestContext {
     }
 
     /**
-     * Saves and leaves the world, reopens it from disk and waits until the player is back in — a real reload,
+     * Saves and leaves the world, reopens it from disk and waits until the player is back in, a real reload,
      * so whatever the test checks afterwards went through NBT and the level save. Any open screen is closed.
      */
     public ClientTestContext thenSaveAndReload(final int delayTicks) {
@@ -357,7 +357,7 @@ public final class ClientTestContext {
 
     /**
      * Client-side: uses the held item on the block at {@code relative}, hitting the face that looks at the
-     * player — the same path a real click takes, so the server-side reach and hit checks apply.
+     * player, the same path a real click takes, so the server-side reach and hit checks apply.
      */
     public void rightClick(final BlockPos relative) {
         final BlockPos target = abs(relative);

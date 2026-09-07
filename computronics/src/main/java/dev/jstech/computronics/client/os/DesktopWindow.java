@@ -72,8 +72,10 @@ public final class DesktopWindow {
         this.appKey = appKey;
         this.x = x;
         this.y = y;
-        // Never open below the app's own minimum, even if a stale saved geometry asks for less — otherwise
-        // content like the Network Interactor's details panel overflows the window and gets clipped.
+        /*
+         * Never open below the app's own minimum, even if a stale saved geometry asks for less, because otherwise
+         * content like the Network Interactor's details panel overflows the window and gets clipped.
+         */
         this.w = Math.max(w, app.minWidth());
         this.h = Math.max(h, app.minHeight());
         this.curX = x;
@@ -115,7 +117,7 @@ public final class DesktopWindow {
         return curH;
     }
 
-    /** The floating bounds — where the window sits when it is not maximized — for persisting it. */
+    /** The floating bounds (where the window sits when it is not maximized) for persisting it. */
     public int floatX() {
         return x;
     }
@@ -305,7 +307,7 @@ public final class DesktopWindow {
     /**
      * Resolves the rectangle this window occupies this frame into {@code curX/curY/curW/curH}: the maximized
      * area (the desktop above the taskbar) or the floating geometry. Called at the top of {@link #render}, and
-     * also by the desktop screen before it positions the inventory slots — so slot positions never lag a frame
+     * also by the desktop screen before it positions the inventory slots, so slot positions never lag a frame
      * behind a drag, resize, or maximize (otherwise {@code curX/curY} only update when the window renders).
      */
     public void resolveGeometry(final int screenW, final int screenH, final int taskbarH) {
@@ -317,23 +319,27 @@ public final class DesktopWindow {
      * top panel), so a maximized window starts under it.
      */
     public void resolveGeometry(final int screenW, final int screenH, final int taskbarH, final int workTop) {
-        // The minimum-size clamp lives in the unit-tested WindowGeometry so it can never silently go missing
-        // again (the bug where a stale small geometry squashed the content and clipped the details panel).
+        /*
+         * The minimum-size clamp lives in the unit-tested WindowGeometry so it can never silently go missing
+         * again (the bug where a stale small geometry squashed the content and clipped the details panel).
+         */
         final WindowGeometry.Rect r = WindowGeometry.resolve(x, y, w, h, app.minWidth(), app.minHeight(),
                 maximized, screenW, screenH, taskbarH, workTop);
         curX = r.x();
         curY = r.y();
         curW = r.w();
         curH = r.h();
-        // Persist the bumped-up floating size so a stale, too-small saved geometry is corrected once and the
-        // resize/drag math (which reads w/h) stays consistent with what is rendered.
+        /*
+         * Persist the bumped-up floating size so a stale, too-small saved geometry is corrected once and the
+         * resize/drag math (which reads w/h) stays consistent with what is rendered.
+         */
         if (!maximized) {
             this.w = curW;
             this.h = curH;
         }
     }
 
-    /** Whether this window is the one in front — the one keystrokes go to. */
+    /** Whether this window is the one in front, the one keystrokes go to. */
     private boolean focused;
 
     public void setFocused(final boolean value) {
@@ -356,16 +362,20 @@ public final class DesktopWindow {
         final int ww = curW;
         final int wh = curH;
 
-        // A soft drop shadow lifts the window off the wallpaper, then the frame (border + body) and title bar,
-        // both shaped and corner-rounded by the installed OS's skin. A maximized window fills the desktop, so
-        // it casts no shadow.
+        /*
+         * A soft drop shadow lifts the window off the wallpaper, then the frame (border + body) and title bar,
+         * both shaped and corner-rounded by the installed OS's skin. A maximized window fills the desktop, so
+         * it casts no shadow.
+         */
         if (!maximized) {
             skin.windowShadow(g, wx, wy, ww, wh);
         }
         skin.windowFrame(g, wx, wy, ww, wh);
         skin.titleBar(g, wx, wy, ww, TITLE_H, focused);
-        // The program's own icon at the left of the bar, the way every desktop of these generations marked
-        // which program a window belongs to. A key nothing answers to simply gets no icon.
+        /*
+         * The program's own icon at the left of the bar, the way every desktop of these generations marked
+         * which program a window belongs to. A key nothing answers to simply gets no icon.
+         */
         final dev.jstech.computronics.os.DesktopEnvironmentDef desktop =
                 dev.jstech.computronics.os.OsRegistry.getDesktop(
                         net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", skin.osPath()));
@@ -375,8 +385,10 @@ public final class DesktopWindow {
         if (titleIcon) {
             ProgramIcons.draw(g, wx + 3, wy + 2, ICON, ICON, program.iconId(), skin.iconSet());
         }
-        // Where the title sits is part of the skin's identity, not a constant: the GNOME form centres it,
-        // and the title is clamped short of the controls so a long one never runs under them.
+        /*
+         * Where the title sits is part of the skin's identity, not a constant: the GNOME form centres it,
+         * and the title is clamped short of the controls so a long one never runs under them.
+         */
         final String title = app.title();
         final int textLeft = wx + (titleIcon ? 3 + ICON + 3 : 4);
         final int titleX = skin.titleCentered()
@@ -384,8 +396,10 @@ public final class DesktopWindow {
                 : textLeft;
         g.drawString(font, title, titleX, wy + 3,
                 focused ? skin.titleText() : 0xFF5B6674, focused && skin.textShadow());
-        // The focused window also carries an accent outline, so "which one am I typing into" reads
-        // at a glance even when several windows overlap.
+        /*
+         * The focused window also carries an accent outline, so "which one am I typing into" reads
+         * at a glance even when several windows overlap.
+         */
         if (focused) {
             final int accent = skin.accent();
             g.fill(wx, wy, wx + ww, wy + 1, accent);
@@ -402,9 +416,11 @@ public final class DesktopWindow {
                 maximized ? OsSkin.Control.RESTORE : OsSkin.Control.MAXIMIZE, hover == 2, pressedBtn == 2);
         skin.windowControl(g, font, closeX(), by, BTN, BTN, OsSkin.Control.CLOSE, hover == 3, pressedBtn == 3);
 
-        // Body content, drawn in the OS skin (the app keeps the skin if it has been migrated to it). Clip it
-        // to the inner rect so nothing an app draws leaks past the frame when the window is resized smaller.
-        // enableScissor ignores the pose in 1.21.1, so compensate for the desktop's translate.
+        /*
+         * Body content, drawn in the OS skin (the app keeps the skin if it has been migrated to it). Clip it
+         * to the inner rect so nothing an app draws leaks past the frame when the window is resized smaller.
+         * enableScissor ignores the pose in 1.21.1, so compensate for the desktop's translate.
+         */
         final int cx = wx + 4;
         final int cy = wy + TITLE_H + 4;
         final int cw = ww - 8;

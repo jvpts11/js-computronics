@@ -290,8 +290,10 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleFirmwareAction);
         registrar.playToServer(RequestFirmwarePayload.TYPE, RequestFirmwarePayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestFirmware);
-        // The power-on self-test: the server asks the monitor to play it; the client reports it finished
-        // (or that DEL asked for the setup) and the server opens the boot target.
+        /*
+         * The power-on self-test: the server asks the monitor to play it; the client reports it finished
+         * (or that DEL asked for the setup) and the server opens the boot target.
+         */
         registrar.playToClient(OpenPostPayload.TYPE, OpenPostPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() ->
                         dev.jstech.computronics.block.IPostScreenOpener.Holder.open(
@@ -355,7 +357,7 @@ public final class ComputingPayloads {
             final boolean running = mainframe.isIqlEngineRunning();
             lines.add(new ProcessListPayload.ProcessLine(ProcessListPayload.KIND_SERVICE, "IQL Engine",
                     running ? "running" : "stopped",
-                    running ? "the network's query and job engine" : "stopped — start it to run jobs"));
+                    running ? "the network's query and job engine" : "stopped, start it to run jobs"));
             for (final dev.jstech.computronics.program.iql.IqlSavedObject job
                     : mainframe.iqlCatalog().ofType(
                             dev.jstech.computronics.program.iql.IqlDefinition.ObjectType.JOB)) {
@@ -414,8 +416,10 @@ public final class ComputingPayloads {
         });
     }
 
-    // Command Prompt — a typed line runs through the shell against the open host and the styled
-    // output is streamed back. The CLI is an alternative interface over the same network operations.
+    /*
+     * Command Prompt: a typed line runs through the shell against the open host and the styled
+     * output is streamed back. The CLI is an alternative interface over the same network operations.
+     */
 
     private static final int CLI_WIDTH = 50;
 
@@ -438,8 +442,10 @@ public final class ComputingPayloads {
                 launchProgram(player, host, menu.monitorPos(), payload.hostPos(), parts[1].trim());
                 return;
             }
-            // An open ssh session runs the line on the remote machine, in its own shell family — the
-            // local terminal is only the window. Everything else (ssh itself, exit) stays local.
+            /*
+             * An open ssh session runs the line on the remote machine, in its own shell family, the
+             * local terminal is only the window. Everything else (ssh itself, exit) stays local.
+             */
             final var localComputer =
                     new dev.jstech.computronics.program.ServerCliComputer(host, level);
             var computer = localComputer;
@@ -448,8 +454,10 @@ public final class ComputingPayloads {
                 computer = new dev.jstech.computronics.program.ServerCliComputer(
                         session, level);
             }
-            // The shell speaks the installed OS kernel's family (DOS verbs on MC-DOS/Frames, POSIX on Linux), or
-            // the live installer's verbs while a live medium is booted.
+            /*
+             * The shell speaks the installed OS kernel's family (DOS verbs on MC-DOS/Frames, POSIX on Linux), or
+             * the live installer's verbs while a live medium is booted.
+             */
             final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(
                     computer, CLI_WIDTH);
             final var response = shell.run(payload.line(), computer);
@@ -467,8 +475,10 @@ public final class ComputingPayloads {
                 return;
             }
             if (computer.rebootRequested()) {
-                // A plain "reboot": the terminal closes and the POST replays on the same monitor, after
-                // which whatever the boot target now is (a freshly installed OS included) comes up.
+                /*
+                 * A plain "reboot": the terminal closes and the POST replays on the same monitor, after
+                 * which whatever the boot target now is (a freshly installed OS included) comes up.
+                 */
                 if (level.getBlockEntity(payload.hostPos())
                         instanceof dev.jstech.computronics.os.IOsHost be) {
                     be.setNeedsPost(true);
@@ -509,8 +519,10 @@ public final class ComputingPayloads {
                     + program.commandName(), OperationRecord.STATUS_FAILED);
             return;
         }
-        // Program run gate: the installed OS platform must be one the program supports, and the computer
-        // must meet its CPU/VRAM minimums. Null-safe: programs with no declared requirement always pass.
+        /*
+         * Program run gate: the installed OS platform must be one the program supports, and the computer
+         * must meet its CPU/VRAM minimums. Null-safe: programs with no declared requirement always pass.
+         */
         if (player.level() instanceof ServerLevel osLevel
                 && osLevel.getBlockEntity(hostPos) instanceof dev.jstech.computronics.os
                         .IOsHost osComputer
@@ -543,7 +555,7 @@ public final class ComputingPayloads {
         for (final String line : wrapToConsole(text)) {
             wire.add(new CommandOutputPayload.WireLine(line, style.ordinal()));
         }
-        // An empty prompt means "keep the current prompt" — this helper does not change the directory.
+        // An empty prompt means "keep the current prompt", so this helper does not change the directory.
         PacketDistributor.sendToPlayer(player, new CommandOutputPayload(false, "", wire));
     }
 
@@ -647,9 +659,11 @@ public final class ComputingPayloads {
                     || host.networkUuid() == null) {
                 return;
             }
-            // Save to the network's Mainframe — the same place the schema snapshot reads it back from —
-            // whether the studio's host is the Mainframe itself or a PC on its network. Saving to the raw
-            // host position instead would silently drop the script when the host is not the Mainframe.
+            /*
+             * Save to the network's Mainframe (the same place the schema snapshot reads it back from)
+             * whether the studio's host is the Mainframe itself or a PC on its network. Saving to the raw
+             * host position instead would silently drop the script when the host is not the Mainframe.
+             */
             final MainframeBlockEntity mainframe = resolveMainframe(level, host.networkUuid());
             if (mainframe != null) {
                 mainframe.setSavedScript(payload.script());
@@ -732,12 +746,16 @@ public final class ComputingPayloads {
         final var console = host.console();
         final List<String> history = console == null ? List.of() : console.history();
         final List<ConsoleInitPayload.WireCommand> commands = new ArrayList<>();
-        // Tab completion offers the installed shell family's verbs (ls/cat on Linux, dir/type on DOS), or the
-        // live installer's while a live medium is booted.
+        /*
+         * Tab completion offers the installed shell family's verbs (ls/cat on Linux, dir/type on DOS), or the
+         * live installer's while a live medium is booted.
+         */
         final boolean live = console != null && console.liveInstall() != null;
-        // Completion and hints offer only what this machine can run: a verb another kind of computer owns
-        // (the cluster command outside a Cluster Management Computer) is no command here, and must not be
-        // hinted as one.
+        /*
+         * Completion and hints offer only what this machine can run: a verb another kind of computer owns
+         * (the cluster command outside a Cluster Management Computer) is no command here, and must not be
+         * hinted as one.
+         */
         final var cli = host instanceof net.minecraft.world.level.block.entity.BlockEntity
                 ? new dev.jstech.computronics.program.ServerCliComputer(host, player.serverLevel())
                 : null;
@@ -751,8 +769,10 @@ public final class ComputingPayloads {
             }
             commands.add(new ConsoleInitPayload.WireCommand(command.name(), command.usage()));
         }
-        // The devices Tab can complete for /dev/ arguments (mkfs, mount, grub-install): the disks in slot
-        // order during a live install, or the mounted drives' device names on an installed POSIX system.
+        /*
+         * The devices Tab can complete for /dev/ arguments (mkfs, mount, grub-install): the disks in slot
+         * order during a live install, or the mounted drives' device names on an installed POSIX system.
+         */
         final List<String> devices = new ArrayList<>();
         if (live && host instanceof dev.jstech.computronics.os
                 .IOsHost computer) {
@@ -798,13 +818,17 @@ public final class ComputingPayloads {
                             instanceof dev.jstech.computronics.terminal.IComputerTerminalHost terminalHost)) {
                 return;
             }
-            // Anti-spoof: either this host's terminal menu is open, or the player is within reach of the
-            // monitor they used (the desktop shell is a client-only screen with no server-side menu, so a
-            // program opened from it cannot be validated against an open container).
+            /*
+             * Anti-spoof: either this host's terminal menu is open, or the player is within reach of the
+             * monitor they used (the desktop shell is a client-only screen with no server-side menu, so a
+             * program opened from it cannot be validated against an open container).
+             */
             final boolean viaTerminal = player.containerMenu instanceof ComputerTerminalMenu terminal
                     && terminal.hostPos().equals(payload.hostPos());
-            // The desktop path is only valid when the monitor is actually a linked peripheral of this host,
-            // so a player near any monitor cannot open a program bound to a foreign computer.
+            /*
+             * The desktop path is only valid when the monitor is actually a linked peripheral of this host,
+             * so a player near any monitor cannot open a program bound to a foreign computer.
+             */
             final boolean nearMonitor = player.distanceToSqr(
                     net.minecraft.world.phys.Vec3.atCenterOf(payload.monitorPos())) <= 64.0
                     && terminalHost instanceof dev.jstech.core.peripheral.IPeripheralOwner owner
@@ -817,9 +841,11 @@ public final class ComputingPayloads {
                     || id.equals("command_prompt")) {
                 final net.minecraft.network.chat.Component title =
                         player.level().getBlockState(payload.hostPos()).getBlock().getName();
-                // The host's board-derived era drives the prompt's GUI skin; capture it at open time. It is
-                // not re-synced afterwards because the board is only swapped in the computer's own assembly
-                // GUI, never from the running prompt.
+                /*
+                 * The host's board-derived era drives the prompt's GUI skin; capture it at open time. It is
+                 * not re-synced afterwards because the board is only swapped in the computer's own assembly
+                 * GUI, never from the running prompt.
+                 */
                 final dev.jstech.core.tier.HardwareEra hostEra =
                         player.level().getBlockEntity(payload.hostPos())
                                 instanceof dev.jstech.computronics.os
@@ -830,8 +856,10 @@ public final class ComputingPayloads {
                         buf -> dev.jstech.computronics.menu.CommandPromptMenu.writeOpenBuffer(
                                 buf, payload.monitorPos(), payload.hostPos(), hostEra));
             } else {
-                // The NMS and other windowed programs open through the shared launcher, which checks they
-                // are installed and (for the NMS) that the IQL Engine is running on the network's Mainframe.
+                /*
+                 * The NMS and other windowed programs open through the shared launcher, which checks they
+                 * are installed and (for the NMS) that the IQL Engine is running on the network's Mainframe.
+                 */
                 launchProgram(player, terminalHost, payload.monitorPos(), payload.hostPos(), id);
             }
         });
@@ -864,8 +892,10 @@ public final class ComputingPayloads {
                     if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
                             instanceof MediaReaderBlockEntity reader
                             && !reader.mediaSlot().getStackInSlot(0).isEmpty()) {
-                        // An installer's drive is named for what it installs ("Frames 11 Setup"), so the
-                        // tree says what is in the drive before it is opened.
+                        /*
+                         * An installer's drive is named for what it installs ("Frames 11 Setup"), so the
+                         * tree says what is in the drive before it is opened.
+                         */
                         final net.minecraft.world.item.ItemStack medium = reader.mediaSlot().getStackInSlot(0);
                         final String fallback = dev.jstech.computronics.os.media
                                 .InstallerProjection.facts(medium).map(f -> f.name() + " Setup").orElse("Removable Drive");
@@ -929,10 +959,12 @@ public final class ComputingPayloads {
         final dev.jstech.computronics.os.FilesystemKind kind =
                 dev.jstech.computronics.os.FilesystemKind.HIERARCHICAL;
         final String prefix = "media:" + readerPos + "/";
-        // An installer shows the disc of its era: setup, readme, manifest and payload, generated from
-        // the medium's stamp the way a disk's .dat files are generated from its storage. It carries no
-        // stored files of its own, so the projection is the whole listing; a data medium lists what it
-        // really holds.
+        /*
+         * An installer shows the disc of its era: setup, readme, manifest and payload, generated from
+         * the medium's stamp the way a disk's .dat files are generated from its storage. It carries no
+         * stored files of its own, so the projection is the whole listing; a data medium lists what it
+         * really holds.
+         */
         for (final dev.jstech.computronics.os.fs.InstallerLayout.Entry e
                 : dev.jstech.computronics.os.media.InstallerProjection.list(media, subDir)) {
             wire.add(new DiskFilesPayload.WireFile(prefix + e.path(),
@@ -1028,9 +1060,11 @@ public final class ComputingPayloads {
         final long capWeight = cap
                 * dev.jstech.computronics.storage.StorageKey.MB_EQ_PER_ITEM;
         final long fsUsed = dev.jstech.computronics.os.fs.DiskFilesystem.filesWeight(media);
-        // A DATA medium can also hold a stored item/fluid snapshot (MEDIA_DATA); both consume the medium's
-        // capacity, so deduct both, mirroring IOsHost.systemDiskFreeWeight (stored items +
-        // FILESYSTEM). Ignoring MEDIA_DATA let the player write files past the medium's real capacity.
+        /*
+         * A DATA medium can also hold a stored item/fluid snapshot (MEDIA_DATA); both consume the medium's
+         * capacity, so deduct both, mirroring IOsHost.systemDiskFreeWeight (stored items +
+         * FILESYSTEM). Ignoring MEDIA_DATA let the player write files past the medium's real capacity.
+         */
         final long dataUsed = media.getOrDefault(
                         dev.jstech.computronics.ComputingModule.MEDIA_DATA.get(),
                         dev.jstech.computronics.storage.ServerStorageContents.EMPTY)
@@ -1066,9 +1100,11 @@ public final class ComputingPayloads {
                 deskPrefs[2] = computer.console().settings().clock12h() ? 1 : 0;
                 deskPrefs[3] = computer.console().settings().taskbarCentered() ? 1 : 0;
                 deskPrefs[4] = computer.console().settings().darkMode() ? 1 : 0;
-                // Installed programs that open as their own desktop window (vs. the always-present built-in
-                // apps). Each is gated by the installed OS, hardware and host scope; the built-in apps are
-                // added on the client, so only installable desktop apps flow through this list.
+                /*
+                 * Installed programs that open as their own desktop window (vs. the always-present built-in
+                 * apps). Each is gated by the installed OS, hardware and host scope; the built-in apps are
+                 * added on the client, so only installable desktop apps flow through this list.
+                 */
                 for (final dev.jstech.computronics.os.ProgramSpec spec
                         : dev.jstech.computronics.os.OsRegistry.programs()) {
                     final dev.jstech.computronics.os.OsDef hostOs = computer.installedOs();
@@ -1079,8 +1115,10 @@ public final class ComputingPayloads {
                         programs.add(spec.id().getPath());
                     }
                 }
-                // The desktop folder only exists on a hierarchical (desktop OS) disk; a POSIX kernel keeps it
-                // under the home directory, the DOS family under Users/Public.
+                /*
+                 * The desktop folder only exists on a hierarchical (desktop OS) disk; a POSIX kernel keeps it
+                 * under the home directory, the DOS family under Users/Public.
+                 */
                 if (!disk.isEmpty()
                         && kind == dev.jstech.computronics.os.FilesystemKind.HIERARCHICAL) {
                     final dev.jstech.computronics.os.OsDef osDef = computer.installedOs();
@@ -1099,9 +1137,11 @@ public final class ComputingPayloads {
                                 e.path(), e.type().extension(), e.weight(), e.readOnly(), false));
                     }
                 }
-                // Pinned icon cells. A "file:" pin whose desktop file no longer exists is dropped here and
-                // forgotten from the console state too, so a stale position never haunts a later file that
-                // happens to take the same name (self-healing). "app:" launcher pins are always kept.
+                /*
+                 * Pinned icon cells. A "file:" pin whose desktop file no longer exists is dropped here and
+                 * forgotten from the console state too, so a stale position never haunts a later file that
+                 * happens to take the same name (self-healing). "app:" launcher pins are always kept.
+                 */
                 final java.util.Set<String> desktopNames = new java.util.HashSet<>();
                 for (final DiskFilesPayload.WireFile f : wire) {
                     desktopNames.add(baseNameOf(f.path()));
@@ -1121,13 +1161,17 @@ public final class ComputingPayloads {
                     computer.setChanged();
                 }
             }
-            // The machine's open windows travel with the desktop listing, so the desktop that is opening
-            // restores them from the machine and not from a cache in this client.
+            /*
+             * The machine's open windows travel with the desktop listing, so the desktop that is opening
+             * restores them from the machine and not from a cache in this client.
+             */
             context.reply(DesktopWindowsPayload.of(payload.hostPos(),
                     context.player().level().getBlockEntity(payload.hostPos()) instanceof IOsHost machine
                             ? machine.openWindows() : java.util.List.of()));
-            // Programs the player installed from the Mirror get a launcher of their own, so the icon on
-            // the desktop is not only for what came with the machines.
+            /*
+             * Programs the player installed from the Mirror get a launcher of their own, so the icon on
+             * the desktop is not only for what came with the machines.
+             */
             final java.util.List<DesktopFilesPayload.WireCommunity> community = new java.util.ArrayList<>();
             if (context.player().level().getBlockEntity(payload.hostPos())
                     instanceof dev.jstech.computronics.terminal.IComputerTerminalHost terminal) {
@@ -1195,8 +1239,10 @@ public final class ComputingPayloads {
                             instanceof dev.jstech.computronics.os
                                     .IOsHost computer
                     && computer instanceof dev.jstech.computronics.terminal.IComputerTerminalHost host) {
-                // Route through the same setConfig the MC-DOS 'config' command uses, so both front-ends
-                // clamp and persist identically.
+                /*
+                 * Route through the same setConfig the MC-DOS 'config' command uses, so both front-ends
+                 * clamp and persist identically.
+                 */
                 new dev.jstech.computronics.program.ServerCliComputer(host, level)
                         .setConfig(payload.key(), payload.value());
                 PacketDistributor.sendToPlayer(player, buildSettingsSnapshot(computer, payload.hostPos()));
@@ -1316,8 +1362,10 @@ public final class ComputingPayloads {
                         final long storeItems = storageW / mbEq;
                         final long fileItems = fsW / mbEq;
                         final long usedItems = storeItems + fileItems + osItems;
-                        // The three shares travel separately, so the disk can show where its space
-                        // actually went instead of one anonymous "used" number.
+                        /*
+                         * The three shares travel separately, so the disk can show where its space
+                         * actually went instead of one anonymous "used" number.
+                         */
                         disks.add(new ThisPcPayload.WireDisk(slot, stack.getHoverName().getString(),
                                 cap, usedItems, stack == sys, osId != null ? osId.getPath() : "",
                                 osItems, storeItems, fileItems));
@@ -1403,8 +1451,10 @@ public final class ComputingPayloads {
         final int osYear = os == null ? 0
                 : dev.jstech.computronics.os.Branding.osYear(os.displayName(), os.minEra());
         final NetworkUuid network = computer.networkUuid();
-        // Hardware by what is seated, read off the parts themselves so every computer type answers
-        // the same way whatever its slot layout.
+        /*
+         * Hardware by what is seated, read off the parts themselves so every computer type answers
+         * the same way whatever its slot layout.
+         */
         String board = "";
         String cpu = "";
         int cpus = 0;
@@ -1541,8 +1591,10 @@ public final class ComputingPayloads {
             if (pl == null || computer.installedOs() == null) {
                 return;
             }
-            // Program install gate: the OS platform must be supported and the hardware must meet the
-            // program's CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
+            /*
+             * Program install gate: the OS platform must be supported and the hardware must meet the
+             * program's CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
+             */
             if (!dev.jstech.computronics.os.OsRegistry.canInstallProgram(
                     computer.installedOsId(), pl,
                     computer.maxCpuMhz(), computer.totalVramMb(), computer.systemDiskFreeMb())) {
@@ -1551,9 +1603,11 @@ public final class ComputingPayloads {
                         false);
                 return;
             }
-            // Host gate: a program bound to a specific computer (the Crafting Manager to a Crafting Computer,
-            // the Mainframe services to a Mainframe) installs only there. Driven by the descriptor's host
-            // scope, not a per-program check.
+            /*
+             * Host gate: a program bound to a specific computer (the Crafting Manager to a Crafting Computer,
+             * the Mainframe services to a Mainframe) installs only there. Driven by the descriptor's host
+             * scope, not a per-program check.
+             */
             final dev.jstech.computronics.os.ProgramSpec spec =
                     dev.jstech.computronics.os.OsRegistry.getProgram(pl);
             if (!hostScopeAllows(spec, computer)) {
@@ -1561,8 +1615,10 @@ public final class ComputingPayloads {
                         hostScopeMessage(spec)), false);
                 return;
             }
-            // The Automation Engine is a Mainframe service: installing its floppy on the Mainframe turns the
-            // job agent on.
+            /*
+             * The Automation Engine is a Mainframe service: installing its floppy on the Mainframe turns the
+             * job agent on.
+             */
             if (pl.equals(Programs.AUTOMATION_ENGINE) && computer instanceof MainframeBlockEntity mainframe) {
                 mainframe.installAutomationEngine();
             }
@@ -1590,8 +1646,10 @@ public final class ComputingPayloads {
                             instanceof dev.jstech.computronics.terminal.IComputerTerminalHost host) {
                 final var computer =
                         new dev.jstech.computronics.program.ServerCliComputer(host, level);
-                // A program has the terminal: everything typed goes to it, not to the shell, and what it
-                // printed since the last time keeps coming until it returns.
+                /*
+                 * A program has the terminal: everything typed goes to it, not to the shell, and what it
+                 * printed since the last time keeps coming until it returns.
+                 */
                 final var running = computer.foreground();
                 if (running != null) {
                     busy = drainForeground(running, payload.line(), wire);
@@ -1606,11 +1664,15 @@ public final class ComputingPayloads {
                     wire.add(new DesktopShellOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
                 }
                 prompt = computer.prompt();
-                // The command just run may have been one that starts a program at this terminal, in
-                // which case the prompt does not come back with this reply.
+                /*
+                 * The command just run may have been one that starts a program at this terminal, in
+                 * which case the prompt does not come back with this reply.
+                 */
                 busy = computer.foreground() != null;
-                // The reboot verbs work from the desktop's terminal window too: the desktop closes and the
-                // monitor either replays the POST (plain reboot) or enters the firmware setup.
+                /*
+                 * The reboot verbs work from the desktop's terminal window too: the desktop closes and the
+                 * monitor either replays the POST (plain reboot) or enters the firmware setup.
+                 */
                 final BlockPos monitorPos = player.containerMenu
                         instanceof dev.jstech.computronics.menu.DesktopMenu desktop
                         ? desktop.monitorPos() : null;
@@ -1667,8 +1729,10 @@ public final class ComputingPayloads {
     private static void handleDesktopShellOutput(final DesktopShellOutputPayload payload,
                                                  final IPayloadContext context) {
         context.enqueueWork(() -> {
-            // The console reply routes to whichever desktop window owns a console (the Shell or the
-            // Network Interactor's embedded command line); both ignore it when not open.
+            /*
+             * The console reply routes to whichever desktop window owns a console (the Shell or the
+             * Network Interactor's embedded command line); both ignore it when not open.
+             */
             dev.jstech.computronics.client.os.ShellApp.accept(payload);
             dev.jstech.computronics.client.os.NetworkInteractorApp.acceptConsole(payload);
         });
@@ -1924,7 +1988,7 @@ public final class ComputingPayloads {
                     ? dev.jstech.computronics.os.FilesystemKind.HIERARCHICAL
                     : filesystemKindOf(computer);
             if (volumeKey(src).equals(volumeKey(destDir))) {
-                // Same volume — an in-place move.
+                // Same volume, an in-place move.
                 if (dev.jstech.computronics.os.fs.DiskFilesystem.move(
                         srcVol, realSrc, realDstDir, srcKind)) {
                     if (srcMedia) {
@@ -1935,8 +1999,10 @@ public final class ComputingPayloads {
                 }
                 return;
             }
-            // Cross-volume (disk <-> media): copy the file then delete the source. Directories are
-            // not copied across volumes here.
+            /*
+             * Cross-volume (disk <-> media): copy the file then delete the source. Directories are
+             * not copied across volumes here.
+             */
             final var read = dev.jstech.computronics.os.fs.DiskFilesystem.read(srcVol, realSrc);
             if (read.isEmpty()) {
                 return;
@@ -1976,7 +2042,7 @@ public final class ComputingPayloads {
      * Sanctioned {@code .dat}-onto-medium item transfer (the one manual {@code .dat} operation that is allowed).
      *
      * <p>A {@code .dat} is a read-only projection of an item kept in the computer's disks. Dragging it onto a
-     * removable medium does not copy a file — it moves the stored item. The flow is conservative end to end so
+     * removable medium does not copy a file; it moves the stored item. The flow is conservative end to end so
      * an item is never lost or duplicated:
      * <ol>
      *   <li>Resolve {@code datPath} back to its {@link StorageKey} by re-projecting the system disk (the
@@ -1986,7 +2052,7 @@ public final class ComputingPayloads {
      *       does not fit is returned to the computer's storage.</li>
      * </ol>
      * The source {@code .dat} vanishes on its own once the key leaves the disk's volume, and the item then
-     * shows up under the medium's projection — no second item-movement path, no byte copy.
+     * shows up under the medium's projection, with no second item-movement path, no byte copy.
      */
     private static void handleMediumTransfer(final MediumTransferPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -2027,7 +2093,7 @@ public final class ComputingPayloads {
     /**
      * Moves the stored quantity of {@code key} from a computer's local storage onto a DATA {@code media} stack,
      * bounded by the medium's free capacity. Conservative: it extracts first and inserts only what was
-     * extracted, capped by what fits, so the sum across the two stores is invariant — nothing is created or
+     * extracted, capped by what fits, so the sum across the two stores is invariant, and nothing is created or
      * destroyed. Returns the number of native units actually moved.
      *
      * <p>Exposed so it can be exercised directly by a GameTest with real component stacks, without a
@@ -2058,8 +2124,10 @@ public final class ComputingPayloads {
             dev.jstech.computronics.os.media.MediaItem.setData(media,
                     new dev.jstech.computronics.storage.ServerStorageContents(next));
         } catch (final RuntimeException e) {
-            // The medium write failed after the items already left local storage; put them back so the
-            // exceptional path still conserves items (nothing lost), then rethrow.
+            /*
+             * The medium write failed after the items already left local storage; put them back so the
+             * exceptional path still conserves items (nothing lost), then rethrow.
+             */
             host.localStore().insert(key, extracted);
             throw e;
         }
@@ -2078,8 +2146,10 @@ public final class ComputingPayloads {
         }
         final dev.jstech.computronics.storage.ServerStorageContents storage =
                 dev.jstech.computronics.storage.DriveVolumes.contents(disk);
-        // The projection emits one entry per key in iteration order, with the same path each time; pair each
-        // emitted path with the storage key at the same position to invert the path back to its key.
+        /*
+         * The projection emits one entry per key in iteration order, with the same path each time; pair each
+         * emitted path with the storage key at the same position to invert the path back to its key.
+         */
         final java.util.List<dev.jstech.computronics.os.fs.DiskFilesystem.FileEntry> entries =
                 dev.jstech.computronics.os.fs.StorageProjection.project(storage);
         final java.util.Iterator<StorageKey> keys = storage.items().keySet().iterator();
@@ -2172,8 +2242,10 @@ public final class ComputingPayloads {
         if (vol.isEmpty()) {
             return java.util.Optional.empty();
         }
-        // A projected file on an installer (its readme, manifest or autorun) has no stored bytes to
-        // read: its text is generated from the medium's stamp.
+        /*
+         * A projected file on an installer (its readme, manifest or autorun) has no stored bytes to
+         * read: its text is generated from the medium's stamp.
+         */
         final java.util.Optional<String> projected = media
                 ? dev.jstech.computronics.os.media.InstallerProjection.text(vol, mediaSubPath(path))
                 : java.util.Optional.empty();
@@ -2385,9 +2457,11 @@ public final class ComputingPayloads {
             final var stock = dev.jstech.computronics.operation.NetworkStorage
                     .of(level, host.networkUuid()).query();
             final StorageKey key = StorageKey.of(payload.result());
-            // A machine recipe whose inputs are in stock, or a multi-stage pipeline, plans by its own inputs.
-            // Otherwise the recursive planner expands bench and machine patterns alike, so a machine-made
-            // ingredient shows up as the raw materials of its own recipe rather than as missing.
+            /*
+             * A machine recipe whose inputs are in stock, or a multi-stage pipeline, plans by its own inputs.
+             * Otherwise the recursive planner expands bench and machine patterns alike, so a machine-made
+             * ingredient shows up as the raw materials of its own recipe rather than as missing.
+             */
             final var machinePlan = planMachineRecipe(mainframe, key, payload.quantity(), stock);
             if (machinePlan != null && (machinePlan.feasible() || !machinePlan.plainMachine())) {
                 PacketDistributor.sendToPlayer(player, new CraftPlanPayload(
@@ -2395,9 +2469,11 @@ public final class ComputingPayloads {
                         machinePlan.feasible(), machinePlan.maxFeasible(), machinePlan.estimateTicks()));
                 return;
             }
-            // The recursive plan is CPU work over immutable inputs: it runs on a virtual thread and the reply
-            // goes out from the main thread when it is ready (the dialog shows "planning..." meanwhile). Without
-            // a dispatcher the plan is made here and now instead.
+            /*
+             * The recursive plan is CPU work over immutable inputs: it runs on a virtual thread and the reply
+             * goes out from the main thread when it is ready (the dialog shows "planning..." meanwhile). Without
+             * a dispatcher the plan is made here and now instead.
+             */
             final long quantity = payload.quantity();
             final ItemStack result = payload.result();
             final java.util.function.Supplier<PlanPreview> preview =
@@ -2580,9 +2656,11 @@ public final class ComputingPayloads {
                 dispatchActiveOperations(player, net, level);
                 dispatchCraftCatalog(player, net, level);
             };
-            // The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
-            // craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. The
-            // multiStage flag picks the pipeline over the flat recursive path when a result has both.
+            /*
+             * The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
+             * craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. The
+             * multiStage flag picks the pipeline over the flat recursive path when a result has both.
+             */
             final var op = mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(),
                     host.originLabel(MoveLabels.TERMINAL), refresh, payload.multiStage());
             if (op != null) {
@@ -2702,17 +2780,21 @@ public final class ComputingPayloads {
                 PacketDistributor.sendToPlayer(player, new RemoteHostsPayload(entries));
                 return;
             }
-            // Take over: put the chosen machine's own session on this monitor, exactly as walking to
-            // it would. Reachability is re-checked here so a stale window cannot reach off-network.
+            /*
+             * Take over: put the chosen machine's own session on this monitor, exactly as walking to
+             * it would. Reachability is re-checked here so a stale window cannot reach off-network.
+             */
             final BlockPos target = BlockPos.of(payload.targetPos());
             final boolean reachable = cli.remoteMachines().values().stream()
                     .anyMatch(machine -> machine.getBlockPos().equals(target));
             if (!reachable) {
                 return;
             }
-            // Mark the screen as showing the remote machine BEFORE opening it: every menu validates
-            // through the monitor, and without this the new session is torn down on its first tick
-            // for showing a computer the cable does not link.
+            /*
+             * Mark the screen as showing the remote machine BEFORE opening it: every menu validates
+             * through the monitor, and without this the new session is torn down on its first tick
+             * for showing a computer the cable does not link.
+             */
             if (level.getBlockEntity(payload.monitorPos())
                     instanceof dev.jstech.computronics.blockentity.MonitorBlockEntity monitor) {
                 monitor.setRemoteSession(target);
@@ -2761,8 +2843,10 @@ public final class ComputingPayloads {
                             instanceof dev.jstech.computronics.os.IOsHost computer)) {
                 return;
             }
-            // The screen closes either way: a machine that just powered off has nothing to show, and
-            // a restart comes back through the power-on self-test like any other cold start.
+            /*
+             * The screen closes either way: a machine that just powered off has nothing to show, and
+             * a restart comes back through the power-on self-test like any other cold start.
+             */
             player.closeContainer();
             switch (payload.action()) {
                 case MachinePowerPayload.ACTION_SHUTDOWN -> computer.setPowered(false);
@@ -2797,8 +2881,10 @@ public final class ComputingPayloads {
         if (player.containerMenu instanceof dev.jstech.computronics.menu.CraftingComputerMenu menu) {
             return menu.computerPos().equals(pos);
         }
-        // A supercomputer node is a rack computer now: it is renamed through the Server assembly GUI
-        // like any other server, so it has no assembly menu of its own to check here.
+        /*
+         * A supercomputer node is a rack computer now: it is renamed through the Server assembly GUI
+         * like any other server, so it has no assembly menu of its own to check here.
+         */
         return false;
     }
 
@@ -2817,8 +2903,10 @@ public final class ComputingPayloads {
                 return;
             }
             final StorageKey key = payload.key();
-            // Take the items out of local storage and carry them in the Operation; whatever the network
-            // cannot hold is returned to local storage when it settles, so nothing is ever lost.
+            /*
+             * Take the items out of local storage and carry them in the Operation; whatever the network
+             * cannot hold is returned to local storage when it settles, so nothing is ever lost.
+             */
             final long taken = host.localStore().extract(key,
                     Math.min(payload.quantity(), host.localStore().count(key)));
             if (taken <= 0L) {
@@ -2850,7 +2938,7 @@ public final class ComputingPayloads {
         });
     }
 
-    // Network-operation dispatch — the ONLY way storage is touched. Every request
+    // Network-operation dispatch: the ONLY way storage is touched. Every request
 
     private static void returnToPlayer(final ServerPlayer player, final ItemStack stack) {
         DataHandoff.returnToPlayer(player, stack);
@@ -2910,8 +2998,10 @@ public final class ComputingPayloads {
                     message = "ANALYZE complete - " + count + " types reconciled";
                 }
                 case TerminalMaintenancePayload.ACTION_REINDEX -> {
-                    // The disks are read now; the catalog is built off the tick and swapped in later, when
-                    // the run is logged and the grid refreshed.
+                    /*
+                     * The disks are read now; the catalog is built off the tick and swapped in later, when
+                     * the run is logged and the grid refreshed.
+                     */
                     final ItemStack reindexIcon = labelledIcon(Items.COMPASS, "index");
                     mainframe.reindexAsync(() -> {
                         mainframe.recordOperation(OperationRecord.TYPE_REINDEX, reindexIcon, index.catalogSize(),
@@ -2939,7 +3029,7 @@ public final class ComputingPayloads {
             mainframe.recordOperation(opType, icon, count, count,
                     OperationRecord.STATUS_COMPLETED, java.util.List.of());
             player.displayClientMessage(Component.literal(message), true);
-            dispatchTerminalQuery(player, net, level); // the catalog may have changed — refresh the grid
+            dispatchTerminalQuery(player, net, level); // the catalog may have changed, so refresh the grid
         });
     }
 
@@ -3054,12 +3144,14 @@ public final class ComputingPayloads {
                 return;
             }
             Set<NodeUuid> sources = payload.serverKeys().isEmpty() ? null : toNodes(payload.serverKeys());
-            // A MOVE must never pull from its own destination Server: extracting and re-inserting into
-            // the same store would churn items in place. Drop the target from the sources.
+            /*
+             * A MOVE must never pull from its own destination Server: extracting and re-inserting into
+             * the same store would churn items in place. Drop the target from the sources.
+             */
             if (dest.move() && dest.target() != null) {
                 sources = sourcesWithout(level, net, sources, dest.target());
                 if (sources.isEmpty()) {
-                    return; // the only chosen source was the destination — nothing to move
+                    return; // the only chosen source was the destination, nothing to move
                 }
             }
             final StorageKey key = payload.key();
@@ -3185,9 +3277,11 @@ public final class ComputingPayloads {
             }
             final DataHandoff.ISource source = fromCursor
                     ? DataHandoff.cursor(player) : DataHandoff.slot(menu.getSlot(idx), player);
-            // A right-click hands over ONE: one item, or what a held container holds — and a held empty
-            // container over a fluid or chemical entry fills from it instead. Left click and shift-click
-            // deposit the stack as items, the way a chest takes them.
+            /*
+             * A right-click hands over ONE: one item, or what a held container holds, and a held empty
+             * container over a fluid or chemical entry fills from it instead. Left click and shift-click
+             * deposit the stack as items, the way a chest takes them.
+             */
             final boolean one = idx == TerminalInsertPayload.CURSOR_ONE;
             final Runnable refresh = () -> sendSnapshot(player, level, net);
             if (one && payload.entry().isPresent() && DataContainers.canTake(source.get(), payload.entry().get())) {
@@ -3208,8 +3302,10 @@ public final class ComputingPayloads {
                     && context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level) {
                 PacketDistributor.sendToPlayer(player, collectBreakdown(level, host.networkUuid(), payload.key()));
-                // The advanced-mode destination picker needs every computer that can hold items (the
-                // Mainframe's local storage and every Server), not just those holding the clicked item.
+                /*
+                 * The advanced-mode destination picker needs every computer that can hold items (the
+                 * Mainframe's local storage and every Server), not just those holding the clicked item.
+                 */
                 PacketDistributor.sendToPlayer(player, collectComputers(level, host.networkUuid()));
             }
         });
@@ -3253,7 +3349,7 @@ public final class ComputingPayloads {
 
     /**
      * The Network Interactor's advanced request: pull from chosen source Servers into a chosen destination.
-     * Reuses the same dispatch as the MC-NET terminal SELECT — only the host resolution (niHost) differs.
+     * Reuses the same dispatch as the MC-NET terminal SELECT, and only the host resolution (niHost) differs.
      */
     private static void handleNiSelect(final NiSelectPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -3283,7 +3379,7 @@ public final class ComputingPayloads {
             if (dest.move() && dest.target() != null) {
                 sources = sourcesWithout(level, net, sources, dest.target());
                 if (sources.isEmpty()) {
-                    return; // the only chosen source was the destination — nothing to move
+                    return; // the only chosen source was the destination, nothing to move
                 }
             }
             final long qty = Math.min(payload.quantity(), Integer.MAX_VALUE);
@@ -3310,8 +3406,10 @@ public final class ComputingPayloads {
                     || !(player.level() instanceof ServerLevel level)) {
                 return;
             }
-            // Any computer on the network may re-prioritise its Operations: the same proximity-to-a-linked-
-            // monitor check the other desktop requests use, so a player cannot drive a foreign network.
+            /*
+             * Any computer on the network may re-prioritise its Operations: the same proximity-to-a-linked-
+             * monitor check the other desktop requests use, so a player cannot drive a foreign network.
+             */
             final var host = niHost(player, level, payload.host(), payload.monitorPos());
             if (host == null || host.networkUuid() == null) {
                 return;
@@ -3488,7 +3586,7 @@ public final class ComputingPayloads {
 
     /**
      * Resolves the computer for a craft request that may come from the MC-NET terminal (its container menu) OR
-     * the desktop Network Interactor (no menu — authenticated by proximity to a linked monitor). Tries the
+     * the desktop Network Interactor (no menu, authenticated by proximity to a linked monitor). Tries the
      * terminal first, then the NI host, so the shared craft flow works from both.
      */
     private static IComputerTerminalHost craftHost(final IPayloadContext context, final BlockPos monitorPos,
@@ -3605,8 +3703,10 @@ public final class ComputingPayloads {
                 if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
                     break;
                 }
-                // A Cluster Management Computer takes a PC's place on the network (same layout, same role
-                // in the topology), but the overview names it for what it is.
+                /*
+                 * A Cluster Management Computer takes a PC's place on the network (same layout, same role
+                 * in the topology), but the overview names it for what it is.
+                 */
                 final int kind = level.getBlockEntity(BlockPos.of(pc.pos()))
                         instanceof dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity
                         ? NetworkNodeInfo.KIND_CLUSTER_MANAGEMENT : NetworkNodeInfo.KIND_PC;
@@ -3624,9 +3724,11 @@ public final class ComputingPayloads {
                 if (nodes.size() >= NetworkManagerPayload.MAX_NODES) {
                     break;
                 }
-                // A supercomputer is a whole cluster bridged by an HBW interface (its pos is that interface,
-                // not a single computer). It is on the network whenever its uplink is; it is online — able
-                // to take crafts — only with at least one rated node.
+                /*
+                 * A supercomputer is a whole cluster bridged by an HBW interface (its pos is that interface,
+                 * not a single computer). It is on the network whenever its uplink is; it is online (able
+                 * to take crafts) only with at least one rated node.
+                 */
                 final String scName = level.getBlockEntity(BlockPos.of(sc.pos()))
                         instanceof dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity hub
                         ? hub.customName() : "";
@@ -3643,8 +3745,10 @@ public final class ComputingPayloads {
             final dev.jstech.computronics.os.IOsHost c,
             final String uuid, final String detail) {
         final int share = dev.jstech.computronics.item.DiskItem.publicPermille(c.systemDisk());
-        // Total capacity is only summed for the Mainframe; a generic computer reports its free space, which is
-        // the "available storage" the tooltip shows, with total left as 0 (unknown).
+        /*
+         * Total capacity is only summed for the Mainframe; a generic computer reports its free space, which is
+         * the "available storage" the tooltip shows, with total left as 0 (unknown).
+         */
         return new NetworkNodeInfo(kind, ShortId.of(uuid), c.customName(), detail, c.isRunning(),
                 c.maxCpuMhz(), c.totalVramMb(), c.systemDiskFreeMb(), 0L,
                 share, osLabelOf(c.installedOsId()));
@@ -3831,7 +3935,7 @@ public final class ComputingPayloads {
         visiting.remove(key);
     }
 
-    // --- Automation Manager: the job list, engine status, create, and pause/resume/delete ------------
+    // Automation Manager: the job list, engine status, create, and pause/resume/delete
 
     private static void handleRequestAutomation(final RequestAutomationPayload payload,
                                                 final IPayloadContext context) {
@@ -4096,8 +4200,10 @@ public final class ComputingPayloads {
                     instanceof dev.jstech.computronics.blockentity.MainframeBlockEntity;
             case CRAFTING_COMPUTER -> computer
                     instanceof CraftingComputerBlockEntity;
-            // A rack answers as the machine it is showing, so scoping to SERVER means "this session
-            // is a rack server", which is exactly where the headless server services belong.
+            /*
+             * A rack answers as the machine it is showing, so scoping to SERVER means "this session
+             * is a rack server", which is exactly where the headless server services belong.
+             */
             case SERVER -> computer
                     instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity;
             case CLUSTER_MANAGEMENT_COMPUTER -> computer
@@ -4226,8 +4332,10 @@ public final class ComputingPayloads {
                 : dev.jstech.computronics.operation.NetworkStorage.of(level, network).query();
         final List<NetworkItemEntry> entries = new ArrayList<>(Math.min(totals.size(),
                 NetworkSnapshotPayload.MAX_ENTRIES));
-        // Bounded by the wire cap so encoding never overflows the StreamCodec. The entry carries the
-        // full stack (components and all), so the terminal shows the enchanted item, not a bare one.
+        /*
+         * Bounded by the wire cap so encoding never overflows the StreamCodec. The entry carries the
+         * full stack (components and all), so the terminal shows the enchanted item, not a bare one.
+         */
         totals.entrySet().stream().limit(NetworkSnapshotPayload.MAX_ENTRIES)
                 .forEach(e -> entries.add(new NetworkItemEntry(e.getKey(), e.getValue())));
         PacketDistributor.sendToPlayer(player, new NetworkSnapshotPayload(entries));
@@ -4236,8 +4344,10 @@ public final class ComputingPayloads {
     private static void handleRequestNetworkInteractor(final RequestNetworkInteractorPayload payload,
                                                        final IPayloadContext context) {
         context.enqueueWork(() -> {
-            // Proximity + monitor-link gated, like the mutating handlers — the snapshot leaks the whole
-            // network's contents, so a player must be at a monitor actually linked to this host.
+            /*
+             * Proximity + monitor-link gated, like the mutating handlers, since the snapshot leaks the whole
+             * network's contents, so a player must be at a monitor actually linked to this host.
+             */
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && niHost(player, level, payload.host(), payload.monitorPos()) != null
@@ -4296,7 +4406,7 @@ public final class ComputingPayloads {
                 networkItems, localItems, online, usedItems, serverCount, crafts));
     }
 
-    /** A human label for a storage node in the details panel's per-server breakdown — a server's rack position
+    /** A human label for a storage node in the details panel's per-server breakdown, such as a server's rack position
      *  and slot, or a generic label for a published Personal Computer (which has no rack location). */
     private static String serverLabel(final dev.jstech.core.network.NetworkSystem system,
                                       final dev.jstech.core.uuid.NodeUuid node) {
@@ -4321,8 +4431,10 @@ public final class ComputingPayloads {
                 instanceof dev.jstech.computronics.terminal.IComputerTerminalHost host)) {
             return null;
         }
-        // Anti-spoof: the monitor must actually be a linked peripheral of this host, so a player near any
-        // monitor cannot drive a foreign computer by sending that computer's position as the host.
+        /*
+         * Anti-spoof: the monitor must actually be a linked peripheral of this host, so a player near any
+         * monitor cannot drive a foreign computer by sending that computer's position as the host.
+         */
         if (!(host instanceof dev.jstech.core.peripheral.IPeripheralOwner owner)
                 || !owner.linkedEndpoints().contains(monitorPos.asLong())) {
             return null;
@@ -4500,8 +4612,10 @@ public final class ComputingPayloads {
             if (host == null) {
                 return;
             }
-            // Left click deposits the whole stack as items; a right-click hands over ONE: one item, or what a
-            // held container holds — and a held empty container over a fluid or chemical entry fills from it.
+            /*
+             * Left click deposits the whole stack as items; a right-click hands over ONE: one item, or what a
+             * held container holds, and a held empty container over a fluid or chemical entry fills from it.
+             */
             final DataHandoff.ISource source = DataHandoff.cursor(player);
             final boolean one = !payload.whole();
             final int amount = one ? 1 : source.get().getCount();
@@ -4566,8 +4680,10 @@ public final class ComputingPayloads {
                     sendNetworkInteractor(player, level, computer);
                 }
             };
-            // The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
-            // craft; refreshNi resends the Network Interactor now and again when the operation settles.
+            /*
+             * The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
+             * craft; refreshNi resends the Network Interactor now and again when the operation settles.
+             */
             mainframe.submitCraftRequest(StorageKey.of(payload.result()), safeAmount, true,
                     host.originLabel(MoveLabels.INTERACTOR), refreshNi);
             refreshNi.run();
@@ -4580,7 +4696,7 @@ public final class ComputingPayloads {
                 dev.jstech.computronics.client.os.NetworkInteractorApp.accept(payload));
     }
 
-    // Local storage (the Storage tab) — disk-backed, component-preserving quantity view.
+    // Local storage (the Storage tab): disk-backed, component-preserving quantity view.
 
     private static void handleLocalSnapshot(final LocalStorageSnapshotPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -4597,8 +4713,10 @@ public final class ComputingPayloads {
                 Math.min(view.size(), LocalStorageSnapshotPayload.MAX_ENTRIES));
         view.entrySet().stream().limit(LocalStorageSnapshotPayload.MAX_ENTRIES)
                 .forEach(e -> entries.add(new NetworkItemEntry(e.getKey(), e.getValue())));
-        // Per-disk privacy state for the Storage tab's slider; empty for a host with no slider, which
-        // makes the Storage tab show the static "always public" badge instead of a control.
+        /*
+         * Per-disk privacy state for the Storage tab's slider; empty for a host with no slider, which
+         * makes the Storage tab show the static "always public" badge instead of a control.
+         */
         final List<LocalStorageSnapshotPayload.DiskInfo> disks = new ArrayList<>();
         if (host.storageHasSlider()) {
             final int count = Math.min(host.diskPrivacyDiskCount(), LocalStorageSnapshotPayload.MAX_DISKS);
@@ -4619,11 +4737,13 @@ public final class ComputingPayloads {
             }
             final StorageKey key = payload.key();
             if (!key.isItem()) {
-                return; // a fluid or chemical cannot be held in the inventory — withdraw it via an Export Bus
+                return; // a fluid or chemical cannot be held in the inventory, withdraw it via an Export Bus
             }
             final int maxStack = Math.max(1, key.stack(1).getMaxStackSize());
-            // Take only as much as the player's inventory can actually hold, so a "withdraw all" on a
-            // huge stack never extracts more than fits — items must never be destroyed by overflow.
+            /*
+             * Take only as much as the player's inventory can actually hold, so a "withdraw all" on a
+             * huge stack never extracts more than fits, since items must never be destroyed by overflow.
+             */
             final long want = Math.min(payload.quantity(), host.localStore().count(key));
             final long toWithdraw = Math.min(want, inventoryRoomFor(player, key, maxStack));
             if (toWithdraw <= 0L) {
@@ -4637,7 +4757,7 @@ public final class ComputingPayloads {
                 final int placed = batch - out.getCount();
                 remaining -= placed;
                 if (placed <= 0) {
-                    break; // inventory unexpectedly full — return the remainder below
+                    break; // inventory unexpectedly full, return the remainder below
                 }
             }
             if (remaining > 0L) {
@@ -4653,8 +4773,10 @@ public final class ComputingPayloads {
             if (host == null || !(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            // A Server or the Mainframe is always fully public — it carries no slider, so a privacy
-            // write to one is a stale or spoofed packet. Warn lightly and ignore it.
+            /*
+             * A Server or the Mainframe is always fully public: it carries no slider, so a privacy
+             * write to one is a stale or spoofed packet. Warn lightly and ignore it.
+             */
             if (!host.storageHasSlider()
                     || !(host instanceof PersonalComputerBlockEntity pc)) {
                 JsComputronics.LOGGER.warn("Ignoring disk-privacy write to a host without a storage slider at {}",
@@ -4688,9 +4810,9 @@ public final class ComputingPayloads {
         return room;
     }
 
-    // OS install flow — client asks the server to scan linked media readers and install the OS.
+    // OS install flow: the client asks the server to scan linked media readers and install the OS.
 
-    // ---- Firmware boot manager ----
+    // Firmware boot manager
 
     private static void handleRequestFirmwareState(final RequestFirmwareStatePayload payload,
                                                    final IPayloadContext context) {
@@ -4757,7 +4879,7 @@ public final class ComputingPayloads {
 
     /**
      * What the firmware's storage page shows: the controller in this machine's bay, the array it
-     * runs, and what each mode would give. Only a rack server has one — a desk computer's firmware
+     * runs, and what each mode would give. Only a rack server has one, since a desk computer's firmware
      * simply has no storage page.
      */
     private static FirmwareStatePayload.RaidInfo raidInfoOf(
@@ -4800,9 +4922,11 @@ public final class ComputingPayloads {
                     computer.setBootDiskSlot((int) payload.ref());
                     computer.setPendingInstallSlot(IOsHost.NO_PENDING_INSTALL); // the reboot the installer asked for
                     if (computer.hasOs()) {
-                        // Booting a disk from the firmware is a restart, so it replays POST like any
-                        // other. Handing straight over to the system skipped the self-test the machine
-                        // has to run, and left the session fixed on whatever it was before.
+                        /*
+                         * Booting a disk from the firmware is a restart, so it replays POST like any
+                         * other. Handing straight over to the system skipped the self-test the machine
+                         * has to run, and left the session fixed on whatever it was before.
+                         */
                         computer.setNeedsPost(true);
                         dev.jstech.computronics.block.MonitorBlock.openPost(
                                 player, level, payload.monitorPos(), payload.hostPos());
@@ -4822,8 +4946,10 @@ public final class ComputingPayloads {
                 case FirmwareActionPayload.ACTION_INSTALL -> {
                     final String failure = installFailure(level, computer, payload.ref(), payload.target());
                     if (failure != null) {
-                        // The client's installer has just played its progress to the end: end it on the
-                        // refusal, not on a "complete" the disk never saw.
+                        /*
+                         * The client's installer has just played its progress to the end: end it on the
+                         * refusal, not on a "complete" the disk never saw.
+                         */
                         final HardwareEra era = computer.displayEra();
                         final int slot = payload.target();
                         PacketDistributor.sendToPlayer(player, new OpenInstallDonePayload(payload.hostPos(),
@@ -4904,15 +5030,19 @@ public final class ComputingPayloads {
                         + eraName(hostEra) + " era.";
                 continue;
             }
-            // A live/source medium (Arch, Gentoo) never one-click installs: it must be BOOTED and the
-            // system put on the disk by hand through its shell. Only guided installers land here.
+            /*
+             * A live/source medium (Arch, Gentoo) never one-click installs: it must be BOOTED and the
+             * system put on the disk by hand through its shell. Only guided installers land here.
+             */
             if (def.installMode() != dev.jstech.computronics.os.InstallMode.GUIDED) {
                 failure = def.displayName() + " is put on the disk by hand from its own shell: boot the medium instead.";
                 continue;
             }
             if (computer.installOs(def.id(), targetSlot)) {
-                // The files are on the disk, but the machine is still running the installer until it
-                // restarts: remember that, so the monitor comes back to the reboot prompt, not the system.
+                /*
+                 * The files are on the disk, but the machine is still running the installer until it
+                 * restarts: remember that, so the monitor comes back to the reboot prompt, not the system.
+                 */
                 computer.setPendingInstallSlot(targetSlot);
                 return null;
             }
@@ -4965,9 +5095,11 @@ public final class ComputingPayloads {
             if (context.player() instanceof ServerPlayer player
                     && player.level().getBlockEntity(payload.host()) instanceof IOsHost computer
                     && computer.isRunning()) {
-                // A machine that has since been switched off or restarted keeps its empty desktop: the
-                // layout in flight belongs to a session that no longer exists. The machine keeps only the
-                // windows its RAM holds: a client that claims more than fits is trimmed to what does.
+                /*
+                 * A machine that has since been switched off or restarted keeps its empty desktop: the
+                 * layout in flight belongs to a session that no longer exists. The machine keeps only the
+                 * windows its RAM holds: a client that claims more than fits is trimmed to what does.
+                 */
                 if (!computer.needsPost()) {
                     computer.setOpenWindows(computer.windowsWithinBudget(payload.toOpenWindows()));
                 }
@@ -4993,9 +5125,11 @@ public final class ComputingPayloads {
                 return; // powered off mid-POST: the screen just stays dark
             }
             computer.setNeedsPost(false);
-            // POST is the moment the machine decides what it is running. Fixing it here is what makes a
-            // freshly installed (or removed) desktop package wait for a restart instead of appearing the
-            // next time the monitor is opened.
+            /*
+             * POST is the moment the machine decides what it is running. Fixing it here is what makes a
+             * freshly installed (or removed) desktop package wait for a restart instead of appearing the
+             * next time the monitor is opened.
+             */
             computer.setBootedDesktopId(computer.installedDesktopId());
             if (payload.enterSetup()) {
                 dev.jstech.computronics.block.MonitorBlock.openFirmware(
@@ -5088,8 +5222,10 @@ public final class ComputingPayloads {
                 DiskFilesystem.list(media, "", FilesystemKind.HIERARCHICAL);
         final List<String> names = new ArrayList<>();
         for (final DiskFilesystem.FileEntry e : entries) {
-            // A name the wire cannot carry would disconnect the player on every listing; the filesystem's own
-            // name limit is the cap, so this only guards against a path the filesystem should never hold.
+            /*
+             * A name the wire cannot carry would disconnect the player on every listing; the filesystem's own
+             * name limit is the cap, so this only guards against a path the filesystem should never hold.
+             */
             if (e.type() == FileType.CRAFT && names.size() < CraftManagerStatePayload.MAX_MEDIA_FILES
                     && e.path().length() <= dev.jstech.computronics.os.fs.FsPaths.MAX_NAME_LENGTH) {
                 names.add(e.path());
@@ -5098,7 +5234,7 @@ public final class ComputingPayloads {
         return names;
     }
 
-    // ---- Crafting Manager (B2) — media ↔ ROM transfer ----
+    // Crafting Manager (B2): media ↔ ROM transfer
 
     /** The Machines tab sets a machine's concurrency config on a Crafting Computer, then gets a fresh state. */
     private static void handleSetMachineConfig(final SetMachineConfigPayload payload,
@@ -5133,7 +5269,7 @@ public final class ComputingPayloads {
         });
     }
 
-    // ---- the Cluster Manager: the Cluster Management Computer's program ----
+    // the Cluster Manager: the Cluster Management Computer's program
 
     private static void handleRequestClusterManager(final RequestClusterManagerPayload payload,
                                                      final IPayloadContext context) {
@@ -5311,8 +5447,10 @@ public final class ComputingPayloads {
                 : dev.jstech.computronics.datacenter.LoadBalanceMode.ROUND_ROBIN;
         final StorageKey key = StorageKey.of(cursor);
         final long want = single ? 1L : cursor.getCount();
-        // The rotation lives on the router, so a run of single-item deposits really does move down the row
-        // of servers instead of piling onto the first one every time.
+        /*
+         * The rotation lives on the router, so a run of single-item deposits really does move down the row
+         * of servers instead of piling onto the first one every time.
+         */
         final int start = router != null && ref.face() != null ? router.nextBalanceStart(ref.face()) : 0;
         final long stored = LoadBalancer.insert(stores, key, want, mode, start);
         if (stored > 0L) {
@@ -5425,8 +5563,10 @@ public final class ComputingPayloads {
             final NetworkSystem system = NetworkSystem.get(level);
             final List<ClusterManagerStatePayload.WireNode> nodes = new ArrayList<>();
             final java.util.Map<BlockPos, Integer> rackIndex = new java.util.LinkedHashMap<>();
-            // Every seated server in the section's cabinets, switched on or off: a bay the manager powered
-            // off has left the network, and must still be listed so the manager can power it back on.
+            /*
+             * Every seated server in the section's cabinets, switched on or off: a bay the manager powered
+             * off has left the network, and must still be listed so the manager can power it back on.
+             */
             for (final long rackLong : ref.section().rackPositions()) {
                 final BlockPos rackPos = BlockPos.of(rackLong);
                 if (!(level.getBlockEntity(rackPos) instanceof ServerRackBlockEntity rack)) {
@@ -5662,8 +5802,10 @@ public final class ComputingPayloads {
                     added = cc.loadPattern(p.get());
                     diskName = craftFileNameFor(p.get()) + ".craft";
                 }
-                // The recipe registers in the ROM (what the network can craft) and the .craft is mirrored under
-                // crafts/ on the system disk so it shows up in the Files app.
+                /*
+                 * The recipe registers in the ROM (what the network can craft) and the .craft is mirrored under
+                 * crafts/ on the system disk so it shows up in the Files app.
+                 */
                 if (added) {
                     loaded++;
                 }
@@ -5850,8 +5992,10 @@ public final class ComputingPayloads {
                 if (content.isEmpty()) {
                     continue;
                 }
-                // A recipe already on the disc under this name is never overwritten: a different one gets the
-                // next free suffix, the same one is simply there already. The encoder writes by the same rule.
+                /*
+                 * A recipe already on the disc under this name is never overwritten: a different one gets the
+                 * next free suffix, the same one is simply there already. The encoder writes by the same rule.
+                 */
                 final String fileName = DiskFilesystem.uniquePath(media, base, ".craft", content.get());
                 final long freeWeight = mediaFreeWeightFor(media);
                 DiskFilesystem.write(media, fileName, FileType.CRAFT, content.get(),
@@ -5890,9 +6034,11 @@ public final class ComputingPayloads {
         String mediaLabel = "";
         List<String> mediaFiles = List.of();
 
-        // A computer commonly has more than one drive linked (a floppy drive, a DVD drive, a dock), and the
-        // one with a blank medium in it may well come first: the disc the player just wrote is the one they
-        // mean, wherever it sits.
+        /*
+         * A computer commonly has more than one drive linked (a floppy drive, a DVD drive, a dock), and the
+         * one with a blank medium in it may well come first: the disc the player just wrote is the one they
+         * mean, wherever it sits.
+         */
         for (final long endpoint : cc.linkedEndpoints()) {
             if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
                     instanceof dev.jstech.computronics.os.media.MediaReaderBlockEntity reader) {
@@ -5919,15 +6065,19 @@ public final class ComputingPayloads {
         final List<CraftingPattern> rom = cc.romPatterns();
         for (int i = 0; i < rom.size() && i < CraftManagerStatePayload.MAX_ROM_ENTRIES; i++) {
             final CraftingPattern p = rom.get(i);
-            // Every string below is cut to its wire field: a result renamed to a long name or a modded machine
-            // with a long id must never make the state impossible to send.
+            /*
+             * Every string below is cut to its wire field: a result renamed to a long name or a modded machine
+             * with a long id must never make the state impossible to send.
+             */
             final String name = wire(p.displayName(), 64);
             final String fileName = craftFileNameFor(p) + ".craft";
             romEntries.add(new CraftManagerStatePayload.WireRomEntry(i, name, mediaFileSet.contains(fileName)));
         }
-        // Machine recipes (processing / multi-stage) share the ROM and must be listed too — an invisible entry
-        // reads as "not loaded" and then the duplicate check looks wrong. Their indices are offset so the
-        // remove action can tell them apart from the bench patterns above.
+        /*
+         * Machine recipes (processing / multi-stage) share the ROM and must be listed too, since an invisible entry
+         * reads as "not loaded" and then the duplicate check looks wrong. Their indices are offset so the
+         * remove action can tell them apart from the bench patterns above.
+         */
         final var machineRecipes = cc.machineRecipes();
         for (int i = 0; i < machineRecipes.size()
                 && romEntries.size() < CraftManagerStatePayload.MAX_ROM_ENTRIES; i++) {
@@ -5936,10 +6086,12 @@ public final class ComputingPayloads {
             romEntries.add(new CraftManagerStatePayload.WireRomEntry(
                     CraftManagerStatePayload.MACHINE_ROM_BASE + i, name, false));
         }
-        // The routed machines (the Machines tab): each distinct machine type the wired switches declare, with
-        // its concurrency config. Keyed by the machine's block registry id, which is what a pattern targets.
-        // One wire per PHYSICAL machine (deduped by position). Paused/Feed are read per machine; Max Jobs is the
-        // machine type's shared ceiling. The label distinguishes machines of one type by their face and position.
+        /*
+         * The routed machines (the Machines tab): each distinct machine type the wired switches declare, with
+         * its concurrency config. Keyed by the machine's block registry id, which is what a pattern targets.
+         * One wire per PHYSICAL machine (deduped by position). Paused/Feed are read per machine; Max Jobs is the
+         * machine type's shared ceiling. The label distinguishes machines of one type by their face and position.
+         */
         final List<CraftManagerStatePayload.WireMachine> machines = new ArrayList<>();
         final Set<net.minecraft.core.BlockPos> seen = new HashSet<>();
         for (final var dm : cc.availableMachines()) {
@@ -6007,7 +6159,7 @@ public final class ComputingPayloads {
         return Math.max(0L, capWeight - fsUsed);
     }
 
-    // IQL filesystem — save/open/list .iql files on the Mainframe's system disk
+    // IQL filesystem: save/open/list .iql files on the Mainframe's system disk
 
     /**
      * Resolves the Mainframe reachable from {@code hostPos}, then writes the editor content to an
@@ -6053,7 +6205,7 @@ public final class ComputingPayloads {
             }
             final String status = switch (result) {
                 case OK -> "saved: " + fileName;
-                case DISK_FULL -> "disk full — free space on the Mainframe's system disk";
+                case DISK_FULL -> "disk full, free space on the Mainframe's system disk";
                 case INVALID_PATH -> "invalid file name";
                 case READ_ONLY -> "file type is read-only";
             };
@@ -6180,9 +6332,11 @@ public final class ComputingPayloads {
             }
             final DataHandoff.ISource source = fromCursor
                     ? DataHandoff.cursor(player) : DataHandoff.slot(menu.getSlot(idx), player);
-            // A right-click hands over ONE: one item, or what a held container holds — and a held empty
-            // container over a fluid or chemical entry fills from the disks instead. Left click and
-            // shift-click deposit the stack as items, the way a chest takes them.
+            /*
+             * A right-click hands over ONE: one item, or what a held container holds, and a held empty
+             * container over a fluid or chemical entry fills from the disks instead. Left click and
+             * shift-click deposit the stack as items, the way a chest takes them.
+             */
             final boolean one = idx == TerminalLocalDepositPayload.CURSOR_ONE;
             final DataHandoff.Outcome outcome;
             if (one && payload.entry().isPresent() && DataContainers.canTake(source.get(), payload.entry().get())) {

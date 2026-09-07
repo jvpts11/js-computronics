@@ -27,8 +27,10 @@ public class DiskItem extends SpecItem<DiskSpec> {
         super(properties, spec);
     }
 
-    // A fresh disk exposes nothing to the network until the owner publishes part of it; this keeps a
-    // newly placed computer's storage private by default. Tunable.
+    /*
+     * A fresh disk exposes nothing to the network until the owner publishes part of it; this keeps a
+     * newly placed computer's storage private by default. Tunable.
+     */
     public static final int DEFAULT_PUBLIC_PERMILLE = 0;
 
     /**
@@ -55,8 +57,10 @@ public class DiskItem extends SpecItem<DiskSpec> {
     public void appendHoverText(final ItemStack stack, final TooltipContext context,
                                 final List<Component> tooltip, final TooltipFlag flag) {
         final DiskSpec spec = spec();
-        // The nameplate, and the one budget in both units its data comes in: what an item costs on the
-        // drive follows from the word size of the era it was made for.
+        /*
+         * The nameplate, and the one budget in both units its data comes in: what an item costs on the
+         * drive follows from the word size of the era it was made for.
+         */
         tooltip.add(Component.literal(DiskSpec.sizeLabel(spec.capacityMb()) + " drive  -  " + spec.era().bits()
                 + "-bit: " + spec.era().mbPerItem() + " MB per item").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.literal(DiskUsage.capacityLine(spec.capacityItems())).withStyle(ChatFormatting.GRAY));
@@ -66,8 +70,10 @@ public class DiskItem extends SpecItem<DiskSpec> {
                         + spec.tier().speedMultiplier() + "x speed")
                 .withStyle(ChatFormatting.DARK_GRAY));
         appendSystem(stack, tooltip);
-        // Files on the disk's filesystem (e.g. .iql scripts, .craft recipes) — separate from the
-        // item/fluid storage listed below.
+        /*
+         * Files on the disk's filesystem (e.g. .iql scripts, .craft recipes), separate from the
+         * item/fluid storage listed below.
+         */
         final dev.jstech.computronics.os.fs.FilesystemContents fs = stack.getOrDefault(
                 ComputingModule.FILESYSTEM.get(),
                 dev.jstech.computronics.os.fs.FilesystemContents.EMPTY);
@@ -77,7 +83,7 @@ public class DiskItem extends SpecItem<DiskSpec> {
 
     /**
      * Names the system installed on this drive, and the desktop and program count it carries. Without
-     * it a drive in the hand is anonymous, and pulling one out of a machine is a guess — which is how a
+     * it a drive in the hand is anonymous, and pulling one out of a machine is a guess, which is how a
      * player wipes a system they meant to keep.
      */
     private static void appendSystem(final ItemStack stack, final List<Component> tooltip) {
@@ -114,7 +120,7 @@ public class DiskItem extends SpecItem<DiskSpec> {
     }
 
     /**
-     * What is on the drive, from the usage summary it carries — items by the piece, fluids and chemicals by
+     * What is on the drive, from the usage summary it carries: items by the piece, fluids and chemicals by
      * the millibucket, and how much of the drive that takes: the contents themselves stay in the volume
      * store and are browsed on a machine, never listed from the hand.
      */

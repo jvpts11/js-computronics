@@ -15,7 +15,7 @@ import java.util.Map;
 
 /**
  * The IQL Engine's catalog of saved objects (views, procedures, jobs), keyed by type and name. Pure logic,
- * no Minecraft — the Mainframe owns one instance and serializes it to its block-entity NBT; the executor
+ * no Minecraft: the Mainframe owns one instance and serializes it to its block-entity NBT; the executor
  * reads it to run a view/procedure or to drive the job agent. Insertion order is preserved so the Object
  * Explorer lists objects the way they were created. Names are matched case-insensitively within a type, so
  * a view and a job may share a name without colliding.

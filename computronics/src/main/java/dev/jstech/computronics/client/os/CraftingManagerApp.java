@@ -84,17 +84,19 @@ public final class CraftingManagerApp implements IDesktopApp {
     private int lastMouseY;
     private int lastW;
 
-    // Frames since the state was last asked for. The window outlives the screen it was opened on (a machine's
-    // open windows come back with their program instances when the monitor is entered again), so the state
-    // is re-asked for while the window is shown, not only when it is created: a disc put in the drive after
-    // the window opened must show up on its own.
+    /*
+     * Frames since the state was last asked for. The window outlives the screen it was opened on (a machine's
+     * open windows come back with their program instances when the monitor is entered again), so the state
+     * is re-asked for while the window is shown, not only when it is created: a disc put in the drive after
+     * the window opened must show up on its own.
+     */
     private int refreshFrames;
 
     /** A machine-type group header row: the type, how many machines it has, and its shared Max Jobs. */
     private record MachineGroup(String typeKey, int count, int maxJobs) {
     }
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final TabStrip tabs;
     private final Label warnLabel;
@@ -175,8 +177,10 @@ public final class CraftingManagerApp implements IDesktopApp {
 
     @Override
     public void applySkin(final OsSkin osSkin) {
-        // Runs each frame for the window being drawn: with two Crafting Computers open in turn, the replies
-        // must reach the window on screen, not the instance created last.
+        /*
+         * Runs each frame for the window being drawn: with two Crafting Computers open in turn, the replies
+         * must reach the window on screen, not the instance created last.
+         */
         active = this;
         this.skin = osSkin;
     }
@@ -206,7 +210,7 @@ public final class CraftingManagerApp implements IDesktopApp {
         return 150;
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -320,7 +324,7 @@ public final class CraftingManagerApp implements IDesktopApp {
         g.drawString(ctx.font(), Texts.clip(ctx.font(), text, w - 6), x + 3, y + 2, ctx.skin().listRowText(sel), false);
     }
 
-    // ---- actions ----
+    // actions
 
     /**
      * The wire indices of the selected ROM rows. List positions are NOT the payload indices: machine recipes
@@ -375,7 +379,7 @@ public final class CraftingManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- the Machines tab: physical machines grouped by type, with per-machine Pause/Feed and a per-type Max Jobs ----
+    // the Machines tab: physical machines grouped by type, with per-machine Pause/Feed and a per-type Max Jobs
 
     private static int machineButtonW(final int width) {
         return Math.max(20, (width / 2 - PAD * 2) / 3);
@@ -462,7 +466,7 @@ public final class CraftingManagerApp implements IDesktopApp {
         return mx >= bx && mx < bx + bw;
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
@@ -494,7 +498,7 @@ public final class CraftingManagerApp implements IDesktopApp {
         return true;
     }
 
-    // ---- inspection (client tests) ----
+    // inspection (client tests)
 
     public boolean isLoaded() {
         return loaded;

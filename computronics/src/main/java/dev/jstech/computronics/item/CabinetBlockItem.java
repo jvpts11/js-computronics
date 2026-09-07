@@ -20,7 +20,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 import java.util.function.Consumer;
 
 /**
- * The item of a multiblock cabinet — a rack or a Mainframe — which shows the cabinet itself.
+ * The item of a multiblock cabinet (a rack or a Mainframe) which shows the cabinet itself.
  *
  * <p>A cabinet's block model is a GeckoLib model drawn by the block entity, so the block itself renders
  * nothing, and its item, having no block model to fall back on, showed a flat icon that looked like a

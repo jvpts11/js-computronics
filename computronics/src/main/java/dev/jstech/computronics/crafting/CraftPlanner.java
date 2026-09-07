@@ -170,8 +170,10 @@ public final class CraftPlanner {
                                    final List<CraftingPattern> patterns, final List<ProcessingPattern> machines,
                                    final Map<StorageKey, Long> stock) {
         long low = 0;
-        // Cap the search ceiling so the midpoint arithmetic below cannot overflow when quantity is near
-        // Long.MAX_VALUE (e.g. an IQL CRAFT with no count cap); a craft beyond this bound is unrealistic.
+        /*
+         * Cap the search ceiling so the midpoint arithmetic below cannot overflow when quantity is near
+         * Long.MAX_VALUE (e.g. an IQL CRAFT with no count cap); a craft beyond this bound is unrealistic.
+         */
         long high = Math.min(quantity, 2_000_000_000L);
         while (low < high) {
             final long mid = low + (high - low + 1) / 2;
@@ -247,8 +249,10 @@ public final class CraftPlanner {
             chain.remove(key);
 
             if (feasibleRuns < runs) {
-                // The uncovered remainder of the request is missing; surplus ingredients secured
-                // above stay in the virtual pools (the real operation only locks what it uses).
+                /*
+                 * The uncovered remainder of the request is missing; surplus ingredients secured
+                 * above stay in the virtual pools (the real operation only locks what it uses).
+                 */
                 missing.merge(key, deficit - feasibleRuns * perRun, Long::sum);
             }
             if (feasibleRuns > 0) {
@@ -256,7 +260,7 @@ public final class CraftPlanner {
                 final long produced = feasibleRuns * perRun;
                 final long surplus = produced - Math.min(deficit, produced);
                 if (surplus > 0) {
-                    intermediates.merge(key, surplus, Long::sum); // rounding overflow — never wasted
+                    intermediates.merge(key, surplus, Long::sum); // rounding overflow, never wasted
                 }
                 deficit -= Math.min(deficit, produced);
             }

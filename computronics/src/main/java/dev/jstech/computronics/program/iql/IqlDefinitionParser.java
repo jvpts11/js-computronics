@@ -12,14 +12,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses the IQL Layer-2 definitions — {@code CREATE}/{@code DROP} of saved objects (views, procedures,
+ * Parses the IQL Layer-2 definitions: {@code CREATE}/{@code DROP} of saved objects (views, procedures,
  * jobs) and {@code EXEC} of a procedure. Pure logic, no Minecraft. Works on the raw string rather than the
  * token stream so a definition's body (a query, a {@code { ... }} block) is captured verbatim and re-parsed
  * when the object runs.
  *
  * <p>{@link #tryParse} returns {@code null} when the text is not a definition (it is an ordinary
  * action/query), so the main parser tries a definition first and falls back. {@code DROP} is the one
- * overlap: {@code DROP VIEW x} drops a definition, while {@code DROP 64 dirt} is the item-trashing action —
+ * overlap: {@code DROP VIEW x} drops a definition, while {@code DROP 64 dirt} is the item-trashing action,
  * so a {@code DROP} not followed by VIEW/PROCEDURE/JOB returns {@code null} to fall through.
  */
 public final class IqlDefinitionParser {
@@ -113,7 +113,7 @@ public final class IqlDefinitionParser {
         final String[] parts = rest.strip().split("\\s+", 2);
         final IqlDefinition.ObjectType type = objectType(parts[0]);
         if (type == null) {
-            return null; // DROP <item> is the action, not a definition drop — fall through to the action parser
+            return null; // DROP <item> is the action, not a definition drop, so fall through to the action parser
         }
         if (parts.length < 2 || parts[1].isBlank()) {
             throw new IllegalArgumentException("DROP " + name(type) + " needs a name");

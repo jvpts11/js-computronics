@@ -30,7 +30,7 @@ import java.util.Map;
 /**
  * The whole Fusion Reactor shell as a planning problem: every part of the 5x5x5 (controller, four ports, two
  * logic adapters, eight reactor glass, the laser focus matrix and the 51 plain frames) is requested against
- * one raw stock with flat patterns only — bench recipes and machine recipes side by side — and the planner
+ * one raw stock with flat patterns only (bench recipes and machine recipes side by side) and the planner
  * must find every part feasible and spend the raw stock to the unit. Polonium pellets and steel casings are
  * raw by decision; ingots (lead, osmium, iron) are raw to keep the tree at the reactor's own recipes.
  */
@@ -161,8 +161,10 @@ public final class FusionReactorBomGameTests {
                     benchRuns += step.runs();
                 }
             }
-            // The next part plans against what this one left: raw stock minus what it drew, plus the surplus
-            // of every intermediate its steps made beyond what they consumed (a craft returns those to storage).
+            /*
+             * The next part plans against what this one left: raw stock minus what it drew, plus the surplus
+             * of every intermediate its steps made beyond what they consumed (a craft returns those to storage).
+             */
             plan.rawConsumption().forEach((key, used) -> stock.merge(key, -used, Long::sum));
             final Map<StorageKey, Long> balance = new HashMap<>();
             for (final CraftPlanner.Step step : plan.steps()) {
@@ -191,8 +193,10 @@ public final class FusionReactorBomGameTests {
             });
         }
         for (final Map.Entry<StorageKey, Long> left : stock.entrySet()) {
-            // Honest surpluses: two frames (17 crafts of four for 66 needed) and one laser focus matrix (the
-            // recipe makes two); everything else is spent.
+            /*
+             * Honest surpluses: two frames (17 crafts of four for 66 needed) and one laser focus matrix (the
+             * recipe makes two); everything else is spent.
+             */
             final long expected = left.getKey().equals(StorageKey.of(gen("fusion_reactor_frame"))) ? 2L
                     : left.getKey().equals(StorageKey.of(gen("laser_focus_matrix"))) ? 1L : 0L;
             helper.assertTrue(left.getValue() == expected, left.getKey() + " must be spent to the unit; left " + left.getValue());

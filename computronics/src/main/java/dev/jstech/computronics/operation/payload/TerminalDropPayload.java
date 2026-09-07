@@ -18,7 +18,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Client to server: a DROP from the terminal's Maintenance tab — destroy stored data, irreversibly, at the chosen scope.
+ * Client to server: a DROP from the terminal's Maintenance tab, destroying stored data, irreversibly, at the chosen scope.
  */
 public record TerminalDropPayload(BlockPos monitorPos, BlockPos hostPos, int scope,
                                   List<StorageKey> types, String serverKey) implements CustomPacketPayload {

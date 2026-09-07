@@ -19,7 +19,7 @@ import net.minecraft.nbt.CompoundTag;
 /**
  * One running Cannon program, as a machine sees it.
  *
- * <p>Everything on this side of it is in the machine's words — a budget, a state, what it printed —
+ * <p>Everything on this side of it is in the machine's words (a budget, a state, what it printed)
  * and everything on the other side is the language's. The three lifecycle calls are the translation:
  * a machine says "another tick has come", and only here does that mean {@code OnTick}.
  */

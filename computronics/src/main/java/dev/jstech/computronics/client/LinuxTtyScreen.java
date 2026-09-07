@@ -13,7 +13,7 @@ import net.minecraft.world.entity.player.Inventory;
 
 /**
  * The Linux virtual console: a full-glass TTY, the way a distribution without a desktop environment (or a
- * booted live installer) really presents itself — a getty banner, a login, a shell, nothing else. The MC-NET
+ * booted live installer) really presents itself: a getty banner, a login, a shell, nothing else. The MC-NET
  * Command Prompt window is deliberately not reused here; each platform owns its console screen.
  */
 public final class LinuxTtyScreen extends CommandPromptScreen<LinuxTtyMenu> {

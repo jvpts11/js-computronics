@@ -16,7 +16,7 @@ import java.util.Objects;
  * The card that lets a Cluster Management Computer address the racks on its network. It follows the
  * pattern of the other computer-exclusive interface cards (the VLDC plate of the Gateway, the
  * Simulation Interface of a simulation node): without it the machine is an ordinary computer. Each
- * era's card reaches further and drives more nodes at once — a serial console card talks to rack
+ * era's card reaches further and drives more nodes at once: a serial console card talks to rack
  * servers one at a time, a management NIC reaches supercomputer fabrics too, a fabric host adapter
  * reaches everything and installs several nodes in parallel. Numbers are estimates, tuned in play.
  *

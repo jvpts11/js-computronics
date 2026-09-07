@@ -67,8 +67,10 @@ public final class CompositeDataPort implements IDataPort {
 
     @Override
     public long count(final StorageKey key) {
-        // Faces of one machine usually see the same tanks and slots, so the count is the largest view, not the
-        // sum: a tank visible from two faces still holds its contents once.
+        /*
+         * Faces of one machine usually see the same tanks and slots, so the count is the largest view, not the
+         * sum: a tank visible from two faces still holds its contents once.
+         */
         long most = 0L;
         for (final IDataPort face : faces) {
             most = Math.max(most, face.count(key));

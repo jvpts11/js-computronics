@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: the channel bar of a KVM Switch — every machine the rack's switch can put on
+ * Server to client: the channel bar of a KVM Switch: every machine the rack's switch can put on
  * this monitor, so the player picks which one the screen shows before the session starts.
  */
 public record OpenKvmPayload(BlockPos rackPos, BlockPos monitorPos, int activeChannel,

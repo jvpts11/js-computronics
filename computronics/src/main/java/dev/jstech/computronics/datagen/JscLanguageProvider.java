@@ -48,14 +48,18 @@ public class JscLanguageProvider extends LanguageProvider {
         add("block.jsc.monitor.rack_empty", "The rack holds no computer to show");
         add("block.jsc.monitor.needs_kvm", "This rack holds several computers - mount a KVM Switch to pick one");
         add("block.jsc.monitor.hint_command_prompt", "Sneak-use to open the Command Prompt");
-        // Program display names come from the single program registry, so a new program's name is written
-        // once (on its ProgramSpec) and datagen emits its translation key here automatically.
+        /*
+         * Program display names come from the single program registry, so a new program's name is written
+         * once (on its ProgramSpec) and datagen emits its translation key here automatically.
+         */
         for (final dev.jstech.computronics.os.ProgramSpec program
                 : dev.jstech.computronics.os.OsBootstrap.builtinPrograms()) {
             add(program.titleKey(), program.displayName());
-            // Every program says what it does, in one line, wherever it is shown: on its install
-            // disc, in the package manager, and in the installed-programs list. A program the player
-            // cannot tell apart from its neighbours might as well not be installable.
+            /*
+             * Every program says what it does, in one line, wherever it is shown: on its install
+             * disc, in the package manager, and in the installed-programs list. A program the player
+             * cannot tell apart from its neighbours might as well not be installable.
+             */
         }
         addProgramBlurbs();
         addBlock(ComputingModule.MAINFRAME, "Mainframe");
@@ -84,8 +88,10 @@ public class JscLanguageProvider extends LanguageProvider {
         add(ComputingModule.DVD_ROM.get(), "DVD-ROM");
         add(ComputingModule.DVD_RW.get(), "DVD-RW");
         add(ComputingModule.USB_FLASH_DRIVE.get(), "USB Flash Drive");
-        // Operating-system display names (the ids stay technical; players see these).
-        // OS display names, like the programs, come from the single OS registry.
+        /*
+         * Operating-system display names (the ids stay technical; players see these).
+         * OS display names, like the programs, come from the single OS registry.
+         */
         for (final dev.jstech.computronics.os.OsDef os
                 : dev.jstech.computronics.os.OsBootstrap.builtinOses()) {
             add(os.titleKey(), os.displayName());
@@ -151,7 +157,7 @@ public class JscLanguageProvider extends LanguageProvider {
         add("item.jsc.server_case.tooltip", "Crafting ingredient for a Server");
         add("menu.jsc.server_assembly", "Server Assembly");
         add("menu.jsc.network_overview", "Network Overview");
-        // Storage tab — the per-disk public/private slider and its readouts.
+        // Storage tab: the per-disk public/private slider and its readouts.
         add("jsc.gui.storage.public_private", "Public / Private");
         add("jsc.gui.storage.public", "%s%% public");
         add("jsc.gui.storage.private", "%s%% private");

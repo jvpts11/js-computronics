@@ -102,8 +102,10 @@ public final class Process {
         if (!fresh) {
             return;
         }
-        // Putting the starting values in a type's own fields is the program's work like any other, so
-        // it waits its turn and is paid for out of the budget rather than run on the spot.
+        /*
+         * Putting the starting values in a type's own fields is the program's work like any other, so
+         * it waits its turn and is paid for out of the budget rather than run on the spot.
+         */
         for (final Loaded.Type type : program.types()) {
             if (type.setUp() != null) {
                 this.waiting.add(new Frame(type.setUp(), null));
@@ -223,9 +225,11 @@ public final class Process {
             } catch (final Halt halt) {
                 this.halt(halt);
             }
-            // Reaching into the machine costs more than moving a number about, and the difference is
-            // charged to this tick rather than hidden, so a program that talks to the world all the time
-            // gets through less of itself than one that does its own arithmetic.
+            /*
+             * Reaching into the machine costs more than moving a number about, and the difference is
+             * charged to this tick rather than hidden, so a program that talks to the world all the time
+             * gets through less of itself than one that does its own arithmetic.
+             */
             final int reached = this.library.drawCost();
             used += reached;
             this.spent += reached;
@@ -275,8 +279,10 @@ public final class Process {
         final Frame frame = new Frame(method, bound.target());
         fill(frame, arguments);
         this.waiting.add(frame);
-        // A process that had run out of work has work again. One that stopped on a mistake stays
-        // stopped: nothing should be able to start it running after that but a person.
+        /*
+         * A process that had run out of work has work again. One that stopped on a mistake stays
+         * stopped: nothing should be able to start it running after that but a person.
+         */
         if (this.state == State.FINISHED) {
             this.state = State.RUNNING;
         }
@@ -288,7 +294,7 @@ public final class Process {
     }
 
     /** A handler bound to a method of an object, for the runtime to hand to an event source. */
-    // ---------------------------------------------------------------- watching the world
+    // watching the world
 
     /** What a watch is waiting for. */
     public enum Watching {
@@ -454,7 +460,7 @@ public final class Process {
         this.frames.clear();
     }
 
-    // ---------------------------------------------------------------- putting it away and back
+    // putting it away and back
 
     /**
      * Writes the whole process down: what it has allocated, what each call was doing, and where each
@@ -473,8 +479,10 @@ public final class Process {
         for (int i = 0; i < things.size(); i++) {
             held.add(this.freeze(things.get(i), i, numbers));
         }
-        // The frames are a stack, so they come out top first; they are written bottom first, which is
-        // the order they have to be put back in.
+        /*
+         * The frames are a stack, so they come out top first; they are written bottom first, which is
+         * the order they have to be put back in.
+         */
         final List<Frame> stack = new ArrayList<>(this.frames);
         java.util.Collections.reverse(stack);
         final List<Snapshot.FrameShot> frames = new ArrayList<>();
@@ -507,8 +515,10 @@ public final class Process {
         for (final Snapshot.IHeld written : shot.held()) {
             byNumber.put(written.id(), shell(written));
         }
-        // Handlers are settled before anything is filled in, because one cannot be changed after it is
-        // made and whatever points at one has to point at the one that stays.
+        /*
+         * Handlers are settled before anything is filled in, because one cannot be changed after it is
+         * made and whatever points at one has to point at the one that stays.
+         */
         for (final Snapshot.IHeld written : shot.held()) {
             if (written instanceof Snapshot.IHeld.Handler handler) {
                 final List<Values.Bound> chain = new ArrayList<>();
@@ -607,8 +617,10 @@ public final class Process {
         };
     }
 
-    // A later pass, because two things can point at each other and neither can be filled in until both
-    // exist.
+    /*
+     * A later pass, because two things can point at each other and neither can be filled in until both
+     * exist.
+     */
     private static void fill(final Snapshot.IHeld written, final Map<Integer, Object> byNumber) {
         final Object thing = byNumber.get(written.id());
         switch (written) {
@@ -733,7 +745,7 @@ public final class Process {
         };
     }
 
-    // ---------------------------------------------------------------- one instruction
+    // one instruction
 
     private void one() {
         final Frame frame = this.frames.peek();
@@ -830,7 +842,7 @@ public final class Process {
         frame.push(Numbers.apply(opcode, left, right, line));
     }
 
-    // ---------------------------------------------------------------- fields
+    // fields
 
     private void loadField(final Frame frame, final IOperand.Field field, final int line) {
         final Object target = this.alive(frame.pop(), line);
@@ -871,7 +883,7 @@ public final class Process {
         return this.statics.computeIfAbsent(owner, Values.Obj::new);
     }
 
-    // ---------------------------------------------------------------- objects
+    // objects
 
     private void newObject(final Frame frame, final IOperand.Constructor made, final int line) {
         frame.push(this.instance(made.owner(), this.take(frame, made.parameters()), line));
@@ -970,7 +982,7 @@ public final class Process {
         };
     }
 
-    // ---------------------------------------------------------------- calls
+    // calls
 
     private void handler(final Frame frame, final IOperand.Method method, final int line) {
         final Object target = frame.pop();
@@ -998,8 +1010,10 @@ public final class Process {
         this.enter(this.onItsOwnType(direct, self, named), self, arguments, line);
     }
 
-    // A call through an interface names the interface, but the object knows which class it is, and
-    // that is the one whose lines should run.
+    /*
+     * A call through an interface names the interface, but the object knows which class it is, and
+     * that is the one whose lines should run.
+     */
     private Loaded.Method onItsOwnType(final Loaded.Method direct, final Object self,
                                        final IOperand.Method named) {
         if (!(self instanceof Values.Obj object) || object.type().equals(named.owner())) {
@@ -1108,11 +1122,13 @@ public final class Process {
         return taken;
     }
 
-    // ---------------------------------------------------------------- odds and ends
+    // odds and ends
 
     private String text(final String value, final int line) {
-        // A fresh piece of text each time, so two that read the same are still two things the program
-        // can free one of without the other going with it.
+        /*
+         * A fresh piece of text each time, so two that read the same are still two things the program
+         * can free one of without the other going with it.
+         */
         return this.heap.allocate(new String(value.toCharArray()), Heap.sizeOfText(value), line);
     }
 
@@ -1142,8 +1158,10 @@ public final class Process {
         return value != null;
     }
 
-    // Two values are the same when they say the same thing, which for a bool and the number that
-    // stands for it means comparing what they both mean rather than what they are.
+    /*
+     * Two values are the same when they say the same thing, which for a bool and the number that
+     * stands for it means comparing what they both mean rather than what they are.
+     */
     private static boolean same(final Object left, final Object right) {
         if (left == null || right == null) {
             return left == right;

@@ -19,8 +19,8 @@ import java.util.Locale;
 
 /**
  * A drive's usage summary, carried on the item so the hand, the creative tab and the client can read it
- * without the volume store: the stored weight, and what that weight is made of — items by the piece, fluids
- * and chemicals by the millibucket — so a drive full of water never reads as "22 944 items".
+ * without the volume store: the stored weight, and what that weight is made of (items by the piece, fluids
+ * and chemicals by the millibucket) so a drive full of water never reads as "22 944 items".
  */
 public record DiskUsage(long usedWeight, long items, long fluidMb, long chemicalMb, int types) {
 

@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  * The boolean tree behind an IQL {@code WHERE} filter or an {@code IF}/{@code WHEN} guard. A leaf is a
  * {@link Comparison} of a field against a value; the rest compose with {@link And}/{@link Or}/{@link Not}.
  *
- * <p>Pure logic, free of Minecraft: {@link #matches} evaluates the tree against a {@code row} — a
+ * <p>Pure logic, free of Minecraft: {@link #matches} evaluates the tree against a {@code row}, a
  * function from field name to its string value (an absent field returns {@code null}). The server fills
  * that function from a real item entry at execution time; the parser and tests build and evaluate the
  * tree without a game loaded.
@@ -78,8 +78,10 @@ public sealed interface IIqlCondition
                 case GT -> compare(actual, value) > 0;
                 case LTE -> compare(actual, value) <= 0;
                 case GTE -> compare(actual, value) >= 0;
-                // HAS is the same substring test as CONTAINS at this layer; multi-valued fields (e.g. a
-                // list of enchantments) are joined to one string by the row provider before it reaches here.
+                /*
+                 * HAS is the same substring test as CONTAINS at this layer; multi-valued fields (e.g. a
+                 * list of enchantments) are joined to one string by the row provider before it reaches here.
+                 */
                 case CONTAINS, HAS -> actual.toLowerCase(Locale.ROOT).contains(value.toLowerCase(Locale.ROOT));
                 case LIKE -> like(actual, value);
             };

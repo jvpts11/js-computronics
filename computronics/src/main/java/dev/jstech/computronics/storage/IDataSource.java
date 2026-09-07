@@ -10,7 +10,7 @@ package dev.jstech.computronics.storage;
 import java.util.List;
 
 /**
- * A source that yields a quantity of one data type — an item OR a fluid — without caring which.
+ * A source that yields a quantity of one data type (an item OR a fluid) without caring which.
  */
 public interface IDataSource {
 

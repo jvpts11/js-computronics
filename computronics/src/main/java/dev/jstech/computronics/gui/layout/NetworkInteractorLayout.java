@@ -73,7 +73,7 @@ public final class NetworkInteractorLayout {
 
     /**
      * The inventory slot index (0..35, row-major: rows 0-2 are the 27 main slots, row 3 is the 9 hotbar slots)
-     * under a content-local point, or -1 when the point is not on a slot — outside the columns, above/below the
+     * under a content-local point, or -1 when the point is not on a slot, outside the columns, above/below the
      * rows, or in the hotbar gap. This is the EXACT inverse of where {@link #rowYOffset} places the slots, so
      * the hover/click hit-test always lands on the drawn cell and can never drift from the rendered position.
      */
@@ -175,10 +175,12 @@ public final class NetworkInteractorLayout {
         final int invX = invBandX + INV_PAD;
         final int invY = invBandY + INV_PAD;
 
-        // The details panel fills the width to the right of the left column, from the header to the footer.
-        // NEVER force it wider than the room left, or it would overflow the window and be clipped by the
-        // border (the bug that cut "WEIGHT"/"STORED"). The window manager keeps the whole window at or above
-        // minContentWidth so the panel still has its minimum room in practice.
+        /*
+         * The details panel fills the width to the right of the left column, from the header to the footer.
+         * NEVER force it wider than the room left, or it would overflow the window and be clipped by the
+         * border (the bug that cut "WEIGHT"/"STORED"). The window manager keeps the whole window at or above
+         * minContentWidth so the panel still has its minimum room in practice.
+         */
         final int detailsX = Math.min(INSET + LEFT_W + GAP, Math.max(0, contentW - INSET));
         final int detailsY = headerBottom;
         final int detailsW = Math.max(0, contentW - detailsX - INSET);

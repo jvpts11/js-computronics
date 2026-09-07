@@ -57,8 +57,10 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     public record NodeRef(BlockPos rack, int row) {
     }
 
-    // Every node on the fabric, in slot order — including those past the six rated slots. The rated
-    // slots decide crafting; this full list is what a console needs to install and control them all.
+    /*
+     * Every node on the fabric, in slot order, including those past the six rated slots. The rated
+     * slots decide crafting; this full list is what a console needs to install and control them all.
+     */
     private List<NodeRef> nodes = List.of();
 
     /** All nodes seated on this fabric, rack by rack, top unit first; the first six are the rated slots. */
@@ -93,9 +95,11 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     private void tickCluster(final ServerLevel serverLevel) {
         survey(serverLevel);
         final NetworkSystem system = NetworkSystem.get(serverLevel);
-        // The interface is on the network whenever its uplink cable is, crafts or no crafts: a cluster with
-        // no rated node still shows up in the Cluster Manager, where the player can see what it lacks.
-        // Crafting itself still waits for clusterOnline().
+        /*
+         * The interface is on the network whenever its uplink cable is, crafts or no crafts: a cluster with
+         * no rated node still shows up in the Cluster Manager, where the player can see what it lacks.
+         * Crafting itself still waits for clusterOnline().
+         */
         final long cable = adjacentHbwCable(serverLevel);
         final NetworkUuid resolved = cable == Long.MIN_VALUE ? null
                 : system.connectivity().networkOf(cable).orElse(null);
@@ -133,14 +137,18 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
                     queue.add(neighbor);
                     continue;
                 }
-                // A Supercomputer Rack on the fabric: every node mounted in it, in rack order, is a
-                // candidate slot. Cabinets are taken in discovery order, so slot numbering is stable
-                // for a given build and does not shuffle between surveys.
+                /*
+                 * A Supercomputer Rack on the fabric: every node mounted in it, in rack order, is a
+                 * candidate slot. Cabinets are taken in discovery order, so slot numbering is stable
+                 * for a given build and does not shuffle between surveys.
+                 */
                 final ServerRackBlockEntity rack = cabinetAt(serverLevel, neighbor);
                 if (rack != null && rack.rackType() == RackChassis.RackType.SUPERCOMPUTER
                         && seenControllers.add(rack.getBlockPos())) {
-                    // The cabinet's link light: this survey already walks the whole fabric every tick, so
-                    // the cabinet is told here rather than walking it again itself.
+                    /*
+                     * The cabinet's link light: this survey already walks the whole fabric every tick, so
+                     * the cabinet is told here rather than walking it again itself.
+                     */
                     rack.noteFabricUplink(serverLevel.getGameTime(), networkUuid != null);
                     for (final int row : rack.computerSlots()) {
                         if (ServerItem.chassisOf(rack.getServers().getStackInSlot(row))
@@ -180,7 +188,7 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
         this.parallelCrafts = budget;
     }
 
-    /** The rack a block belongs to — the controller itself or any part of the cabinet — or null. */
+    /** The rack a block belongs to (the controller itself or any part of the cabinet), or null. */
     @Nullable
     private static ServerRackBlockEntity cabinetAt(final ServerLevel level, final BlockPos pos) {
         final BlockEntity be = level.getBlockEntity(pos);
@@ -309,8 +317,10 @@ public class HbwInterfaceBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         super.setRemoved();
-        // Unregister the cluster on chunk unload too, not just on destruction (the block's onRemove),
-        // so the Supercomputer never lingers in the still-loaded per-level network. onBroken is idempotent.
+        /*
+         * Unregister the cluster on chunk unload too, not just on destruction (the block's onRemove),
+         * so the Supercomputer never lingers in the still-loaded per-level network. onBroken is idempotent.
+         */
         if (level instanceof ServerLevel serverLevel) {
             onBroken(serverLevel);
         }

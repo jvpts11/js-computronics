@@ -34,7 +34,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The Electric Furnace — a Tier-1 industrial machine that smelts items using vanilla smelting recipes and FE power.
+ * The Electric Furnace, a Tier-1 industrial machine that smelts items using vanilla smelting recipes and FE power.
  */
 public class ElectricFurnaceBlock extends HorizontalDirectionalBlock implements EntityBlock {
 

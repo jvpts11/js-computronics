@@ -96,7 +96,7 @@ final class IqlLexer {
             }
             if (ch == '(') {
                 if (sb.length() == 0) {
-                    break; // structural '(' — the main loop reads it as LPAREN
+                    break; // structural '(', the main loop reads it as LPAREN
                 }
                 i = consumeBalancedCall(input, i, sb);
                 break; // a function call ends the word
@@ -136,8 +136,10 @@ final class IqlLexer {
     }
 
     private static Type classify(final String text) {
-        // A bare integer (optionally a percentage, e.g. "50%") is a number; everything else — item ids,
-        // keywords, '*', function calls — is a word the parser interprets by position.
+        /*
+         * A bare integer (optionally a percentage, e.g. "50%") is a number; everything else (item ids,
+         * keywords, '*', function calls) is a word the parser interprets by position.
+         */
         return text.matches("-?\\d+%?") ? Type.NUMBER : Type.WORD;
     }
 }

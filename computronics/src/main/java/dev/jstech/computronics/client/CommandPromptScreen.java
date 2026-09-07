@@ -75,7 +75,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     }
 
     /**
-     * A bare terminal draws no window chrome — just the glass and the text, the way a real console
+     * A bare terminal draws no window chrome, just the glass and the text, the way a real console
      * fills its display. The MC-DOS terminal and the Linux TTY override this; the MC-NET Command
      * Prompt keeps its program window.
      */
@@ -85,8 +85,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     @Override
     protected void init() {
-        // Every console fills the standard monitor viewport (the same one the desktops use), instead of
-        // the small fixed window it used to open in.
+        /*
+         * Every console fills the standard monitor viewport (the same one the desktops use), instead of
+         * the small fixed window it used to open in.
+         */
         this.imageWidth = Math.min(this.width - 44, 384);
         this.imageHeight = Math.min(this.height - 60, 256);
         super.init();
@@ -96,11 +98,13 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
                 imageWidth - 18 - promptW, 11, Component.literal("command"));
         input.setBordered(false);
         input.setMaxLength(RunCommandPayload.MAX_LEN);
-        // Use the era's primary text color: dark for light-panel eras (Legacy), light for dark-panel
-        // eras (Standard, Vintage). The input strip adopts the era's panel background, so the text
-        // must track the era — a fixed light color disappears on Legacy's cream panel.
-        // A bare console is always dark glass, so its input is always light; the windowed prompt tracks
-        // the era theme (dark text on Legacy's cream panel, light on the dark eras).
+        /*
+         * Use the era's primary text color: dark for light-panel eras (Legacy), light for dark-panel
+         * eras (Standard, Vintage). The input strip adopts the era's panel background, so the text
+         * must track the era, since a fixed light color disappears on Legacy's cream panel.
+         * A bare console is always dark glass, so its input is always light; the windowed prompt tracks
+         * the era theme (dark text on Legacy's cream panel, light on the dark eras).
+         */
         input.setTextColor(colorOf(CliStyle.PROMPT));
         input.setFocused(true);
         // A real edit (typing/backspace) restarts Tab cycling; our own programmatic setValue does not.
@@ -112,10 +116,12 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         setInitialFocus(input);
         addRenderableWidget(input);
         if (scrollback.isEmpty()) {
-            // Opening a terminal starts a session, and a session announces itself. Restoring the old
-            // scrollback used to drop the player mid-conversation with no sign the program had just
-            // been opened; the command history (arrow keys) still persists, which is the part worth
-            // keeping — a fresh terminal emulator behaves exactly like this.
+            /*
+             * Opening a terminal starts a session, and a session announces itself. Restoring the old
+             * scrollback used to drop the player mid-conversation with no sign the program had just
+             * been opened; the command history (arrow keys) still persists, which is the part worth
+             * keeping; a fresh terminal emulator behaves exactly like this.
+             */
             if (menu.shellId().equals("live")) {
                 // A booted installer medium: the live ISO's banner, already logged in as root.
                 push(menu.osLabel() + " installation medium (tty1)", CliStyle.ACCENT);
@@ -132,8 +138,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
                 push("Welcome to " + menu.osLabel() + " (Linux 6.8-jsc x86_64)", CliStyle.DIM);
                 push("", CliStyle.PLAIN);
             } else if (dosStyle()) {
-                // MC-DOS wears a period boot banner instead of the generic shell greeting. The lines are
-                // kept short on purpose so they never overflow the narrow 256px window.
+                /*
+                 * MC-DOS wears a period boot banner instead of the generic shell greeting. The lines are
+                 * kept short on purpose so they never overflow the narrow 256px window.
+                 */
                 push(menu.osLabel() + "  Version 1.0  [Network Build]", CliStyle.ACCENT);
                 push(dev.jstech.computronics.os.Branding.systemCopyright(
                         menu.osLabel(), screenEra()), CliStyle.DIM);
@@ -150,7 +158,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         PacketDistributor.sendToServer(new RequestConsoleInitPayload(menu.hostPos()));
     }
 
-    // --- output ----------------------------------------------------------------------------------
+    // output
 
     /** Routes a server output payload to the open Command Prompt, if one is showing. */
     public static void accept(final CommandOutputPayload payload) {
@@ -167,8 +175,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     }
 
     private void applyInit(final ConsoleInitPayload payload) {
-        // Only this computer's console seeds this screen: a reply raced from another machine's prompt must
-        // never leak its history (Up-arrow on computer B recalling computer A's commands).
+        /*
+         * Only this computer's console seeds this screen: a reply raced from another machine's prompt must
+         * never leak its history (Up-arrow on computer B recalling computer A's commands).
+         */
         if (!menu.hostPos().equals(payload.hostPos())) {
             return;
         }
@@ -183,9 +193,11 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         }
         deviceNames.clear();
         deviceNames.addAll(payload.devices());
-        // Say which machine this session is on. It arrives with the init reply (a tick after the
-        // window opens) rather than being guessed client-side, and it is what makes a terminal
-        // opened over ssh or a KVM channel obviously belong to the machine it is talking to.
+        /*
+         * Say which machine this session is on. It arrives with the init reply (a tick after the
+         * window opens) rather than being guessed client-side, and it is what makes a terminal
+         * opened over ssh or a KVM channel obviously belong to the machine it is talking to.
+         */
         if (!identityShown) {
             identityShown = true;
             final String machine = menu.hostname().isBlank() ? "machine" : menu.hostname();
@@ -221,7 +233,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         input.setWidth(Math.max(20, imageWidth - 18 - promptW));
     }
 
-    /** The console's scrollback, oldest first — what the player can read on the prompt right now. */
+    /** The console's scrollback, oldest first, what the player can read on the prompt right now. */
     public List<String> scrollbackText() {
         final List<String> lines = new ArrayList<>(scrollback.size());
         for (final Line line : scrollback) {
@@ -231,8 +243,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     }
 
     private void push(final String text, final CliStyle style) {
-        // Wrap to the console's usable width so a long line (a help row, a path) never leaks past the
-        // glass. Wrapping happens as lines land, so scrollback and the wheel scroll count real rows.
+        /*
+         * Wrap to the console's usable width so a long line (a help row, a path) never leaks past the
+         * glass. Wrapping happens as lines land, so scrollback and the wheel scroll count real rows.
+         */
         final int maxPx = font == null ? Integer.MAX_VALUE
                 : Math.max(40, (int) ((imageWidth - 20) / TEXT_SCALE));
         String rest = text;
@@ -281,7 +295,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         PacketDistributor.sendToServer(new RunCommandPayload(menu.monitorPos(), menu.hostPos(), line));
     }
 
-    // --- rendering -------------------------------------------------------------------------------
+    // rendering
 
     @Override
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
@@ -340,8 +354,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         final String verb = (space < 0 ? typed : typed.substring(0, space)).toLowerCase(Locale.ROOT);
         final String usage = commandUsage.get(verb);
         if (usage != null && !usage.isEmpty()) {
-            // The hint shares the input line: it gets the room to the right of what is typed, and is cut
-            // short rather than drawn over the prompt when a long usage does not fit.
+            /*
+             * The hint shares the input line: it gets the room to the right of what is typed, and is cut
+             * short rather than drawn over the prompt when a long usage does not fit.
+             */
             final int promptW = font.width(prompt() + " ");
             final int typedW = font.width(input == null ? "" : input.getValue());
             final int room = imageWidth - 10 - (10 + promptW + typedW + 12);
@@ -379,8 +395,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     }
 
     private int colorOf(final CliStyle style) {
-        // A Vintage machine draws on a green-phosphor tube, which has ONE colour: every style comes out
-        // as that green, brighter or dimmer, so an error still reads as an error without being red.
+        /*
+         * A Vintage machine draws on a green-phosphor tube, which has ONE colour: every style comes out
+         * as that green, brighter or dimmer, so an error still reads as an error without being red.
+         */
         final int color = terminalColor(style);
         return screenEra() == HardwareEra.VINTAGE ? dev.jstech.core.gui.Phosphor.green(color) : color;
     }
@@ -405,7 +423,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         };
     }
 
-    // --- input -----------------------------------------------------------------------------------
+    // input
 
     @Override
     public boolean keyPressed(final int key, final int scan, final int mods) {
@@ -413,15 +431,15 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
             submit();
             return true;
         }
-        if (key == 258) { // Tab — complete the command word
+        if (key == 258) { // Tab: complete the command word
             complete();
             return true;
         }
-        if (key == 265) { // Up — older history
+        if (key == 265) { // Up: older history
             recallHistory(-1);
             return true;
         }
-        if (key == 264) { // Down — newer history
+        if (key == 264) { // Down: newer history
             recallHistory(1);
             return true;
         }
@@ -429,8 +447,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
             onClose();
             return true;
         }
-        // Everything else (typing, backspace, arrows within the line) goes to the input box, so the
-        // inventory key never reaches the screen and closes it mid-command.
+        /*
+         * Everything else (typing, backspace, arrows within the line) goes to the input box, so the
+         * inventory key never reaches the screen and closes it mid-command.
+         */
         if (input != null) {
             input.keyPressed(key, scan, mods);
             return true;
@@ -476,7 +496,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     /**
      * Completes a {@code /dev/<device>} first argument for the device verbs (mkfs.ext4, mount,
-     * grub-install), cycling through the drives the server reported — so the Arch/Gentoo install never
+     * grub-install), cycling through the drives the server reported, so the Arch/Gentoo install never
      * needs the device names typed out by hand.
      */
     private void completeDevice(final String text) {
@@ -534,10 +554,12 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     @Override
     protected void containerTick() {
         super.containerTick();
-        // Keep the input color in sync if a board swap changes the era while the screen is open. This
-        // must repeat the bare-console rule, not just take the era's text colour: a bare terminal is
-        // dark glass, and on Legacy the era text is dark for its cream panel — writing that here left
-        // the player typing near-black on black.
+        /*
+         * Keep the input color in sync if a board swap changes the era while the screen is open. This
+         * must repeat the bare-console rule, not just take the era's text colour: a bare terminal is
+         * dark glass, and on Legacy the era text is dark for its cream panel, and writing that here left
+         * the player typing near-black on black.
+         */
         if (input != null) {
             input.setTextColor(colorOf(CliStyle.PROMPT));
         }
@@ -545,8 +567,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     @Override
     public void removed() {
-        // Nothing to remember: a terminal that is closed is over, and the next one opens fresh with
-        // its own banner. The command history lives on the machine and comes back with the session.
+        /*
+         * Nothing to remember: a terminal that is closed is over, and the next one opens fresh with
+         * its own banner. The command history lives on the machine and comes back with the session.
+         */
         super.removed();
     }
 
@@ -576,9 +600,11 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     @Override
     protected HardwareEra screenEra() {
-        // Resolve the host computer's era from its block entity on the client so the first frame already wears
-        // the right era skin; the synced era slot lagged a tick and flashed the default era on open. Fall back
-        // to the synced value when the host isn't client-loaded.
+        /*
+         * Resolve the host computer's era from its block entity on the client so the first frame already wears
+         * the right era skin; the synced era slot lagged a tick and flashed the default era on open. Fall back
+         * to the synced value when the host isn't client-loaded.
+         */
         final net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(menu.hostPos())
                 instanceof dev.jstech.computronics.blockentity.AbstractComputerBlockEntity host) {

@@ -96,7 +96,7 @@ public final class Emitter {
         return program;
     }
 
-    // ---------------------------------------------------------------- types
+    // types
 
     private AsmType emitClass(final NamedType type, final IDecl.ClassDecl declaration) {
         final AsmType written = new AsmType(AsmType.Kind.CLASS, type.name());
@@ -135,8 +135,10 @@ public final class Emitter {
             }
         }
         this.addSetUp(type, written, declaration, instanceStart, staticStart);
-        // A lambda is a method the player did not write a name for, so it becomes one here, on the
-        // type it was written inside.
+        /*
+         * A lambda is a method the player did not write a name for, so it becomes one here, on the
+         * type it was written inside.
+         */
         for (final AsmMethod method : this.synthesized) {
             written.addMethod(method);
         }
@@ -145,9 +147,11 @@ public final class Emitter {
         return written;
     }
 
-    // A class with fields that start out holding something, and no constructor of its own, still has
-    // to put those values there. A static one gets a method named after its type, which no source
-    // method can be, because inside a class that name is a constructor.
+    /*
+     * A class with fields that start out holding something, and no constructor of its own, still has
+     * to put those values there. A static one gets a method named after its type, which no source
+     * method can be, because inside a class that name is a constructor.
+     */
     private void addSetUp(final NamedType type, final AsmType written, final IDecl.ClassDecl declaration,
                           final List<IDecl.FieldDecl> instanceStart, final List<IDecl.FieldDecl> staticStart) {
         final boolean hasConstructor = declaration.members().stream()
@@ -211,7 +215,7 @@ public final class Emitter {
         return written;
     }
 
-    // ---------------------------------------------------------------- methods
+    // methods
 
     private AsmMethod emitMethod(final NamedType type, final IDecl.MethodDecl method) {
         final ITypeSymbol returns = this.declarations.resolve(method.returnType());
@@ -227,8 +231,10 @@ public final class Emitter {
                                       final List<IDecl.FieldDecl> instanceStart) {
         final Body body = new Body(type, ITypeSymbol.Primitive.VOID);
         body.parameters(constructor.parameters());
-        // Chaining to another constructor of the same class means that one already put the starting
-        // values in place, so doing it again here would undo whatever it decided.
+        /*
+         * Chaining to another constructor of the same class means that one already put the starting
+         * values in place, so doing it again here would undo whatever it decided.
+         */
         if (constructor.chained() == null || constructor.chained().base()) {
             body.fieldStarts(instanceStart);
         }
@@ -336,8 +342,10 @@ public final class Emitter {
                     new IOperand.Field(this.closure.type(), this.closure.fields().get(variable)));
         }
 
-        // Inside a lambda the object the method belonged to is a field of the shared object, because
-        // the lambda itself belongs to that shared object and not to the type the method was in.
+        /*
+         * Inside a lambda the object the method belonged to is a field of the shared object, because
+         * the lambda itself belongs to that shared object and not to the type the method was in.
+         */
         private void pushThis() {
             this.emit(Opcode.LDTHIS);
             if (this.closureIsThis) {
@@ -387,7 +395,7 @@ public final class Emitter {
             return null;
         }
 
-        // ------------------------------------------------------------ writing lines
+        // writing lines
 
         private void add(final Instruction instruction) {
             Instruction written = instruction;
@@ -462,7 +470,7 @@ public final class Emitter {
             return at;
         }
 
-        // ------------------------------------------------------------ statements
+        // statements
 
         void block(final IStmt.Block block) {
             for (final IStmt statement : block.statements()) {
@@ -507,8 +515,10 @@ public final class Emitter {
             this.emit(Opcode.STLOC, new IOperand.Slot(place));
         }
 
-        // An expression written as a statement is there for what it does, so whatever it leaves
-        // behind is thrown away. An assignment is told beforehand, so it never puts it there at all.
+        /*
+         * An expression written as a statement is there for what it does, so whatever it leaves
+         * behind is thrown away. An assignment is told beforehand, so it never puts it there at all.
+         */
         private void discard(final IExpr expression) {
             if (expression instanceof IExpr.Assign assign) {
                 this.assign(assign, false);
@@ -580,8 +590,10 @@ public final class Emitter {
             this.mark(end);
         }
 
-        // A foreach is a counted loop over the thing it walks, which is why the assembly has no
-        // instruction of its own for it.
+        /*
+         * A foreach is a counted loop over the thing it walks, which is why the assembly has no
+         * instruction of its own for it.
+         */
         private void forEach(final IStmt.ForEach loop) {
             final ITypeSymbol source = Emitter.this.model.typeOf(loop.source());
             final int held = this.hidden();
@@ -641,8 +653,10 @@ public final class Emitter {
             this.continues.pop();
         }
 
-        // Every label is tested first and the sections follow, so a section is entered only by being
-        // chosen and a run of labels can share the lines under them.
+        /*
+         * Every label is tested first and the sections follow, so a section is entered only by being
+         * chosen and a run of labels can share the lines under them.
+         */
         private void choice(final IStmt.Switch choice) {
             final ITypeSymbol type = Emitter.this.model.typeOf(choice.value());
             final int held = this.hidden();
@@ -718,7 +732,7 @@ public final class Emitter {
             return member.owner() == this.owner ? null : member.owner().name();
         }
 
-        // ------------------------------------------------------------ expressions
+        // expressions
 
         private void value(final IExpr expression, final ITypeSymbol wanted) {
             if (expression == null) {
@@ -783,8 +797,10 @@ public final class Emitter {
             }
         }
 
-        // A field, a property and an event are all read the same way, because in the assembly they
-        // are the same thing: a named place on an object.
+        /*
+         * A field, a property and an event are all read the same way, because in the assembly they
+         * are the same thing: a named place on an object.
+         */
         private void loadMember(final IExpr target, final IMemberSymbol member) {
             if (member instanceof IMemberSymbol.MethodSymbol method) {
                 this.handler(target, method);
@@ -876,8 +892,10 @@ public final class Emitter {
             this.emit(Opcode.CASTCLASS, new IOperand.Type(expression.type().describe()));
         }
 
-        // "is" asks and gives back an answer; "as" converts when it can and gives back nothing when
-        // it cannot, which is the same question asked first and acted on.
+        /*
+         * "is" asks and gives back an answer; "as" converts when it can and gives back nothing when
+         * it cannot, which is the same question asked first and acted on.
+         */
         private void typeTest(final IExpr.TypeTest expression) {
             final String written = expression.type().describe();
             if (!expression.conversion()) {
@@ -916,8 +934,10 @@ public final class Emitter {
             }
         }
 
-        // Reading, changing and writing back, with the value that is left over being the one the
-        // language says: the old one after, the new one before.
+        /*
+         * Reading, changing and writing back, with the value that is left over being the one the
+         * language says: the old one after, the new one before.
+         */
         private void step(final IExpr.Unary expression) {
             final IExpr place = expression.operand();
             final ITypeSymbol type = Emitter.this.model.typeOf(place);
@@ -1001,8 +1021,10 @@ public final class Emitter {
             }
         }
 
-        // A shift moves its left side by however much its right side says, and the two do not have
-        // to be the same kind of number.
+        /*
+         * A shift moves its left side by however much its right side says, and the two do not have
+         * to be the same kind of number.
+         */
         private static boolean shiftKeepsItsOwn(final IExpr.Binary expression) {
             return expression.operator() == Operator.SHIFT_LEFT
                     || expression.operator() == Operator.SHIFT_RIGHT;
@@ -1054,8 +1076,10 @@ public final class Emitter {
             this.emit(Opcode.CEQ);
         }
 
-        // The right side of "and" and "or" is not run when the left side already settles the answer,
-        // which is a branch and cannot be an instruction that takes both sides at once.
+        /*
+         * The right side of "and" and "or" is not run when the left side already settles the answer,
+         * which is a branch and cannot be an instruction that takes both sides at once.
+         */
         private void shortCircuit(final IExpr.Binary expression) {
             final String settled = this.label();
             final String end = this.label();
@@ -1082,7 +1106,7 @@ public final class Emitter {
             this.mark(end);
         }
 
-        // ------------------------------------------------------------ calls
+        // calls
 
         private void call(final IExpr.Call expression) {
             final IMemberSymbol resolved = Emitter.this.model.callOf(expression);
@@ -1117,8 +1141,10 @@ public final class Emitter {
             }
         }
 
-        // What a method fills in comes back on the stack after its answer, the last one on top, so
-        // they are put away from the last to the first.
+        /*
+         * What a method fills in comes back on the stack after its answer, the last one on top, so
+         * they are put away from the last to the first.
+         */
         private void storeOutward(final List<IExpr> arguments, final IMemberSymbol.MethodSymbol method) {
             for (int i = arguments.size() - 1; i >= 0; i--) {
                 if (i >= method.parameters().size() || !method.parameters().get(i).outward()) {
@@ -1144,7 +1170,7 @@ public final class Emitter {
             }
         }
 
-        // ------------------------------------------------------------ assignment
+        // assignment
 
         private void assign(final IExpr.Assign expression, final boolean leavesValue) {
             final IBinding binding = Emitter.this.model.bindingOf(expression.target());
@@ -1253,8 +1279,10 @@ public final class Emitter {
                             held.isEmpty() ? "object" : held.getLast().describe()), "void"));
         }
 
-        // Joining and parting handlers is what the runtime does with a delegate, so the assembly asks
-        // it rather than pretending an event is a kind of arithmetic.
+        /*
+         * Joining and parting handlers is what the runtime does with a delegate, so the assembly asks
+         * it rather than pretending an event is a kind of arithmetic.
+         */
         private void subscribe(final IExpr.Assign expression, final IMemberSymbol.EventSymbol event) {
             final String delegate = event.delegateType().name();
             if (!event.isStatic()) {
@@ -1273,8 +1301,10 @@ public final class Emitter {
                             event.name()));
         }
 
-        // A lambda becomes a method of the type it was written in, and a delegate bound to the same
-        // object. Its name begins with a digit so no source name can ever be the same.
+        /*
+         * A lambda becomes a method of the type it was written in, and a delegate bound to the same
+         * object. Its name begins with a digit so no source name can ever be the same.
+         */
         private void lambda(final IExpr.Lambda lambda) {
             final ITypeSymbol type = Emitter.this.model.typeOf(lambda);
             final NamedType delegate = Emitter.this.rules.named(type);
@@ -1307,8 +1337,10 @@ public final class Emitter {
             final AsmMethod made = new AsmMethod(name, gives.describe(), written, false,
                     body.slotCount(), body.finish());
 
-            // With nothing of the method's own to keep, the lambda belongs to the type it was written
-            // in. With something to keep, it belongs to the object holding it, so it can reach it.
+            /*
+             * With nothing of the method's own to keep, the lambda belongs to the type it was written
+             * in. With something to keep, it belongs to the object holding it, so it can reach it.
+             */
             if (this.closure == null) {
                 Emitter.this.synthesized.add(made);
                 this.pushThis();
@@ -1322,7 +1354,7 @@ public final class Emitter {
                     new IOperand.Method(this.closure.type(), name, written, gives.describe()));
         }
 
-        // ------------------------------------------------------------ conversions
+        // conversions
 
         private void coerce(final ITypeSymbol from, final ITypeSymbol to) {
             if (from == null || to == null || from.equals(to)) {
@@ -1346,7 +1378,7 @@ public final class Emitter {
         }
     }
 
-    // ---------------------------------------------------------------- what a lambda keeps
+    // what a lambda keeps
 
     /**
      * The object a lambda keeps the method's variables in.
@@ -1437,8 +1469,10 @@ public final class Emitter {
         }
     }
 
-    // One walk serves both questions: how deep inside loops each variable was declared, and what each
-    // lambda reaches for. The depth is what says whether a variable outlives the lambda that keeps it.
+    /*
+     * One walk serves both questions: how deep inside loops each variable was declared, and what each
+     * lambda reaches for. The depth is what says whether a variable outlives the lambda that keeps it.
+     */
     private void walk(final IStmt statement, final int depth, final Found found) {
         switch (statement) {
             case null -> { }

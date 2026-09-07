@@ -61,7 +61,7 @@ import java.util.stream.Collectors;
  * Card: it reaches every supercomputer and datacenter section on its network, writes a system or a
  * program to their nodes a few at a time over real time, and switches their bays in bulk. Every
  * action goes through the same per-node hosts a player reaches rack by rack, so what the manager
- * does by itself must equal what a player could do by hand — a shortcut, never a loophole.
+ * does by itself must equal what a player could do by hand, a shortcut, never a loophole.
  */
 @GameTestHolder(JsTests.MODID)
 @PrefixGameTestTemplate(false)
@@ -96,11 +96,11 @@ public final class ClusterManagerGameTests {
     private ClusterManagerGameTests() {
     }
 
-    // ---- fixtures ----
+    // fixtures
 
     /**
-     * Places the backbone and the manager on it — rear to the cable, the same consumer build a PC runs on,
-     * {@code card} in its first expansion slot (none when empty) — and powers it on.
+     * Places the backbone and the manager on it (rear to the cable, the same consumer build a PC runs on,
+     * {@code card} in its first expansion slot, none when empty) and powers it on.
      */
     private static ClusterManagementComputerBlockEntity placeBackbone(final GameTestHelper helper,
                                                                        final ItemStack card) {
@@ -247,7 +247,7 @@ public final class ClusterManagerGameTests {
         return count;
     }
 
-    // ---- the card ----
+    // the card
 
     @GameTest(template = ARENA)
     public static void manager_isAnOrdinaryComputerWithoutTheCard(final GameTestHelper helper) {
@@ -292,7 +292,7 @@ public final class ClusterManagerGameTests {
                 .thenSucceed();
     }
 
-    // ---- reach over the network ----
+    // reach over the network
 
     @GameTest(template = ARENA)
     public static void manager_seesTheSupercomputerOverTheNetwork(final GameTestHelper helper) {
@@ -357,8 +357,10 @@ public final class ClusterManagerGameTests {
                     helper.assertTrue(manager.powerAll(ref, false) == 1, "power-all-off flips the one bay");
                     helper.assertTrue(!rack.bayPowerOn(0), "the bay is off");
                     helper.assertTrue(manager.powerAll(ref, false) == 0, "an off section has nothing left to switch");
-                    // The off bay has left the network, but the manager still lists it — or it could never
-                    // switch it back on from here.
+                    /*
+                     * The off bay has left the network, but the manager still lists it, or it could never
+                     * switch it back on from here.
+                     */
                     helper.assertTrue(manager.nodesOf(ref).size() == 1,
                             "an off bay stays in the section's node list; got " + manager.nodesOf(ref).size());
                     helper.assertTrue(manager.toggleNode(helper.absolutePos(SERVER_RACK), 0) && rack.bayPowerOn(0),
@@ -483,8 +485,8 @@ public final class ClusterManagerGameTests {
     }
 
     /**
-     * A supercomputer node is only worth a cluster slot with a coprocessor in it. The manager must name that
-     * — a node seated, powered and systemless otherwise looks the same as one that is pulling its weight.
+     * A supercomputer node is only worth a cluster slot with a coprocessor in it. The manager must name that,
+     * since a node seated, powered and systemless otherwise looks the same as one that is pulling its weight.
      */
     @GameTest(template = ARENA)
     public static void manager_namesASupercomputerNodeWithoutItsCoprocessor(final GameTestHelper helper) {
@@ -512,7 +514,7 @@ public final class ClusterManagerGameTests {
                 .thenSucceed();
     }
 
-    // ---- install jobs ----
+    // install jobs
 
     @GameTest(template = ARENA, timeoutTicks = INSTALL_TIMEOUT)
     public static void manager_installsTheSystemOnEveryNodeOverTime(final GameTestHelper helper) {
@@ -652,7 +654,7 @@ public final class ClusterManagerGameTests {
                 .thenSucceed();
     }
 
-    // ---- reach is the card's, not the network's ----
+    // reach is the card's, not the network's
 
     /**
      * The Vintage manager on the backbone: an AT board (the era's PCI bus, Socket 7) with the era's
@@ -707,7 +709,7 @@ public final class ClusterManagerGameTests {
                 .thenSucceed();
     }
 
-    // ---- the shell ----
+    // the shell
 
     @GameTest(template = ARENA)
     public static void clusterCommand_drivesTheClustersFromTheManagersShellOnly(final GameTestHelper helper) {

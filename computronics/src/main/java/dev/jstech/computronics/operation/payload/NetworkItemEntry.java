@@ -18,7 +18,7 @@ import java.util.List;
 
 /**
  * One row in the network/storage view: the data type held (item OR fluid, via {@link StorageKey}), the true
- * total on the network (which may exceed a stack/bucket), and where it is stored ({@link #shares} — one entry
+ * total on the network (which may exceed a stack/bucket), and where it is stored ({@link #shares}, one entry
  * per server/storage that holds it, for the details panel; empty for views without a per-server breakdown).
  */
 public record NetworkItemEntry(StorageKey key, long total, List<StorageShare> shares) {

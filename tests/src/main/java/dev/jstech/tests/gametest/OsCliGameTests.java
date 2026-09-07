@@ -63,9 +63,7 @@ public final class OsCliGameTests {
     private static final ResourceLocation MC_DOS =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
 
-    // -------------------------------------------------------------------------
     // the console-open payload
-    // -------------------------------------------------------------------------
 
     /**
      * Every shell's command list, live installer included, must encode into the payload that opens a
@@ -97,9 +95,7 @@ public final class OsCliGameTests {
         helper.succeed();
     }
 
-    // -------------------------------------------------------------------------
     // dir (listDisk)
-    // -------------------------------------------------------------------------
 
     /**
      * After writing a file directly via {@link DiskFilesystem}, {@code dir} (listDisk) must include
@@ -151,9 +147,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // type (readFile)
-    // -------------------------------------------------------------------------
 
     /**
      * {@code type} (readFile) must return the exact content that was written to the file.
@@ -199,13 +193,11 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // del (deleteFile)
-    // -------------------------------------------------------------------------
 
     /**
      * After {@code del} (deleteFile) succeeds, a subsequent {@code type} (readFile) on the same
-     * path must fail — confirming the file was actually removed from the disk.
+     * path must fail, confirming the file was actually removed from the disk.
      */
     @GameTest(template = ARENA)
     public static void cliDel_removesFile_andSubsequentTypeErrors(final GameTestHelper helper) {
@@ -251,9 +243,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // run (runScript)
-    // -------------------------------------------------------------------------
 
     /**
      * {@code run} on a stored {@code .iql} file must parse and execute the statement, returning
@@ -280,9 +270,11 @@ public final class OsCliGameTests {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
                     final ICliComputer.FsResult result = cli.runScript("daily.iql");
 
-                    // The script must have been found and parsed successfully.
-                    // A network-dispatch failure is acceptable (no network here);
-                    // a file-not-found or syntax error is a test failure.
+                    /*
+                     * The script must have been found and parsed successfully.
+                     * A network-dispatch failure is acceptable (no network here);
+                     * a file-not-found or syntax error is a test failure.
+                     */
                     final boolean parsedOk = result.ok()
                             || (result.opResult() != null)
                             || (!result.ok() && result.message().contains("Mainframe"));
@@ -335,9 +327,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // write (writeFile)
-    // -------------------------------------------------------------------------
 
     /**
      * {@code write} (writeFile) must create a file whose content {@code type} (readFile) then returns,
@@ -400,9 +390,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // DOS directory navigation and filesystem verbs
-    // -------------------------------------------------------------------------
 
     /** {@code cd} into a subdirectory updates the current location, and {@code cd ..} returns. */
     @GameTest(template = ARENA)
@@ -576,9 +564,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // Settings store and the config command
-    // -------------------------------------------------------------------------
 
     /** setConfig routes to the name, the settings store (clamping), and the disk's network share. */
     @GameTest(template = ARENA)
@@ -675,9 +661,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // Helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Places a Mainframe at {@code pos} with a valid hardware build, installs MC-DOS onto the disk
@@ -729,7 +713,7 @@ public final class OsCliGameTests {
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
-        // No disk slot filled — systemDisk() will return empty, resolveDiskCtx() returns null.
+        // No disk slot filled, so systemDisk() returns empty, resolveDiskCtx() returns null.
         mainframe.togglePower();
         return mainframe;
     }
@@ -740,7 +724,7 @@ public final class OsCliGameTests {
         return new ServerCliComputer(mainframe, level);
     }
 
-    // --- Linux -----------------------------------------------------------------------------------
+    // Linux
 
     /**
      * A Linux distribution boots to a bash TTY: the OS installs on the Linux kernel (POSIX shell family),
@@ -812,7 +796,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // --- Firmware boot manager -------------------------------------------------------------------
+    // Firmware boot manager
 
     /**
      * Dual boot: with two disks each carrying a system, the firmware's preferred boot disk decides which OS
@@ -854,7 +838,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    // --- Package managers + Mirror -----------------------------------------------------------------
+    // Package managers + Mirror
 
     /**
      * Packages come from the network's Mirror service: without it {@code apt} cannot resolve the mirror, after
@@ -943,8 +927,10 @@ public final class OsCliGameTests {
                     helper.assertTrue(gnome.equals(mainframe.installedDesktopId()),
                             "the installed desktop package must become the computer's desktop; got "
                                     + mainframe.installedDesktopId());
-                    // Installing the package does not put the running machine into a desktop: a system
-                    // that is already up keeps the session it booted until it is restarted.
+                    /*
+                     * Installing the package does not put the running machine into a desktop: a system
+                     * that is already up keeps the session it booted until it is restarted.
+                     */
                     helper.assertTrue(dev.jstech.computronics.os.boot.BootController
                                     .targetForComputer(mainframe)
                                     == dev.jstech.computronics.os.boot.BootController.BootTarget.TERMINAL_ONLY,
@@ -1151,7 +1137,7 @@ public final class OsCliGameTests {
     /**
      * The DOS-family shell manages the machine: {@code mirror install} turns the Mainframe service on,
      * {@code uninstall mirror} turns it off again, and {@code format} erases a data drive only after the
-     * explicit confirmation flag — never the running system drive.
+     * explicit confirmation flag, never the running system drive.
      */
     @GameTest(template = ARENA)
     public static void shell_formatAndUninstallManageTheComputer(final GameTestHelper helper) {
@@ -1206,7 +1192,7 @@ public final class OsCliGameTests {
 
     /**
      * Each distribution removes packages with its own manager's flags, and every manager advertises
-     * removal in its usage line — a verb that works but is never listed cannot be discovered.
+     * removal in its usage line, since a verb that works but is never listed cannot be discovered.
      */
     @GameTest(template = ARENA)
     public static void packageManagers_removeWithTheirOwnFlagsAndAdvertiseIt(final GameTestHelper helper) {
@@ -1241,8 +1227,10 @@ public final class OsCliGameTests {
         final BlockPos legacyPos = new BlockPos(2, 2, 2);
         final BlockPos vintagePos = new BlockPos(6, 2, 2);
         final ResourceLocation ubuntu = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu");
-        // A machine of an era is its era chassis carrying a board of that same era: the chassis accepts
-        // no other, so the two can never disagree.
+        /*
+         * A machine of an era is its era chassis carrying a board of that same era: the chassis accepts
+         * no other, so the two can never disagree.
+         */
         final MainframeBlockEntity legacy = placeMainframeWithEra(helper, legacyPos, ubuntu,
                 ComputingModule.LEGACY_MAINFRAME.get(),
                 HardwareItems.MOTHERBOARD_MTX_LEGACY.get(), HardwareItems.CPU_VELOCION_DUAL_285.get(),
@@ -1280,7 +1268,7 @@ public final class OsCliGameTests {
 
     /**
      * Installed software belongs to the disk, not to the computer. Swapping in a fresh disk must give a
-     * clean machine, and putting the original back must bring its programs with it — the bug being that
+     * clean machine, and putting the original back must bring its programs with it, the bug being that
      * a newly installed system inherited the previous one's programs and desktop.
      */
     @GameTest(template = ARENA)
@@ -1318,8 +1306,8 @@ public final class OsCliGameTests {
 
     /**
      * The windows open on a desktop are the machine's state: they persist with it, and a restart or a
-     * shutdown closes them, as on any real machine. This is what lets whoever opens the monitor next —
-     * or the same player after the game was closed — find the desktop as it was left.
+     * shutdown closes them, as on any real machine. This is what lets whoever opens the monitor next,
+     * or the same player after the game was closed, find the desktop as it was left.
      */
     @GameTest(template = ARENA)
     public static void openWindows_persistWithTheMachineAndCloseOnRestartOrShutdown(final GameTestHelper helper) {
@@ -1473,7 +1461,7 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
-    /** A source build settles by itself through the computer's tick — no command needed to finish it. */
+    /** A source build settles by itself through the computer's tick, with no command needed to finish it. */
     @GameTest(template = ARENA, timeoutTicks = 400)
     public static void linux_buildSettlesByTickingWithoutACommand(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);

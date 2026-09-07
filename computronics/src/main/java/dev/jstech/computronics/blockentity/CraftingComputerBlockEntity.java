@@ -29,8 +29,10 @@ import java.util.Set;
 public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         implements dev.jstech.computronics.terminal.IComputerTerminalHost {
 
-    // Slot layout — an ATX board: one CPU, four RAM, four PCIe (GPU and/or Crafting Card), one PSU,
-    // two disks. Kept public so the assembly Menu and Screen address slots by name.
+    /*
+     * Slot layout for an ATX board: one CPU, four RAM, four PCIe (GPU and/or Crafting Card), one PSU,
+     * two disks. Kept public so the assembly Menu and Screen address slots by name.
+     */
     public static final int MOTHERBOARD_SLOT = 0;
     public static final int CPU_SLOT = 1;
     public static final int RAM_SLOTS_START = 2;
@@ -54,8 +56,10 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected Set<FormFactor> acceptedFormFactors() {
-        // A Crafting Computer is a PC-class machine: each era takes its own consumer form factor —
-        // Vintage on Baby-AT/AT, Legacy and Standard on ATX.
+        /*
+         * A Crafting Computer is a PC-class machine: each era takes its own consumer form factor:
+         * Vintage on Baby-AT/AT, Legacy and Standard on ATX.
+         */
         return switch (blockEra()) {
             case VINTAGE -> Set.of(FormFactor.BABY_AT, FormFactor.AT);
             default -> Set.of(FormFactor.ATX);
@@ -64,8 +68,10 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected dev.jstech.core.tier.HardwareEra requiredBoardEra() {
-        // A Crafting Computer accepts only a board of its own era, so a Legacy and a Standard ATX board
-        // are not interchangeable: each installs in its matching machine alone.
+        /*
+         * A Crafting Computer accepts only a board of its own era, so a Legacy and a Standard ATX board
+         * are not interchangeable: each installs in its matching machine alone.
+         */
         return blockEra();
     }
 
@@ -143,7 +149,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         return isRunning() && craftingCardFactor() > 0.0;
     }
 
-    // Craft execution claim — one craft at a time without a Supercomputer
+    // Craft execution claim: one craft at a time without a Supercomputer
 
     private java.util.UUID activeCraftId;
 
@@ -165,13 +171,15 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         }
     }
 
-    // Recipe ROM — the computer's pattern store, hard-capped at 50
+    // Recipe ROM: the computer's pattern store, hard-capped at 50
 
     private final java.util.List<dev.jstech.computronics.crafting.CraftingPattern> rom =
             new java.util.ArrayList<>();
 
-    // Machine recipes (processing / multi-stage) share the ROM's slot budget but live in their own list, so the
-    // bench-craft path stays untouched. Both count toward RECIPE_ROM_LIMIT.
+    /*
+     * Machine recipes (processing / multi-stage) share the ROM's slot budget but live in their own list, so the
+     * bench-craft path stays untouched. Both count toward RECIPE_ROM_LIMIT.
+     */
     private final java.util.List<dev.jstech.computronics.crafting.NetworkRecipe> machineRecipes =
             new java.util.ArrayList<>();
 
@@ -209,9 +217,11 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
      * may run on a machine at once, whether it is paused, and whether to fill it rather than feed one lot.
      */
     public record MachineConfig(int maxJobs, boolean locked, boolean feedMax) {
-        // maxJobs is an OPTIONAL per-type ceiling on concurrent jobs; 0 means "auto" — use every machine of the
-        // type that exists (the dispatcher gives each job a distinct physical machine, so concurrency already
-        // scales with the machines present). A positive value caps below that.
+        /*
+         * maxJobs is an OPTIONAL per-type ceiling on concurrent jobs; 0 means "auto", which uses every machine of the
+         * type that exists (the dispatcher gives each job a distinct physical machine, so concurrency already
+         * scales with the machines present). A positive value caps below that.
+         */
         public static final MachineConfig DEFAULT = new MachineConfig(0, false, false);
 
         public MachineConfig {
@@ -219,9 +229,11 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         }
     }
 
-    // Config lives in one map under two kinds of key: a machine TYPE (e.g. "mekanism:...factory") holds that
-    // type's Max Jobs ceiling; a per-PHYSICAL-machine key (see machineStateKey, prefixed "@") holds that one
-    // machine's Paused/Feed state. So Max Jobs is set once per type, while a machine can be paused on its own.
+    /*
+     * Config lives in one map under two kinds of key: a machine TYPE (e.g. "mekanism:...factory") holds that
+     * type's Max Jobs ceiling; a per-PHYSICAL-machine key (see machineStateKey, prefixed "@") holds that one
+     * machine's Paused/Feed state. So Max Jobs is set once per type, while a machine can be paused on its own.
+     */
     private final java.util.Map<String, MachineConfig> machineConfigs = new java.util.HashMap<>();
 
     /** The config key for one physical machine's per-machine state (Paused/Feed), by its world position. */
@@ -370,7 +382,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         }
     }
 
-    // Screen sync (ContainerData wire layout — single source of truth shared with the Menu)
+    // Screen sync (ContainerData wire layout, single source of truth shared with the Menu)
 
     public static final int DATA_RUNNING = 0;
     public static final int DATA_BUILD_VALID = 1;
@@ -429,8 +441,10 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         return dataAccess;
     }
 
-    // IComputerTerminalHost — read-only monitoring so the Network Interactor works on a Crafting Computer
-    // (the storage/hardware getters are inherited from the base; only these computer-semantic ones differ).
+    /*
+     * IComputerTerminalHost: read-only monitoring so the Network Interactor works on a Crafting Computer
+     * (the storage/hardware getters are inherited from the base; only these computer-semantic ones differ).
+     */
 
     @Override
     public boolean computerRunning() {

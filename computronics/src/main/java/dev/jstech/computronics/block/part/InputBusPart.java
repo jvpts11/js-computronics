@@ -16,7 +16,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * An Input Bus part: marks the machine face that crafting operations deliver inputs through — the way to drive
+ * An Input Bus part: marks the machine face that crafting operations deliver inputs through, the way to drive
  * a sided machine whose input face differs from the face its Crafting Switch touches. It shares the Export
  * Bus's identity plumbing (menu, filters) but is passive: the crafting engine pushes through it, it never
  * transfers on its own.

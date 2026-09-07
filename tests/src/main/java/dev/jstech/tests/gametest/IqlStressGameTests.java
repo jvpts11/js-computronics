@@ -99,9 +99,11 @@ public final class IqlStressGameTests {
                     run(cli, "UNLOCK dirt");
                     helper.assertFalse(mainframe.networkIndex().isManuallyLocked(dirt), "UNLOCK must release dirt");
 
-                    // Malformed, incomplete and unknown-target statements must be refused, never crash. (A
-                    // non-positive quantity is NOT malformed: like CRAFT and SELECT, it means "all", so it is
-                    // left out here to avoid actually locking cobblestone.)
+                    /*
+                     * Malformed, incomplete and unknown-target statements must be refused, never crash. (A
+                     * non-positive quantity is NOT malformed: like CRAFT and SELECT, it means "all", so it is
+                     * left out here to avoid actually locking cobblestone.)
+                     */
                     for (final String bad : new String[]{
                             "", "   ", "LOCK", "UNLOCK", "LOCK 5 not_a_real_item",
                             "SELECT", "SELECT 5 not_a_real_item", "COUNT nonsense WHERE", "garbage tokens", "operation"}) {

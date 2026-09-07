@@ -34,7 +34,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The Compressor — a Tier-1 industrial machine that presses ingots into plates using FE power.
+ * The Compressor, a Tier-1 industrial machine that presses ingots into plates using FE power.
  */
 public class CompressorBlock extends HorizontalDirectionalBlock implements EntityBlock {
 

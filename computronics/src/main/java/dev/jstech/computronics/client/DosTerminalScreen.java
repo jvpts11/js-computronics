@@ -12,7 +12,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
- * The MC-DOS terminal: the whole monitor glass is the console, no program window around it — the machine IS
+ * The MC-DOS terminal: the whole monitor glass is the console, no program window around it, the machine IS
  * the prompt. Boots with the period MC-DOS banner and the drive-tracking {@code C:\>} prompt. The MC-NET
  * Command Prompt window is deliberately not reused here; each platform owns its console screen.
  */

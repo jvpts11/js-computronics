@@ -30,7 +30,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Integration coverage for the era-variant Crafting Computers and Mainframes: the assembly menu stays
- * open (stillValid validates the block family, not the Standard block alone — the bug that made an
+ * open (stillValid validates the block family, not the Standard block alone, the bug that made an
  * era GUI flash for one tick and close), the era board gate (a board of the wrong era never powers the
  * machine on), the Mainframe multiblock stamping its era onto every structural part, and the
  * era-correct block dropping.
@@ -45,7 +45,7 @@ public final class EraMachineGameTests {
     private static final String ARENA = "empty";
     private static final int SETTLE = 4;
 
-    // ---- Crafting Computer: the menu must stay open for every era ----
+    // Crafting Computer: the menu must stay open for every era
 
     @GameTest(template = ARENA)
     public static void craftingComputer_menuStaysOpen(final GameTestHelper helper) {
@@ -81,7 +81,7 @@ public final class EraMachineGameTests {
         helper.succeed();
     }
 
-    // ---- Mainframe: the menu must stay open for every era ----
+    // Mainframe: the menu must stay open for every era
 
     @GameTest(template = ARENA)
     public static void mainframe_menuStaysOpen(final GameTestHelper helper) {
@@ -117,7 +117,7 @@ public final class EraMachineGameTests {
         helper.succeed();
     }
 
-    // ---- Era board gate: the right-era board powers on, the wrong-era board does not ----
+    // Era board gate: the right-era board powers on, the wrong-era board does not
 
     @GameTest(template = ARENA)
     public static void vintageCrafting_validBuild_powersOn(final GameTestHelper helper) {
@@ -200,7 +200,7 @@ public final class EraMachineGameTests {
             helper.fail("no MainframeBlockEntity at " + pos);
             return;
         }
-        // A Legacy MTX board in a Vintage Mainframe: same MTX form factor, wrong era — gate rejects it.
+        // A Legacy MTX board in a Vintage Mainframe: same MTX form factor, wrong era, so the gate rejects it.
         final var hw = be.getHardware();
         hw.setStackInSlot(MainframeBlockEntity.MOTHERBOARD_SLOT,
                 new ItemStack(HardwareItems.MOTHERBOARD_MTX_LEGACY.get()));
@@ -217,7 +217,7 @@ public final class EraMachineGameTests {
                 .thenSucceed();
     }
 
-    // ---- Mainframe multiblock: every structural part inherits the controller's era ----
+    // Mainframe multiblock: every structural part inherits the controller's era
 
     @GameTest(template = ARENA)
     public static void vintageMainframe_formsWithEraParts(final GameTestHelper helper) {
@@ -249,7 +249,7 @@ public final class EraMachineGameTests {
                 .thenSucceed();
     }
 
-    // ---- Era-correct drops: breaking the block returns its own era's item ----
+    // Era-correct drops: breaking the block returns its own era's item
 
     @GameTest(template = ARENA)
     public static void vintageCrafting_break_dropsVintageItem(final GameTestHelper helper) {

@@ -42,8 +42,10 @@ final class SystemLayoutTest {
     @Test
     void directoriesFor_listsParentsBeforeChildren() {
         final List<String> dirs = SystemLayout.directoriesFor(OsCapability.FULL_DESKTOP);
-        // Every nested path must appear after each of its ancestors, so a caller materialising the
-        // list in order never references a missing parent.
+        /*
+         * Every nested path must appear after each of its ancestors, so a caller materialising the
+         * list in order never references a missing parent.
+         */
         for (int i = 0; i < dirs.size(); i++) {
             final String path = dirs.get(i);
             final int lastSlash = path.lastIndexOf('/');

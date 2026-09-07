@@ -20,7 +20,7 @@ import java.util.List;
  * Server to client: the Craft Planner's answer for a chosen target. It reports whether the network can make
  * the item at all, whether the request is fully feasible from stock, how much a single run of the plan
  * yields, the largest feasible amount, the ordered {@link Stage}s the plan runs, and the raw-ingredient bill
- * ({@link #ingredients} — need vs have, short when red). Sent in reply to {@link RequestCraftPlannerPayload}
+ * ({@link #ingredients}, need vs have, short when red). Sent in reply to {@link RequestCraftPlannerPayload}
  * when a target is set.
  */
 public record CraftPlannerPayload(ItemStack result, long quantity, boolean craftable, boolean feasible,

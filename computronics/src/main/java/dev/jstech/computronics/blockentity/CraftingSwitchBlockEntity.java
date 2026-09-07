@@ -33,16 +33,18 @@ import java.util.Set;
  * Declares up to five adjacent machines for network crafting. Five of the six faces can each touch a machine the
  * network can route crafts through; the sixth face carries the crafting cable to a Crafting Computer (found by a
  * BFS through that cable, exactly like the supercomputer cluster discovers its nodes over the HPC cable). The
- * switch never receives Operations itself — the Crafting Computer discovers it and aggregates its machines.
+ * switch never receives Operations itself; the Crafting Computer discovers it and aggregates its machines.
  */
 public class CraftingSwitchBlockEntity extends BlockEntity {
 
     private static final int FACES = 6;
     private static final int BFS_STEPS = 64;
 
-    // Persistent per-face config: a player-set name (referenced by PROCESSING patterns), an active toggle, and a
-    // generic machine category (a recipe type id, e.g. "minecraft:smelting") so patterns authored against
-    // generic:<category> match this face.
+    /*
+     * Persistent per-face config: a player-set name (referenced by PROCESSING patterns), an active toggle, and a
+     * generic machine category (a recipe type id, e.g. "minecraft:smelting") so patterns authored against
+     * generic:<category> match this face.
+     */
     private final String[] faceNames = new String[FACES];
     private final boolean[] faceActive = new boolean[FACES];
     private final String[] faceCategories = new String[FACES];
@@ -53,13 +55,15 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
     private BlockPos linkedComputer;
     private boolean clientLinked; // client mirror of "linkedComputer != null", carried by the update tag
     private int busMachineCount;  // machines discovered over the cables via crafting buses (synced for the GUI)
-    // One line per bus-discovered machine, synced so the GUI lists WHICH machines the switch found, where
-    // (absolute coordinates), and through which bus (whose name is editable from the switch screen).
+    /*
+     * One line per bus-discovered machine, synced so the GUI lists WHICH machines the switch found, where
+     * (absolute coordinates), and through which bus (whose name is editable from the switch screen).
+     */
     private java.util.List<BusMachineLine> busMachineLines = java.util.List.of();
 
     /**
      * A machine discovered over the cables: its block name, the bus's name, where both sit, and the switch
-     * face whose cable run reaches it — the GUI lists the machine ON that face row.
+     * face whose cable run reaches it, and the GUI lists the machine ON that face row.
      */
     public record BusMachineLine(String blockName, String busName, BlockPos machinePos,
                                  BlockPos cablePos, int busFace, int switchFace) {
@@ -94,10 +98,12 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
                 cable = direction;
                 machinePresent[direction.get3DDataValue()] = false; // the cable face never hosts a machine
             } else {
-                // A "machine" is any adjacent block with a block entity that exposes an item handler on ANY side
-                // — not just the touched face. Sided machines (e.g. a mod machine whose side-config closes the
-                // face the switch happens to touch) must still be recognized; the engine can reach their real
-                // I/O faces through Input/Receiving buses.
+                /*
+                 * A "machine" is any adjacent block with a block entity that exposes an item handler on ANY side,
+                 * not just the touched face. Sided machines (e.g. a mod machine whose side-config closes the
+                 * face the switch happens to touch) must still be recognized; the engine can reach their real
+                 * I/O faces through Input/Receiving buses.
+                 */
                 machinePresent[direction.get3DDataValue()] = exposesItemHandler(level, neighbor);
             }
         }
@@ -164,7 +170,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
         return null;
     }
 
-    // --- accessors for the GUI / the Crafting Computer ---
+    // accessors for the GUI / the Crafting Computer
 
     public boolean machineOnFace(final Direction face) {
         return machinePresent[face.get3DDataValue()];
@@ -178,7 +184,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
         return linkedComputer;
     }
 
-    /** Whether a Crafting Computer is reachable over the crafting cable — valid on both sides. */
+    /** Whether a Crafting Computer is reachable over the crafting cable, valid on both sides. */
     public boolean isLinked() {
         return linkedComputer != null || clientLinked;
     }
@@ -201,7 +207,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    /** The face's generic category — a recipe type id such as {@code minecraft:smelting}, or empty for none. */
+    /** The face's generic category, a recipe type id such as {@code minecraft:smelting}, or empty for none. */
     public String faceCategory(final Direction face) {
         return faceCategories[face.get3DDataValue()];
     }
@@ -218,7 +224,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
 
     /**
      * Every machine this switch currently offers the network, from two sources: active faces (excluding the
-     * cable face) that touch a block with an item handler, and machines reached over the crafting cables — any
+     * cable face) that touch a block with an item handler, and machines reached over the crafting cables, any
      * block a mounted Crafting Input/Receiving Bus points at. The engine uses {@code machineType}/{@code name}
      * to find a machine for a processing pattern and {@code machinePos}/{@code face} to drive its I/O.
      */
@@ -239,8 +245,10 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
             out.add(new DeclaredMachine(faceNames[i], key.toString(), faceCategories[i], machinePos, direction));
             declared.add(machinePos);
         }
-        // Machines reached over the cables belong to the switch face their cable run hangs from: they inherit
-        // that face's category (so generic patterns match them) and are gated by that face's active toggle.
+        /*
+         * Machines reached over the cables belong to the switch face their cable run hangs from: they inherit
+         * that face's category (so generic patterns match them) and are gated by that face's active toggle.
+         */
         for (final BusMachineLine line : collectBusMachines(declared)) {
             final var key = net.minecraft.core.registries.BuiltInRegistries.BLOCK
                     .getKey(level.getBlockState(line.machinePos()).getBlock());
@@ -252,7 +260,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
 
     /**
      * Walks the crafting cables reachable from this switch and returns the block each mounted Crafting
-     * Input/Receiving Bus points at — how a machine that does not touch the switch itself joins the crafting
+     * Input/Receiving Bus points at, which is how a machine that does not touch the switch itself joins the crafting
      * network. Each machine remembers the switch face its cable run starts at (BFS origin), so the GUI lists it
      * on that face row and the face's active toggle/category govern it. The bus face doubles as the I/O face
      * the engine drives; the bus's editable name doubles as the machine's name.
@@ -305,7 +313,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
         return lines;
     }
 
-    // --- persistence + client sync ---
+    // persistence + client sync
 
     @Override
     protected void loadAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
@@ -338,12 +346,12 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
         }
     }
 
-    /** How many machines this switch discovered over its cables via crafting buses — valid on both sides. */
+    /** How many machines this switch discovered over its cables via crafting buses, valid on both sides. */
     public int busMachineCount() {
         return busMachineCount;
     }
 
-    /** The bus-discovered machines (block name, bus name, absolute positions) — valid on both sides. */
+    /** The bus-discovered machines (block name, bus name, absolute positions), valid on both sides. */
     public java.util.List<BusMachineLine> busMachineLines() {
         return busMachineLines;
     }
@@ -362,8 +370,10 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
     public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
         final CompoundTag tag = super.getUpdateTag(registries);
         saveAdditional(tag, registries);
-        // The survey results are transient (recomputed server-side every tick) but the GUI reads them on the
-        // client, so the update tag carries them; without this the screen always shows UNLINKED / no machine.
+        /*
+         * The survey results are transient (recomputed server-side every tick) but the GUI reads them on the
+         * client, so the update tag carries them; without this the screen always shows UNLINKED / no machine.
+         */
         int presentMask = 0;
         for (int i = 0; i < FACES; i++) {
             if (machinePresent[i]) {

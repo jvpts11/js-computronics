@@ -71,8 +71,10 @@ public final class OsMediaGameTests {
                     helper.assertTrue(cd.acceptsMedia(cdRom), "a CD drive must accept a CD");
                     helper.assertTrue(floppy.acceptsMedia(disk), "a floppy drive must accept a floppy");
 
-                    // The disc a player actually holds is an installer off the creative tab, not a blank
-                    // one: it carries a kind and a payload. Those components must not change acceptance.
+                    /*
+                     * The disc a player actually holds is an installer off the creative tab, not a blank
+                     * one: it carries a kind and a payload. Those components must not change acceptance.
+                     */
                     final ItemStack installer = new ItemStack(ComputingModule.DVD_ROM.get());
                     MediaItem.setKind(installer, MediaKind.PROGRAM_INSTALL);
                     MediaItem.setPayload(installer,

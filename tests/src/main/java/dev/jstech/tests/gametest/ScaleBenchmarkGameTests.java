@@ -59,7 +59,7 @@ import java.util.Map;
  * The proof of scale: a whole late-game base, built for real (cabinets with their part blocks, hundreds
  * of servers, thousands of item types with component variants, supercomputers, computers), put under a
  * terminal's worth of traffic every tick, and measured on the five axes that decide whether the mod holds
- * up — the server tick, the bytes an item catalog costs on the wire, what a save writes, what a reload
+ * up: the server tick, the bytes an item catalog costs on the wire, what a save writes, what a reload
  * costs, and whether the cost of an operation stays flat as the catalog grows.
  *
  * <p>Runs alone in its own batch so the clock is not shared with other tests. The numbers go to
@@ -165,8 +165,10 @@ public final class ScaleBenchmarkGameTests {
                 .put("drives_per_server", params.drivesPerServer()).put("drive_size", params.driveSize().name())
                 .put("max_lot", params.maxLot()).put("mainframe_queues", base.mainframe().parallelQueues());
 
-        // Both traffic runs are prepared up front: a sequence step that fails still lets the next steps run
-        // in the same tick, and anything but an assertion failure escaping a step brings the server down.
+        /*
+         * Both traffic runs are prepared up front: a sequence step that fails still lets the next steps run
+         * in the same tick, and anything but an assertion failure escaping a step brings the server down.
+         */
         final List<StorageKey> fullCatalog = BigBaseScenario.catalog(params.types(), params.variantPercent());
         final BenchmarkLoad.Workload crafting = base.workload(CRAFT_EVERY_TICKS, RECIPE_QUANTITY, PROCESSING_QUANTITY);
         report.put("craft_requests_per_burst", crafting.requests().size())
@@ -201,10 +203,12 @@ public final class ScaleBenchmarkGameTests {
                     firstIdle[0] = averageTickMs(server);
                     report.put("idle_ms", firstIdle[0]);
                 }))
-                // The average covers the last hundred ticks, so one heavy tick inside the window reads as if
-                // the base paid it every tick: the server's autosave lands wherever its tick counter says
-                // (this server runs ticks back to back, so it moves from run to run), and the first window
-                // still carries the JIT. The idle cost is the better of two consecutive windows.
+                /*
+                 * The average covers the last hundred ticks, so one heavy tick inside the window reads as if
+                 * the base paid it every tick: the server's autosave lands wherever its tick counter says
+                 * (this server runs ticks back to back, so it moves from run to run), and the first window
+                 * still carries the JIT. The idle cost is the better of two consecutive windows.
+                 */
                 .thenExecuteAfter(TICK_AVERAGE_WINDOW, () -> {
                     if (!Double.isNaN(firstIdle[0])) {
                         report.put("idle_ms", Math.min(firstIdle[0], averageTickMs(server)));
@@ -218,9 +222,11 @@ public final class ScaleBenchmarkGameTests {
                             .put("ops_small_in_flight", base.mainframe().activeOperationRecords().size());
                     helper.assertTrue(small.accepted() == small.submitted(),
                             "the Mainframe accepts every operation; refused " + (small.submitted() - small.accepted()));
-                    // Grow the catalog to its full size: the same traffic must not get slower per operation.
-                    // The whole catalog is seeded, small keys included: the first run's pulls drained the
-                    // smallest lots among them, and every key must be present for the completeness check.
+                    /*
+                     * Grow the catalog to its full size: the same traffic must not get slower per operation.
+                     * The whole catalog is seeded, small keys included: the first run's pulls drained the
+                     * smallest lots among them, and every key must be present for the completeness check.
+                     */
                     final long seeded = BigBaseScenario.seed(base, fullCatalog, 2L);
                     final long[] storage = BigBaseScenario.storageItems(base);
                     report.put("items_seeded_full", seeded).put("storage_items_capacity", storage[0])
@@ -228,8 +234,10 @@ public final class ScaleBenchmarkGameTests {
                     helper.assertTrue(storage[1] < storage[0],
                             "the catalog must fit the base's drives with room to spare; used " + storage[1]
                                     + " of " + storage[0]);
-                    // The index must know every key right after seeding; traffic will legitimately drain
-                    // some small lots later, so completeness is checked here, not at the end.
+                    /*
+                     * The index must know every key right after seeding; traffic will legitimately drain
+                     * some small lots later, so completeness is checked here, not at the end.
+                     */
                     final int distinct = new HashSet<>(fullCatalog).size();
                     final Map<StorageKey, Long> indexed = NetworkStorage.of(level, base.mainframe().networkUuid()).query();
                     long missing = 0;
@@ -243,9 +251,11 @@ public final class ScaleBenchmarkGameTests {
                             "the index knows every catalog key; " + missing + " of " + distinct + " missing: "
                                     + missingKeys(base, fullCatalog, indexed));
                 }))
-                // Long enough for the average to have rolled past the seeding tick itself. Seeding the whole
-                // catalog is one enormous tick; measured any sooner, a hundredth of THAT is what the number
-                // reports, which is a measurement of how fast the machine seeded and not of the idle cost.
+                /*
+                 * Long enough for the average to have rolled past the seeding tick itself. Seeding the whole
+                 * catalog is one enormous tick; measured any sooner, a hundredth of THAT is what the number
+                 * reports, which is a measurement of how fast the machine seeded and not of the idle cost.
+                 */
                 .thenExecuteAfter(TICK_AVERAGE_WINDOW + 20, () -> {
                     report.put("idle_full_ms", averageTickMs(server));
                     craftedBefore[0] = craftedOutput(level, base);
@@ -453,9 +463,11 @@ public final class ScaleBenchmarkGameTests {
         }
         report.put("save_ms", saveNanos / 1_000_000.0).put("save_bytes", bytes);
 
-        // The stored items themselves live in the volume store, saved once per level save: its cost is
-        // the real price of the catalog on disk. Only this base's volumes are counted — the store is
-        // shared by every test that ran in this world.
+        /*
+         * The stored items themselves live in the volume store, saved once per level save: its cost is
+         * the real price of the catalog on disk. Only this base's volumes are counted, since the store is
+         * shared by every test that ran in this world.
+         */
         final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);
         final List<StorageVolume> volumes = new ArrayList<>();
         for (final ServerRackBlockEntity rack : entities.stream()

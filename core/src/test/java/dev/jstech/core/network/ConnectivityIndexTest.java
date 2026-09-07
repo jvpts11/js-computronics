@@ -97,7 +97,7 @@ class ConnectivityIndexTest {
 
     @Test
     void placeAdjacentToExisting_mergesWithoutUuid() {
-        // Place A first (isolated), then B adjacent to A — neither has UUID.
+        // Place A first (isolated), then B adjacent to A, neither has UUID.
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         var result = index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
         assertInstanceOf(IPlacementResult.MergedWithoutUuid.class, result);
@@ -113,7 +113,7 @@ class ConnectivityIndexTest {
         // Place A and assign UUID to its component.
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.assignUuid(pos(0, 0, 0), uuid);
-        // Place B adjacent to A — B inherits A's UUID.
+        // Place B adjacent to A, so B inherits A's UUID.
         var result = index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
         var inherited = assertInstanceOf(IPlacementResult.Inherited.class, result);
         assertEquals(uuid, inherited.uuid());
@@ -124,7 +124,7 @@ class ConnectivityIndexTest {
 
     @Test
     void placeBetweenSameUuidComponents_isInheritedNotConflict() {
-        // Two separate components with the SAME UUID (rare but possible —
+        // Two separate components that already share a UUID (rare, but possible after a reload).
         var uuid = NetworkUuid.random();
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.assignUuid(pos(0, 0, 0), uuid);
@@ -156,8 +156,10 @@ class ConnectivityIndexTest {
                 pos(5, 0, 0),
                 Set.of(pos(0, 0, 0), pos(10, 0, 0)));
         var conflict = assertInstanceOf(IPlacementResult.Conflict.class, result);
-        // The exact "first" UUID depends on iteration order of Set; what
-        // matters is that BOTH UUIDs appear in the conflict report.
+        /*
+         * The exact "first" UUID depends on iteration order of Set; what
+         * matters is that BOTH UUIDs appear in the conflict report.
+         */
         Set<NetworkUuid> reported = Set.of(conflict.first(), conflict.second());
         assertTrue(reported.contains(uuidA));
         assertTrue(reported.contains(uuidB));
@@ -184,8 +186,10 @@ class ConnectivityIndexTest {
 
     @Test
     void scenario_buildSmallNetworkOneCableAtATime() {
-        // Place a cable line (5 cables in a row). Each new cable connects
-        // to the previous one. After all 5: one component, no UUID yet.
+        /*
+         * Place a cable line (5 cables in a row). Each new cable connects
+         * to the previous one. After all 5: one component, no UUID yet.
+         */
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
         index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));
@@ -263,8 +267,10 @@ class ConnectivityIndexTest {
 
     @Test
     void removeLeafCable_survivingFragmentKeepsUuid() {
-        // Removing a leaf does NOT sever the component, so the remainder keeps
-        // its UUID — only a genuine split resets identity.
+        /*
+         * Removing a leaf does NOT sever the component, so the remainder keeps
+         * its UUID, and only a genuine split resets identity.
+         */
         var uuid = NetworkUuid.random();
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
@@ -352,8 +358,10 @@ class ConnectivityIndexTest {
 
     @Test
     void clear_thenReuse_reportsConsistentCounts() {
-        // After clear, the index must behave like a fresh instance: the
-        // backing DSU component count must also reset, not carry stale data.
+        /*
+         * After clear, the index must behave like a fresh instance: the
+         * backing DSU component count must also reset, not carry stale data.
+         */
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
         index.clear();
@@ -365,7 +373,7 @@ class ConnectivityIndexTest {
 
     @Test
     void bridge_unionsSeparateRuns_intoOneComponent() {
-        // Two runs separated by a device (no direct cable-to-cable contact) — two components.
+        // Two runs separated by a device (no direct cable-to-cable contact), so two components.
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         index.onCablePlaced(pos(10, 0, 0), Set.of());
         assertEquals(2, index.componentCount());
@@ -405,8 +413,10 @@ class ConnectivityIndexTest {
 
     @Test
     void reachableFrom_blockingRouter_isolatesOneBranch() {
-        // A router R at the centre with two cable branches; blocking R separates the branches —
-        // this is how a Server Router computes one datacenter section per output face.
+        /*
+         * A router R at the centre with two cable branches; blocking R separates the branches, and
+         * this is how a Server Router computes one datacenter section per output face.
+         */
         index.onCablePlaced(pos(0, 0, 0), Set.of());                // router R
         index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));    // branch A: A1
         index.onCablePlaced(pos(2, 0, 0), Set.of(pos(1, 0, 0)));    // A2

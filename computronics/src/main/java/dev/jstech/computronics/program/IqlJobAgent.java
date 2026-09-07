@@ -27,11 +27,11 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * The IQL Engine's job agent — the "SQL Server Agent". Each Mainframe owns one; it runs on the Mainframe
+ * The IQL Engine's job agent, the "SQL Server Agent". Each Mainframe owns one; it runs on the Mainframe
  * tick (only while the Engine is installed and running) and fires the catalog's jobs by their trigger:
  * {@code EVERY <duration>} on a schedule, {@code WHEN <condition>} on the rising edge of the condition
  * (so it fires once when the condition becomes true, not every tick it stays true). Firing runs the job's
- * body through the {@link IqlEngine}, producing ordinary network Operations — there is no special per-job
+ * body through the {@link IqlEngine}, producing ordinary network Operations, and there is no special per-job
  * cost beyond those Operations. The agent evaluates every {@value #EVAL_INTERVAL} ticks to keep the
  * condition checks cheap; its scheduling state is transient (a reload reschedules from the next tick).
  */
@@ -46,8 +46,10 @@ public final class IqlJobAgent {
 
     public void tick(final MainframeBlockEntity mainframe, final ServerLevel level) {
         clock++;
-        // Either service enables job firing: the IQL Engine (with the NMS) or the Automation Engine
-        // (with the Automation Manager). A player needs only one installed for their jobs to run.
+        /*
+         * Either service enables job firing: the IQL Engine (with the NMS) or the Automation Engine
+         * (with the Automation Manager). A player needs only one installed for their jobs to run.
+         */
         if ((!mainframe.isIqlEngineActive() && !mainframe.isAutomationEngineActive())
                 || clock % EVAL_INTERVAL != 0) {
             return;

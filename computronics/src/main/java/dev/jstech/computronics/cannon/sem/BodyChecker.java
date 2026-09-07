@@ -105,8 +105,10 @@ public final class BodyChecker {
             }
             this.expect(this.check(constant.value(), ITypeSymbol.Primitive.INT),
                     ITypeSymbol.Primitive.INT, constant.value());
-            // The number has to be there in the source, not worked out from it: an enum's numbers are
-            // what the assembly and every saved file are written with, so they are read, never computed.
+            /*
+             * The number has to be there in the source, not worked out from it: an enum's numbers are
+             * what the assembly and every saved file are written with, so they are read, never computed.
+             */
             if (numberOf(constant.value()) == null) {
                 this.report(constant.value().line(), constant.value().column(),
                         CannonError.ENUM_VALUE_MUST_BE_WRITTEN);
@@ -194,7 +196,7 @@ public final class BodyChecker {
         this.switchDepth = 0;
     }
 
-    // ---------------------------------------------------------------- statements
+    // statements
 
     private void checkBlock(final IStmt.Block block, final boolean newScope) {
         final Scope saved = this.scope;
@@ -343,8 +345,10 @@ public final class BodyChecker {
         this.model.setDeclared(local, variable);
     }
 
-    // "var" takes the type of what it is given, which means it has to be given something, and
-    // something with a type of its own: null and a call that gives nothing back have neither.
+    /*
+     * "var" takes the type of what it is given, which means it has to be given something, and
+     * something with a type of its own: null and a call that gives nothing back have neither.
+     */
     private ITypeSymbol inferred(final IStmt.LocalDecl local) {
         if (local.initializer() == null) {
             this.report(local.line(), local.column(),
@@ -389,8 +393,10 @@ public final class BodyChecker {
                 && reference.arrayRank() == 0 && reference.arguments().isEmpty();
     }
 
-    // A method that gives something back has to do it on every way out. This knows the shapes that
-    // certainly leave; anything else counts as a path that falls off the end.
+    /*
+     * A method that gives something back has to do it on every way out. This knows the shapes that
+     * certainly leave; anything else counts as a path that falls off the end.
+     */
     private static boolean alwaysReturns(final IStmt statement) {
         return switch (statement) {
             case IStmt.Return ignored -> true;
@@ -411,7 +417,7 @@ public final class BodyChecker {
         return condition instanceof IExpr.Literal literal && Boolean.TRUE.equals(literal.value());
     }
 
-    // ---------------------------------------------------------------- expressions
+    // expressions
 
     private ITypeSymbol check(final IExpr expression, final ITypeSymbol expected) {
         if (expression == null) {
@@ -619,7 +625,7 @@ public final class BodyChecker {
         return test.conversion() ? target : ITypeSymbol.Primitive.BOOL;
     }
 
-    // ---------------------------------------------------------------- members
+    // members
 
     private ITypeSymbol memberType(final IExpr.Member member, final ITypeSymbol expected) {
         final ITypeSymbol target = this.check(member.target(), null);
@@ -644,8 +650,10 @@ public final class BodyChecker {
         return found;
     }
 
-    // A name that turned out to be a member: a value if it holds one, and a method only where a
-    // delegate of the same shape is wanted, which is how a handler is handed over without brackets.
+    /*
+     * A name that turned out to be a member: a value if it holds one, and a method only where a
+     * delegate of the same shape is wanted, which is how a handler is handed over without brackets.
+     */
     private ITypeSymbol bindMember(final IExpr expression, final ITypeSymbol receiver,
                                   final List<IMemberSymbol> members, final ITypeSymbol expected,
                                   final Access access) {
@@ -737,7 +745,7 @@ public final class BodyChecker {
         }
     }
 
-    // ---------------------------------------------------------------- calls
+    // calls
 
     private ITypeSymbol callType(final IExpr.Call call) {
         if (call.callee() instanceof IExpr.Name name && this.scope.lookup(name.identifier()) == null
@@ -794,8 +802,10 @@ public final class BodyChecker {
         return invoke.returnType();
     }
 
-    // Raising an event is only allowed where it was declared, as in the language this one borrows
-    // from: everywhere else an event is something to subscribe to, not something to fire.
+    /*
+     * Raising an event is only allowed where it was declared, as in the language this one borrows
+     * from: everywhere else an event is something to subscribe to, not something to fire.
+     */
     private void checkEventRaise(final IExpr.Call call) {
         if (this.model.bindingOf(call.callee()) instanceof IBinding.Member member
                 && member.member() instanceof IMemberSymbol.EventSymbol event
@@ -824,8 +834,10 @@ public final class BodyChecker {
         return chosen == null ? ITypeSymbol.Special.ERROR : chosen.returnType();
     }
 
-    // A method read off a filled-in collection has its stand-in types replaced by what that
-    // collection holds, so List<string>.Get gives back a string and not a T.
+    /*
+     * A method read off a filled-in collection has its stand-in types replaced by what that
+     * collection holds, so List<string>.Get gives back a string and not a T.
+     */
     private IMemberSymbol.MethodSymbol fill(final IMemberSymbol.MethodSymbol method,
                                            final List<ITypeSymbol> arguments) {
         if (arguments.isEmpty()) {
@@ -882,8 +894,10 @@ public final class BodyChecker {
         return chosen;
     }
 
-    // When only one version could have been meant, saying which argument is wrong beats saying that
-    // none of them fit: with a single version there is nothing to choose between.
+    /*
+     * When only one version could have been meant, saying which argument is wrong beats saying that
+     * none of them fit: with a single version there is nothing to choose between.
+     */
     private IMemberSymbol.MethodSymbol reportNoFit(final List<IMemberSymbol.MethodSymbol> candidates,
                                                   final List<IExpr> arguments, final List<ITypeSymbol> given,
                                                   final String name, final INode at) {
@@ -935,9 +949,11 @@ public final class BodyChecker {
         }
     }
 
-    // How well a version fits: an exact type counts double, a conversion counts once, and anything
-    // that does not fit at all rules the version out. An outward argument fits only an outward
-    // parameter, and only exactly, because the method writes straight into the place it is given.
+    /*
+     * How well a version fits: an exact type counts double, a conversion counts once, and anything
+     * that does not fit at all rules the version out. An outward argument fits only an outward
+     * parameter, and only exactly, because the method writes straight into the place it is given.
+     */
     private int score(final IMemberSymbol.MethodSymbol candidate, final List<ITypeSymbol> given,
                       final List<IExpr> arguments) {
         if (candidate.parameters().size() != given.size()) {
@@ -979,7 +995,7 @@ public final class BodyChecker {
         }
     }
 
-    // ---------------------------------------------------------------- assignment and lambdas
+    // assignment and lambdas
 
     private ITypeSymbol assignType(final IExpr.Assign assign) {
         final ITypeSymbol target = this.check(assign.target(), null);
@@ -1093,11 +1109,13 @@ public final class BodyChecker {
         }
     }
 
-    // ---------------------------------------------------------------- outward arguments
+    // outward arguments
 
-    // The place a method is being asked to write into: a local it declares here, a local that already
-    // exists, or a field. Written as var, the local takes whatever the method fills in, which is only
-    // known once the version of the method has been chosen.
+    /*
+     * The place a method is being asked to write into: a local it declares here, a local that already
+     * exists, or a field. Written as var, the local takes whatever the method fills in, which is only
+     * known once the version of the method has been chosen.
+     */
     private ITypeSymbol outArgumentType(final IExpr.OutArgument argument, final ITypeSymbol expected) {
         if (argument.type() != null) {
             final ITypeSymbol type = isInferred(argument.type())
@@ -1137,9 +1155,11 @@ public final class BodyChecker {
         return argument instanceof IExpr.OutArgument outward && isInferred(outward.type());
     }
 
-    // An outward parameter has to be given a value on every way out of the method, because the caller
-    // is promised one. This walks the body carrying whether it has been given yet, and says so at the
-    // first way out that has not.
+    /*
+     * An outward parameter has to be given a value on every way out of the method, because the caller
+     * is promised one. This walks the body carrying whether it has been given yet, and says so at the
+     * first way out that has not.
+     */
     private void checkOutParameters(final List<IDecl.Parameter> parameters, final IStmt.Block body,
                                     final INode at) {
         for (final IDecl.Parameter parameter : parameters) {
@@ -1192,15 +1212,19 @@ public final class BodyChecker {
         };
     }
 
-    // A body that may not run at all cannot be counted on to have given the value, but a way out
-    // inside it still has to be checked.
+    /*
+     * A body that may not run at all cannot be counted on to have given the value, but a way out
+     * inside it still has to be checked.
+     */
     private boolean aside(final IStmt body, final String name, final boolean assigned) {
         this.flow(body, name, assigned);
         return assigned;
     }
 
-    // Whether evaluating this expression gives the name a value: an assignment to it, or handing it
-    // to a method as the place to fill in. A lambda's body does not count, because it runs later.
+    /*
+     * Whether evaluating this expression gives the name a value: an assignment to it, or handing it
+     * to a method as the place to fill in. A lambda's body does not count, because it runs later.
+     */
     private static boolean writesTo(final IExpr expression, final String name) {
         return switch (expression) {
             case null -> false;
@@ -1224,19 +1248,23 @@ public final class BodyChecker {
         };
     }
 
-    // ---------------------------------------------------------------- helpers
+    // helpers
 
-    // Every message goes through here so a look-ahead can be taken back. Working out whether an
-    // argument is a method being handed over means resolving it, and resolving it must not complain
-    // about what the real pass is about to do properly.
+    /*
+     * Every message goes through here so a look-ahead can be taken back. Working out whether an
+     * argument is a method being handed over means resolving it, and resolving it must not complain
+     * about what the real pass is about to do properly.
+     */
     private void report(final int line, final int column, final CannonError error, final Object... arguments) {
         if (this.quiet == 0) {
             this.diagnostics.error(line, column, error, arguments);
         }
     }
 
-    // A name or a member that turns out to be a method, written without brackets. Like a lambda, it
-    // has no type of its own until it is known what it is being handed to.
+    /*
+     * A name or a member that turns out to be a method, written without brackets. Like a lambda, it
+     * has no type of its own until it is known what it is being handed to.
+     */
     private boolean isMethodGroup(final IExpr expression) {
         if (expression instanceof IExpr.Name name) {
             if (this.scope.lookup(name.identifier()) != null || this.currentType == null) {
@@ -1266,8 +1294,10 @@ public final class BodyChecker {
         }
     }
 
-    // The nearest declaration wins. A class that writes a method its interface also declares would
-    // otherwise offer the same method twice and every call of it would look ambiguous.
+    /*
+     * The nearest declaration wins. A class that writes a method its interface also declares would
+     * otherwise offer the same method twice and every call of it would look ambiguous.
+     */
     private static List<IMemberSymbol> lookup(final NamedType type, final String name) {
         final List<IMemberSymbol> found = new ArrayList<>();
         for (final IMemberSymbol member : type.allMembers()) {

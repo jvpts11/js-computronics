@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: which Servers hold the item the player clicked in the Network tab, and how much each has — the source-server picker in the request popup.
+ * Server to client: which Servers hold the item the player clicked in the Network tab, and how much each has, for the source-server picker in the request popup.
  */
 public record ServerBreakdownPayload(List<ServerHolding> servers) implements CustomPacketPayload {
 

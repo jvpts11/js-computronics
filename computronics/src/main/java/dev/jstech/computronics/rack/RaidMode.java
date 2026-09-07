@@ -46,7 +46,7 @@ public enum RaidMode {
 
     /**
      * How many drives the array can lose and still serve data. {@link #RAID1} mirrors every drive,
-     * so it survives down to one — that is reported as {@code driveCount - 1} by
+     * so it survives down to one, which is reported as {@code driveCount - 1} by
      * {@link #lossesTolerated(int)}; this raw value is the mode's own ceiling.
      */
     public int lossesTolerated(final int driveCount) {
@@ -64,7 +64,7 @@ public enum RaidMode {
     /**
      * The usable capacity of the array in items: the sum for a stripe, the smallest drive for a
      * mirror, and the sum minus one drive's worth for parity. Below the mode's minimum drive count
-     * the array does not form and the capacity is zero — the caller falls back to plain volumes.
+     * the array does not form and the capacity is zero, and the caller falls back to plain volumes.
      */
     public long usableCapacity(final List<Long> driveCapacities) {
         return usableCapacity(driveCapacities, driveCapacities.size());
@@ -73,7 +73,7 @@ public enum RaidMode {
     /**
      * The usable capacity of an array formed with {@code memberCount} drives, of which
      * {@code driveCapacities} are the members still present. A degraded array keeps the size it
-     * promised — losing a member costs redundancy, not capacity — so the parity reserve is charged
+     * promised (losing a member costs redundancy, not capacity) so the parity reserve is charged
      * against the member count the array was built with, not against what is left in the bay.
      */
     public long usableCapacity(final List<Long> driveCapacities, final int memberCount) {
@@ -89,10 +89,12 @@ public enum RaidMode {
         return switch (this) {
             case RAID0 -> sum;
             case RAID1 -> smallest;
-            // Parity costs one drive's worth. Charging the smallest member (rather than subtracting
-            // it from the raw sum) is what makes a mixed array safe: the survivors always have room
-            // for the whole volume when one member is pulled, so a degraded array never has to drop
-            // data it promised to hold. On the usual array of identical drives the two are equal.
+            /*
+             * Parity costs one drive's worth. Charging the smallest member (rather than subtracting
+             * it from the raw sum) is what makes a mixed array safe: the survivors always have room
+             * for the whole volume when one member is pulled, so a degraded array never has to drop
+             * data it promised to hold. On the usual array of identical drives the two are equal.
+             */
             case RAID5 -> (Math.max(memberCount, driveCapacities.size()) - 1) * smallest;
             case NONE -> 0L;
         };

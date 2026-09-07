@@ -52,8 +52,10 @@ class PatternMatcherTest {
         var pattern = MultiblockPattern.builder("just_ctrl")
                 .layer("#")
                 .build();
-        // World is empty (any block at 0,0,0 — even air — is fine, because
-        // the controller slot doesn't validate blocks beyond "is controller").
+        /*
+         * World is empty (any block at 0,0,0, even air, is fine, because
+         * the controller slot doesn't validate blocks beyond "is controller").
+         */
         IBlockProvider provider = providerFrom(Map.of());
         var result = PatternMatcher.match(pattern, provider, pos(0, 0, 0));
         var success = assertInstanceOf(IMatchResult.Success.class, result);
@@ -63,8 +65,10 @@ class PatternMatcherTest {
 
     @Test
     void horizontalLine_matchesNorthOrientation() {
-        // Pattern in canonical NORTH orientation: a 3x1x1 line where
-        // x=-1 and x=+1 are casing, x=0 is controller.
+        /*
+         * Pattern in canonical NORTH orientation: a 3x1x1 line where
+         * x=-1 and x=+1 are casing, x=0 is controller.
+         */
         var pattern = MultiblockPattern.builder("hline")
                 .layer("C#C")
                 .where('C', IBlockMatcher.exact("jsc:casing"))
@@ -107,13 +111,15 @@ class PatternMatcherTest {
                 .layer("C#C")
                 .where('C', IBlockMatcher.exact("jsc:casing"))
                 .build();
-        // World has only the controller — both casings missing.
+        // World has only the controller, both casings missing.
         Map<Long, String> world = new HashMap<>();
         world.put(pos(0, 0, 0), "jsc:controller");
         var result = PatternMatcher.match(pattern, providerFrom(world), pos(0, 0, 0));
         var failure = assertInstanceOf(IMatchResult.Failure.class, result);
-        // Failure should be from NORTH attempt (the canonical, debug-friendly one).
-        // First failing slot iterated is at (px=0, py=0, pz=0) which is rel (-1, 0, 0).
+        /*
+         * Failure should be from NORTH attempt (the canonical, debug-friendly one).
+         * First failing slot iterated is at (px=0, py=0, pz=0) which is rel (-1, 0, 0).
+         */
         assertEquals('C', failure.expectedChar());
         assertEquals("minecraft:air", failure.actualBlockId());
         assertEquals(-1, failure.relX());
@@ -140,7 +146,7 @@ class PatternMatcherTest {
 
     @Test
     void cube3x3x3_matchesAllOrientations() {
-        // Cube is rotationally symmetric — any rotation should match.
+        // Cube is rotationally symmetric, so any rotation should match.
         var pattern = MultiblockPattern.builder("cube")
                 .layer(
                         "CCC",
@@ -202,12 +208,12 @@ class PatternMatcherTest {
 
     @Test
     void ignoreChar_isNotValidated() {
-        // Pattern has a space at (1, 0, 0) — that slot should be skipped.
+        // Pattern has a space at (1, 0, 0), so that slot should be skipped.
         var pattern = MultiblockPattern.builder("with_air")
                 .layer("# C")
                 .where('C', IBlockMatcher.exact("jsc:casing"))
                 .build();
-        // World has anything (even stone) where the space is — should still match.
+        // World has anything (even stone) where the space is, so it should still match.
         Map<Long, String> world = new HashMap<>();
         world.put(pos(0, 0, 0), "jsc:controller");
         world.put(pos(1, 0, 0), "minecraft:stone"); // would normally fail

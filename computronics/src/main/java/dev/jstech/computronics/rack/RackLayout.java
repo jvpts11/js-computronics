@@ -13,7 +13,7 @@ import java.util.List;
  * Pure geometry of a rack measured in rack units: which vertical spans are free, and what role each of
  * the rack's front-panel hotswap slots plays given what is mounted. The front slots belong to the RACK
  * (5 per rack unit); a mounted chassis claims the slots of the rows it occupies, row-major, up to its
- * drive and gadget budgets — every remaining slot is blocked, and each blocked slot knows why, so the
+ * drive and gadget budgets; every remaining slot is blocked, and each blocked slot knows why, so the
  * GUI can always explain itself. Minecraft-free on purpose: the fitting and claiming rules are unit
  * tested here and consumed by both the block entity and the screen.
  */
@@ -31,7 +31,7 @@ public final class RackLayout {
         }
     }
 
-    /** What one front-panel slot is, and — when blocked — why. */
+    /** What one front-panel slot is, and, when blocked, why. */
     public enum SlotRole {
         /** Cabled as a drive bay by the chassis in this row. */
         DRIVE,
@@ -93,7 +93,7 @@ public final class RackLayout {
 
     /**
      * The role of the front slot at ({@code uRow}, {@code index}): the unit occupying the row claims its
-     * rows' slots row-major — drives first, then gadgets, the rest blocked by budget.
+     * rows' slots row-major: drives first, then gadgets, the rest blocked by budget.
      */
     public SlotRole roleAt(final int uRow, final int index, final List<Unit> mounted) {
         if (uRow < 0 || uRow >= capacityU || index < 0 || index >= SLOTS_PER_U) {

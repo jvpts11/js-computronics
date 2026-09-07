@@ -16,7 +16,7 @@ import java.util.UUID;
  * An in-flight {@link INetworkOperation} that survives the world being saved and reopened. The Mainframe
  * writes every live persistent operation into its own NBT on save and rebuilds them on the first booted
  * tick after a load, so a craft that was running when the player left the world is still running when
- * they come back — instead of silently vanishing with the chunk.
+ * they come back, instead of silently vanishing with the chunk.
  *
  * <p>The {@code Kind} written by {@link #saveState} selects the restorer; the id lets a multi-stage
  * pipeline find the stage it was waiting on among the restored operations.

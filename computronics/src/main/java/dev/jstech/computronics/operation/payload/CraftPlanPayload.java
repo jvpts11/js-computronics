@@ -17,7 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 /**
- * Server to client: the recursive planner's answer for the Craft popup — the raw ingredients the request consumes (need vs have, red when short), whether it is fully feasible, the largest feasible amount for the PARTIAL button, and a time estimate.
+ * Server to client: the recursive planner's answer for the Craft popup: the raw ingredients the request consumes (need vs have, red when short), whether it is fully feasible, the largest feasible amount for the PARTIAL button, and a time estimate.
  */
 public record CraftPlanPayload(ItemStack result, long quantity, List<Row> rows,
                                boolean feasible, long maxFeasible, int estimateTicks)

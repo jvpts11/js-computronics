@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
  * with, and its style is flat, so a STANDARD-era (or no-board / unknown-era) screen renders pixel-for-pixel as before.
  *
  * <p>The Vintage and Legacy palettes are starting points (tunable in playtesting / a mockup pass): square corners
- * only, no rounded geometry — the eras differ by color first and by a restrained square overlay (scanlines, bevel)
+ * only, no rounded geometry; the eras differ by color first and by a restrained square overlay (scanlines, bevel)
  * only where it reads as period-correct. Eras beyond Standard ship no content yet, so they share the STANDARD skin.
  */
 public final class EraThemes {
@@ -26,7 +26,7 @@ public final class EraThemes {
 
     private static final float SMALL = 0.75f;
 
-    /** Frozen copy of the original flat-dark constants — STANDARD must stay byte-identical to today. */
+    /** Frozen copy of the original flat-dark constants; STANDARD must stay byte-identical to today. */
     public static final EraTheme STANDARD = new EraTheme(
             new EraPalette(
                     0xFF05070A, 0xFF0B0E13, 0xFF0E131A, 0xFF11161D, 0xFF1D2530, 0xFF0A0E14,

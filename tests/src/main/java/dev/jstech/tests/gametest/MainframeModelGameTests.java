@@ -136,8 +136,10 @@ public final class MainframeModelGameTests {
                                     && vintage.mainframeEra() == dev.jstech.core.tier.HardwareEra.VINTAGE
                                     && legacy.mainframeEra() == dev.jstech.core.tier.HardwareEra.LEGACY,
                             "each cabinet reports its own era, which picks its model and atlas");
-                    // The cabinet is three wide, two tall and two deep; culling by the controller's own
-                    // block would blink the whole machine out as the player walks past it.
+                    /*
+                     * The cabinet is three wide, two tall and two deep; culling by the controller's own
+                     * block would blink the whole machine out as the player walks past it.
+                     */
                     final net.minecraft.world.phys.AABB box = standard.renderBox();
                     helper.assertTrue(box.getXsize() >= 3.0D && box.getYsize() >= 2.0D && box.getZsize() >= 2.0D,
                             "the render box covers the whole footprint, not just the controller");

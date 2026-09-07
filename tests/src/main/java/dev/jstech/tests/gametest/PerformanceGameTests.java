@@ -61,10 +61,10 @@ public final class PerformanceGameTests {
     private static final String ARENA = "empty";
     private static final int SETTLE = 4;
 
-    /** A single Mainframe tick over this many milliseconds cannot sustain 20 TPS — treat as a failure. */
+    /** A single Mainframe tick over this many milliseconds cannot sustain 20 TPS, so treat it as a failure. */
     private static final double CATASTROPHE_MS = 50.0;
 
-    // --- the measurement core ---------------------------------------------------------------------
+    // the measurement core
 
     /**
      * Times {@link MainframeBlockEntity#serverTick} over {@code iters} calls (after {@code warmup} untimed
@@ -105,7 +105,7 @@ public final class PerformanceGameTests {
         return rackBe;
     }
 
-    // --- benchmarks -------------------------------------------------------------------------------
+    // benchmarks
 
     /**
      * Dispatcher overhead: flood the Mainframe with self-test Operations (pure CPU work on virtual threads,
@@ -131,7 +131,7 @@ public final class PerformanceGameTests {
     /**
      * Machine-crafting at scale: flood the Mainframe with thousands of processing operations at once and measure
      * the per-tick dispatch cost, including the maxJobs concurrency pre-pass that walks every processing op each
-     * tick. The pattern targets a machine that isn't present, so the ops stay queued (no world I/O) — this isolates
+     * tick. The pattern targets a machine that isn't present, so the ops stay queued (no world I/O), which isolates
      * the dispatch/concurrency overhead and proves it scales rather than going quadratic.
      */
     @GameTest(template = ARENA, batch = "jsc_bench_processing", timeoutTicks = 800)
@@ -178,9 +178,11 @@ public final class PerformanceGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 8, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 1_000_000_000L))
                 .thenExecuteAfter(6, () -> {
-                    // Hold every cobblestone with a LOCK so each SELECT parks in WAITING and stays alive
-                    // instead of draining mid-measurement. That is the true worst case for the per-tick cost:
-                    // many Operations alive at once, all walked by tickOperations every tick.
+                    /*
+                     * Hold every cobblestone with a LOCK so each SELECT parks in WAITING and stays alive
+                     * instead of draining mid-measurement. That is the true worst case for the per-tick cost:
+                     * many Operations alive at once, all walked by tickOperations every tick.
+                     */
                     mf.lockType(cobble, Long.MAX_VALUE, null);
                     int submitted = 0;
                     for (final int target : new int[]{1000, 3000, 6000, 10000}) {
@@ -254,8 +256,10 @@ public final class PerformanceGameTests {
         }
         TestWorldBuilder.mountDefaultServer(rackBe, 0);
 
-        // A deep chain: chain[i] is crafted from 2x chain[i+1]; only the leaf is stocked, so a CRAFT of the
-        // top item forces the planner to expand the entire tree (the hot path) instead of finding it in stock.
+        /*
+         * A deep chain: chain[i] is crafted from 2x chain[i+1]; only the leaf is stocked, so a CRAFT of the
+         * top item forces the planner to expand the entire tree (the hot path) instead of finding it in stock.
+         */
         final List<Item> chain = new ArrayList<>();
         for (final Item item : BuiltInRegistries.ITEM) {
             if (item == Items.AIR) {
@@ -307,15 +311,17 @@ public final class PerformanceGameTests {
     /**
      * Physical network scale: a large arena packed with a mesh of data cables (each a ticking block entity)
      * plus Mekanism machines as background ticking load, measuring the real server tick over a window. This
-     * is the passive cost that sinks AE2/RS networks at scale — what it costs to merely have a huge network
+     * is the passive cost that sinks AE2/RS networks at scale, what it costs to merely have a huge network
      * exist, before any operation runs. Runs alone in its own batch so the wall-clock is not polluted by the
      * other parallel GameTests. Measures the whole server tick (the cable BEs tick outside the Mainframe).
      */
     @GameTest(template = "bench", batch = "jsc_bench_physical", timeoutTicks = 2000)
     public static void bench_physicalNetwork(final GameTestHelper helper) {
         final MainframeBlockEntity mf = NetworkGameTests.placeRunningMainframe(helper, new BlockPos(1, 2, 1));
-        // 32 keeps this a fast regression gate (~1k cables); a one-off run at side 72 (~5k cables,
-        // GregTech-late-game scale) measured 4.7 ms/tick, confirming the network scales sub-linearly.
+        /*
+         * 32 keeps this a fast regression gate (~1k cables); a one-off run at side 72 (~5k cables,
+         * GregTech-late-game scale) measured 4.7 ms/tick, confirming the network scales sub-linearly.
+         */
         final int x0 = 2;
         final int z0 = 1;
         final int side = 32;
@@ -326,8 +332,10 @@ public final class PerformanceGameTests {
                 cables++;
             }
         }
-        // Mekanism machines as background ticking load — placed by id so this stays a soft dependency
-        // (no Mekanism class is referenced); skipped cleanly if Mekanism is not on the runtime.
+        /*
+         * Mekanism machines as background ticking load, placed by id so this stays a soft dependency
+         * (no Mekanism class is referenced); skipped cleanly if Mekanism is not on the runtime.
+         */
         int mekCount = 0;
         final Block mek = BuiltInRegistries.BLOCK.getOptional(
                 ResourceLocation.fromNamespaceAndPath("mekanism", "enrichment_chamber")).orElse(null);

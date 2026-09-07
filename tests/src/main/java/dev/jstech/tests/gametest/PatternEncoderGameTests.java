@@ -85,8 +85,10 @@ public final class PatternEncoderGameTests {
 
         helper.assertTrue(encoder.queueBurn("oak_planks", content), "the job is queued");
         helper.assertTrue(encoder.queued() == 1 && !encoder.busy(), "queued, not yet started");
-        // Watch the job tick by tick: the phases must come in order, the bay must stay locked while the head
-        // is down, and the file must only be on the disc once the write is over.
+        /*
+         * Watch the job tick by tick: the phases must come in order, the bay must stay locked while the head
+         * is down, and the file must only be on the disc once the write is over.
+         */
         final List<PatternEncoderBlockEntity.Phase> seen = new ArrayList<>();
         final int[] ticks = {0};
         helper.startSequence()

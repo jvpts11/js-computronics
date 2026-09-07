@@ -53,8 +53,10 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     private final StorageKey resultKey;
 
     private CraftingSwitchBlockEntity.DeclaredMachine machine;
-    // The physical machine the dispatcher assigned this job, so two concurrent jobs of one machine type never
-    // land on the same block and jam it. Null means unassigned (a standalone run that just takes the first it can).
+    /*
+     * The physical machine the dispatcher assigned this job, so two concurrent jobs of one machine type never
+     * land on the same block and jam it. Null means unassigned (a standalone run that just takes the first it can).
+     */
     @Nullable
     private BlockPos assignedMachinePos;
     private long produced;
@@ -69,12 +71,16 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     private OperationPriority priority = OperationPriority.DEFAULT;
     private Runnable onSettle;
     private boolean concurrencyBlocked;
-    // Where inputs are drawn from and outputs returned to: the network by default; a craft's isolated pool for a
-    // machine step run inside a recursive craft, so concurrent steps pipeline without racing on network stock.
+    /*
+     * Where inputs are drawn from and outputs returned to: the network by default; a craft's isolated pool for a
+     * machine step run inside a recursive craft, so concurrent steps pipeline without racing on network stock.
+     */
     private final ICraftIo io;
     private final boolean ephemeral;
-    // A machine step run inside a craft (given a pool ICraftIo) is "nested": it is one stage of the parent craft,
-    // so it is NOT logged as an operation of its own — the parent's log entry carries it as a sub-operation.
+    /*
+     * A machine step run inside a craft (given a pool ICraftIo) is "nested": it is one stage of the parent craft,
+     * so it is NOT logged as an operation of its own; the parent's log entry carries it as a sub-operation.
+     */
     private final boolean nested;
 
     public NetworkProcessingOperation(final ServerLevel level, final NetworkUuid network,
@@ -97,10 +103,12 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
         this.operationId = operationId;
         this.requesterLabel = requesterLabel;
         this.io = io != null ? io : ICraftIo.network(level, network);
-        // A craft's machine step reads and writes that craft's isolated pool through {@code io}, but it still
-        // persists across a reload: on resume it is rebuilt with the network as its I/O and finishes whatever the
-        // machine still holds into the network, where the re-planned parent craft counts it as stock. So nothing
-        // fed into a machine before a save is ever lost.
+        /*
+         * A craft's machine step reads and writes that craft's isolated pool through {@code io}, but it still
+         * persists across a reload: on resume it is rebuilt with the network as its I/O and finishes whatever the
+         * machine still holds into the network, where the re-planned parent craft counts it as stock. So nothing
+         * fed into a machine before a save is ever lost.
+         */
         this.ephemeral = false;
         // A step given its own I/O is a craft's internal stage: don't log it as a separate operation.
         this.nested = io != null;
@@ -128,8 +136,10 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
             }
             waiting = false;
         }
-        // Sided machines route through crafting buses when present: an Input Bus aimed at the machine carries
-        // the deliveries, a Receiving Bus the pickups. Without buses both ride the switch-touched face.
+        /*
+         * Sided machines route through crafting buses when present: an Input Bus aimed at the machine carries
+         * the deliveries, a Receiving Bus the pickups. Without buses both ride the switch-touched face.
+         */
         final IDataPort inPort = portFor(dev.jstech.computronics.block.part.CablePartType.INPUT);
         final IDataPort outPort = portFor(dev.jstech.computronics.block.part.CablePartType.RECEIVING);
         if (inPort.isEmpty() && outPort.isEmpty()) {
@@ -138,8 +148,10 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
         }
         boolean progressed = false;
 
-        // 1) Collect any finished output the machine holds, back into the sink (the network, or the craft's
-        //    pool for a craft-internal step), counting the primary yield.
+        /*
+         * 1) Collect any finished output the machine holds, back into the sink (the network, or the craft's
+         *    pool for a craft-internal step), counting the primary yield.
+         */
         for (final ProcessingPattern.ProcessingOutput out : pattern.outputs()) {
             final long inMachine = outPort.count(out.key());
             if (inMachine <= 0) {
@@ -162,22 +174,26 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
 
         final CraftingComputerBlockEntity.MachineConfig config = resolveConfig();
         if (config.locked() || concurrencyBlocked) {
-            // Paused from the Machines tab, or over the machine's concurrent-job cap: keep collecting finished
-            // output, but don't feed or time out.
+            /*
+             * Paused from the Machines tab, or over the machine's concurrent-job cap: keep collecting finished
+             * output, but don't feed or time out.
+             */
             waiting = true;
             return;
         }
         waiting = false;
 
-        // 2) Feed inputs when the cooldown elapses (so we don't overfill a slow machine). feedMax keeps feeding
-        // until the machine is full each cycle; otherwise a single lot goes in. Feeding is bounded by the
-        // demand: lots still inside the machine are expected to yield their share, so nothing beyond what the
-        // request needs leaves the network. A lot whose chance-based output fell short is simply fed again.
-        // A lot is only ever committed whole: what the machine could not take at once (a small chemical tank,
-        // a full slot) stays owed and is topped up on the following cycles as the machine consumes.
-        // What leaves the network for the machine in one tick is bounded by the Mainframe's orchestration
-        // capacity, like any other transfer: a faster CPU feeds machines faster. The budget is items per tick;
-        // fluids and chemicals count by the same weight (1 000 mB = one item).
+        /*
+         * 2) Feed inputs when the cooldown elapses (so we don't overfill a slow machine). feedMax keeps feeding
+         * until the machine is full each cycle; otherwise a single lot goes in. Feeding is bounded by the
+         * demand: lots still inside the machine are expected to yield their share, so nothing beyond what the
+         * request needs leaves the network. A lot whose chance-based output fell short is simply fed again.
+         * A lot is only ever committed whole: what the machine could not take at once (a small chemical tank,
+         * a full slot) stays owed and is topped up on the following cycles as the machine consumes.
+         * What leaves the network for the machine in one tick is bounded by the Mainframe's orchestration
+         * capacity, like any other transfer: a faster CPU feeds machines faster. The budget is items per tick;
+         * fluids and chemicals count by the same weight (1 000 mB = one item).
+         */
         if (--feedCooldown <= 0) {
             feedCooldown = FEED_INTERVAL;
             final int maxLots = config.feedMax() ? 64 : 1;
@@ -220,7 +236,7 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     }
 
     /**
-     * This physical machine's per-machine state (Paused / Feed), set on the Machines tab — resolved by the
+     * This physical machine's per-machine state (Paused / Feed), set on the Machines tab, resolved by the
      * machine's position, so pausing one machine of a type does not pause the others. (The Max Jobs ceiling is a
      * per-type setting, read by the Mainframe's dispatcher, not here.)
      */
@@ -230,8 +246,10 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
                 ? CraftingComputerBlockEntity.machineStateKey(machinePos) : null;
         for (final BlockPos pos : candidateComputers) {
             if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc) {
-                // This one machine's own state wins; otherwise a state set on the whole machine type applies
-                // (so you can pause a single machine, or a whole type, whichever you set).
+                /*
+                 * This one machine's own state wins; otherwise a state set on the whole machine type applies
+                 * (so you can pause a single machine, or a whole type, whichever you set).
+                 */
                 if (machineKey != null) {
                     final CraftingComputerBlockEntity.MachineConfig perMachine = cc.machineConfig(machineKey);
                     if (perMachine != CraftingComputerBlockEntity.MachineConfig.DEFAULT) {
@@ -261,15 +279,19 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
                     if (firstOfType == null) {
                         firstOfType = m;
                     }
-                    // The dispatcher gives each concurrent job a distinct physical machine so two never share and
-                    // jam one; honor that assignment exactly (it may be a fallback machine with no matching bus).
+                    /*
+                     * The dispatcher gives each concurrent job a distinct physical machine so two never share and
+                     * jam one; honor that assignment exactly (it may be a fallback machine with no matching bus).
+                     */
                     if (assignedMachinePos != null && assignedMachinePos.equals(m.machinePos())) {
                         assigned = m;
                     }
-                    // Prefer a machine whose Input Buses can actually route this recipe's inputs. Several
-                    // machines of one type are told apart only by their bus filters (one factory filtered to
-                    // iron, another to enriched iron), so picking the first by type alone feeds a machine that
-                    // cannot accept the inputs. This is what makes a group of same-type machines usable.
+                    /*
+                     * Prefer a machine whose Input Buses can actually route this recipe's inputs. Several
+                     * machines of one type are told apart only by their bus filters (one factory filtered to
+                     * iron, another to enriched iron), so picking the first by type alone feeds a machine that
+                     * cannot accept the inputs. This is what makes a group of same-type machines usable.
+                     */
                     if (firstRoutable == null && machineCanRoute(m)) {
                         firstRoutable = m;
                     }
@@ -286,7 +308,7 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     /**
      * The distinct physical machines this job could run on. Machines whose Input Buses can actually route its
      * inputs come first; if none can (a bus-less machine fed through the switch face, or a chemical input no item
-     * bus filters), every machine of the type is a fallback — the same reach the single-machine path always had.
+     * bus filters), every machine of the type is a fallback, the same reach the single-machine path always had.
      * The dispatcher picks a free one per job, so concurrency scales with the machines actually present.
      */
     public List<BlockPos> routableMachines() {
@@ -317,7 +339,7 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     }
 
     /**
-     * The Crafting Computer that drives this job — the one whose Crafting Switch declares the machine it is
+     * The Crafting Computer that drives this job, the one whose Crafting Switch declares the machine it is
      * assigned to (or currently on). Its crafting card sets the feed rate, so the card, not the machine, governs
      * how fast the step runs. Null when no computer declares the machine (then it cannot be fed).
      */
@@ -418,7 +440,7 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     /**
      * The port to move data through for the given bus kind. Every crafting cable adjacent to the machine with an
      * Input Bus (deliveries) or Receiving Bus (pickups) mounted against it contributes its machine face, and the
-     * faces act as one port — this is how sided machines whose I/O faces differ from the switch-touched face, or
+     * faces act as one port, which is how sided machines whose I/O faces differ from the switch-touched face, or
      * that spread outputs over several faces, are driven. A bus carrying a filter restricts its face to that one
      * key, so a machine fed two ingredients from two sides routes each to the correct face; an unfiltered bus
      * carries anything. Without a bus, the switch-touched face serves both directions.
@@ -434,8 +456,10 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
                     && bus.type() == kind) {
                 final ExternalDataPort port = portOn(d);
                 if (!port.isEmpty()) {
-                    // Honor the bus filter so the player can pin which face each ingredient (or output) uses:
-                    // a filtered face carries only that key, an empty filter carries anything.
+                    /*
+                     * Honor the bus filter so the player can pin which face each ingredient (or output) uses:
+                     * a filtered face carries only that key, an empty filter carries anything.
+                     */
                     final StorageKey filter = bus.filterKey();
                     faces.add(filter == null ? port : new FilteredDataPort(port, filter));
                 }
@@ -459,7 +483,7 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
      * Moves what the machine is owed into it, within {@code budgetWeight} (mB-equivalent) for this tick, and
      * returns the weight moved. Items are owed lot by lot. Fluids and chemicals are continuous: the machine is
      * kept topped up with as much as the whole request still needs, so a tank never starves a machine that
-     * could run faster than one lot every few ticks — the pattern's amount only sets the ratio.
+     * could run faster than one lot every few ticks, since the pattern's amount only sets the ratio.
      */
     private long deliverOwed(final IDataPort inPort, final long budgetWeight) {
         final List<ProcessingPattern.ProcessingInput> inputs = pattern.inputs();
@@ -485,10 +509,10 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
 
     /**
      * How many lots the request justifies. A guaranteed primary output needs exactly {@code ceil(requested /
-     * amount)} lots — no more, so nothing is wasted. A probabilistic primary output cannot be counted ahead of
+     * amount)} lots, no more, so nothing is wasted. A probabilistic primary output cannot be counted ahead of
      * time: crediting fed lots at their expected yield cancels the real {@code produced} out of the arithmetic
      * and the machine would stop one batch short. So while the request is still short, one more lot than has
-     * been fed is always allowed — a lot that rolled low is simply replaced — and the request-complete check in
+     * been fed is always allowed (a lot that rolled low is simply replaced) and the request-complete check in
      * {@link #tick} stops the op the moment real production catches up.
      */
     private long lotsNeeded() {
@@ -549,7 +573,7 @@ public final class NetworkProcessingOperation implements IPersistentOperation {
     }
 
     /** Whether this is a craft's internal machine stage (fed from the craft's pool), not a standalone operation.
-     *  Nested steps are not written to the operations log on their own — the parent craft records them as its
+     *  Nested steps are not written to the operations log on their own; the parent craft records them as its
      *  sub-operations. */
     public boolean isNested() {
         return nested;

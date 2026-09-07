@@ -40,8 +40,10 @@ public class GpuItem extends SpecItem<GpuSpec> implements IExpansionCardItem {
         tooltip.add(Component.literal(
                 "+1 parallel queue  -  " + spec.tdpWatts() + " W")
                 .withStyle(ChatFormatting.DARK_GRAY));
-        // Say what the card wants and what happens when it does not get it: the card still fits an
-        // older board, so without this line the lost VRAM would look like a bug rather than a trade-off.
+        /*
+         * Say what the card wants and what happens when it does not get it: the card still fits an
+         * older board, so without this line the lost VRAM would look like a bug rather than a trade-off.
+         */
         tooltip.add(Component.literal(spec.bus() + "  -  slower on an older slot")
                 .withStyle(ChatFormatting.DARK_GRAY));
         HardwareTooltip.appendEra(tooltip, spec.era());

@@ -102,9 +102,10 @@ public final class ComputingModule {
     public static final DeferredRegister.DataComponents COMPONENTS =
             DeferredRegister.createDataComponents(JsComputronics.MODID);
 
-    // Data components — a Server item carries its state in its NBT: the items it
-    // stores, the hardware it is built from, and its network node identity.
-
+    /*
+     * Data components: a Server item carries its state in its NBT: the items it
+     * stores, the hardware it is built from, and its network node identity.
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<
                     dev.jstech.computronics.storage.ServerStorageContents>>
@@ -113,8 +114,10 @@ public final class ComputingModule {
                     .networkSynchronized(
                             dev.jstech.computronics.storage.ServerStorageContents.STREAM_CODEC));
 
-    // A drive's stored items live in the save-wide volume store, not on the item: the item carries the
-    // volume's id and a usage summary, so a drive holding thousands of types stays a tiny item.
+    /*
+     * A drive's stored items live in the save-wide volume store, not on the item: the item carries the
+     * volume's id and a usage summary, so a drive holding thousands of types stays a tiny item.
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<java.util.UUID>>
             DISK_VOLUME = COMPONENTS.registerComponentType("disk_volume", b -> b
@@ -140,8 +143,10 @@ public final class ComputingModule {
                     .persistent(net.minecraft.core.UUIDUtil.CODEC)
                     .networkSynchronized(net.minecraft.core.UUIDUtil.STREAM_CODEC));
 
-    // A RAID Controller carries its array configuration: the mode it runs and how many member
-    // drives the array was formed with (so a missing member reads as degraded rather than smaller).
+    /*
+     * A RAID Controller carries its array configuration: the mode it runs and how many member
+     * drives the array was formed with (so a missing member reads as degraded rather than smaller).
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<String>>
             RAID_MODE = COMPONENTS.registerComponentType("raid_mode", b -> b
@@ -154,18 +159,22 @@ public final class ComputingModule {
                     .persistent(com.mojang.serialization.Codec.INT)
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
 
-    // A rack server's software state (console history, installed programs, settings) persists WITH
-    // the item, so it moves between racks with the machine. Server-side only: never network-synced.
+    /*
+     * A rack server's software state (console history, installed programs, settings) persists WITH
+     * the item, so it moves between racks with the machine. Server-side only: never network-synced.
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<net.minecraft.nbt.CompoundTag>>
             SERVER_CONSOLE = COMPONENTS.registerComponentType("server_console", b -> b
                     .persistent(net.minecraft.nbt.CompoundTag.CODEC));
 
-    // The software a disk carries: installed programs and their versions, the desktop preferences, and
-    // the shell history. It rides on the DISK, not on the computer, because that is what it is — moving
-    // a system disk to another machine takes its programs along, and a fresh disk boots clean. Keeping
-    // this on the block entity meant a newly installed system still believed the old one's programs
-    // were present. Server-side only: never network-synced.
+    /*
+     * The software a disk carries: installed programs and their versions, the desktop preferences, and
+     * the shell history. It rides on the DISK, not on the computer, because that is what it is: moving
+     * a system disk to another machine takes its programs along, and a fresh disk boots clean. Keeping
+     * this on the block entity meant a newly installed system still believed the old one's programs
+     * were present. Server-side only: never network-synced.
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<net.minecraft.nbt.CompoundTag>>
             DISK_CONSOLE = COMPONENTS.registerComponentType("disk_console", b -> b
@@ -177,17 +186,21 @@ public final class ComputingModule {
                     .persistent(com.mojang.serialization.Codec.STRING)
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.STRING_UTF8));
 
-    // How much of a (non-Server) computer disk's storage is public, as a per-mille 0..1000. The
-    // component rides on the disk ItemStack so the split travels with the disk when it is pulled
-    // and reinserted. An absent component reads as fully private (see DiskItem.publicPermille).
+    /*
+     * How much of a (non-Server) computer disk's storage is public, as a per-mille 0..1000. The
+     * component rides on the disk ItemStack so the split travels with the disk when it is pulled
+     * and reinserted. An absent component reads as fully private (see DiskItem.publicPermille).
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<Integer>>
             DISK_PUBLIC_PERMILLE = COMPONENTS.registerComponentType("disk_public_permille", b -> b
                     .persistent(com.mojang.serialization.Codec.intRange(0, 1000))
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
 
-    // OS media subsystem — components that together describe the content of a MediaItem.
-    // A medium carries exactly one kind and the matching content component for that kind.
+    /*
+     * OS media subsystem: components that together describe the content of a MediaItem.
+     * A medium carries exactly one kind and the matching content component for that kind.
+     */
 
     // Installer payload (OS_INSTALL / PROGRAM_INSTALL): the OS or program id.
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
@@ -196,8 +209,10 @@ public final class ComputingModule {
                     .persistent(net.minecraft.resources.ResourceLocation.CODEC)
                     .networkSynchronized(net.minecraft.resources.ResourceLocation.STREAM_CODEC));
 
-    // Which of the three content kinds this medium carries. Absent component → OS_INSTALL (safe
-    // default that keeps legacy blank media behaving as installer media).
+    /*
+     * Which of the three content kinds this medium carries. Absent component → OS_INSTALL (safe
+     * default that keeps legacy blank media behaving as installer media).
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<MediaKind>>
             MEDIA_KIND = COMPONENTS.registerComponentType("media_kind", b -> b
@@ -222,8 +237,10 @@ public final class ComputingModule {
                     .persistent(com.mojang.serialization.Codec.INT)
                     .networkSynchronized(net.minecraft.network.codec.ByteBufCodecs.VAR_INT));
 
-    // Disk filesystem components — files and the installed OS live on the DiskItem stack so
-    // they travel with the disk when it is inserted or removed.
+    /*
+     * Disk filesystem components: files and the installed OS live on the DiskItem stack so
+     * they travel with the disk when it is inserted or removed.
+     */
 
     // The filesystem contents of a disk volume: path-keyed map of stored files.
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
@@ -234,17 +251,21 @@ public final class ComputingModule {
                     .networkSynchronized(
                             dev.jstech.computronics.os.fs.FilesystemContents.STREAM_CODEC));
 
-    // The OS installed on a system disk: a ResourceLocation identifying the registered OsDef.
-    // Present only on bootable disks; absent on plain data disks.
+    /*
+     * The OS installed on a system disk: a ResourceLocation identifying the registered OsDef.
+     * Present only on bootable disks; absent on plain data disks.
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<net.minecraft.resources.ResourceLocation>>
             SYSTEM_OS = COMPONENTS.registerComponentType("system_os", b -> b
                     .persistent(net.minecraft.resources.ResourceLocation.CODEC)
                     .networkSynchronized(net.minecraft.resources.ResourceLocation.STREAM_CODEC));
 
-    // A user-chosen label for a disk or media volume, shown in This PC and the explorer drive tree and
-    // editable there. Rides on the ItemStack so it travels with the disk/medium. Absent → the volume's
-    // default name (e.g. "Local Disk" for a system disk, "Removable Drive" for a medium).
+    /*
+     * A user-chosen label for a disk or media volume, shown in This PC and the explorer drive tree and
+     * editable there. Rides on the ItemStack so it travels with the disk/medium. Absent → the volume's
+     * default name (e.g. "Local Disk" for a system disk, "Removable Drive" for a medium).
+     */
     public static final DeferredHolder<net.minecraft.core.component.DataComponentType<?>,
             net.minecraft.core.component.DataComponentType<String>>
             VOLUME_LABEL = COMPONENTS.registerComponentType("volume_label", b -> b
@@ -413,7 +434,7 @@ public final class ComputingModule {
                             dev.jstech.computronics.blockentity.TankBlockEntity::new,
                             TANK.get()).build(null));
 
-    // Interaction buses — move items between the network and adjacent inventories
+    // Interaction buses: move items between the network and adjacent inventories
 
     public static final DeferredItem<dev.jstech.computronics.block.part.CablePartItem> IMPORT_BUS_ITEM =
             ITEMS.register("import_bus", () -> new dev.jstech.computronics.block.part.CablePartItem(
@@ -460,7 +481,7 @@ public final class ComputingModule {
             MENUS.register("receiving_bus", () -> IMenuTypeExtension.create(
                     dev.jstech.computronics.menu.ReceivingBusMenu::fromNetwork));
 
-    // Server Rack — houses Server items as network nodes
+    // Server Rack: houses Server items as network nodes
 
     public static final DeferredBlock<dev.jstech.computronics.block.ServerRackBlock> SERVER_RACK =
             BLOCKS.register("server_rack",
@@ -482,8 +503,10 @@ public final class ComputingModule {
             "server_rack", () -> new dev.jstech.computronics.item.CabinetBlockItem(
                     SERVER_RACK.get(), new Item.Properties(), "rack", "server_rack", "rack", RACK_FIT));
 
-    // The supercomputer cabinet: the same foundation, but it seats only Supercomputer Nodes and its
-    // rear port takes only the high-compute fabric.
+    /*
+     * The supercomputer cabinet: the same foundation, but it seats only Supercomputer Nodes and its
+     * rear port takes only the high-compute fabric.
+     */
     public static final DeferredBlock<dev.jstech.computronics.block.SupercomputerRackBlock>
             SUPERCOMPUTER_RACK = BLOCKS.register("supercomputer_rack",
                     () -> new dev.jstech.computronics.block.SupercomputerRackBlock(
@@ -498,8 +521,10 @@ public final class ComputingModule {
                     SUPERCOMPUTER_RACK.get(), new Item.Properties(), "rack", "supercomputer_rack",
                     "rack", RACK_FIT));
 
-    // The Server Rack of the earlier eras: the same cabinet in its decade's materials, seating only
-    // servers of its own era or earlier.
+    /*
+     * The Server Rack of the earlier eras: the same cabinet in its decade's materials, seating only
+     * servers of its own era or earlier.
+     */
     public static final DeferredBlock<dev.jstech.computronics.block.LegacyServerRackBlock>
             LEGACY_SERVER_RACK = BLOCKS.register("legacy_server_rack",
                     () -> new dev.jstech.computronics.block.LegacyServerRackBlock(
@@ -570,8 +595,10 @@ public final class ComputingModule {
             MENUS.register("command_prompt", () -> IMenuTypeExtension.create(
                     dev.jstech.computronics.menu.CommandPromptMenu::fromNetwork));
 
-    // Each terminal platform opens its own screen: MC-DOS and the Linux TTY carry the Command Prompt's
-    // data but are separate menu types, so the MC-NET window is never reused for another system's console.
+    /*
+     * Each terminal platform opens its own screen: MC-DOS and the Linux TTY carry the Command Prompt's
+     * data but are separate menu types, so the MC-NET window is never reused for another system's console.
+     */
     public static final DeferredHolder<MenuType<?>,
             MenuType<dev.jstech.computronics.menu.DosTerminalMenu>> DOS_TERMINAL_MENU =
             MENUS.register("dos_terminal", () -> IMenuTypeExtension.create(
@@ -587,7 +614,7 @@ public final class ComputingModule {
             MENUS.register("desktop", () -> IMenuTypeExtension.create(
                     dev.jstech.computronics.menu.DesktopMenu::fromNetwork));
 
-    // Hardware components (Standard era — minimal set to build a Mainframe)
+    // Hardware components (Standard era, minimal set to build a Mainframe)
 
     public static final DeferredItem<MotherboardItem> MOTHERBOARD_MTX_P = ITEMS.register(
             "motherboard_mtx_p", () -> new MotherboardItem(new Item.Properties(),
@@ -623,8 +650,10 @@ public final class ComputingModule {
             "crafting_card_t3", () -> new CraftingCardItem(new Item.Properties(),
                     new CraftingCardSpec(IndustrialTier.T3, PcieGeneration.PCIE_2_0, 0.1, 4, 100)));
 
-    // The Cluster Interface Cards: exclusive to the Cluster Management Computer, one per era. Each era
-    // reaches further and writes more nodes at once. Numbers are estimates.
+    /*
+     * The Cluster Interface Cards: exclusive to the Cluster Management Computer, one per era. Each era
+     * reaches further and writes more nodes at once. Numbers are estimates.
+     */
     public static final DeferredItem<dev.jstech.computronics.item.ClusterInterfaceCardItem> SERIAL_CONSOLE_CARD =
             ITEMS.register("serial_console_card", () -> new dev.jstech.computronics.item.ClusterInterfaceCardItem(
                     new Item.Properties(), new dev.jstech.computronics.hardware.ClusterInterfaceCardSpec(
@@ -644,8 +673,10 @@ public final class ComputingModule {
     public static final DeferredItem<PsuItem> PSU_650G = ITEMS.register(
             "psu_650g", () -> new PsuItem(new Item.Properties(), new PsuSpec(650, 90)));
 
-    // Pattern system — the Pattern Encoder burns .craft files onto removable media, one encoder per era:
-    // the Standard one writes DVDs, CDs and USB sticks, the Legacy one CDs, the Vintage one floppies.
+    /*
+     * Pattern system: the Pattern Encoder burns .craft files onto removable media, one encoder per era:
+     * the Standard one writes DVDs, CDs and USB sticks, the Legacy one CDs, the Vintage one floppies.
+     */
 
     public static final DeferredBlock<dev.jstech.computronics.block.PatternEncoderBlock> PATTERN_ENCODER =
             BLOCKS.register("pattern_encoder",
@@ -654,8 +685,10 @@ public final class ComputingModule {
                                     .mapColor(MapColor.COLOR_GRAY)
                                     .strength(1.5F)
                                     .sound(SoundType.METAL)
-                                    // The body is drawn by the block entity: without this a full cube would
-                                    // block its own light and cull the faces of its neighbours.
+                                    /*
+                                     * The body is drawn by the block entity: without this a full cube would
+                                     * block its own light and cull the faces of its neighbours.
+                                     */
                                     .noOcclusion(), HardwareEra.STANDARD));
 
     /**
@@ -710,8 +743,10 @@ public final class ComputingModule {
             MENUS.register("pattern_encoder", () -> IMenuTypeExtension.create(
                     dev.jstech.computronics.menu.PatternEncoderMenu::fromNetwork));
 
-    // OS media subsystem — a peripheral block that holds one MediaItem and exposes the
-    // installer payload or data contents so the firmware boot screen and transfer logic can read it.
+    /*
+     * OS media subsystem: a peripheral block that holds one MediaItem and exposes the
+     * installer payload or data contents so the firmware boot screen and transfer logic can read it.
+     */
 
     // Media reader drives: one block per drive type, each linked to a computer via the Peripheral Cable.
     public static final DeferredBlock<MediaReaderBlock> FLOPPY_DRIVE = BLOCKS.register("floppy_drive",
@@ -806,8 +841,10 @@ public final class ComputingModule {
             ITEMS.register("server", () -> new dev.jstech.computronics.item.ServerItem(
                     new Item.Properties()));
 
-    // The servers of the earlier eras: a case of its era takes only boards of that era, and seats in a
-    // cabinet of its era or later.
+    /*
+     * The servers of the earlier eras: a case of its era takes only boards of that era, and seats in a
+     * cabinet of its era or later.
+     */
     public static final DeferredItem<dev.jstech.computronics.item.ServerCaseItem> LEGACY_SERVER_CASE =
             ITEMS.register("legacy_server_case",
                     () -> new dev.jstech.computronics.item.ServerCaseItem(new Item.Properties()));
@@ -851,8 +888,10 @@ public final class ComputingModule {
                     () -> new dev.jstech.computronics.item.RackUnitItem(new Item.Properties(),
                             dev.jstech.computronics.item.RackUnitItem.Kind.COOLING_UNIT));
 
-    // Bay gadgets: they occupy a gadget slot on the rack's front panel and serve the machine
-    // mounted in that row.
+    /*
+     * Bay gadgets: they occupy a gadget slot on the rack's front panel and serve the machine
+     * mounted in that row.
+     */
     public static final DeferredItem<dev.jstech.computronics.item.RackGadgetItem> RAID_CONTROLLER =
             ITEMS.register("raid_controller",
                     () -> new dev.jstech.computronics.item.RackGadgetItem(new Item.Properties(),
@@ -941,9 +980,11 @@ public final class ComputingModule {
     // Mainframe
 
     private static BlockBehaviour.Properties mainframeProperties() {
-        // The cabinet is one GeckoLib model drawn by the controller, so the twelve blocks render
-        // nothing themselves: without noOcclusion they would still cull their neighbours' faces and
-        // block light, leaving a machine-shaped hole in the world around the model.
+        /*
+         * The cabinet is one GeckoLib model drawn by the controller, so the twelve blocks render
+         * nothing themselves: without noOcclusion they would still cull their neighbours' faces and
+         * block light, leaving a machine-shaped hole in the world around the model.
+         */
         return BlockBehaviour.Properties.of()
                 .mapColor(MapColor.COLOR_GRAY)
                 .strength(3.5F)
@@ -959,8 +1000,10 @@ public final class ComputingModule {
             "mainframe", () -> new dev.jstech.computronics.item.MainframeBlockItem(
                     MAINFRAME.get(), new Item.Properties(), "mainframe"));
 
-    // Earlier-era Mainframes — the same orchestrator and block entity, differing only by era, accepted
-    // MTX board and skin. Same 3x2x2 multiblock geometry and shared parts.
+    /*
+     * Earlier-era Mainframes: the same orchestrator and block entity, differing only by era, accepted
+     * MTX board and skin. Same 3x2x2 multiblock geometry and shared parts.
+     */
     public static final DeferredBlock<dev.jstech.computronics.block.VintageMainframeBlock>
             VINTAGE_MAINFRAME = BLOCKS.register("vintage_mainframe",
                     () -> new dev.jstech.computronics.block.VintageMainframeBlock(mainframeProperties()));
@@ -1002,8 +1045,10 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> PERSONAL_COMPUTER_ITEM = ITEMS.register(
             "personal_computer", () -> new BlockItem(PERSONAL_COMPUTER.get(), new Item.Properties()));
 
-    // Earlier-era Personal Computers — the same machine and block entity, differing only by era, accepted
-    // board and skin.
+    /*
+     * Earlier-era Personal Computers: the same machine and block entity, differing only by era, accepted
+     * board and skin.
+     */
     public static final DeferredBlock<dev.jstech.computronics.block.VintagePersonalComputerBlock>
             VINTAGE_PERSONAL_COMPUTER = BLOCKS.register("vintage_personal_computer",
                     () -> new dev.jstech.computronics.block.VintagePersonalComputerBlock(
@@ -1035,7 +1080,7 @@ public final class ComputingModule {
     public static final DeferredHolder<MenuType<?>, MenuType<PersonalComputerMenu>> PERSONAL_COMPUTER_MENU =
             MENUS.register("personal_computer", () -> IMenuTypeExtension.create(PersonalComputerMenu::fromNetwork));
 
-    // Crafting Computer — an ATX computer that executes recipes once a Crafting Card is installed
+    // Crafting Computer: an ATX computer that executes recipes once a Crafting Card is installed
 
     public static final DeferredBlock<CraftingComputerBlock> CRAFTING_COMPUTER = BLOCKS.register(
             "crafting_computer", () -> new CraftingComputerBlock(BlockBehaviour.Properties.of()
@@ -1045,8 +1090,10 @@ public final class ComputingModule {
     public static final DeferredItem<BlockItem> CRAFTING_COMPUTER_ITEM = ITEMS.register(
             "crafting_computer", () -> new BlockItem(CRAFTING_COMPUTER.get(), new Item.Properties()));
 
-    // Earlier-era Crafting Computers — the same machine and block entity, differing only by era, accepted
-    // board and skin.
+    /*
+     * Earlier-era Crafting Computers: the same machine and block entity, differing only by era, accepted
+     * board and skin.
+     */
     public static final DeferredBlock<dev.jstech.computronics.block.VintageCraftingComputerBlock>
             VINTAGE_CRAFTING_COMPUTER = BLOCKS.register("vintage_crafting_computer",
                     () -> new dev.jstech.computronics.block.VintageCraftingComputerBlock(
@@ -1080,8 +1127,10 @@ public final class ComputingModule {
             MENUS.register("crafting_computer", () -> IMenuTypeExtension.create(
                     dev.jstech.computronics.menu.CraftingComputerMenu::fromNetwork));
 
-    // Cluster Management Computer — a full computer that, with a Cluster Interface Card, drives every
-    // supercomputer fabric and datacenter section on its network as one machine. Three eras.
+    /*
+     * Cluster Management Computer: a full computer that, with a Cluster Interface Card, drives every
+     * supercomputer fabric and datacenter section on its network as one machine. Three eras.
+     */
     public static final DeferredBlock<dev.jstech.computronics.block.ClusterManagementComputerBlock>
             CLUSTER_MANAGEMENT_COMPUTER = BLOCKS.register("cluster_management_computer",
                     () -> new dev.jstech.computronics.block.ClusterManagementComputerBlock(
@@ -1116,8 +1165,10 @@ public final class ComputingModule {
                     () -> IMenuTypeExtension.create(
                             dev.jstech.computronics.menu.ClusterManagementComputerMenu::fromNetwork));
 
-    // Supercomputer — the nodes are rack computers seated in Supercomputer Racks; the racks are tied
-    // together by the high-compute fabric and uplinked to the data network by one HBW Interface.
+    /*
+     * Supercomputer: the nodes are rack computers seated in Supercomputer Racks; the racks are tied
+     * together by the high-compute fabric and uplinked to the data network by one HBW Interface.
+     */
 
     public static final DeferredItem<dev.jstech.computronics.item.ServerItem> SUPERCOMPUTER_NODE =
             ITEMS.register("supercomputer_node", () -> new dev.jstech.computronics.item.ServerItem(
@@ -1190,8 +1241,10 @@ public final class ComputingModule {
                     dev.jstech.computronics.menu.ServerRouterMenu::fromNetwork));
 
     public static void register(final IEventBus modEventBus) {
-        // Force the per-era hardware catalog to load so its items register onto ITEMS before the
-        // DeferredRegister is handed to the mod event bus below.
+        /*
+         * Force the per-era hardware catalog to load so its items register onto ITEMS before the
+         * DeferredRegister is handed to the mod event bus below.
+         */
         HardwareItems.init();
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);

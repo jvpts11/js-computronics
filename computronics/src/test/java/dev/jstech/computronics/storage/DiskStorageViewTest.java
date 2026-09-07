@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DiskStorageViewTest {
 
-    // 1000 per item-unit, 1 per fluid-unit — exactly what StorageKey.weight reports.
+    // 1000 per item-unit, 1 per fluid-unit, exactly what StorageKey.weight reports.
     private static final ToLongFunction<String> WEIGHT = key -> key.startsWith("fluid:") ? 1L : 1000L;
 
     // A capacity of 10 items = 10_000 weight (1000 per item).
@@ -60,8 +60,10 @@ class DiskStorageViewTest {
 
     @Test
     void publicView_budgetWalksInsertionOrderAndSplitsTheStraddlingType() {
-        // 50% of a 10-item disk = budget of 5 items (5000 weight). Walk a=3 (public, 3000 used), then
-        // b=4 of which only 2 fit the remaining 2000 weight -> 2 public, 2 private; c entirely private.
+        /*
+         * 50% of a 10-item disk = budget of 5 items (5000 weight). Walk a=3 (public, 3000 used), then
+         * b=4 of which only 2 fit the remaining 2000 weight -> 2 public, 2 private; c entirely private.
+         */
         final Map<String, Long> c = contents("a", 3L, "b", 4L, "c", 6L);
         final Map<String, Long> pub = DiskStorageView.publicView(c, CAP_10_ITEMS, 500, WEIGHT);
         assertEquals(3L, pub.get("a"));

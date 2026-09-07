@@ -15,7 +15,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: the machine's own power menu — shut down, restart, or just leave the screen.
+ * Client to server: the machine's own power menu: shut down, restart, or just leave the screen.
  * Encerrar from inside the system has to reach the machine, not only the window: a computer whose
  * screen closed is still running, still on the network, and still holding open whatever was open.
  */

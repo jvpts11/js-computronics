@@ -28,7 +28,7 @@ public final class DiskStorageView {
         return new DiskPrivacy(permille).publicShareOf(Math.max(0L, capacityWeight));
     }
 
-    // Generic core (no Minecraft types) — walks the insertion-ordered contents up to the public budget.
+    // Generic core (no Minecraft types), walks the insertion-ordered contents up to the public budget.
 
     /**
      * The public portion of {@code contents}, walked in insertion order up to the weight budget. {@code unitWeight} returns the weight of one of a key (1000 for an item, 1 per mB of fluid).
@@ -98,7 +98,7 @@ public final class DiskStorageView {
         return sum;
     }
 
-    // StorageKey overloads — the production callers; they reuse the generic core with the key's weight.
+    // StorageKey overloads: the production callers; they reuse the generic core with the key's weight.
 
     private static final ToLongFunction<StorageKey> STORAGE_KEY_WEIGHT = key -> key.weight(1L);
 

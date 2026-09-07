@@ -14,7 +14,7 @@ package dev.jstech.computronics.os;
  * and in kernel definitions without pulling in the binding layer.
  */
 public enum FilesystemKind {
-    /** No filesystem support — data lives in memory only. */
+    /** No filesystem support, so data lives in memory only. */
     NONE,
     /** A flat key-value store with no directory hierarchy. */
     FLAT,

@@ -58,7 +58,7 @@ public enum ModMaterial {
     }
 
     /**
-     * Forms that exist as vanilla Minecraft items — this mod only needs to add them to {@code c:} tags,
+     * Forms that exist as vanilla Minecraft items; this mod only needs to add them to {@code c:} tags,
      * not register new items.
      */
     public Set<MaterialForm> vanillaForms() {

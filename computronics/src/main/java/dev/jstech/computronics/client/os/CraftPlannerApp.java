@@ -65,7 +65,7 @@ public final class CraftPlannerApp implements IDesktopApp {
 
     private static CraftPlannerApp active;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final SearchField search;
     private final ListView<CraftCatalogPayload.Entry> catalogList;
@@ -186,7 +186,7 @@ public final class CraftPlannerApp implements IDesktopApp {
         active = this;
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -342,7 +342,7 @@ public final class CraftPlannerApp implements IDesktopApp {
         }
     }
 
-    // ---- state ----
+    // state
 
     private void select(final ItemStack stack) {
         this.selected = stack;
@@ -396,7 +396,7 @@ public final class CraftPlannerApp implements IDesktopApp {
         g.pose().popPose();
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {

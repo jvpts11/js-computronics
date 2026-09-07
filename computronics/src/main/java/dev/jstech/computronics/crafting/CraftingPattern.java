@@ -197,10 +197,12 @@ public record CraftingPattern(List<ItemStack> grid, ItemStack result, List<Strin
         return true;
     }
 
-    // ItemStack has no value-based equals/hashCode in 1.21.1, so the record-generated ones compared by
-    // identity — making two patterns that hold the same recipe unequal and breaking this type's use as a
-    // data-component value (dedupe, stack comparison). Compare and hash the stacks by value instead. The
-    // name and note are the author's label, not the recipe, and stay out of it.
+    /*
+     * ItemStack has no value-based equals/hashCode in 1.21.1, so the record-generated ones compared by
+     * identity, making two patterns that hold the same recipe unequal and breaking this type's use as a
+     * data-component value (dedupe, stack comparison). Compare and hash the stacks by value instead. The
+     * name and note are the author's label, not the recipe, and stay out of it.
+     */
 
     @Override
     public boolean equals(final Object o) {

@@ -9,7 +9,7 @@ package dev.jstech.core.gui.layout;
 
 /**
  * The fixed Z (depth) of every desktop render layer, back-to-front. In 1.21.1 {@code GuiGraphics} batches
- * text and renders it last — over everything — so a back layer's text (e.g. a desktop icon's label) bleeds
+ * text and renders it last (over everything), so a back layer's text (e.g. a desktop icon's label) bleeds
  * on top of a front layer (an open window) when every layer draws at the same depth. Flushing the batch
  * between layers does not work outside a managed draw, so instead each layer draws at its own Z via
  * {@code pose().translate(0, 0, z)}; the depth buffer then keeps a back layer strictly behind a front one,
@@ -26,9 +26,9 @@ public final class DesktopZ {
 
     /** The dimmed/blurred world and the wallpaper. */
     public static final int WALLPAPER = 0;
-    /** Desktop icons and their labels — the back-most interactive layer, behind every window. */
+    /** Desktop icons and their labels, the back-most interactive layer, behind every window. */
     public static final int ICONS = 20;
-    /** The back-most open window. Each further window sits {@link #WINDOW_STEP} in front — see {@link #windowZ}. */
+    /** The back-most open window. Each further window sits {@link #WINDOW_STEP} in front; see {@link #windowZ}. */
     public static final int WINDOWS = 40;
     /** Real container-slot items for the focused window's inventory band, over every window. */
     public static final int INVENTORY = 300;
@@ -38,10 +38,10 @@ public final class DesktopZ {
     public static final int MENU = 360;
     /** The icon drag drop-target outline and the drag ghost. */
     public static final int DRAG = 380;
-    /** Hover tooltips. Fixed at 400 — the vanilla tooltip renderer translates +400 itself, so the desktop
+    /** Hover tooltips. Fixed at 400, because the vanilla tooltip renderer translates +400 itself, so the desktop
      *  draws tooltips at the base pose (no extra translate) and they land here. */
     public static final int TOOLTIP = 400;
-    /** The carried (cursor) item stack, at the mouse — above the tooltip. */
+    /** The carried (cursor) item stack, at the mouse, above the tooltip. */
     public static final int CURSOR = 420;
     /** A modal dialog, over the whole desktop. */
     public static final int POPUP = 540;
@@ -49,13 +49,15 @@ public final class DesktopZ {
     /** A {@code renderItem} model occupies roughly this much depth; item layers must leave this much headroom. */
     public static final int ITEM_DEPTH = 100;
 
-    // ---- windows get a depth band each -----------------------------------------------------------
-    //
-    // An item is not flat: renderItem lifts the model +150 and it spans about ±8 around that, so an item
-    // drawn by a window whose chrome sits at Z ends up ~150 in FRONT of it. With every window drawn at one
-    // shared Z, a background window's items therefore painted over the window in front of them (and its
-    // items over theirs). So each window gets its own band, and an item drawn inside a window is pushed
-    // back into that band — near its own chrome — instead of floating 150 above the whole desktop.
+    /*
+     * windows get a depth band each
+     *
+     * An item is not flat: renderItem lifts the model +150 and it spans about ±8 around that, so an item
+     * drawn by a window whose chrome sits at Z ends up ~150 in FRONT of it. With every window drawn at one
+     * shared Z, a background window's items therefore painted over the window in front of them (and its
+     * items over theirs). So each window gets its own band, and an item drawn inside a window is pushed
+     * back into that band (near its own chrome) instead of floating 150 above the whole desktop.
+     */
 
     /** The depth reserved for one window: its chrome, the items it draws, and their counts. */
     public static final int WINDOW_STEP = 32;

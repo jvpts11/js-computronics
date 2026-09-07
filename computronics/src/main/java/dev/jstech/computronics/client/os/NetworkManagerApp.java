@@ -127,8 +127,10 @@ public final class NetworkManagerApp implements IDesktopApp {
     private OperationRecord detailOp;
     private List<DetailRow> detailRows = List.of();
 
-    // Per-node drag offsets on the Map (kept only for this session, keyed by the node's short id), so the
-    // player can pull crowded nodes apart. A node with no entry sits at its computed ring position.
+    /*
+     * Per-node drag offsets on the Map (kept only for this session, keyed by the node's short id), so the
+     * player can pull crowded nodes apart. A node with no entry sits at its computed ring position.
+     */
     private final Map<String, int[]> nodeOffsets = new HashMap<>();
     @Nullable
     private String draggingNode;
@@ -143,7 +145,7 @@ public final class NetworkManagerApp implements IDesktopApp {
 
     private static NetworkManagerApp active;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final TabStrip tabs;
     private final Label loadingLabel;
@@ -334,7 +336,7 @@ public final class NetworkManagerApp implements IDesktopApp {
         active = this;
     }
 
-    // ---- state readers ----
+    // state readers
 
     private List<NetworkNodeInfo> nodes() {
         return data == null ? List.of() : data.nodes();
@@ -391,7 +393,7 @@ public final class NetworkManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -628,8 +630,10 @@ public final class NetworkManagerApp implements IDesktopApp {
         if (next == detailOp.priority()) {
             return;
         }
-        // Show the new level at once; the server's next live snapshot confirms it (or reverts it if the
-        // Operation settled in the meantime).
+        /*
+         * Show the new level at once; the server's next live snapshot confirms it (or reverts it if the
+         * Operation settled in the meantime).
+         */
         detailOp = detailOp.withPriority(next);
         PacketDistributor.sendToServer(new SetOperationPriorityPayload(host, monitorPos, detailOp.id(), next));
     }
@@ -643,7 +647,7 @@ public final class NetworkManagerApp implements IDesktopApp {
         detailPopup.close();
     }
 
-    // ---- the map ----
+    // the map
 
     /**
      * The topology as a canvas: the Mainframe at the centre, the other nodes ringed around it, each a click
@@ -670,9 +674,11 @@ public final class NetworkManagerApp implements IDesktopApp {
                     break;
                 }
             }
-            // The Mainframe sits at the centre; the rest ring around it. Adjacent nodes alternate between two
-            // radii so labels don't collide, the ring spread scales with the zoom, and pan plus per-node drag
-            // offsets (both in screen pixels) let the player explore and arrange a large network.
+            /*
+             * The Mainframe sits at the centre; the rest ring around it. Adjacent nodes alternate between two
+             * radii so labels don't collide, the ring spread scales with the zoom, and pan plus per-node drag
+             * offsets (both in screen pixels) let the player explore and arrange a large network.
+             */
             final int vcx = x + w / 2;
             final int vcy = y + h / 2;
             int mcx = vcx + mapPanX;
@@ -829,8 +835,10 @@ public final class NetworkManagerApp implements IDesktopApp {
         by = Math.min(by, cy + ch - boxH - 1);
         bx = Math.max(bx, cx);
         by = Math.max(by, cy);
-        // The tooltip pass runs at the base pose; without lifting to the tooltip depth the box would draw
-        // behind the window body and never be seen.
+        /*
+         * The tooltip pass runs at the base pose; without lifting to the tooltip depth the box would draw
+         * behind the window body and never be seen.
+         */
         g.pose().pushPose();
         g.pose().translate(0, 0, DesktopZ.TOOLTIP);
         g.fill(bx, by, bx + boxW, by + boxH, 0xF00E0E12);
@@ -844,7 +852,7 @@ public final class NetworkManagerApp implements IDesktopApp {
         g.pose().popPose();
     }
 
-    // ---- the detail dialog (a logged Operation and its sub-operations) ----
+    // the detail dialog (a logged Operation and its sub-operations)
 
     private void openDetail(final OperationRecord op) {
         showDetail(op);
@@ -990,7 +998,7 @@ public final class NetworkManagerApp implements IDesktopApp {
         };
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {

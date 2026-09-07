@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Server to client: the storage snapshot the Network Interactor desktop app renders. It mirrors what
- * the terminal shows — the network item grid, the host's local item grid, and the network status line.
+ * the terminal shows: the network item grid, the host's local item grid, and the network status line.
  *
  * @param networkItems    the items held across the whole network (Network Storage tab)
  * @param localItems      the items on this computer's own disks (Local Storage tab)

@@ -37,7 +37,7 @@ import java.util.Set;
 public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         implements IComputerTerminalHost {
 
-    // Slot layout — kept public so the assembly Menu and Screen address slots by name.
+    // Slot layout, kept public so the assembly Menu and Screen address slots by name.
     public static final int MOTHERBOARD_SLOT = 0;
     public static final int CPU_SLOT = 1;
     public static final int RAM_SLOTS_START = 2;
@@ -55,9 +55,11 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
             MOTHERBOARD_SLOT, CPU_SLOT, 1, RAM_SLOTS_START, RAM_SLOTS,
             GPU_SLOTS_START, GPU_SLOTS, PSU_SLOT, DISK_SLOTS_START, DISK_SLOTS, HARDWARE_SLOTS);
 
-    // Bumped on any change to the disk contents (insert/extract/disk swap) AND on a privacy-slider
-    // write, so the Mainframe's incremental ANALYZE re-reads this PC's public view exactly when it
-    // could have changed — moving a slider changes the public view with no item movement at all.
+    /*
+     * Bumped on any change to the disk contents (insert/extract/disk swap) AND on a privacy-slider
+     * write, so the Mainframe's incremental ANALYZE re-reads this PC's public view exactly when it
+     * could have changed, since moving a slider changes the public view with no item movement at all.
+     */
     private long storageModCount;
 
     public PersonalComputerBlockEntity(final BlockPos pos, final BlockState state) {
@@ -71,7 +73,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
     /**
      * Marks the PC's storage as changed so the network index re-reads it; used by the slider write, which
      * changes the public view without moving any item. Defers to {@link #setChanged()}, which advances the
-     * counter once — so a slider write and a disk swap both bump it by exactly one.
+     * counter once, so a slider write and a disk swap both bump it by exactly one.
      */
     public void bumpStorageModCount() {
         setChanged();
@@ -79,8 +81,10 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     public void setChanged() {
-        // Any reason the BE is marked dirty (a disk swap, a content write) could have changed the
-        // public view, so advance the counter the index keys its re-reads on.
+        /*
+         * Any reason the BE is marked dirty (a disk swap, a content write) could have changed the
+         * public view, so advance the counter the index keys its re-reads on.
+         */
         storageModCount++;
         super.setChanged();
     }
@@ -106,12 +110,14 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected dev.jstech.core.tier.HardwareEra requiredBoardEra() {
-        // A PC accepts only a board of its own era, so a Legacy and a Standard ATX board are not
-        // interchangeable: each installs in its matching machine alone.
+        /*
+         * A PC accepts only a board of its own era, so a Legacy and a Standard ATX board are not
+         * interchangeable: each installs in its matching machine alone.
+         */
         return blockEra();
     }
 
-    // Network node — a passive Category-C node read from the adjacent cable
+    // Network node, a passive Category-C node read from the adjacent cable
 
     public static void serverTick(final Level level, final BlockPos pos,
                                   final BlockState state, final PersonalComputerBlockEntity be) {
@@ -191,7 +197,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         return new StoreSink(localStore());
     }
 
-    // IComputerTerminalHost — read-only monitoring (the rest is inherited from the base)
+    // IComputerTerminalHost: read-only monitoring (the rest is inherited from the base)
 
     @Override
     public boolean computerRunning() {
@@ -228,7 +234,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         return false;
     }
 
-    // Public/private storage slider — a PC publishes part of each disk to the network per disk.
+    // Public/private storage slider: a PC publishes part of each disk to the network per disk.
 
     @Override
     public boolean storageHasSlider() {
@@ -273,7 +279,7 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
         bumpStorageModCount();
     }
 
-    // Screen sync (ContainerData wire layout — single source of truth shared with the Menu)
+    // Screen sync (ContainerData wire layout, single source of truth shared with the Menu)
 
     public static final int DATA_RUNNING = 0;
     public static final int DATA_BUILD_VALID = 1;

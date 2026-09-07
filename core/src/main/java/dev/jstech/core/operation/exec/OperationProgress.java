@@ -10,7 +10,7 @@ package dev.jstech.core.operation.exec;
 import java.util.List;
 
 /**
- * A read-only view over the timed transfers of one parent Operation — its SubOperations, one per source, running in parallel.
+ * A read-only view over the timed transfers of one parent Operation, its SubOperations, one per source, running in parallel.
  */
 public final class OperationProgress {
 

@@ -36,7 +36,7 @@ import java.util.List;
 
 /**
  * The craft engine is concurrent by design: a chain of machine steps pipelines instead of running one stage
- * fully before the next. This mirrors the setup a player builds to speed up a chain — two Metallurgic Infusers
+ * fully before the next. This mirrors the setup a player builds to speed up a chain: two Metallurgic Infusers
  * told apart by their Input Bus filters (one carries copper, the other the infused alloy the first makes) on a
  * Mainframe with a GPU (two queues). Requesting the end of the chain must run BOTH infusers at the same time:
  * the second stage starts as soon as the first has made one, not after the first has made them all.
@@ -160,8 +160,10 @@ public final class PipeliningGameTests {
                     final CraftingComputerBlockEntity cc = rig.net().cc();
                     helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(infusedAlloy())), "infused loads");
                     helper.assertTrue(cc.loadMachineRecipe(NetworkRecipe.ofProcessing(reinforcedAlloy())), "reinforced loads");
-                    // No Max Jobs is set: with two physical infusers the engine runs two infuser jobs on its own
-                    // (Auto = use every machine of the type). The filters route each stage to its own machine.
+                    /*
+                     * No Max Jobs is set: with two physical infusers the engine runs two infuser jobs on its own
+                     * (Auto = use every machine of the type). The filters route each stage to its own machine.
+                     */
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     helper.assertTrue(rig.net().mainframe().parallelQueues() == 2, "the GPU must give two queues");

@@ -24,14 +24,14 @@ import org.junit.jupiter.api.Test;
 /**
  * An aggressive, cross-cutting audit of every screen layout in the mod. Per-screen tests check one screen;
  * this one sweeps them all and is hard to slip past: a layout that overlaps, spills out of its frame, hides
- * an invisible (zero-sized) solid, or — for a fixed-size screen — outgrows the on-screen budget fails here.
+ * an invisible (zero-sized) solid, or, for a fixed-size screen, outgrows the on-screen budget fails here.
  * It also reflects over the layout package and fails if a new layout factory is added without an audit case,
  * so coverage can never silently regress (the way the NMS out-of-frame bug slipped through).
  */
 class LayoutAuditTest {
 
     /** A fixed-size GUI must fit a usable screen: width up to ~360px, height up to ~256px (the project's
-     *  honest ceiling — beyond it the game's auto GUI scale starts clipping the panel). */
+     *  honest ceiling, since beyond it the game's auto GUI scale starts clipping the panel). */
     private static final int SCREEN_W_BUDGET = 360;
     private static final int SCREEN_H_BUDGET = 256;
 
@@ -57,8 +57,10 @@ class LayoutAuditTest {
         c.add(new AuditCase("ServerRackLayout", ServerRackLayout.layout(), true));
         c.add(new AuditCase("ComputerTerminalLayout(mainframe)", ComputerTerminalLayout.layout(true), true));
         c.add(new AuditCase("ComputerTerminalLayout(pc)", ComputerTerminalLayout.layout(false), true));
-        // The explorer and This PC are resizable desktop windows: audit the smallest, the default and a
-        // maximised size, plus the row and grid geometry that depend on the width alone.
+        /*
+         * The explorer and This PC are resizable desktop windows: audit the smallest, the default and a
+         * maximised size, plus the row and grid geometry that depend on the width alone.
+         */
         for (final int[] size : new int[][]{
                 {dev.jstech.computronics.gui.layout.FilesLayout.MIN_W,
                         dev.jstech.computronics.gui.layout.FilesLayout.MIN_H},
@@ -89,15 +91,19 @@ class LayoutAuditTest {
         for (int s = 0; s <= ServerRouterLayout.MAX_SECTIONS; s++) {
             c.add(new AuditCase("ServerRouterLayout(" + s + ")", ServerRouterLayout.layout(s), true));
         }
-        // The Network Interactor is a resizable desktop window — audit a spread of content sizes. Not
-        // screen-budgeted: the window itself is clamped to the screen elsewhere; here we only require that
-        // whatever size it resolves to is internally clean.
+        /*
+         * The Network Interactor is a resizable desktop window, so audit a spread of content sizes. Not
+         * screen-budgeted: the window itself is clamped to the screen elsewhere; here we only require that
+         * whatever size it resolves to is internally clean.
+         */
         final int minW = NetworkInteractorLayout.minContentWidth();
         c.add(new AuditCase("NetworkInteractorLayout(default)", NetworkInteractorLayout.toGuiLayout(330, 226), false));
         c.add(new AuditCase("NetworkInteractorLayout(min)", NetworkInteractorLayout.toGuiLayout(minW, 150), false));
         c.add(new AuditCase("NetworkInteractorLayout(wide)", NetworkInteractorLayout.toGuiLayout(520, 360), false));
-        // The Pattern Studio is a resizable desktop window too: the content a standard monitor's window gives
-        // it (194), a maximized one (210) and one too short for the inventory band, which then folds away.
+        /*
+         * The Pattern Studio is a resizable desktop window too: the content a standard monitor's window gives
+         * it (194), a maximized one (210) and one too short for the inventory band, which then folds away.
+         */
         for (final int h : new int[]{194, 210, dev.jstech.computronics.gui.layout.PatternStudioLayout
                 .minContentHeight() - 1}) {
             c.add(new AuditCase("PatternStudioLayout(" + h + ")",
@@ -145,10 +151,12 @@ class LayoutAuditTest {
 
     @Test
     void everyLayoutFactoryHasAnAuditCase() throws Exception {
-        // Reflection guard: any class in the layout package that produces a GuiLayout must be covered by
-        // cases() above. A new screen layout added without an audit case fails here — coverage can't regress.
+        /*
+         * Reflection guard: any class in the layout package that produces a GuiLayout must be covered by
+         * cases() above. A new screen layout added without an audit case fails here, so coverage cannot regress.
+         */
         final List<Class<?>> classes = layoutClasses();
-        assertFalse(classes.isEmpty(), "no *Layout classes found on the classpath — the scan path is wrong");
+        assertFalse(classes.isEmpty(), "no *Layout classes found on the classpath, the scan path is wrong");
         for (final Class<?> cls : classes) {
             final boolean producesLayout = Arrays.stream(cls.getDeclaredMethods())
                     .anyMatch(m -> Modifier.isStatic(m.getModifiers()) && Modifier.isPublic(m.getModifiers())
@@ -156,7 +164,7 @@ class LayoutAuditTest {
             if (producesLayout) {
                 assertTrue(COVERED.contains(cls.getSimpleName()),
                         cls.getSimpleName() + " produces a GuiLayout but has no audit case in LayoutAuditTest"
-                                + " — add it to cases() and COVERED");
+                                + ", add it to cases() and COVERED");
             }
         }
     }

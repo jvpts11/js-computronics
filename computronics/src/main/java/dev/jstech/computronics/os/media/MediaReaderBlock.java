@@ -131,8 +131,10 @@ public class MediaReaderBlock extends HorizontalDirectionalBlock implements Enti
             return ItemInteractionResult.SUCCESS;
         }
 
-        // A refused disc must say why. A silent click is indistinguishable from a broken block, and a
-        // player holding a DVD at a CD drive has no other way to learn the difference.
+        /*
+         * A refused disc must say why. A silent click is indistinguishable from a broken block, and a
+         * player holding a DVD at a CD drive has no other way to learn the difference.
+         */
         if (heldStack.getItem() instanceof MediaItem) {
             player.displayClientMessage(net.minecraft.network.chat.Component.literal(
                     "This " + driveName(reader) + " cannot read that disc."), true);

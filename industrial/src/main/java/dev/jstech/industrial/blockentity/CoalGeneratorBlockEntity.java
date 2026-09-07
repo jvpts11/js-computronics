@@ -24,7 +24,7 @@ import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 
 /**
- * The Coal Generator — the first FE source: burns furnace fuel (coal, charcoal, etc.) to produce {@value #FE_PER_TICK} FE per tick while it has burn time left, and pushes stored FE into adjacent energy consumers each tick.
+ * The Coal Generator, the first FE source: burns furnace fuel (coal, charcoal, etc.) to produce {@value #FE_PER_TICK} FE per tick while it has burn time left, and pushes stored FE into adjacent energy consumers each tick.
  */
 public class CoalGeneratorBlockEntity extends AbstractMachineBlockEntity {
 

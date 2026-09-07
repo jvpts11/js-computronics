@@ -26,8 +26,8 @@ import java.util.List;
 
 /**
  * A craft request plans off the tick: the request is listed at once as a pending craft, a virtual thread
- * makes the plan, and the real craft takes over on the main thread when the plan lands — carrying the level
- * and the settle callback given meanwhile — while the log shows one craft, not two. A request nothing can
+ * makes the plan, and the real craft takes over on the main thread when the plan lands (carrying the level
+ * and the settle callback given meanwhile) while the log shows one craft, not two. A request nothing can
  * make is refused at once, and one cancelled while planning never starts.
  */
 @GameTestHolder(JsTests.MODID)
@@ -68,8 +68,10 @@ public final class AsyncPlanningGameTests {
                                     && live.get(0).status() == OperationRecord.STATUS_PENDING,
                             "the pending craft is listed at once; got " + live);
                 })
-                // The plan is made on a virtual thread promoted on the next tick and lands the tick after: the
-                // placeholder is still the only thing listed one tick in.
+                /*
+                 * The plan is made on a virtual thread promoted on the next tick and lands the tick after: the
+                 * placeholder is still the only thing listed one tick in.
+                 */
                 .thenExecuteAfter(1, () -> {
                     final List<OperationRecord> live = net.mainframe().activeOperationRecords();
                     helper.assertTrue(!request[0].isDone() && live.size() == 1

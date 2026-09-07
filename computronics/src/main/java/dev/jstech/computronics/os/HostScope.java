@@ -24,7 +24,7 @@ public enum HostScope {
     /** Only on the Mainframe (the network's orchestrator, holder of the network index). */
     MAINFRAME,
 
-    /** Only on a server mounted in a rack — where the headless server services live. */
+    /** Only on a server mounted in a rack, where the headless server services live. */
     SERVER,
 
     /** Only on a Cluster Management Computer (the master of the racks on its network). */

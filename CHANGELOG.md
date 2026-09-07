@@ -22,7 +22,7 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   Mainframe has been doing this past hour; and the network itself, to pull, push, craft and cancel. Every row
   it leaves in the network's log names the program that asked.
 - A program can ask to be told instead of asking. It says once that it wants to know when something runs
-  low, and is called when it does — on the crossing, not for as long as it stays crossed.
+  low, and is called when it does: on the crossing, not for as long as it stays crossed.
 - Programs can be handed to other people. `canpack` wraps one up with everything it needs into a single
   readable file, publishes it to the network's Mirror, and anyone on that network installs it like any other
   package, marked as a player's own. An installed one gets an icon on the desktop and a terminal to run in.
@@ -41,8 +41,8 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   one about memory.
 - The Task Manager, on every desktop, in the shape that desktop really had: the Close Program box on Frames
   95, the four-tab manager with its menu and status bars on Frames XP, the page rail on Frames 11, and the
-  system monitor each Linux desktop's own package brings. It reads this machine — its processes and what
-  each holds, its memory, processor, disks and network link — and ends the program you pick. It has no icon
+  system monitor each Linux desktop's own package brings. It reads this machine (its processes and what
+  each holds, its memory, processor, disks and network link) and ends the program you pick. It has no icon
   of its own: right-click the panel and it is one entry on the menu, the way these desktops offered it.
 - Every panel's notification area shows whether the computer is on a data network, alongside a speaker and
   the memory bar; resting the cursor on it reads out the link and the figures.

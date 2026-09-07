@@ -28,8 +28,8 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * A drive's capacity is one budget in one unit of weight — an item weighs 1 000 mB-eq, a millibucket of
- * fluid or chemical weighs 1 — and its usage summary reports what that weight is made of in each kind's own
+ * A drive's capacity is one budget in one unit of weight (an item weighs 1 000 mB-eq, a millibucket of
+ * fluid or chemical weighs 1) and its usage summary reports what that weight is made of in each kind's own
  * unit. A store never writes past its capacity, whatever the kind.
  */
 @GameTestHolder(JsTests.MODID)

@@ -23,7 +23,7 @@ public interface IMultiblockGeometry {
     /** Every cell the structure occupies, controller included, when the controller is at {@code controller}. */
     List<BlockPos> allPositions(BlockPos controller, Direction facing);
 
-    /** Every cell except the controller's own — the part blocks the controller raises and later dissolves. */
+    /** Every cell except the controller's own, the part blocks the controller raises and later dissolves. */
     List<BlockPos> partPositions(BlockPos controller, Direction facing);
 
     /** Total number of cells in the footprint (controller plus parts). */

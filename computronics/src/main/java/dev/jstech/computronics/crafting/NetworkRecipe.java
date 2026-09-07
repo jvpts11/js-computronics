@@ -56,7 +56,7 @@ public record NetworkRecipe(Optional<CraftingPattern> bench, Optional<Processing
                     ByteBufCodecs.optional(MultiStagePattern.STREAM_CODEC), NetworkRecipe::multi,
                     NetworkRecipe::new);
 
-    /** The item or fluid this recipe produces — the final stage's primary output; null if malformed/empty. */
+    /** The item or fluid this recipe produces, the final stage's primary output; null if malformed/empty. */
     @Nullable
     public StorageKey resultKey() {
         if (bench.isPresent()) {

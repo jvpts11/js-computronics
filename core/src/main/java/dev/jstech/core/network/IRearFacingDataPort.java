@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * A data device whose cable port sits on its rear face only — every standalone computer and every rear-connecting multiblock. The block must carry the standard horizontal {@code FACING} property; the cable attaches on the face opposite FACING.
+ * A data device whose cable port sits on its rear face only: every standalone computer and every rear-connecting multiblock. The block must carry the standard horizontal {@code FACING} property; the cable attaches on the face opposite FACING.
  *
  * <p>Implementing this instead of overriding {@link IDataNetworkConnectable#connectsOnFace} per block keeps the rear-only rule in one place, so the cable's rendered connection and the device's network attachment can never drift apart. {@link IDataNetworkConnectable} itself defaults to accepting every face (the Mainframe's behaviour); this narrows that to the rear.
  */

@@ -52,7 +52,7 @@ public class TankBlock extends BaseEntityBlock {
     protected ItemInteractionResult useItemOn(final ItemStack stack, final BlockState state, final Level level,
                                               final BlockPos pos, final Player player, final InteractionHand hand,
                                               final BlockHitResult hit) {
-        // A bucket (or any fluid container) fills or empties the tank — the easy way to seed a test.
+        // A bucket (or any fluid container) fills or empties the tank, the easy way to seed a test.
         if (FluidUtil.interactWithFluidHandler(player, hand, level, pos, hit.getDirection())) {
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }

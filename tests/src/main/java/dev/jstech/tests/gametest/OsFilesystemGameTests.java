@@ -54,7 +54,7 @@ public final class OsFilesystemGameTests {
 
     @GameTest(template = ARENA)
     public static void fs_componentsRoundTripOnDisk(final GameTestHelper helper) {
-        // Build a DiskItem stack (NVMe 1 TB — any registered disk works).
+        // Build a DiskItem stack (NVMe 1 TB, since any registered disk works).
         final ItemStack stack = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
 
         // Stamp it with a FILESYSTEM containing one IQL file.
@@ -67,8 +67,10 @@ public final class OsFilesystemGameTests {
                 ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_net");
         stack.set(ComputingModule.SYSTEM_OS.get(), osId);
 
-        // copy() exercises the DataComponent codec path (the components are serialised and
-        // deserialised into a fresh stack, exactly as happens on save/load).
+        /*
+         * copy() exercises the DataComponent codec path (the components are serialised and
+         * deserialised into a fresh stack, exactly as happens on save/load).
+         */
         final ItemStack copy = stack.copy();
 
         helper.startSequence()
@@ -169,7 +171,7 @@ public final class OsFilesystemGameTests {
                     helper.assertTrue(soRede.equals(onDisk),
                             "the system disk stack must carry SYSTEM_OS == jsc:mc_net; got " + onDisk);
 
-                    // Remove the disk from the inventory — the OS must disappear with it.
+                    // Remove the disk from the inventory, and the OS must disappear with it.
                     inv.setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START, ItemStack.EMPTY);
 
                     helper.assertFalse(mainframe.hasOs(),
@@ -182,9 +184,7 @@ public final class OsFilesystemGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
-    // Task 5 — DiskFilesystem API tests
-    // -------------------------------------------------------------------------
+    // Task 5: DiskFilesystem API tests
 
     /**
      * A write followed by a read must return the same content (FLAT filesystem).
@@ -253,9 +253,7 @@ public final class OsFilesystemGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
-    // Task 6 — StorageProjection tests
-    // -------------------------------------------------------------------------
+    // Task 6: StorageProjection tests
 
     /**
      * A disk whose storage volume holds two StorageKeys must surface two read-only .dat entries in
@@ -332,9 +330,7 @@ public final class OsFilesystemGameTests {
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
-    // Real directories (hierarchical filesystem — the Frames desktop)
-    // -------------------------------------------------------------------------
+    // Real directories (hierarchical filesystem, the Frames desktop)
 
     /**
      * mkdir creates a persistent empty directory on a hierarchical disk and listDirs surfaces it;
@@ -529,8 +525,10 @@ public final class OsFilesystemGameTests {
         helper.assertTrue(OsRegistry.getProgram(nms).titleKey().equals("program.jsc.nms"),
                 "the title key must be program.jsc.nms");
 
-        // The OS registry is well-formed too: every built-in OS is registered with a display name and a
-        // kernel that itself exists, so its lang key and install disc derive cleanly.
+        /*
+         * The OS registry is well-formed too: every built-in OS is registered with a display name and a
+         * kernel that itself exists, so its lang key and install disc derive cleanly.
+         */
         final var oses = dev.jstech.computronics.os.OsBootstrap.builtinOses();
         helper.assertTrue(!oses.isEmpty(), "the built-in OS list must not be empty");
         for (final var os : oses) {
@@ -608,7 +606,7 @@ public final class OsFilesystemGameTests {
     }
 
     /**
-     * The console state — installed programs and the desktop personalization — must survive an
+     * The console state (installed programs and the desktop personalization) must survive an
      * NBT save/load round-trip (a world reload).
      */
     @GameTest(template = ARENA)
@@ -676,7 +674,7 @@ public final class OsFilesystemGameTests {
 
     /**
      * Dragging a file from the desktop folder into another folder, then back to the desktop, conserves the
-     * file and its content end to end (the move never loses or duplicates it) — the data path behind the
+     * file and its content end to end (the move never loses or duplicates it), the data path behind the
      * cross-window desktop&lt;-&gt;explorer drag.
      */
     @GameTest(template = ARENA)
@@ -720,7 +718,7 @@ public final class OsFilesystemGameTests {
     }
 
     /**
-     * A {@code .dat} projection cannot be moved between folders by hand — the move is refused without
+     * A {@code .dat} projection cannot be moved between folders by hand, and the move is refused without
      * mutating the disk, so the no-drag rule holds at the data layer (the desktop and explorer also block
      * it client-side and raise the locked dialog).
      */

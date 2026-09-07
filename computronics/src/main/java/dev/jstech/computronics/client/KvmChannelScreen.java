@@ -21,7 +21,7 @@ import java.util.List;
 
 /**
  * The KVM Switch's channel bar: one monitor, several machines. A rack holding two or more computers
- * needs the switch to say which of them the screen means, so this is what the monitor shows first —
+ * needs the switch to say which of them the screen means, so this is what the monitor shows first:
  * pick a channel (click it, or press its number key) and the machine's own session opens on top.
  */
 public final class KvmChannelScreen extends Screen {

@@ -57,9 +57,11 @@ public class JscItemModelProvider extends ItemModelProvider {
 
     @Override
     protected void registerModels() {
-        // UncheckedModelFile avoids datagen ordering coupling: the parent
-        // block model is produced by the BlockStateProvider in the same run.
-        // Cables show their core model in the inventory.
+        /*
+         * UncheckedModelFile avoids datagen ordering coupling: the parent
+         * block model is produced by the BlockStateProvider in the same run.
+         * Cables show their core model in the inventory.
+         */
         getBuilder("ethernet_cable")
                 .parent(new ModelFile.UncheckedModelFile(modLoc("block/ethernet_cable_core")));
         getBuilder("hbw_cable")
@@ -130,8 +132,10 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.CD_RW.get());
         basicItem(ComputingModule.DVD_ROM.get());
         basicItem(ComputingModule.DVD_RW.get());
-        // The USB flash drive uses a hand-authored 3D model (models/item/usb_flash_drive.json), not a flat sprite,
-        // so it is not generated here.
+        /*
+         * The USB flash drive uses a hand-authored 3D model (models/item/usb_flash_drive.json), not a flat sprite,
+         * so it is not generated here.
+         */
         basicItem(ComputingModule.MOTHERBOARD_MTX_P.get());
         basicItem(ComputingModule.MOTHERBOARD_ATX_P.get());
         basicItem(ComputingModule.CPU_SERVO_2620.get());
@@ -163,10 +167,12 @@ public class JscItemModelProvider extends ItemModelProvider {
         basicItem(ComputingModule.KVM_SWITCH.get());
         basicItem(ComputingModule.RACK_UPS.get());
         basicItem(ComputingModule.COOLING_UNIT.get());
-        // The cabinets have no block model at all — the block entity draws them — so their items are drawn
-        // by a renderer of their own, showing the same cabinet. Vanilla only asks that renderer when the
-        // item's model is the built-in entity one, and the transforms below are what place the cabinet in
-        // the slot and in the hand.
+        /*
+         * The cabinets have no block model at all (the block entity draws them) so their items are drawn
+         * by a renderer of their own, showing the same cabinet. Vanilla only asks that renderer when the
+         * item's model is the built-in entity one, and the transforms below are what place the cabinet in
+         * the slot and in the hand.
+         */
         cabinetItem("server_rack");
         cabinetItem("legacy_server_rack");
         cabinetItem("vintage_server_rack");
@@ -183,13 +189,15 @@ public class JscItemModelProvider extends ItemModelProvider {
             basicItem(disk.item().get());
         }
 
-        // Per-era hardware catalog — a generated (layer0 = item texture) model for every component.
+        // Per-era hardware catalog: a generated (layer0 = item texture) model for every component.
         dev.jstech.computronics.HardwareItems.DISKS.forEach(h -> basicItem(h.get()));
         dev.jstech.computronics.HardwareItems.CPUS.forEach(h -> basicItem(h.get()));
         dev.jstech.computronics.HardwareItems.RAMS.forEach(h -> basicItem(h.get()));
-        // These newly added GPUs ship without a repo texture yet (the artwork is pending review); mark each
-        // expected texture as generated so basicItem can reference it without the datagen existence check
-        // failing. Remove the matching id from this set once its real texture lands in resources.
+        /*
+         * These newly added GPUs ship without a repo texture yet (the artwork is pending review); mark each
+         * expected texture as generated so basicItem can reference it without the datagen existence check
+         * failing. Remove the matching id from this set once its real texture lands in resources.
+         */
         for (final String previewOnlyGpu : PREVIEW_ONLY_GPU_TEXTURES) {
             existingFileHelper.trackGenerated(modLoc("item/" + previewOnlyGpu), TEXTURE);
         }

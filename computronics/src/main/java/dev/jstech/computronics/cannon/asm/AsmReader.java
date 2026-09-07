@@ -81,8 +81,10 @@ public final class AsmReader {
         final String rest = space < 0 ? "" : text.substring(space + 1).trim();
         switch (word) {
             case "start" -> {
-                // "<Type> <shape>"; a listing that names no shape is a script, which is what the only
-                // kind of program there used to be would have been.
+                /*
+                 * "<Type> <shape>"; a listing that names no shape is a script, which is what the only
+                 * kind of program there used to be would have been.
+                 */
                 final int split = rest.indexOf(' ');
                 program.setEntryPoint(split < 0 ? rest : rest.substring(0, split),
                         Shape.of(split < 0 ? "" : rest.substring(split + 1).trim()));
@@ -116,8 +118,10 @@ public final class AsmReader {
         return read;
     }
 
-    // ".delegate bool Finder(string, out int)" carries the whole shape on one line, because a
-    // delegate is a shape and nothing else.
+    /*
+     * ".delegate bool Finder(string, out int)" carries the whole shape on one line, because a
+     * delegate is a shape and nothing else.
+     */
     private AsmType readDelegate(final String rest, final int line) {
         final int open = rest.indexOf('(');
         final int close = rest.lastIndexOf(')');
@@ -310,8 +314,10 @@ public final class AsmReader {
         this.method = null;
     }
 
-    // A branch that names a label nothing carries would send the runtime nowhere, so it is caught
-    // here, where the line it was written on is still known.
+    /*
+     * A branch that names a label nothing carries would send the runtime nowhere, so it is caught
+     * here, where the line it was written on is still known.
+     */
     private void checkLabels(final AsmMethod.Builder built) {
         final Set<String> marked = new HashSet<>();
         for (final Instruction instruction : built.instructions()) {

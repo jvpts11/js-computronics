@@ -16,7 +16,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * skin of whatever era it is running on.
  *
  * <p>The STANDARD theme's style is {@linkplain EraStyle#flat flat} (every overlay off), so its helpers execute the
- * identical {@code g.fill(...)} sequence the original {@code JsTechTheme} did — byte-for-byte the same pixels.
+ * identical {@code g.fill(...)} sequence the original {@code JsTechTheme} did, byte-for-byte the same pixels.
  */
 public final class EraTheme {
 
@@ -119,11 +119,13 @@ public final class EraTheme {
     public void window(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, p.outer());
         g.fill(x, y, x + w, y + h, p.screen());
-        // Double-bevel themes (e.g., Legacy) draw a raised 3D frame just inside the outer border,
-        // giving the window the "dialog box" look authentic to the era.
+        /*
+         * Double-bevel themes (e.g., Legacy) draw a raised 3D frame just inside the outer border,
+         * giving the window the "dialog box" look authentic to the era.
+         */
         bevel(g, x, y, w, h, true);
         if (s.scanlines() && s.scanlineColor() != 0) {
-            // Square, low-alpha 1px lines every 2px across the screen rect — a CRT scanline finish.
+            // Square, low-alpha 1px lines every 2px across the screen rect, a CRT scanline finish.
             for (int ly = y + 1; ly < y + h; ly += 2) {
                 g.fill(x, ly, x + w, ly + 1, s.scanlineColor());
             }

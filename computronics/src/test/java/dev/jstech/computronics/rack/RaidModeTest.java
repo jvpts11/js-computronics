@@ -59,8 +59,10 @@ class RaidModeTest {
 
     @Test
     void usableCapacity_aDegradedArrayKeepsThePromisedSize() {
-        // A 3-member parity array of 2000s presents 4000; losing one member costs redundancy, not
-        // capacity, so the two survivors still report 4000.
+        /*
+         * A 3-member parity array of 2000s presents 4000; losing one member costs redundancy, not
+         * capacity, so the two survivors still report 4000.
+         */
         assertEquals(4000L, RaidMode.RAID5.usableCapacity(List.of(2000L, 2000L, 2000L), 3));
         assertEquals(4000L, RaidMode.RAID5.usableCapacity(List.of(2000L, 2000L), 3));
         assertEquals(1000L, RaidMode.RAID1.usableCapacity(List.of(1000L), 3));

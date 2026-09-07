@@ -15,8 +15,8 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * The Supercomputer Rack: the same 8U cabinet as the Server Rack — units, front slots, KVM, the
- * physical GUI — but it seats only Supercomputer Nodes, and its rear port speaks only the high-compute
+ * The Supercomputer Rack: the same 8U cabinet as the Server Rack (units, front slots, KVM, the
+ * physical GUI), but it seats only Supercomputer Nodes, and its rear port speaks only the high-compute
  * fabric. A supercomputer is every such rack tied together by that fabric behind one HBW Interface;
  * the interface is what joins the data network, so this cabinet never carries a data-cable tier.
  */
@@ -45,9 +45,11 @@ public class SupercomputerRackBlock extends ServerRackBlock {
 
     @Override
     public Set<DataTier> acceptedCableTiers() {
-        // Only the compute fabric reaches a supercomputer cabinet. A data cable on this port would
-        // put the nodes on the data network directly, which is exactly what the HBW Interface exists
-        // to prevent.
+        /*
+         * Only the compute fabric reaches a supercomputer cabinet. A data cable on this port would
+         * put the nodes on the data network directly, which is exactly what the HBW Interface exists
+         * to prevent.
+         */
         return EnumSet.of(DataTier.HPC);
     }
 }

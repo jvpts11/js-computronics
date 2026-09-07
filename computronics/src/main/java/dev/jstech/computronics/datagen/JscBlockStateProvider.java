@@ -35,9 +35,11 @@ public class JscBlockStateProvider extends BlockStateProvider {
         pipeCable(ComputingModule.CRAFTING_CABLE.get(), "crafting_cable");
         pipeCable(ComputingModule.PERIPHERAL_CABLE.get(), "peripheral_cable");
 
-        // Mainframes: 3x2x2 cabinets drawn as ONE model each by the controller's block-entity renderer,
-        // one model per era. The twelve blocks themselves are invisible; the only model they need
-        // carries the particle texture for breaking effects.
+        /*
+         * Mainframes: 3x2x2 cabinets drawn as ONE model each by the controller's block-entity renderer,
+         * one model per era. The twelve blocks themselves are invisible; the only model they need
+         * carries the particle texture for breaking effects.
+         */
         final ModelFile mainframeInvisible = models().getBuilder("mainframe_cabinet")
                 .texture("particle", modLoc("block/mainframe_particle"));
         for (final net.minecraft.world.level.block.Block cabinet : java.util.List.of(
@@ -68,8 +70,10 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 .texture("particle", modLoc("block/server_router_side"));
         horizontalBlock(ComputingModule.SERVER_ROUTER.get(), serverRouterModel);
 
-        // Tank: glass walls in a metal casing frame, so it reads as a containment vessel rather than a
-        // solid block.
+        /*
+         * Tank: glass walls in a metal casing frame, so it reads as a containment vessel rather than a
+         * solid block.
+         */
         simpleBlock(ComputingModule.TANK.get(), models()
                 .cubeBottomTop("tank", mcLoc("block/glass"),
                         modLoc("block/mainframe_side"), modLoc("block/mainframe_side"))
@@ -78,9 +82,11 @@ public class JscBlockStateProvider extends BlockStateProvider {
         simpleBlock(ComputingModule.CRAFTING_SWITCH.get(),
                 models().cubeAll("crafting_switch", modLoc("block/crafting_switch")));
 
-        // Server Racks and the Supercomputer Rack: 2x3x2 cabinets drawn as ONE model each by the
-        // controller's block-entity renderer. The blocks themselves are invisible; the only model they
-        // need carries the particle texture for breaking effects.
+        /*
+         * Server Racks and the Supercomputer Rack: 2x3x2 cabinets drawn as ONE model each by the
+         * controller's block-entity renderer. The blocks themselves are invisible; the only model they
+         * need carries the particle texture for breaking effects.
+         */
         final ModelFile rackInvisible = models().getBuilder("rack")
                 .texture("particle", modLoc("block/rack_particle"));
         for (final net.minecraft.world.level.block.Block cabinet : java.util.List.of(
@@ -155,13 +161,17 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/legacy_cluster_management_computer_front"),
                 modLoc("block/legacy_cluster_management_computer_top")));
 
-        // Supercomputer cluster: the node is a rack-sized cabinet whose front lights up while it
-        // runs; the HBW Interface is the uplink; the console is a hand-written kiosk model.
+        /*
+         * Supercomputer cluster: the node is a rack-sized cabinet whose front lights up while it
+         * runs; the HBW Interface is the uplink; the console is a hand-written kiosk model.
+         */
         simpleBlock(ComputingModule.HBW_INTERFACE.get(), models().cubeColumn(
                 "hbw_interface", modLoc("block/hbw_interface_side"), modLoc("block/hbw_interface_top")));
 
-        // Pattern Encoders: one burner body per era, drawn as a model by the block entity. The blocks
-        // themselves are invisible; the only model they need carries the particle texture.
+        /*
+         * Pattern Encoders: one burner body per era, drawn as a model by the block entity. The blocks
+         * themselves are invisible; the only model they need carries the particle texture.
+         */
         final ModelFile encoderInvisible = models().getBuilder("pattern_encoder_body")
                 .texture("particle", modLoc("block/pattern_encoder_particle"));
         for (final net.minecraft.world.level.block.Block body : java.util.List.of(
@@ -172,8 +182,10 @@ public class JscBlockStateProvider extends BlockStateProvider {
                             .modelFile(encoderInvisible).build());
         }
 
-        // Media reader drives: the front carries the drive face, the sides and top use the drive's
-        // own casing texture, and the LOADED blockstate swaps the front to the lit "_active" face.
+        /*
+         * Media reader drives: the front carries the drive face, the sides and top use the drive's
+         * own casing texture, and the LOADED blockstate swaps the front to the lit "_active" face.
+         */
         final ModelFile floppyIdle = models().orientable("floppy_drive",
                 modLoc("block/floppy_drive_casing"), modLoc("block/floppy_drive_front"), modLoc("block/floppy_drive_casing"));
         final ModelFile floppyActive = models().orientable("floppy_drive_active",
@@ -192,8 +204,10 @@ public class JscBlockStateProvider extends BlockStateProvider {
                 modLoc("block/dvd_drive_casing"), modLoc("block/dvd_drive_active"), modLoc("block/dvd_drive_casing"));
         horizontalBlock(ComputingModule.DVD_DRIVE.get(),
                 s -> s.getValue(dev.jstech.computronics.os.media.MediaReaderBlock.LOADED) ? dvdActive : dvdIdle);
-        // The Dock Station is a low hub on the desk, not a cube: two hand-authored element models, the
-        // empty hub and the hub with the flash drive standing out of its port, picked by LOADED.
+        /*
+         * The Dock Station is a low hub on the desk, not a cube: two hand-authored element models, the
+         * empty hub and the hub with the flash drive standing out of its port, picked by LOADED.
+         */
         final ModelFile dockIdle = models().getExistingFile(modLoc("block/dock_station"));
         final ModelFile dockDocked = models().getExistingFile(modLoc("block/dock_station_docked"));
         horizontalBlock(ComputingModule.DOCK_STATION.get(),

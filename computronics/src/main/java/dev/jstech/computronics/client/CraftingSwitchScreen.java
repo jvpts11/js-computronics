@@ -24,7 +24,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * The Crafting Switch screen: a master-detail panel listing the six faces (five can host a machine, one carries
  * the crafting cable) and, for the selected face, its detected machine, an editable name and an active toggle.
- * Reads the switch's block entity locally — the server keeps it in sync via the update tag — and pushes edits
+ * Reads the switch's block entity locally (the server keeps it in sync via the update tag) and pushes edits
  * back with {@link SetCraftingSwitchFacePayload}.
  */
 public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitchMenu> {
@@ -134,8 +134,10 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
         } else {
             nameBox.setValue(be == null ? "" : be.faceName(d));
         }
-        // Active + category govern the face's whole cable run too, so they stay editable when machines hang
-        // off this face via buses.
+        /*
+         * Active + category govern the face's whole cable run too, so they stay editable when machines hang
+         * off this face via buses.
+         */
         final boolean editable = adjacent || !viaBus.isEmpty();
         nameBox.setEditable(editable);
         activeBtn.active = editable;
@@ -166,8 +168,10 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
 
     @Override
     public boolean keyPressed(final int key, final int scan, final int mods) {
-        // While the name field has focus, route typing to it and never let a key (e.g. the inventory key
-        // 'E') reach the screen and close the GUI. ESC just unfocuses the field.
+        /*
+         * While the name field has focus, route typing to it and never let a key (e.g. the inventory key
+         * 'E') reach the screen and close the GUI. ESC just unfocuses the field.
+         */
         if (nameBox != null && nameBox.isFocused()) {
             if (key == 256) {
                 nameBox.setFocused(false);
@@ -234,7 +238,7 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
                 menu.switchPos(), face.get3DDataValue(), name, active, category));
     }
 
-    /** "none" first, then every installed recipe type id — the dynamic generic machine categories. */
+    /** "none" first, then every installed recipe type id, the dynamic generic machine categories. */
     private java.util.List<String> categories() {
         if (allCategories == null) {
             final java.util.List<String> list = new java.util.ArrayList<>();
@@ -300,7 +304,7 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
         return faceRowLabel(be, d);
     }
 
-    // --- inspection (client tests assert on what the player sees) ---
+    // inspection (client tests assert on what the player sees)
 
     public int selectedFace() {
         return selectedFace;
@@ -345,8 +349,10 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
         g.drawString(this.font, pill, x + imageWidth - 8 - this.font.width(pill),
                 y + CraftingSwitchLayout.HEADER_Y + 1, linked ? GREEN : DIM, false);
 
-        // Face rows. A machine reached over a face's cable run is listed ON that face row, exactly like an
-        // adjacent one — the face is how the player thinks of the connection.
+        /*
+         * Face rows. A machine reached over a face's cable run is listed ON that face row, exactly like an
+         * adjacent one, since the face is how the player thinks of the connection.
+         */
         for (int i = 0; i < CraftingSwitchLayout.FACES; i++) {
             final Direction d = Direction.from3DDataValue(i);
             final int ry = y + CraftingSwitchLayout.rowY(i);
@@ -381,8 +387,10 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
             g.drawString(this.font, "NAME", dx + 4, y + CraftingSwitchLayout.NAME_LABEL_Y, DIM, false);
         }
 
-        // Player inventory slot frames (3 main rows + hotbar). Without these, the empty creative-mode slots have
-        // nothing drawn behind them and the inventory looks like it vanished.
+        /*
+         * Player inventory slot frames (3 main rows + hotbar). Without these, the empty creative-mode slots have
+         * nothing drawn behind them and the inventory looks like it vanished.
+         */
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 JsTechTheme.slot(g, x + CraftingSwitchLayout.INV_X + col * 18,
@@ -461,7 +469,7 @@ public class CraftingSwitchScreen extends AbstractContainerScreen<CraftingSwitch
             final String name = be.faceName(d);
             return dir + "  " + (name.isEmpty() ? "machine" : name);
         }
-        return dir + "  —";
+        return dir + "  none";
     }
 
     private static String detailMachineLabel(final CraftingSwitchBlockEntity be, final Direction d) {

@@ -21,7 +21,7 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Menu for the Server Router's config GUI: no item slots — it exposes the live topology summary the router writes into its synced data (input face, managed-rack budget, and one row per output-face section with its rack/server counts and load-balance mode), and routes a row's mode-cycle click back to the router.
+ * Menu for the Server Router's config GUI: no item slots; it exposes the live topology summary the router writes into its synced data (input face, managed-rack budget, and one row per output-face section with its rack/server counts and load-balance mode), and routes a row's mode-cycle click back to the router.
  */
 public class ServerRouterMenu extends AbstractContainerMenu {
 

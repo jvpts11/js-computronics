@@ -51,7 +51,7 @@ import java.util.Random;
  *
  * <p>Two layouts: the {@link Layout#WIDE} one runs a single backbone across the arena with sections
  * south of it and everything else north; the {@link Layout#DENSE} one runs two backbones with sections
- * on both sides, a spine for the supercomputers between them, and the desks along a west connector —
+ * on both sides, a spine for the supercomputers between them, and the desks along a west connector,
  * as many cabinets as the arena holds. Cabinets are formed like placed ones, part blocks and all.
  */
 public final class BigBaseScenario {
@@ -86,7 +86,7 @@ public final class BigBaseScenario {
         /**
          * A base the size of an expert pack's endgame: 180 cabinets of 2U storage servers on eight 8 TB
          * drives each (about 190 million items of room), 30 000 item types half of them component variants
-         * in lots of up to 8000 — some 120 million items — four supercomputers, five desks and six
+         * in lots of up to 8000 (some 120 million items), four supercomputers, five desks and six
          * machine desks, two million logs and copper ingots to craft from, and a Mainframe with as many
          * graphics cards as its supply can feed (six queues).
          */
@@ -211,8 +211,10 @@ public final class BigBaseScenario {
     private static final int W_NORTH_ROW_Z = W_BACKBONE_Z - 1;
     private static final int W_ROUTER_Z = W_BACKBONE_Z + 1;
 
-    // Dense layout: two backbones joined by a west connector, a spine between them for the supercomputers,
-    // desks along the connector (computers east of it, machine desks west of it).
+    /*
+     * Dense layout: two backbones joined by a west connector, a spine between them for the supercomputers,
+     * desks along the connector (computers east of it, machine desks west of it).
+     */
     private static final int D_CONNECTOR_X = 3;
     private static final int D_BACKBONE_A_Z = 12;
     private static final int D_BACKBONE_B_Z = 37;
@@ -240,9 +242,11 @@ public final class BigBaseScenario {
      * power budget: queues are what the benchmark wants from them, not throughput.
      */
     private static MainframeBlockEntity placeMainframe(final TestWorldBuilder world, final Params params, final BlockPos pos) {
-        // The controller alone, deliberately: the layout packs the backbone right against it, and a raised
-        // Mainframe's side parts would land on the first cable of that backbone and cut the network at its
-        // source. The orchestrator works from its controller, which is what this base measures.
+        /*
+         * The controller alone, deliberately: the layout packs the backbone right against it, and a raised
+         * Mainframe's side parts would land on the first cable of that backbone and cut the network at its
+         * source. The orchestrator works from its controller, which is what this base measures.
+         */
         world.setBlock(pos, ComputingModule.MAINFRAME.get());
         final MainframeBlockEntity mainframe = world.blockEntity(pos, MainframeBlockEntity.class);
         TestWorldBuilder.installMainframeBuild(mainframe);
@@ -301,8 +305,10 @@ public final class BigBaseScenario {
         for (int x = D_CONNECTOR_X + 1; x <= D_BACKBONE_X1; x++) {
             world.setBlock(new BlockPos(x, Y, D_SPINE_Z), ComputingModule.HBW_CABLE.get());
         }
-        // Four rows of sections: both sides of each backbone. The row facing the spine is kept short so
-        // its cables never touch the spine and turn a section into the whole network.
+        /*
+         * Four rows of sections: both sides of each backbone. The row facing the spine is kept short so
+         * its cables never touch the spine and turn a section into the whole network.
+         */
         final List<ServerRackBlockEntity> serverRacks = new ArrayList<>();
         for (int r = 0; r < params.routers(); r++) {
             final int rx = D_ROUTER_X0 + r * PITCH;
@@ -312,8 +318,10 @@ public final class BigBaseScenario {
             serverRacks.addAll(placeSection(world, params, rx, D_BACKBONE_B_Z - 1, Direction.NORTH, params.racksPerRouter()));
             serverRacks.addAll(placeSection(world, params, rx, D_BACKBONE_B_Z + 1, Direction.SOUTH, params.racksPerRouter()));
         }
-        // Supercomputers hang south of the spine: the interface on it, the fabric running east, the node
-        // cabinets rear to the fabric in the two free rows before the next section band.
+        /*
+         * Supercomputers hang south of the spine: the interface on it, the fabric running east, the node
+         * cabinets rear to the fabric in the two free rows before the next section band.
+         */
         final List<HbwInterfaceBlockEntity> hubs = new ArrayList<>();
         final List<ServerRackBlockEntity> nodeRacks = new ArrayList<>();
         for (int s = 0; s < params.supercomputers(); s++) {
@@ -401,8 +409,10 @@ public final class BigBaseScenario {
         for (int k = 0; k < count; k++) {
             final boolean east = k % 2 == 0;
             final int slot = k / 2;
-            // Going south: an east cabinet (facing east) spans z..z+1, a west one (facing west) spans z-1..z.
-            // Going north the same shapes are placed mirrored, so the stagger keeps the footprints apart.
+            /*
+             * Going south: an east cabinet (facing east) spans z..z+1, a west one (facing west) spans z-1..z.
+             * Going north the same shapes are placed mirrored, so the stagger keeps the footprints apart.
+             */
             final int z = start + step * (1 + 2 * slot) + (step > 0 ? (east ? 0 : 1) : (east ? -1 : 0));
             final Direction facing = east ? Direction.EAST : Direction.WEST;
             final int cx = east ? x + 2 : x - 2;
@@ -417,9 +427,11 @@ public final class BigBaseScenario {
     private static ServerRackBlockEntity placeCabinet(final TestWorldBuilder world, final Block rackBlock,
                                                       final BlockPos pos, final Direction facing) {
         final BlockState state = rackBlock.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing);
-        // A cabinet refuses to raise its eleven parts into occupied space, so in a real world (as opposed to
-        // an empty test arena) the ground has to come out first — otherwise every cabinet stays a lone
-        // controller block, no rack forms, and the base has nothing on its network at all.
+        /*
+         * A cabinet refuses to raise its eleven parts into occupied space, so in a real world (as opposed to
+         * an empty test arena) the ground has to come out first, because otherwise every cabinet stays a lone
+         * controller block, no rack forms, and the base has nothing on its network at all.
+         */
         world.clearFor(dev.jstech.computronics.block.ServerRackStructure.allPositions(pos, facing));
         world.setBlock(pos, state);
         ((AbstractMultiblockControllerBlock) rackBlock).setPlacedBy(world.level(), world.absolute(pos), state,

@@ -76,8 +76,10 @@ public abstract class AbstractBusMenu extends AbstractComputerMenu {
 
             @Override
             public boolean isActive() {
-                // Every bus has a filter: on a crafting bus it pins what the face carries so the engine routes
-                // per face. Only the stock controls (min/max/mode) hide on the passive buses.
+                /*
+                 * Every bus has a filter: on a crafting bus it pins what the face carries so the engine routes
+                 * per face. Only the stock controls (min/max/mode) hide on the passive buses.
+                 */
                 return filterApplies();
             }
         });
@@ -145,8 +147,10 @@ public abstract class AbstractBusMenu extends AbstractComputerMenu {
 
     @Override
     public void clicked(final int slotId, final int button, final ClickType type, final Player player) {
-        // Clicking the filter slot sets it from the carried item (a copy), or clears
-        // it with an empty cursor — the player's item is never consumed.
+        /*
+         * Clicking the filter slot sets it from the carried item (a copy), or clears
+         * it with an empty cursor, so the player's item is never consumed.
+         */
         if (slotId == FILTER_SLOT) {
             if (filterApplies()) {
                 part.setFilter(getCarried());

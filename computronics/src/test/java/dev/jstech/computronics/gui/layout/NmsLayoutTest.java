@@ -58,7 +58,7 @@ class NmsLayoutTest {
         assertTrue(NmsLayout.WIDTH <= 380, "width should stay within a usable budget");
     }
 
-    // --- File menu elements ---
+    // File menu elements
 
     @Test
     void fileDropdown_fitsInWindowAndDoesNotOverlapMenuBar() {
@@ -76,7 +76,7 @@ class NmsLayoutTest {
 
     @Test
     void fileDropdown_staysWithinWindow() {
-        // The dropdown overlays the body when open — it must not extend past the window's bottom edge.
+        // The dropdown overlays the body when open, and it must not extend past the window's bottom edge.
         assertTrue(NmsLayout.FILE_DROP_Y + NmsLayout.FILE_DROP_H <= NmsLayout.HEIGHT,
                 "dropdown bottom must not exceed the window height");
         assertTrue(NmsLayout.FILE_DROP_X + NmsLayout.FILE_DROP_W <= NmsLayout.WIDTH,

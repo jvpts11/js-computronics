@@ -80,8 +80,10 @@ public final class ServerRackStructure {
         if (h < 0 || h >= HEIGHT - 1) {
             return false;
         }
-        // The front layer is the controller's own layer along the facing axis: the
-        // controller column and the column one step clockwise of it.
+        /*
+         * The front layer is the controller's own layer along the facing axis: the
+         * controller column and the column one step clockwise of it.
+         */
         final BlockPos flat = part.below(h);
         return flat.equals(controller) || flat.equals(controller.relative(facing.getClockWise()));
     }

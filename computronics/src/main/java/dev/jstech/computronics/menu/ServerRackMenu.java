@@ -45,8 +45,10 @@ public class ServerRackMenu extends AbstractComputerMenu {
         this.access = ContainerLevelAccess.create(be.getLevel(), be.getBlockPos());
         this.data = be.getDataAccess();
 
-        // Server slot i = rack-unit row i; a taller chassis claims the rows below its slot (the
-        // handler rejects them).
+        /*
+         * Server slot i = rack-unit row i; a taller chassis claims the rows below its slot (the
+         * handler rejects them).
+         */
         final IItemHandler servers = be.getServers();
         for (int i = 0; i < RACK_SLOTS; i++) {
             addSlot(new SlotItemHandler(servers, i,
@@ -130,7 +132,7 @@ public class ServerRackMenu extends AbstractComputerMenu {
         return rack.getBlockPos();
     }
 
-    // ---- RAID readout, derived from the synced slots so the client can draw it -------------------
+    // RAID readout, derived from the synced slots so the client can draw it
 
     /** The front-slot indices the unit topped at {@code topRow} claims with the given role. */
     private java.util.List<Integer> claimedSlots(final int topRow, final RackLayout.SlotRole role) {
@@ -208,8 +210,10 @@ public class ServerRackMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        // The FAMILY, not the one block: the Supercomputer Rack shares this menu, and checking the
-        // Server Rack alone would open its GUI for a single tick and then close it.
+        /*
+         * The FAMILY, not the one block: the Supercomputer Rack shares this menu, and checking the
+         * Server Rack alone would open its GUI for a single tick and then close it.
+         */
         return access.evaluate((level, pos) -> level.getBlockState(pos).getBlock()
                         instanceof dev.jstech.computronics.block.ServerRackBlock
                         && player.canInteractWithBlock(pos, 4.0), true);

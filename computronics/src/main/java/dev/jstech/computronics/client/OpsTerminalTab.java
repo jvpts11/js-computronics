@@ -23,7 +23,7 @@ final class OpsTerminalTab extends AbstractTerminalTab {
         super(screen, menu);
     }
 
-    /** The live operations followed by the recent log — so a craft in flight shows the moment it starts, not
+    /** The live operations followed by the recent log, so a craft in flight shows the moment it starts, not
      *  only once it has finished. Live ones come first; their status (PROCESSING/PENDING) tells them apart. */
     private List<OperationRecord> ops() {
         final List<OperationRecord> out = new java.util.ArrayList<>(menu.activeOps());
@@ -80,13 +80,17 @@ final class OpsTerminalTab extends AbstractTerminalTab {
         if (screen.selectedOp >= 0 && screen.selectedOp < ops.size()) {
             final OperationRecord op = ops.get(screen.selectedOp);
             g.drawString(font(), op.name().getString(), cx + 24, cy + 96, TEXT(), false);
-            // Show "all" for an uncapped request, so a Long.MAX demand never renders as an absurd,
-            // overflowing "9223372036854.8M" total.
+            /*
+             * Show "all" for an uncapped request, so a Long.MAX demand never renders as an absurd,
+             * overflowing "9223372036854.8M" total.
+             */
             final String reqLabel = op.requested() >= 1_000_000_000L ? "all" : fmt(op.requested());
             final String sub = fmt(op.moved()) + " of " + reqLabel + "  " + statusLabel(op.status());
             g.drawString(font(), sub, cx + 24, cy + 106, statusColor(op.status()), false);
-            // A craft carries its stages as sub-operations; show those (what it is made of, how far each is)
-            // rather than provenance rows, which is what makes a multi-stage craft legible here.
+            /*
+             * A craft carries its stages as sub-operations; show those (what it is made of, how far each is)
+             * rather than provenance rows, which is what makes a multi-stage craft legible here.
+             */
             if (!op.subs().isEmpty()) {
                 subRows(g, cx, cy + 118, op.subs());
             } else {

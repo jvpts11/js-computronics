@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  */
 class EraThemeTest {
 
-    // The STANDARD palette is frozen — these are the exact values the original flat-dark theme shipped with.
+    // The STANDARD palette is frozen; these are the exact values the original flat-dark theme shipped with.
     private static final int STD_OUTER = 0xFF05070A;
     private static final int STD_SCREEN = 0xFF0B0E13;
     private static final int STD_PANEL = 0xFF11161D;
@@ -96,8 +96,10 @@ class EraThemeTest {
 
     @Test
     void everyEra_tabLabelOnDiffersFromTabOn() {
-        // tabLabelOn must contrast with tabOn: if they were the same, labels drawn on a selected tab
-        // would be invisible. Verified as a structural invariant: tabLabelOn != tabOn for every era.
+        /*
+         * tabLabelOn must contrast with tabOn: if they were the same, labels drawn on a selected tab
+         * would be invisible. Verified as a structural invariant: tabLabelOn != tabOn for every era.
+         */
         for (final HardwareEra era : HardwareEra.values()) {
             final EraTheme t = EraThemes.of(era);
             assertNotEquals(t.tabOn(), t.tabLabelOn(),

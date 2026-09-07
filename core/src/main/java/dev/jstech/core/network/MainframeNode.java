@@ -47,10 +47,12 @@ public record MainframeNode(NodeUuid nodeUuid,
 
     @Override
     public long contributedCapacity() {
-        // PASSIVE consumes 50% in standby; NOT contributed to total.
-        // The function below returns the "net contribution" view.
+        /*
+         * PASSIVE consumes 50% in standby; NOT contributed to total.
+         * The function below returns the "net contribution" view.
+         */
         if (failoverRole == FailoverRole.PASSIVE) {
-            return 0; // Passive contributes nothing — pure overhead.
+            return 0; // Passive contributes nothing, it is pure overhead.
         }
         return ownCapacity;
     }

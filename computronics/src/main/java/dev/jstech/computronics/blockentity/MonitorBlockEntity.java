@@ -73,10 +73,12 @@ public class MonitorBlockEntity extends BlockEntity implements IPeripheralEndpoi
         return linkedOwner == null ? null : BlockPos.of(linkedOwner);
     }
 
-    // The machine this screen is currently showing on someone else's behalf: a Remote Control
-    // session puts a REMOTE computer on this monitor, so for as long as it lasts the screen answers
-    // for that machine and not for the one its cable is linked to. Transient by nature — a session
-    // does not outlive the window it was opened in.
+    /*
+     * The machine this screen is currently showing on someone else's behalf: a Remote Control
+     * session puts a REMOTE computer on this monitor, so for as long as it lasts the screen answers
+     * for that machine and not for the one its cable is linked to. Transient by nature, a session
+     * does not outlive the window it was opened in.
+     */
     private BlockPos remoteSession;
 
     /** Starts (or ends, with {@code null}) a remote session showing {@code machine} on this screen. */
@@ -143,7 +145,7 @@ public class MonitorBlockEntity extends BlockEntity implements IPeripheralEndpoi
             return;
         }
         final boolean lit = state.getValue(MonitorBlock.LIT);
-        // LIT = true only when the linked computer is actively running — not just linked but powered off.
+        // LIT = true only when the linked computer is actively running, not just linked but powered off.
         final boolean computerRunning = linkedOwner != null
                 && level.getBlockEntity(BlockPos.of(linkedOwner))
                         instanceof dev.jstech.computronics.os.IOsHost host

@@ -27,9 +27,9 @@ import java.util.Optional;
  * What passes between a player's hands and a computer, by every route the GUIs offer (the cursor, a menu
  * slot or an inventory slot; the terminal or the desktop). Handing a stack over stores it as its item, the way
  * a chest takes it; handing over what a held container HOLDS stores the fluid or chemical and returns the
- * container emptied; and a held empty container over a fluid or chemical entry fills from it. The two sides —
+ * container emptied; and a held empty container over a fluid or chemical entry fills from it. The two sides (
  * the network's servers, written and read over ticks by an INSERT or a SELECT, and a computer's own disks,
- * written and read at once — go through this one path, so no route can treat a bucket differently.
+ * written and read at once) go through this one path, so no route can treat a bucket differently.
  */
 public final class DataHandoff {
 
@@ -127,7 +127,7 @@ public final class DataHandoff {
 
     /**
      * Hands a stack to the network. {@code amount} is how many items to send (clamped to the stack). With
-     * {@code contents} set, a held container hands over what it holds instead — one container's worth — and
+     * {@code contents} set, a held container hands over what it holds instead (one container's worth) and
      * comes back emptied; without it a bucket is stored as the item it is. {@code afterSettle} runs when the
      * INSERT has settled and any leftover is back with the player, so a caller can refresh the player's view.
      */
@@ -155,8 +155,10 @@ public final class DataHandoff {
             }
             stack.shrink(1);
             source.set(stack);
-            // The emptied container comes back once the write has settled, refilled with whatever the
-            // network could not take after all, so nothing is lost on the way.
+            /*
+             * The emptied container comes back once the write has settled, refilled with whatever the
+             * network could not take after all, so nothing is lost on the way.
+             */
             op.onSettle(() -> {
                 handBack(player, source, DataContainers.fill(data.container(), data.key(), op.leftover()).container());
                 afterSettle.run();
@@ -220,7 +222,7 @@ public final class DataHandoff {
     /**
      * Fills ONE held container with {@code key} from the network: a bucket takes a full bucket or nothing, a
      * tank item takes what it has room for. The container is in flight while the SELECT runs and comes back
-     * filled — onto the cursor it left, if that is still free — with anything it could not take after all
+     * filled, onto the cursor it left if that is still free, with anything it could not take after all
      * put back into the network.
      */
     public static Outcome fillFromNetwork(final MainframeBlockEntity mainframe, final ServerLevel level,

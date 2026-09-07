@@ -47,10 +47,12 @@ import java.util.Set;
  */
 public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTerminalMenu> {
 
-    // Flat palette (ARGB), read live from the render-bound OS theme so the Monitor terminal repaints in the host
-    // computer's hardware-era skin. These mirror the former static constants one-for-one; refreshed via
-    // syncPalette() at the top of each draw pass (renderBg/renderLabels) while the era theme is bound, so a
-    // STANDARD-era host renders byte-identically to the old flat-dark constants.
+    /*
+     * Flat palette (ARGB), read live from the render-bound OS theme so the Monitor terminal repaints in the host
+     * computer's hardware-era skin. These mirror the former static constants one-for-one; refreshed via
+     * syncPalette() at the top of each draw pass (renderBg/renderLabels) while the era theme is bound, so a
+     * STANDARD-era host renders byte-identically to the old flat-dark constants.
+     */
     private int OUTER;
     private int SCREEN;
     private int RAIL;
@@ -98,7 +100,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private static final int TAB_H = 27;
     private static final int CONTENT_X = 63;
 
-    // Network item grid (a virtual grid — not real slots; rendered from the snapshot).
+    // Network item grid (a virtual grid, not real slots; rendered from the snapshot).
     private static final int NET_X = 68;
     private static final int NET_COLS = 9;
     private static final int NET_ROWS = 4;
@@ -112,13 +114,15 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private static final int SORT_X = NET_X + TOOLBAR_W - SORT_W;
     private static final int SEARCH_W = TOOLBAR_W - SORT_W - 4;
 
-    // Deposit bar — the explicit "insert held items into the network" target, sitting
-    // just below the item grid and above the player inventory.
+    /*
+     * Deposit bar: the explicit "insert held items into the network" target, sitting
+     * just below the item grid and above the player inventory.
+     */
     private static final int DEPOSIT_Y = NET_Y + NET_ROWS * 18 + 2;
     private static final int DEPOSIT_W = NET_COLS * 18 - 2;
     private static final int DEPOSIT_H = 14;
 
-    // Indexed by ComputerTerminalMenu.TAB_* id — keep in sync with those constants (Processes = 7, Console = 8).
+    // Indexed by ComputerTerminalMenu.TAB_* id, keep in sync with those constants (Processes = 7, Console = 8).
     private static final String[] TAB_NAMES =
             {"Local", "Storage", "Network", "Operations", "Tasks", "Maint", "Craft", "Processes", "Console"};
 
@@ -130,16 +134,20 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     @org.jetbrains.annotations.Nullable
     private EditBox searchBox;
     boolean sortByQuantity = true;
-    // The grid's filtered and sorted view, kept between frames: it is asked for several times a frame and
-    // re-sorting a big network's catalog each time cost the frame rate (see visibleItems).
+    /*
+     * The grid's filtered and sorted view, kept between frames: it is asked for several times a frame and
+     * re-sorting a big network's catalog each time cost the frame rate (see visibleItems).
+     */
     private List<NetworkItemEntry> visibleCache = List.of();
     private List<NetworkItemEntry> visibleSource = List.of();
     private String visibleKey = "";
 
-    // Storage tab — public/private slider band. The Storage tab inserts a band between the header bar
-    // and the item toolbar, then shifts its toolbar/grid/deposit down by STORAGE_SHIFT so nothing
-    // overlaps. The band holds one compact track per disk (a PC has 2). For a host without a slider
-    // (a Server/Mainframe) the band shows a static "always public" badge instead of a dead control.
+    /*
+     * Storage tab: the public/private slider band. The Storage tab inserts a band between the header bar
+     * and the item toolbar, then shifts its toolbar/grid/deposit down by STORAGE_SHIFT so nothing
+     * overlaps. The band holds one compact track per disk (a PC has 2). For a host without a slider
+     * (a Server/Mainframe) the band shows a static "always public" badge instead of a dead control.
+     */
     private static final int SLIDER_TRACK0_DY = 1;        // first track top, relative to the band top
     private static final int SLIDER_ROW_PITCH = 9;        // vertical distance between the two tracks
     private static final int SLIDER_TRACK_H = 7;
@@ -147,9 +155,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     private static final int SLIDER_HANDLE_W = 3;
     // Snap step while dragging (50 per-mille = 5%); holding Shift drags at fine 1 per-mille. Tunable.
     private static final int SLIDER_STEP = 50;
-    // Storage-tab vertical shift applied to the shared toolbar/grid/deposit so the band fits above. The
-    // shift is bounded by the inventory: DEPOSIT_Y(126) + STORAGE_SHIFT + DEPOSIT_H(14) must stay <=
-    // INV_Y(148), so 8 is the maximum and the deposit bar abuts the inventory exactly with no overlap.
+    /*
+     * Storage-tab vertical shift applied to the shared toolbar/grid/deposit so the band fits above. The
+     * shift is bounded by the inventory: DEPOSIT_Y(126) + STORAGE_SHIFT + DEPOSIT_H(14) must stay <=
+     * INV_Y(148), so 8 is the maximum and the deposit bar abuts the inventory exactly with no overlap.
+     */
     private static final int STORAGE_SHIFT = 8;
     // The Storage grid loses one row to the band; the Network grid keeps all four.
     private static final int STORAGE_NET_ROWS = 3;
@@ -232,8 +242,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         final EditBox box = new EditBox(font, leftPos + NET_X + 4, topPos + TOOLBAR_Y + 2,
                 SEARCH_W - 8, TOOLBAR_H - 3, Component.literal("Search"));
         box.setBordered(false);
-        // The fields are built outside a render pass, so color them from the resolved era theme (not the bound
-        // static); containerTick keeps them in step when a board swap changes the host era.
+        /*
+         * The fields are built outside a render pass, so color them from the resolved era theme (not the bound
+         * static); containerTick keeps them in step when a board swap changes the host era.
+         */
         box.setTextColor(theme.text());
         box.setMaxLength(48);
         box.setHint(Component.literal("Search items...").withStyle(ChatFormatting.DARK_GRAY));
@@ -399,8 +411,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.fill(x - 1, y - 1, x + imageWidth + 1, y + imageHeight + 1, OUTER);
         g.fill(x, y, x + imageWidth, y + imageHeight, SCREEN);
 
-        // Tab rail — a fixed-height, scrolling list so every entry keeps its name even when there are
-        // more tabs (plus the Command Prompt) than fit at once.
+        /*
+         * Tab rail: a fixed-height, scrolling list so every entry keeps its name even when there are
+         * more tabs (plus the Command Prompt) than fit at once.
+         */
         final int railH = menu.invY() - TAB_Y0 - 2;
         g.fill(x + RAIL_X, y + TAB_Y0, x + RAIL_X + RAIL_W, y + TAB_Y0 + railH, RAIL);
         g.fill(x + RAIL_X + RAIL_W, y + TAB_Y0, x + RAIL_X + RAIL_W + 1, y + TAB_Y0 + railH, LINE);
@@ -531,8 +545,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 menu.monitorPos(), menu.hostPos(), disk, permille));
     }
 
-    // A parameterized item grid + deposit bar shared by the Network tab (offset 0, 4 rows) and the
-    // Storage tab (offset STORAGE_SHIFT, 3 rows), so both stay pixel-identical apart from the offset.
+    /*
+     * A parameterized item grid + deposit bar shared by the Network tab (offset 0, 4 rows) and the
+     * Storage tab (offset STORAGE_SHIFT, 3 rows), so both stay pixel-identical apart from the offset.
+     */
     void gridBg(final GuiGraphics g, final int x, final int y, final int dy, final int rows) {
         final int tbx = x + NET_X;
         final int tby = y + TOOLBAR_Y + dy;
@@ -625,7 +641,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         }
     }
 
-    // Craft tab — catalog grid + running/recent panels + request popup
+    // Craft tab: catalog grid + running/recent panels + request popup
 
     private static final int CRAFT_COLS = 9;
     private static final int CRAFT_ROWS = 2;
@@ -720,9 +736,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.drawString(font, "CRAFT  " + trim(craftPopup.result().getHoverName().getString(), 18),
                 px + 28, py + 8, TEXT, false);
 
-        // Quantity row: the shared editable field plus steppers. The popup draws over the screen at a
-        // raised z, so the qty field (a widget drawn earlier by super.render) must be re-rendered here or
-        // the selected craft amount stays hidden behind the overlay -- the item popup does the same.
+        /*
+         * Quantity row: the shared editable field plus steppers. The popup draws over the screen at a
+         * raised z, so the qty field (a widget drawn earlier by super.render) must be re-rendered here or
+         * the selected craft amount stays hidden behind the overlay -- the item popup does the same.
+         */
         g.fill(px + 6, py + 28, px + 130, py + 46, TRACK);
         if (qtyBox != null) {
             qtyBox.render(g, mouseX, mouseY, 0.0f);
@@ -837,7 +855,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         g.drawString(font, text, cx + 6, cy + 28, DIM, false);
     }
 
-    // Network tab — a virtual item grid drawn from the snapshot
+    // Network tab: a virtual item grid drawn from the snapshot
 
     /** The vertical shift applied to the shared grid on the Storage tab (the slider band lives above). */
     private int gridShift() {
@@ -917,12 +935,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         return idx >= 0 && idx < items.size() ? items.get(idx) : null;
     }
 
-    // Operations tab — recent network Operations + provenance detail
+    // Operations tab: recent network Operations + provenance detail
 
     void moveRow(final GuiGraphics g, final int cx, final int my, final OperationRecord.MoveRow mv) {
-        // Either end can be a "host (program)" label, so the parts are measured instead of sitting in fixed
-        // columns: the origin takes up to half the row, the arrow follows it, and the quantity and the
-        // destination get what is left.
+        /*
+         * Either end can be a "host (program)" label, so the parts are measured instead of sitting in fixed
+         * columns: the origin takes up to half the row, the arrow follows it, and the quantity and the
+         * destination get what is left.
+         */
         final int left = cx + 6;
         final int right = cx + POPUP_W - 6;
         final String from = font.plainSubstrByWidth(mv.from(), (right - left) / 2 - 6);
@@ -970,8 +990,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         };
     }
 
-    // Tasks tab (Mainframe only): the network's Operations in flight. Not to be confused with the desktop's
-    // Task Manager, which is about one machine; this one is about the network the Mainframe orchestrates.
+    /*
+     * Tasks tab (Mainframe only): the network's Operations in flight. Not to be confused with the desktop's
+     * Task Manager, which is about one machine; this one is about the network the Mainframe orchestrates.
+     */
 
     // Maintenance tab (Mainframe-only): index stats + ANALYZE / VACUUM / REINDEX / DROP
 
@@ -1276,17 +1298,17 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     private void icon(final GuiGraphics g, final int tab, final int x, final int y, final int c) {
         switch (tab) {
-            case 0 -> { // Local — ascending stat bars
+            case 0 -> { // Local: ascending stat bars
                 g.fill(x + 2, y + 9, x + 5, y + 14, c);
                 g.fill(x + 6, y + 6, x + 9, y + 14, c);
                 g.fill(x + 10, y + 3, x + 13, y + 14, c);
             }
-            case 1 -> { // Storage — stacked drive bays
+            case 1 -> { // Storage: stacked drive bays
                 g.fill(x + 2, y + 3, x + 14, y + 6, c);
                 g.fill(x + 2, y + 7, x + 14, y + 10, c);
                 g.fill(x + 2, y + 11, x + 14, y + 14, c);
             }
-            case 2 -> { // Network — hub and spokes
+            case 2 -> { // Network: hub and spokes
                 g.fill(x + 3, y + 7, x + 13, y + 9, c);
                 g.fill(x + 7, y + 3, x + 9, y + 13, c);
                 g.fill(x + 6, y + 6, x + 10, y + 10, c);
@@ -1295,14 +1317,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 g.fill(x + 2, y + 6, x + 4, y + 10, c);
                 g.fill(x + 12, y + 6, x + 14, y + 10, c);
             }
-            case 3 -> { // Operations — bulleted list
+            case 3 -> { // Operations: bulleted list
                 for (int r = 0; r < 3; r++) {
                     final int ly = y + 3 + r * 4;
                     g.fill(x + 2, ly, x + 4, ly + 2, c);
                     g.fill(x + 5, ly, x + 14, ly + 2, c);
                 }
             }
-            case 4 -> { // Tasks — CPU chip
+            case 4 -> { // Tasks: CPU chip
                 g.fill(x + 4, y + 4, x + 12, y + 5, c);
                 g.fill(x + 4, y + 11, x + 12, y + 12, c);
                 g.fill(x + 4, y + 4, x + 5, y + 12, c);
@@ -1317,14 +1339,14 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 g.fill(x + 12, y + 6, x + 14, y + 7, c);
                 g.fill(x + 12, y + 9, x + 14, y + 10, c);
             }
-            case 6 -> { // Craft — a 3x3 crafting grid
+            case 6 -> { // Craft: a 3x3 crafting grid
                 for (int r = 0; r < 3; r++) {
                     for (int col = 0; col < 3; col++) {
                         g.fill(x + 2 + col * 4, y + 3 + r * 4, x + 5 + col * 4, y + 6 + r * 4, c);
                     }
                 }
             }
-            case 7 -> { // Processes — a cog (the network's background services)
+            case 7 -> { // Processes: a cog (the network's background services)
                 g.fill(x + 7, y + 2, x + 9, y + 4, c);   // tooth: top
                 g.fill(x + 7, y + 12, x + 9, y + 14, c); // tooth: bottom
                 g.fill(x + 2, y + 7, x + 4, y + 9, c);   // tooth: left
@@ -1334,13 +1356,13 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 g.fill(x + 5, y + 5, x + 7, y + 11, c);  // ring: left edge
                 g.fill(x + 9, y + 5, x + 11, y + 11, c); // ring: right edge
             }
-            case 8 -> { // Console — a ">" prompt and a blinking cursor underscore
+            case 8 -> { // Console: a ">" prompt and a blinking cursor underscore
                 g.fill(x + 3, y + 4, x + 5, y + 6, c);
                 g.fill(x + 5, y + 6, x + 7, y + 8, c);
                 g.fill(x + 3, y + 8, x + 5, y + 10, c);
                 g.fill(x + 8, y + 11, x + 13, y + 13, c);
             }
-            default -> { // Maintenance — a wrench laid diagonally (C-shaped open jaw, diagonal shaft)
+            default -> { // Maintenance: a wrench laid diagonally (C-shaped open jaw, diagonal shaft)
                 g.fill(x + 2, y + 2, x + 7, y + 4, c); // jaw: top lip
                 g.fill(x + 2, y + 2, x + 4, y + 7, c); // jaw: left side
                 g.fill(x + 2, y + 5, x + 7, y + 7, c); // jaw: bottom lip (mouth opens toward the shaft)
@@ -1362,8 +1384,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             return true;
         }
-        // The craft popup is modal: ESC closes it, Enter submits a feasible craft, typing goes to
-        // the quantity field, anything else is swallowed.
+        /*
+         * The craft popup is modal: ESC closes it, Enter submits a feasible craft, typing goes to
+         * the quantity field, anything else is swallowed.
+         */
         if (craftPopup != null) {
             if (key == 256) {
                 closeCraftPopup();
@@ -1381,8 +1405,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             return true;
         }
-        // The request popup is modal: ESC closes it, Enter submits, typing goes to the quantity field,
-        // and every other key is swallowed so the inventory key ('E') never closes the GUI mid-edit.
+        /*
+         * The request popup is modal: ESC closes it, Enter submits, typing goes to the quantity field,
+         * and every other key is swallowed so the inventory key ('E') never closes the GUI mid-edit.
+         */
         if (popupEntry != null) {
             if (key == 256) {
                 closeRequest();
@@ -1402,8 +1428,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             return true;
         }
-        // A focused privacy slider takes the arrow / Home / End keys: arrows nudge by the snap step
-        // (Shift = fine 1 per-mille), Home/End jump to fully private / fully public. Each key commits.
+        /*
+         * A focused privacy slider takes the arrow / Home / End keys: arrows nudge by the snap step
+         * (Shift = fine 1 per-mille), Home/End jump to fully private / fully public. Each key commits.
+         */
         if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE && menu.storageHasSlider()
                 && focusedSliderDisk >= 0 && focusedSliderDisk < menu.diskCount()
                 && (searchBox == null || !searchBox.isFocused())) {
@@ -1424,8 +1452,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 return true;
             }
         }
-        // While the search field has focus, route typing to it; ESC unfocuses it; never let a letter
-        // key fall through and close the GUI.
+        /*
+         * While the search field has focus, route typing to it; ESC unfocuses it; never let a letter
+         * key fall through and close the GUI.
+         */
         if (searchBox != null && searchBox.isFocused()) {
             if (key == 256) {
                 searchBox.setFocused(false);
@@ -1463,14 +1493,18 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         if (popupOp != null) {
             return handleOpPopupClick(mouseX, mouseY, button);
         }
-        // Let the active content tab claim the press (e.g. the Processes tab's action buttons), after any
-        // modal popup above has had its chance but before the rail/grid handlers below.
+        /*
+         * Let the active content tab claim the press (e.g. the Processes tab's action buttons), after any
+         * modal popup above has had its chance but before the rail/grid handlers below.
+         */
         final int active = menu.activeTab();
         if (active >= 0 && active < tabs.length && tabs[active].onMouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        // Privacy slider (Storage tab): a press on a disk's track starts a drag and jumps the value to
-        // the cursor. Handled before the deposit/grid handlers so a slider drag never deposits a stack.
+        /*
+         * Privacy slider (Storage tab): a press on a disk's track starts a drag and jumps the value to
+         * the cursor. Handled before the deposit/grid handlers so a slider drag never deposits a stack.
+         */
         if (button == 0) {
             final int disk = sliderDiskAt(mouseX, mouseY);
             if (disk >= 0) {
@@ -1480,8 +1514,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 return true;
             }
         }
-        // Clicking the search field selects it for typing; clicking elsewhere deselects it. Container
-        // screens don't reliably route focus to widgets, so do it explicitly.
+        /*
+         * Clicking the search field selects it for typing; clicking elsewhere deselects it. Container
+         * screens don't reliably route focus to widgets, so do it explicitly.
+         */
         if (searchBox != null && searchBox.visible) {
             if (searchBox.isMouseOver(mouseX, mouseY)) {
                 setFocused(searchBox);
@@ -1490,10 +1526,12 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             searchBox.setFocused(false);
         }
-        // Holding a stack and clicking the grid or deposit bar hands it to the network (Network tab) or the
-        // computer's local storage (Storage tab): left = the whole stack as items, right = one — one item, or
-        // what a held container holds; and a held empty container right-clicked on a fluid or chemical
-        // entry fills from it, so the entry under the cursor travels with a right-click.
+        /*
+         * Holding a stack and clicking the grid or deposit bar hands it to the network (Network tab) or the
+         * computer's local storage (Storage tab): left = the whole stack as items, right = one; one item, or
+         * what a held container holds; and a held empty container right-clicked on a fluid or chemical
+         * entry fills from it, so the entry under the cursor travels with a right-click.
+         */
         if (isGridTab() && !menu.getCarried().isEmpty()
                 && (button == 0 || button == 1)
                 && (overDepositBar(mouseX, mouseY) || overNetworkGrid(mouseX, mouseY))) {
@@ -1509,8 +1547,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
             }
             return true;
         }
-        // Storage tab: clicking an item with an empty cursor opens the actions popup, where the player
-        // sets a quantity and sends it to their inventory or up into the network.
+        /*
+         * Storage tab: clicking an item with an empty cursor opens the actions popup, where the player
+         * sets a quantity and sends it to their inventory or up into the network.
+         */
         if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE && menu.getCarried().isEmpty()
                 && button == 0) {
             final NetworkItemEntry e = networkItemAt((int) mouseX, (int) mouseY);
@@ -1651,9 +1691,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         if (qtyBox != null) {
             qtyBox.setTextColor(theme.text());
         }
-        // Drop a slider's optimistic preview once the authoritative sync has caught up to it (or while
-        // it is not being dragged and the server reports a different, clamped value), so a rejected
-        // value visibly corrects and later syncs drive the display.
+        /*
+         * Drop a slider's optimistic preview once the authoritative sync has caught up to it (or while
+         * it is not being dragged and the server reports a different, clamped value), so a rejected
+         * value visibly corrects and later syncs drive the display.
+         */
         for (int d = 0; d < sliderPreviewActive.length; d++) {
             if (sliderPreviewActive[d] && draggingSliderDisk != d
                     && d < menu.diskCount() && menu.diskPermille(d) == sliderPreview[d]) {
@@ -1664,8 +1706,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     @Override
     protected void slotClicked(final Slot slot, final int slotId, final int button, final ClickType type) {
-        // On the Network/Storage tabs, shift-clicking an inventory stack deposits it into the network
-        // or local storage respectively, instead of a (no-op) quick-move.
+        /*
+         * On the Network/Storage tabs, shift-clicking an inventory stack deposits it into the network
+         * or local storage respectively, instead of a (no-op) quick-move.
+         */
         if (isGridTab() && type == ClickType.QUICK_MOVE
                 && slot != null && slot.hasItem() && slot.index >= menu.storageSlotCount()) {
             if (menu.activeTab() == ComputerTerminalMenu.TAB_STORAGE) {
@@ -1723,8 +1767,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         if (qtyBox != null) {
             qtyBox.setFocused(true);
         }
-        // The reply carries BOTH the per-server breakdown (advanced sources) and the full computer list
-        // (the advanced destination picker).
+        /*
+         * The reply carries BOTH the per-server breakdown (advanced sources) and the full computer list
+         * (the advanced destination picker).
+         */
         PacketDistributor.sendToServer(new RequestServerBreakdownPayload(
                 menu.monitorPos(), menu.hostPos(), e.key()));
     }
@@ -1807,8 +1853,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 }
             }
         }
-        // Push above the item grid and dim the screen, so the tab rail and header behind never show
-        // through the panel (flat fills draw below items otherwise).
+        /*
+         * Push above the item grid and dim the screen, so the tab rail and header behind never show
+         * through the panel (flat fills draw below items otherwise).
+         */
         g.pose().pushPose();
         g.pose().translate(0, 0, 350);
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xE0070A0F);
@@ -1828,8 +1876,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         track(g, px + 6, py + 30, POPUP_W - 12, f,
                 popupOp.status() == OperationRecord.STATUS_PROCESSING ? ACCENT2 : statusColor(popupOp.status()));
         g.drawString(font, "SUBOPERATIONS", px + 6, py + 42, DIM, false);
-        // A live Operation carries its real SubOperation rows (per-server share, progress, state);
-        // a finished log entry carries only its provenance moves — render whichever it has.
+        /*
+         * A live Operation carries its real SubOperation rows (per-server share, progress, state);
+         * a finished log entry carries only its provenance moves, so render whichever it has.
+         */
         final List<OperationRecord.SubRow> subs = popupOp.subs();
         final List<OperationRecord.MoveRow> moves = popupOp.moves();
         if (!subs.isEmpty()) {
@@ -1973,8 +2023,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         boolean anyDeselected = false;
         int kind = TerminalSelectPayload.DEST_AUTO;
         String destServer = "";
-        // Sources and destination are advanced-only; a simple request pulls from everywhere to the
-        // auto destination (local storage, else inventory).
+        /*
+         * Sources and destination are advanced-only; a simple request pulls from everywhere to the
+         * auto destination (local storage, else inventory).
+         */
         if (advancedMode) {
             for (final ServerBreakdownPayload.ServerHolding s : menu.serverBreakdown()) {
                 if (deselectedServers.contains(s.key())) {
@@ -1984,12 +2036,12 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
                 }
             }
             if (anyDeselected && keys.isEmpty() && !menu.serverBreakdown().isEmpty()) {
-                closeRequest(); // every source unchecked — nothing to pull from
+                closeRequest(); // every source unchecked, nothing to pull from
                 return;
             }
             final List<NetworkServersPayload.ServerEntry> comp = menu.networkServers();
             if (comp.isEmpty()) {
-                return; // no destination computer yet — keep the popup open
+                return; // no destination computer yet, keep the popup open
             }
             kind = TerminalSelectPayload.DEST_SERVER;
             destServer = comp.get(Math.floorMod(destServerIndex, comp.size())).key();
@@ -2023,8 +2075,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
         if (popupEntry == null) {
             return;
         }
-        // Items (the grid + inventory) render at a higher z than flat fills, so the popup must sit
-        // above them or they show through. Push the whole popup — and the quantity field — forward.
+        /*
+         * Items (the grid + inventory) render at a higher z than flat fills, so the popup must sit
+         * above them or they show through. Push the whole popup (and the quantity field) forward.
+         */
         g.pose().pushPose();
         g.pose().translate(0, 0, 350);
         g.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xE0070A0F);
@@ -2209,8 +2263,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         syncSearchBoxVisibility();
-        // The base render() binds the era skin, draws the screen, and renders the slot tooltip; the popups and
-        // custom hover tooltips below draw afterward using the palette fields refreshed during renderBg/Labels.
+        /*
+         * The base render() binds the era skin, draws the screen, and renders the slot tooltip; the popups and
+         * custom hover tooltips below draw afterward using the palette fields refreshed during renderBg/Labels.
+         */
         super.render(g, mouseX, mouseY, partialTick);
         if (dropOpen) {
             renderDropPopup(g, mouseX, mouseY);
@@ -2251,8 +2307,10 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     private void renderNetworkHover(final GuiGraphics g, final int mx, final int my) {
         final int gx = leftPos + NET_X;
-        // Match the grid's per-tab vertical shift and row count so the highlight tracks the cell the
-        // tooltip hit-test (networkItemAt) reports -- on the Storage tab the slider band pushes both down.
+        /*
+         * Match the grid's per-tab vertical shift and row count so the highlight tracks the cell the
+         * tooltip hit-test (networkItemAt) reports -- on the Storage tab the slider band pushes both down.
+         */
         final int gy = topPos + NET_Y + gridShift();
         final int relX = mx - gx;
         final int relY = my - gy;
@@ -2275,9 +2333,11 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
     @Override
     protected HardwareEra screenEra() {
-        // Read the host computer's era straight from its block entity on the client, so the very first frame
-        // already wears the right era skin. Relying only on the synced era slot lagged one tick and flashed
-        // the default era when the GUI opened. Fall back to the synced value if the host isn't client-loaded.
+        /*
+         * Read the host computer's era straight from its block entity on the client, so the very first frame
+         * already wears the right era skin. Relying only on the synced era slot lagged one tick and flashed
+         * the default era when the GUI opened. Fall back to the synced value if the host isn't client-loaded.
+         */
         final net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(menu.hostPos())
                 instanceof dev.jstech.computronics.blockentity.AbstractComputerBlockEntity host) {

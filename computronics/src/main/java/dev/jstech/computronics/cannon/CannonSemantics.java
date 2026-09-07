@@ -92,8 +92,10 @@ public final class CannonSemantics {
         final BuiltIns builtIns = new BuiltIns();
         final TypeRules rules = new TypeRules(builtIns);
         final Declarations declarations = new Declarations(builtIns, rules, bag, model);
-        // A tree the parser had to guess its way through says nothing reliable about types, so the
-        // player gets the mistakes that are certainly there rather than the ones that follow from them.
+        /*
+         * A tree the parser had to guess its way through says nothing reliable about types, so the
+         * player gets the mistakes that are certainly there rather than the ones that follow from them.
+         */
         if (bag.hasErrors()) {
             return new Analysis(model, builtIns, rules, declarations);
         }

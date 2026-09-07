@@ -18,7 +18,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * GUI skins for the Network Management Studio, kept apart from the general {@link EraThemes} because a program has
  * its own visual identity rather than the host computer's OS skin. The Studio is a deliberate clone of classic SQL
- * Server Management Studio, so its STANDARD-era skin is a LIGHT theme (white panels, system-blue status bar) — unlike
+ * Server Management Studio, so its STANDARD-era skin is a LIGHT theme (white panels, system-blue status bar), unlike
  * every other computing screen, which stays on the dark OS skin.
  *
  * <p>The Studio still varies by hardware era: {@link #of} resolves an era to its Studio skin. Only the modern

@@ -189,8 +189,10 @@ public final class BuiltIns {
         this.method(this.mapType, "Put", nothing, PUBLIC, key, value);
         this.method(this.mapType, "Get", value, PUBLIC, key);
         this.method(this.mapType, "ContainsKey", ITypeSymbol.Primitive.BOOL, PUBLIC, key);
-        // The one lookup that answers both questions at once: whether the key was there, and what it
-        // held. It is why the language has an outward parameter at all.
+        /*
+         * The one lookup that answers both questions at once: whether the key was there, and what it
+         * held. It is why the language has an outward parameter at all.
+         */
         this.mapType.addMember(new IMemberSymbol.MethodSymbol(this.mapType, "TryGet",
                 ITypeSymbol.Primitive.BOOL,
                 List.of(IMemberSymbol.ParameterSymbol.of("key", key),
@@ -362,8 +364,10 @@ public final class BuiltIns {
         this.method(network, "Servers", new ITypeSymbol.GenericType(this.listType, List.of(server)),
                 PUBLIC_STATIC);
 
-        // Being told beats asking. A program that wants to know when the iron runs low says so once and
-        // is called when it happens, instead of asking every tick for the rest of the world's life.
+        /*
+         * Being told beats asking. A program that wants to know when the iron runs low says so once and
+         * is called when it happens, instead of asking every tick for the rest of the world's life.
+         */
         final NamedType event = this.declare("StockEvent", NamedType.Kind.CLASS);
         this.property(event, "Item", this.stringType, PUBLIC);
         this.property(event, "Total", whole, PUBLIC);
@@ -432,8 +436,10 @@ public final class BuiltIns {
         this.method(operations, "Push", asked, PUBLIC_STATIC, this.stringType, whole);
         this.method(operations, "Craft", asked, PUBLIC_STATIC, this.stringType, whole);
         this.method(operations, "Cancel", asked, PUBLIC_STATIC, this.stringType);
-        // Moving one up the queue is asked for, not written into the record a program was handed: what
-        // it holds is a picture of how things were, and painting over a picture changes nothing.
+        /*
+         * Moving one up the queue is asked for, not written into the record a program was handed: what
+         * it holds is a picture of how things were, and painting over a picture changes nothing.
+         */
         this.method(operations, "Reprioritise", asked, PUBLIC_STATIC, this.stringType, this.stringType);
         this.method(operations, "Get", operation, PUBLIC_STATIC, this.stringType);
         this.method(operations, "List", new ITypeSymbol.GenericType(this.listType, List.of(operation)),

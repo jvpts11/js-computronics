@@ -37,8 +37,10 @@ public final class RadialGeometry {
     }
 
     public static double angleFromCenter(final double dx, final double dy) {
-        // atan2(dx, -dy): top (0,-1) -> 0; right (1,0) -> π/2;
-        // bottom (0,1) -> π; left (-1,0) -> 3π/2 after normalization.
+        /*
+         * atan2(dx, -dy): top (0,-1) -> 0; right (1,0) -> π/2;
+         * bottom (0,1) -> π; left (-1,0) -> 3π/2 after normalization.
+         */
         double a = Math.atan2(dx, -dy);
         if (a < 0) {
             a += TWO_PI;

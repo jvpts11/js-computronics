@@ -67,7 +67,7 @@ class PeripheralLinkValidatorTest {
 
     @Test
     void pathWithinMaxLength_succeeds() {
-        // 3-cable path for COMPUTING (max 16) — well within budget.
+        // 3-cable path for COMPUTING (max 16), well within budget.
         TestOwner owner = new TestOwner(PeripheralCableType.COMPUTING, 8);
         TestEndpoint endpoint = new TestEndpoint(PeripheralCableType.COMPUTING);
 
@@ -140,8 +140,10 @@ class PeripheralLinkValidatorTest {
 
     @Test
     void bfs_ignoresCablesOfWrongType() {
-        // Path is OWNER -- C1(TELEMETRY) -- ENDPOINT, but owner needs COMPUTING.
-        // Path should fail because BFS won't traverse the TELEMETRY cable.
+        /*
+         * Path is OWNER -- C1(TELEMETRY) -- ENDPOINT, but owner needs COMPUTING.
+         * Path should fail because BFS won't traverse the TELEMETRY cable.
+         */
         TestOwner owner = new TestOwner(PeripheralCableType.COMPUTING, 8);
         TestEndpoint endpoint = new TestEndpoint(PeripheralCableType.COMPUTING);
 
@@ -198,8 +200,10 @@ class PeripheralLinkValidatorTest {
 
     @Test
     void reLinkSameEndpoint_atCapacity_succeeds() {
-        // If endpoint is already linked to this owner, link is idempotent
-        // and should succeed even when capacity is full.
+        /*
+         * If endpoint is already linked to this owner, link is idempotent
+         * and should succeed even when capacity is full.
+         */
         TestOwner owner = new TestOwner(PeripheralCableType.COMPUTING, 2);
         owner.onEndpointLinked(ENDPOINT_POS); // pre-linked
         owner.onEndpointLinked(60L);          // at capacity now
@@ -277,7 +281,7 @@ class PeripheralLinkValidatorTest {
 
     @Test
     void telemetryCable_supportsLongPaths() {
-        // Build a 50-hop path of TELEMETRY cables — well under max 256.
+        // Build a 50-hop path of TELEMETRY cables, well under max 256.
         TestOwner owner = new TestOwner(PeripheralCableType.TELEMETRY, 6);
         TestEndpoint endpoint = new TestEndpoint(PeripheralCableType.TELEMETRY);
 

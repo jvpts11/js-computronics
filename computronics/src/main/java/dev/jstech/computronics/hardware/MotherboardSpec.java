@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Immutable specification of a motherboard — the chassis that bounds an assembly: which CPU socket and how many of them, how many RAM slots and which generations they accept, how many PCIe slots and their bus generation, and how many peripheral ports.
+ * Immutable specification of a motherboard, the chassis that bounds an assembly: which CPU socket and how many of them, how many RAM slots and which generations they accept, how many PCIe slots and their bus generation, and how many peripheral ports.
  */
 public record MotherboardSpec(FormFactor formFactor,
                               HardwareEra era,

@@ -55,8 +55,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
         if (embeddedPattern != null) {
             CraftingPattern.CODEC.encodeStart(ops, embeddedPattern).result().ifPresent(t -> tag.put("Embedded", t));
         }
-        // Every machine step still running keeps going on its own after a reload; the re-planned craft waits for
-        // them all so their output is in stock when the plan is made, instead of being made a second time.
+        /*
+         * Every machine step still running keeps going on its own after a reload; the re-planned craft waits for
+         * them all so their output is in stock when the plan is made, instead of being made a second time.
+         */
         final ListTag machineSteps = new ListTag();
         for (final MachineRun run : machineRuns) {
             if (!run.op.isDone()) {
@@ -68,8 +70,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
         if (!machineSteps.isEmpty()) {
             tag.put(MACHINE_STEPS_KEY, machineSteps);
         }
-        // Everything this craft has drained from the network but not delivered yet: intermediates and
-        // finished results alike. They are handed back to storage on resume, so nothing is lost or doubled.
+        /*
+         * Everything this craft has drained from the network but not delivered yet: intermediates and
+         * finished results alike. They are handed back to storage on resume, so nothing is lost or doubled.
+         */
         final ListTag pool = new ListTag();
         for (final Map.Entry<StorageKey, Long> entry : this.pool.entrySet()) {
             if (entry.getValue() > 0) {
@@ -213,19 +217,25 @@ public final class NetworkCraftOperation implements IPersistentOperation {
     private final List<BlockPos> candidateComputers;
     private final List<BlockPos> supercomputers;
     private final String requesterLabel;
-    // A pattern that travels with the request instead of living in a Recipe ROM: a multi-stage
-    // pipeline's bench stage embeds its pattern, so any online computer may execute it.
+    /*
+     * A pattern that travels with the request instead of living in a Recipe ROM: a multi-stage
+     * pipeline's bench stage embeds its pattern, so any online computer may execute it.
+     */
     @org.jetbrains.annotations.Nullable
     private final CraftingPattern embeddedPattern;
 
     private final Map<StorageKey, Long> pool = new HashMap<>();
-    // The servers each ingredient's reservation was placed on, so the per-tick drain targets the same
-    // servers and every release frees the matching reservation instead of silently missing.
+    /*
+     * The servers each ingredient's reservation was placed on, so the per-tick drain targets the same
+     * servers and every release frees the matching reservation instead of silently missing.
+     */
     private final Map<StorageKey, java.util.Set<NodeUuid>> lockedServers = new HashMap<>();
     private final long[] runsDone;
 
-    // With a supercomputer, one request fans out across several CCs at once (one per granted slot); without
-    // one, a single exclusively-claimed CC. The per-tick rate is the summed throughput of the live executors.
+    /*
+     * With a supercomputer, one request fans out across several CCs at once (one per granted slot); without
+     * one, a single exclusively-claimed CC. The per-tick rate is the summed throughput of the live executors.
+     */
     private final List<CraftingComputerBlockEntity> executors = new ArrayList<>();
     private dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity orchestrator;
     private boolean exclusiveClaim;
@@ -240,20 +250,28 @@ public final class NetworkCraftOperation implements IPersistentOperation {
     private byte status = OperationRecord.STATUS_FAILED;
     private OperationPriority priority = OperationPriority.DEFAULT;
     private Runnable onSettle;
-    // The Mainframe that runs this craft's machine steps as processing operations of their own; null only for
-    // plans without machine steps.
+    /*
+     * The Mainframe that runs this craft's machine steps as processing operations of their own; null only for
+     * plans without machine steps.
+     */
     @org.jetbrains.annotations.Nullable
     private final MainframeBlockEntity mainframe;
-    // The machine steps this craft is running right now, one processing operation each. A downstream step
-    // launches as soon as its inputs reach the pool (raws are locked; an upstream step delivers its output
-    // there), so a chain pipelines instead of running one stage at a time; the count is bounded by the executing
-    // computer's crafting-thread ceiling. This is the Operations system's concurrent design applied WITHIN one craft.
+    /*
+     * The machine steps this craft is running right now, one processing operation each. A downstream step
+     * launches as soon as its inputs reach the pool (raws are locked; an upstream step delivers its output
+     * there), so a chain pipelines instead of running one stage at a time; the count is bounded by the executing
+     * computer's crafting-thread ceiling. This is the Operations system's concurrent design applied WITHIN one craft.
+     */
     private final List<MachineRun> machineRuns = new ArrayList<>();
-    // Each machine step is launched at most once (its own operation feeds all of its runs); a step that fell
-    // short because its machine broke or timed out is not retried.
+    /*
+     * Each machine step is launched at most once (its own operation feeds all of its runs); a step that fell
+     * short because its machine broke or timed out is not retried.
+     */
     private final boolean[] launched;
-    // True while the claimed computer or cluster slots are let go during the machine steps (the machines, not
-    // the computer, are working); the craft claims a computer again once every step clears and bench work remains.
+    /*
+     * True while the claimed computer or cluster slots are let go during the machine steps (the machines, not
+     * the computer, are working); the craft claims a computer again once every step clears and bench work remains.
+     */
     private boolean executorsParked;
 
     /** One running machine step: which plan step it is and the processing operation executing it. */
@@ -307,8 +325,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
         if (done) {
             return;
         }
-        // Collect finished machine steps: their output was delivered to the network, so count what each made. A
-        // step that fell short (its machine broke or timed out) is not retried; it contributes what it managed.
+        /*
+         * Collect finished machine steps: their output was delivered to the network, so count what each made. A
+         * step that fell short (its machine broke or timed out) is not retried; it contributes what it managed.
+         */
         machineRuns.removeIf(run -> {
             if (!run.op.isDone()) {
                 return false;
@@ -319,10 +339,12 @@ public final class NetworkCraftOperation implements IPersistentOperation {
         });
 
         if (waiting) {
-            // Acquire in two stages, holding nothing while blocked so waiters cannot deadlock:
-            // first the full ingredient reservation, then an idle computer that can execute. Distinct crafts are
-            // gated by executor availability (a lone Crafting Computer serves one at a time; a Supercomputer
-            // cluster unlocks parallel crafts), not by the Mainframe's operation queues — crafting is a subnet.
+            /*
+             * Acquire in two stages, holding nothing while blocked so waiters cannot deadlock:
+             * first the full ingredient reservation, then an idle computer that can execute. Distinct crafts are
+             * gated by executor availability (a lone Crafting Computer serves one at a time; a Supercomputer
+             * cluster unlocks parallel crafts), not by the Mainframe's operation queues, because crafting is a subnet.
+             */
             if (++waitTicks > dev.jstech.core.operation.OperationBalance.waitingTimeoutTicks()) {
                 timedOut = true;
                 finish();
@@ -338,17 +360,21 @@ public final class NetworkCraftOperation implements IPersistentOperation {
             executorsParked = false;
         }
         if (!executorsAlive()) {
-            // The computer was broken or powered off mid-craft: settle with what was produced. Any machine step
-            // already in flight is an operation of its own and runs on to deliver its output to the network, so
-            // nothing it was making is lost; the craft simply stops launching new steps and doing bench work.
+            /*
+             * The computer was broken or powered off mid-craft: settle with what was produced. Any machine step
+             * already in flight is an operation of its own and runs on to deliver its output to the network, so
+             * nothing it was making is lost; the craft simply stops launching new steps and doing bench work.
+             */
             finish();
             return;
         }
 
-        // Launch every machine step whose inputs are ready (raws are locked; an upstream step's output sits in
-        // the pool), up to the executing computer's crafting-thread ceiling. Launching needs only a live computer
-        // to exist, not the held claim, so a downstream step starts while an upstream step still runs and this
-        // craft is parked: a chain pipelines and independent steps run at once, instead of one stage at a time.
+        /*
+         * Launch every machine step whose inputs are ready (raws are locked; an upstream step's output sits in
+         * the pool), up to the executing computer's crafting-thread ceiling. Launching needs only a live computer
+         * to exist, not the held claim, so a downstream step starts while an upstream step still runs and this
+         * craft is parked: a chain pipelines and independent steps run at once, instead of one stage at a time.
+         */
         boolean progressed = startReadyMachineSteps();
 
         if (allRunsDone() && machineRuns.isEmpty()) {
@@ -357,9 +383,11 @@ public final class NetworkCraftOperation implements IPersistentOperation {
         }
 
         if (!machineRuns.isEmpty()) {
-            // The machines are doing the work: let go of the computer and the cluster slots so other crafts can
-            // use them while this craft waits (it keeps a reference to the computer for the liveness check above),
-            // and claim again once every step clears and bench work remains.
+            /*
+             * The machines are doing the work: let go of the computer and the cluster slots so other crafts can
+             * use them while this craft waits (it keeps a reference to the computer for the liveness check above),
+             * and claim again once every step clears and bench work remains.
+             */
             parkExecutors();
             progressed = true;
         } else {
@@ -369,8 +397,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
                 waitTicks = 0;
                 return; // re-claim a computer before the bench work resumes
             }
-            // Bench work at the summed throughput of the live computers (never above the Mainframe's grant).
-            // Denser recipes take longer; faster computers contribute proportionally more of each tick's work.
+            /*
+             * Bench work at the summed throughput of the live computers (never above the Mainframe's grant).
+             * Denser recipes take longer; faster computers contribute proportionally more of each tick's work.
+             */
             long budget = Math.min(throughputBudget, aliveThroughput());
             final NetworkStorage storage = NetworkStorage.of(level, network);
             for (int i = 0; i < plan.steps().size() && budget > 0; i++) {
@@ -384,8 +414,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
                     continue;
                 }
                 final long runsNow = Math.min(step.runs() - runsDone[i], runsAffordable);
-                // A bench step consumes its machine-made intermediates straight from the pool (a machine step
-                // delivered them there) plus its locked raw stock; its result goes back into the pool.
+                /*
+                 * A bench step consumes its machine-made intermediates straight from the pool (a machine step
+                 * delivered them there) plus its locked raw stock; its result goes back into the pool.
+                 */
                 final long executable = consumeIngredients(storage, step.pattern(), runsNow);
                 if (executable <= 0) {
                     continue; // ingredients not deliverable yet (an upstream step must fill the pool first)
@@ -461,7 +493,7 @@ public final class NetworkCraftOperation implements IPersistentOperation {
     /**
      * This craft's isolated I/O for a machine step: inputs come from the pool (intermediates an upstream step
      * produced) or from the servers this craft locked (raws, extracted scoped to those servers and released as
-     * they leave — race-free, the way the bench path already consumes); outputs go straight into the pool. So the
+     * they leave, race-free, the way the bench path already consumes); outputs go straight into the pool. So the
      * craft's intermediates never touch shared network storage while it runs, which keeps concurrent steps
      * pipelining without racing and keeps other crafts' planners from ever seeing a half-made intermediate.
      *
@@ -570,19 +602,23 @@ public final class NetworkCraftOperation implements IPersistentOperation {
                 ? null : plan.steps().get(plan.steps().size() - 1).pattern();
         final var sc = findRunningSupercomputer();
         if (sc != null) {
-            // Fan out: take every capable computer (fastest first) the supercomputer's free slots allow — one
-            // slot per computer. The summed throughput crafts the request faster, weighted toward the faster
-            // computers; requesting one slot per capable computer honors "use the maximum available computers".
+            /*
+             * Fan out: take every capable computer (fastest first) the supercomputer's free slots allow, one
+             * slot per computer. The summed throughput crafts the request faster, weighted toward the faster
+             * computers; requesting one slot per capable computer honors "use the maximum available computers".
+             */
             final List<CraftingComputerBlockEntity> capable = capableComputers(root);
             if (capable.isEmpty()) {
                 return false;
             }
             final int granted = sc.acquireCraftSlots(operationId, capable.size());
             if (granted <= 0) {
-                return false; // the parallel budget is spent — wait in line
+                return false; // the parallel budget is spent, wait in line
             }
-            // A re-claim can flip a craft that started exclusive (no cluster then) into fan-out: reset the
-            // exclusive latch so a later machine-step park releases the cluster slot, not a no-op computer claim.
+            /*
+             * A re-claim can flip a craft that started exclusive (no cluster then) into fan-out: reset the
+             * exclusive latch so a later machine-step park releases the cluster slot, not a no-op computer claim.
+             */
             orchestrator = sc;
             exclusiveClaim = false;
             executors.clear();
@@ -619,7 +655,7 @@ public final class NetworkCraftOperation implements IPersistentOperation {
     /**
      * The supercomputer a craft should ask for slots: the online one with the most room. Every
      * supercomputer runs its own queue, so a craft must never sit waiting on a full one while another
-     * has free slots — taking the first online one did exactly that, and a second supercomputer on the
+     * has free slots, since taking the first online one did exactly that, and a second supercomputer on the
      * network never received work. When none has room, the first is returned so the craft waits in
      * line there and its next re-claim lands wherever slots free up first.
      */
@@ -656,8 +692,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
             @org.jetbrains.annotations.Nullable final CraftingPattern root) {
         final List<CraftingComputerBlockEntity> capable = new ArrayList<>();
         for (final BlockPos pos : candidateComputers) {
-            // An embedded pattern travels with the request (a multi-stage's bench stage), so knowing
-            // it does not require a Recipe ROM entry of its own.
+            /*
+             * An embedded pattern travels with the request (a multi-stage's bench stage), so knowing
+             * it does not require a Recipe ROM entry of its own.
+             */
             if (level.getBlockEntity(pos) instanceof CraftingComputerBlockEntity cc
                     && cc.canCraft()
                     && (root == null || cc.romContains(root) || root.equals(embeddedPattern))) {
@@ -715,7 +753,7 @@ public final class NetworkCraftOperation implements IPersistentOperation {
         return false;
     }
 
-    /** How much of {@code key} sits on the servers this operation locked — what {@link #consumeIngredients} can extract. */
+    /** How much of {@code key} sits on the servers this operation locked, which is what {@link #consumeIngredients} can extract. */
     private long lockedServersHold(final NetworkStorage storage, final StorageKey key) {
         final java.util.Set<NodeUuid> allowed = lockedServers.get(key);
         if (allowed == null || allowed.isEmpty()) {
@@ -733,16 +771,20 @@ public final class NetworkCraftOperation implements IPersistentOperation {
     private long consumeIngredients(final NetworkStorage storage, final CraftingPattern pattern,
                                     final long runs) {
         long executable = runs;
-        // First pass: how many runs can the pools + LOCKED network actually deliver? Only ingredients this
-        // operation holds a lock on may come from the network; an UNLOCKED ingredient is an intermediate that
-        // must come from the pool (its upstream step), so it is never pulled from the shared network under
-        // another operation's reservation — counting it here would let this craft bypass the lock system.
+        /*
+         * First pass: how many runs can the pools + LOCKED network actually deliver? Only ingredients this
+         * operation holds a lock on may come from the network; an UNLOCKED ingredient is an intermediate that
+         * must come from the pool (its upstream step), so it is never pulled from the shared network under
+         * another operation's reservation, and counting it here would let this craft bypass the lock system.
+         */
         for (final Map.Entry<StorageKey, Long> entry : pattern.ingredientTotals().entrySet()) {
             final long perRun = entry.getValue();
             final long pooled = pool.getOrDefault(entry.getKey(), 0L);
-            // Count only the servers this operation locked — the same servers the extract below pulls from —
-            // not the whole network. A concurrent machine step can drain unlocked (or another op's) servers, so
-            // counting the whole network would let this craft credit runs whose input it cannot actually remove.
+            /*
+             * Count only the servers this operation locked (the same servers the extract below pulls from)
+             * not the whole network. A concurrent machine step can drain unlocked (or another op's) servers, so
+             * counting the whole network would let this craft credit runs whose input it cannot actually remove.
+             */
             final long networkHas = lockedServersHold(storage, entry.getKey());
             executable = Math.min(executable, (pooled + networkHas) / perRun);
         }
@@ -759,13 +801,17 @@ public final class NetworkCraftOperation implements IPersistentOperation {
             }
             if (need > 0) {
                 if (!lockedServers.containsKey(key)) {
-                    // Intermediate shortfall with no lock: stall rather than bypass the lock by pulling
-                    // from the open network; the upstream step replenishes the pool on a later tick.
+                    /*
+                     * Intermediate shortfall with no lock: stall rather than bypass the lock by pulling
+                     * from the open network; the upstream step replenishes the pool on a later tick.
+                     */
                     return 0;
                 }
-                // Crafting consumes the items: extract from the SAME servers the lock holds (not just any
-                // server in discovery order) so each release frees its matching reservation as the items
-                // leave, instead of missing and leaving them reserved until the craft finishes.
+                /*
+                 * Crafting consumes the items: extract from the SAME servers the lock holds (not just any
+                 * server in discovery order) so each release frees its matching reservation as the items
+                 * leave, instead of missing and leaving them reserved until the craft finishes.
+                 */
                 final Map<NodeUuid, Long> moved = storage.selectBreakdown(
                         key, need, (k, amount, simulate) -> amount, lockedServers.get(key));
                 moved.forEach((server, amount) -> index.release(operationId, key, server, amount));
@@ -792,9 +838,11 @@ public final class NetworkCraftOperation implements IPersistentOperation {
             }
         }
 
-        // Deliver the result, then return every leftover intermediate. A machine step delivered its output into
-        // this craft's pool (like a bench step), so both the result and any leftover intermediates sit in the
-        // pool here and go back to the network from there — nothing is ever wasted.
+        /*
+         * Deliver the result, then return every leftover intermediate. A machine step delivered its output into
+         * this craft's pool (like a bench step), so both the result and any leftover intermediates sit in the
+         * pool here and go back to the network from there, so nothing is ever wasted.
+         */
         deliveredResult = Math.min(pool.getOrDefault(resultKey, 0L), requested);
         if (deliveredResult > 0) {
             pool.merge(resultKey, -deliveredResult, Long::sum);
@@ -822,8 +870,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
             return;
         }
         cancelled = true;
-        // The machine steps in flight are this craft's own stages: stop them with it. Whatever the machines
-        // already hold stays in the machines, in the world, where the player can collect it.
+        /*
+         * The machine steps in flight are this craft's own stages: stop them with it. Whatever the machines
+         * already hold stays in the machines, in the world, where the player can collect it.
+         */
         for (final MachineRun run : new ArrayList<>(machineRuns)) {
             run.op.cancel();
         }
@@ -855,10 +905,12 @@ public final class NetworkCraftOperation implements IPersistentOperation {
 
     @Override
     public boolean isWaiting() {
-        // While its machine steps run, the craft is parked on those operations and holds no Mainframe queue of its
-        // own: crafting is a subnet independent of the Mainframe's operation queues, so a parked craft frees the
-        // queue for other operations while its machines (gated by the Crafting Computer's threads) do the work.
-        // Its own liveRecord still reads PROCESSING (the waiting field, not this), so the log shows it under way.
+        /*
+         * While its machine steps run, the craft is parked on those operations and holds no Mainframe queue of its
+         * own: crafting is a subnet independent of the Mainframe's operation queues, so a parked craft frees the
+         * queue for other operations while its machines (gated by the Crafting Computer's threads) do the work.
+         * Its own liveRecord still reads PROCESSING (the waiting field, not this), so the log shows it under way.
+         */
         return (waiting || !machineRuns.isEmpty()) && !done;
     }
 
@@ -905,8 +957,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
 
     @Override
     public OperationRecord toRecord() {
-        // Keep the sub-operations (each plan step) in the settled record too, so the operations log shows what a
-        // craft was made of — its machine and bench stages — instead of the stages appearing as separate entries.
+        /*
+         * Keep the sub-operations (each plan step) in the settled record too, so the operations log shows what a
+         * craft was made of (its machine and bench stages) instead of the stages appearing as separate entries.
+         */
         return buildRecord(status, true);
     }
 
@@ -955,8 +1009,10 @@ public final class NetworkCraftOperation implements IPersistentOperation {
                 OperationRecord.MAX_SUBS));
         for (int i = 0; i < plan.steps().size() && subs.size() < OperationRecord.MAX_SUBS; i++) {
             final CraftPlanner.Step step = plan.steps().get(i);
-            // A step is streaming when it is actually being worked now: a machine step with a running operation,
-            // or a bench step that has started and is not currently yielding to the machine steps.
+            /*
+             * A step is streaming when it is actually being worked now: a machine step with a running operation,
+             * or a bench step that has started and is not currently yielding to the machine steps.
+             */
             final byte state = runsDone[i] >= step.runs() ? OperationRecord.SubRow.SUB_COMPLETED
                     : isRunningStep(i) || (!step.isMachine() && !waiting && machineRuns.isEmpty() && runsDone[i] > 0)
                         ? OperationRecord.SubRow.SUB_STREAMING

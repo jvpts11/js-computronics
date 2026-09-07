@@ -283,8 +283,10 @@ class CoreEventDispatcherTest {
     void post_deliversToAncestorInterfaceSubscriber() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        // ICoreEvent is a SUPERinterface of the event's direct interface (IOperationLifecycleEvent), so it
-        // is only reached once the whole interface graph is walked, not just the direct interfaces.
+        /*
+         * ICoreEvent is a SUPERinterface of the event's direct interface (IOperationLifecycleEvent), so it
+         * is only reached once the whole interface graph is walked, not just the direct interfaces.
+         */
         dispatcher.subscribe(ICoreEvent.class, e -> count.incrementAndGet());
 
         dispatcher.post(created());

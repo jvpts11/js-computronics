@@ -94,8 +94,10 @@ public class PatternEncoderBlock extends HorizontalDirectionalBlock implements E
         return net.minecraft.world.level.block.RenderShape.ENTITYBLOCK_ANIMATED;
     }
 
-    // The body fills its block in every era, so the shape is the plain cube: nothing to walk through or
-    // stand on beyond the block itself.
+    /*
+     * The body fills its block in every era, so the shape is the plain cube: nothing to walk through or
+     * stand on beyond the block itself.
+     */
     @Override
     protected net.minecraft.world.phys.shapes.VoxelShape getShape(
             final BlockState state, final net.minecraft.world.level.BlockGetter level, final BlockPos pos,

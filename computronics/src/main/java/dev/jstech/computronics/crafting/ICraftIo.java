@@ -17,7 +17,7 @@ import net.minecraft.server.level.ServerLevel;
  * Where a machine step draws its inputs from and returns its outputs to. A standalone processing operation uses
  * the network (the default). A machine step run inside a recursive craft uses that craft's isolated pool, so
  * several steps of one craft can run at once and pipeline through the pool without racing on shared network
- * stock — the network is touched only for the craft's raws and its final result.
+ * stock, and the network is touched only for the craft's raws and its final result.
  */
 public interface ICraftIo {
 

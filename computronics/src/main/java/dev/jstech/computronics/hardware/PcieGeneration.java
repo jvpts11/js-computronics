@@ -36,7 +36,7 @@ public enum PcieGeneration {
      * Whether this card bus is compatible with the given motherboard slot. ISA, PCI, and AGP are
      * physically distinct and reject each other; all PCIe generations are cross-compatible.
      *
-     * <p>A newer card in an older slot still runs — it is simply held to the older slot's bandwidth.
+     * <p>A newer card in an older slot still runs, and is simply held to the older slot's bandwidth.
      * See {@link #bandwidthFactorIn}.
      */
     public boolean compatibleWith(final PcieGeneration slot) {

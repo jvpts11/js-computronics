@@ -64,8 +64,10 @@ public final class OperationLifecycleGameTests {
         final ItemStackHandler dest = new ItemStackHandler(9);
         final List<IOperationLifecycleEvent> seen = new ArrayList<>();
         final NetworkSelectOperation[] op = new NetworkSelectOperation[1];
-        // The bus is shared by every test on the server: listen for this network's events only, and let
-        // go of the listener when done so it does not outlive the test.
+        /*
+         * The bus is shared by every test on the server: listen for this network's events only, and let
+         * go of the listener when done so it does not outlive the test.
+         */
         final Consumer<IOperationLifecycleEvent> listener = event -> {
             if (event.networkUuid().equals(mainframe.networkUuid())) {
                 seen.add(event);

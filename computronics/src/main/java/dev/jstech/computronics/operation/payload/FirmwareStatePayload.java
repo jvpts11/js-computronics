@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Server to client: everything the firmware boot manager shows for one computer — the boot entries (each
+ * Server to client: everything the firmware boot manager shows for one computer: the boot entries (each
  * disk, with or without a system; each linked drive holding a bootable medium), the preferred boot disk,
  * and the hardware summary. Sent in reply to {@link RequestFirmwareStatePayload} and after every
  * {@link FirmwareActionPayload} that changes the state.

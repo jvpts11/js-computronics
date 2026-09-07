@@ -15,7 +15,7 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Server to client: reopen the system installer at its last beat. The system is already on the
- * disk, but the machine has not restarted since, so it is still the installer that is running —
+ * disk, but the machine has not restarted since, so it is still the installer that is running, and
  * the monitor shows its "reboot" prompt again rather than a system that never booted.
  *
  * @param host         the computer

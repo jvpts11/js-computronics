@@ -68,10 +68,12 @@ public abstract class AbstractComputerScreen<T extends AbstractContainerMenu> ex
 
     @Override
     public void render(final GuiGraphics graphics, final int mouseX, final int mouseY, final float partialTick) {
-        // Bind this screen's era skin for the render pass (background, widgets, labels) and always restore the
-        // default afterwards, so any unthemed draw stays on the frozen STANDARD look. A subclass that overrides
-        // render still routes through here via super.render(), so its background and widgets get the bound skin;
-        // its post-super draws are tooltips (vanilla-styled, palette-agnostic) so they are unaffected by the skin.
+        /*
+         * Bind this screen's era skin for the render pass (background, widgets, labels) and always restore the
+         * default afterwards, so any unthemed draw stays on the frozen STANDARD look. A subclass that overrides
+         * render still routes through here via super.render(), so its background and widgets get the bound skin;
+         * its post-super draws are tooltips (vanilla-styled, palette-agnostic) so they are unaffected by the skin.
+         */
         JsTechTheme.bind(theme);
         try {
             super.render(graphics, mouseX, mouseY, partialTick);

@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PcieGenerationTest {
 
-    // busFamily() — correct family mapping
+    // busFamily(): correct family mapping
 
     @Test
     void busFamily_isa_returnsIsa() {
@@ -45,7 +45,7 @@ class PcieGenerationTest {
         }
     }
 
-    // compatibleWith() — same family = compatible, cross-family = incompatible
+    // compatibleWith(): same family = compatible, cross-family = incompatible
 
     @Test
     void compatibleWith_sameFamily_isa() {

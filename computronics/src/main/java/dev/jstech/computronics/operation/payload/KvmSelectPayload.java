@@ -15,7 +15,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: the player picked a channel on the KVM Switch — put the machine in rack row
+ * Client to server: the player picked a channel on the KVM Switch, so put the machine in rack row
  * {@code slot} on the monitor and start its session.
  */
 public record KvmSelectPayload(BlockPos rackPos, BlockPos monitorPos, int slot)

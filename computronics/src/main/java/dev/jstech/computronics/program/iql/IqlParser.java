@@ -20,14 +20,14 @@ import java.util.Locale;
  *
  * <p>Three statement shapes, dispatched on the verb:
  * <ul>
- *   <li><b>action</b> — {@code VERB [qty] item [FROM loc] [TO loc] [WHERE cond] [IF cond]
+ *   <li><b>action</b>: {@code VERB [qty] item [FROM loc] [TO loc] [WHERE cond] [IF cond]
  *       [ORDER BY field [ASC|DESC]] [LIMIT n] [PRIORITY level]}
  *       (SELECT/INSERT/DELETE/MOVE/DROP/CRAFT/COUNT/LOCK/UNLOCK), with the five-flow validation (see
  *       {@link #validateFlow}). {@code qty} is optional; when omitted it is {@link IqlOperation#NONE}.
  *       {@code level} is one of LOW, MEDIUM_LOW, MEDIUM, MEDIUM_HIGH, HIGH (or NORMAL for MEDIUM).</li>
- *   <li><b>query</b> — {@code (QUERY|SHOW) object [WHERE cond] [ORDER BY ...] [LIMIT n]}: a read that
+ *   <li><b>query</b>: {@code (QUERY|SHOW) object [WHERE cond] [ORDER BY ...] [LIMIT n]}: a read that
  *       names a schema object instead of an item, and has no FROM/TO/IF.</li>
- *   <li><b>maintenance</b> — {@code (ANALYZE|VACUUM|REINDEX) [object]}.</li>
+ *   <li><b>maintenance</b>: {@code (ANALYZE|VACUUM|REINDEX) [object]}.</li>
  * </ul>
  *
  * <p>A parse error currently surfaces as an {@link IllegalArgumentException}; it will move to a richer
@@ -58,8 +58,10 @@ public final class IqlParser {
         if (input == null || input.isBlank()) {
             return IqlParseResult.error("empty statement", IqlParseResult.NO_POSITION);
         }
-        // Layer 2 first: CREATE/DROP/EXEC of a saved object. tryParse returns null (and we fall through)
-        // for an ordinary action; it throws only when the text *is* a malformed definition.
+        /*
+         * Layer 2 first: CREATE/DROP/EXEC of a saved object. tryParse returns null (and we fall through)
+         * for an ordinary action; it throws only when the text *is* a malformed definition.
+         */
         try {
             final IqlDefinition definition = IqlDefinitionParser.tryParse(input);
             if (definition != null) {

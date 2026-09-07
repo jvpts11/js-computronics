@@ -33,7 +33,7 @@ class PerEraBuildTest {
         return new ComputerBuild(board, List.of(cpu), List.of(), List.of(ram), psu);
     }
 
-    // ---- Vintage ----
+    // Vintage
 
     private static MotherboardSpec vintageBoard() {
         return new MotherboardSpec(FormFactor.BABY_AT, HardwareEra.VINTAGE, CpuSocket.SOCKET_3, 1,
@@ -65,7 +65,7 @@ class PerEraBuildTest {
         assertFalse(build(vintageBoard(), vintageCpu(), ddr, psu(300)).isPowered());
     }
 
-    // ---- Legacy ----
+    // Legacy
 
     private static MotherboardSpec legacyBoard() {
         return new MotherboardSpec(FormFactor.ATX, HardwareEra.LEGACY, CpuSocket.LGA_775, 1,
@@ -97,7 +97,7 @@ class PerEraBuildTest {
         assertFalse(build(legacyBoard(), legacyCpu(), ddr3, psu(500)).isPowered());
     }
 
-    // ---- Standard ----
+    // Standard
 
     private static MotherboardSpec standardBoard() {
         return new MotherboardSpec(FormFactor.ATX, HardwareEra.STANDARD, CpuSocket.LGA_1150, 1,

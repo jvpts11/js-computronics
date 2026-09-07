@@ -58,7 +58,7 @@ class DisjointSetUnionTest {
 
     @Test
     void makeSet_growsBackingCapacity() {
-        // Default initial capacity is 16 — adding 100 should trigger resizes.
+        // Default initial capacity is 16, so adding 100 should trigger resizes.
         for (int i = 0; i < 100; i++) {
             dsu.makeSet();
         }
@@ -191,8 +191,10 @@ class DisjointSetUnionTest {
 
     @Test
     void scenario_twoSeparateNetworksThenMerge() {
-        // Simulates: place 5 cables forming network A, place 5 cables
-        // forming network B, then a cable connects them — they merge.
+        /*
+         * Simulates: place 5 cables forming network A, place 5 cables
+         * forming network B, then a cable connects them, so they merge.
+         */
         int[] netA = new int[5];
         int[] netB = new int[5];
         for (int i = 0; i < 5; i++) netA[i] = dsu.makeSet();

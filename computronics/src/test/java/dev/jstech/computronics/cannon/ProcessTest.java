@@ -216,8 +216,10 @@ class ProcessTest {
 
     @Test
     void run_stopsWhenAnotherNameForSomethingFreedIsUsed() {
-        // Disposing leaves the name that did it holding nothing, so the way to reach a freed object
-        // is through a second name for it, and that is what has to be caught.
+        /*
+         * Disposing leaves the name that did it holding nothing, so the way to reach a freed object
+         * is through a second name for it, and that is what has to be caught.
+         */
         final Process process = run("""
                         List<string> names = new List<string>();
                         List<string> also = names;

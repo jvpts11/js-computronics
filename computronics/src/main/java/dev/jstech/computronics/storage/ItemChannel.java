@@ -29,8 +29,10 @@ public record ItemChannel(IItemHandler items) implements IDataChannel {
         if (amount <= 0L || !key.isItem()) {
             return 0L;
         }
-        // Items insert in vanilla-sized stacks; EXECUTE mutates the handler so each batch sees the remaining
-        // room. (Simulation is best-effort — the operation path always executes.)
+        /*
+         * Items insert in vanilla-sized stacks; EXECUTE mutates the handler so each batch sees the remaining
+         * room. (Simulation is best-effort; the operation path always executes.)
+         */
         final int batch = Math.max(1, key.stack(1).getMaxStackSize());
         long inserted = 0L;
         long remaining = amount;

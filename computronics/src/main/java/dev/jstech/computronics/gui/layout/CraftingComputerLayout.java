@@ -14,7 +14,7 @@ import dev.jstech.core.gui.layout.GuiLayout;
  * no Minecraft dependency, so {@link #layout()} can be unit-tested without the game running.
  *
  * <p>Both {@code CraftingComputerMenu} (which places the real slots) and {@code CraftingComputerScreen}
- * (which draws the frames) consume these constants — one source of truth so moving any element or adding
+ * (which draws the frames) consume these constants, one source of truth so moving any element or adding
  * a new control updates the layout, the test, and the in-game screen all at once.
  *
  * <p>Hardware slots occupy the left half (x up to ~116); the right column starts at {@link #COL_R}.
@@ -25,9 +25,7 @@ import dev.jstech.core.gui.layout.GuiLayout;
  */
 public final class CraftingComputerLayout {
 
-    // -----------------------------------------------------------------------
     // Panel dimensions
-    // -----------------------------------------------------------------------
 
     public static final int WIDTH = 244;
 
@@ -38,17 +36,13 @@ public final class CraftingComputerLayout {
      */
     public static final int HEIGHT = 216;
 
-    // -----------------------------------------------------------------------
     // Header bar
-    // -----------------------------------------------------------------------
 
     public static final int HEADER_X = 6;
     public static final int HEADER_Y = 6;
     public static final int HEADER_W = 232;
 
-    // -----------------------------------------------------------------------
-    // Left column — hardware slots
-    // -----------------------------------------------------------------------
+    // Left column: hardware slots
 
     public static final int SLOT = 18;
 
@@ -74,15 +68,11 @@ public final class CraftingComputerLayout {
     public static final int DISK_Y = 106; // up to DISK_SLOTS = 2
     public static final int DISK_SLOTS = 2;
 
-    // -----------------------------------------------------------------------
     // Vertical separator
-    // -----------------------------------------------------------------------
 
     public static final int VLINE_X = 121;  // COL_R - 5
 
-    // -----------------------------------------------------------------------
-    // Right column — metrics tiles and control buttons
-    // -----------------------------------------------------------------------
+    // Right column: metrics tiles and control buttons
 
     public static final int COL_R = 126;
     public static final int COL_R_W = 110;
@@ -98,9 +88,7 @@ public final class CraftingComputerLayout {
     public static final int AUTO_X = COL_R;
     public static final int AUTO_Y = 121;
 
-    // -----------------------------------------------------------------------
-    // Player inventory — starts below the hardware block and the control buttons.
-    // -----------------------------------------------------------------------
+    // Player inventory: starts below the hardware block and the control buttons.
 
     /**
      * Y of the player inventory top row. The Auto button (the lowest right-column control) ends at
@@ -121,7 +109,7 @@ public final class CraftingComputerLayout {
      */
     public static GuiLayout layout() {
         final GuiLayout l = new GuiLayout(WIDTH, HEIGHT)
-                // Left column — hardware slots (worst case: all slots present)
+                // Left column: hardware slots (worst case: all slots present)
                 .box("mobo",  MOBO_X,              MOBO_Y, SLOT, SLOT)
                 .box("psu",   PSU_X,               PSU_Y,  SLOT, SLOT)
                 .box("cpu",   RIGHT_X,             CPU_Y,  SLOT, SLOT);
@@ -137,7 +125,7 @@ public final class CraftingComputerLayout {
         }
 
         l
-                // Right column — tiles and buttons
+                // Right column: tiles and buttons
                 .box("tileCapacity", COL_R, TILE_Y0, COL_R_W, TILE_H)
                 .box("tileCraft",    COL_R, TILE_Y1, COL_R_W, TILE_H)
                 .box("tileRom",      COL_R, TILE_Y2, COL_R_W, TILE_H)
@@ -147,7 +135,7 @@ public final class CraftingComputerLayout {
         // Player inventory
         l.playerInventory(INV_X, INV_Y);
 
-        // Text labels (captions — excluded from overlap check, only checked for bounds)
+        // Text labels (captions, excluded from overlap check, only checked for bounds)
         l.text("titleCC",     12,                    11, 2, 1.0f);
         l.text("statusPill",  WIDTH - 6 * 7,         11, 7, 1.0f);  // "OFFLINE" = 7 chars
         l.text("lblBoard",     MOBO_X,               27, 5, 1.0f);  // "BOARD"

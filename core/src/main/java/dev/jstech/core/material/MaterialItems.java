@@ -57,7 +57,7 @@ public final class MaterialItems {
         if (formMap == null || !formMap.containsKey(form)) {
             throw new IllegalStateException(
                     "Not registered: " + mat + "/" + form
-                    + " — check activeModForms or call MaterialItems.register() first");
+                    + ". Check activeModForms or call MaterialItems.register() first");
         }
         return formMap.get(form);
     }

@@ -159,8 +159,10 @@ public final class Library {
             };
         }
         if (this.host.provides(owner)) {
-            // To the machine, being asked for a value and being asked to do something are the same
-            // question with different names, so a property goes out as a call that takes nothing.
+            /*
+             * To the machine, being asked for a value and being asked to do something are the same
+             * question with different names, so a property goes out as a call that takes nothing.
+             */
             final IHost.Reply reply = this.host.call(owner, name, List.of(), this.caller, line);
             this.owed += Math.max(0, reply.cost() - 1);
             return this.adopt(reply.value(), line);
@@ -359,8 +361,10 @@ public final class Library {
         };
     }
 
-    // Joining two handlers makes a third that calls both. Parting takes the last one that matches,
-    // which is how a listener removes only what it added.
+    /*
+     * Joining two handlers makes a third that calls both. Parting takes the last one that matches,
+     * which is how a listener removes only what it added.
+     */
     private Object delegates(final String name, final List<Object> arguments, final int line) {
         final Object left = arguments.getFirst();
         final Object right = arguments.get(1);

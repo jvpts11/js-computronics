@@ -30,8 +30,10 @@ public final class BuiltinCommands {
             "cls", "dir", "cd", "type", "del", "write", "run", "mkdir", "rmdir", "copy", "move", "ren",
             // The POSIX shell formats with mkfs and removes packages through its package manager.
             "format", "uninstall",
-            // pckmgr is the Frames package manager: a Linux distribution keeps apt/dnf/pacman/emerge,
-            // and offering both on the same shell would be two doors to one room.
+            /*
+             * pckmgr is the Frames package manager: a Linux distribution keeps apt/dnf/pacman/emerge,
+             * and offering both on the same shell would be two doors to one room.
+             */
             "pckmgr");
 
     /** The verbs both shell families share (network, programs, config, maintenance); no DOS file verbs. */
@@ -47,9 +49,11 @@ public final class BuiltinCommands {
 
     public static List<ICliCommand> all() {
         final List<ICliCommand> out = new java.util.ArrayList<>(base());
-        // The toolchain's verbs come from the toolchain, so adding one there is enough to have it. Two
-        // lists of the same commands is two lists that eventually disagree, and the one that loses is
-        // always the one a player types into.
+        /*
+         * The toolchain's verbs come from the toolchain, so adding one there is enough to have it. Two
+         * lists of the same commands is two lists that eventually disagree, and the one that loses is
+         * always the one a player types into.
+         */
         out.addAll(CannonCommands.all());
         return List.copyOf(out);
     }
@@ -106,7 +110,7 @@ public final class BuiltinCommands {
         return String.format(Locale.ROOT, "%,d", n);
     }
 
-    // --- meta -------------------------------------------------------------------------------------
+    // meta
 
     static final class Help implements ICliCommand {
         @Override public String name() {
@@ -200,7 +204,7 @@ public final class BuiltinCommands {
         }
     }
 
-    // --- this computer ----------------------------------------------------------------------------
+    // this computer
 
     static final class Whoami implements ICliCommand {
         @Override public String name() {
@@ -242,7 +246,7 @@ public final class BuiltinCommands {
     }
 
     /**
-     * A remote shell on another machine of the same network — the route that makes a headless rack
+     * A remote shell on another machine of the same network, the route that makes a headless rack
      * server administrable from any terminal. {@code ssh} with no argument lists what is reachable;
      * {@code exit} on a connected session comes back to the local shell.
      */
@@ -269,8 +273,10 @@ public final class BuiltinCommands {
                 }
                 ctx.out().line("Reachable hosts:");
                 for (final ICliComputer.RemoteHost host : hosts) {
-                    // Name what the player can actually type: the host name, the machine's own name
-                    // and its node id all address it.
+                    /*
+                     * Name what the player can actually type: the host name, the machine's own name
+                     * and its node id all address it.
+                     */
                     final StringBuilder detail = new StringBuilder();
                     if (!host.name().isEmpty() && !host.name().equalsIgnoreCase(host.hostname())) {
                         detail.append('"').append(host.name()).append("\"  ");
@@ -323,13 +329,17 @@ public final class BuiltinCommands {
                 case "install" -> requireName(ctx, computer::packageInstall);
                 case "remove", "uninstall" -> requireName(ctx, computer::packageRemove);
                 case "update", "upgrade" -> report(ctx, computer.packageUpdate());
-                // search always looks at the whole shelf; list shows this computer's packages unless
-                // --available asks for everything the mirror offers.
+                /*
+                 * search always looks at the whole shelf; list shows this computer's packages unless
+                 * --available asks for everything the mirror offers.
+                 */
                 case "search" -> listPackages(ctx, ctx.argCount() > 1 ? ctx.arg(1) : "", false);
                 case "list" -> {
                     final String flag = ctx.argCount() > 1 ? ctx.arg(1) : "";
-                    // A mistyped flag must say so: silently listing something else is how a typo
-                    // becomes "the feature is broken".
+                    /*
+                     * A mistyped flag must say so: silently listing something else is how a typo
+                     * becomes "the feature is broken".
+                     */
                     if (!flag.isEmpty() && !flag.equalsIgnoreCase("--available")) {
                         ctx.out().error("pckmgr list: unknown option " + flag + " (did you mean --available?)");
                     } else {
@@ -388,8 +398,10 @@ public final class BuiltinCommands {
                         && !info.description().toLowerCase(Locale.ROOT).contains(needle)) {
                     continue;
                 }
-                // Something another player wrote says so. Whether to install it is then an informed
-                // choice rather than a guess about where it came from.
+                /*
+                 * Something another player wrote says so. Whether to install it is then an informed
+                 * choice rather than a guess about where it came from.
+                 */
                 final String state = info.building() ? "building"
                         : info.installed() ? "installed"
                                 : info.community() ? "community" : "available";
@@ -506,7 +518,7 @@ public final class BuiltinCommands {
         }
     }
 
-    // --- storage ----------------------------------------------------------------------------------
+    // storage
 
     static final class Find implements ICliCommand {
         @Override public String name() {
@@ -537,7 +549,7 @@ public final class BuiltinCommands {
         }
     }
 
-    // --- operations -------------------------------------------------------------------------------
+    // operations
 
     static final class Lock implements ICliCommand {
         @Override public String name() {
@@ -962,7 +974,7 @@ public final class BuiltinCommands {
         }
     }
 
-    // --- filesystem -------------------------------------------------------------------------------
+    // filesystem
 
     /**
      * Lists the files on the system disk. Each entry shows the file name, its size in mB-equivalents,
@@ -1302,7 +1314,7 @@ public final class BuiltinCommands {
         }
     }
 
-    /** Shows or changes this computer's settings — the MC-DOS front-end for the Settings app. */
+    /** Shows or changes this computer's settings, the MC-DOS front-end for the Settings app. */
     static final class Config implements ICliCommand {
         @Override public String name() { return "config"; }
 

@@ -10,7 +10,7 @@ package dev.jstech.computronics.program.cli;
 import java.util.List;
 
 /**
- * Everything a command receives when it runs: the arguments after the command word, the computer to act on, the output buffer to write into, and the shell itself (so {@code help} can list its peers). Pure data — no Minecraft types — so a command is exercised in a unit test with a fake computer.
+ * Everything a command receives when it runs: the arguments after the command word, the computer to act on, the output buffer to write into, and the shell itself (so {@code help} can list its peers). Pure data (no Minecraft types) so a command is exercised in a unit test with a fake computer.
  */
 public record CliContext(List<String> args, ICliComputer computer, CliOutput out, CliShell shell) {
 
@@ -45,7 +45,7 @@ public record CliContext(List<String> args, ICliComputer computer, CliOutput out
         }
     }
 
-    /** The arguments from {@code index} onward joined with spaces — for free-text trailing operands. */
+    /** The arguments from {@code index} onward joined with spaces, for free-text trailing operands. */
     public String rest(final int index) {
         if (index >= args.size()) {
             return "";

@@ -60,8 +60,10 @@ class DesktopZTest {
 
     @Test
     void itemLayers_eachLeavesItemDepthHeadroomBeforeTheNextLayer() {
-        // A renderItem model occupies ~ITEM_DEPTH of depth; an item layer must not let its models poke into
-        // the layer drawn in front of it, or items would render over a higher layer.
+        /*
+         * A renderItem model occupies ~ITEM_DEPTH of depth; an item layer must not let its models poke into
+         * the layer drawn in front of it, or items would render over a higher layer.
+         */
         for (final int layer : DesktopZ.itemLayers()) {
             final int next = DesktopZ.nextAbove(layer);
             assertTrue(next - layer >= DesktopZ.ITEM_DEPTH,
@@ -80,8 +82,10 @@ class DesktopZTest {
 
     @Test
     void tooltipMatchesTheVanillaInternalDepth() {
-        // The vanilla tooltip renderer translates +400 internally; the desktop draws tooltips at the base pose
-        // and relies on this exact value landing them above the windows and taskbar.
+        /*
+         * The vanilla tooltip renderer translates +400 internally; the desktop draws tooltips at the base pose
+         * and relies on this exact value landing them above the windows and taskbar.
+         */
         assertEquals(400, DesktopZ.TOOLTIP);
     }
 
@@ -91,8 +95,10 @@ class DesktopZTest {
 
     @Test
     void everyDepthConstant_appearsExactlyOnceInOrdered() throws IllegalAccessException {
-        // Reflection guard: every public layer constant must be in ordered() exactly once, so a newly added
-        // layer can never be drawn at an unmanaged depth — the exact way this bug kept returning.
+        /*
+         * Reflection guard: every public layer constant must be in ordered() exactly once, so a newly added
+         * layer can never be drawn at an unmanaged depth, the exact way this bug kept returning.
+         */
         final List<Integer> ordered = Arrays.stream(DesktopZ.ordered()).boxed().toList();
         for (final Field f : DesktopZ.class.getDeclaredFields()) {
             if (f.getType() == int.class && Modifier.isStatic(f.getModifiers())
@@ -140,8 +146,10 @@ class DesktopZTest {
 
     @Test
     void windowBands_fitUnderTheInventoryLayer() {
-        // A window's items and their counts live inside its band; the whole stack of bands must stay behind
-        // the inventory band, or a back window's item would paint over the focused window's real slots.
+        /*
+         * A window's items and their counts live inside its band; the whole stack of bands must stay behind
+         * the inventory band, or a back window's item would paint over the focused window's real slots.
+         */
         assertTrue(DesktopZ.windowsTop() <= DesktopZ.INVENTORY,
                 "window bands reach z=" + DesktopZ.windowsTop() + ", past the inventory layer at "
                         + DesktopZ.INVENTORY);
@@ -152,8 +160,10 @@ class DesktopZTest {
 
     @Test
     void inWindowItems_landInTheirOwnBandNotInFrontOfTheDesktop() {
-        // The offsets cancel the lift GuiGraphics applies internally, which is the whole point: an item drawn
-        // at a window's Z must end up near that window, not ITEM_LIFT in front of every window.
+        /*
+         * The offsets cancel the lift GuiGraphics applies internally, which is the whole point: an item drawn
+         * at a window's Z must end up near that window, not ITEM_LIFT in front of every window.
+         */
         assertEquals(DesktopZ.BAND_ITEM, DesktopZ.itemOffset() + DesktopZ.ITEM_LIFT);
         assertEquals(DesktopZ.BAND_COUNT, DesktopZ.countOffset() + DesktopZ.DECORATION_LIFT);
         final int backItem = DesktopZ.windowZ(0, 2) + DesktopZ.BAND_COUNT;

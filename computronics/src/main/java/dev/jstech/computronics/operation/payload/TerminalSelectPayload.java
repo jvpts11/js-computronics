@@ -18,7 +18,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Client to server: a Monitor terminal asked to SELECT {@code quantity} of {@code key}'s data type (item OR fluid, with components) from the chosen source Servers to a chosen destination — the computer's local storage, or another computer on the network (a MOVE).
+ * Client to server: a Monitor terminal asked to SELECT {@code quantity} of {@code key}'s data type (item OR fluid, with components) from the chosen source Servers to a chosen destination: the computer's local storage, or another computer on the network (a MOVE).
  */
 public record TerminalSelectPayload(BlockPos monitorPos, BlockPos hostPos, StorageKey key, long quantity,
                                     List<String> serverKeys, int destKind, String destServer)

@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * The NetworkSystem — graph of cables, network anchors, gateways and routers that connects computers, machines and peripherals.
+ * The NetworkSystem: the graph of cables, network anchors, gateways and routers that connects computers, machines and peripherals.
  */
 package dev.jstech.core.network;

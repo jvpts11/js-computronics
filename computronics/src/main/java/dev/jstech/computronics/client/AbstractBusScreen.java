@@ -81,8 +81,10 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
         JsTechTheme.vLine(g, nx, ny, BusLayout.NAME_H);
         JsTechTheme.vLine(g, nx + BusLayout.NAME_W - 1, ny, BusLayout.NAME_H);
 
-        // Every bus shows its filter slot (on a crafting bus it routes the mounted face). Only the stock
-        // controls (min/max window, mode) vanish on the passive crafting buses rather than lie.
+        /*
+         * Every bus shows its filter slot (on a crafting bus it routes the mounted face). Only the stock
+         * controls (min/max window, mode) vanish on the passive crafting buses rather than lie.
+         */
         if (menu.filterApplies()) {
             JsTechTheme.slot(g, x + BusLayout.FILTER_X, y + BusLayout.FILTER_Y); // ghost filter slot
         }
@@ -151,8 +153,10 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
             JsTechTheme.textCenter(g, font, modeText, BusLayout.MODE_X + BusLayout.MODE_W / 2,
                     BusLayout.MODE_Y + 4, JsTechTheme.accent());
         } else {
-            // A passive crafting bus keeps its filter (it routes the mounted face) but has no stock window:
-            // explain the filter in place of the inapplicable min/max/mode controls.
+            /*
+             * A passive crafting bus keeps its filter (it routes the mounted face) but has no stock window:
+             * explain the filter in place of the inapplicable min/max/mode controls.
+             */
             JsTechTheme.textS(g, font, "Filter pins what this face", BusLayout.LABEL_X,
                     BusLayout.MIN_Y + 1, JsTechTheme.dim());
             JsTechTheme.textS(g, font, "carries (empty = any). The", BusLayout.LABEL_X,
@@ -166,8 +170,10 @@ public abstract class AbstractBusScreen<T extends AbstractBusMenu> extends Abstr
 
     @Override
     public boolean keyPressed(final int key, final int scan, final int mods) {
-        // While the name field has focus, route keys to it and swallow the inventory key so 'e' types
-        // a character instead of closing the GUI; ESC just unfocuses the field.
+        /*
+         * While the name field has focus, route keys to it and swallow the inventory key so 'e' types
+         * a character instead of closing the GUI; ESC just unfocuses the field.
+         */
         if (nameBox != null && nameBox.isFocused()) {
             if (key == 256) {
                 nameBox.setFocused(false);

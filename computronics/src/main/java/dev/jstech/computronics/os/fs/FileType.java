@@ -14,8 +14,8 @@ import java.util.Optional;
  *
  * <p>Two flags describe how a type is handled:
  * <ul>
- *   <li>{@code userEditable} — the player can open and edit this type in the Text Editor.</li>
- *   <li>{@code virtualProjection} — the type is generated on-the-fly from the disk's item
+ *   <li>{@code userEditable}, the player can open and edit this type in the Text Editor.</li>
+ *   <li>{@code virtualProjection}, the type is generated on-the-fly from the disk's item
  *       storage and is never persisted as a real file. Only {@link #DAT} is a virtual
  *       projection; all others are stored on disk.</li>
  * </ul>
@@ -25,31 +25,33 @@ import java.util.Optional;
  */
 public enum FileType {
 
-    /** IQL query script — user-editable. */
+    /** IQL query script, user-editable. */
     IQL("iql", true, false),
 
-    /** Plain text file — user-editable. */
+    /** Plain text file, user-editable. */
     TXT("txt", true, false),
 
-    /** System log — append-only; not directly editable by the player. */
+    /** System log, append-only; not directly editable by the player. */
     LOG("log", false, false),
 
-    /** Configuration file — user-editable. */
+    /** Configuration file, user-editable. */
     CFG("cfg", true, false),
 
-    /** Comma-separated values — user-editable. */
+    /** Comma-separated values, user-editable. */
     CSV("csv", true, false),
 
-    /** Command script — user-editable. */
+    /** Command script, user-editable. */
     CMD("cmd", true, false),
 
-    /** Crafting-pattern data — not directly editable (managed by the Crafting Computer). */
+    /** Crafting-pattern data, not directly editable (managed by the Crafting Computer). */
     CRAFT("craft", false, false),
 
     /** Virtual read-only projection of a disk's item/fluid storage; never persisted. */
     DAT("dat", false, true),
-    // What an install medium shows when opened: generated from its payload the way DAT is generated
-    // from a disk's storage, never stored, never a player's to create, copy or delete.
+    /*
+     * What an install medium shows when opened: generated from its payload the way DAT is generated
+     * from a disk's storage, never stored, never a player's to create, copy or delete.
+     */
     /** A setup program a player runs to install what the medium carries. */
     EXE("exe", false, true),
     /** The same on a Linux medium. */
@@ -61,11 +63,11 @@ public enum FileType {
     /** Opaque installer payload (a cabinet, an image, a kernel): listed, never opened. */
     BIN("bin", false, true),
 
-    /** Cannon source — user-editable, and what the compiler reads. */
+    /** Cannon source, user-editable, and what the compiler reads. */
     CAN("can", true, false),
 
     /**
-     * The assembly the compiler writes — user-editable, and meant to be read.
+     * The assembly the compiler writes, user-editable, and meant to be read.
      *
      * <p>It is text on purpose: a player can open what their program was turned into and follow it a
      * line at a time, which is the whole reason the compiler does not keep it to itself.

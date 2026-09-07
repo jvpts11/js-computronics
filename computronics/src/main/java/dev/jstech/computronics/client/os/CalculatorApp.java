@@ -98,8 +98,10 @@ public final class CalculatorApp implements IDesktopApp {
         final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, partialTick);
         g.fill(x, y, x + width, y + height, skin.windowBg());
 
-        // Display: the running expression on top, the last result below, both right-aligned with their
-        // ends kept in view, since the most recently typed part is what matters.
+        /*
+         * Display: the running expression on top, the last result below, both right-aligned with their
+         * ends kept in view, since the most recently typed part is what matters.
+         */
         skin.field(g, x + 2, y + 2, width - 4, DISPLAY_H - 4, false);
         final String shown = tail(font, input.isEmpty() ? "0" : input, width - 12);
         g.drawString(font, shown, x + width - 6 - font.width(shown), y + 6, skin.text(), false);

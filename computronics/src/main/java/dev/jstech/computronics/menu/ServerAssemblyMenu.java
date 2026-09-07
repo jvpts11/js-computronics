@@ -37,9 +37,11 @@ public class ServerAssemblyMenu extends AbstractComputerMenu {
         this.hand = hand;
         this.hw = new ServerHardwareHandler(owner, hand);
 
-        // The spec readout (tiles + tracks + problems, in a smaller font) sits on top;
-        // the bays follow. Left column: board + PSU. No disk slots since the racks rework —
-        // a server's drives live in the rack's front-panel hotswap slots, not in the chassis.
+        /*
+         * The spec readout (tiles + tracks + problems, in a smaller font) sits on top;
+         * the bays follow. Left column: board + PSU. No disk slots since the racks rework:
+         * a server's drives live in the rack's front-panel hotswap slots, not in the chassis.
+         */
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.MOBO, 8, 96));
         addSlot(new SlotItemHandler(hw, ServerHardwareHandler.PSU, 26, 96));
         // Middle column: CPUs on a row, RAM in 2 rows, GPUs in 2 rows.

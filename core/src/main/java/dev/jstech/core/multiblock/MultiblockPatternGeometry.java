@@ -49,7 +49,7 @@ public final class MultiblockPatternGeometry implements IMultiblockGeometry {
         return cachedBlockCount;
     }
 
-    // ---- internals -----------------------------------------------------------
+    // internals
 
     private List<BlockPos> collect(final BlockPos controller, final Direction facing,
                                    final boolean excludeController) {

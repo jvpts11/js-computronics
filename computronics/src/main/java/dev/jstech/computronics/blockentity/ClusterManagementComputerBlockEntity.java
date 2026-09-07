@@ -53,8 +53,8 @@ import java.util.Set;
 
 /**
  * The Cluster Management Computer's machine: an ordinary computer (board, CPU, RAM, disks, a GPU to sit
- * at it) that, with a Cluster Interface Card, reaches every cluster on its network — each HBW Interface
- * is a supercomputer, each router section a datacenter — and drives their nodes as one machine: bulk
+ * at it) that, with a Cluster Interface Card, reaches every cluster on its network (each HBW Interface
+ * is a supercomputer, each router section a datacenter) and drives their nodes as one machine: bulk
  * installs that run as timed jobs, bay power in bulk or one by one, the craft queues. Everything it does
  * goes through the same per-node hosts a player reaches rack by rack, with the same gates: a shortcut,
  * never a loophole. A cluster works without one.
@@ -140,7 +140,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         system.unregisterPersonalComputer(network, nodeUuid());
     }
 
-    // ---- the card ----
+    // the card
 
     /** The installed Cluster Interface Card, or null. */
     @Nullable
@@ -185,7 +185,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return Math.max(1, (int) Math.floor(card.parallelNodes() * factor));
     }
 
-    // ---- what the network reaches ----
+    // what the network reaches
 
     /** A cluster the machine can address: a supercomputer (its interface) or a datacenter section. */
     public record ClusterRef(RackChassis.RackType kind, BlockPos anchor, @Nullable Direction face) {
@@ -229,9 +229,11 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
             return refs;
         }
         final NetworkSystem system = NetworkSystem.get(serverLevel);
-        // A router rebuilds its sections on its own only about once a second. A manager acting on a
-        // section must see the servers that registered this tick, not a second-old picture, so the
-        // caches are forced up to date first — once per tick, however many times this is asked.
+        /*
+         * A router rebuilds its sections on its own only about once a second. A manager acting on a
+         * section must see the servers that registered this tick, not a second-old picture, so the
+         * caches are forced up to date first, once per tick, however many times this is asked.
+         */
         final long now = serverLevel.getGameTime();
         final boolean refresh = now != routersRefreshedAt;
         routersRefreshedAt = now;
@@ -283,8 +285,10 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         }
         final SectionRef section = sectionAt(ref.anchor(), ref.face());
         if (section != null) {
-            // Every seated server in the section's cabinets, switched on or off: a bay the manager powered
-            // off has left the network, and must still be listed so the manager can power it back on.
+            /*
+             * Every seated server in the section's cabinets, switched on or off: a bay the manager powered
+             * off has left the network, and must still be listed so the manager can power it back on.
+             */
             for (final long rackPos : section.section().rackPositions()) {
                 if (serverLevel.getBlockEntity(BlockPos.of(rackPos)) instanceof ServerRackBlockEntity rack) {
                     for (final int row : rack.computerSlots()) {
@@ -312,7 +316,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return level != null && level.getBlockEntity(pos) instanceof ServerRackBlockEntity rack ? rack : null;
     }
 
-    // ---- install media: the discs in the readers linked to this machine ----
+    // install media: the discs in the readers linked to this machine
 
     public record Medium(ResourceLocation id, String label) {
     }
@@ -341,7 +345,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return program != null ? program.displayName() : id.getPath();
     }
 
-    // ---- bulk power ----
+    // bulk power
 
     /** Switches every node's bay on or off; returns how many changed. */
     public int powerAll(final ClusterRef ref, final boolean on) {
@@ -369,7 +373,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return true;
     }
 
-    // ---- the install job: timed, per node, cancellable ----
+    // the install job: timed, per node, cancellable
 
     public enum JobKind { SYSTEM, PROGRAM }
 
@@ -599,8 +603,10 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
             if (!host.installOs(j.medium.id())) {
                 return false;
             }
-            // The files are on the disk; the node restarts into them, the same rule a single machine's
-            // installer enforces — a system is only running once it has booted.
+            /*
+             * The files are on the disk; the node restarts into them, the same rule a single machine's
+             * installer enforces: a system is only running once it has booted.
+             */
             host.setNeedsPost(true);
             return true;
         }
@@ -629,7 +635,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return chassis == RackChassis.SUPERCOMPUTER_NODE ? "node" : "server";
     }
 
-    // ---- local storage, like a PC: what is on the installed disks ----
+    // local storage, like a PC: what is on the installed disks
 
     @Override
     public LocalStore localStore() {
@@ -666,7 +672,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return new StoreSink(localStore());
     }
 
-    // ---- IComputerTerminalHost: the monitor's read-only view ----
+    // IComputerTerminalHost: the monitor's read-only view
 
     @Override
     public boolean computerRunning() {
@@ -711,7 +717,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return NetworkSystem.get(serverLevel).serversOf(networkUuid()).size();
     }
 
-    // ---- screen sync ----
+    // screen sync
 
     public static final int DATA_RUNNING = 0;
     public static final int DATA_BUILD_VALID = 1;

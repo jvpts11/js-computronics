@@ -28,7 +28,7 @@ import java.util.Set;
  *
  * <p>{@code .dat} entries are never persisted; they are generated on-demand from the disk's storage volume
  * each time {@link DiskFilesystem#list} is called. Items leave storage only via the Network
- * Interactor — the filesystem API cannot write or delete {@code .dat} entries.
+ * Interactor, and the filesystem API cannot write or delete {@code .dat} entries.
  */
 public final class StorageProjection {
 
@@ -64,9 +64,7 @@ public final class StorageProjection {
         return List.copyOf(entries);
     }
 
-    // -------------------------------------------------------------------------
     // Internal helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Converts an arbitrary display-name string into a valid file base name (no extension):
@@ -84,8 +82,10 @@ public final class StorageProjection {
         if (displayName == null || displayName.isBlank()) {
             return "item";
         }
-        // Replace anything that is not alphanumeric/hyphen/underscore/dot with underscore.
-        // Then collapse consecutive underscores and trim boundary underscores.
+        /*
+         * Replace anything that is not alphanumeric/hyphen/underscore/dot with underscore.
+         * Then collapse consecutive underscores and trim boundary underscores.
+         */
         String s = displayName.strip();
         final StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {

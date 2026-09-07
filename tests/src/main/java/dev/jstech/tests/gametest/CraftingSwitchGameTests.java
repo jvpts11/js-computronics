@@ -34,7 +34,7 @@ public final class CraftingSwitchGameTests {
 
     @GameTest(template = ARENA)
     public static void craftingSwitch_detectsMachineAndComputer(final GameTestHelper helper) {
-        // computer — crafting cable — switch, with a Macerator on another switch face.
+        // computer to crafting cable to switch, with a Macerator on another switch face.
         final BlockPos computer = new BlockPos(2, 2, 2);
         final BlockPos cable = new BlockPos(3, 2, 2);
         final BlockPos sw = new BlockPos(4, 2, 2);
@@ -68,9 +68,11 @@ public final class CraftingSwitchGameTests {
 
     @GameTest(template = ARENA)
     public static void craftingSwitch_updateTagCarriesSurveyToTheGui(final GameTestHelper helper) {
-        // The survey results (machine faces, linked computer) are transient server data: the GUI only sees
-        // them through the block-entity update tag. A switch with a machine and a linked computer must
-        // publish both, or the screen renders UNLINKED with no machine — a bug this mod shipped once.
+        /*
+         * The survey results (machine faces, linked computer) are transient server data: the GUI only sees
+         * them through the block-entity update tag. A switch with a machine and a linked computer must
+         * publish both, or the screen renders UNLINKED with no machine, a bug this mod shipped once.
+         */
         final BlockPos computer = new BlockPos(2, 2, 2);
         final BlockPos cable = new BlockPos(3, 2, 2);
         final BlockPos sw = new BlockPos(4, 2, 2);

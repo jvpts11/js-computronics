@@ -8,7 +8,7 @@
 package dev.jstech.computronics.storage;
 
 /**
- * A store that holds data by weight and reports how much room it has left — the contract a {@link StoreSink} needs, shared by a Server's {@link ServerStore} and a computer's disk-backed {@link LocalStore} so one sink serves both.
+ * A store that holds data by weight and reports how much room it has left, the contract a {@link StoreSink} needs, shared by a Server's {@link ServerStore} and a computer's disk-backed {@link LocalStore} so one sink serves both.
  */
 public interface IWeightedStore {
 

@@ -77,9 +77,11 @@ public final class ComputerConsoleState {
         return installed.add(programId);
     }
 
-    // The mod version each installed package was built against. A mod update leaves packages behind
-    // their new build, which is what `pckmgr update` exists to reconcile — the same way a real
-    // package manager reconciles a repository that moved on without you.
+    /*
+     * The mod version each installed package was built against. A mod update leaves packages behind
+     * their new build, which is what `pckmgr update` exists to reconcile, the same way a real
+     * package manager reconciles a repository that moved on without you.
+     */
     private final Map<String, String> installedVersions = new LinkedHashMap<>();
 
     /** The version a package was installed at, or {@code ""} when it predates version tracking. */
@@ -110,8 +112,10 @@ public final class ComputerConsoleState {
         return installed.remove(programId);
     }
 
-    // A live installation medium booted on this computer (the manual Arch / Gentoo install), until it reboots
-    // into the installed system. Persisted so a half-done install survives a reload.
+    /*
+     * A live installation medium booted on this computer (the manual Arch / Gentoo install), until it reboots
+     * into the installed system. Persisted so a half-done install survives a reload.
+     */
     private dev.jstech.computronics.program.install.LiveInstallState liveInstall;
 
     /** The live installation in progress, or null when the computer is not booted from a live medium. */
@@ -129,9 +133,11 @@ public final class ComputerConsoleState {
         this.liveInstall = null;
     }
 
-    // Packages a source-based package manager (emerge) is still compiling: program id -> the game tick at
-    // which the build finishes and the program becomes installed. Settled lazily by the shell on the next
-    // command, so no per-tick agent is needed.
+    /*
+     * Packages a source-based package manager (emerge) is still compiling: program id -> the game tick at
+     * which the build finishes and the program becomes installed. Settled lazily by the shell on the next
+     * command, so no per-tick agent is needed.
+     */
     private final Map<String, Long> pendingBuilds = new LinkedHashMap<>();
 
     /** Starts (or restarts) a source build of {@code programId} that completes at game tick {@code readyAtTick}. */
@@ -145,8 +151,10 @@ public final class ComputerConsoleState {
         buildTotals.put(programId, totalTicks);
     }
 
-    // The full duration of each running build, so the console can print percentage progress. Persisted
-    // beside the completion ticks; entries leave with their build.
+    /*
+     * The full duration of each running build, so the console can print percentage progress. Persisted
+     * beside the completion ticks; entries leave with their build.
+     */
     private final Map<String, Long> buildTotals = new LinkedHashMap<>();
 
     /** The full duration in ticks of a running build, or 0 when unknown. */
@@ -186,8 +194,10 @@ public final class ComputerConsoleState {
         return done;
     }
 
-    // Builds that finished but have not been announced to the player yet (persisted, so a build that
-    // completes while the world is unloaded is still reported the next time the shell is used).
+    /*
+     * Builds that finished but have not been announced to the player yet (persisted, so a build that
+     * completes while the world is unloaded is still reported the next time the shell is used).
+     */
     private final java.util.List<String> finishedBuilds = new java.util.ArrayList<>();
 
     /** Returns and clears the finished-but-unannounced build ids, in completion order. */
@@ -218,9 +228,11 @@ public final class ComputerConsoleState {
         this.computerName = name == null ? "" : name;
     }
 
-    // The machine this session is currently ssh'd into, as a packed block position, or null when the
-    // shell is local. In memory like the rest of the session: closing the terminal drops the remote
-    // shell, exactly as hanging up a real one does.
+    /*
+     * The machine this session is currently ssh'd into, as a packed block position, or null when the
+     * shell is local. In memory like the rest of the session: closing the terminal drops the remote
+     * shell, exactly as hanging up a real one does.
+     */
     private Long sshTarget;
 
     /** The packed position of the machine this session is connected to, or null when local. */
@@ -233,9 +245,11 @@ public final class ComputerConsoleState {
         this.sshTarget = packedPos;
     }
 
-    // The command line's current drive and per-drive current directory (a DOS-style session). Kept in memory:
-    // like closing a real terminal, it resets to the boot drive's root when the computer reloads. Each drive
-    // remembers its own directory, so switching back to a drive returns to where you left it.
+    /*
+     * The command line's current drive and per-drive current directory (a DOS-style session). Kept in memory:
+     * like closing a real terminal, it resets to the boot drive's root when the computer reloads. Each drive
+     * remembers its own directory, so switching back to a drive returns to where you left it.
+     */
     private char terminalDrive = 'C';
     private final Map<Character, String> terminalDirs = new LinkedHashMap<>();
 

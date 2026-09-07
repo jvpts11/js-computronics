@@ -190,8 +190,10 @@ class ProportionalSplitterTest {
 
     @Test
     void shortage_conservesTheTotalWithoutOverflowOnHugeSupply() {
-        // available * effDemand once overflowed a long here: 4e9 * 5e9 = 2e19 > Long.MAX (~9.2e18),
-        // corrupting the largest-remainder split. With long-range FE this is a reachable late-tier case.
+        /*
+         * available * effDemand once overflowed a long here: 4e9 * 5e9 = 2e19 > Long.MAX (~9.2e18),
+         * corrupting the largest-remainder split. With long-range FE this is a reachable late-tier case.
+         */
         final long demandEach = 5_000_000_000L;
         final long available = 4_000_000_000L;
         final Map<Long, Long> demand = new LinkedHashMap<>();

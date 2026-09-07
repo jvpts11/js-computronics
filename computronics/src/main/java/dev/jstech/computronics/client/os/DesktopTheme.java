@@ -40,21 +40,21 @@ public record DesktopTheme(
             0xFF2A3656, 0xFFFFFFFF, 0xFFFAFAFE, 0xFFC0C4D2,
             "Start", false);
 
-    // KDE Plasma — Breeze: deep blue wallpaper, dark panel, sky-blue accents, light window chrome.
+    // KDE Plasma (Breeze): deep blue wallpaper, dark panel, sky-blue accents, light window chrome.
     private static final DesktopTheme KDE = new DesktopTheme(
             0xFF0C3D73, 0xFF1B1E24, 0xFF2A2F38, 0xFF3DAEE9, 0xFFEFF0F1,
             0xFF2A2F38, 0xFF1F5A8A, 0xFFFFFFFF, 0xFF31363B, 0xFFEFF0F1,
             0xFF3DAEE9, 0xFFEFF0F1, 0xFFEFF0F1, 0xFFB9BFC8,
             "K", false);
 
-    // GNOME — Adwaita: blue-violet wallpaper, black top bar, GNOME blue accents.
+    // GNOME (Adwaita): blue-violet wallpaper, black top bar, GNOME blue accents.
     private static final DesktopTheme GNOME = new DesktopTheme(
             0xFF3B3F8F, 0xFF0F0F12, 0xFF1F1F24, 0xFF0F0F12, 0xFFFFFFFF,
             0xFF2A2A30, 0xFF2F3380, 0xFFFFFFFF, 0xFFF6F5F4, 0xFF2E3436,
             0xFF3584E4, 0xFF2E3436, 0xFFF6F5F4, 0xFFC0BFBC,
             "Activities", false);
 
-    // Cinnamon — Mint-Y: green-teal wallpaper, dark grey panel, Mint green accents.
+    // Cinnamon (Mint-Y): green-teal wallpaper, dark grey panel, Mint green accents.
     private static final DesktopTheme CINNAMON = new DesktopTheme(
             0xFF2B8A6E, 0xFF2B2B2B, 0xFF3A3A3A, 0xFF69B03B, 0xFFE3E3E3,
             0xFF3A3A3A, 0xFF1F6650, 0xFFFFFFFF, 0xFF2F2F2F, 0xFFE8E8E8,

@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: the machines Remote Control can take over from this computer — every other
+ * Server to client: the machines Remote Control can take over from this computer, every other
  * computer on the network, with what it runs and whether it is up.
  */
 public record RemoteHostsPayload(List<Entry> hosts) implements CustomPacketPayload {

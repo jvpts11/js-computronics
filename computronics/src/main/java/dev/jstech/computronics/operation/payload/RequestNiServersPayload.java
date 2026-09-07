@@ -15,7 +15,7 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Client to server: the Network Interactor asks for the network's computers (Mainframe, Servers, PCs)
- * to populate the request popup's advanced mode — the PULL FROM source list and the SEND TO destination
+ * to populate the request popup's advanced mode: the PULL FROM source list and the SEND TO destination
  * cycle. The server replies with a {@link NetworkServersPayload}.
  *
  * @param host       the computer the desktop is bound to

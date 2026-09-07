@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModMaterialTest {
 
-    // --- materialName() ---
+    // materialName()
 
     @Test
     void iron_materialName() {
@@ -42,7 +42,7 @@ class ModMaterialTest {
         assertEquals("bronze", ModMaterial.BRONZE.materialName());
     }
 
-    // --- isFormActive() ---
+    // isFormActive()
 
     @Test
     void iron_dust_is_active() {
@@ -131,7 +131,7 @@ class ModMaterialTest {
         }
     }
 
-    // --- isVanillaForm() ---
+    // isVanillaForm()
 
     @Test
     void iron_ingot_is_vanilla() {
@@ -179,7 +179,7 @@ class ModMaterialTest {
         assertTrue(ModMaterial.GOLD.isVanillaForm(MaterialForm.NUGGET));
     }
 
-    // --- isModForm() ---
+    // isModForm()
 
     @Test
     void iron_dust_is_mod_form() {
@@ -219,7 +219,7 @@ class ModMaterialTest {
         }
     }
 
-    // --- vanillaForms / activeModForms set immutability ---
+    // vanillaForms / activeModForms set immutability
 
     @Test
     void vanillaForms_returns_unmodifiable_set() {

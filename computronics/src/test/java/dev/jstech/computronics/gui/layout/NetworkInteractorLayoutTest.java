@@ -49,10 +49,12 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void layout_isCleanAcrossEveryWindowSizeAtOrAboveTheMinimum() {
-        // Sweep every size the window manager actually allows (it clamps to the per-app minimum). The four
-        // bands must never overlap and nothing may spill past the panel — this is the bug the player hit (the
-        // inventory rode up over the grid / fell off the window on resize). The framed inventory is always
-        // fully visible because the minimum reserves room for the whole band.
+        /*
+         * Sweep every size the window manager actually allows (it clamps to the per-app minimum). The four
+         * bands must never overlap and nothing may spill past the panel, which is the bug the player hit (the
+         * inventory rode up over the grid / fell off the window on resize). The framed inventory is always
+         * fully visible because the minimum reserves room for the whole band.
+         */
         for (int h = MIN_H; h <= 420; h += 5) {
             for (int w = MIN_W; w <= 540; w += 17) {
                 final GuiLayout layout = NetworkInteractorLayout.toGuiLayout(w, h);
@@ -65,8 +67,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void resolve_searchAndSortShareTheHeaderRowWithoutOverlapping() {
-        // The sort button is clicked at these coordinates, not at "the right edge of the content": measuring
-        // it against the whole width put its hit box out over the details panel, and the button did nothing.
+        /*
+         * The sort button is clicked at these coordinates, not at "the right edge of the content": measuring
+         * it against the whole width put its hit box out over the details panel, and the button did nothing.
+         */
         for (int w = MIN_W; w <= 520; w += 37) {
             final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(w, MIN_H);
             assertTrue(z.sortW() > 0, "the sort button needs room at width " + w);
@@ -114,8 +118,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void resolve_detailsPanelNeverOverflowsTheWindowAtAnySize() {
-        // The bug that cut "WEIGHT"/"STORED": the panel must NEVER extend past the content box, at ANY size —
-        // even far below the minimum (a window restored at a stale small size). It shrinks; it never spills.
+        /*
+         * The bug that cut "WEIGHT"/"STORED": the panel must NEVER extend past the content box, at ANY size,
+         * even far below the minimum (a window restored at a stale small size). It shrinks; it never spills.
+         */
         for (int w = 100; w <= 560; w += 7) {
             for (int h = 100; h <= 440; h += 13) {
                 final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(w, h);
@@ -129,8 +135,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void resolve_gridNeverOverlapsTheDetailsPanel() {
-        // The grid lives in the left column; its right edge must never cross into the details panel. Checked
-        // across the real allowed range (the window manager clamps to minWidth).
+        /*
+         * The grid lives in the left column; its right edge must never cross into the details panel. Checked
+         * across the real allowed range (the window manager clamps to minWidth).
+         */
         for (int w = MIN_W; w <= 560; w += 7) {
             final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(w, 260);
             final int gridRight = z.gridX() + z.gridCols() * NetworkInteractorLayout.CELL;
@@ -141,8 +149,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void resolve_inventoryCellsTileExactlyAndStayInsideTheFrame() {
-        // The 36 slots must tile edge-to-edge: 9 columns at col*CELL, rows contiguous except the single hotbar
-        // gap before row 3, every cell fully inside the framed band — the seating that was wrong in-game.
+        /*
+         * The 36 slots must tile edge-to-edge: 9 columns at col*CELL, rows contiguous except the single hotbar
+         * gap before row 3, every cell fully inside the framed band, the seating that was wrong in-game.
+         */
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(348, 252);
         final int cell = NetworkInteractorLayout.CELL;
         assertTrue(z.invX() >= z.invBandX() + NetworkInteractorLayout.INV_PAD, "slots start left of the frame");
@@ -161,8 +171,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void resolve_nothingEverSpillsPastTheContentBoxAtOrAboveTheMinimum() {
-        // The strict version of the old generous sweep: at EVERY size the window manager actually allows (it
-        // clamps to minWidth/minHeight), NO zone may fall outside the content box — checked every 7px.
+        /*
+         * The strict version of the old generous sweep: at EVERY size the window manager actually allows (it
+         * clamps to minWidth/minHeight), NO zone may fall outside the content box, checked every 7px.
+         */
         for (int w = MIN_W; w <= 560; w += 7) {
             for (int h = MIN_H; h <= 440; h += 7) {
                 final GuiLayout layout = NetworkInteractorLayout.toGuiLayout(w, h);
@@ -174,8 +186,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void inventorySlotAt_roundTripsEverySlotCenterAndRejectsGapAndOutside() {
-        // The hover/click hit-test (inventorySlotAt) must be the exact inverse of where the slots are drawn:
-        // every drawn slot center maps back to its own index, so the hover always lands on the right slot.
+        /*
+         * The hover/click hit-test (inventorySlotAt) must be the exact inverse of where the slots are drawn:
+         * every drawn slot center maps back to its own index, so the hover always lands on the right slot.
+         */
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(348, 252);
         final int cell = NetworkInteractorLayout.CELL;
         for (int r = 0; r < NetworkInteractorLayout.INV_ROWS; r++) {
@@ -197,8 +211,10 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void gridIndexAt_roundTripsVisibleCellsAndRejectsScrollbarAndOutside() {
-        // The grid hover/click hit-test maps each drawn cell center back to its item index, honours the item
-        // scroll, and rejects the thin scrollbar margin on the right (which previously fired spurious actions).
+        /*
+         * The grid hover/click hit-test maps each drawn cell center back to its item index, honours the item
+         * scroll, and rejects the thin scrollbar margin on the right (which previously fired spurious actions).
+         */
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(348, 300);
         final int cell = NetworkInteractorLayout.CELL;
         for (int r = 0; r < z.gridRows(); r++) {
@@ -217,9 +233,11 @@ class NetworkInteractorLayoutTest {
 
     @Test
     void rowYOffset_insertsTheHotbarGapBeforeRow3() {
-        // The real inventory slots (DesktopMenu.layoutInventory) and the drawn backgrounds (renderInventoryBand)
-        // BOTH derive their row Y from this single function. The bug was layoutInventory using a plain row*18
-        // that dropped the hotbar gap, so the hotbar items sat 4px off their slots. Lock the offsets here.
+        /*
+         * The real inventory slots (DesktopMenu.layoutInventory) and the drawn backgrounds (renderInventoryBand)
+         * BOTH derive their row Y from this single function. The bug was layoutInventory using a plain row*18
+         * that dropped the hotbar gap, so the hotbar items sat 4px off their slots. Lock the offsets here.
+         */
         assertEquals(0, NetworkInteractorLayout.rowYOffset(0));
         assertEquals(NetworkInteractorLayout.CELL, NetworkInteractorLayout.rowYOffset(1));
         assertEquals(2 * NetworkInteractorLayout.CELL, NetworkInteractorLayout.rowYOffset(2));

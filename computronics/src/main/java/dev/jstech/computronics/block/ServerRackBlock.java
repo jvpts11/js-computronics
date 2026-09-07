@@ -106,8 +106,10 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
 
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
-        // A Server Rack takes any data cable tier but the high-compute fabric, which belongs to the
-        // supercomputer cabinet alone.
+        /*
+         * A Server Rack takes any data cable tier but the high-compute fabric, which belongs to the
+         * supercomputer cabinet alone.
+         */
         return java.util.EnumSet.complementOf(java.util.EnumSet.of(DataTier.HPC));
     }
 
@@ -167,8 +169,10 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
         final Level level = context.getLevel();
         final List<BlockPos> obstructedBlocks = getObstructedBlocks(level, context.getClickedPos(), facing);
         if (!obstructedBlocks.isEmpty()) {
-            // No room for the 2x3x2 cabinet — cancel placement, item not consumed, and outline the
-            // obstructing cells with particles so the player can see what is in the way.
+            /*
+             * No room for the 2x3x2 cabinet, so cancel placement, item not consumed, and outline the
+             * obstructing cells with particles so the player can see what is in the way.
+             */
             spawnMisplaceParticles(level, obstructedBlocks);
             return null;
         }
@@ -188,16 +192,18 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
-    // The cabinet model's rack units: rows fill texels 4..92 of the 96 (three blocks of 32) from the
-    // top down, 11 texels each, the same layout the rack renderer draws.
+    /*
+     * The cabinet model's rack units: rows fill texels 4..92 of the 96 (three blocks of 32) from the
+     * top down, 11 texels each, the same layout the rack renderer draws.
+     */
     private static final double ROW_BASE_TEXELS = 4.0;
     private static final double ROW_TEXELS = 11.0;
     private static final double TEXELS_PER_BLOCK = 32.0;
 
     /**
      * Seats a server or rack unit held in the hand. Aimed at the cabinet's front, it goes into the rack
-     * row under the crosshair — the row the player is looking at, counted from the top like the rack's
-     * slots — and is refused with the reason when that row cannot take it. Aimed anywhere else, it
+     * row under the crosshair (the row the player is looking at, counted from the top like the rack's
+     * slots) and is refused with the reason when that row cannot take it. Aimed anywhere else, it
      * takes the first row that fits, top down. Shared by the controller and the cabinet's part blocks.
      */
     static ItemInteractionResult mountFromHand(final ServerRackBlockEntity rack, final BlockPos controllerPos,
@@ -214,8 +220,10 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
         final ItemStackHandler servers = rack.getServers();
         final int aimed = aimedRow(rack, controllerPos, hitPos, hit);
         if (aimed >= 0) {
-            // isItemValid enforces the rack-unit fit: a row covered by a taller chassis is empty but
-            // not placeable, and a chassis must fit below its top row too.
+            /*
+             * isItemValid enforces the rack-unit fit: a row covered by a taller chassis is empty but
+             * not placeable, and a chassis must fit below its top row too.
+             */
             if (servers.getStackInSlot(aimed).isEmpty() && servers.isItemValid(aimed, stack)) {
                 servers.setStackInSlot(aimed, stack.split(1));
             } else {
@@ -256,7 +264,7 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
     /**
      * What the middle mouse button picks off a cabinet: the machine under the crosshair when there is one,
      * otherwise the cabinet itself. Every block of the cabinet answers this (the part blocks delegate here),
-     * because a player aiming anywhere at a rack expects to pick the rack — the parts have no item of their
+     * because a player aiming anywhere at a rack expects to pick the rack, since the parts have no item of their
      * own, so picking them used to hand back nothing at all.
      */
     static ItemStack pickFrom(final ServerRackBlockEntity rack, final BlockPos controllerPos,
@@ -273,7 +281,7 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
         return new ItemStack(cabinetItem);
     }
 
-    /** The row holding the machine that occupies {@code row} — a 2U chassis is picked from either of its rows. */
+    /** The row holding the machine that occupies {@code row}; a 2U chassis is picked from either of its rows. */
     private static int unitTopRow(final ServerRackBlockEntity rack, final int row) {
         for (int i = 0; i < row; i++) {
             final RackChassis chassis = ServerItem.chassisOf(rack.getServers().getStackInSlot(i));
@@ -303,8 +311,10 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
                                                final Player player, final BlockHitResult hit) {
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof ServerRackBlockEntity rack) {
-            // Sneaking on a supercomputer cabinet takes its livery panel off (or puts it back): the
-            // nodes are only ever seen through that opening.
+            /*
+             * Sneaking on a supercomputer cabinet takes its livery panel off (or puts it back): the
+             * nodes are only ever seen through that opening.
+             */
             if (player.isShiftKeyDown()
                     && rack.rackType() == dev.jstech.computronics.rack.RackChassis.RackType.SUPERCOMPUTER) {
                 rack.toggleServicePanel();
@@ -312,8 +322,10 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
             }
             serverPlayer.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new dev.jstech.computronics.menu.ServerRackMenu(id, inv, rack),
-                    // The cabinet's own name: a compute cabinet is not a Server Rack, and each era has its
-                    // own. It used to open every one of them titled "Server Rack".
+                    /*
+                     * The cabinet's own name: a compute cabinet is not a Server Rack, and each era has its
+                     * own. It used to open every one of them titled "Server Rack".
+                     */
                     state.getBlock().getName()),
                     buf -> buf.writeBlockPos(pos));
         }

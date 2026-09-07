@@ -86,7 +86,7 @@ public final class ThisPcApp implements IDesktopApp {
 
     private static ThisPcApp active;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final Label nameLabel;
     private final Label kindLabel;
@@ -200,8 +200,10 @@ public final class ThisPcApp implements IDesktopApp {
                         g.drawString(font, badge, tx + maxW - bw, cy + 2, GREEN, false);
                     }
                 }
-                // The bar is segmented by what actually takes the space, so "the disk is full" always
-                // comes with "of what": the system, the items stored on it, or its files.
+                /*
+                 * The bar is segmented by what actually takes the space, so "the disk is full" always
+                 * comes with "of what": the system, the items stored on it, or its files.
+                 */
                 final int barW = maxW - 70;
                 g.fill(tx, cy + 12, tx + barW, cy + 15, 0xFFD7DBE4);
                 final long cap = Math.max(1, disk.capItems());
@@ -386,7 +388,7 @@ public final class ThisPcApp implements IDesktopApp {
         return !skin.osPath().startsWith("frames_");
     }
 
-    // ---- state readers ----
+    // state readers
 
     private String machineName() {
         final ThisPcPayload.WireMachine m = data.machine();
@@ -434,7 +436,7 @@ public final class ThisPcApp implements IDesktopApp {
         }
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -592,7 +594,7 @@ public final class ThisPcApp implements IDesktopApp {
         }
     }
 
-    // ---- inspection (client tests; points are content-local, i.e. relative to window.x()+4 / window.y()+18)
+    // inspection (client tests; points are content-local, i.e. relative to window.x()+4 / window.y()+18)
 
     /** The index of the first drive whose medium name contains {@code nameContains}, or -1. */
     public int mediaRowIndex(final String nameContains) {
@@ -623,7 +625,7 @@ public final class ThisPcApp implements IDesktopApp {
         return new int[] {0, 0};
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
@@ -646,8 +648,10 @@ public final class ThisPcApp implements IDesktopApp {
     private void install(final long readerPos) {
         PacketDistributor.sendToServer(new InstallFromMediaPayload(host, readerPos));
         request();
-        // The install lands server-side before this refresh is processed, so the desktop's
-        // launchers pick the new program up immediately.
+        /*
+         * The install lands server-side before this refresh is processed, so the desktop's
+         * launchers pick the new program up immediately.
+         */
         DesktopScreen.refreshActive();
     }
 
@@ -724,7 +728,7 @@ public final class ThisPcApp implements IDesktopApp {
         return false;
     }
 
-    // ---- helpers ----
+    // helpers
 
     private static String prettyDrive(final String drive) {
         return switch (drive) {

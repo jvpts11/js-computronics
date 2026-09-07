@@ -20,7 +20,7 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
- * Menu for the Crafting Computer's assembly surface: motherboard, PSU, CPU, RAM, PCIe (where the Crafting Card goes) and disks — each restricted to its component category and clamped to the count the installed motherboard offers — plus the player inventory.
+ * Menu for the Crafting Computer's assembly surface: motherboard, PSU, CPU, RAM, PCIe (where the Crafting Card goes) and disks (each restricted to its component category and clamped to the count the installed motherboard offers) plus the player inventory.
  */
 public class CraftingComputerMenu extends AbstractComputerMenu {
 
@@ -167,9 +167,11 @@ public class CraftingComputerMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        // Validate against the block family, not a single block: the Standard, Vintage and Legacy
-        // Crafting Computers are distinct blocks that share this menu. Checking only the Standard block
-        // would make the server reject a Vintage/Legacy menu as invalid and close it the instant it opens.
+        /*
+         * Validate against the block family, not a single block: the Standard, Vintage and Legacy
+         * Crafting Computers are distinct blocks that share this menu. Checking only the Standard block
+         * would make the server reject a Vintage/Legacy menu as invalid and close it the instant it opens.
+         */
         return access.evaluate((level, pos) ->
                 level.getBlockState(pos).getBlock()
                         instanceof dev.jstech.computronics.block.CraftingComputerBlock

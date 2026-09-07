@@ -16,8 +16,8 @@ import net.minecraft.client.gui.GuiGraphics;
  * OS" look as its STANDARD default and lets each screen repaint in the skin of its host computer's hardware era.
  *
  * <p>A screen binds its resolved theme once per render pass ({@link #bind}) and unbinds afterwards; every color
- * accessor and palette-coupled helper below reads the bound theme. With the STANDARD theme bound — the default, and
- * the fallback for any screen without a valid build — the helpers run the exact fill sequences the flat-dark theme
+ * accessor and palette-coupled helper below reads the bound theme. With the STANDARD theme bound (the default, and
+ * the fallback for any screen without a valid build), the helpers run the exact fill sequences the flat-dark theme
  * always did, so the default GUI is byte-identical to before.
  */
 public final class JsTechTheme {
@@ -120,7 +120,7 @@ public final class JsTechTheme {
         return active.small();
     }
 
-    // Backgrounds (renderBg, absolute coordinates) — delegate to the bound theme's palette-coupled drawing.
+    // Backgrounds (renderBg, absolute coordinates): delegate to the bound theme's palette-coupled drawing.
 
     public static void window(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         active.window(g, x, y, w, h);
@@ -156,7 +156,7 @@ public final class JsTechTheme {
         active.track(g, x, y, w, frac, fillColor);
     }
 
-    // Text (renderLabels, GUI-relative coordinates) — palette-agnostic; the caller passes the color.
+    // Text (renderLabels, GUI-relative coordinates): palette-agnostic; the caller passes the color.
 
     public static void text(final GuiGraphics g, final Font f, final String s, final int x, final int y,
                             final int color) {

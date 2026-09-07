@@ -26,7 +26,7 @@ public sealed interface ILinkResult
     }
 
     /**
-     * The endpoint is already linked to another owner — endpoints have cardinality 1.
+     * The endpoint is already linked to another owner, and endpoints have cardinality 1.
      */
     record AlreadyLinked(long endpointPos, long existingOwnerPos)
             implements ILinkResult {
@@ -40,7 +40,7 @@ public sealed interface ILinkResult
     }
 
     /**
-     * BFS could not reach the endpoint from the owner via cables of the matching type — no continuous path exists.
+     * BFS could not reach the endpoint from the owner via cables of the matching type, so no continuous path exists.
      */
     record NoPathFound(long ownerPos, long endpointPos) implements ILinkResult {
     }
@@ -54,7 +54,7 @@ public sealed interface ILinkResult
     }
 
     /**
-     * The cable type of the path does not match either the owner's or the endpoint's accepted type — happens when the BFS picks up a cable of the wrong system mid-path.
+     * The cable type of the path does not match either the owner's or the endpoint's accepted type, which happens when the BFS picks up a cable of the wrong system mid-path.
      */
     record CableTypeMismatch(PeripheralCableType expected,
                              PeripheralCableType actual)

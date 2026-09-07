@@ -37,7 +37,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A structural part of the Mainframe multiblock — one of the 11 non-controller blocks.
+ * A structural part of the Mainframe multiblock, one of the 11 non-controller blocks.
  */
 public class MainframePartBlock extends HorizontalDirectionalBlock
         implements EntityBlock, IDataNetworkConnectable, IPeripheralConnectable {
@@ -46,17 +46,21 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
 
     @Override
     public PeripheralCableType peripheralType() {
-        // The whole Mainframe footprint is a COMPUTING peripheral owner, so a
-        // Peripheral Cable may attach to any part's face, not just the controller.
+        /*
+         * The whole Mainframe footprint is a COMPUTING peripheral owner, so a
+         * Peripheral Cable may attach to any part's face, not just the controller.
+         */
         return PeripheralCableType.COMPUTING;
     }
 
     public static final BooleanProperty CORE = BooleanProperty.create("core");
 
-    // The part inherits its controller's hardware era so the whole footprint wears one skin. The value
-    // is the era's level() ordinal (0=Vintage, 1=Legacy, 2=Standard) — only the eras that actually have
-    // a Mainframe controller. Storing the ordinal keeps the Minecraft-aware property type out of the
-    // pure HardwareEra enum; consumers map it back with HardwareEra.fromLevel(int).
+    /*
+     * The part inherits its controller's hardware era so the whole footprint wears one skin. The value
+     * is the era's level() ordinal (0=Vintage, 1=Legacy, 2=Standard), and only the eras that actually have
+     * a Mainframe controller. Storing the ordinal keeps the Minecraft-aware property type out of the
+     * pure HardwareEra enum; consumers map it back with HardwareEra.fromLevel(int).
+     */
     public static final IntegerProperty ERA = IntegerProperty.create(
             "era", HardwareEra.VINTAGE.level(), HardwareEra.STANDARD.level());
 
@@ -75,7 +79,7 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
 
     @Override
     public java.util.Set<DataTier> acceptedCableTiers() {
-        // The whole Mainframe footprint takes HBW — a cable may attach to any face.
+        // The whole Mainframe footprint takes HBW, so a cable may attach to any face.
         return java.util.Set.of(DataTier.T2_HBW);
     }
 
@@ -92,8 +96,10 @@ public class MainframePartBlock extends HorizontalDirectionalBlock
                 && part.controllerPos() != null
                 && level.getBlockEntity(part.controllerPos()) instanceof MainframeBlockEntity controller) {
             final BlockPos controllerPos = part.controllerPos();
-            // Sneaking anywhere on the cabinet takes its service panel off, the same as on the
-            // controller: a player has no way to tell which of the twelve blocks they are looking at.
+            /*
+             * Sneaking anywhere on the cabinet takes its service panel off, the same as on the
+             * controller: a player has no way to tell which of the twelve blocks they are looking at.
+             */
             if (player.isShiftKeyDown()) {
                 controller.toggleServicePanel();
                 return InteractionResult.sidedSuccess(false);

@@ -38,7 +38,7 @@ import java.util.List;
 
 /**
  * Everything at once: two Mekanism machines on the crafting run, two Crafting Computers, a Supercomputer
- * cluster and a Mainframe with a GPU serve three requests together — frames through the infuser, iron dust
+ * cluster and a Mainframe with a GPU serve three requests together: frames through the infuser, iron dust
  * through the crusher and a large bench craft fanned out across the computers. Both machines must work at the
  * same time, every request must complete, and the stock must balance to the unit.
  */
@@ -134,17 +134,21 @@ public final class MekanismParallelLoadGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 6000)
     public static void clusterComingOnlineMidCraft_freesItsSlotWhileWaitingOnAMachine(final GameTestHelper helper) {
-        // Regression for the exclusiveClaim latch: a craft that starts with no cluster (exclusive claim) and then
-        // sees the cluster come online mid-flight must switch to fan-out AND still release the cluster slot while
-        // it waits on a later machine step — so a second request can use the cluster.
+        /*
+         * Regression for the exclusiveClaim latch: a craft that starts with no cluster (exclusive claim) and then
+         * sees the cluster come online mid-flight must switch to fan-out AND still release the cluster slot while
+         * it waits on a later machine step, so a second request can use the cluster.
+         */
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final TestWorldBuilder world = rig.world();
         final StorageKey frame = MekanismRig.itemKey(MekanismRig.generators("fusion_reactor_frame"));
         placeClusterOffline(world); // present but OFF at submit → the craft claims a single computer exclusively
         final INetworkOperation[] op = new INetworkOperation[1];
-        // The longest run of consecutive ticks the craft held a cluster slot after the cluster came online. With
-        // the stale-latch bug, a fanned-out craft never releases the slot, so it stays held for a whole machine
-        // step (dozens of ticks); with the fix it is taken and freed within one tick per machine step.
+        /*
+         * The longest run of consecutive ticks the craft held a cluster slot after the cluster came online. With
+         * the stale-latch bug, a fanned-out craft never releases the slot, so it stays held for a whole machine
+         * step (dozens of ticks); with the fix it is taken and freed within one tick per machine step.
+         */
         final int[] maxHeld = {0};
         final int[] held = {0};
         final boolean[] clusterWasOnlineMidCraft = {false};
@@ -186,8 +190,10 @@ public final class MekanismParallelLoadGameTests {
                     helper.assertTrue(rig.net().storage(helper.getLevel()).count(frame) == 4, "four frames must be made");
                     helper.assertTrue(clusterWasOnlineMidCraft[0],
                             "the cluster must have come online while the craft still had machine steps to run");
-                    // The final bench step legitimately holds the slot for a few ticks; a stale exclusiveClaim
-                    // latch would instead pin it across a whole ~200-tick machine step. 20 separates the two.
+                    /*
+                     * The final bench step legitimately holds the slot for a few ticks; a stale exclusiveClaim
+                     * latch would instead pin it across a whole ~200-tick machine step. 20 separates the two.
+                     */
                     helper.assertTrue(maxHeld[0] <= 20,
                             "a fanned-out craft must not hold a cluster slot across a machine-step wait; held for " + maxHeld[0] + " ticks");
                 })
@@ -267,8 +273,10 @@ public final class MekanismParallelLoadGameTests {
                                     && r.status() == OperationRecord.STATUS_PROCESSING)
                             .count();
                     helper.assertTrue(running == 2, "both machines must be working at once on their own queues; active=" + records);
-                    // Crafts waiting on their machines hold no cluster slot: the planks are done, the other
-                    // two are parked on the infuser and the crusher, so the cluster is free for the next request.
+                    /*
+                     * Crafts waiting on their machines hold no cluster slot: the planks are done, the other
+                     * two are parked on the infuser and the crusher, so the cluster is free for the next request.
+                     */
                     helper.assertTrue(world.blockEntity(HUB, HbwInterfaceBlockEntity.class).craftSlotsInUse() == 0,
                             "a craft waiting on a machine step must not hold cluster slots; in use="
                                     + world.blockEntity(HUB, HbwInterfaceBlockEntity.class).craftSlotsInUse());

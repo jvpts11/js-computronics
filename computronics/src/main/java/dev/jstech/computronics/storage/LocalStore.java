@@ -33,7 +33,7 @@ public final class LocalStore implements IWeightedStore {
 
     /**
      * @param balanced when true, writes go to the emptiest disk first instead of filling disks in
-     *                 order — what the Load Balancer service buys a server: no single drive fills up
+     *                 order, what the Load Balancer service buys a server: no single drive fills up
      *                 while its neighbours sit half empty.
      */
     public LocalStore(final List<ItemStack> disks, final Runnable onChanged, final boolean balanced) {
@@ -98,9 +98,11 @@ public final class LocalStore implements IWeightedStore {
         return merged;
     }
 
-    // The owner-local view/insert/extract above is always the full contents — the slider never blocks
-    // the owner at their own machine. The public/private split below is a read-only classification the
-    // network sees, computed per disk from its public-share permille; it never moves items.
+    /*
+     * The owner-local view/insert/extract above is always the full contents, and the slider never blocks
+     * the owner at their own machine. The public/private split below is a read-only classification the
+     * network sees, computed per disk from its public-share permille; it never moves items.
+     */
 
     public int diskCount() {
         return disks.size();
@@ -141,7 +143,7 @@ public final class LocalStore implements IWeightedStore {
         return sum;
     }
 
-    /** The union of every disk's public view — what the network may read from this computer. */
+    /** The union of every disk's public view, what the network may read from this computer. */
     public Map<StorageKey, Long> publicView() {
         final Map<StorageKey, Long> merged = new LinkedHashMap<>();
         for (final ItemStack disk : disks) {
@@ -163,7 +165,7 @@ public final class LocalStore implements IWeightedStore {
         return total;
     }
 
-    /** The union of every disk's private view — owner-only, never offered to the network. */
+    /** The union of every disk's private view, owner-only, never offered to the network. */
     public Map<StorageKey, Long> privateView() {
         final Map<StorageKey, Long> merged = new LinkedHashMap<>();
         for (final ItemStack disk : disks) {

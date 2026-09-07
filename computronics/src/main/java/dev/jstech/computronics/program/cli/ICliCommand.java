@@ -10,7 +10,7 @@ package dev.jstech.computronics.program.cli;
 import java.util.List;
 
 /**
- * A single shell command. Add-ons implement this and register it with {@link CliCommands#register} (or through the {@code RegisterCliCommandsEvent}) to extend the Command Prompt with their own verbs — the command set is deliberately open.
+ * A single shell command. Add-ons implement this and register it with {@link CliCommands#register} (or through the {@code RegisterCliCommandsEvent}) to extend the Command Prompt with their own verbs; the command set is deliberately open.
  */
 public interface ICliCommand {
 
@@ -34,7 +34,7 @@ public interface ICliCommand {
     void run(CliContext context);
 
     /**
-     * Whether this command is available on a given computer — used to hide a program's commands until that
+     * Whether this command is available on a given computer, used to hide a program's commands until that
      * program is installed there. Built-ins are always available; a program's verbs override this.
      */
     default boolean available(final ICliComputer computer) {

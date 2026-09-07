@@ -43,7 +43,7 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
     @Override
     protected void init() {
         super.init();
-        // No vanilla labels — the panel draws its own.
+        // No vanilla labels, the panel draws its own.
         this.titleLabelY = -1000;
         this.inventoryLabelY = -1000;
 
@@ -94,7 +94,7 @@ public final class ServerRouterScreen extends AbstractContainerScreen<ServerRout
 
         // Input + rack-budget tiles.
         final Direction in = menu.inputFace();
-        JsTechTheme.tileTextS(g, font, 8, 56, "INPUT", in == null ? "—" : title(in.getName()), JsTechTheme.accent2());
+        JsTechTheme.tileTextS(g, font, 8, 56, "INPUT", in == null ? "none" : title(in.getName()), JsTechTheme.accent2());
         final int max = menu.maxRacks();
         final String racks = menu.managedRacks() + " / " + max;
         JsTechTheme.tileTextS(g, font, 98, 56, "RACKS",

@@ -73,7 +73,7 @@ public final class StorageInsightsApp implements IDesktopApp {
 
     private static StorageInsightsApp active;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final Label loadingLabel;
     private final SearchField search;
@@ -218,7 +218,7 @@ public final class StorageInsightsApp implements IDesktopApp {
         active = this;
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -437,7 +437,7 @@ public final class StorageInsightsApp implements IDesktopApp {
         g.drawString(font, b.kind(), x + w - font.width(b.kind()), y, ctx.skin().accent(), false);
     }
 
-    // ---- state ----
+    // state
 
     private void openDetail(final ItemStack stack) {
         if (stack.isEmpty()) {
@@ -507,7 +507,7 @@ public final class StorageInsightsApp implements IDesktopApp {
         g.pose().popPose();
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {

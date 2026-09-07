@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.Set;
 
 /**
- * Marker implemented by blocks that a data cable connects to — network devices such as the Mainframe, routers and racks.
+ * Marker implemented by blocks that a data cable connects to, network devices such as the Mainframe, routers and racks.
  */
 public interface IDataNetworkConnectable {
 

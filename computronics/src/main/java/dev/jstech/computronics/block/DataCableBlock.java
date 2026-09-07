@@ -115,8 +115,10 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         if (neighbor instanceof DataCableBlock other) {
             return other.tier == this.tier;
         }
-        // The cable only shows a connection where the device actually accepts a cable on that face
-        // (a computer accepts one on its rear only), so the rendered nub never lies about connectivity.
+        /*
+         * The cable only shows a connection where the device actually accepts a cable on that face
+         * (a computer accepts one on its rear only), so the rendered nub never lies about connectivity.
+         */
         return neighbor instanceof dev.jstech.core.network.IDataNetworkConnectable device
                 && device.acceptedCableTiers().contains(this.tier)
                 && device.connectsOnFace(neighborState, direction.getOpposite(), this.tier);
@@ -153,9 +155,11 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
-        // A plain click opens the part's configuration menu (import / export buses); picking a part off
-        // the cable is done with a left-click, handled separately so it never breaks the cable. Each bus
-        // builds its own menu, and the open packet carries the bus name so the field shows it client-side.
+        /*
+         * A plain click opens the part's configuration menu (import / export buses); picking a part off
+         * the cable is done with a left-click, handled separately so it never breaks the cable. Each bus
+         * builds its own menu, and the open packet carries the bus name so the field shows it client-side.
+         */
         final ICablePart part = cable.getPart(face);
         if (part instanceof AbstractBusPart bus && player instanceof ServerPlayer serverPlayer) {
             serverPlayer.openMenu(new SimpleMenuProvider(
@@ -174,8 +178,10 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
     public ItemStack getCloneItemStack(final BlockState state, final HitResult target, final LevelReader level,
                                        final BlockPos pos, final Player player) {
         if (level.getBlockEntity(pos) instanceof DataCableBlockEntity cable && cable.hasAnyPart()) {
-            // Pick by the player's look ray (same as the highlight) rather than the merged-shape
-            // hit point, which can land on the cable bar in front of the part.
+            /*
+             * Pick by the player's look ray (same as the highlight) rather than the merged-shape
+             * hit point, which can land on the cable bar in front of the part.
+             */
             final Vec3 start = player.getEyePosition();
             final Vec3 end = start.add(player.getViewVector(1.0F).scale(player.blockInteractionRange() + 1.0));
             final Direction face = aimedPart(level, pos, start, end);
@@ -285,8 +291,10 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
                 // Never void real items the parts are buffering, on any removal path.
                 cable.dropAllBuffers(serverLevel);
             }
-            // A cable removed before its lazy onLoad registered it (placed and broken the same tick) has
-            // nothing in the index; calling onCableRemoved would throw "Position not registered".
+            /*
+             * A cable removed before its lazy onLoad registered it (placed and broken the same tick) has
+             * nothing in the index; calling onCableRemoved would throw "Position not registered".
+             */
             final var connectivity = NetworkSystem.get(serverLevel).connectivity();
             if (connectivity.contains(pos.asLong())) {
                 connectivity.onCableRemoved(pos.asLong());
@@ -316,8 +324,10 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
 
     private static Map<Direction, AABB> buildPartBoxes() {
         final Map<Direction, AABB> boxes = new EnumMap<>(Direction.class);
-        // Bounds the funnel model (widest at the mouth, 5px deep, sitting outside the cable core)
-        // so the highlight and hit-test hug the part, not the cable.
+        /*
+         * Bounds the funnel model (widest at the mouth, 5px deep, sitting outside the cable core)
+         * so the highlight and hit-test hug the part, not the cable.
+         */
         final double a = 2.0 / 16.0;
         final double b = 14.0 / 16.0;
         final double d = 5.0 / 16.0;

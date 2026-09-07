@@ -71,7 +71,7 @@ class IqlDefinitionParserTest {
 
     @Test
     void parse_dropItem_isNotADefinition() {
-        // DROP <item> is the item-trashing action, not a definition drop — the definition parser declines it.
+        // DROP <item> is the item-trashing action, not a definition drop, so the definition parser declines it.
         assertNull(IqlDefinitionParser.tryParse("DROP 64 dirt"));
         assertNull(IqlDefinitionParser.tryParse("DROP diamond"));
     }

@@ -79,12 +79,14 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     public static final int STORAGE_SLOTS = 27;
 
-    // ---- the cabinet as one model: what the renderer needs to know ----
-    //
-    // The Mainframe is drawn as a single GeckoLib cabinet by its controller, with a bone per installed
-    // part. The client copy of a computer only carries its name (the hardware handler is deliberately
-    // not synced), so the visual state travels as three small numbers in the block update: which
-    // hardware slots are filled, which disks carry a system, and the machine's own condition.
+    /*
+     * the cabinet as one model: what the renderer needs to know
+     *
+     * The Mainframe is drawn as a single GeckoLib cabinet by its controller, with a bone per installed
+     * part. The client copy of a computer only carries its name (the hardware handler is deliberately
+     * not synced), so the visual state travels as three small numbers in the block update: which
+     * hardware slots are filled, which disks carry a system, and the machine's own condition.
+     */
 
     private static final int FLAG_RUNNING = 1;
     private static final int FLAG_BUILD_VALID = 2;
@@ -110,8 +112,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Override
     public void registerControllers(
             final software.bernie.geckolib.animation.AnimatableManager.ControllerRegistrar controllers) {
-        // The roof fans and the tape reels turn while the machine is up; every other visual (installed
-        // hardware, the lamps, the panel) is bone visibility set by the renderer, not animation.
+        /*
+         * The roof fans and the tape reels turn while the machine is up; every other visual (installed
+         * hardware, the lamps, the panel) is bone visibility set by the renderer, not animation.
+         */
         controllers.add(new software.bernie.geckolib.animation.AnimationController<>(this, "work", 0,
                 state -> visualRunning() ? state.setAndContinue(WORK)
                         : software.bernie.geckolib.animation.PlayState.STOP));
@@ -257,8 +261,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     public void handleUpdateTag(final CompoundTag tag, final HolderLookup.Provider registries) {
-        // A chunk arriving carries the same three numbers as a live update; without this the cabinet
-        // would render empty until something changed and pushed a packet.
+        /*
+         * A chunk arriving carries the same three numbers as a live update; without this the cabinet
+         * would render empty until something changed and pushed a packet.
+         */
         super.handleUpdateTag(tag, registries);
         clientHardwareMask = tag.getInt("VisualHardware");
         clientDiskSystemMask = tag.getInt("VisualSystems");
@@ -291,9 +297,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     // Set when the block is being destroyed, so setRemoved can tell a break (discard) from a chunk unload (keep).
     private boolean broken;
 
-    // The IQL Engine: a service installed on the Mainframe that holds the network's saved IQL objects
-    // (views/procedures/jobs) and runs the jobs. The catalog persists with the Mainframe; the NMS only
-    // opens when the Engine is installed and running. A running Mainframe runs its Engine by default.
+    /*
+     * The IQL Engine: a service installed on the Mainframe that holds the network's saved IQL objects
+     * (views/procedures/jobs) and runs the jobs. The catalog persists with the Mainframe; the NMS only
+     * opens when the Engine is installed and running. A running Mainframe runs its Engine by default.
+     */
     private final dev.jstech.computronics.program.iql.IqlCatalog iqlCatalog =
             new dev.jstech.computronics.program.iql.IqlCatalog();
     private boolean iqlEngineInstalled;
@@ -341,11 +349,15 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 : dev.jstech.core.tier.HardwareEra.STANDARD;
     }
 
-    // Slot validity is governed by the inherited instance isValidForSlot, which the acceptedFormFactors
-    // override above ties to MTX-only boards over the CPU/RAM/PCIe/disk ranges of the shared layout.
+    /*
+     * Slot validity is governed by the inherited instance isValidForSlot, which the acceptedFormFactors
+     * override above ties to MTX-only boards over the CPU/RAM/PCIe/disk ranges of the shared layout.
+     */
 
-    // The hardware handler is inherited; this shim keeps the historic public name so the Menu/Screen,
-    // block drops and GameTests address it unchanged.
+    /*
+     * The hardware handler is inherited; this shim keeps the historic public name so the Menu/Screen,
+     * block drops and GameTests address it unchanged.
+     */
     public ItemStackHandler getInventory() {
         return getHardware();
     }
@@ -387,8 +399,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                                   final BlockState state, final MainframeBlockEntity be) {
         if (level instanceof ServerLevel serverLevel) {
             be.tickBuildProgress(serverLevel);
-            // Before tick(), which returns early on a powered-down machine: a cabinet that was just
-            // switched off still has to put its lamps out on the client.
+            /*
+             * Before tick(), which returns early on a powered-down machine: a cabinet that was just
+             * switched off still has to put its lamps out on the client.
+             */
             be.syncVisualsIfChanged();
             be.tick(serverLevel);
         }
@@ -408,16 +422,20 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             return;
         }
         if (failoverRole == FailoverRole.PASSIVE) {
-            // A Passive standby holds no dispatcher and runs no Operations until it is promoted; the
-            // Active member owns the network. closeDispatch settles anything left from a demotion.
+            /*
+             * A Passive standby holds no dispatcher and runs no Operations until it is promoted; the
+             * Active member owns the network. closeDispatch settles anything left from a demotion.
+             */
             closeDispatch();
             return;
         }
         if (!hasOs()) {
-            // Network orchestration requires a booted OS. Without one the Mainframe holds its network
-            // UUID and topology but skips the dispatcher, index, Operation processing, and the IQL job
-            // agent. Any submitted Operations remain PENDING until an OS is installed; on the tick when
-            // the OS becomes present the dispatcher picks them up automatically (self-healing).
+            /*
+             * Network orchestration requires a booted OS. Without one the Mainframe holds its network
+             * UUID and topology but skips the dispatcher, index, Operation processing, and the IQL job
+             * agent. Any submitted Operations remain PENDING until an OS is installed; on the tick when
+             * the OS becomes present the dispatcher picks them up automatically (self-healing).
+             */
             return;
         }
         runDispatch();
@@ -433,13 +451,17 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return networkIndex;
     }
 
-    // Network OWNERSHIP — the Mainframe orchestrates its own network instead of reading one from a
-    // single cable, so the base's passive registerNode/unregisterNode/tickNode path is unused here.
+    /*
+     * Network OWNERSHIP: the Mainframe orchestrates its own network instead of reading one from a
+     * single cable, so the base's passive registerNode/unregisterNode/tickNode path is unused here.
+     */
 
     @Override
     protected void registerNode(final NetworkSystem system, final NetworkUuid network) {
-        // No-op: the Mainframe owns and orchestrates its network through updateNetwork/orchestrate
-        // rather than registering as a passive member; the base's tickNode is never invoked for it.
+        /*
+         * No-op: the Mainframe owns and orchestrates its network through updateNetwork/orchestrate
+         * rather than registering as a passive member; the base's tickNode is never invoked for it.
+         */
     }
 
     @Override
@@ -451,11 +473,13 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final NetworkSystem system = NetworkSystem.get(level);
         final ConnectivityIndex index = system.connectivity();
         final java.util.Set<Long> cables = adjacentCables(level);
-        // Bridge every cable run this Mainframe touches into one segment, so the topology connected
-        // through the Mainframe is a single network.
+        /*
+         * Bridge every cable run this Mainframe touches into one segment, so the topology connected
+         * through the Mainframe is a single network.
+         */
         index.bridge(cables);
 
-        // The network already laid on a touched cable, if any — a primary's network to join, or an
+        // The network already laid on a touched cable, if any, a primary's network to join, or an
         NetworkUuid adopted = null;
         for (final long cable : cables) {
             final Optional<NetworkUuid> segment = index.networkOf(cable);
@@ -504,8 +528,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             unregister(system);
             return;
         }
-        // No primary present — it is gone and the network is orphaned. The lowest-positioned standby
-        // takes that SAME network over after the takeover delay; the rest keep standing by.
+        /*
+         * No primary present, so it is gone and the network is orphaned. The lowest-positioned standby
+         * takes that SAME network over after the takeover delay; the rest keep standing by.
+         */
         final boolean superiorStandbyPresent = peers.stream()
                 .anyMatch(peer -> peer.worldPosition.asLong() < worldPosition.asLong());
         updateFailoverRole(superiorStandbyPresent);
@@ -526,7 +552,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
         }
         networkUuid = effective;
-        // Restore the network from any prior CONFLICTED or ORPHANED state — adopting it revives it.
+        // Restore the network from any prior CONFLICTED or ORPHANED state, since adopting it revives it.
         NetworkRegistrySavedData.get(level).setNetworkState(effective, NetworkUuidState.ACTIVE);
         system.registerMainframe(snapshot(effective));
         system.recordMainframePosition(effective, worldPosition.asLong());
@@ -535,7 +561,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     private void updateFailoverRole(final boolean superiorPresent) {
         if (superiorPresent) {
-            failoverRole = FailoverRole.PASSIVE; // a preferred Active is running — stand by
+            failoverRole = FailoverRole.PASSIVE; // a preferred Active is running, so stand by
             failoverWaitTicks = 0;
         } else if (failoverRole == FailoverRole.PASSIVE) {
             // The Active this member was backing is gone; take over after the promotion delay.
@@ -544,7 +570,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 failoverWaitTicks = 0;
             }
         } else {
-            // Lowest-positioned and not standing by — own the network immediately (initial election).
+            // Lowest-positioned and not standing by, so own the network immediately (initial election).
             failoverRole = FailoverRole.ACTIVE;
             failoverWaitTicks = 0;
         }
@@ -577,7 +603,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             return;
         }
         final NetworkSystem system = NetworkSystem.get(serverLevel);
-        // The LAST Mainframe out orphans the network — whatever its failover role. While another
+        // The LAST Mainframe out orphans the network, whatever its failover role. While another
         final boolean survivorPresent = !otherRunningMainframesOnSegment(
                 serverLevel, system.connectivity(), adjacentCables(serverLevel)).isEmpty();
         if (!survivorPresent) {
@@ -662,8 +688,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         networkConflict = conflict;
     }
 
-    // The Mainframe is a 3x2x2 multiblock, so it scans for a cable across its whole footprint and
-    // bridges every touched cable into one network — replacing the base's single-cable scan.
+    /*
+     * The Mainframe is a 3x2x2 multiblock, so it scans for a cable across its whole footprint and
+     * bridges every touched cable into one network, replacing the base's single-cable scan.
+     */
     private java.util.Set<Long> adjacentCables(final ServerLevel level) {
         final Direction facing = getBlockState().getValue(HorizontalDirectionalBlock.FACING);
         final java.util.Set<Long> inside = new java.util.HashSet<>();
@@ -675,8 +703,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 inside.add(p.asLong());
             }
         }
-        // Collect EVERY cable on an external face, not just the first — the mainframe
-        // bridges all of them into its single network.
+        /*
+         * Collect EVERY cable on an external face, not just the first, because the mainframe
+         * bridges all of them into its single network.
+         */
         final java.util.Set<Long> cables = new java.util.LinkedHashSet<>();
         for (final long posLong : inside) {
             final BlockPos p = BlockPos.of(posLong);
@@ -713,9 +743,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             dispatch = new OperationDispatch(queues);
             dispatchQueues = queues;
         } else if (dispatchQueues != queues) {
-            // The GPU count changed (a hot-swap): resize the dispatcher's lanes in place. Rebuilding it would run
-            // closeDispatch, which abandons every in-flight Operation — so pulling a GPU mid-craft would discard
-            // the craft and leave its machines stranded. Resizing keeps the active Operations running untouched.
+            /*
+             * The GPU count changed (a hot-swap): resize the dispatcher's lanes in place. Rebuilding it would run
+             * closeDispatch, which abandons every in-flight Operation, so pulling a GPU mid-craft would discard
+             * the craft and leave its machines stranded. Resizing keeps the active Operations running untouched.
+             */
             dispatch.setParallelQueues(queues);
             dispatchQueues = queues;
         }
@@ -744,19 +776,23 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * Tears the dispatcher down. With {@code keepPersistent}, the resumable Operations are dropped WITHOUT
      * being abandoned or logged: this is the chunk-unload path, where the block entity was just written to
      * disk with those Operations inside it, and abandoning them here would move items after the save (a
-     * craft returning its pool) — items the resumed Operation would move again on reload.
+     * craft returning its pool), items the resumed Operation would move again on reload.
      */
     private void closeDispatch(final boolean keepPersistent) {
         if (dispatch != null) {
-            // Fold the dying dispatcher's tally into the persisted lifetime total so the
-            // completed count carries across power cycles and chunk unloads.
+            /*
+             * Fold the dying dispatcher's tally into the persisted lifetime total so the
+             * completed count carries across power cycles and chunk unloads.
+             */
             completedTotal += dispatch.completedCount();
             dispatch.close();
             dispatch = null;
             dispatchQueues = 0;
-            // Settle every in-flight multi-tick Operation first, so a holder polling isDone() (an
-            // INSERT returning leftover, a SELECT freeing its lock) recovers; then record each as
-            // DISCARDED so a conflict or power-off leaves a trace in the log instead of vanishing.
+            /*
+             * Settle every in-flight multi-tick Operation first, so a holder polling isDone() (an
+             * INSERT returning leftover, a SELECT freeing its lock) recovers; then record each as
+             * DISCARDED so a conflict or power-off leaves a trace in the log instead of vanishing.
+             */
             for (final var operation : activeOperations) {
                 if (keepPersistent && operation instanceof dev.jstech.computronics.operation
                         .IPersistentOperation persistent && !persistent.isEphemeral()) {
@@ -801,7 +837,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 continue;
             }
             if (operation.isWaiting()) {
-                queued++; // blocked on another Operation's LOCK — not streaming
+                queued++; // blocked on another Operation's LOCK, not streaming
             } else if (!occupiesQueue(operation)) {
                 continue; // a machine stage runs under its computer's threads, never queued in the Mainframe
             } else if (used < slots) {
@@ -912,8 +948,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel,
             final byte recordType,
             final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
-        // A SELECT/MOVE/DELETE also needs the dispatcher; without an OS the Operation would never tick and would
-        // just pile up in activeOperations. Refuse it so callers no-op cleanly instead of accumulating dead work.
+        /*
+         * A SELECT/MOVE/DELETE also needs the dispatcher; without an OS the Operation would never tick and would
+         * just pile up in activeOperations. Refuse it so callers no-op cleanly instead of accumulating dead work.
+         */
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
             return null;
         }
@@ -928,9 +966,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jstech.computronics.operation.NetworkInsertOperation submitNetworkInsert(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
             final String sourceLabel) {
-        // Without a booted OS the dispatcher never ticks (see tick()), so an Operation submitted here would
-        // sit forever in activeOperations holding items the caller already took out of the world. Refuse it so
-        // callers hit their op == null branch and return the items to the player instead of losing them.
+        /*
+         * Without a booted OS the dispatcher never ticks (see tick()), so an Operation submitted here would
+         * sit forever in activeOperations holding items the caller already took out of the world. Refuse it so
+         * callers hit their op == null branch and return the items to the player instead of losing them.
+         */
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null) {
             return null;
         }
@@ -947,7 +987,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 demand, sourceLabel);
     }
 
-    // CRAFT — recursive autocrafting over the network's Crafting Computers
+    // CRAFT: recursive autocrafting over the network's Crafting Computers
 
     public java.util.List<net.minecraft.core.BlockPos> craftingComputerPositions() {
         if (networkUuid() == null || !(level instanceof ServerLevel serverLevel)) {
@@ -1049,8 +1089,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             return null;
         }
         final var stock = networkIndex.snapshot();
-        // A cell that accepts a tag is settled here, against what the network holds right now, so the
-        // planner and the craft itself only ever see exact items.
+        /*
+         * A cell that accepts a tag is settled here, against what the network holds right now, so the
+         * planner and the craft itself only ever see exact items.
+         */
         final var patterns = dev.jstech.computronics.crafting.AnyTagResolver
                 .resolveAll(networkPatterns(), stock);
         final dev.jstech.computronics.crafting.CraftingPattern extra = extraPattern == null ? null
@@ -1177,7 +1219,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     /**
-     * The single craft entry point every OS surface — the terminal, the Network Interactor, and the CLI/IQL —
+     * The single craft entry point every OS surface (the terminal, the Network Interactor, and the CLI/IQL)
      * routes a request through, so all three behave the same. If a machine recipe on the network produces
      * {@code key} directly, that recipe runs (a processing run, or a multi-stage pipeline); otherwise a recursive
      * bench-and-machine craft is planned. When a machine recipe's own inputs are not all in stock and other
@@ -1210,8 +1252,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             }
             if (recipe.proc().isPresent()) {
                 if (!inputsInStock(recipe.proc().get(), demand)) {
-                    // A machine input is missing: if other patterns can make it, run the whole tree as one craft
-                    // (all-or-nothing, so partial is false here); otherwise fall through to the bare machine run.
+                    /*
+                     * A machine input is missing: if other patterns can make it, run the whole tree as one craft
+                     * (all-or-nothing, so partial is false here); otherwise fall through to the bare machine run.
+                     */
                     final var planned = submitNetworkCraft(key, demand, false, label);
                     if (planned != null) {
                         if (onSettle != null) {
@@ -1234,8 +1278,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 return op;
             }
         }
-        // No machine makes it directly (or multi-stage was declined): plan a recursive bench-and-machine craft.
-        // The planning runs off the tick; the request is listed as pending until the plan lands.
+        /*
+         * No machine makes it directly (or multi-stage was declined): plan a recursive bench-and-machine craft.
+         * The planning runs off the tick; the request is listed as pending until the plan lands.
+         */
         final var op = submitCraftAsync(key, demand, partial, label);
         if (op != null && onSettle != null) {
             op.onSettle(onSettle);
@@ -1303,8 +1349,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return (amount + perRun - 1) / perRun;
     }
 
-    // Manual LOCK / UNLOCK — player-issued holds on a network item type that make concurrent
-    // Operations WAIT, the explicit handle on storage concurrency.
+    /*
+     * Manual LOCK / UNLOCK: player-issued holds on a network item type that make concurrent
+     * Operations WAIT, the explicit handle on storage concurrency.
+     */
 
     public long lockType(final dev.jstech.computronics.storage.StorageKey key,
                          final long demand,
@@ -1352,8 +1400,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         pendingOperations = null;
         final long savedAt = pendingSavedAt;
         pendingSavedAt = 0L;
-        // Operations that sat unresumed past the expiry have lost whoever wanted them: they are restored just far
-        // enough to hand back what they held (a craft's pool goes back to storage), then discarded and logged.
+        /*
+         * Operations that sat unresumed past the expiry have lost whoever wanted them: they are restored just far
+         * enough to hand back what they held (a craft's pool goes back to storage), then discarded and logged.
+         */
         final long expiry = dev.jstech.core.operation.OperationBalance.orphanedOperationsExpiryTicks();
         final boolean expired = expiry > 0L && savedAt > 0L && level.getGameTime() - savedAt >= expiry;
         final int liveBefore = activeOperations.size();
@@ -1363,8 +1413,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final java.util.Set<java.util.UUID> completedStages = new java.util.HashSet<>();
         final java.util.List<dev.jstech.computronics.crafting.NetworkMultiStageOperation>
                 pipelines = new java.util.ArrayList<>();
-        // Crafts that had machine steps in flight re-plan only once every operation is back, so the steps they
-        // were running can be found by id and their output counted before the remaining demand is planned.
+        /*
+         * Crafts that had machine steps in flight re-plan only once every operation is back, so the steps they
+         * were running can be found by id and their output counted before the remaining demand is planned.
+         */
         final java.util.List<CompoundTag> craftsOnMachines = new java.util.ArrayList<>();
         for (int i = 0; i < saved.size(); i++) {
             final CompoundTag tag = saved.getCompound(i);
@@ -1382,8 +1434,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                     }
                 }
                 case dev.jstech.computronics.crafting.NetworkCraftOperation.KIND -> {
-                    // An expired craft is not re-planned after its machine steps: it hands its pool back now and
-                    // is discarded with the rest, so it takes the plain restore path below.
+                    /*
+                     * An expired craft is not re-planned after its machine steps: it hands its pool back now and
+                     * is discarded with the rest, so it takes the plain restore path below.
+                     */
                     if (!expired && !dev.jstech.computronics.crafting.NetworkCraftOperation
                             .savedMachineSteps(tag).isEmpty()) {
                         craftsOnMachines.add(tag);
@@ -1563,16 +1617,20 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         // Progress lives in the Operations themselves and is saved with this block entity.
         setChanged();
         statistics.observeConcurrency(level.getGameTime(), activeOperations.size());
-        // A queue processes at most the RAM buffer per tick: a buffer smaller than the CPU leaves
-        // the CPU idle waiting on RAM, so the effective rate is the lesser of the two. Subframes pool
-        // their share of capacity and their GPUs' queues into the Mainframe that orchestrates them.
+        /*
+         * A queue processes at most the RAM buffer per tick: a buffer smaller than the CPU leaves
+         * the CPU idle waiting on RAM, so the effective rate is the lesser of the two. Subframes pool
+         * their share of capacity and their GPUs' queues into the Mainframe that orchestrates them.
+         */
         final long effectiveCapacity = Math.min(pooledCapacity(), ramBuffer());
         final int slots = Math.max(1, pooledQueues());
         assignMachines();
-        // A machine step feeds at its Crafting Computer's crafting-card throughput (card x CPU), NOT the
-        // Mainframe's capacity — the card is what governs how fast any craft runs, bench or machine. That
-        // throughput is SHARED among the steps one computer is driving at once, so a computer feeding three
-        // machines splits its card's throughput three ways (the machine's own speed is still the ceiling).
+        /*
+         * A machine step feeds at its Crafting Computer's crafting-card throughput (card x CPU), NOT the
+         * Mainframe's capacity; the card is what governs how fast any craft runs, bench or machine. That
+         * throughput is SHARED among the steps one computer is driving at once, so a computer feeding three
+         * machines splits its card's throughput three ways (the machine's own speed is still the ceiling).
+         */
         final java.util.Map<net.minecraft.core.BlockPos, Integer> stepsPerComputer = new java.util.HashMap<>();
         for (final var operation : activeOperations) {
             if (operation instanceof dev.jstech.computronics.crafting.NetworkProcessingOperation proc
@@ -1583,13 +1641,17 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 }
             }
         }
-        // Iterate a snapshot: a multi-stage operation submits its sub-stage into activeOperations mid-tick,
-        // which would otherwise be a concurrent modification. The new stage simply ticks next tick.
+        /*
+         * Iterate a snapshot: a multi-stage operation submits its sub-stage into activeOperations mid-tick,
+         * which would otherwise be a concurrent modification. The new stage simply ticks next tick.
+         */
         final java.util.List<dev.jstech.computronics.operation.INetworkOperation> snapshot =
                 new java.util.ArrayList<>(activeOperations);
-        // The queue slots go to the ready Operations by effective priority (level plus aging), submission
-        // order inside a level. Re-deciding every tick means a higher-priority request takes over a slot the
-        // next tick instead of waiting for whatever was streaming to finish.
+        /*
+         * The queue slots go to the ready Operations by effective priority (level plus aging), submission
+         * order inside a level. Re-deciding every tick means a higher-priority request takes over a slot the
+         * next tick instead of waiting for whatever was streaming to finish.
+         */
         final java.util.List<dev.jstech.core.operation.exec.QueueArbiter.Candidate<
                 dev.jstech.computronics.operation.INetworkOperation>> ready = new java.util.ArrayList<>();
         for (final var operation : snapshot) {
@@ -1611,16 +1673,20 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 countTick(operation, WAITED);
                 operation.tick(0L); // lock retry + timeout only; holds no queue slot
             } else if (!occupiesQueue(operation)) {
-                // A craft's machine stage runs under its Crafting Computer's thread ceiling, not a Mainframe
-                // queue: it always gets its feed and never counts against the queue budget.
+                /*
+                 * A craft's machine stage runs under its Crafting Computer's thread ceiling, not a Mainframe
+                 * queue: it always gets its feed and never counts against the queue budget.
+                 */
                 countTick(operation, RAN);
                 operation.tick(machineFeedBudget(operation, effectiveCapacity, stepsPerComputer));
             } else if (granted.contains(operation)) {
                 countTick(operation, RAN);
                 operation.tick(machineFeedBudget(operation, effectiveCapacity, stepsPerComputer));
             } else {
-                // Ready Operations beyond the queue count stay PENDING this tick: no progress, no latency
-                // countdown — their disks have not started reading yet. Their wait is what ages them.
+                /*
+                 * Ready Operations beyond the queue count stay PENDING this tick: no progress, no latency
+                 * countdown, since their disks have not started reading yet. Their wait is what ages them.
+                 */
                 countTick(operation, WAITED);
                 deferredTicks.merge(operation, 1, Integer::sum);
             }
@@ -1634,9 +1700,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 final int[] counted = timing.remove(operation);
                 final int waited = counted == null ? 0 : counted[WAITED];
                 final int ran = counted == null ? 0 : counted[RAN];
-                // A craft's machine steps are nested stages, not operations of their own: the parent craft logs
-                // them as its sub-operations, so don't write them to the log or the lifetime tally separately.
-                // A silent Operation (a placeholder that became a real one) leaves no trace either.
+                /*
+                 * A craft's machine steps are nested stages, not operations of their own: the parent craft logs
+                 * them as its sub-operations, so don't write them to the log or the lifetime tally separately.
+                 * A silent Operation (a placeholder that became a real one) leaves no trace either.
+                 */
                 final boolean nested = operation instanceof dev.jstech.computronics.crafting
                         .NetworkProcessingOperation proc && proc.isNested();
                 if (!nested && !operation.silent()) {
@@ -1656,7 +1724,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     /**
      * Gives every running processing job a distinct physical machine, so concurrency on a machine type scales
-     * with the machines actually present — two same-type jobs never share (and jam) one block. A job keeps the
+     * with the machines actually present, so two same-type jobs never share (and jam) one block. A job keeps the
      * machine it already holds (as long as it is still there and routable); a new job claims a free one of the
      * ones its recipe can route to. A job with no free machine is flagged blocked (it waits, it does not time
      * out). The Machines tab's Max Jobs is an OPTIONAL per-type ceiling on top of this: 0 means "use them all".
@@ -1672,8 +1740,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 jobs.add(proc);
             }
         }
-        // Pass 1: a job that already holds a still-valid, unclaimed machine keeps it (stable across ticks so a
-        // machine is never fed by two jobs turn and turn about).
+        /*
+         * Pass 1: a job that already holds a still-valid, unclaimed machine keeps it (stable across ticks so a
+         * machine is never fed by two jobs turn and turn about).
+         */
         for (final var proc : jobs) {
             final net.minecraft.core.BlockPos held = proc.assignedMachine();
             if (held != null && !taken.contains(held) && proc.routableMachines().contains(held)) {
@@ -1715,7 +1785,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     /**
      * The per-tick throughput to run {@code operation} at. A machine step feeds at its Crafting Computer's
-     * crafting-card throughput (card x CPU), shared among the steps that computer drives at once — the card, not
+     * crafting-card throughput (card x CPU), shared among the steps that computer drives at once; the card, not
      * the machine, sets the crafting speed. Everything else runs at the Mainframe's own orchestration capacity.
      */
     private long machineFeedBudget(final dev.jstech.computronics.operation.INetworkOperation operation,
@@ -1761,9 +1831,11 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         for (final var operation : activeOperations) {
             final int[] counted = timingOf(operation);
             var record = operation.liveRecord().withTiming(counted[WAITED], counted[RAN]);
-            // A ready Operation the last tick did not grant a slot to is queued: the scheduler decides, the
-            // view only reports it. A machine stage keeps its live status (PROCESSING while it runs): it is
-            // gated by its Crafting Computer's threads, not a Mainframe queue, so it is never forced to PENDING.
+            /*
+             * A ready Operation the last tick did not grant a slot to is queued: the scheduler decides, the
+             * view only reports it. A machine stage keeps its live status (PROCESSING while it runs): it is
+             * gated by its Crafting Computer's threads, not a Mainframe queue, so it is never forced to PENDING.
+             */
             if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation)
                     && !lastGranted.contains(operation)) {
                 record = record.withStatus(dev.jstech.computronics.operation.payload
@@ -1831,7 +1903,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         setChanged();
     }
 
-    // IComputerTerminalHost — read-only monitoring for the Monitor terminal
+    // IComputerTerminalHost: read-only monitoring for the Monitor terminal
 
     @Override
     public boolean computerRunning() {
@@ -2064,11 +2136,13 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Override
     public void setRemoved() {
         super.setRemoved();
-        // Covers both destruction and chunk-unload: stop the virtual-thread executor
-        // and drop the registry snapshot, so neither leaks for a mainframe that is gone.
-        // This override is authoritative — the base setRemoved's passive onBroken/unregisterNode
-        // path is a no-op for the Mainframe (its node hooks are no-ops), so there is no double teardown.
-        // A chunk unload keeps the resumable Operations (they are in the saved NBT); a break discards them.
+        /*
+         * Covers both destruction and chunk-unload: stop the virtual-thread executor
+         * and drop the registry snapshot, so neither leaks for a mainframe that is gone.
+         * This override is authoritative; the base setRemoved's passive onBroken/unregisterNode
+         * path is a no-op for the Mainframe (its node hooks are no-ops), so there is no double teardown.
+         * A chunk unload keeps the resumable Operations (they are in the saved NBT); a break discards them.
+         */
         closeDispatch(!broken);
         if (level instanceof ServerLevel serverLevel) {
             unregister(NetworkSystem.get(serverLevel));
@@ -2077,12 +2151,16 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected void loadExtra(final CompoundTag tag, final HolderLookup.Provider registries) {
-        // Hardware (under the "Inventory" key), ManualOn, AutoStart, NodeUuid, LinkedMonitors and
-        // Console are loaded by the base; only the Mainframe-only state is restored here.
+        /*
+         * Hardware (under the "Inventory" key), ManualOn, AutoStart, NodeUuid, LinkedMonitors and
+         * Console are loaded by the base; only the Mainframe-only state is restored here.
+         */
         failoverEnabled = tag.getBoolean("Failover");
         servicePanelOff = tag.getBoolean("ServicePanelOff");
-        // Persist the standby role + countdown so a reload mid-promotion does not reset the timer (which
-        // could, with frequent chunk cycling, stop a standby from ever promoting).
+        /*
+         * Persist the standby role + countdown so a reload mid-promotion does not reset the timer (which
+         * could, with frequent chunk cycling, stop a standby from ever promoting).
+         */
         if (tag.contains("FailoverRole")) {
             try {
                 failoverRole = FailoverRole.valueOf(tag.getString("FailoverRole"));
@@ -2144,8 +2222,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         if (nativeNetworkUuid != null) {
             tag.putString("NetworkUuid", nativeNetworkUuid.asString());
         }
-        // Save the full lifetime total (persisted base plus the live dispatcher's tally);
-        // the live dispatcher itself is transient, so the snapshot reloads as the new base.
+        /*
+         * Save the full lifetime total (persisted base plus the live dispatcher's tally);
+         * the live dispatcher itself is transient, so the snapshot reloads as the new base.
+         */
         tag.putLong("CompletedTotal", completedOps());
         if (!operationLog.isEmpty()) {
             final net.minecraft.nbt.ListTag ops = new net.minecraft.nbt.ListTag();
@@ -2159,8 +2239,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         for (final var operation : activeOperations) {
             if (operation instanceof dev.jstech.computronics.operation.IPersistentOperation persistent
                     && !operation.isDone() && !persistent.isEphemeral()) {
-                // A craft's machine steps read and write its in-memory pool, which does not survive a reload, so
-                // they are not persisted; the parent craft re-plans and re-creates them from the handed-back pool.
+                /*
+                 * A craft's machine steps read and write its in-memory pool, which does not survive a reload, so
+                 * they are not persisted; the parent craft re-plans and re-creates them from the handed-back pool.
+                 */
                 inFlight.add(persistent.saveState(registries));
             }
         }
@@ -2169,8 +2251,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         if (!inFlight.isEmpty()) {
             tag.put("ActiveOperations", inFlight);
-            // When the saved Operations resume, the time they spent unresumed decides whether they are still
-            // wanted: a list that never got to resume since it was loaded keeps its original stamp.
+            /*
+             * When the saved Operations resume, the time they spent unresumed decides whether they are still
+             * wanted: a list that never got to resume since it was loaded keeps its original stamp.
+             */
             tag.putLong("ActiveOperationsSavedAt", pendingOperations != null && pendingSavedAt > 0L
                     ? pendingSavedAt : level != null ? level.getGameTime() : 0L);
         }
@@ -2208,7 +2292,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
     }
 
-    // --- IQL Engine (the saved-object service installed on the Mainframe) -------------------------
+    // IQL Engine (the saved-object service installed on the Mainframe)
 
     public dev.jstech.computronics.program.iql.IqlCatalog iqlCatalog() {
         return iqlCatalog;
@@ -2383,7 +2467,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         setChanged();
     }
 
-    // --- IQL job process control (the Processes-tab task manager) ---------------------------------
+    // IQL job process control (the Processes-tab task manager)
 
     public boolean isJobPaused(final String jobName) {
         return pausedJobs.contains(jobName.toLowerCase(java.util.Locale.ROOT));

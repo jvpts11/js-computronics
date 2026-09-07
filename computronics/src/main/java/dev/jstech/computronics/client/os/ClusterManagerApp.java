@@ -104,7 +104,7 @@ public final class ClusterManagerApp implements IDesktopApp {
     private int moveQty = 64;
     private int moveDest;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final TabStrip tabs;
     private final Label loadingLabel;
@@ -319,7 +319,7 @@ public final class ClusterManagerApp implements IDesktopApp {
         return 150;
     }
 
-    // ---- state readers ----
+    // state readers
 
     @Nullable
     private Detail detail() {
@@ -416,7 +416,7 @@ public final class ClusterManagerApp implements IDesktopApp {
         };
     }
 
-    // ---- selection ----
+    // selection
 
     private void selectTab(final int target) {
         if (target != tab) {
@@ -532,7 +532,7 @@ public final class ClusterManagerApp implements IDesktopApp {
         return moveItem == null ? "" : "MOVE OUT · " + moveItem.key().displayName().getString();
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y, final int width,
@@ -659,9 +659,11 @@ public final class ClusterManagerApp implements IDesktopApp {
         final int by = top + bodyH - BTN_H - PAD;
 
         if (nodesTab) {
-            // Columns are measured from both edges so nothing runs into its neighbour: the unit and the
-            // metric take fixed room, the status takes what its longest word needs, and the name and the
-            // system share the rest.
+            /*
+             * Columns are measured from both edges so nothing runs into its neighbour: the unit and the
+             * metric take fixed room, the status takes what its longest word needs, and the name and the
+             * system share the rest.
+             */
             final int rightEdge = dx + dw - PAD - SWITCH_W;
             final int metricW = 32;
             final int statusW = font.width("INSTALLING") + 6;
@@ -824,7 +826,7 @@ public final class ClusterManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- dialogs ----
+    // dialogs
 
     @Override
     public boolean modalActive() {
@@ -896,7 +898,7 @@ public final class ClusterManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
@@ -966,7 +968,7 @@ public final class ClusterManagerApp implements IDesktopApp {
         return popup != null && popup.charTyped(c);
     }
 
-    // ---- helpers ----
+    // helpers
 
     private static String shortCount(final long n) {
         if (n >= 1_000_000L) {

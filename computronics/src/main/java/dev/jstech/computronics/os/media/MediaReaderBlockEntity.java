@@ -205,7 +205,7 @@ public class MediaReaderBlockEntity extends BlockEntity implements IPeripheralEn
      * Returns the storage snapshot of the inserted DATA medium. Returns
      * {@link ServerStorageContents#EMPTY} when the slot is empty or the medium is not a DATA kind.
      *
-     * <p>// TODO(os): DATA transfer — move network storage to/from a DATA medium via a timed
+     * <p>// TODO(os): DATA transfer, move network storage to/from a DATA medium via a timed
      * // Operation, bounded by capacity(stack).
      */
     public ServerStorageContents insertedData() {
@@ -297,9 +297,11 @@ public class MediaReaderBlockEntity extends BlockEntity implements IPeripheralEn
 
     private void syncToClients() {
         if (level != null && !level.isClientSide()) {
-            // Read the state from the world, not the cached one: while the drive is being broken the world
-            // already holds its replacement, and writing the drive's state back (the drop empties the slot)
-            // would make the chunk abort the removal, leaving the drive standing with its disc on the floor.
+            /*
+             * Read the state from the world, not the cached one: while the drive is being broken the world
+             * already holds its replacement, and writing the drive's state back (the drop empties the slot)
+             * would make the chunk abort the removal, leaving the drive standing with its disc on the floor.
+             */
             final BlockState state = level.getBlockState(worldPosition);
             if (!(state.getBlock() instanceof MediaReaderBlock)) {
                 return;

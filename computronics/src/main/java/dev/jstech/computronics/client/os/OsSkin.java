@@ -20,10 +20,10 @@ import net.minecraft.resources.ResourceLocation;
  * the core's {@link ISkin}, so the core's components paint through it as well.
  *
  * <ul>
- *   <li>{@link Form#BEVEL} (Frames 95) — raised/sunken 3D bevels, solid navy title, grey chrome, square.</li>
- *   <li>{@link Form#LUNA} (Frames XP) — blue gradients, white title text, green active tab; only the TOP
+ *   <li>{@link Form#BEVEL} (Frames 95): raised/sunken 3D bevels, solid navy title, grey chrome, square.</li>
+ *   <li>{@link Form#LUNA} (Frames XP): blue gradients, white title text, green active tab; only the TOP
  *       window corners are rounded (XP kept square bottom corners).</li>
- *   <li>{@link Form#FLAT} (Frames 11) — light chrome with DARK title text, flat fills, a thin accent line,
+ *   <li>{@link Form#FLAT} (Frames 11): light chrome with DARK title text, flat fills, a thin accent line,
  *       all four window corners gently rounded.</li>
  * </ul>
  */
@@ -31,7 +31,7 @@ public final class OsSkin implements ISkin {
 
     /**
      * The shape language a skin draws its primitives in. A period Unix desktop is not the Frames 95
-     * bevel in other colours — it has its own geometry — so KDE and GNOME on Legacy hardware each get
+     * bevel in other colours (it has its own geometry) so KDE and GNOME on Legacy hardware each get
      * a form of their own rather than a recolour.
      */
     public enum Form {
@@ -103,61 +103,67 @@ public final class OsSkin implements ISkin {
         this.dark = dark;
     }
 
-    // Frames 95 — classic grey bevel, solid navy title, square corners.
+    // Frames 95: classic grey bevel, solid navy title, square corners.
     private static final OsSkin FRAMES_95 = new OsSkin(
             DesktopTheme.forOs(ResourceLocation.fromNamespaceAndPath("jsc", "frames_95")),
             Form.BEVEL, 0, 0, 0xFFFFFFFF, false, 0xFFC0C0C0, 0xFF000000,
             0xFF000080, 0xFF000000, 0xFF505050, 0xFFFFFFFF,
             0xFF000080, 0xFFFFFFFF, 0xFFD4D0C8, false);
 
-    // Frames XP — Luna blue gradients, white title, cream client; ONLY the top corners are rounded.
+    // Frames XP: Luna blue gradients, white title, cream client; ONLY the top corners are rounded.
     private static final OsSkin FRAMES_XP = new OsSkin(
             DesktopTheme.forOs(ResourceLocation.fromNamespaceAndPath("jsc", "frames_xp")),
             Form.LUNA, 2, 0, 0xFFFFFFFF, true, 0xFFECECF6, 0xFF0831D9,
             0xFF2C66BD, 0xFF10203A, 0xFF5A6B85, 0xFFFFFFFF,
             0xFF2C66BD, 0xFFFFFFFF, 0xFFD8E4FB, false);
 
-    // Frames 11 — flat light chrome with DARK title text and a thin accent; all corners rounded.
+    // Frames 11: flat light chrome with DARK title text and a thin accent; all corners rounded.
     private static final OsSkin FRAMES_11 = new OsSkin(
             DesktopTheme.forOs(ResourceLocation.fromNamespaceAndPath("jsc", "frames_11")),
             Form.FLAT, 2, 2, 0xFF202434, false, 0xFFFAFAFE, 0xFFC0C4D2,
             0xFF3A6AE0, 0xFF202434, 0xFF6B7488, 0xFFFFFFFF,
             0xFFE7EEFC, 0xFF1D4ED8, 0xFFF0F1F7, false);
 
-    // Frames 11 (dark) — the same flat shape language on a dark slate palette, chosen in Settings. A brighter
-    // accent keeps contrast on the dark ground; the flat chrome branches key off the dark flag.
+    /*
+     * Frames 11 (dark): the same flat shape language on a dark slate palette, chosen in Settings. A brighter
+     * accent keeps contrast on the dark ground; the flat chrome branches key off the dark flag.
+     */
     private static final OsSkin FRAMES_11_DARK = new OsSkin(
             DesktopTheme.forOs(ResourceLocation.fromNamespaceAndPath("jsc", "frames_11")),
             Form.FLAT, 2, 2, 0xFFE7E9EF, false, 0xFF1E212A, 0xFF3A4150,
             0xFF5B84F0, 0xFFE7E9EF, 0xFF9AA2B2, 0xFF14171F,
             0xFF2A3A63, 0xFFDCE7FF, 0xFF262B36, true);
 
-    // The Linux desktop environments: flat chrome like Frames 11, each in its own palette and accent.
-    // KDE Plasma — Breeze: light grey window, sky-blue accent.
+    /*
+     * The Linux desktop environments: flat chrome like Frames 11, each in its own palette and accent.
+     * KDE Plasma (Breeze): light grey window, sky-blue accent.
+     */
     private static final OsSkin KDE_PLASMA = new OsSkin(
             DesktopTheme.forDesktop(ResourceLocation.fromNamespaceAndPath("jsc", "kde_plasma")),
             Form.FLAT, 2, 2, 0xFF232629, false, 0xFFEFF0F1, 0xFFB9BFC8,
             0xFF3DAEE9, 0xFF232629, 0xFF6E7680, 0xFFFCFCFC,
             0xFFD6ECF7, 0xFF1F6F9A, 0xFFE6EBEF, false, "kde_plasma");
 
-    // GNOME — Adwaita: warm light window, GNOME blue accent, rounded.
+    // GNOME (Adwaita): warm light window, GNOME blue accent, rounded.
     private static final OsSkin GNOME = new OsSkin(
             DesktopTheme.forDesktop(ResourceLocation.fromNamespaceAndPath("jsc", "gnome")),
             Form.FLAT, 3, 3, 0xFF2E3436, false, 0xFFF6F5F4, 0xFFC0BFBC,
             0xFF3584E4, 0xFF2E3436, 0xFF77767B, 0xFFFFFFFF,
             0xFFDCE8FA, 0xFF1C5FB4, 0xFFEBEBEA, false, "gnome");
 
-    // Cinnamon — Mint-Y: light grey window, Mint green accent.
+    // Cinnamon (Mint-Y): light grey window, Mint green accent.
     private static final OsSkin CINNAMON = new OsSkin(
             DesktopTheme.forDesktop(ResourceLocation.fromNamespaceAndPath("jsc", "cinnamon")),
             Form.FLAT, 2, 2, 0xFF2B2B2B, false, 0xFFF7F7F7, 0xFFB0B0B0,
             0xFF69B03B, 0xFF2B2B2B, 0xFF6E6E6E, 0xFFFFFFFF,
             0xFFDFF0D4, 0xFF3C6E1E, 0xFFEBEBEB, false, "cinnamon");
 
-    // The same desktops as they looked on Legacy-era hardware. These are not the modern skins in older
-    // colours: each carries its own geometry, because that is what actually told the two apart at the
-    // time. KDE ran cold blue-grey with vertical gradients and hairline borders; GNOME ran warm putty
-    // with a thick frame and a centred title, since a separate window manager drew its decoration.
+    /*
+     * The same desktops as they looked on Legacy-era hardware. These are not the modern skins in older
+     * colours: each carries its own geometry, because that is what actually told the two apart at the
+     * time. KDE ran cold blue-grey with vertical gradients and hairline borders; GNOME ran warm putty
+     * with a thick frame and a centred title, since a separate window manager drew its decoration.
+     */
 
     private static final OsSkin KDE_PLASMA_LEGACY = new OsSkin(
             DesktopTheme.forDesktop(ResourceLocation.fromNamespaceAndPath("jsc", "kde_plasma")),
@@ -179,7 +185,7 @@ public final class OsSkin implements ISkin {
     /**
      * The skin for a desktop as it looks on hardware of {@code era}. The Frames editions already ARE
      * their era (95 is Legacy, 11 is Standard). Of the Linux desktops only KDE and GNOME get a period
-     * variant, because only those two install on Legacy hardware at all — Cinnamon is a later desktop
+     * variant, because only those two install on Legacy hardware at all, since Cinnamon is a later desktop
      * and requires a Standard machine, so it has no older self to wear.
      */
     public static OsSkin forDesktop(final ResourceLocation desktopId,
@@ -329,7 +335,7 @@ public final class OsSkin implements ISkin {
         return listHoverBg;
     }
 
-    // ---- window chrome ----
+    // window chrome
 
     /**
      * The window body background and 1px outer border, with the skin's per-corner rounding (XP rounds only the
@@ -340,8 +346,10 @@ public final class OsSkin implements ISkin {
         final int t = frameThickness();
         roundedRect(g, x - t, y - t, w + t * 2, h + t * 2, windowBorder, topRadius, bottomRadius);
         if (form == Form.GNOME1) {
-            // The thick period frame is relief, not a flat band: a separate window manager drew it, and
-            // a plain slab of colour at this width just looks like a mistake.
+            /*
+             * The thick period frame is relief, not a flat band: a separate window manager drew it, and
+             * a plain slab of colour at this width just looks like a mistake.
+             */
             bevelDouble(g, x - t, y - t, w + t * 2, h + t * 2, true);
         }
         roundedRect(g, x, y, w, h, windowBg, topRadius, bottomRadius);
@@ -354,8 +362,8 @@ public final class OsSkin implements ISkin {
 
     /**
      * A window's title bar, lit when the window has focus and greyed when it does not. Every desktop
-     * this mod imitates says which window is in front the same way — the active bar keeps its colour
-     * and the rest fall back to a flat grey — and without that a stack of open programs gives the
+     * this mod imitates says which window is in front the same way (the active bar keeps its colour
+     * and the rest fall back to a flat grey) and without that a stack of open programs gives the
      * player nothing to read.
      */
     public void titleBar(final GuiGraphics g, final int x, final int y, final int w, final int titleH,
@@ -371,8 +379,10 @@ public final class OsSkin implements ISkin {
                     roundedRect(g, x, y, w, titleH, flat(0xFFEDEEF2, 0xFF1B2029), topRadius, 0);
                     g.fill(x + topRadius, y + titleH - 1, x + w - topRadius, y + titleH, edge());
                 }
-                // Both period forms desaturate rather than dim: an inactive window of that age kept its
-                // gradient and lost its colour.
+                /*
+                 * Both period forms desaturate rather than dim: an inactive window of that age kept its
+                 * gradient and lost its colour.
+                 */
                 case KDE2 -> {
                     g.fillGradient(x, y, x + w, y + titleH / 2, 0xFFB4B0AA, 0xFF98938C);
                     g.fillGradient(x, y + titleH / 2, x + w, y + titleH, 0xFF938E87, 0xFF7E7972);
@@ -418,7 +428,7 @@ public final class OsSkin implements ISkin {
 
     /**
      * Whether this skin centres a window title. Only the GNOME form does, which is exactly why it reads
-     * as a different desktop rather than a repainted one — nothing else in the mod centres a title.
+     * as a different desktop rather than a repainted one, and nothing else in the mod centres a title.
      */
     public boolean titleCentered() {
         return form == Form.GNOME1;
@@ -498,7 +508,7 @@ public final class OsSkin implements ISkin {
         g.drawString(font, s, x + (bw - font.width(s)) / 2, y + (bh - 7) / 2, color, false);
     }
 
-    // ---- widgets (used by the programs' content) ----
+    // widgets (used by the programs' content)
 
     /** A group panel/box: sunken bevel (95), soft border (XP), or hairline (11). */
     @Override
@@ -711,7 +721,7 @@ public final class OsSkin implements ISkin {
         return dark ? darkColor : light;
     }
 
-    // ---- primitives ----
+    // primitives
 
     /** A filled rectangle whose TOP corners are rounded by {@code rTop}px and BOTTOM by {@code rBottom}px. */
     public static void roundedRect(final GuiGraphics g, final int x, final int y, final int w, final int h,
@@ -789,8 +799,10 @@ public final class OsSkin implements ISkin {
     public void windowShadow(final GuiGraphics g, final int x, final int y, final int w, final int h) {
         final int spread = form == Form.BEVEL ? 3 : 5;
         final int base = form == Form.BEVEL ? 0x0E : 0x12;
-        // Farther layers are lighter; nearer layers stack on top, so the fringe just outside the window is
-        // darkest and it fades out toward the edge.
+        /*
+         * Farther layers are lighter; nearer layers stack on top, so the fringe just outside the window is
+         * darkest and it fades out toward the edge.
+         */
         for (int i = spread; i >= 1; i--) {
             final int a = Math.min(0xFF, base * (spread - i + 1));
             g.fill(x + i, y + i + 1, x + w + i, y + h + i + 1, a << 24);

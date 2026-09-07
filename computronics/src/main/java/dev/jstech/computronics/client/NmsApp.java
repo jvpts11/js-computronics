@@ -40,7 +40,7 @@ import java.util.Locale;
  * Server Management Studio with an Object Explorer, a query editor, a results/messages grid and a status
  * bar. It opens from the Frames desktop NMS icon and closes back to the desktop like any other window.
  *
- * <p>It carries its own light SSMS skin ({@link NmsThemes}) rather than the host's era OS skin — a program
+ * <p>It carries its own light SSMS skin ({@link NmsThemes}) rather than the host's era OS skin, since a program
  * has its own identity. The {@link NmsLayout} constants give the fixed internal geometry; the explorer
  * width and editor height are live, draggable via the two splitters. Unlike the other desktop apps it has
  * no real inventory slots, so it needs no container menu: the payload handlers authenticate by the player's
@@ -145,8 +145,10 @@ public final class NmsApp implements IDesktopApp {
 
     private int explorerW = NmsLayout.EXPLORER_W;
     private int editorH = NmsLayout.EDITOR_H;
-    // The live content size, set each frame from the window so the Studio fills (and resizes with) its window
-    // instead of drawing at a fixed size in the corner. Defaults to the layout's design size.
+    /*
+     * The live content size, set each frame from the window so the Studio fills (and resizes with) its window
+     * instead of drawing at a fixed size in the corner. Defaults to the layout's design size.
+     */
     private int viewW = NmsLayout.WIDTH;
     private int viewH = NmsLayout.HEIGHT;
     private int dragging = DRAG_NONE;
@@ -195,7 +197,7 @@ public final class NmsApp implements IDesktopApp {
         return 150;
     }
 
-    // --- payload routing (to the open NMS window) -------------------------------------------------
+    // payload routing (to the open NMS window)
 
     public static void accept(final IqlResultPayload payload) {
         if (active != null) {
@@ -333,7 +335,7 @@ public final class NmsApp implements IDesktopApp {
                 || head.startsWith("DROP PROC ") || head.startsWith("DROP JOB ");
     }
 
-    // --- live geometry ----------------------------------------------------------------------------
+    // live geometry
 
     private int vsplitX() {
         return explorerW;
@@ -378,7 +380,7 @@ public final class NmsApp implements IDesktopApp {
         return viewW - 150;
     }
 
-    // --- Object Explorer tree ---------------------------------------------------------------------
+    // Object Explorer tree
 
     private static Node leaf(final int icon, final String label) {
         return new Node(icon, label, label, List.of());
@@ -471,7 +473,7 @@ public final class NmsApp implements IDesktopApp {
         return Math.max(0, Math.min(treeScroll, Math.max(0, visible.size() - treeMaxRows())));
     }
 
-    // --- File menu actions ------------------------------------------------------------------------
+    // File menu actions
 
     private void fileNew() {
         editor().setValue("");
@@ -541,7 +543,7 @@ public final class NmsApp implements IDesktopApp {
         return (row >= 0 && row < FILE_ITEMS.length) ? row : -1;
     }
 
-    // --- rendering --------------------------------------------------------------------------------
+    // rendering
 
     @Override
     public void applySkin(final dev.jstech.computronics.client.os.OsSkin skin) {
@@ -584,8 +586,10 @@ public final class NmsApp implements IDesktopApp {
         final int w = viewW;
         JsTechTheme.window(g, 0, 0, w, viewH);
 
-        // No internal title bar: the DesktopWindow already draws the program's title bar (TITLE_H = 0). The
-        // menu bar is the top strip.
+        /*
+         * No internal title bar: the DesktopWindow already draws the program's title bar (TITLE_H = 0). The
+         * menu bar is the top strip.
+         */
         strip(g, NmsLayout.MENU_Y, NmsLayout.MENU_H);
         strip(g, NmsLayout.TOOLBAR_Y, NmsLayout.TOOLBAR_H);
         final boolean execHover = inRect(mlx, mly, EXEC_X, NmsLayout.TOOLBAR_Y + 2, EXEC_W, 10);
@@ -881,7 +885,7 @@ public final class NmsApp implements IDesktopApp {
         }
     }
 
-    // --- input ------------------------------------------------------------------------------------
+    // input
 
     private boolean inRect(final int mlx, final int mly, final int rx, final int ry, final int w, final int h) {
         return mlx >= rx && mlx < rx + w && mly >= ry && mly < ry + h;

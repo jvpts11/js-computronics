@@ -44,15 +44,19 @@ public final class GameTestStructureProvider implements DataProvider {
 
     @Override
     public CompletableFuture<?> run(final CachedOutput cache) {
-        // "empty" is the 9x6x9 box the correctness tests run in; "bench" is a large arena for the
-        // performance benchmarks that build a physically huge network (hundreds of ticking cables).
+        /*
+         * "empty" is the 9x6x9 box the correctness tests run in; "bench" is a large arena for the
+         * performance benchmarks that build a physically huge network (hundreds of ticking cables).
+         */
         return CompletableFuture.allOf(
                 write(cache, "empty", emptyArena(9, 6, 9)),
                 write(cache, "bench", emptyArena(48, 8, 48)));
     }
 
-    // SHA-1 is the digest the vanilla datagen cache keys files by; it is a cache
-    // key, not a security primitive, so Guava's deprecation does not apply here.
+    /*
+     * SHA-1 is the digest the vanilla datagen cache keys files by; it is a cache
+     * key, not a security primitive, so Guava's deprecation does not apply here.
+     */
     @SuppressWarnings("deprecation")
     private CompletableFuture<?> write(final CachedOutput cache, final String name, final CompoundTag tag) {
         final Path path = output.getOutputFolder(PackOutput.Target.DATA_PACK)
@@ -81,8 +85,10 @@ public final class GameTestStructureProvider implements DataProvider {
         palette.add(blockState("minecraft:barrier"));
         root.put("palette", palette);
 
-        // Only the floor is written; unwritten cells default to structure void
-        // (left as the surrounding air the GameTest framework provides).
+        /*
+         * Only the floor is written; unwritten cells default to structure void
+         * (left as the surrounding air the GameTest framework provides).
+         */
         final ListTag blocks = new ListTag();
         for (int x = 0; x < sx; x++) {
             for (int z = 0; z < sz; z++) {

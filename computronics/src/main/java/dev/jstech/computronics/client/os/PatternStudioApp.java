@@ -59,8 +59,10 @@ public final class PatternStudioApp implements IInventoryBandApp {
     private static final int RAIL_W = 112;
     private static final int RAIL_TAB_H = 11;
     private static final int ROW_H = 11;
-    // The vertical arithmetic (tabs, editor, band, bar) lives in the pure layout so a test can prove the band
-    // fits the window a standard monitor opens the program in.
+    /*
+     * The vertical arithmetic (tabs, editor, band, bar) lives in the pure layout so a test can prove the band
+     * fits the window a standard monitor opens the program in.
+     */
     private static final int CELL = PatternStudioLayout.CELL;
     private static final int BAR_H = PatternStudioLayout.BAR_H;
     private static final int PAD = PatternStudioLayout.PAD;
@@ -74,8 +76,10 @@ public final class PatternStudioApp implements IInventoryBandApp {
     private static final int[] CHANCE_STEPS = {100, 75, 50, 25, 10};
     private static final int ERROR_RED = 0xFFEF6A5A;
 
-    // The player's inventory band under the editor: three rows, a gap, the hotbar, inside a frame. The desktop
-    // lays the real container slots over these cells.
+    /*
+     * The player's inventory band under the editor: three rows, a gap, the hotbar, inside a frame. The desktop
+     * lays the real container slots over these cells.
+     */
     private static final int INV_COLS = PatternStudioLayout.INV_COLS;
     private static final int INV_ROWS = PatternStudioLayout.INV_ROWS;
     private static final int BAND_PAD = PatternStudioLayout.BAND_PAD;
@@ -381,7 +385,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return PatternStudioLayout.minContentHeight() + DesktopWindow.TITLE_H + 8;
     }
 
-    // ---- inventory band geometry (content-local) ----
+    // inventory band geometry (content-local)
 
     private static int rowYOffset(final int row) {
         return PatternStudioLayout.rowYOffset(row);
@@ -421,9 +425,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return bandTop(contentHeight) + BAND_PAD + rowYOffset(INV_ROWS - 1) + CELL;
     }
 
-    // ======================================================================================
     //  Rendering: lay the components out for this frame, then draw the tree
-    // ======================================================================================
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y, final int width,
@@ -501,7 +503,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         };
     }
 
-    // ---- bench ----
+    // bench
 
     private void layoutBench(final int x, final int y, final int w, final boolean show) {
         final int gx = x + PAD;
@@ -595,14 +597,16 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return state == null || state.benchOpened().isEmpty() ? "" : "File: " + state.benchOpened();
     }
 
-    // ---- machine ----
+    // machine
 
     private void layoutMachine(final int x, final int y, final int w, final boolean show) {
         final int gx = x + PAD;
         final int gy = y + PAD;
         final int outX = x + w - PAD - PROC_COLS * CELL;
-        // Inputs on the left, the machine between, outputs on the right: the order reads as the process, so
-        // no caption row is spent on it (the row is what lets the inventory band fit under the editor).
+        /*
+         * Inputs on the left, the machine between, outputs on the right: the order reads as the process, so
+         * no caption row is spent on it (the row is what lets the inventory band fit under the editor).
+         */
         inGrid.place(gx, gy);
         outGrid.place(outX, gy);
         final int mx = gx + PROC_COLS * CELL + 10;
@@ -709,7 +713,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         }
     }
 
-    // ---- multi-stage ----
+    // multi-stage
 
     private int pipelineListH(final int h) {
         return Math.max(ROW_H * 2, h - PAD * 2 - FIELD_H - BTN_H - 6);
@@ -763,7 +767,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         }
     }
 
-    // ---- rail ----
+    // rail
 
     /** A flat list of the rail's file rows: drive headers and files, for drawing and clicking. */
     private record FileRow(String driveKey, String label, boolean header, String file) {
@@ -902,7 +906,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return "Queued: " + (e == null ? 0 : e.queued());
     }
 
-    // ---- action bar ----
+    // action bar
 
     private void layoutBar(final int x, final int barY, final int width, final boolean loaded) {
         final boolean complete = draftComplete();
@@ -955,7 +959,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return status.isEmpty() ? Label.Tone.DIM : Label.Tone.TEXT;
     }
 
-    // ---- popups ----
+    // popups
 
     @Override
     public boolean modalActive() {
@@ -1064,9 +1068,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         amountPopup.close();
     }
 
-    // ======================================================================================
     //  Input: everything goes to the open popup, or else to the content tree
-    // ======================================================================================
 
     private Panel inputTarget() {
         if (machinePicker.isOpen()) {
@@ -1106,9 +1108,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return inputTarget().keyPressed(key, scanCode, modifiers);
     }
 
-    // ======================================================================================
     //  Tooltips
-    // ======================================================================================
 
     @Override
     public void renderTooltip(final GuiGraphics g, final Font font, final int x, final int y, final int width,
@@ -1183,9 +1183,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         }
     }
 
-    // ======================================================================================
     //  Helpers
-    // ======================================================================================
 
     /** The name and note of a draft on one row: the name takes two fifths, the note the rest. */
     private final class NameNoteRow extends Panel {
@@ -1288,9 +1286,7 @@ public final class PatternStudioApp implements IInventoryBandApp {
         return shortCount(mb);
     }
 
-    // ======================================================================================
     //  Inspection (client tests): content-local centres of the controls, from the last frame's layout
-    // ======================================================================================
 
     public boolean isLoaded() {
         return state != null;

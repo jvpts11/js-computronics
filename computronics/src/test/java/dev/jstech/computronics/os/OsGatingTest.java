@@ -18,9 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OsGatingTest {
 
-    // -------------------------------------------------------------------------
-    // canInstall — era gating
-    // -------------------------------------------------------------------------
+    // canInstall: era gating
 
     @Test
     void canInstall_rejectsNewerEraOsOnOlderHardware() {
@@ -59,9 +57,7 @@ class OsGatingTest {
         assertFalse(OsGating.canInstall(HardwareEra.SINGULARITY, HardwareEra.EXA));
     }
 
-    // -------------------------------------------------------------------------
-    // canRunProgram / canInstallProgram — platform + hardware gating
-    // -------------------------------------------------------------------------
+    // canRunProgram / canInstallProgram: platform + hardware gating
 
     @Test
     void canRunProgram_rejectsProgramOnUnsupportedPlatform() {
@@ -115,9 +111,7 @@ class OsGatingTest {
                 9999, 9999, 100000L, 0, 0, 256));
     }
 
-    // -------------------------------------------------------------------------
     // FirmwareKind.forEra
-    // -------------------------------------------------------------------------
 
     @Test
     void firmwareKind_forEra_vintageIsCliBios() {

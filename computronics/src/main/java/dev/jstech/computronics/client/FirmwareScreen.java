@@ -27,9 +27,9 @@ import java.util.List;
 /**
  * The computer's firmware: a real boot manager, worn in the era-correct look chosen by {@link FirmwareKind}:
  * <ul>
- *   <li>{@link FirmwareKind#CLI_BIOS} — a green monochrome phosphor POST screen with a numbered boot menu;</li>
- *   <li>{@link FirmwareKind#BLUE_BIOS} — a classic blue setup utility with Boot / Hardware / Exit tabs;</li>
- *   <li>{@link FirmwareKind#UEFI} — a modern graphical boot manager with a side navigation.</li>
+ *   <li>{@link FirmwareKind#CLI_BIOS}, a green monochrome phosphor POST screen with a numbered boot menu;</li>
+ *   <li>{@link FirmwareKind#BLUE_BIOS}, a classic blue setup utility with Boot / Hardware / Exit tabs;</li>
+ *   <li>{@link FirmwareKind#UEFI}, a modern graphical boot manager with a side navigation.</li>
  * </ul>
  * It lists every boot entry the server reports ({@link FirmwareStatePayload}): each installed disk (with or
  * without a system) and each linked drive holding a medium (an installer or live medium is bootable). The
@@ -45,13 +45,13 @@ public class FirmwareScreen extends Screen {
     private static final int W = 340;
     private static final int H = 214;
 
-    // Vintage — green phosphor CLI BIOS
+    // Vintage: green phosphor CLI BIOS
     private static final int CLI_BG     = 0xFF021207;
     private static final int CLI_TEXT   = 0xFF35D158;
     private static final int CLI_BRIGHT = 0xFF87FFAC;
     private static final int CLI_DIM    = 0xFF1A7C39;
 
-    // Legacy — classic blue BIOS
+    // Legacy: classic blue BIOS
     private static final int BLUE_BG     = 0xFF0000A8;
     private static final int BLUE_TITLE  = 0xFFB9B9B9;
     private static final int BLUE_BORDER = 0xFF6FB7FF;
@@ -61,7 +61,7 @@ public class FirmwareScreen extends Screen {
     private static final int BLUE_DIM    = 0xFFB9C4D6;
     private static final int BLUE_SELBG  = 0xFFD9D9D9;
 
-    // Standard — modern UEFI
+    // Standard: modern UEFI
     private static final int UEFI_BG     = 0xFF1E2030;
     private static final int UEFI_HEAD   = 0xFF11131F;
     private static final int UEFI_PANEL  = 0xFF2A2D3E;
@@ -141,9 +141,7 @@ public class FirmwareScreen extends Screen {
         }
     }
 
-    // ---------------------------------------------------------------------------
     // Model
-    // ---------------------------------------------------------------------------
 
     /** The entries shown on the current page: all of them on Boot, only disks on Boot Order. */
     private List<FirmwareStatePayload.Entry> rows() {
@@ -179,9 +177,7 @@ public class FirmwareScreen extends Screen {
         return false;
     }
 
-    // ---------------------------------------------------------------------------
     // Actions
-    // ---------------------------------------------------------------------------
 
     /** Boots the selected entry (a disk with a system, or a bootable medium), or sets the boot order on that page. */
     private void activateSelected() {
@@ -210,9 +206,11 @@ public class FirmwareScreen extends Screen {
         if (!e.bootable()) {
             return;
         }
-        // Booting a guided installer means installing it: that is one act, and it goes through the
-        // installation sequence so both routes to a new system look and feel the same. A live medium
-        // (Arch, Gentoo) really does just boot — its system is put on the disk by hand afterwards.
+        /*
+         * Booting a guided installer means installing it: that is one act, and it goes through the
+         * installation sequence so both routes to a new system look and feel the same. A live medium
+         * (Arch, Gentoo) really does just boot, and its system is put on the disk by hand afterwards.
+         */
         if (e.kind() == FirmwareStatePayload.KIND_MEDIA && e.installMode() == 0) {
             openInstaller(e.label(), e.ref());
             return;
@@ -231,15 +229,19 @@ public class FirmwareScreen extends Screen {
         final FirmwareStatePayload.Entry e = selectedEntry();
         if (e != null && e.kind() == FirmwareStatePayload.KIND_MEDIA && page == PAGE_BOOT) {
             if (!e.bootable()) {
-                // A medium this machine cannot install — a system newer than its era, or no installer on
-                // it — is refused here, in words. Falling through to "whatever is linked" used to open the
-                // installer anyway, which then played a write the server refused without saying so.
+                /*
+                 * A medium this machine cannot install (a system newer than its era, or no installer on
+                 * it) is refused here, in words. Falling through to "whatever is linked" used to open the
+                 * installer anyway, which then played a write the server refused without saying so.
+                 */
                 notice(e.installMode() < 0 ? "There is no installer on that medium."
                         : systemNameOf(e.label()) + " needs " + reasonOf(e.detail()) + " hardware.");
                 return;
             }
-            // A live/source medium (Arch, Gentoo) has no one-click install: "installing" it means booting
-            // its shell and putting the system on the disk by hand, so the action boots the medium.
+            /*
+             * A live/source medium (Arch, Gentoo) has no one-click install: "installing" it means booting
+             * its shell and putting the system on the disk by hand, so the action boots the medium.
+             */
             if (e.installMode() != 0) {
                 activateSelected();
                 return;
@@ -288,9 +290,7 @@ public class FirmwareScreen extends Screen {
                 : new int[]{installHit[0] + installHit[2] / 2, installHit[1] + installHit[3] / 2};
     }
 
-    // ---------------------------------------------------------------------------
     // Render
-    // ---------------------------------------------------------------------------
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
@@ -337,9 +337,7 @@ public class FirmwareScreen extends Screen {
         };
     }
 
-    // ---------------------------------------------------------------------------
-    // Vintage — green phosphor CLI BIOS
-    // ---------------------------------------------------------------------------
+    // Vintage: green phosphor CLI BIOS
 
     private void renderCliBios(final GuiGraphics g, final int x, final int y, final int mouseX, final int mouseY) {
         g.fill(x, y, x + W, y + H, CLI_BG);
@@ -400,9 +398,7 @@ public class FirmwareScreen extends Screen {
         g.drawString(font, hintText(), tx, y + H - 14, CLI_DIM, false);
     }
 
-    // ---------------------------------------------------------------------------
-    // Legacy — classic blue BIOS setup utility
-    // ---------------------------------------------------------------------------
+    // Legacy: classic blue BIOS setup utility
 
     private void renderBlueBios(final GuiGraphics g, final int x, final int y, final int mouseX, final int mouseY) {
         g.fill(x, y, x + W, y + H, BLUE_BG);
@@ -496,9 +492,7 @@ public class FirmwareScreen extends Screen {
         g.drawString(font, header, x + 6, y + 3, BLUE_BG, false);
     }
 
-    // ---------------------------------------------------------------------------
-    // Standard — modern UEFI boot manager
-    // ---------------------------------------------------------------------------
+    // Standard: modern UEFI boot manager
 
     private void renderUefi(final GuiGraphics g, final int x, final int y, final int mouseX, final int mouseY) {
         g.fill(x, y, x + W, y + H, UEFI_BG);
@@ -542,8 +536,10 @@ public class FirmwareScreen extends Screen {
             } else if (rows.isEmpty()) {
                 g.drawString(font, "No bootable device", mainX + 8, ry + 2, UEFI_AMBER, false);
             }
-            // The action buttons sit at a fixed height at the foot of the panel, so the list has to stop
-            // above them. Drawing past this point put BOOT and INSTALL TO DISK on top of real rows.
+            /*
+             * The action buttons sit at a fixed height at the foot of the panel, so the list has to stop
+             * above them. Drawing past this point put BOOT and INSTALL TO DISK on top of real rows.
+             */
             final int listBottom = top + panelH - 26 - 4;
             for (int i = 0; i < rows.size(); i++) {
                 if (ry + ROW_H + 2 > listBottom) {
@@ -594,9 +590,7 @@ public class FirmwareScreen extends Screen {
         g.drawString(font, header, x + 7, y + 3, UEFI_TEXT, false);
     }
 
-    // ---------------------------------------------------------------------------
     // Shared helpers
-    // ---------------------------------------------------------------------------
 
     /** The hardware page's key/value lines in the caller's palette. */
     private void renderHardwareLines(final GuiGraphics g, final int x, final int y, final int lh,
@@ -631,8 +625,10 @@ public class FirmwareScreen extends Screen {
         int ty = y;
         if (raid == null || !raid.present()) {
             g.drawString(font, "No storage controller fitted.", x, ty, dimColor, false);
-            // Wrapped to the panel: this sentence is longer than the box, and drawn as one line it ran
-            // straight through the border and over the help panel beside it.
+            /*
+             * Wrapped to the panel: this sentence is longer than the box, and drawn as one line it ran
+             * straight through the border and over the help panel beside it.
+             */
             ty += lh;
             for (final net.minecraft.util.FormattedCharSequence line : font.split(
                     net.minecraft.network.chat.Component.literal(
@@ -718,9 +714,7 @@ public class FirmwareScreen extends Screen {
         }
     }
 
-    // ---------------------------------------------------------------------------
     // Input
-    // ---------------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button) {
@@ -792,7 +786,7 @@ public class FirmwareScreen extends Screen {
                 activateSelected();
                 return true;
             }
-            case 70 -> { // F: format the selected disk (pressed twice — the first press only arms it)
+            case 70 -> { // F: format the selected disk (pressed twice, the first press only arms it)
                 formatSelected();
                 return true;
             }

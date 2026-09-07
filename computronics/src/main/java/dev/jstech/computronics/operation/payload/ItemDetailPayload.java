@@ -17,8 +17,8 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 
 /**
- * Server to client: one item's full detail for Storage Insights — the network total, where it is stored
- * (per server), what recipes it helps make ({@link #usedToMake} — the products of patterns that consume it),
+ * Server to client: one item's full detail for Storage Insights: the network total, where it is stored
+ * (per server), what recipes it helps make ({@link #usedToMake}, the products of patterns that consume it),
  * and which buses filter it ({@link #buses}). Sent in reply to {@link RequestItemDetailPayload}.
  */
 public record ItemDetailPayload(ItemStack item, long total, List<NetworkItemEntry.StorageShare> storedIn,

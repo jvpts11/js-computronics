@@ -17,7 +17,7 @@ import java.util.List;
 /**
  * One program window a machine has open: which program, where it floats, and whether it is
  * minimized or maximized. This is the machine's own state, kept on the server, so a computer that
- * was left running comes back to the same windows for anyone who looks at its monitor — and after
+ * was left running comes back to the same windows for anyone who looks at its monitor, and after
  * the game itself was closed. It deliberately holds the layout only: what each program had inside
  * (a terminal's scrollback, an unsaved query) is session convenience, not machine state, and a real
  * machine does not hand that back after a restart either.

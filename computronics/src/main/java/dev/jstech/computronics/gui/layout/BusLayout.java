@@ -13,7 +13,7 @@ import dev.jstech.core.gui.layout.GuiLayout;
  * Pure layout shared by the Export Bus and Import Bus screens: every drawn element's position and size, with
  * no Minecraft dependency, so {@link #layout()} can be unit-tested. Both menus place their slots from these
  * constants and both screens draw their frames from the same ones, so the screens, the menus and the test
- * share one source of truth — moving a control, a longer caption, or the name field is caught by the test
+ * share one source of truth, so moving a control, a longer caption, or the name field is caught by the test
  * before it ever reaches the game.
  *
  * <p>The two buses have an identical control set (a name field, a ghost filter slot, min/max stock steppers,

@@ -33,7 +33,7 @@ class ProgramKeybindsTest {
 
     @Test
     void enter_isEditingNotRunOrClose() {
-        // In the multi-line editor, Enter inserts a newline — it must not close or run the program.
+        // In the multi-line editor, Enter inserts a newline, and it must not close or run the program.
         assertEquals(Action.EDIT, ProgramKeybinds.route(ProgramKeybinds.ENTER));
     }
 

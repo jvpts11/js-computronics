@@ -6,6 +6,6 @@
  * This file is part of J's Industrial.
  */
 /**
- * Industrial module — metallurgy, chemistry, nuclear reactors, multiblock machines, ore processing chains, T0-T9 progression.
+ * Industrial module: metallurgy, chemistry, nuclear reactors, multiblock machines, ore processing chains, T0-T9 progression.
  */
 package dev.jstech.industrial;

@@ -20,9 +20,11 @@ import net.neoforged.neoforge.items.IItemHandlerModifiable;
  */
 public final class ServerHardwareHandler implements IItemHandlerModifiable {
 
-    // Since the racks rework a server carries NO drives: its disks live in the rack's front-panel
-    // hotswap slots (the chassis decides how many it cables). The old disk slots (20-25) are gone;
-    // anything a legacy stack still holds there is simply ignored (dev-only mod, no migration).
+    /*
+     * Since the racks rework a server carries NO drives: its disks live in the rack's front-panel
+     * hotswap slots (the chassis decides how many it cables). The old disk slots (20-25) are gone;
+     * anything a legacy stack still holds there is simply ignored (dev-only mod, no migration).
+     */
     public static final int MOBO = 0;
     public static final int CPU_START = 1;
     public static final int CPU = 4;
@@ -108,9 +110,11 @@ public final class ServerHardwareHandler implements IItemHandlerModifiable {
     @Override
     public boolean isItemValid(final int slot, final ItemStack stack) {
         if (slot == MOBO) {
-            // A Server takes a server-class board: EEB across the eras, or the EATX workstation board
-            // where the era offers one. It does not accept consumer or Mainframe-only boards, and the
-            // case takes only a board of its own era, like every other computer's chassis.
+            /*
+             * A Server takes a server-class board: EEB across the eras, or the EATX workstation board
+             * where the era offers one. It does not accept consumer or Mainframe-only boards, and the
+             * case takes only a board of its own era, like every other computer's chassis.
+             */
             return MotherboardItem.fits(stack,
                     java.util.Set.of(dev.jstech.computronics.hardware.FormFactor.EEB,
                             dev.jstech.computronics.hardware.FormFactor.EATX))
@@ -126,9 +130,11 @@ public final class ServerHardwareHandler implements IItemHandlerModifiable {
             return stack.getItem() instanceof RamItem;
         }
         if (slot >= GPU_START && slot < GPU_START + GPU) {
-            // The expansion slots take a GPU in any server. The crafting co-processor is the one card
-            // reserved to a chassis: it goes only in a Supercomputer Node, whose single expansion slot
-            // exists for it — accepting GPUs alone here left that slot unable to seat anything.
+            /*
+             * The expansion slots take a GPU in any server. The crafting co-processor is the one card
+             * reserved to a chassis: it goes only in a Supercomputer Node, whose single expansion slot
+             * exists for it, and accepting GPUs alone here left that slot unable to seat anything.
+             */
             if (stack.getItem() instanceof PhiCoprocessorItem) {
                 return ServerItem.chassisOf(held())
                         == dev.jstech.computronics.rack.RackChassis.SUPERCOMPUTER_NODE

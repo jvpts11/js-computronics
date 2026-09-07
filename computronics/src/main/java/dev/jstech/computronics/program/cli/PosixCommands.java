@@ -66,8 +66,10 @@ public final class PosixCommands {
 
         @Override public String summary() { return "install and remove packages from the network mirror"; }
 
-        // Removal is listed here on purpose: a verb the shell accepts but never advertises may as well
-        // not exist, since the only way to find it is to already know it.
+        /*
+         * Removal is listed here on purpose: a verb the shell accepts but never advertises may as well
+         * not exist, since the only way to find it is to already know it.
+         */
         @Override public String usage() {
             return switch (kind) {
                 case PACMAN -> "-S <package> | -R <package> | -Ss [term] | -Q | -Syu";
@@ -367,8 +369,10 @@ public final class PosixCommands {
         @Override public String usage() { return ""; }
 
         @Override public boolean available(final ICliComputer computer) {
-            // A package the Mirror serves, not a built-in: 'command not found' until it is installed —
-            // the classic first thing to apt install on a fresh system.
+            /*
+             * A package the Mirror serves, not a built-in: 'command not found' until it is installed,
+             * the classic first thing to apt install on a fresh system.
+             */
             return computer.hasProgram(
                     net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", "screenfetch"));
         }
@@ -410,7 +414,7 @@ public final class PosixCommands {
             }
         }
 
-        /** The world's uptime as {@code Xd Xh Xm} (in-game time — the machine has been part of it). */
+        /** The world's uptime as {@code Xd Xh Xm} (in-game time, and the machine has been part of it). */
         private static String uptime(final long ticks) {
             final long minutes = ticks / (20L * 60L);
             final long days = minutes / (60 * 24);

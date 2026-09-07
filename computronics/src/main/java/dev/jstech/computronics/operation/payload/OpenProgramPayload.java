@@ -15,7 +15,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: launch a program for the computer at {@code hostPos} from the Monitor at {@code monitorPos} — used by the terminal's Console tab to open the Command Prompt without sneaking.
+ * Client to server: launch a program for the computer at {@code hostPos} from the Monitor at {@code monitorPos}, used by the terminal's Console tab to open the Command Prompt without sneaking.
  */
 public record OpenProgramPayload(BlockPos monitorPos, BlockPos hostPos, String programId)
         implements CustomPacketPayload {

@@ -50,7 +50,7 @@ import java.util.Set;
 /**
  * Enumerates the blocks that count as processing machines for the Pattern Encoder's machine picker. A block
  * qualifies when it has a block entity that is not one of the known vanilla non-machine types (decoration,
- * structure, plain storage, world mechanics). Mod blocks are never excluded — a mod's block-entity blocks are
+ * structure, plain storage, world mechanics). Mod blocks are never excluded, since a mod's block-entity blocks are
  * its machines. Kept out of the client screen so a GameTest can pin the catalog's contents.
  */
 public final class MachineCatalog {

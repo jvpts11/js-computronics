@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Server to client: the full state the Settings app draws — the editable per-computer knobs, the
+ * Server to client: the full state the Settings app draws: the editable per-computer knobs, the
  * read-only hardware/OS specs (System &amp; Display pages), the installed programs (Programs page),
  * the per-disk usage (Storage page) and the memory ledger (what holds RAM, for the System Monitor).
  * Sent in reply to {@link RequestSettingsPayload} and after every {@link SetSettingPayload}.

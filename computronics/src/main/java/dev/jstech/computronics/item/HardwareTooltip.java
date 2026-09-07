@@ -16,7 +16,7 @@ import java.util.Locale;
 
 /**
  * The lines every hardware component's tooltip shares. A board seats only parts of its own generation,
- * so the generation has to be readable on the part itself — otherwise the only way to find out whether
+ * so the generation has to be readable on the part itself, because otherwise the only way to find out whether
  * two pieces go together is to try them in the slot and watch nothing happen.
  *
  * <p>One place, so the wording cannot drift between a CPU and the memory it has to match.

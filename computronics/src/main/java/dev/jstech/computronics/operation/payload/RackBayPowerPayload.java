@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Client to server: flip the power switch of the bay whose unit tops at {@code slot} in the Server
- * Rack at {@code rackPos} — the PWR button on the rack GUI's bay row.
+ * Rack at {@code rackPos}, from the PWR button on the rack GUI's bay row.
  */
 public record RackBayPowerPayload(BlockPos rackPos, int slot) implements CustomPacketPayload {
 

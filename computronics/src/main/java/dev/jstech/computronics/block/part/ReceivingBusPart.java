@@ -16,7 +16,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * A Receiving Bus part: marks the machine face that crafting operations collect finished outputs from — the
+ * A Receiving Bus part: marks the machine face that crafting operations collect finished outputs from, the
  * way to drive a sided machine whose output face differs from the face its Crafting Switch touches. It shares
  * the Import Bus's identity plumbing (menu, filters) but is passive: the crafting engine pulls through it, it
  * never transfers on its own.
@@ -30,8 +30,10 @@ public final class ReceivingBusPart extends ImportBusPart {
 
     @Override
     public void serverTick() {
-        // Passive: autonomous pulling would steal a craft's outputs into the bus buffer while the operation
-        // is trying to collect and account for them.
+        /*
+         * Passive: autonomous pulling would steal a craft's outputs into the bus buffer while the operation
+         * is trying to collect and account for them.
+         */
     }
 
     @Override

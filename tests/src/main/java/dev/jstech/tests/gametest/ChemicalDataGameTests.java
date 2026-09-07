@@ -41,7 +41,7 @@ import java.util.Optional;
 /**
  * "Everything is data": a chemical is a third kind of storage key next to items and fluids. The network stores
  * it by id and millibucket, saves and syncs it, and moves it in and out of real machines through the chemical
- * bridge — here Mekanism's, present on the dev runtime.
+ * bridge, here Mekanism's, present on the dev runtime.
  */
 @GameTestHolder(JsTests.MODID)
 @PrefixGameTestTemplate(false)
@@ -161,8 +161,10 @@ public final class ChemicalDataGameTests {
                 .thenSucceed();
     }
 
-    // The bus cable hangs south of the Ethernet at (4,2,2); tank A's front (north) touches the cable's south
-    // face — the tank's only output face — and tank B stands west of the cable, taking input on its east face.
+    /*
+     * The bus cable hangs south of the Ethernet at (4,2,2); tank A's front (north) touches the cable's south
+     * face (the tank's only output face) and tank B stands west of the cable, taking input on its east face.
+     */
     private static final BlockPos BUS_CABLE = new BlockPos(4, 2, 3);
     private static final BlockPos TANK_A = new BlockPos(4, 2, 4);
     private static final BlockPos TANK_B = new BlockPos(3, 2, 3);
@@ -196,8 +198,10 @@ public final class ChemicalDataGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 400)
     public static void exportBus_metersAGasIntoATankUpToItsMax(final GameTestHelper helper) {
-        // The filter names the chemical the way a bucket names a fluid: with an item that carries it — here a
-        // tank item that held oxygen when it was picked up. The max keeps the faced tank at 300 mB, no more.
+        /*
+         * The filter names the chemical the way a bucket names a fluid: with an item that carries it, here a
+         * tank item that held oxygen when it was picked up. The max keeps the faced tank at 300 mB, no more.
+         */
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
         world.setBlock(BUS_CABLE, dev.jstech.computronics.ComputingModule.ETHERNET_CABLE.get());
@@ -249,8 +253,10 @@ public final class ChemicalDataGameTests {
 
     @GameTest(template = ARENA)
     public static void externalPort_offersEveryKindOfDataTheBlockHas(final GameTestHelper helper) {
-        // The one factory every production port goes through must find each kind a block offers on a face —
-        // a chemical tank has item slots and a chemical tank, a furnace only item slots — and none it lacks.
+        /*
+         * The one factory every production port goes through must find each kind a block offers on a face (
+         * a chemical tank has item slots and a chemical tank, a furnace only item slots) and none it lacks.
+         */
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final BlockPos tank = new BlockPos(2, 2, 2);
         final BlockPos furnace = new BlockPos(4, 2, 2);

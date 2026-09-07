@@ -57,7 +57,7 @@ public abstract class AbstractTransferOperation implements INetworkOperation {
     /**
      * One SubOperation: a server's timed transfer. Two virtual-thread gates guard the start of
      * the stream: {@code diskReady} flips when the disk seek latency elapses, and {@code ramReady}
-     * flips when the RAM staging latency elapses. Both must be true before any data moves —
+     * flips when the RAM staging latency elapses. Both must be true before any data moves,
      * mirroring real hardware where a seek completes and then data is buffered through RAM.
      * The two VTs run in parallel, so each latency is paid concurrently.
      */
@@ -88,7 +88,7 @@ public abstract class AbstractTransferOperation implements INetworkOperation {
 
     /**
      * Adds one SubOperation for a server. With a scheduler, each latency (disk seek and RAM
-     * staging) parks its own virtual thread that flips the corresponding gate once it elapses —
+     * staging) parks its own virtual thread that flips the corresponding gate once it elapses;
      * both gates must open before data moves, and the two VTs run concurrently so neither adds
      * to the other's wall-clock cost. Without a scheduler both latencies are counted on the main
      * thread through {@link TransferState} (the directly-driven fallback path used in tests).

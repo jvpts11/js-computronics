@@ -47,7 +47,7 @@ import java.util.UUID;
  *
  * <p>The front-panel hotswap slots belong to the RACK, five per rack unit: a mounted chassis
  * cables the slots of the rows it occupies up to its drive and gadget budgets, and drives stay in
- * their slots when the server itself is pulled — the next chassis mounted over those rows inherits
+ * their slots when the server itself is pulled, and the next chassis mounted over those rows inherits
  * them. All server-side storage is therefore held by the bay drives (each drive's own disk
  * components), never by the Server item.
  */
@@ -57,7 +57,7 @@ public class ServerRackBlockEntity extends BlockEntity
         dev.jstech.computronics.terminal.IComputerTerminalHost,
         software.bernie.geckolib.animatable.GeoBlockEntity {
 
-    // ---- the cabinet as one model: what the renderer needs to know about every row ----
+    // the cabinet as one model: what the renderer needs to know about every row
 
     /** Codes for what a rack unit row holds, as the model names its bones. Row 0 is the bottom U. */
     public static final int UNIT_NONE = 0;
@@ -81,8 +81,10 @@ public class ServerRackBlockEntity extends BlockEntity
     private final software.bernie.geckolib.animatable.instance.AnimatableInstanceCache geckoCache =
             software.bernie.geckolib.util.GeckoLibUtil.createInstanceCache(this);
 
-    // What the client copy knows about the cabinet: it holds no inventory, so the server sends the unit
-    // code of every row, the bay power mask and the service panel state with each block update.
+    /*
+     * What the client copy knows about the cabinet: it holds no inventory, so the server sends the unit
+     * code of every row, the bay power mask and the service panel state with each block update.
+     */
     private final byte[] clientUnits = new byte[CAPACITY_U];
     private int clientBayPowerOff;
     private boolean clientServicePanelOff;
@@ -92,8 +94,10 @@ public class ServerRackBlockEntity extends BlockEntity
 
     @Override
     public void registerControllers(final software.bernie.geckolib.animation.AnimatableManager.ControllerRegistrar controllers) {
-        // The roof fans turn while any bay is powered; the light bar and the seated units are bone
-        // visibility set by the renderer, not animation.
+        /*
+         * The roof fans turn while any bay is powered; the light bar and the seated units are bone
+         * visibility set by the renderer, not animation.
+         */
         controllers.add(new software.bernie.geckolib.animation.AnimationController<>(this, "fans", 0,
                 state -> anyBayOn() ? state.setAndContinue(FANS)
                         : software.bernie.geckolib.animation.PlayState.STOP));
@@ -217,8 +221,10 @@ public class ServerRackBlockEntity extends BlockEntity
     private final ItemStackHandler servers = new ItemStackHandler(CAPACITY_U) {
         @Override
         public boolean isItemValid(final int slot, final ItemStack stack) {
-            // Servers and rack equipment (KVM, UPS, cooling) bid for the same rack units, but a
-            // computer only mounts in the cabinet its chassis belongs to.
+            /*
+             * Servers and rack equipment (KVM, UPS, cooling) bid for the same rack units, but a
+             * computer only mounts in the cabinet its chassis belongs to.
+             */
             final dev.jstech.computronics.rack.IMountableRackUnit unit =
                     dev.jstech.computronics.rack.IMountableRackUnit.of(stack);
             if (unit == null || !acceptsChassis(stack)) {
@@ -235,8 +241,10 @@ public class ServerRackBlockEntity extends BlockEntity
         @Override
         public ItemStack extractItem(final int slot, final int amount, final boolean simulate) {
             if (!simulate) {
-                // The software state lives with the item: write the running console back onto the
-                // stack before it leaves, so the machine's history travels between racks with it.
+                /*
+                 * The software state lives with the item: write the running console back onto the
+                 * stack before it leaves, so the machine's history travels between racks with it.
+                 */
                 flushConsole(slot);
             }
             return super.extractItem(slot, amount, simulate);
@@ -244,8 +252,10 @@ public class ServerRackBlockEntity extends BlockEntity
 
         @Override
         protected void onContentsChanged(final int slot) {
-            // A freshly mounted (or swapped) machine runs POST on its next session; whatever
-            // console state the old occupant left in memory dies with the swap.
+            /*
+             * A freshly mounted (or swapped) machine runs POST on its next session; whatever
+             * console state the old occupant left in memory dies with the swap.
+             */
             unitStates.remove(slot);
             buildCached[slot] = false;
             markStorageChanged(slot);
@@ -339,8 +349,10 @@ public class ServerRackBlockEntity extends BlockEntity
         }
         final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
         state.console.save(tag);
-        // A machine that is already up must still be up after a reload. Keeping the POST flag only in
-        // memory made every server re-run POST when the world came back, as if it had been switched off.
+        /*
+         * A machine that is already up must still be up after a reload. Keeping the POST flag only in
+         * memory made every server re-run POST when the world came back, as if it had been switched off.
+         */
         tag.putBoolean("NeedsPost", state.needsPost);
         tag.putInt("BootDiskSlot", state.bootDiskSlot);
         if (state.bootedDesktopId != null) {
@@ -371,8 +383,10 @@ public class ServerRackBlockEntity extends BlockEntity
     private final ItemStackHandler frontSlots = new ItemStackHandler(CAPACITY_U * RackLayout.SLOTS_PER_U) {
         @Override
         public boolean isItemValid(final int slot, final ItemStack stack) {
-            // Each front slot takes only what its role cables: drives in a drive bay, bay gadgets
-            // (RAID controller, cache card) in a gadget bay, nothing in a blocked one.
+            /*
+             * Each front slot takes only what its role cables: drives in a drive bay, bay gadgets
+             * (RAID controller, cache card) in a gadget bay, nothing in a blocked one.
+             */
             return switch (roleOfFrontSlot(slot)) {
                 case DRIVE -> stack.getItem() instanceof DiskItem;
                 case GADGET -> stack.getItem()
@@ -384,8 +398,10 @@ public class ServerRackBlockEntity extends BlockEntity
         @Override
         public ItemStack extractItem(final int slot, final int amount, final boolean simulate) {
             if (!simulate && getStackInSlot(slot).getItem() instanceof DiskItem) {
-                // Pulling a member out of an array is the moment the array's promise is tested:
-                // a redundant array keeps its data (and hands back a blank drive), a stripe dies.
+                /*
+                 * Pulling a member out of an array is the moment the array's promise is tested:
+                 * a redundant array keeps its data (and hands back a blank drive), a stripe dies.
+                 */
                 onArrayMemberRemoved(slot);
             }
             return super.extractItem(slot, amount, simulate);
@@ -419,8 +435,10 @@ public class ServerRackBlockEntity extends BlockEntity
         }
         final net.minecraft.core.Direction facing = self.getValue(
                 net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
-        // The cabinet model still shows 4 visual bays over 8 rack units: bay b lights up when
-        // either of its two rows carries part of a mounted unit.
+        /*
+         * The cabinet model still shows 4 visual bays over 8 rack units: bay b lights up when
+         * either of its two rows carries part of a mounted unit.
+         */
         final List<RackLayout.Unit> mounted = mountedUnits();
         for (int h = 0; h < 2; h++) {
             for (int w = 0; w < 2; w++) {
@@ -447,16 +465,20 @@ public class ServerRackBlockEntity extends BlockEntity
 
     private final long[] storageModCounts = new long[CAPACITY_U];
 
-    // Each mounted machine's build, parsed from its item once per mount instead of on every tick: the
-    // tick, the thermal load and the port count all read it, and a rack of eight was re-parsing eight
-    // hardware inventories twenty times a second.
+    /*
+     * Each mounted machine's build, parsed from its item once per mount instead of on every tick: the
+     * tick, the thermal load and the port count all read it, and a rack of eight was re-parsing eight
+     * hardware inventories twenty times a second.
+     */
     private final dev.jstech.computronics.hardware.ComputerBuild[] buildCache =
             new dev.jstech.computronics.hardware.ComputerBuild[CAPACITY_U];
     private final boolean[] buildCached = new boolean[CAPACITY_U];
 
-    // The bay capacity each unit registers, kept until its storage mod count moves (a drive or the machine
-    // itself went in or out): the tick asks for it for every unit, every tick, and computing it walks the
-    // chassis, the mounted units and the whole front panel.
+    /*
+     * The bay capacity each unit registers, kept until its storage mod count moves (a drive or the machine
+     * itself went in or out): the tick asks for it for every unit, every tick, and computing it walks the
+     * chassis, the mounted units and the whole front panel.
+     */
     private final long[] bayItemsCache = new long[CAPACITY_U];
     private final long[] bayItemsMod = new long[CAPACITY_U];
     private final boolean[] bayItemsCached = new boolean[CAPACITY_U];
@@ -500,8 +522,10 @@ public class ServerRackBlockEntity extends BlockEntity
         if (bayPowerOn(slot)) {
             unitState(slot).needsPost = true;
         }
-        // Off or a cold start, no desktop survives — the bay switch is this machine's power button,
-        // and writing needsPost directly here had let it skip the clearing setNeedsPost does.
+        /*
+         * Off or a cold start, no desktop survives; the bay switch is this machine's power button,
+         * and writing needsPost directly here had let it skip the clearing setNeedsPost does.
+         */
         unitState(slot).openWindows.clear();
         unitState(slot).pendingInstallSlot = dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL;
         flushConsole(slot);
@@ -612,7 +636,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return false;
     }
 
-    // ---- RAID: the bay's drives as one logical volume ---------------------------------------------
+    // RAID: the bay's drives as one logical volume
 
     /** The front-slot index holding the unit's RAID Controller, or -1 when it has none. */
     public int raidControllerSlot(final int serverSlot) {
@@ -721,8 +745,10 @@ public class ServerRackBlockEntity extends BlockEntity
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
-        // A machine running the Integrity Monitor re-reads its own bay after a hot event, so the
-        // index never learns to doubt it. A fragmented index still wants a vacuum by hand.
+        /*
+         * A machine running the Integrity Monitor re-reads its own bay after a hot event, so the
+         * index never learns to doubt it. A fragmented index still wants a vacuum by hand.
+         */
         if (hasService(topRow, "integrity_monitor")) {
             return;
         }
@@ -745,7 +771,7 @@ public class ServerRackBlockEntity extends BlockEntity
     /**
      * A drive is leaving the front slot {@code frontSlot}. A redundant array keeps the volume: the
      * departing member's share is redistributed across the drives that stay and the drive comes out
-     * blank (its stripes were never a standalone copy — nothing is duplicated). A stripe has no
+     * blank (its stripes were never a standalone copy, so nothing is duplicated). A stripe has no
      * redundancy to fall back on, so pulling any member destroys the whole array's contents.
      */
     private void onArrayMemberRemoved(final int frontSlot) {
@@ -756,8 +782,10 @@ public class ServerRackBlockEntity extends BlockEntity
         final int top = unit.topU();
         final RaidMode mode = raidModeOf(top);
         if (mode == RaidMode.NONE) {
-            // An independent volume travels with its drive, as any computer disk does — and the
-            // network index is left holding rows it has not re-read: that is a hot pull.
+            /*
+             * An independent volume travels with its drive, as any computer disk does, and the
+             * network index is left holding rows it has not re-read: that is a hot pull.
+             */
             notifyHotPull(top);
             return;
         }
@@ -802,7 +830,7 @@ public class ServerRackBlockEntity extends BlockEntity
         setChanged();
     }
 
-    // ---- Rebuild: putting a replacement member back to work --------------------------------------
+    // Rebuild: putting a replacement member back to work
 
     /** Ticks of rebuild work per item of array capacity (a balancing estimate). */
     private static final int REBUILD_TICKS_PER_1K_ITEMS = 20;
@@ -961,8 +989,10 @@ public class ServerRackBlockEntity extends BlockEntity
         return node;
     }
 
-    // A compute cabinet's link state: its fabric reaches an HBW Interface that is on a network. The
-    // interface reports it as it surveys the fabric; the cabinet only remembers when and what it said.
+    /*
+     * A compute cabinet's link state: its fabric reaches an HBW Interface that is on a network. The
+     * interface reports it as it surveys the fabric; the cabinet only remembers when and what it said.
+     */
     private boolean fabricLinked;
     private long fabricSeenAt = Long.MIN_VALUE;
     private boolean fabricNetworked;
@@ -981,16 +1011,20 @@ public class ServerRackBlockEntity extends BlockEntity
             }
         }
         if (rackType() == RackChassis.RackType.SUPERCOMPUTER) {
-            // A compute cabinet sits on the high-compute fabric and answers to nothing else: a data cable
-            // on it is ignored, whatever the face. Its nodes are reached through the HBW Interface at the
-            // end of the fabric and are never servers on the data network. The link light is what the
-            // interface's survey said as it walked the fabric (every tick, any face of the cabinet).
+            /*
+             * A compute cabinet sits on the high-compute fabric and answers to nothing else: a data cable
+             * on it is ignored, whatever the face. Its nodes are reached through the HBW Interface at the
+             * end of the fabric and are never servers on the data network. The link light is what the
+             * interface's survey said as it walked the fabric (every tick, any face of the cabinet).
+             */
             fabricLinked = fabricNetworked && level.getGameTime() - fabricSeenAt <= 2L;
             return null;
         }
         fabricLinked = false;
-        // Cables attach ONLY through the cabinet's rear: the open front is the bay. The high-compute fabric
-        // is the supercomputer cabinet's alone, so a server cabinet does not answer to it.
+        /*
+         * Cables attach ONLY through the cabinet's rear: the open front is the bay. The high-compute fabric
+         * is the supercomputer cabinet's alone, so a server cabinet does not answer to it.
+         */
         final Direction back = facing.getOpposite();
         final Set<Long> cables = new HashSet<>();
         for (final long posLong : inside) {
@@ -1004,8 +1038,10 @@ public class ServerRackBlockEntity extends BlockEntity
                 cables.add(neighbor.asLong());
             }
         }
-        // Bridge the cable runs this rack touches into one segment, so a Mainframe on one side and a
-        // standby on the other are on a single network connected through the rack.
+        /*
+         * Bridge the cable runs this rack touches into one segment, so a Mainframe on one side and a
+         * standby on the other are on a single network connected through the rack.
+         */
         system.connectivity().bridge(cables);
         for (final long cable : cables) {
             final var net = system.connectivity().networkOf(cable);
@@ -1034,29 +1070,35 @@ public class ServerRackBlockEntity extends BlockEntity
     @Override
     public void setRemoved() {
         super.setRemoved();
-        // Unregister the housed Servers on chunk unload too, not just on destruction (the block's
-        // onRemove), so they never linger in the still-loaded per-level network. onBroken is idempotent.
+        /*
+         * Unregister the housed Servers on chunk unload too, not just on destruction (the block's
+         * onRemove), so they never linger in the still-loaded per-level network. onBroken is idempotent.
+         */
         if (level instanceof ServerLevel serverLevel) {
             onBroken(serverLevel);
         }
     }
 
-    // ---- The rack as the mounted computer's face -------------------------------------------------
-    //
-    // A monitor (or a media reader) cables to the RACK; with exactly one computer mounted, the rack
-    // answers the whole OS-host contract by delegating to that machine, so the server runs the same
-    // POST / firmware / boot / console pipeline as a desk computer. With two or more computers the
-    // monitor cannot address the bays (that takes a KVM switch), so the delegating host goes dark.
+    /*
+     * The rack as the mounted computer's face
+     *
+     * A monitor (or a media reader) cables to the RACK; with exactly one computer mounted, the rack
+     * answers the whole OS-host contract by delegating to that machine, so the server runs the same
+     * POST / firmware / boot / console pipeline as a desk computer. With two or more computers the
+     * monitor cannot address the bays (that takes a KVM switch), so the delegating host goes dark.
+     */
 
     private final Set<Long> linkedPeripherals = new HashSet<>();
     private NodeUuid fallbackNode;
 
-    // ---- Thermal budget: what a dense cabinet costs you ------------------------------------------
-    //
-    // Every mounted machine dumps its power draw into the cabinet as heat. A rack sheds a fixed
-    // amount on its own; past that the machines throttle unless cooling is mounted — which is the
-    // trade-off the rack-unit budget is meant to create, since cooling spends the same U a server
-    // would. The watt figures are balancing estimates.
+    /*
+     * Thermal budget: what a dense cabinet costs you
+     *
+     * Every mounted machine dumps its power draw into the cabinet as heat. A rack sheds a fixed
+     * amount on its own; past that the machines throttle unless cooling is mounted, which is the
+     * trade-off the rack-unit budget is meant to create, since cooling spends the same U a server
+     * would. The watt figures are balancing estimates.
+     */
 
     /** Heat a bare cabinet sheds on its own, in watts. */
     private static final int PASSIVE_HEAT_BUDGET_W = 1000;
@@ -1093,7 +1135,7 @@ public class ServerRackBlockEntity extends BlockEntity
     /**
      * How much of its capacity a machine in this rack actually delivers, in percent. A cabinet
      * inside its thermal budget runs at full speed; past it every machine throttles by the same
-     * proportion, down to a floor — hot hardware slows down, it does not stop.
+     * proportion, down to a floor: hot hardware slows down, it does not stop.
      */
     public int thermalThrottlePercent() {
         final int load = thermalLoadWatts();
@@ -1120,13 +1162,15 @@ public class ServerRackBlockEntity extends BlockEntity
     /** Whether this cabinet takes the given stack's chassis (rack equipment always fits). */
     public boolean acceptsChassis(final ItemStack stack) {
         final RackChassis chassis = ServerItem.chassisOf(stack);
-        // The cabinet type must match, and a cabinet seats its own era or earlier: a Vintage server
-        // still fits a Standard rack, a Standard server never fits a Vintage one.
+        /*
+         * The cabinet type must match, and a cabinet seats its own era or earlier: a Vintage server
+         * still fits a Standard rack, a Standard server never fits a Vintage one.
+         */
         return chassis == null
                 || (chassis.rackType() == rackType() && chassis.era().isAtMost(rackEra()));
     }
 
-    /** The rows holding computers, in rack order — the channels a KVM switch can address. */
+    /** The rows holding computers, in rack order, the channels a KVM switch can address. */
     public List<Integer> computerSlots() {
         final List<Integer> slots = new ArrayList<>();
         for (int i = 0; i < CAPACITY_U; i++) {
@@ -1149,8 +1193,10 @@ public class ServerRackBlockEntity extends BlockEntity
         return false;
     }
 
-    // The bay a linked monitor is currently showing. Only meaningful with a KVM switch mounted;
-    // a rack with a single computer always shows that one.
+    /*
+     * The bay a linked monitor is currently showing. Only meaningful with a KVM switch mounted;
+     * a rack with a single computer always shows that one.
+     */
     private int activeChannel;
 
     /** The channel (rack row) a linked monitor shows, clamped to the machines actually mounted. */
@@ -1190,10 +1236,12 @@ public class ServerRackBlockEntity extends BlockEntity
         return hasKvmSwitch() ? activeChannel() : -1;
     }
 
-    // The unit a caller is addressing directly, or -1 when the monitor's channel decides. Every
-    // "this rack as a computer" method resolves its unit through soleComputerSlot(), so pointing that
-    // one resolver at a row makes all of them act on that row — one code path, no second copy of the
-    // machine logic per unit. Scoped, never persisted: the KVM channel is untouched.
+    /*
+     * The unit a caller is addressing directly, or -1 when the monitor's channel decides. Every
+     * "this rack as a computer" method resolves its unit through soleComputerSlot(), so pointing that
+     * one resolver at a row makes all of them act on that row, one code path, no second copy of the
+     * machine logic per unit. Scoped, never persisted: the KVM channel is untouched.
+     */
     private int unitOverride = -1;
 
     /** Runs {@code body} with every machine-level method of this rack addressing unit {@code row}. */
@@ -1245,7 +1293,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return -1;
     }
 
-    // IOsHost — the machine identity and its bay-backed disks.
+    // IOsHost: the machine identity and its bay-backed disks.
 
     @Override
     public boolean isRunning() {
@@ -1255,8 +1303,10 @@ public class ServerRackBlockEntity extends BlockEntity
 
     @Override
     public void setPowered(final boolean on) {
-        // A rack machine's power switch is its bay's, so shutting down from inside the system
-        // flips the same switch the rack GUI shows.
+        /*
+         * A rack machine's power switch is its bay's, so shutting down from inside the system
+         * flips the same switch the rack GUI shows.
+         */
         final int slot = soleComputerSlot();
         if (slot >= 0 && bayPowerOn(slot) != on) {
             toggleBayPower(slot);
@@ -1337,8 +1387,10 @@ public class ServerRackBlockEntity extends BlockEntity
                 unitState(slot).pendingInstallSlot = // and is what a finished installer was waiting for
                         dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL;
             }
-            // Write it through immediately: the flag lives on the Server item, and a world that unloads
-            // before the next save would otherwise forget that this machine had finished booting.
+            /*
+             * Write it through immediately: the flag lives on the Server item, and a world that unloads
+             * before the next save would otherwise forget that this machine had finished booting.
+             */
             flushConsole(slot);
             setChanged();
         }
@@ -1598,7 +1650,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return os != null ? os.footprintItemsOn(diskEra(disk)) : 0L;
     }
 
-    /** The era a disk was made for — what an item and a system cost on it; standard for no disk. */
+    /** The era a disk was made for, which sets what an item and a system cost on it; standard for no disk. */
     private static dev.jstech.core.tier.HardwareEra diskEra(final ItemStack disk) {
         return disk.getItem() instanceof DiskItem item
                 ? item.spec().era() : dev.jstech.core.tier.HardwareEra.STANDARD;
@@ -1610,8 +1662,10 @@ public class ServerRackBlockEntity extends BlockEntity
         final int mobo = dev.jstech.computronics.item.ServerHardwareHandler.MOBO;
         final net.minecraft.world.item.component.ItemContainerContents parts =
                 ServerItem.hardware(soleServerStack());
-        // A server's hardware is a data component, so its container is only as long as what was written
-        // to it: an empty one has no slots at all and rejects even index 0. Never index it blindly.
+        /*
+         * A server's hardware is a data component, so its container is only as long as what was written
+         * to it: an empty one has no slots at all and rejects even index 0. Never index it blindly.
+         */
         if (mobo >= parts.getSlots()) {
             return null;
         }
@@ -1623,15 +1677,17 @@ public class ServerRackBlockEntity extends BlockEntity
     @Override
     @org.jetbrains.annotations.Nullable
     public dev.jstech.core.tier.HardwareEra displayEra() {
-        // The client copy of a rack holds no mounted servers, so the era has to travel to it: screens
-        // that dress themselves by era (the boot sequence, the terminal bezel) render client-side.
+        /*
+         * The client copy of a rack holds no mounted servers, so the era has to travel to it: screens
+         * that dress themselves by era (the boot sequence, the terminal bezel) render client-side.
+         */
         if (level != null && level.isClientSide()) {
             return clientEra;
         }
         return installedEra();
     }
 
-    // IComputerTerminalHost — the physical terminal's monitoring surface over the same machine.
+    // IComputerTerminalHost: the physical terminal's monitoring surface over the same machine.
 
     @Override
     public boolean computerRunning() {
@@ -1771,7 +1827,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return false;
     }
 
-    // IPeripheralOwnerSupport — monitors and media readers cable to the rack itself.
+    // IPeripheralOwnerSupport: monitors and media readers cable to the rack itself.
 
     @Override
     public Set<Long> peripheralEndpoints() {
@@ -1785,10 +1841,12 @@ public class ServerRackBlockEntity extends BlockEntity
 
     @Override
     public int maxEndpoints() {
-        // Cabling a monitor to the cabinet only needs SOME machine with ports — which one the screen
-        // ends up showing is the KVM's business, decided when the player uses the monitor. Reading
-        // the active machine here would refuse the cable outright on a rack that merely lacks a
-        // switch, and blame the hardware for it.
+        /*
+         * Cabling a monitor to the cabinet only needs SOME machine with ports, and which one the screen
+         * ends up showing is the KVM's business, decided when the player uses the monitor. Reading
+         * the active machine here would refuse the cable outright on a rack that merely lacks a
+         * switch, and blame the hardware for it.
+         */
         int ports = 0;
         for (final int slot : computerSlots()) {
             final dev.jstech.computronics.hardware.ComputerBuild build = buildAt(slot);
@@ -1842,9 +1900,11 @@ public class ServerRackBlockEntity extends BlockEntity
         }
     }
 
-    // ItemStackHandler.deserializeNBT resizes the handler to the persisted Size, so a rack saved
-    // under the old 4-bay layout would come back too small and out-of-range the rack-unit loops.
-    // Re-expand it, keeping whatever fits (this is a size fixup, not a data migration).
+    /*
+     * ItemStackHandler.deserializeNBT resizes the handler to the persisted Size, so a rack saved
+     * under the old 4-bay layout would come back too small and out-of-range the rack-unit loops.
+     * Re-expand it, keeping whatever fits (this is a size fixup, not a data migration).
+     */
     private static void resizeAfterLoad(final ItemStackHandler handler, final int size) {
         if (handler.getSlots() == size) {
             return;
@@ -1862,8 +1922,10 @@ public class ServerRackBlockEntity extends BlockEntity
     @Override
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        // Console state persists WITH each Server item, so flush the live sessions onto their
-        // stacks before the stacks themselves are serialized.
+        /*
+         * Console state persists WITH each Server item, so flush the live sessions onto their
+         * stacks before the stacks themselves are serialized.
+         */
         flushConsoles();
         tag.put("Servers", servers.serializeNBT(registries));
         tag.put("FrontSlots", frontSlots.serializeNBT(registries));
@@ -1875,20 +1937,26 @@ public class ServerRackBlockEntity extends BlockEntity
         tag.putIntArray("PendingRebuild", new ArrayList<>(pendingRebuild));
     }
 
-    // The era of the machine the monitor is currently showing, as last received from the server. Only
-    // ever written on the client; the server always answers from the mounted hardware itself.
+    /*
+     * The era of the machine the monitor is currently showing, as last received from the server. Only
+     * ever written on the client; the server always answers from the mounted hardware itself.
+     */
     @org.jetbrains.annotations.Nullable
     private dev.jstech.core.tier.HardwareEra clientEra;
 
     @Override
     public CompoundTag getUpdateTag(final HolderLookup.Provider registries) {
         final CompoundTag tag = super.getUpdateTag(registries);
-        // Only the active channel's era travels. Sending the mounted stacks would put every server's
-        // full build on the wire on every block update, for one enum the screens need.
+        /*
+         * Only the active channel's era travels. Sending the mounted stacks would put every server's
+         * full build on the wire on every block update, for one enum the screens need.
+         */
         final dev.jstech.core.tier.HardwareEra era = installedEra();
         tag.putInt("DisplayEra", era == null ? -1 : era.ordinal());
-        // The cabinet model: one byte per row says what is seated there, the mask says which bays are
-        // off, and the panel flag whether the supercomputer's livery is on. Enough to draw it all.
+        /*
+         * The cabinet model: one byte per row says what is seated there, the mask says which bays are
+         * off, and the panel flag whether the supercomputer's livery is on. Enough to draw it all.
+         */
         final byte[] units = new byte[CAPACITY_U];
         for (int slot = 0; slot < CAPACITY_U; slot++) {
             units[slot] = (byte) unitCodeAt(slot);
@@ -1911,8 +1979,10 @@ public class ServerRackBlockEntity extends BlockEntity
     public void onDataPacket(final net.minecraft.network.Connection connection,
                              final net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket packet,
                              final HolderLookup.Provider registries) {
-        // Apply only the era. Running the full loadAdditional here would deserialize empty inventories
-        // over the client copy and reset the transient rack state to its defaults.
+        /*
+         * Apply only the era. Running the full loadAdditional here would deserialize empty inventories
+         * over the client copy and reset the transient rack state to its defaults.
+         */
         final CompoundTag tag = packet.getTag();
         final int ordinal = tag != null ? tag.getInt("DisplayEra") : -1;
         final dev.jstech.core.tier.HardwareEra[] eras =

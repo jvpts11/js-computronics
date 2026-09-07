@@ -84,8 +84,10 @@ public final class StorageVolumesGameTests {
         } finally {
             store.remove(stone);
         }
-        // A store fresh from disk owes no encoding: what it read is what it would write. (The save carries
-        // every volume of the shared test level, so only this test's volume is looked at.)
+        /*
+         * A store fresh from disk owes no encoding: what it read is what it would write. (The save carries
+         * every volume of the shared test level, so only this test's volume is looked at.)
+         */
         final StorageVolumes loaded = StorageVolumes.factory().deserializer().apply(saved, registries);
         final long stored = loaded.volume(stone).count(StorageKey.of(Items.STONE));
         helper.assertTrue(stored == 3L, "the volume comes back with its contents; stored " + stored);

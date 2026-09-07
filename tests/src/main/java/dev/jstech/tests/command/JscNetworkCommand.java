@@ -34,7 +34,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import java.util.Optional;
 
 /**
- * Developer commands under {@code /jsc}: <ul> <li>{@code /jsc net} — inspect (and {@code net assign}, for testing, seed) the data network at the cable the player is looking at.</li> <li>{@code /jsc op submit <count>} / {@code /jsc op status} — submit self-test Operations to, and read the dispatch counters of, the Mainframe the player is looking at, to exercise the virtual-thread runtime.</li> <li>{@code /jsc benchmark build [types|expert]} — raise the scale benchmark's base (a 48-block square starting one block east of the player and extending east and south) in the real world, at the default size, with a given catalog size, or at expert-pack scale; {@code /jsc benchmark load <opsPerTick> <ticks>} and {@code stop} put the same traffic on it, for watching a profiler while it works.</li> </ul>
+ * Developer commands under {@code /jsc}: <ul> <li>{@code /jsc net}, to inspect (and {@code net assign}, for testing, seed) the data network at the cable the player is looking at.</li> <li>{@code /jsc op submit <count>} / {@code /jsc op status}, to submit self-test Operations to, and read the dispatch counters of, the Mainframe the player is looking at, to exercise the virtual-thread runtime.</li> <li>{@code /jsc benchmark build [types|expert]}, to raise the scale benchmark's base (a 48-block square starting one block east of the player and extending east and south) in the real world, at the default size, with a given catalog size, or at expert-pack scale; {@code /jsc benchmark load <opsPerTick> <ticks>} and {@code stop} put the same traffic on it, for watching a profiler while it works.</li> </ul>
  */
 @EventBusSubscriber(modid = JsTests.MODID)
 public final class JscNetworkCommand {
@@ -91,9 +91,11 @@ public final class JscNetworkCommand {
         final long start = System.nanoTime();
         final TestWorldBuilder world = TestWorldBuilder.at(level, origin);
         final BigBaseScenario.Built built = BigBaseScenario.build(world, params);
-        // A GameTest builds into an empty arena; here the same base lands in whatever the player is standing
-        // on. Everything between the machines is cleared afterwards and given a floor, so the base is a room
-        // that can be walked into and read — a base buried in rock cannot be inspected or profiled.
+        /*
+         * A GameTest builds into an empty arena; here the same base lands in whatever the player is standing
+         * on. Everything between the machines is cleared afterwards and given a floor, so the base is a room
+         * that can be walked into and read, since a base buried in rock cannot be inspected or profiled.
+         */
         final int cleared = carveRoom(level, world);
         BenchmarkLoad.remember(built);
         final double ms = (System.nanoTime() - start) / 1_000_000.0;
@@ -107,8 +109,10 @@ public final class JscNetworkCommand {
                         + "Run '/jsc benchmark load <opsPerTick> <ticks>' to put traffic on it.",
                 params.racks(), params.servers(), params.nodes(), params.personalComputers(), types, ms, cleared,
                 mainframePos.getX(), mainframePos.getY(), mainframePos.getZ())), false);
-        // Say so plainly when the base did not come up: a benchmark on a base with no network measures
-        // nothing at all, and the numbers would look fine.
+        /*
+         * Say so plainly when the base did not come up: a benchmark on a base with no network measures
+         * nothing at all, and the numbers would look fine.
+         */
         if (network == null || servers < params.servers()) {
             source.sendFailure(Component.literal(String.format(
                     "The base did not come up whole: network %s, %d of %d servers registered. Build it somewhere"
@@ -221,7 +225,7 @@ public final class JscNetworkCommand {
         final int submitted = mainframe.submitSelfTest(count, SELF_TEST_WORK_UNITS);
         if (submitted == 0) {
             source.sendFailure(Component.literal(
-                    "Mainframe is not running — power it on with a valid build first."));
+                    "Mainframe is not running, power it on with a valid build first."));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(

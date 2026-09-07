@@ -15,7 +15,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: store the desktop personalization for the computer at {@code hostPos} — the
+ * Client to server: store the desktop personalization for the computer at {@code hostPos}: the
  * chosen wallpaper id ({@code ""} keeps the OS default) and the computer name ({@code ""} clears it).
  * Persisted on the computer so it survives a reload and shows on every monitor.
  */

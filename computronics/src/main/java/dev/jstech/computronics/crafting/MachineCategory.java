@@ -19,7 +19,7 @@ import java.util.List;
  * recipe-type registry ({@code minecraft:smelting}, {@code mekanism:crushing}, ...), so every installed mod
  * contributes its own categories automatically. A processing pattern authored against a generic category stores
  * the machine id {@code generic:<recipeTypeId>} and matches any declared machine whose Crafting Switch face the
- * player tagged with that category — the player declares "this face hosts a smelting machine" instead of the mod
+ * player tagged with that category, so the player declares "this face hosts a smelting machine" instead of the mod
  * guessing it from the block.
  */
 public final class MachineCategory {
@@ -30,7 +30,7 @@ public final class MachineCategory {
     /** Prefix of the synthetic machine ids a generic pattern stores, e.g. {@code generic:minecraft:smelting}. */
     public static final String GENERIC_PREFIX = GENERIC_NAMESPACE + ":";
 
-    /** The empty category — an untagged face only matches by block id or face name. */
+    /** The empty category, where an untagged face only matches by block id or face name. */
     public static final String NONE = "";
 
     private MachineCategory() {

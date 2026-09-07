@@ -41,7 +41,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * BlockEntity backing the Server Router — the first network topology element.
+ * BlockEntity backing the Server Router, the first network topology element.
  */
 public class ServerRouterBlockEntity extends BlockEntity {
 
@@ -162,8 +162,10 @@ public class ServerRouterBlockEntity extends BlockEntity {
         final Set<Long> blocked = Set.of(worldPosition.asLong());
         final List<DatacenterSection> found = new ArrayList<>();
         final Set<Set<Long>> seenRackSets = new HashSet<>();
-        // The back face is the dedicated uplink to the Mainframe; every other face is a
-        // potential datacenter section.
+        /*
+         * The back face is the dedicated uplink to the Mainframe; every other face is a
+         * potential datacenter section.
+         */
         final Direction uplink = getBlockState().getBlock()
                 instanceof dev.jstech.computronics.block.ServerRouterBlock
                 ? getBlockState().getValue(
@@ -184,13 +186,13 @@ public class ServerRouterBlockEntity extends BlockEntity {
             }
             final BranchScan scan = scanBranch(level, branchCables);
             if (scan.hasMainframe) {
-                continue; // a section branch must not loop back to the Mainframe — miswired, ignore
+                continue; // a section branch must not loop back to the Mainframe (miswired), ignore
             }
             if (scan.rackControllers.isEmpty()) {
                 continue; // an empty branch carries no datacenter
             }
             if (!seenRackSets.add(scan.rackControllers)) {
-                continue; // a looped topology surfaced the same racks on two faces — count once
+                continue; // a looped topology surfaced the same racks on two faces, count once
             }
 
             final List<NodeUuid> servers = new ArrayList<>();
@@ -235,9 +237,11 @@ public class ServerRouterBlockEntity extends BlockEntity {
             final BlockPos cable = BlockPos.of(cablePos);
             for (final Direction direction : Direction.values()) {
                 final BlockEntity neighbor = level.getBlockEntity(cable.relative(direction));
-                // A datacenter is made of Server Racks. A Supercomputer Rack lives on the compute fabric
-                // behind its HBW Interface and is never a section member, even if the branch walk
-                // happens to reach it through that fabric.
+                /*
+                 * A datacenter is made of Server Racks. A Supercomputer Rack lives on the compute fabric
+                 * behind its HBW Interface and is never a section member, even if the branch walk
+                 * happens to reach it through that fabric.
+                 */
                 if (neighbor instanceof ServerRackBlockEntity rack) {
                     if (rack.rackType() != dev.jstech.computronics.rack.RackChassis.RackType.SUPERCOMPUTER) {
                         racks.add(rack.getBlockPos().asLong());
@@ -279,8 +283,10 @@ public class ServerRouterBlockEntity extends BlockEntity {
     @Override
     public void setRemoved() {
         super.setRemoved();
-        // Also unregister on chunk unload, not just on destruction (the block's onRemove), so the router
-        // never lingers in the still-loaded per-level network. onBroken is idempotent.
+        /*
+         * Also unregister on chunk unload, not just on destruction (the block's onRemove), so the router
+         * never lingers in the still-loaded per-level network. onBroken is idempotent.
+         */
         if (level instanceof ServerLevel serverLevel) {
             onBroken(serverLevel);
         }

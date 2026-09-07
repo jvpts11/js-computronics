@@ -18,7 +18,7 @@ import java.util.List;
  * Internal base for list-style widgets: stores a typed item list, validates and holds the row height, and
  * delegates narration. Subclasses own their pagination / scroll state and their rendering strategy.
  *
- * <p>This class is package-private — public widget contracts are {@link DataTableWidget} and
+ * <p>This class is package-private; the public widget contracts are {@link DataTableWidget} and
  * {@link ScrollableListWidget}. Callers outside this package interact only with those types.
  */
 abstract class RowListWidget<T> extends AbstractWidget {

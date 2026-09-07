@@ -26,7 +26,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Menu for the Monitor terminal — the tabbed interface a Monitor opens onto the computer it is linked to.
+ * Menu for the Monitor terminal, the tabbed interface a Monitor opens onto the computer it is linked to.
  */
 public class ComputerTerminalMenu extends AbstractComputerMenu {
 
@@ -39,17 +39,23 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
     public static final int TAB_CRAFT = 6;
     /** The process/service manager: the network's background services (the IQL Engine and its state). */
     public static final int TAB_PROCESSES = 7;
-    // A launch-only rail entry: clicking it opens the Command Prompt rather than switching content,
-    // so it is never the active tab (the menu's initial-tab clamp stops at TAB_PROCESSES).
+    /*
+     * A launch-only rail entry: clicking it opens the Command Prompt rather than switching content,
+     * so it is never the active tab (the menu's initial-tab clamp stops at TAB_PROCESSES).
+     */
     public static final int TAB_CONSOLE = 8;
 
-    // Slot layout (relative to the screen's top-left). The screen draws the slot
-    // backgrounds and the inventory at these exact positions.
+    /*
+     * Slot layout (relative to the screen's top-left). The screen draws the slot
+     * backgrounds and the inventory at these exact positions.
+     */
     public static final int STORAGE_COLS = 9;
     public static final int STORAGE_X = 68;
     public static final int STORAGE_Y = 40;
-    // The inventory positions come from ComputerTerminalLayout, the single source the layout test
-    // validates, so the real slots placed here are covered by that test.
+    /*
+     * The inventory positions come from ComputerTerminalLayout, the single source the layout test
+     * validates, so the real slots placed here are covered by that test.
+     */
     public static final int INV_X = ComputerTerminalLayout.INV_X;
     public static final int INV_Y = ComputerTerminalLayout.INV_Y;
     public static final int HOTBAR_Y = ComputerTerminalLayout.HOTBAR_Y;
@@ -62,8 +68,10 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
     private static final int DATA_INDEX_HEALTH_TYPES = 32;
     private static final int DATA_USABLE_SLOTS = 18;
     private static final int DATA_CRAFT_COMPUTERS = 29;
-    // The host's board-derived hardware-era ordinal (or -1 when no board), synced so the client can skin the
-    // terminal in the host computer's era. It re-resolves each tick, so swapping the board repaints live.
+    /*
+     * The host's board-derived hardware-era ordinal (or -1 when no board), synced so the client can skin the
+     * terminal in the host computer's era. It re-resolves each tick, so swapping the board repaints live.
+     */
     private static final int DATA_ERA = 30;
 
     private final Level level;
@@ -130,8 +138,10 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         this.host = host;
         this.hostPos = hostPos.immutable();
         this.monitorPos = monitorPos.immutable();
-        // Open on the player's last-used tab; fall back to Network, and never land on the
-        // Mainframe-only Tasks view when the host is a plain computer.
+        /*
+         * Open on the player's last-used tab; fall back to Network, and never land on the
+         * Mainframe-only Tasks view when the host is a plain computer.
+         */
         int tab = initialTab >= TAB_LOCAL && initialTab <= TAB_PROCESSES ? initialTab : TAB_NETWORK;
         if ((tab == TAB_TASKS || tab == TAB_MAINTENANCE) && (host == null || !host.isMainframeHost())) {
             tab = TAB_NETWORK;
@@ -142,8 +152,10 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         this.activeTab = tab;
         this.invDrop = host != null && host.isMainframeHost() ? MAINFRAME_INV_DROP : 0;
 
-        // The Storage tab is now a disk-backed quantity view (like the Network tab), not vanilla
-        // slots, so the menu holds only the player inventory; local items are synced via snapshot.
+        /*
+         * The Storage tab is now a disk-backed quantity view (like the Network tab), not vanilla
+         * slots, so the menu holds only the player inventory; local items are synced via snapshot.
+         */
         this.storageCount = 0;
         addPlayerInventory(playerInventory, INV_X, INV_Y + invDrop);
         addDataSlots(data);
@@ -274,13 +286,17 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
                 ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
             } else if (id == TAB_MAINTENANCE) {
-                // The DROP popup needs the network's data types (the TYPES grid) and the list of
-                // Servers it can wipe (the SERVER picker); the index stats arrive via ContainerData.
+                /*
+                 * The DROP popup needs the network's data types (the TYPES grid) and the list of
+                 * Servers it can wipe (the SERVER picker); the index stats arrive via ContainerData.
+                 */
                 ComputingPayloads.dispatchTerminalQuery(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchNetworkServers(serverPlayer, host.networkUuid(), serverLevel);
             } else if (id == TAB_CRAFT) {
-                // The Craft tab needs the catalog plus the live/logged Operations for its
-                // RUNNING and RECENT panels.
+                /*
+                 * The Craft tab needs the catalog plus the live/logged Operations for its
+                 * RUNNING and RECENT panels.
+                 */
                 ComputingPayloads.dispatchCraftCatalog(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
                 ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
@@ -346,8 +362,10 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         return localItems;
     }
 
-    // Per-disk privacy state for the Storage tab's slider, synced with the local snapshot. Empty for a
-    // host with no slider (a Server/Mainframe), which the screen reads as "always public".
+    /*
+     * Per-disk privacy state for the Storage tab's slider, synced with the local snapshot. Empty for a
+     * host with no slider (a Server/Mainframe), which the screen reads as "always public".
+     */
     private java.util.List<dev.jstech.computronics.operation.payload
             .LocalStorageSnapshotPayload.DiskInfo> diskPrivacy = java.util.List.of();
 
@@ -436,14 +454,18 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
             return;
         }
         refreshTick = 0;
-        // The Tasks view always re-syncs (so finished ops drop off); the Network grid re-queries
-        // only while something is in flight (its snapshot is already pushed on deposit/withdraw/settle).
+        /*
+         * The Tasks view always re-syncs (so finished ops drop off); the Network grid re-queries
+         * only while something is in flight (its snapshot is already pushed on deposit/withdraw/settle).
+         */
         if (activeTab == TAB_TASKS || activeTab == TAB_OPS) {
             ComputingPayloads.dispatchActiveOperations(serverPlayer, host.networkUuid(), serverLevel);
         }
         if (activeTab == TAB_OPS) {
-            // Keep the log live too: a craft that just settled drops out of the active list and must appear in
-            // the recent log the same tick, so the Operations view is fully real-time (in flight and just done).
+            /*
+             * Keep the log live too: a craft that just settled drops out of the active list and must appear in
+             * the recent log the same tick, so the Operations view is fully real-time (in flight and just done).
+             */
             ComputingPayloads.dispatchTerminalOpsLog(serverPlayer, host.networkUuid(), serverLevel);
         }
         if (activeTab == TAB_CRAFT

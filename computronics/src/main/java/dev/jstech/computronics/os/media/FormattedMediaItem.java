@@ -54,9 +54,11 @@ public class FormattedMediaItem extends MediaItem {
         tooltip.add(Component.literal(format.capacityItems() + " item capacity")
                 .withStyle(ChatFormatting.DARK_GRAY));
 
-        // Files written on the medium (e.g. .craft recipes from the Pattern Encoder) take priority: a
-        // medium carrying files reads as such, not as a blank installer. The installer/data lines only
-        // show for a medium with no files of its own.
+        /*
+         * Files written on the medium (e.g. .craft recipes from the Pattern Encoder) take priority: a
+         * medium carrying files reads as such, not as a blank installer. The installer/data lines only
+         * show for a medium with no files of its own.
+         */
         final dev.jstech.computronics.os.fs.FilesystemContents fs = stack.getOrDefault(
                 dev.jstech.computronics.ComputingModule.FILESYSTEM.get(),
                 dev.jstech.computronics.os.fs.FilesystemContents.EMPTY);
@@ -94,8 +96,10 @@ public class FormattedMediaItem extends MediaItem {
                 if (payload != null) {
                     final dev.jstech.computronics.os.ProgramSpec spec =
                             dev.jstech.computronics.os.OsRegistry.getProgram(payload);
-                    // Lead with the program's friendly, translated name, then its house and the year it was
-                    // written. A disc of a bundled program has no shipper to lean on, so it says Midsoft.
+                    /*
+                     * Lead with the program's friendly, translated name, then its house and the year it was
+                     * written. A disc of a bundled program has no shipper to lean on, so it says Midsoft.
+                     */
                     tooltip.add(Component.translatable("program.jsc." + payload.getPath())
                             .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
                             .append(spec == null ? Component.empty() : Component.literal("  "
@@ -110,8 +114,10 @@ public class FormattedMediaItem extends MediaItem {
                             .withStyle(ChatFormatting.GRAY));
                     tooltip.addAll(dev.jstech.computronics.os.MinSpecTooltip.programMinSpec(payload));
                     if (spec != null) {
-                        // The package id and the command that installs it: the only other place to learn
-                        // either was the Mirror's listing on a Mainframe.
+                        /*
+                         * The package id and the command that installs it: the only other place to learn
+                         * either was the Mirror's listing on a Mainframe.
+                         */
                         tooltip.add(Component.literal("Package: " + spec.commandName()).withStyle(ChatFormatting.GOLD));
                         tooltip.add(Component.literal(String.join(" · ", installCommands(spec)))
                                 .withStyle(ChatFormatting.DARK_GRAY));

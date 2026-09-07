@@ -27,7 +27,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * An Import Bus part: pulls data from the inventory its mounted face touches — items OR fluids, with no distinction — and pushes it into the network as INSERT Operations dispatched by the Mainframe. An empty filter imports everything; a set filter imports only that one type and the min/max window keeps the NETWORK stocked of it (with hysteresis).
+ * An Import Bus part: pulls data from the inventory its mounted face touches (items OR fluids, with no distinction) and pushes it into the network as INSERT Operations dispatched by the Mainframe. An empty filter imports everything; a set filter imports only that one type and the min/max window keeps the NETWORK stocked of it (with hysteresis).
  */
 public non-sealed class ImportBusPart extends AbstractBusPart {
 
@@ -132,8 +132,10 @@ public non-sealed class ImportBusPart extends AbstractBusPart {
         bufferKey = null;
         bufferAmount = 0L;
         ticksSinceFlush = 0;
-        // Push the buffered data into the network as a timed INSERT; whatever does not fit comes back
-        // as the Operation's leftover and is re-buffered when it finishes (above).
+        /*
+         * Push the buffered data into the network as a timed INSERT; whatever does not fit comes back
+         * as the Operation's leftover and is re-buffered when it finishes (above).
+         */
         activeOp = mainframe.submitNetworkInsert(payloadKey, payloadAmount, MoveLabels.bus("Import Bus", name()));
         flushedKey = payloadKey;
         flushedAmount = payloadAmount;
@@ -177,9 +179,11 @@ public non-sealed class ImportBusPart extends AbstractBusPart {
 
     @Override
     public void dropContents(final ServerLevel level) {
-        // Drop a buffered item back into the world; a buffered fluid (rare, transient) is discarded.
-        // If an INSERT operation is in flight, the payload was already extracted from the source but
-        // not yet confirmed by the network, so drop the in-flight amount too; nothing is silently lost.
+        /*
+         * Drop a buffered item back into the world; a buffered fluid (rare, transient) is discarded.
+         * If an INSERT operation is in flight, the payload was already extracted from the source but
+         * not yet confirmed by the network, so drop the in-flight amount too; nothing is silently lost.
+         */
         final StorageKey drop = bufferKey != null ? bufferKey : flushedKey;
         final long dropAmount = bufferKey != null ? bufferAmount : flushedAmount;
         if (drop != null && drop.isItem() && dropAmount > 0L && host != null) {
@@ -201,8 +205,10 @@ public non-sealed class ImportBusPart extends AbstractBusPart {
                     .result().ifPresent(encoded -> tag.put("BufferKey", encoded));
             tag.putLong("BufferAmount", bufferAmount);
         }
-        // Persist the in-flight payload so a save/reload cannot destroy items that were extracted
-        // from the source but whose INSERT operation has not yet been confirmed by the network.
+        /*
+         * Persist the in-flight payload so a save/reload cannot destroy items that were extracted
+         * from the source but whose INSERT operation has not yet been confirmed by the network.
+         */
         if (flushedKey != null && flushedAmount > 0L) {
             StorageKey.CODEC.encodeStart(registries.createSerializationContext(NbtOps.INSTANCE), flushedKey)
                     .result().ifPresent(encoded -> tag.put("FlushedKey", encoded));
@@ -226,10 +232,12 @@ public non-sealed class ImportBusPart extends AbstractBusPart {
                         bufferAmount = tag.getLong("BufferAmount");
                     });
         }
-        // Recover items that were in flight before the reload; the timed operation is gone but the data
-        // must not be lost, so move them into the buffer to be re-inserted next tick. Buffer and flushed
-        // should be mutually exclusive at a save point, but if both are present, accumulate (same key) or
-        // keep the larger batch rather than overwrite, so no items are silently dropped.
+        /*
+         * Recover items that were in flight before the reload; the timed operation is gone but the data
+         * must not be lost, so move them into the buffer to be re-inserted next tick. Buffer and flushed
+         * should be mutually exclusive at a save point, but if both are present, accumulate (same key) or
+         * keep the larger batch rather than overwrite, so no items are silently dropped.
+         */
         if (tag.contains("FlushedKey")) {
             final long flushedAmt = tag.getLong("FlushedAmount");
             StorageKey.CODEC.parse(ops, tag.get("FlushedKey"))

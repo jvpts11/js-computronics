@@ -34,7 +34,7 @@ public final class CliShell {
         }
     }
 
-    /** The commands this shell knows, in registration order — for {@code help} and tab completion. */
+    /** The commands this shell knows, in registration order, for {@code help} and tab completion. */
     public List<ICliCommand> commands() {
         return List.copyOf(byName.values());
     }
@@ -50,8 +50,10 @@ public final class CliShell {
      */
     public Response run(final String line, final ICliComputer computer) {
         final CliOutput out = new CliOutput(width);
-        // A source build that finished in the background is announced before whatever the player typed
-        // (an empty Enter included), the way a shell shows a finished job ahead of the next prompt.
+        /*
+         * A source build that finished in the background is announced before whatever the player typed
+         * (an empty Enter included), the way a shell shows a finished job ahead of the next prompt.
+         */
         for (final String notice : computer.drainBuildNotices()) {
             out.ok(notice);
         }
@@ -70,8 +72,10 @@ public final class CliShell {
             return new Response(out.lines(), false);
         }
         final ICliCommand command = find(word);
-        // A command that is not available on this computer (another distribution's package manager, an
-        // uninstalled program's verbs) does not exist here, exactly like an unknown word.
+        /*
+         * A command that is not available on this computer (another distribution's package manager, an
+         * uninstalled program's verbs) does not exist here, exactly like an unknown word.
+         */
         if (command == null || !command.available(computer)) {
             out.error("command not found: " + word);
             out.dim("type 'help' to list commands");
@@ -82,8 +86,10 @@ public final class CliShell {
         try {
             command.run(context);
         } catch (final RuntimeException unexpected) {
-            // A command must not throw for ordinary errors; if one does anyway, the shell stays alive
-            // and reports it rather than tearing down the session.
+            /*
+             * A command must not throw for ordinary errors; if one does anyway, the shell stays alive
+             * and reports it rather than tearing down the session.
+             */
             out.error("error running '" + word + "': " + unexpected.getMessage());
         }
         final boolean clear = command instanceof IClearMarker;

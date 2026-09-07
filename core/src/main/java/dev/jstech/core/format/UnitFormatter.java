@@ -48,9 +48,11 @@ public final class UnitFormatter {
             return full(value, unit);
         }
 
-        // Math.abs(Long.MIN_VALUE) stays negative (it overflows back to itself), which would print a
-        // stray leading "-" on top of the sign prefix; clamp it to Long.MAX_VALUE so the magnitude is
-        // always non-negative.
+        /*
+         * Math.abs(Long.MIN_VALUE) stays negative (it overflows back to itself), which would print a
+         * stray leading "-" on top of the sign prefix; clamp it to Long.MAX_VALUE so the magnitude is
+         * always non-negative.
+         */
         final long abs = value == Long.MIN_VALUE ? Long.MAX_VALUE : Math.abs(value);
         final String sign = value < 0 ? "-" : "";
 

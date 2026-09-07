@@ -139,11 +139,11 @@ public final class ServerCliComputer implements ICliComputer {
         return host.isMainframeHost();
     }
 
-    // ---- Remote shells ---------------------------------------------------------------------------
+    // Remote shells
 
     /**
      * Every machine on this network a remote shell can reach, keyed by host name: the Mainframe, the
-     * personal computers, and the servers in their racks. The local machine is left out — you cannot
+     * personal computers, and the servers in their racks. The local machine is left out, since you cannot
      * ssh into the terminal you are already sitting at.
      */
     /** The reachable machines by host name, for callers outside the CLI (Remote Control's list). */
@@ -204,7 +204,7 @@ public final class ServerCliComputer implements ICliComputer {
     /**
      * Resolves what the player typed to one machine. A host name, the machine's own name and the
      * head of its node id all address it; an OS name works too, but only while it picks out exactly
-     * one machine — two Debian servers make "debian" ambiguous, and saying so is more useful than
+     * one machine, since two Debian servers make "debian" ambiguous, and saying so is more useful than
      * guessing.
      */
     private Map<String, BlockEntity> matchMachines(final String wanted) {
@@ -289,8 +289,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (net == null) {
             return List.of();
         }
-        // WHERE server=X scopes the read to that server; every other field is evaluated per item, so the
-        // full condition (qty < 100, name contains "ore", damaged = true, ...) really filters now.
+        /*
+         * WHERE server=X scopes the read to that server; every other field is evaluated per item, so the
+         * full condition (qty < 100, name contains "ore", damaged = true, ...) really filters now.
+         */
         final String serverName = (server == null || server.isBlank())
                 ? dev.jstech.computronics.program.iql.IIqlCondition.firstValue(where, "server")
                 : server;
@@ -307,8 +309,10 @@ public final class ServerCliComputer implements ICliComputer {
             storage = NetworkStorage.ofServers(level, java.util.List.of(scoped));
             scopedServer = serverName;
         }
-        // Filter by the condition, then sort by quantity and take the top rows: the limit applies after the
-        // sort so the result is the largest holdings, not an arbitrary slice.
+        /*
+         * Filter by the condition, then sort by quantity and take the top rows: the limit applies after the
+         * sort so the result is the largest holdings, not an arbitrary slice.
+         */
         return storage.query().entrySet().stream()
                 .filter(entry -> where == null
                         || where.matches(rowOf(entry.getKey(), entry.getValue(), scopedServer)))
@@ -676,8 +680,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (mainframe == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        // Route through the shared entry point so the CLI and IQL craft a machine or multi-stage recipe
-        // directly (not only a bench-planned tree), exactly as the terminal and Network Interactor do.
+        /*
+         * Route through the shared entry point so the CLI and IQL craft a machine or multi-stage recipe
+         * directly (not only a bench-planned tree), exactly as the terminal and Network Interactor do.
+         */
         final var op = mainframe.submitCraftRequest(key, demand(quantity), true,
                 host.originLabel(origin), null);
         if (op == null) {
@@ -798,8 +804,10 @@ public final class ServerCliComputer implements ICliComputer {
     @Override
     public List<ProgramInfo> programs() {
         final List<ProgramInfo> out = new ArrayList<>();
-        // Pre-installed programs the host's platform supports, so an MC-DOS listing does not show the Frames
-        // desktop apps (which are pre-installed only on the Frames platform).
+        /*
+         * Pre-installed programs the host's platform supports, so an MC-DOS listing does not show the Frames
+         * desktop apps (which are pre-installed only on the Frames platform).
+         */
         final dev.jstech.computronics.os.Platform platform = hostPlatform();
         for (final dev.jstech.computronics.os.ProgramSpec spec : Programs.installed()) {
             if (platform == null || spec.platforms().contains(platform)) {
@@ -839,12 +847,14 @@ public final class ServerCliComputer implements ICliComputer {
             return OpResult.fail("no such program: " + programId);
         }
         if (program.id().equals(Programs.IQL_ENGINE)) {
-            // The Engine is a service on the Mainframe, not a console-local app — install it there.
+            // The Engine is a service on the Mainframe, not a console-local app, so install it there.
             return engineControl("install");
         }
-        // The other Mainframe services flip their agent flag, exactly like the mirror-based package path:
-        // marking only the console entry would leave the service itself off (the bug that made a Mirror
-        // installed from its disc unable to serve packages).
+        /*
+         * The other Mainframe services flip their agent flag, exactly like the mirror-based package path:
+         * marking only the console entry would leave the service itself off (the bug that made a Mirror
+         * installed from its disc unable to serve packages).
+         */
         if (hostBlock instanceof MainframeBlockEntity mainframe
                 && program.kind() == dev.jstech.computronics.os.ProgramKind.SERVICE) {
             if (!hasInstallMediumFor(program.id())) {
@@ -869,13 +879,17 @@ public final class ServerCliComputer implements ICliComputer {
         if (tooOld != null) {
             return tooOld;
         }
-        // Install economy: an app needs its physical install medium in a linked drive — you cannot conjure
-        // a program out of thin air.
+        /*
+         * Install economy: an app needs its physical install medium in a linked drive, and you cannot conjure
+         * a program out of thin air.
+         */
         if (!hasInstallMediumFor(program.id())) {
             return OpResult.fail(program.commandName() + " needs its install disc in a linked drive");
         }
-        // Program install gate: the OS platform must be supported and the hardware must meet the program's
-        // CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
+        /*
+         * Program install gate: the OS platform must be supported and the hardware must meet the program's
+         * CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
+         */
         if (host instanceof dev.jstech.computronics.os.IOsHost oc
                 && !dev.jstech.computronics.os.OsRegistry.canInstallProgram(
                         oc.installedOsId(), program.id(),
@@ -904,8 +918,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (spec.minEra() == dev.jstech.core.tier.HardwareEra.VINTAGE) {
             return null; // no requirement
         }
-        // displayEra, not installedEra: a Vintage or Legacy chassis IS that generation whatever board
-        // sits in it, and that chassis is the only way a machine of an older era exists right now.
+        /*
+         * displayEra, not installedEra: a Vintage or Legacy chassis IS that generation whatever board
+         * sits in it, and that chassis is the only way a machine of an older era exists right now.
+         */
         final dev.jstech.core.tier.HardwareEra era =
                 hostBlock instanceof IOsHost computer ? computer.displayEra() : null;
         if (era != null && dev.jstech.computronics.os.OsGating.canInstall(spec.minEra(), era)) {
@@ -1075,8 +1091,10 @@ public final class ServerCliComputer implements ICliComputer {
         }
         int queued = 0;
         for (final StorageKey key : keys) {
-            // SELECT pulls from the whole network; SELECT ... FROM <server> is a move scoped to that server,
-            // both landing in this computer's local storage.
+            /*
+             * SELECT pulls from the whole network; SELECT ... FROM <server> is a move scoped to that server,
+             * both landing in this computer's local storage.
+             */
             final var operation = prioritize(from == null
                     ? mainframe.submitNetworkSelect(key, demand(op.quantity()), host.localStorage(),
                             host.originLabel(MoveLabels.IQL))
@@ -1099,8 +1117,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (mainframe == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        // A DELETE that names a bus EXPORTS to that bus's external inventory (the "leaves the network" sense);
-        // a DROP, or a DELETE with no target, trashes via a sink that accepts everything and keeps nothing.
+        /*
+         * A DELETE that names a bus EXPORTS to that bus's external inventory (the "leaves the network" sense);
+         * a DROP, or a DELETE with no target, trashes via a sink that accepts everything and keeps nothing.
+         */
         dev.jstech.computronics.storage.IDataSink target = (k, amount, simulate) -> amount;
         if ("DELETE".equals(verb) && op.to() != null && !op.to().isBlank()) {
             final dev.jstech.computronics.block.part.NamedBus.Located bus =
@@ -1116,8 +1136,10 @@ public final class ServerCliComputer implements ICliComputer {
                     ? OpResult.ok("nothing to " + verb.toLowerCase(java.util.Locale.ROOT))
                     : OpResult.fail("unknown item: " + op.item());
         }
-        // Only act on items the network actually holds, so a repeating job's DROP/DELETE becomes a quiet
-        // no-op once the stock runs out, instead of a stream of failed operations polluting the log.
+        /*
+         * Only act on items the network actually holds, so a repeating job's DROP/DELETE becomes a quiet
+         * no-op once the stock runs out, instead of a stream of failed operations polluting the log.
+         */
         final java.util.Map<StorageKey, Long> stock = NetworkStorage.of(level, host.networkUuid()).query();
         int queued = 0;
         for (final StorageKey key : keys) {
@@ -1139,8 +1161,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (mainframe == null || net == null) {
             return OpResult.fail("the network has no running Mainframe");
         }
-        // A named bus on either side routes through its external inventory: TO a bus EXPORTS, FROM a bus
-        // IMPORTS. Otherwise both sides name servers and it is an internal server-to-server move.
+        /*
+         * A named bus on either side routes through its external inventory: TO a bus EXPORTS, FROM a bus
+         * IMPORTS. Otherwise both sides name servers and it is an internal server-to-server move.
+         */
         final dev.jstech.computronics.block.part.NamedBus.Located toBus =
                 dev.jstech.computronics.block.part.NamedBus.find(level, net, op.to());
         if (toBus != null) {
@@ -1270,7 +1294,7 @@ public final class ServerCliComputer implements ICliComputer {
                 .orElse(null);
     }
 
-    // --- helpers ----------------------------------------------------------------------------------
+    // helpers
 
     private MainframeBlockEntity mainframe(final NetworkUuid net) {
         if (net == null) {
@@ -1337,7 +1361,7 @@ public final class ServerCliComputer implements ICliComputer {
         };
     }
 
-    // --- filesystem -------------------------------------------------------------------------------
+    // filesystem
 
     /**
      * Resolved system-disk context: the disk {@link ItemStack} held by the hardware inventory and
@@ -1499,7 +1523,7 @@ public final class ServerCliComputer implements ICliComputer {
         return reboot;
     }
 
-    // ---- packages: the Linux package managers over the network's Mirror service ----
+    // packages: the Linux package managers over the network's Mirror service
 
     private OsDef installedOsDef() {
         return hostBlock instanceof IOsHost c ? c.installedOs() : null;
@@ -1833,8 +1857,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (outdated.isEmpty()) {
             return OpResult.ok("All packages are up to date (" + current + ").");
         }
-        // Bringing a package to the current build is a re-stamp: the program itself always runs the
-        // code this mod version ships, so an update reconciles the record rather than moving files.
+        /*
+         * Bringing a package to the current build is a re-stamp: the program itself always runs the
+         * code this mod version ships, so an update reconciles the record rather than moving files.
+         */
         for (final String id : outdated) {
             console.setInstalledVersion(id, current);
         }
@@ -1888,8 +1914,10 @@ public final class ServerCliComputer implements ICliComputer {
             return OpResult.ok(">>> " + spec.commandName() + ": build cancelled");
         }
         boolean removed = console != null && console.uninstall(spec.id().toString());
-        // A Mainframe service also turns its agent off (removing only the console entry would leave the
-        // service running headless).
+        /*
+         * A Mainframe service also turns its agent off (removing only the console entry would leave the
+         * service running headless).
+         */
         if (hostBlock instanceof MainframeBlockEntity mainframe
                 && spec.kind() == dev.jstech.computronics.os.ProgramKind.SERVICE) {
             removed = switch (spec.id().getPath()) {
@@ -1920,8 +1948,10 @@ public final class ServerCliComputer implements ICliComputer {
             if (letter == 'C' && hostBlock instanceof IOsHost computer && computer.hasOs()) {
                 return OpResult.fail("format: cannot format drive C: - the running system lives on it");
             }
-            // Formatting erases everything the volume carries: the system, the filesystem, the item
-            // storage, and (on removable media) the stamped installer identity — a blank volume remains.
+            /*
+             * Formatting erases everything the volume carries: the system, the filesystem, the item
+             * storage, and (on removable media) the stamped installer identity, so a blank volume remains.
+             */
             target.remove(dev.jstech.computronics.ComputingModule.SYSTEM_OS.get());
             target.remove(dev.jstech.computronics.ComputingModule.FILESYSTEM.get());
             dev.jstech.computronics.storage.DriveVolumes.erase(target);
@@ -2053,10 +2083,12 @@ public final class ServerCliComputer implements ICliComputer {
             return OpResult.fail(text + "\nThe installation could not be written to the disk (no space or no disk).");
         }
         computer.setBootDiskSlot(target);
-        // Ask the host for the console again rather than reusing the reference taken at the top of this
-        // method: writing the system may have replaced the disk stack, and the console is bound to the
-        // drive it was read from. Clearing the stale binding would leave the finished live session on
-        // the newly written disk, so the machine would boot straight back into the installer.
+        /*
+         * Ask the host for the console again rather than reusing the reference taken at the top of this
+         * method: writing the system may have replaced the disk stack, and the console is bound to the
+         * drive it was read from. Clearing the stale binding would leave the finished live session on
+         * the newly written disk, so the machine would boot straight back into the installer.
+         */
         host.console().clearLiveInstall();
         hostBlock.setChanged();
         // The live medium's reboot is a real one: the shell closes, the POST replays, the new system boots.
@@ -2108,8 +2140,10 @@ public final class ServerCliComputer implements ICliComputer {
         if (console == null) {
             return dev.jstech.computronics.program.cli.DosPath.Location.root('C');
         }
-        // A fresh POSIX session starts in the home directory (a DOS one at the drive root); once the player
-        // has changed directory the stored location wins, so "cd /" really lands on the root.
+        /*
+         * A fresh POSIX session starts in the home directory (a DOS one at the drive root); once the player
+         * has changed directory the stored location wins, so "cd /" really lands on the root.
+         */
         if (!console.hasTerminalLocation() && console.terminalDrive() == 'C'
                 && shellFamily() == dev.jstech.computronics.os.ShellFamily.POSIX) {
             return dev.jstech.computronics.program.cli.PosixPath.home();
@@ -2140,7 +2174,7 @@ public final class ServerCliComputer implements ICliComputer {
         final DiskCtx ctx = r.ctx();
         final String target = r.path();
         final List<FsEntry> entries = new ArrayList<>();
-        // Subdirectories first, then files — matching DOS DIR ordering.
+        // Subdirectories first, then files, matching DOS DIR ordering.
         for (final String sub : DiskFilesystem.listDirs(ctx.disk(), target, ctx.kind())) {
             entries.add(new FsEntry(FsPaths.fileName(sub), "", 0L, false, true, 0L));
         }
@@ -2227,10 +2261,12 @@ public final class ServerCliComputer implements ICliComputer {
             return FsResult.fail(path + ": syntax error: " + parsed.error());
         }
         final IqlOperation op = parsed.operation();
-        // QUERY/COUNT are read operations that produce rows, not timed operations; they cannot be
-        // dispatched via execute(). The caller should use 'operation' for those.
+        /*
+         * QUERY/COUNT are read operations that produce rows, not timed operations; they cannot be
+         * dispatched via execute(). The caller should use 'operation' for those.
+         */
         if (op.verb() == IqlVerb.QUERY || op.verb() == IqlVerb.COUNT) {
-            return FsResult.fail(path + ": QUERY/COUNT are not supported by 'run' — use 'operation' instead");
+            return FsResult.fail(path + ": QUERY/COUNT are not supported by 'run', use 'operation' instead");
         }
         final OpResult result = execute(op);
         return FsResult.iqlResult(result);
@@ -2609,7 +2645,7 @@ public final class ServerCliComputer implements ICliComputer {
                 : "";
     }
 
-    // Script processes — the Cannon programs this machine is running.
+    // Script processes: the Cannon programs this machine is running.
 
     /**
      * The machine's programs when one of them has the terminal, or null when the prompt is free.

@@ -70,9 +70,9 @@ import java.util.Set;
 
 /**
  * The Network Interactor desktop window: the graphical face of the data network for a Frames computer,
- * with the same capabilities as the MC-NET terminal — extract from the network into local storage,
+ * with the same capabilities as the MC-NET terminal: extract from the network into local storage,
  * withdraw local storage into the inventory, deposit/insert from the player's hotbar, and request
- * crafts — addressing the host by position. The player's full inventory is shown in the window as real
+ * crafts, addressing the host by position. The player's full inventory is shown in the window as real
  * container slots inside a fixed, framed band pinned just above the footer: the desktop menu owns the 36
  * slots and the desktop screen positions them over that band, so the vanilla container drives the cursor,
  * drag, and shift-click. This app paints the inventory frame and slot backgrounds; the screen renders the
@@ -92,8 +92,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private static final int TAB_CRAFTING = 3;
     private static final int TAB_OPS = 4;
 
-    // Layout constants and zone math live in the pure NetworkInteractorLayout, shared with the desktop
-    // screen so the drawn cells, the real container slots, and the hit-tests all agree at every size.
+    /*
+     * Layout constants and zone math live in the pure NetworkInteractorLayout, shared with the desktop
+     * screen so the drawn cells, the real container slots, and the hit-tests all agree at every size.
+     */
     private static final int TAB_H = NetworkInteractorLayout.TAB_H;
     private static final int SEARCH_H = NetworkInteractorLayout.SEARCH_H;
     private static final int CELL = NetworkInteractorLayout.CELL;
@@ -109,8 +111,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private static final int LINK_BLUE = 0xFF2F6AC6;
     private static final int SCROLLBAR_W = 3;
 
-    // Request/storage popup (MC-NET style): clicking an item with an empty cursor opens a quantity dialog
-    // instead of extracting a fixed amount.
+    /*
+     * Request/storage popup (MC-NET style): clicking an item with an empty cursor opens a quantity dialog
+     * instead of extracting a fixed amount.
+     */
     private static final int[] POPUP_STEPS = {-1000, -100, -10, -1, 1, 10, 100, 1000};
     private static final int POPUP_W = 188;
     private static final int POPUP_H = 100;
@@ -124,8 +128,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private static final int[] CRAFT_STEPS = {-64, -1, 1, 64};
     private static final long MAX_CRAFT_QTY = 99_999L;
 
-    // The last tab the player viewed, kept across reopens (reopening the computer or the monitor) so the NI
-    // comes back to where they left it instead of snapping to Network every time.
+    /*
+     * The last tab the player viewed, kept across reopens (reopening the computer or the monitor) so the NI
+     * comes back to where they left it instead of snapping to Network every time.
+     */
     private static int lastTab = TAB_NETWORK;
 
     private static NetworkInteractorApp active;
@@ -147,8 +153,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
 
     /** How the grid is ordered: 0 by name, 1 most stored first, 2 least stored first. */
     private int sortMode;
-    // The grid's filtered and sorted view, kept between frames: cells, tooltip and hit-tests all ask for it
-    // several times a frame, and re-sorting thousands of entries each time was a frame-rate cost.
+    /*
+     * The grid's filtered and sorted view, kept between frames: cells, tooltip and hit-tests all ask for it
+     * several times a frame, and re-sorting thousands of entries each time was a frame-rate cost.
+     */
     private List<NetworkItemEntry> filteredCache = List.of();
     private List<NetworkItemEntry> filteredSource = List.of();
     private String filteredKey = "";
@@ -165,9 +173,11 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private int lastY;
     private int lastMouseX;
     private int lastMouseY;
-    // Frames since the last live refresh: the Network Interactor re-asks the server for the storage grid and,
-    // on the Operations tab, the live operations a few times a second, so stock and craft progress move on their
-    // own instead of only when a command is run.
+    /*
+     * Frames since the last live refresh: the Network Interactor re-asks the server for the storage grid and,
+     * on the Operations tab, the live operations a few times a second, so stock and craft progress move on their
+     * own instead of only when a command is run.
+     */
     private int refreshFrames;
 
     // The request/storage dialog's state; popupEntry is null while it is closed.
@@ -185,8 +195,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     @Nullable
     private CraftCatalogPayload.Entry craftEntry;
     private long craftQty = 1;
-    // When the item in the craft popup can be made BOTH by a multi-stage pipeline and by composing its flat
-    // patterns, this toggle chooses: true runs the pipeline, false lets the recursive planner build the tree.
+    /*
+     * When the item in the craft popup can be made BOTH by a multi-stage pipeline and by composing its flat
+     * patterns, this toggle chooses: true runs the pipeline, false lets the recursive planner build the tree.
+     */
     private boolean craftMulti = true;
     private OperationPriority craftPriority = OperationPriority.DEFAULT;
     @Nullable
@@ -242,7 +254,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     }
 
     /**
-     * Marks this window as the active Network Interactor — the one that receives network snapshots and
+     * Marks this window as the active Network Interactor, the one that receives network snapshots and
      * console output. The desktop screen calls this whenever this window becomes the focused one, so the
      * static routing follows focus instead of pointing at the most recently constructed instance.
      */
@@ -267,7 +279,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         PacketDistributor.sendToServer(new RequestNiOperationsPayload(host, monitorPos));
     }
 
-    // ---- what the server sends ----
+    // what the server sends
 
     /** Routes a storage snapshot to the open Network Interactor window. */
     public static void accept(final NetworkInteractorPayload payload) {
@@ -342,7 +354,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
     }
 
-    // ---- the window ----
+    // the window
 
     @Override
     public String title() {
@@ -351,8 +363,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
 
     @Override
     public int defaultWidth() {
-        // Left column (grid + framed inventory) + details panel + gaps — compact, just above minWidth() so the
-        // window opens tidy and never below its own minimum (which squashes the content and clips the panel).
+        /*
+         * Left column (grid + framed inventory) + details panel + gaps, compact and just above minWidth() so the
+         * window opens tidy and never below its own minimum (which squashes the content and clips the panel).
+         */
         return 330;
     }
 
@@ -371,15 +385,19 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return NetworkInteractorLayout.minContentHeight() + DesktopWindow.TITLE_H + 8;
     }
 
-    // Layout — every zone comes from the pure NetworkInteractorLayout, derived from the LIVE content size, so
-    // the drawn cells, the real container slots, and the hit-tests agree at any size. The inventory band is a
-    // fixed-height panel pinned above the footer; only the grid scrolls (its items, not its pixels).
+    /*
+     * Layout: every zone comes from the pure NetworkInteractorLayout, derived from the LIVE content size, so
+     * the drawn cells, the real container slots, and the hit-tests agree at any size. The inventory band is a
+     * fixed-height panel pinned above the footer; only the grid scrolls (its items, not its pixels).
+     */
     private NetworkInteractorLayout.Zones zones() {
         return NetworkInteractorLayout.resolve(contentW, contentH);
     }
 
-    // --- Inventory zone, in content-local coordinates (relative to the app content's top-left). The desktop
-    // screen reads these to place the menu's 36 inventory slots over this window each frame. ---
+    /*
+     * Inventory zone, in content-local coordinates (relative to the app content's top-left). The desktop
+     * screen reads these to place the menu's 36 inventory slots over this window each frame.
+     */
 
     /** The content-local x of a slot cell's top-left, where the vanilla item is drawn. */
     @Override
@@ -390,7 +408,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     /**
      * The content-local y of a slot cell's top-left for the given content height. The inventory band is a
      * fixed-height panel pinned just above the footer, so the row position is derived from the live height,
-     * never from a cached field — the item lines up with its slot background from the very first frame.
+     * never from a cached field, so the item lines up with its slot background from the very first frame.
      */
     @Override
     public int invCellContentY(final int row, final int contentHeight) {
@@ -399,7 +417,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     }
 
     /**
-     * The content-local y just past the bottom row of inventory slots, for the given content height — the
+     * The content-local y just past the bottom row of inventory slots, for the given content height, the
      * desktop screen uses it as the band's lower visibility bound so all 36 slots are always counted visible.
      */
     @Override
@@ -417,9 +435,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return tab == TAB_NETWORK || tab == TAB_LOCAL || tab == TAB_CRAFTING;
     }
 
-    // ======================================================================================
     //  Rendering: lay the components out from the zones, draw the rest by hand, then the tree
-    // ======================================================================================
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -431,8 +447,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         lastY = y;
         lastMouseX = mouseX;
         lastMouseY = mouseY;
-        // Keep the view live: a few times a second, re-ask for the storage grid (and the live operations on the
-        // Operations tab) so stock counts and craft progress update on their own, without a manual refresh.
+        /*
+         * Keep the view live: a few times a second, re-ask for the storage grid (and the live operations on the
+         * Operations tab) so stock counts and craft progress update on their own, without a manual refresh.
+         */
         if (++refreshFrames >= 20) {
             refreshFrames = 0;
             request();
@@ -452,8 +470,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         sortButton.setBounds(x + z.sortX(), y + z.searchY(), z.sortW(), SEARCH_H);
         sortButton.setVisible(onGrid);
 
-        // The grid zone: the tab body between the fixed header and the inventory band. The grid scrolls its
-        // ITEMS, not its pixels: the rows shown change.
+        /*
+         * The grid zone: the tab body between the fixed header and the inventory band. The grid scrolls its
+         * ITEMS, not its pixels: the rows shown change.
+         */
         final int gridTop = y + z.gridY();
         final int gridRows = Math.max(1, z.gridRows());
         grid.setColumns(z.gridCols()).setVisibleRows(gridRows).setTotalRows(totalItemRows(z)).setCellCount(gridCount());
@@ -488,8 +508,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             Draw.popScissor(g);
         }
 
-        // The framed inventory band — a pinned panel with the 36 slot backgrounds; the desktop screen draws
-        // the real container items and the cursor over it. Always fully visible, never clipped.
+        /*
+         * The framed inventory band: a pinned panel with the 36 slot backgrounds; the desktop screen draws
+         * the real container items and the cursor over it. Always fully visible, never clipped.
+         */
         renderInventoryBand(g, font, x, y, z);
 
         // Item details panel (right column): the hovered grid item, or the selected Operation on the Ops tab.
@@ -499,7 +521,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             renderDetails(g, font, x, y, z, mouseX, mouseY);
         }
 
-        // Status line (fixed footer) — usage right-aligned, the left label clipped so it never overruns.
+        // Status line (fixed footer): usage right-aligned, the left label clipped so it never overruns.
         final int statusY = y + z.statusY();
         final int usageW = font.width(usageText());
         usageLabel.setBounds(x + width - 3 - usageW, statusY + 1, usageW, 8);
@@ -607,8 +629,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         // "Inventory" label tucked into the band's top frame, so the panel is clearly the player inventory.
         g.drawString(font, "Inventory", bx + 3, by - 9, skin.dim(), false);
 
-        // Slot backgrounds inside the frame (the desktop screen draws the real items and cursor over these),
-        // using the shared rowYOffset so the 3-rows + gap + hotbar lines up exactly with the real slots.
+        /*
+         * Slot backgrounds inside the frame (the desktop screen draws the real items and cursor over these),
+         * using the shared rowYOffset so the 3-rows + gap + hotbar lines up exactly with the real slots.
+         */
         for (int r = 0; r < INV_ROWS; r++) {
             for (int c = 0; c < INV_COLS; c++) {
                 final int cx = x + z.invX() + c * CELL;
@@ -628,7 +652,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         g.fill(x + w - 1, y, x + w, y + h, skin.edge());
     }
 
-    // ---- details panel ----
+    // details panel
 
     /**
      * The right-hand item details panel: the hovered grid item's icon, name, mod, id, weight, durability and
@@ -835,7 +859,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return out;
     }
 
-    // ---- Operations tab (network task manager) ----
+    // Operations tab (network task manager)
 
     private List<OperationRecord> allOps() {
         final List<OperationRecord> all = new ArrayList<>(activeOps.size() + recentOps.size());
@@ -965,8 +989,8 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private static int opStatusColor(final byte status) {
         return switch (status) {
             case 0 -> ONLINE_GREEN;       // completed
-            case 1, 3, 4, 6 -> 0xFFB8860B; // partial / processing / waiting / pending — amber
-            case 2, 5, 7 -> 0xFFB23A3A; // failed / locked / discarded — red
+            case 1, 3, 4, 6 -> 0xFFB8860B; // partial / processing / waiting / pending: amber
+            case 2, 5, 7 -> 0xFFB23A3A; // failed / locked / discarded: red
             default -> 0xFF6A7280;
         };
     }
@@ -980,7 +1004,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         };
     }
 
-    // ---- footer ----
+    // footer
 
     private String usageText() {
         return dataLabel(usedItems) + " stored";
@@ -1008,9 +1032,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         PacketDistributor.sendToServer(new DesktopShellRunPayload(host, line));
     }
 
-    // ======================================================================================
     //  Input
-    // ======================================================================================
 
     private Panel inputTarget() {
         if (requestPopup.isOpen()) {
@@ -1029,8 +1051,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             inputTarget().mouseClicked(mouseX, mouseY, button);
             return;
         }
-        // Inventory band — real container slots handled by the desktop screen (cursor, drag, shift-click);
-        // the app simply ignores clicks that land there so it never misreads them as grid/console input.
+        /*
+         * Inventory band: real container slots handled by the desktop screen (cursor, drag, shift-click);
+         * the app simply ignores clicks that land there so it never misreads them as grid/console input.
+         */
         if (inInventoryZone(mouseX - lastX, mouseY - lastY)) {
             return;
         }
@@ -1068,8 +1092,8 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     }
 
     /**
-     * The grid entry under the cursor on a grid tab — the data a held empty container would fill with on a
-     * right-click — or empty when the click is not on an entry.
+     * The grid entry under the cursor on a grid tab: the data a held empty container would fill with on a
+     * right-click, or empty when the click is not on an entry.
      */
     public Optional<StorageKey> cursorDepositEntry(final double lx, final double ly) {
         if (tab != TAB_NETWORK && tab != TAB_LOCAL) {
@@ -1080,7 +1104,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return idx >= 0 && idx < items.size() ? Optional.of(items.get(idx).key()) : Optional.empty();
     }
 
-    /** Whether any modal dialog (request/storage or craft) is open — the desktop routes all clicks to the app then. */
+    /** Whether any modal dialog (request/storage or craft) is open, in which case the desktop routes every click to the app. */
     public boolean hasPopup() {
         return requestPopup.isOpen() || craftPopup.isOpen();
     }
@@ -1093,8 +1117,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     @Override
     public void renderModal(final GuiGraphics g, final Font font, final int x, final int y, final int width,
                             final int height, final int mouseX, final int mouseY) {
-        // The desktop draws this in a late pass above every item icon, so the dialog's own dim covers and
-        // darkens the grid/craft/inventory icons instead of them piercing through at their blit depth.
+        /*
+         * The desktop draws this in a late pass above every item icon, so the dialog's own dim covers and
+         * darkens the grid/craft/inventory icons instead of them piercing through at their blit depth.
+         */
         final UiContext ctx = new UiContext(skin, font, mouseX, mouseY, 0f);
         if (requestPopup.isOpen()) {
             requestPopup.renderIn(g, ctx, x, y, width, height);
@@ -1126,8 +1152,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         if (hasPopup()) {
             return true;
         }
-        // The wheel anywhere in the window moves the tab's list: the Operations tab its rows, the grid tabs
-        // their items; nothing on Status.
+        /*
+         * The wheel anywhere in the window moves the tab's list: the Operations tab its rows, the grid tabs
+         * their items; nothing on Status.
+         */
         final int step = delta > 0 ? -1 : 1;
         if (tab == TAB_OPS) {
             opList.setScroll(opList.scroll() + step);
@@ -1153,8 +1181,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     @Override
     public void renderTooltip(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY) {
-        // The inventory band is real container slots; the desktop screen renders their item tooltips, so the
-        // app stays out of that area to avoid a double tooltip.
+        /*
+         * The inventory band is real container slots; the desktop screen renders their item tooltips, so the
+         * app stays out of that area to avoid a double tooltip.
+         */
         if (inInventoryZone(mouseX - x, mouseY - y)) {
             return;
         }
@@ -1174,9 +1204,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
     }
 
-    // ======================================================================================
     //  The request/storage dialog
-    // ======================================================================================
 
     private void openPopup(final NetworkItemEntry e, final boolean storage) {
         craftPopup.close();
@@ -1467,9 +1495,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
     }
 
-    // ======================================================================================
     //  The craft dialog
-    // ======================================================================================
 
     private void openCraftPopup(final CraftCatalogPayload.Entry entry) {
         craftEntry = entry;
@@ -1569,8 +1595,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             estimate.setVisible(craftPlan != null);
             feasible.setBounds(px + 70, py + CRAFT_H - 32, 44, 8);
             feasible.setVisible(craftPlan != null && !craftPlan.feasible());
-            // The recipe toggle only shows when the item can be made as a multi-stage pipeline (and thus also
-            // flat): it picks which recipe the craft runs.
+            /*
+             * The recipe toggle only shows when the item can be made as a multi-stage pipeline (and thus also
+             * flat): it picks which recipe the craft runs.
+             */
             recipeToggle.setBounds(px + 118, py + CRAFT_H - 33, CRAFT_W - 118 - 5, 12);
             recipeToggle.setVisible(craftEntry != null && craftEntry.multiStage());
             final int by = py + CRAFT_H - 19;
@@ -1634,9 +1662,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
     }
 
-    // ======================================================================================
     //  Helpers
-    // ======================================================================================
 
     private static String formatCount(final long n) {
         if (n < 1000) {
@@ -1728,9 +1754,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         };
     }
 
-    // ======================================================================================
     //  Inspection (client tests): content-local points of the controls, from the last frame's layout
-    // ======================================================================================
 
     private int[] local(final int[] c) {
         return new int[] {c[0] - lastX, c[1] - lastY};

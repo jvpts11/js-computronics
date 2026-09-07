@@ -14,7 +14,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Server to client: the result of an Editor save — whether it succeeded and a short status message to
+ * Server to client: the result of an Editor save: whether it succeeded and a short status message to
  * show in the Editor's status line.
  */
 public record FileSavedPayload(boolean ok, String message) implements CustomPacketPayload {

@@ -111,8 +111,10 @@ public final class CraftingChainClientTests {
                 .thenAssert(2, () -> studio(ctx).bandShown(), "the Studio's inventory band must show in the default window")
                 .thenScreenshot(80, "studio")
                 .then(0, () -> JsComputronics.LOGGER.info("[JSC-CT] viewer on the desktop: {}", viewerReport()))
-                // The viewer's transfer button: with its recipe screen over the desktop, the transfer must still
-                // find the Studio in front (the desktop is the viewer's parent screen there, not the current one).
+                /*
+                 * The viewer's transfer button: with its recipe screen over the desktop, the transfer must still
+                 * find the Studio in front (the desktop is the viewer's parent screen there, not the current one).
+                 */
                 .then(0, () -> ctx.assertTrue(viewerShowsRecipesFor(new ItemStack(Items.IRON_INGOT)),
                         "the viewer must open its recipe screen for the iron ingot"))
                 .thenWaitUntil(CraftingChainClientTests::viewerScreenOpen, SCREEN_WAIT, "the viewer's recipe screen")
@@ -324,16 +326,20 @@ public final class CraftingChainClientTests {
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
-                    // The machine: a vanilla furnace (sided: in through the top, out through the bottom) on a
-                    // crafting cable run behind the switch, with the two crafting buses aimed at it.
+                    /*
+                     * The machine: a vanilla furnace (sided: in through the top, out through the bottom) on a
+                     * crafting cable run behind the switch, with the two crafting buses aimed at it.
+                     */
                     world.setBlock(CRAFTING_CABLE, ComputingModule.CRAFTING_CABLE.get());
                     world.setBlock(SWITCH, ComputingModule.CRAFTING_SWITCH.get());
                     world.setBlock(FURNACE, Blocks.FURNACE);
                     world.setBlock(CABLE_ABOVE_FURNACE, ComputingModule.CRAFTING_CABLE.get());
                     world.setBlock(CABLE_BELOW_FURNACE, ComputingModule.CRAFTING_CABLE.get());
                     net.seed(Items.RAW_IRON, 32);
-                    // Finished ingots already in the furnace's output slot: collecting them proves the receiving
-                    // path without waiting out real smelting (the furnace has no fuel here).
+                    /*
+                     * Finished ingots already in the furnace's output slot: collecting them proves the receiving
+                     * path without waiting out real smelting (the furnace has no fuel here).
+                     */
                     if (world.getBlockEntity(FURNACE) instanceof FurnaceBlockEntity furnace) {
                         furnace.setItem(2, new ItemStack(Items.IRON_INGOT, 8));
                     }
@@ -460,8 +466,10 @@ public final class CraftingChainClientTests {
                     world.setBlock(CABLE_ABOVE_FURNACE, ComputingModule.CRAFTING_CABLE.get());
                     world.setBlock(CABLE_BELOW_FURNACE, ComputingModule.CRAFTING_CABLE.get());
                     net.seed(Items.RAW_IRON, 32);
-                    // Finished ingots already in the furnace output: collecting them proves the receiving path
-                    // without waiting out real smelting (the furnace has no fuel here).
+                    /*
+                     * Finished ingots already in the furnace output: collecting them proves the receiving path
+                     * without waiting out real smelting (the furnace has no fuel here).
+                     */
                     if (world.getBlockEntity(FURNACE) instanceof FurnaceBlockEntity furnace) {
                         furnace.setItem(2, new ItemStack(Items.IRON_INGOT, 8));
                     }
@@ -484,8 +492,10 @@ public final class CraftingChainClientTests {
                     ctx.assertTrue(world.blockEntity(CRAFTING_COMPUTER, CraftingComputerBlockEntity.class)
                             .loadMachineRecipe(NetworkRecipe.ofMultiStage(multi)),
                             "the multi-stage iron recipe loads into the ROM");
-                    // The recursive planner alone is blind to a multi-stage-only recipe, so the CLI/IQL depends on
-                    // the shared entry point to run it at all.
+                    /*
+                     * The recursive planner alone is blind to a multi-stage-only recipe, so the CLI/IQL depends on
+                     * the shared entry point to run it at all.
+                     */
                     final MainframeBlockEntity mainframe = world.blockEntity(MAINFRAME, MainframeBlockEntity.class);
                     ctx.assertTrue(mainframe.submitNetworkCraft(StorageKey.of(Items.IRON_INGOT), 1, true, "check") == null,
                             "the recursive planner must not see the multi-stage-only recipe");
@@ -623,7 +633,7 @@ public final class CraftingChainClientTests {
                 .thenAwaitNoScreen(SCREEN_WAIT);
     }
 
-    // --- helpers ---
+    // helpers
 
     private static void launch(final ClientTestContext ctx, final String label) {
         final DesktopScreen desktop = ctx.screen(DesktopScreen.class);

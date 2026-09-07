@@ -37,7 +37,7 @@ import java.util.Map;
 
 /**
  * In-world tests for the {@code .dat} integrity rule: a {@code .dat} is a read-only projection of stored
- * items, so it can never be created, written, deleted, or renamed by hand — and the one sanctioned manual
+ * items, so it can never be created, written, deleted, or renamed by hand, and the one sanctioned manual
  * action, dragging it onto a removable medium, moves the underlying item conservatively (no loss, no dupe).
  */
 @GameTestHolder(JsTests.MODID)
@@ -51,7 +51,7 @@ public final class OsDatLockGameTests {
     private static final int SETTLE = 4;
 
     /**
-     * A manual {@code .dat} action — delete or rename — is refused at the filesystem API, the gate every
+     * A manual {@code .dat} action (delete or rename) is refused at the filesystem API, the gate every
      * client and server path funnels through. Neither mutates the disk.
      */
     @GameTest(template = ARENA)

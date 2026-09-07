@@ -20,7 +20,7 @@ import java.util.Map;
 
 /**
  * The one place that knows how each {@link StorageKey.Kind} is found on a block face. Every kind must have a
- * resolver here — the class refuses to load otherwise — so adding a kind of data to {@link StorageKey} forces
+ * resolver here (the class refuses to load otherwise) so adding a kind of data to {@link StorageKey} forces
  * its channel into every port the network builds, instead of into whichever call sites happened to be
  * updated.
  */

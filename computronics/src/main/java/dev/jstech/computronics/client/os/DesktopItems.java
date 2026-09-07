@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
  * <p>An item is a model, not a sprite: {@code renderItem} lifts it {@link DesktopZ#ITEM_LIFT} in front of
  * whatever pose it is given, and the count another {@link DesktopZ#DECORATION_LIFT}. A window that drew its
  * items with the raw calls therefore put them ~150 deep in front of the entire desktop, where they covered
- * every window in front of that one — two open windows painted their items over each other's chrome. These
+ * every window in front of that one, and two open windows painted their items over each other's chrome. These
  * helpers push the model back into the window's own depth band, so an item can never leave the window that
  * drew it. Every app draws its items through here; only the carried (cursor) stack, which is meant to ride
  * above everything, uses the raw call.

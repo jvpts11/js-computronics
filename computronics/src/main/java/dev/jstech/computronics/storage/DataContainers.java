@@ -17,7 +17,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
 import java.util.Optional;
 
 /**
- * An item that CARRIES data — a filled bucket, a tank item, anything with a fluid or a chemical inside — gives
+ * An item that CARRIES data (a filled bucket, a tank item, anything with a fluid or a chemical inside) gives
  * up what it holds when it is deposited, and the emptied container comes back; the container itself is never
  * stored. This is the one place that knows how to take data out of such an item and how to put data back, so
  * every deposit route (terminal or desktop; cursor, menu slot or inventory slot) treats a container the same
@@ -49,7 +49,7 @@ public final class DataContainers {
     /**
      * Takes up to {@code roomWeight} mB of data out of ONE container from {@code stack}, leaving {@code stack}
      * itself untouched: the result carries a copy of that container with the data removed. Empty when the item
-     * carries no data, or when nothing could come out — a bucket only ever gives up its whole 1 000 mB, so with
+     * carries no data, or when nothing could come out, since a bucket only ever gives up its whole 1 000 mB, so with
      * less room than that it stays full, while a tank item gives up exactly what fits.
      */
     public static Optional<Drained> drain(final ItemStack stack, final long roomWeight) {
@@ -61,8 +61,10 @@ public final class DataContainers {
         final Optional<IFluidHandlerItem> fluids = FluidUtil.getFluidHandler(one);
         if (fluids.isPresent()) {
             final IFluidHandlerItem handler = fluids.get();
-            // What one drain hands out is the deposit: a tank item may cap that at a bucket's worth per
-            // operation, and then a full tank empties a bucket at a time, one click each.
+            /*
+             * What one drain hands out is the deposit: a tank item may cap that at a bucket's worth per
+             * operation, and then a full tank empties a bucket at a time, one click each.
+             */
             final FluidStack held = handler.drain(Integer.MAX_VALUE, IFluidHandler.FluidAction.SIMULATE);
             if (!held.isEmpty()) {
                 final FluidStack taken = handler.drain(Math.min(room, held.getAmount()),

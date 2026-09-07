@@ -20,9 +20,11 @@ import dev.jstech.core.gui.layout.GuiLayout;
  */
 public final class ServerRackLayout {
 
-    // Eight rack rows of 18px plus a player inventory leave no room to spare: the cabinet summary
-    // rides in the header (as the mock has it) instead of taking a line of its own, and the panel
-    // lands just inside the project's 256px height ceiling.
+    /*
+     * Eight rack rows of 18px plus a player inventory leave no room to spare: the cabinet summary
+     * rides in the header (as the mock has it) instead of taking a line of its own, and the panel
+     * lands just inside the project's 256px height ceiling.
+     */
     public static final int WIDTH = 244;
     public static final int HEIGHT = 254;
 
@@ -61,7 +63,7 @@ public final class ServerRackLayout {
 
     /**
      * How far an item sits inside the {@link #SLOT}-wide cell drawn for it. A slot cell is 18 px and the
-     * item in it is 16, so the item is inset by one — the same relationship vanilla's own slot texture has.
+     * item in it is 16, so the item is inset by one, the same relationship vanilla's own slot texture has.
      * The menu adds its slots at these inset coordinates; without it every item (and its hover box) sat a
      * pixel up and to the left of the bay drawn under it.
      */

@@ -144,8 +144,10 @@ public final class EraComputerGameTests {
         final BlockPos pos = new BlockPos(2, 2, 2);
         helper.setBlock(pos, ComputingModule.VINTAGE_PERSONAL_COMPUTER.get());
         helper.startSequence()
-                // The vanilla helper.destroyBlock passes dropBlock=false, so drop through the level
-                // directly (dropBlock=true) to exercise the block's loot table.
+                /*
+                 * The vanilla helper.destroyBlock passes dropBlock=false, so drop through the level
+                 * directly (dropBlock=true) to exercise the block's loot table.
+                 */
                 .thenExecute(() -> helper.getLevel().destroyBlock(helper.absolutePos(pos), true))
                 .thenExecuteAfter(SETTLE, () -> helper.assertItemEntityPresent(
                         ComputingModule.VINTAGE_PERSONAL_COMPUTER_ITEM.get(), pos, 3.0))
@@ -157,8 +159,10 @@ public final class EraComputerGameTests {
         final BlockPos pos = new BlockPos(2, 2, 2);
         helper.setBlock(pos, ComputingModule.LEGACY_PERSONAL_COMPUTER.get());
         helper.startSequence()
-                // The vanilla helper.destroyBlock passes dropBlock=false, so drop through the level
-                // directly (dropBlock=true) to exercise the block's loot table.
+                /*
+                 * The vanilla helper.destroyBlock passes dropBlock=false, so drop through the level
+                 * directly (dropBlock=true) to exercise the block's loot table.
+                 */
                 .thenExecute(() -> helper.getLevel().destroyBlock(helper.absolutePos(pos), true))
                 .thenExecuteAfter(SETTLE, () -> helper.assertItemEntityPresent(
                         ComputingModule.LEGACY_PERSONAL_COMPUTER_ITEM.get(), pos, 3.0))

@@ -39,8 +39,10 @@ public final class CraftingManagerMediaGameTests {
 
     private static final String ARENA = "empty";
     private static final int SETTLE = 4;
-    // The crafting network's computer sits at (5,2,2) with its rear on the cable to the west; the drives go
-    // on its free sides, the floppy drive first so it is the first linked endpoint.
+    /*
+     * The crafting network's computer sits at (5,2,2) with its rear on the cable to the west; the drives go
+     * on its free sides, the floppy drive first so it is the first linked endpoint.
+     */
     private static final BlockPos FLOPPY_DRIVE = new BlockPos(5, 2, 3);
     private static final BlockPos DVD_DRIVE = new BlockPos(5, 2, 1);
     private static final BlockPos ENCODER = new BlockPos(1, 2, 4);

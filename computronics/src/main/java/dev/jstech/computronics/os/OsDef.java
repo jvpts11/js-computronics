@@ -27,7 +27,7 @@ import java.util.Optional;
  * @param id             unique registry key for this OS (e.g. {@code jsc:mc_dos})
  * @param capability     the capability tier this OS provides to programs and the player
  * @param minEra         the minimum hardware era required to install this OS; the era acts as a
- *                       minimum — installing on hardware at this era or later is accepted, older
+ *                       minimum, so installing on hardware at this era or later is accepted, older
  *                       hardware is rejected
  * @param kernelId       registry key of the kernel this OS runs on
  * @param footprintMb    the size of the installed system in megabytes; what that costs in items follows
@@ -92,8 +92,10 @@ public record OsDef(
                                        final int footprintMb, final Platform platform,
                                        final String displayName, final Optional<ResourceLocation> bundledDesktop,
                                        final SoftwareHouse house) {
-        // A Frames edition ships pckmgr; anything else installed from media (MC-NET, MC-DOS) still
-        // takes its programs from a disc in a linked drive.
+        /*
+         * A Frames edition ships pckmgr; anything else installed from media (MC-NET, MC-DOS) still
+         * takes its programs from a disc in a linked drive.
+         */
         return new OsDef(id, capability, minEra, kernelId, footprintMb, Optional.empty(), platform,
                 displayName, "cmd",
                 platform == Platform.FRAMES ? PackageManagerKind.PCKMGR : PackageManagerKind.NONE,

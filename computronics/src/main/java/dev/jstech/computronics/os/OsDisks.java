@@ -25,7 +25,7 @@ import java.util.function.ObjIntConsumer;
  * The disk-set logic every OS-hosting machine shares: which disk boots, where an install lands,
  * whether a footprint fits, and what a format erases. Extracted so a desk computer (disks in its
  * hardware inventory) and a rack server (drives in the rack's front-panel bays) run the exact same
- * rules over different physical slots — the callers supply slot accessors, this class supplies the
+ * rules over different physical slots: the callers supply slot accessors, this class supplies the
  * behavior.
  */
 public final class OsDisks {
@@ -41,7 +41,7 @@ public final class OsDisks {
 
     /**
      * The disk that boots: the preferred slot when it holds a system, else the first disk with a
-     * system, else EMPTY — so a machine with two installed OSes dual-boots by choice.
+     * system, else EMPTY, so a machine with two installed OSes dual-boots by choice.
      */
     public static ItemStack systemDisk(final int diskCount, final IntFunction<ItemStack> diskInSlot,
                                        final int preferredSlot) {
@@ -131,8 +131,10 @@ public final class OsDisks {
         }
         final ItemStack updated = disk.copy();
         updated.set(ComputingModule.SYSTEM_OS.get(), osId);
-        // A graphical desktop OS lays down the Windows-like system folder skeleton on first install
-        // (Program Files, Windows, Users\Public\Desktop, ...). Terminal/network OSes get nothing.
+        /*
+         * A graphical desktop OS lays down the Windows-like system folder skeleton on first install
+         * (Program Files, Windows, Users\Public\Desktop, ...). Terminal/network OSes get nothing.
+         */
         final List<String> systemDirs = SystemLayout.directoriesFor(def, OsRegistry.getKernel(def.kernelId()));
         if (!systemDirs.isEmpty()) {
             FilesystemContents fs = updated.getOrDefault(

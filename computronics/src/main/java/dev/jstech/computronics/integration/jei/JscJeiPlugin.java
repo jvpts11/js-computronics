@@ -82,17 +82,21 @@ public final class JscJeiPlugin implements IModPlugin {
     public void registerRecipeTransferHandlers(final IRecipeTransferRegistration registration) {
         registration.addRecipeTransferHandler(new StudioBenchTransferHandler(registration.getTransferHelper()),
                 RecipeTypes.CRAFTING);
-        // Every other category (smelting, mod machines, ...) lands in the machine draft. The viewer prefers the
-        // crafting handler above, so the universal one only sees non-crafting recipes.
+        /*
+         * Every other category (smelting, mod machines, ...) lands in the machine draft. The viewer prefers the
+         * crafting handler above, so the universal one only sees non-crafting recipes.
+         */
         registration.addUniversalRecipeTransferHandler(
                 new StudioProcessingTransferHandler(registration.getTransferHelper()));
     }
 
     @Override
     public void registerGuiHandlers(final IGuiHandlerRegistration registration) {
-        // The monitor body (bezel and chin) is an exclusion area, so the ingredient list sits beside the monitor
-        // instead of over its frame. The glass itself is the container's image rectangle, which the viewer
-        // already keeps clear.
+        /*
+         * The monitor body (bezel and chin) is an exclusion area, so the ingredient list sits beside the monitor
+         * instead of over its frame. The glass itself is the container's image rectangle, which the viewer
+         * already keeps clear.
+         */
         registration.addGuiContainerHandler(DesktopScreen.class, new IGuiContainerHandler<DesktopScreen>() {
             @Override
             public List<Rect2i> getGuiExtraAreas(final DesktopScreen screen) {

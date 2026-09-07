@@ -25,8 +25,8 @@ import java.util.Random;
 
 /**
  * The traffic a busy base puts on its Mainframe, tick after tick: terminal pulls of random catalog
- * items, deposits of the same, and a crafting workload — bench recipes, recipe chains and machine
- * processing — requested in bursts. The scale benchmark ticks a {@link Session} itself; the
+ * items, deposits of the same, and a crafting workload (bench recipes, recipe chains and machine
+ * processing) requested in bursts. The scale benchmark ticks a {@link Session} itself; the
  * {@code /jsc benchmark load} command runs one on the server tick so a player can watch the profiler
  * while the base works.
  */
@@ -160,7 +160,7 @@ public final class BenchmarkLoad {
         }
     }
 
-    // ---- the in-world driver behind the command ----
+    // the in-world driver behind the command
 
     public static void remember(final BigBaseScenario.Built built) {
         lastBuilt = built;

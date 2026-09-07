@@ -74,9 +74,11 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
     public static final CustomPacketPayload.Type<DesktopFilesPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("jsc", "desktop_files"));
 
-    // Written out by hand: composite takes six pairs and this carries seven things. The alternative was
-    // to bundle two of them into a record nobody else wants, which would have cost a reader more than
-    // these two short methods do.
+    /*
+     * Written out by hand: composite takes six pairs and this carries seven things. The alternative was
+     * to bundle two of them into a record nobody else wants, which would have cost a reader more than
+     * these two short methods do.
+     */
     public static final StreamCodec<RegistryFriendlyByteBuf, DesktopFilesPayload> STREAM_CODEC =
             StreamCodec.of(DesktopFilesPayload::encode, DesktopFilesPayload::decode);
 

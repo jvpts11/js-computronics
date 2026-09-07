@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture;
  * vanilla ingots and nuggets into the corresponding {@code c:} tags for interop.
  *
  * <p>Adding a new material or form is automatic once {@link ModMaterial} or {@link MaterialForm}
- * is updated — no changes needed here.
+ * is updated, and no changes are needed here.
  */
 public class JsCoreItemTagsProvider extends IntrinsicHolderTagsProvider<Item> {
 

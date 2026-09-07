@@ -52,9 +52,11 @@ public final class MekanismRig {
     public static final BlockPos CABLE_EAST = new BlockPos(7, 2, 7);
     public static final BlockPos CABLE_NORTH = new BlockPos(6, 2, 6);
 
-    // A second machine of the same kind, further south, for tests that need two physical machines (concurrency
-    // scales with the machines present). Its buses hang from B_ABOVE (top input), B_BELOW (bottom extra) and
-    // B_RUN (right/west receiving); the run links back to the first machine's cables at (5,2,8).
+    /*
+     * A second machine of the same kind, further south, for tests that need two physical machines (concurrency
+     * scales with the machines present). Its buses hang from B_ABOVE (top input), B_BELOW (bottom extra) and
+     * B_RUN (right/west receiving); the run links back to the first machine's cables at (5,2,8).
+     */
     public static final BlockPos MACHINE_B = new BlockPos(6, 2, 10);
     public static final BlockPos B_RUN = new BlockPos(5, 2, 10);
     public static final BlockPos B_ABOVE = new BlockPos(6, 3, 10);

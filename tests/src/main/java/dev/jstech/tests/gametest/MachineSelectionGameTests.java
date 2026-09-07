@@ -33,7 +33,7 @@ import java.util.List;
 
 /**
  * Machine selection must honor the bus filters, not just the block type. Two machines of the same type are told
- * apart only by their Crafting Input Bus filters — one factory takes iron, another takes enriched iron — so a
+ * apart only by their Crafting Input Bus filters (one factory takes iron, another takes enriched iron) so a
  * recipe whose input only the second machine's bus can carry must run on that second machine, not fail on the
  * first. An unfiltered Input Bus is a wildcard, so a machine carrying it can run any recipe of its type. This is
  * the multi-machine group setup a player builds to spread load without congesting one machine.
@@ -92,8 +92,10 @@ public final class MachineSelectionGameTests {
                     // Furnace A only carries raw iron; furnace B only carries raw copper.
                     wireFurnace(helper, furnaceA, Items.RAW_IRON);
                     wireFurnace(helper, furnaceB, Items.RAW_COPPER);
-                    // Finished copper ingots sit in furnace B's output so the receiving path has something to
-                    // pull without waiting out a real smelt; furnace A holds none.
+                    /*
+                     * Finished copper ingots sit in furnace B's output so the receiving path has something to
+                     * pull without waiting out a real smelt; furnace A holds none.
+                     */
                     if (helper.getBlockEntity(furnaceB) instanceof FurnaceBlockEntity furnace) {
                         furnace.setItem(2, new ItemStack(Items.COPPER_INGOT, 8));
                     }
@@ -106,8 +108,10 @@ public final class MachineSelectionGameTests {
                         helper.assertTrue(net.mainframe().submitNetworkProcessing(smelt(Items.RAW_COPPER, Items.COPPER_INGOT), 4, "sel") != null,
                                 "the processing operation is accepted"))
                 .thenWaitUntil(() -> {
-                    // Only reachable if the engine chose furnace B (whose bus routes raw copper) and collected its
-                    // output; choosing furnace A would block the input on its iron filter and collect nothing.
+                    /*
+                     * Only reachable if the engine chose furnace B (whose bus routes raw copper) and collected its
+                     * output; choosing furnace A would block the input on its iron filter and collect nothing.
+                     */
                     final long have = net.storage(helper.getLevel()).count(copperIngot);
                     if (have < 4) {
                         throw new GameTestAssertException("engine must route to the copper-capable furnace; network copper="

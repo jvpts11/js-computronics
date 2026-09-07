@@ -91,7 +91,7 @@ class ComputerBuildTest {
 
     @Test
     void agpCardInPcieBoard_isNotPowered() {
-        // AGP and PCIe are physically distinct bus families — an AGP card cannot enter a PCIe slot.
+        // AGP and PCIe are physically distinct bus families, so an AGP card cannot enter a PCIe slot.
         final GpuSpec agpGpu = new GpuSpec(HardwareEra.LEGACY, PcieGeneration.AGP_8X, 8, 128, 70);
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(agpGpu), List.of(ddr3()), psu(650));
@@ -100,7 +100,7 @@ class ComputerBuildTest {
 
     @Test
     void pcieCardNewerGenerationInPcieBoard_isPowered() {
-        // All PCIe generations are cross-compatible — a PCIe 5.0 card fits a PCIe 3.0 slot.
+        // All PCIe generations are cross-compatible, so a PCIe 5.0 card fits a PCIe 3.0 slot.
         final GpuSpec pcie5Gpu = new GpuSpec(HardwareEra.EXA, PcieGeneration.PCIE_5_0, 19456, 192000, 750);
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(pcie5Gpu), List.of(ddr3()), psu(2000));
@@ -109,7 +109,7 @@ class ComputerBuildTest {
 
     @Test
     void pcie1CardInPcie3Board_isPowered() {
-        // All PCIe generations are cross-compatible — a PCIe 1.0 card fits a PCIe 3.0 slot.
+        // All PCIe generations are cross-compatible, so a PCIe 1.0 card fits a PCIe 3.0 slot.
         final GpuSpec pcie1Gpu = new GpuSpec(HardwareEra.LEGACY, PcieGeneration.PCIE_1_0, 112, 512, 110);
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()), List.of(pcie1Gpu), List.of(ddr3()), psu(650));
@@ -135,8 +135,10 @@ class ComputerBuildTest {
 
     @Test
     void autoScalingPsuBelowDraw_isPowered() {
-        // 4 x 130W CPU + 250W GPU + 15W RAM = 785W draw, far above the nominal 1W wattage, but an
-        // auto-scaling PSU dimensions itself to the draw and always satisfies it.
+        /*
+         * 4 x 130W CPU + 250W GPU + 15W RAM = 785W draw, far above the nominal 1W wattage, but an
+         * auto-scaling PSU dimensions itself to the draw and always satisfies it.
+         */
         final PsuSpec alienPsu = new PsuSpec(1, 100, true);
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu(), standardCpu(), standardCpu(), standardCpu()),
@@ -178,8 +180,10 @@ class ComputerBuildTest {
 
     @Test
     void parallelQueues_countsOnlyGpus_andMatchesGpusAccessor() {
-        // Two GPUs plus a non-GPU card (a Crafting Card): only the GPUs add parallel queues,
-        // and the count must agree with the typed gpus() accessor — a single GPU-detection path.
+        /*
+         * Two GPUs plus a non-GPU card (a Crafting Card): only the GPUs add parallel queues,
+         * and the count must agree with the typed gpus() accessor, a single GPU-detection path.
+         */
         final ComputerBuild build = new ComputerBuild(mtxStandard(),
                 List.of(standardCpu()),
                 List.of(standardGpu(), craftingCard(), standardGpu()),

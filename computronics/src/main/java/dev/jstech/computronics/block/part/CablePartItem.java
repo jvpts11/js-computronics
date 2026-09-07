@@ -36,15 +36,19 @@ public class CablePartItem extends Item {
         final Level level = context.getLevel();
         final BlockPos clicked = context.getClickedPos();
 
-        // Clicked a data cable directly: mount on it (clicked face, snapping to an adjacent
-        // inventory when there is exactly one).
+        /*
+         * Clicked a data cable directly: mount on it (clicked face, snapping to an adjacent
+         * inventory when there is exactly one).
+         */
         if (level.getBlockState(clicked).getBlock() instanceof DataCableBlock
                 && level.getBlockEntity(clicked) instanceof DataCableBlockEntity cable) {
             return place(context, cable, chooseFace(cable, context.getClickedFace()));
         }
 
-        // Clicked another block (e.g. a chest): mount on an adjacent cable so the bus faces that
-        // block. Prefer the cable behind the clicked face, then any other adjacent cable.
+        /*
+         * Clicked another block (e.g. a chest): mount on an adjacent cable so the bus faces that
+         * block. Prefer the cable behind the clicked face, then any other adjacent cable.
+         */
         final Direction behind = context.getClickedFace().getOpposite();
         final InteractionResult viaBehind = tryAdjacentCable(context, clicked, behind);
         if (viaBehind != InteractionResult.PASS) {
@@ -80,9 +84,11 @@ public class CablePartItem extends Item {
             return InteractionResult.PASS; // every candidate face is taken
         }
         final Level level = context.getLevel();
-        // Crafting buses belong on crafting cables and storage buses on data cables. A storage bus on a
-        // crafting cable would autonomously move items the crafting engine is accounting for (and vice versa
-        // the crafting buses are inert), so a mismatched mount is refused with a hint instead.
+        /*
+         * Crafting buses belong on crafting cables and storage buses on data cables. A storage bus on a
+         * crafting cable would autonomously move items the crafting engine is accounting for (and vice versa
+         * the crafting buses are inert), so a mismatched mount is refused with a hint instead.
+         */
         final boolean craftingPart = type == CablePartType.INPUT || type == CablePartType.RECEIVING;
         final boolean craftingCable =
                 cable.tier() == dev.jstech.core.network.DataTier.CRAFTING;
@@ -120,9 +126,11 @@ public class CablePartItem extends Item {
             if (firstFree == null) {
                 firstFree = direction;
             }
-            // Any face touching a block that offers data — items, fluids, or chemicals — is a candidate, so a
-            // fluid- or chemical-only machine face (e.g. a chemical tank side) snaps the bus the same way an
-            // inventory does, now that buses carry every kind of data.
+            /*
+             * Any face touching a block that offers data (items, fluids, or chemicals) is a candidate, so a
+             * fluid- or chemical-only machine face (e.g. a chemical tank side) snaps the bus the same way an
+             * inventory does, now that buses carry every kind of data.
+             */
             if (!cable.neighborPort(direction).isEmpty()) {
                 dataFace = direction;
                 dataCount++;

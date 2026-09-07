@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * The Processes tab: a task manager for the CURRENT computer (the host the terminal is attached to). It lists
- * that computer's processes — the IQL Engine service and each of its jobs — and lets the player manage the
+ * that computer's processes (the IQL Engine service and each of its jobs) and lets the player manage the
  * selected one from a small toolbar: Start/Stop/Restart a service, End (pause) / Restart a job. A computer
  * with no service (a Personal Computer today) shows "no processes running".
  */
@@ -68,7 +68,7 @@ final class ProcessesTerminalTab extends AbstractTerminalTab {
         final ProcessListPayload.ProcessLine sel = any ? processes.get(selected) : null;
         final boolean service = sel != null && sel.kind() == ProcessListPayload.KIND_SERVICE;
         final boolean running = sel != null && (sel.state().equals("running") || sel.state().equals("active"));
-        final String primary = sel == null ? "—" : service ? (running ? "Stop" : "Start") : "End";
+        final String primary = sel == null ? "None" : service ? (running ? "Stop" : "Start") : "End";
         final int primaryColor = service ? TEXT() : RED();
         final int[] b1 = primaryRect(cx, cy, cw);
         final int[] b2 = restartRect(cx, cy, cw);

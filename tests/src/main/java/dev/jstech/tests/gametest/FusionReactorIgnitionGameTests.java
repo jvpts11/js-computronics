@@ -219,8 +219,10 @@ public final class FusionReactorIgnitionGameTests {
                     helper.assertTrue(ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(NORTH_PORT), Direction.NORTH).isPresent(),
                             "the reactor port must expose a chemical port on its outer face");
                 })
-                // The physical chain: the Laser (fed FE on its back) fires into the amplifier, which fires
-                // into the matrix; the plasma must warm up from the ambient 300 K.
+                /*
+                 * The physical chain: the Laser (fed FE on its back) fires into the amplifier, which fires
+                 * into the matrix; the plasma must warm up from the ambient 300 K.
+                 */
                 .thenExecuteAfter(SETTLE, () -> plasmaBefore[0] = number(multiblock(helper.getBlockEntity(CONTROLLER)), "getPlasmaTemp"))
                 .thenWaitUntil(() -> {
                     final IEnergyStorage fe = helper.getLevel().getCapability(Capabilities.EnergyStorage.BLOCK, helper.absolutePos(LASER), Direction.NORTH);
@@ -229,8 +231,10 @@ public final class FusionReactorIgnitionGameTests {
                     helper.assertTrue(number(data, "getPlasmaTemp") > plasmaBefore[0] + 1000.0,
                             "the laser chain must heat the plasma; plasma=" + number(data, "getPlasmaTemp") + " before=" + plasmaBefore[0]);
                 })
-                // Ignition needs about 1E10 J; a Laser gives 10 kJ per tick, so the rest of the shot goes in the
-                // way the amplifier's beam delivers it: through the matrix's laser-receptor capability.
+                /*
+                 * Ignition needs about 1E10 J; a Laser gives 10 kJ per tick, so the rest of the shot goes in the
+                 * way the amplifier's beam delivers it: through the matrix's laser-receptor capability.
+                 */
                 .thenWaitUntil(() -> {
                     final Object data = multiblock(helper.getBlockEntity(CONTROLLER));
                     if (!flag(data, "isBurning")) {
@@ -239,8 +243,10 @@ public final class FusionReactorIgnitionGameTests {
                     helper.assertTrue(flag(data, "isBurning"), "waiting for ignition: plasma=" + number(data, "getPlasmaTemp")
                             + " ignition=" + number(data, "getIgnitionTemperature", false));
                 })
-                // Burning, the plasma eats whatever fuel the tank holds above ignition heat, so the network
-                // meters it in: two millibuckets a tick through the port, like an injection rate, for 40 ticks.
+                /*
+                 * Burning, the plasma eats whatever fuel the tank holds above ignition heat, so the network
+                 * meters it in: two millibuckets a tick through the port, like an injection rate, for 40 ticks.
+                 */
                 .thenWaitUntil(() -> {
                     final Object data = multiblock(helper.getBlockEntity(CONTROLLER));
                     helper.assertTrue(flag(data, "isBurning"), "the reactor must keep burning on metered network fuel; tick " + sustained[0]

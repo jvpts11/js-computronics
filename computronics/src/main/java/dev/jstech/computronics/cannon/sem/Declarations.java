@@ -146,8 +146,10 @@ public final class Declarations {
         }
     }
 
-    // A field, a property and an event share one set of names, because they are all read the same
-    // way at a use site. Methods are left out of this: telling them apart by parameters is the point.
+    /*
+     * A field, a property and an event share one set of names, because they are all read the same
+     * way at a use site. Methods are left out of this: telling them apart by parameters is the point.
+     */
     private void addUnique(final NamedType type, final IMemberSymbol member, final INode declaration) {
         for (final IMemberSymbol existing : type.members()) {
             if (!(existing instanceof IMemberSymbol.MethodSymbol) && existing.name().equals(member.name())) {

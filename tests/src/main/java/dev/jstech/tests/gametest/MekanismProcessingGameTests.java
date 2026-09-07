@@ -203,9 +203,11 @@ public final class MekanismProcessingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 600)
     public static void chemicalInfuser_makesFusionFuelFromDeuteriumAndTritiumData(final GameTestHelper helper) {
-        // The reactor's fuel as data: deuterium and tritium held by the network go into the Chemical Infuser
-        // through one bus on each side face (the machine takes a different input on each), and the D-T fuel
-        // comes back through the bus on its front.
+        /*
+         * The reactor's fuel as data: deuterium and tritium held by the network go into the Chemical Infuser
+         * through one bus on each side face (the machine takes a different input on each), and the D-T fuel
+         * comes back through the bus on its front.
+         */
         final MekanismRig.Rig rig = MekanismRig.build(helper, MekanismRig.mek("chemical_infuser"));
         final StorageKey deuterium = StorageKey.chemical(MekanismRig.generators("deuterium"));
         final StorageKey tritium = StorageKey.chemical(MekanismRig.generators("tritium"));

@@ -53,8 +53,10 @@ class BlockMatcherTest {
 
     @Test
     void anyOf_isolatesItselfFromCallerMutations() {
-        // If the caller mutates their set after creating the matcher,
-        // the matcher's behavior must not change.
+        /*
+         * If the caller mutates their set after creating the matcher,
+         * the matcher's behavior must not change.
+         */
         var mutable = new HashSet<>(Set.of("jsc:a", "jsc:b"));
         var m = IBlockMatcher.anyOf(mutable);
         mutable.add("jsc:c");

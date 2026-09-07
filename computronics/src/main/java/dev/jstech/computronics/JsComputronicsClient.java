@@ -20,8 +20,10 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 public class JsComputronicsClient {
 
     public JsComputronicsClient(ModContainer container) {
-        // Allow NeoForge to render a generic config screen for this mod.
-        // Accessed via the Mods menu > J's Computronics > Config.
+        /*
+         * Allow NeoForge to render a generic config screen for this mod.
+         * Accessed via the Mods menu > J's Computronics > Config.
+         */
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
 }

@@ -10,7 +10,7 @@ package dev.jstech.core.client.gui.theme;
 /**
  * The full ARGB color palette of one GUI skin. Every color {@code JsTechTheme} historically exposed as a
  * {@code public static final int} constant lives here as a field, so a palette is a complete, self-contained
- * description of how a computing screen is painted. Pure data — no Minecraft types — so it can be selected and
+ * description of how a computing screen is painted. Pure data (no Minecraft types), so it can be selected and
  * compared without a running client.
  *
  * @param outer    the 1px border drawn just outside the window

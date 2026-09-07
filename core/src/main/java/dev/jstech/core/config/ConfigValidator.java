@@ -49,9 +49,11 @@ public final class ConfigValidator {
 
         final T typedValue = (T) rawValue;
 
-        // Rule 3: value not in the string whitelist -> Rejected (default substituted).
-        // There is no "nearest valid" string to clamp to, so the safe house rule is to fall back to the
-        // default, which the key guarantees is itself whitelisted.
+        /*
+         * Rule 3: value not in the string whitelist -> Rejected (default substituted).
+         * There is no "nearest valid" string to clamp to, so the safe house rule is to fall back to the
+         * default, which the key guarantees is itself whitelisted.
+         */
         if (key.whitelist().isPresent() && !key.whitelist().get().contains(typedValue)) {
             final String reason = "value '" + typedValue + "' for key '"
                     + key.dottedPath() + "' is not one of " + key.whitelist().get()

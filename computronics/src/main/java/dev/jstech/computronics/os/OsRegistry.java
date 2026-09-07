@@ -32,9 +32,7 @@ public final class OsRegistry {
 
     private OsRegistry() {}
 
-    // -------------------------------------------------------------------------
     // Registration (called by JSComputronicsAPI)
-    // -------------------------------------------------------------------------
 
     static void registerKernel(KernelDef def) {
         KERNELS.put(def.id(), def);
@@ -62,9 +60,7 @@ public final class OsRegistry {
         return Collections.unmodifiableCollection(DESKTOPS.values());
     }
 
-    // -------------------------------------------------------------------------
     // Lookup
-    // -------------------------------------------------------------------------
 
     /**
      * Returns the {@link KernelDef} registered under {@code id}, or {@code null} if absent.
@@ -111,8 +107,10 @@ public final class OsRegistry {
         if (os == null) {
             return false;
         }
-        // The version rank gate only bites WITHIN the Frames family (ranks 1/2/3); a non-Frames OS (rank 0)
-        // is decided by the platform gate alone, so a headless service still runs on an MC-DOS Mainframe.
+        /*
+         * The version rank gate only bites WITHIN the Frames family (ranks 1/2/3); a non-Frames OS (rank 0)
+         * is decided by the platform gate alone, so a headless service still runs on an MC-DOS Mainframe.
+         */
         final int rank = osVersionRank(osId);
         return (rank == 0 || rank >= prog.minOsRank())
                 && OsGating.canRunProgram(os.platform(), prog.platforms(), cpuMhz, vramMb,
@@ -163,9 +161,7 @@ public final class OsRegistry {
                 prog.minCpuMhz(), prog.minVramMb(), prog.minDiskMb());
     }
 
-    // -------------------------------------------------------------------------
     // Listing
-    // -------------------------------------------------------------------------
 
     /** Returns an unmodifiable view of all registered kernels. */
     public static Collection<KernelDef> kernels() {

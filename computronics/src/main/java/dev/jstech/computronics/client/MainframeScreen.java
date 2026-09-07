@@ -60,8 +60,10 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
         // Hardware cells, only up to the count the installed board exposes.
         JsTechTheme.slot(g, x + 8, y + 40);   // motherboard
         JsTechTheme.slot(g, x + 8, y + 73);   // psu
-        // The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
-        // screen draws exactly what the menu exposes — one source of truth, no duplicated cap literal.
+        /*
+         * The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
+         * screen draws exactly what the menu exposes, one source of truth, no duplicated cap literal.
+         */
         final int cpu = menu.boardCpuSlots();
         final int ram = menu.boardRamSlots();
         final int gpu = menu.boardPcieSlots();
@@ -127,7 +129,7 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
         JsTechTheme.text(g, font, status, pillX, 11, statusColor);
         g.fill(pillX - 6, 11, pillX - 2, 15, statusColor);
 
-        // Hardware group labels (no counters — the drawn cells show installed vs available).
+        // Hardware group labels (no counters, the drawn cells show installed vs available).
         JsTechTheme.text(g, font, "BOARD", 8, 27, menu.hasBoard() ? JsTechTheme.accent() : JsTechTheme.dim());
         JsTechTheme.text(g, font, "CPU", 44, 27, JsTechTheme.dim());
         JsTechTheme.text(g, font, "PSU", 8, 60, JsTechTheme.dim());
@@ -149,7 +151,7 @@ public class MainframeScreen extends AbstractComputerScreen<MainframeMenu> {
                 : net == MainframeBlockEntity.NET_STATE_LINKED ? JsTechTheme.green() : JsTechTheme.dim();
         JsTechTheme.textRight(g, font, netStr, COL_R + COL_R_W, 96, netColor);
 
-        // Operations dispatch — one row per metric (label left, value right).
+        // Operations dispatch: one row per metric (label left, value right).
         final int running = menu.runningOps();
         opRow(g, "QUEUED", String.valueOf(menu.pendingOps()), 113, JsTechTheme.text());
         opRow(g, "RUNNING", String.valueOf(running), 124, running > 0 ? JsTechTheme.green() : JsTechTheme.text());

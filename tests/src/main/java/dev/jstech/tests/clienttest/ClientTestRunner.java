@@ -123,9 +123,11 @@ public final class ClientTestRunner {
     }
 
     private void boot(final Minecraft mc) {
-        // A shard's game directory is fresh, so the game would show the accessibility onboarding screen and
-        // would pause whenever its window loses focus — and several shard windows run side by side, so at
-        // most one of them is ever focused. Both are settled before anything else happens.
+        /*
+         * A shard's game directory is fresh, so the game would show the accessibility onboarding screen and
+         * would pause whenever its window loses focus, and several shard windows run side by side, so at
+         * most one of them is ever focused. Both are settled before anything else happens.
+         */
         if (mc.options.pauseOnLostFocus || mc.options.onboardAccessibility) {
             mc.options.pauseOnLostFocus = false;
             mc.options.onboardAccessibility = false;
@@ -195,8 +197,10 @@ public final class ClientTestRunner {
     }
 
     private void prepare(final Minecraft mc) {
-        // Screens must not pause when a shard window loses focus (several shards run side by side), and a
-        // fixed GUI scale keeps screen coordinates and screenshots identical from run to run.
+        /*
+         * Screens must not pause when a shard window loses focus (several shards run side by side), and a
+         * fixed GUI scale keeps screen coordinates and screenshots identical from run to run.
+         */
         mc.options.pauseOnLostFocus = false;
         mc.options.guiScale().set(GUI_SCALE);
         mc.resizeDisplay();
@@ -227,8 +231,10 @@ public final class ClientTestRunner {
             return;
         }
         current = tests.get(nextTest++);
-        // Areas are laid out along x by the test's index in the whole suite; y is chosen so the GameTest
-        // convention (relative y = 2 stands on the ground) holds here too.
+        /*
+         * Areas are laid out along x by the test's index in the whole suite; y is chosen so the GameTest
+         * convention (relative y = 2 stands on the ground) holds here too.
+         */
         final BlockPos origin = new BlockPos(spawn.getX() + current.index() * AREA_SPACING, groundY - 2, spawn.getZ());
         context = new ClientTestContext(mc, current.name(), origin);
         final MinecraftServer server = mc.getSingleplayerServer();

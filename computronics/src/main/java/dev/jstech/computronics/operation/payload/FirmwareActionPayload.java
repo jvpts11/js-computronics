@@ -39,7 +39,7 @@ public record FirmwareActionPayload(BlockPos hostPos, BlockPos monitorPos, int a
     public static final int ACTION_FORMAT = 4;
     /**
      * Set the storage controller's array mode to the {@code ref}-th mode. Configuring an array from
-     * the firmware — not from inside a running system — is how a real controller works, and it means
+     * the firmware (not from inside a running system) is how a real controller works, and it means
      * a machine with no OS can still have its storage set up.
      */
     public static final int ACTION_RAID_MODE = 5;

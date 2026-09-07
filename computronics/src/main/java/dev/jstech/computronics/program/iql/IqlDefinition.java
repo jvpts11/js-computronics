@@ -13,7 +13,7 @@ package dev.jstech.computronics.program.iql;
  * names an object the IQL Engine stores and later runs. Pure logic, no Minecraft.
  *
  * <p>{@code body} is the raw text after {@code AS} (a query for a view, a {@code { ... }} block for a
- * procedure, a statement or procedure name for a job) — kept verbatim and re-parsed when the object runs,
+ * procedure, a statement or procedure name for a job), kept verbatim and re-parsed when the object runs,
  * so the catalog persists exactly what the player wrote. {@code triggerKind}/{@code triggerSpec} carry a
  * job's {@code EVERY <duration>} or {@code WHEN <condition>}; both are empty/NONE for views and procedures.
  */

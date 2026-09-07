@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * The Operation system — SQL-like requests dispatched across the network (SELECT, INSERT, DELETE, CRAFT, VACUUM, etc.) and the OperationType registry used to declare new operation kinds.
+ * The Operation system: SQL-like requests dispatched across the network (SELECT, INSERT, DELETE, CRAFT, VACUUM, etc.) and the OperationType registry used to declare new operation kinds.
  */
 package dev.jstech.core.operation;

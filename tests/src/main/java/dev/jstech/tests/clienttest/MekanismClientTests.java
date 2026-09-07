@@ -35,8 +35,8 @@ import java.util.List;
 
 /**
  * The Mekanism build as the player drives it: with the alloy machine patterns and the frame recipe in the Recipe
- * ROM, one request — from the Network Interactor's Crafting tab on the Frames desktop, or typed at the MC-DOS
- * Command Prompt — must plan the whole tree, run the infuser three times over through its buses and finish on
+ * ROM, one request (from the Network Interactor's Crafting tab on the Frames desktop, or typed at the MC-DOS
+ * Command Prompt) must plan the whole tree, run the infuser three times over through its buses and finish on
  * the bench with Fusion Reactor Frames.
  */
 public final class MekanismClientTests {
@@ -58,7 +58,7 @@ public final class MekanismClientTests {
     private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath("jsc", "mc_dos");
     /**
      * The chain runs through an Ultimate Infusing Factory rather than a bare Metallurgic Infuser. It is the
-     * same machine to the mod — one declared type behind buses — but it works nine operations at a time, so
+     * same machine to the mod (one declared type behind buses) but it works nine operations at a time, so
      * the twelve infusions this build needs take a fraction of the ticks. The bare infuser stays covered by
      * the machine GameTests, which leaves both a raw machine and a factory under test.
      */
@@ -126,8 +126,10 @@ public final class MekanismClientTests {
                     net.cc().togglePower();
                     net.cc().togglePower();
                     world.placeMonitor(MONITOR, Direction.EAST);
-                    // Raw stock sized for exactly one bench run of frames, straight into the server's store
-                    // (the network itself only forms over the next ticks).
+                    /*
+                     * Raw stock sized for exactly one bench run of frames, straight into the server's store
+                     * (the network itself only forms over the next ticks).
+                     */
                     net.seed(Items.COPPER_INGOT, 4);
                     net.seed(Items.REDSTONE, 4);
                     net.seed(MekanismRig.item(DUST_DIAMOND), 8);
@@ -229,8 +231,10 @@ public final class MekanismClientTests {
 
     @ClientTest(timeoutTicks = 6000)
     public static void commandPrompt_craftRequestPlansTheAlloyChainThroughTheInfuser(final ClientTestContext ctx) {
-        // The terminal-only route: MC-DOS on the Crafting Computer, the Command Prompt on its monitor, and
-        // "operation craft" typed by the player must reach the same planner and drive the same machine steps.
+        /*
+         * The terminal-only route: MC-DOS on the Crafting Computer, the Command Prompt on its monitor, and
+         * "operation craft" typed by the player must reach the same planner and drive the same machine steps.
+         */
         ctx.thenBuild(0, world -> {
                     final TestWorldBuilder.CraftingNetwork net = MekanismRig.place(world, INFUSER);
                     TestWorldBuilder.installDesktop(net.cc(), MC_DOS);

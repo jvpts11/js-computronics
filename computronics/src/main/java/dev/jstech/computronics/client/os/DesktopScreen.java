@@ -70,10 +70,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private final List<Launcher> launchers = new ArrayList<>();
     private final List<String> installedPrograms = new ArrayList<>();
 
-    // --- Per-OS memory model: the system, its desktop and its services hold their share of the machine's RAM
-    // (reserved, from the server) and every open program holds its own, weighed under the running system by the
-    // same rule the server applies. A cooperative kernel (Frames 95) is fragile and crashes when overloaded; a
-    // preemptive one (XP/11) just refuses. ---
+    /*
+     * Per-OS memory model: the system, its desktop and its services hold their share of the machine's RAM
+     * (reserved, from the server) and every open program holds its own, weighed under the running system by the
+     * same rule the server applies. A cooperative kernel (Frames 95) is fragile and crashes when overloaded; a
+     * preemptive one (XP/11) just refuses.
+     */
     private int ramTotalMb;
     private int ramReservedMb;
     /** True while the cooperative OS is showing its crash screen; the desktop reboots to an empty session after. */
@@ -87,8 +89,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private static final int MAX_SAVED_DESKTOPS = 16;
 
-    // The live app instances kept per computer while its Monitor is left, so re-entering restores each
-    // program's in-progress session (terminal scrollback, an unsaved query) instead of a fresh window.
+    /*
+     * The live app instances kept per computer while its Monitor is left, so re-entering restores each
+     * program's in-progress session (terminal scrollback, an unsaved query) instead of a fresh window.
+     */
     private static final java.util.Map<BlockPos, java.util.Map<String, IDesktopApp>> SAVED_APPS =
             new java.util.LinkedHashMap<>(16, 0.75f, true) {
                 @Override
@@ -185,8 +189,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Rebuilds the skin from the current accent + dark-mode prefs (dark applies only to the flat Frames 11). */
     private void rebuildSkin() {
-        // The host's era picks the desktop's period look: a Linux desktop on Legacy hardware wears
-        // its own era, instead of a modern flat theme on a machine from another decade.
+        /*
+         * The host's era picks the desktop's period look: a Linux desktop on Legacy hardware wears
+         * its own era, instead of a modern flat theme on a machine from another decade.
+         */
         OsSkin base = OsSkin.forDesktop(desktopId, era());
         if (desktopDarkMode) {
             base = base.darkVariant();
@@ -303,11 +309,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private int panelCtxY;
     private int deskCtxItem = -1; // index into desktopItems, or -1 for the empty background
 
-    // Drag-and-drop of a desktop icon (a file/folder, or a program launcher) — onto a folder, an open
-    // explorer, or a free grid cell.
-    // Rubber-band selection: dragging on empty wallpaper sweeps a rectangle and selects every icon
-    // it touches. Every desktop does this, and without it there was no way to act on more than one
-    // icon at a time.
+    /*
+     * Drag-and-drop of a desktop icon (a file/folder, or a program launcher), onto a folder, an open
+     * explorer, or a free grid cell.
+     * Rubber-band selection: dragging on empty wallpaper sweeps a rectangle and selects every icon
+     * it touches. Every desktop does this, and without it there was no way to act on more than one
+     * icon at a time.
+     */
     private boolean bandActive;
     private double bandStartX;
     private double bandStartY;
@@ -358,9 +366,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     private static final int TASKBAR_H = 24;
 
-    // The work area (icons, windows, drops) is the desktop minus its panel. Every panel style but GNOME puts
-    // the panel at the bottom; GNOME's top bar reserves the top TASKBAR_H pixels instead, so icons start and
-    // windows clamp/maximize below it rather than sliding under it.
+    /*
+     * The work area (icons, windows, drops) is the desktop minus its panel. Every panel style but GNOME puts
+     * the panel at the bottom; GNOME's top bar reserves the top TASKBAR_H pixels instead, so icons start and
+     * windows clamp/maximize below it rather than sliding under it.
+     */
 
     /**
      * Whether this desktop wears its period chrome. Derived from the skin's form, which the era already
@@ -423,8 +433,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** How many of the left column's entries are drawn as pinned (bold) at its top. */
     private static final int XP_PINNED = 2;
     private static final int XP_ALL_ROW_H = 15;
-    // Frames 11 Start: a compact floating panel with a search box, a pinned-app grid, and a footer power button.
-    // Kept small (5 columns, tight tiles) so even a Mainframe's full app set fits above the taskbar.
+    /*
+     * Frames 11 Start: a compact floating panel with a search box, a pinned-app grid, and a footer power button.
+     * Kept small (5 columns, tight tiles) so even a Mainframe's full app set fits above the taskbar.
+     */
     private static final int W11_MENU_W = 172;
     private static final int W11_COLS = 5;
     private static final int W11_TILE_W = 32;
@@ -447,8 +459,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int GN_COLS = 6;
     private static final int GN_TILE_W = 40;
     private static final int GN_TILE_H = 34;
-    // Desktop icons sit on a grid wide enough for a name on two lines. The old pitch was narrower than the
-    // labels it drew, so "Command Prompt" ran across its neighbour and both names read as one word.
+    /*
+     * Desktop icons sit on a grid wide enough for a name on two lines. The old pitch was narrower than the
+     * labels it drew, so "Command Prompt" ran across its neighbour and both names read as one word.
+     */
     private static final int ICON_PITCH_Y = 44;
     private static final int ICON_PITCH_X = 50;
     /** The width of the Frames XP Start pill, which the task buttons and its own hit-test both clear. */
@@ -481,8 +495,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int PANEL_CTX_W = 104;
 
     /** A desktop/start-menu entry that opens an app when clicked. */
-    // A launcher either opens a built-in app window (factory) or runs a custom action (e.g. open the
-    // NMS, which is a server-side menu rather than a desktop window). Exactly one is non-null.
+    /*
+     * A launcher either opens a built-in app window (factory) or runs a custom action (e.g. open the
+     * NMS, which is a server-side menu rather than a desktop window). Exactly one is non-null.
+     */
     /** A desktop launcher: its display label, the program id (icon + identity), and the window factory. */
     /**
      * One thing on the desktop that can be started.
@@ -591,8 +607,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             crashing = true;
             crashUntil = System.currentTimeMillis() + 4200;
         } else {
-            // A refusal the machine can simply report: the desktop is still there, so a balloon says it the
-            // way the notification area always did, instead of taking the screen over with a dialog.
+            /*
+             * A refusal the machine can simply report: the desktop is still there, so a balloon says it the
+             * way the notification area always did, instead of taking the screen over with a dialog.
+             */
             showBalloon("Low on memory", "This computer is running out of RAM for programs. " + key
                     + " needs " + need + " MB and only " + Math.max(0, free) + " MB are free.");
         }
@@ -632,8 +650,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
     }
 
-    // The on-screen monitor "screen" rectangle: a centred window, not the whole game viewport. The extra slack
-    // (vs the raw viewport) leaves room for the monitor frame drawn around the glass and its chin below it.
+    /*
+     * The on-screen monitor "screen" rectangle: a centred window, not the whole game viewport. The extra slack
+     * (vs the raw viewport) leaves room for the monitor frame drawn around the glass and its chin below it.
+     */
     private int sw() {
         return Math.min(width - 44, 384);
     }
@@ -650,7 +670,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return (height - sh()) / 2;
     }
 
-    // --- inspection (client tests drive the desktop through the same hit areas the player clicks) ---
+    // inspection (client tests drive the desktop through the same hit areas the player clicks)
 
     public boolean isStartOpen() {
         return startOpen;
@@ -826,9 +846,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     @Override
     protected void init() {
-        // Size the container's image rect to the on-screen monitor glass, so leftPos/topPos centre exactly
-        // where ox()/oy() place the desktop. The inventory/title labels the base would draw are pushed
-        // off-screen — the desktop draws its own chrome.
+        /*
+         * Size the container's image rect to the on-screen monitor glass, so leftPos/topPos centre exactly
+         * where ox()/oy() place the desktop. The inventory/title labels the base would draw are pushed
+         * off-screen, since the desktop draws its own chrome.
+         */
         this.imageWidth = sw();
         this.imageHeight = sh();
         super.init();
@@ -837,18 +859,22 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         this.titleLabelX = -10000;
         this.inventoryLabelY = -10000;
 
-        // Resolve the era skin before the first frame. The panel's placement now follows the skin (a
-        // period desktop panels at the bottom), so waiting for the desktop payload to arrive would draw
-        // one frame with the panel on the wrong edge and then jump.
+        /*
+         * Resolve the era skin before the first frame. The panel's placement now follows the skin (a
+         * period desktop panels at the bottom), so waiting for the desktop payload to arrive would draw
+         * one frame with the panel on the wrong edge and then jump.
+         */
         rebuildSkin();
 
         buildLaunchers();
 
-        // Restore the windows that were open when this computer's Monitor was last left.
-        // The open windows are the machine's, not this client's: they arrive from the server with the
-        // desktop listing requested below, and are restored in applyWindows. The app instances kept per
-        // computer (SAVED_APPS) are only the programs' insides — scrollback, an unsaved query — and are
-        // reattached to the restored windows when they are still around.
+        /*
+         * Restore the windows that were open when this computer's Monitor was last left.
+         * The open windows are the machine's, not this client's: they arrive from the server with the
+         * desktop listing requested below, and are restored in applyWindows. The app instances kept per
+         * computer (SAVED_APPS) are only the programs' insides (scrollback, an unsaved query) and are
+         * reattached to the restored windows when they are still around.
+         */
 
         // Become the active desktop and fetch the desktop-folder listing for the background icons.
         active = this;
@@ -884,8 +910,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 app.onRestored(); // a kept instance re-asks the server for what may have changed meanwhile
             }
             final DesktopWindow w = new DesktopWindow(app, ow.key(), ow.x(), ow.y(), ow.w(), ow.h());
-            // Clamp into the current work area: the monitor may be a different size from the one the
-            // layout was left on, and a title bar off-screen is a window nobody can reach.
+            /*
+             * Clamp into the current work area: the monitor may be a different size from the one the
+             * layout was left on, and a title bar off-screen is a window nobody can reach.
+             */
             w.moveTo(ow.x(), ow.y(), screen.workTop(), screen.sw(), screen.workBottom());
             w.setMinimized(ow.minimized());
             w.setMaximized(ow.maximized());
@@ -901,8 +929,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /**
      * Tells the machine which programs it has open, whenever that changes. Without this the machine only
-     * learned its layout when the desktop closed, so anything reading its memory ledger — the Task Manager
-     * above all — saw a computer running nothing while the player had five windows in front of them.
+     * learned its layout when the desktop closed, so anything reading its memory ledger (the Task Manager
+     * above all) saw a computer running nothing while the player had five windows in front of them.
      */
     private void pushWindowsIfChanged() {
         if (!windowsRestored || powerCycling) {
@@ -987,10 +1015,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             launchers.add(new Launcher(launcherLabel(spec), spec.id(),
                     () -> factory.create(host, monitorPos, desktopId)));
         }
-        // Then whatever the player installed from the Mirror. These are not the mod's programs and have
-        // no window of their own: starting one gets it a terminal, exactly as opening it in the file
-        // explorer would. The icon id is one the artwork can grow into; until it does they wear the
-        // generic one, which is what ProgramIcons falls back to.
+        /*
+         * Then whatever the player installed from the Mirror. These are not the mod's programs and have
+         * no window of their own: starting one gets it a terminal, exactly as opening it in the file
+         * explorer would. The icon id is one the artwork can grow into; until it does they wear the
+         * generic one, which is what ProgramIcons falls back to.
+         */
         for (final CommunityLauncher one : communityPrograms) {
             launchers.add(new Launcher(one.name(),
                     net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
@@ -1087,8 +1117,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         for (final DesktopFilesPayload.WireIconCell cell : payload.iconCells()) {
             active.iconCells.put(cell.key(), cell.cell());
         }
-        // Refresh the installed-program launchers whenever the installed set changes, so ANY installable
-        // program (NMS, Minesweeper, Storage Insights, ...) gets its launcher the moment it is installed.
+        /*
+         * Refresh the installed-program launchers whenever the installed set changes, so ANY installable
+         * program (NMS, Minesweeper, Storage Insights, ...) gets its launcher the moment it is installed.
+         */
         final java.util.Set<String> before = new java.util.HashSet<>(active.installedPrograms);
         final List<CommunityLauncher> theirsBefore = List.copyOf(active.communityPrograms);
         active.installedPrograms.clear();
@@ -1115,12 +1147,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        // renderBackground already draws the vanilla blur + dim gradient once; a second identical fill
-        // would darken the world behind the desktop to near-black (the double-dim bug). One pass only.
+        /*
+         * renderBackground already draws the vanilla blur + dim gradient once; a second identical fill
+         * would darken the world behind the desktop to near-black (the double-dim bug). One pass only.
+         */
         renderBackground(g, mouseX, mouseY, partialTick);
-        // The desktop paints everything itself instead of running the container's render pass, so it posts the
-        // two container render events that pass would post: a recipe viewer draws its ingredient list beside the
-        // monitor from them (its plain screen-render hook skips container screens on purpose).
+        /*
+         * The desktop paints everything itself instead of running the container's render pass, so it posts the
+         * two container render events that pass would post: a recipe viewer draws its ingredient list beside the
+         * monitor from them (its plain screen-render hook skips container screens on purpose).
+         */
         NeoForge.EVENT_BUS.post(new ContainerScreenEvent.Render.Background(this, g, mouseX, mouseY));
         // Drain any cross-app open requests (e.g. Files asked to launch the Editor).
         if (!PENDING_OPEN.isEmpty()) {
@@ -1134,8 +1170,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     continue;
                 }
                 if (key.startsWith(RUN_AT_TERMINAL)) {
-                    // The Files window asked for a program to be run. It gets this desktop's terminal,
-                    // whatever this desktop calls it, and the command goes in as if it had been typed.
+                    /*
+                     * The Files window asked for a program to be run. It gets this desktop's terminal,
+                     * whatever this desktop calls it, and the command goes in as if it had been typed.
+                     */
                     final String terminal = terminalLabel();
                     final IDesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
                     if (shell != null && allowOpen(terminal)) {
@@ -1151,8 +1189,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             PENDING_OPEN.clear();
         }
-        // Drain any request to end a window (the Task Manager), newest first so ending a repeated program
-        // closes the one on top rather than the oldest copy of it.
+        /*
+         * Drain any request to end a window (the Task Manager), newest first so ending a repeated program
+         * closes the one on top rather than the oldest copy of it.
+         */
         if (!PENDING_CLOSE.isEmpty()) {
             for (final String key : PENDING_CLOSE) {
                 for (int i = windows.size() - 1; i >= 0; i--) {
@@ -1165,8 +1205,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             PENDING_CLOSE.clear();
         }
         pushWindowsIfChanged();
-        // Keep the inventory slots glued to the focused Network Interactor window this frame (per-frame, so a
-        // dragged window does not leave its slots a tick behind).
+        /*
+         * Keep the inventory slots glued to the focused Network Interactor window this frame (per-frame, so a
+         * dragged window does not leave its slots a tick behind).
+         */
         syncInventorySlots();
         final int sw = sw();
         final int sh = sh();
@@ -1179,8 +1221,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         this.hoverY = lmy;
         final HardwareEra eraNow = era();
 
-        // The host computer's hardware-era monitor frame wraps the desktop glass, then translate so the desktop
-        // draws in local (0,0)-(sw,sh) coordinates.
+        /*
+         * The host computer's hardware-era monitor frame wraps the desktop glass, then translate so the desktop
+         * draws in local (0,0)-(sw,sh) coordinates.
+         */
         MonitorFrame.renderBody(g, ox, oy, sw, sh, eraNow, font);
         g.pose().pushPose();
         g.pose().translate(ox, oy, 0);
@@ -1200,29 +1244,37 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
 
-        // Desktop icons: program launchers first, then the desktop folder's files and folders, laid
-        // out in columns (top-down, then left-to-right) like a Windows desktop. Each icon's cell comes
-        // from the free-positioning layout (a pinned cell, else the next auto-flow cell).
+        /*
+         * Desktop icons: program launchers first, then the desktop folder's files and folders, laid
+         * out in columns (top-down, then left-to-right) like a Windows desktop. Each icon's cell comes
+         * from the free-positioning layout (a pinned cell, else the next auto-flow cell).
+         */
         final int total = launchers.size() + desktopItems.size();
         final int perCol = iconsPerColumn(sh);
         final int[] slotCells = computeSlotCells(perCol);
         final int deskDropTarget = deskDragging ? iconSlotAt(deskDragX, deskDragY, perCol) : -1;
-        // The selected icon's full, wrapped label is drawn last (after every icon) so it sits on top of the
-        // icon below it instead of being clipped by it.
+        /*
+         * The selected icon's full, wrapped label is drawn last (after every icon) so it sits on top of the
+         * icon below it instead of being clipped by it.
+         */
         String selLabelText = null;
         int selLabelX = 0;
         int selLabelY = 0;
-        // Each desktop layer draws at its own strictly-increasing Z (DesktopZ): the depth buffer keeps a back
-        // layer behind a front one, so a back layer's batched text (an icon label) can never paint over a
-        // front layer (an open window). Flushing the text batch between layers does not work — g.flush() is a
-        // no-op outside a managed draw in 1.21.1 — which is why the icon-label-over-window bug kept returning.
+        /*
+         * Each desktop layer draws at its own strictly-increasing Z (DesktopZ): the depth buffer keeps a back
+         * layer behind a front one, so a back layer's batched text (an icon label) can never paint over a
+         * front layer (an open window). Flushing the text batch between layers does not work: g.flush() is a
+         * no-op outside a managed draw in 1.21.1, which is why the icon-label-over-window bug kept returning.
+         */
         g.pose().pushPose();
         g.pose().translate(0, 0, DesktopZ.ICONS);
         for (int i = 0; i < total; i++) {
             final int ix = iconXForCell(slotCells[i]);
             final int iy = iconYForCell(slotCells[i]);
-            // Icons draw at DesktopZ.ICONS and the Start menu at DesktopZ.MENU, so the menu covers them via the
-            // depth buffer — the icons behind it stay drawn (they must not vanish) and just sit under the panel.
+            /*
+             * Icons draw at DesktopZ.ICONS and the Start menu at DesktopZ.MENU, so the menu covers them via the
+             * depth buffer, so the icons behind it stay drawn (they must not vanish) and just sit under the panel.
+             */
             final int cellX = ix + CELL_DX;
             final int cellY = iy + CELL_DY;
             if (i == selectedIcon || selectedIcons.contains(i)) {
@@ -1232,8 +1284,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 // Hover feedback so the player sees which icon the cursor is over.
                 g.fill(cellX, cellY, cellX + CELL_W, cellY + CELL_H, 0x28FFFFFF);
             }
-            // Green drop-target outline on the folder under the cursor while dragging a real
-            // file/folder icon (a launcher has no file to move into a folder, so it lights none).
+            /*
+             * Green drop-target outline on the folder under the cursor while dragging a real
+             * file/folder icon (a launcher has no file to move into a folder, so it lights none).
+             */
             if (deskDragging && deskDragSlot >= launchers.size()
                     && i == deskDropTarget && i >= launchers.size() && i != deskDragSlot
                     && desktopItems.get(i - launchers.size()).directory()) {
@@ -1258,9 +1312,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 selLabelX = ix;
                 selLabelY = iy;
             } else {
-                // The name under the icon: centred, wrapped inside its own cell over at most two lines, and
-                // cut with an ellipsis past that. A name wider than the cell used to run across its neighbour,
-                // which is how "Network" and "Command Prompt" came to read as one word.
+                /*
+                 * The name under the icon: centred, wrapped inside its own cell over at most two lines, and
+                 * cut with an ellipsis past that. A name wider than the cell used to run across its neighbour,
+                 * which is how "Network" and "Command Prompt" came to read as one word.
+                 */
                 int ly = iy + 23;
                 final java.util.List<String> lines = wrapLabel(label, labelFontWidth());
                 for (int li = 0; li < lines.size() && li < LABEL_LINES; li++) {
@@ -1285,8 +1341,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         g.pose().popPose();
 
-        // Each window draws in a depth band of its own: an item is a model standing well in front of the pose
-        // it is drawn at, so windows sharing one depth painted their items over each other (see DesktopItems).
+        /*
+         * Each window draws in a depth band of its own: an item is a model standing well in front of the pose
+         * it is drawn at, so windows sharing one depth painted their items over each other (see DesktopItems).
+         */
         final DesktopWindow front = frontWindow();
         for (int i = 0; i < windows.size(); i++) {
             final DesktopWindow w = windows.get(i);
@@ -1300,8 +1358,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             g.pose().popPose();
         }
 
-        // Real container-slot items for the focused Network Interactor window's inventory zone, over the
-        // window the app already drew the slot backgrounds for.
+        /*
+         * Real container-slot items for the focused Network Interactor window's inventory zone, over the
+         * window the app already drew the slot backgrounds for.
+         */
         g.pose().pushPose();
         g.pose().translate(0, 0, DesktopZ.INVENTORY);
         renderInventoryItems(g, lmx, lmy, partialTick);
@@ -1322,7 +1382,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         } else if (linuxDesktop()) {
             renderLinuxPanel(g, tbY, sw, sh, lmx, lmy);
         } else {
-            // Taskbar background — 95 bevelled grey, XP Luna gradient.
+            // Taskbar background: 95 bevelled grey, XP Luna gradient.
             if (osp.equals("frames_xp")) {
                 g.fillGradient(0, tbY, sw, sh, 0xFF4A86D4, 0xFF1C4D9C);
                 g.fill(0, tbY, sw, tbY + 1, 0xFF8FBCEC);
@@ -1330,7 +1390,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(0, tbY, sw, sh, theme.taskbar());
                 g.fill(0, tbY, sw, tbY + 1, 0xFFFFFFFF);
             }
-            // Start button — distinct per Frames version, each with its own glyph.
+            // Start button: distinct per Frames version, each with its own glyph.
             if (osp.equals("frames_xp")) {
                 drawXpStart(g, tbY, sh);
             } else {
@@ -1353,12 +1413,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     break;
                 }
                 final DesktopWindow w = windows.get(i);
-                // The window in front reads as a pushed-in button, the way a taskbar has always said which
-                // program you are actually looking at.
+                /*
+                 * The window in front reads as a pushed-in button, the way a taskbar has always said which
+                 * program you are actually looking at.
+                 */
                 taskButton(g, bx, tbY + 3, btnW, TASKBAR_H - 6, osp, w == taskFront && !w.minimized());
                 ProgramIcons.draw(g, bx + 4, tbY + 6, 12, 12, programIdForLabel(w.appKey()), iconSet());
-                // No shadow: the taskbar button name sits on a solid button, where a shadow only muddies it
-                // (a dark blob behind the dark 95 text, a halo behind the light XP text).
+                /*
+                 * No shadow: the taskbar button name sits on a solid button, where a shadow only muddies it
+                 * (a dark blob behind the dark 95 text, a halo behind the light XP text).
+                 */
                 g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 20, tbY + 8,
                         theme.startText(), false);
             }
@@ -1414,8 +1478,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (deskDragging && deskDragSlot >= 0) {
             g.pose().pushPose();
             g.pose().translate(0, 0, DesktopZ.DRAG);
-            // While dragging an icon to a free spot (not onto a folder), outline the grid cell it would snap to.
-            // Suppressed over a folder (the green folder outline wins) or off the wallpaper, where the drop is a no-op.
+            /*
+             * While dragging an icon to a free spot (not onto a folder), outline the grid cell it would snap to.
+             * Suppressed over a folder (the green folder outline wins) or off the wallpaper, where the drop is a no-op.
+             */
             if (deskDropTarget < 0 && deskDragX < sw && deskDragY < tbY && overWallpaper(deskDragX, deskDragY)) {
                 final int cell = cellAt(deskDragX, deskDragY, perCol);
                 final int cx = iconXForCell(cell);
@@ -1427,8 +1493,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(gx, gy, gx + 1, gy + CELL_H, 0x804C84F0);
                 g.fill(gx + CELL_W - 1, gy, gx + CELL_W, gy + CELL_H, 0x804C84F0);
             }
-            // Drag ghost: a label trailing the cursor for the icon being moved.
-            // (the rubber band is drawn below, outside the icon-drag branch)
+            /*
+             * Drag ghost: a label trailing the cursor for the icon being moved.
+             * (the rubber band is drawn below, outside the icon-drag branch)
+             */
             if (deskDragSlot < total) {
                 final String label = deskDragSlot < launchers.size()
                         ? launchers.get(deskDragSlot).label()
@@ -1441,8 +1509,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             g.pose().popPose();
         }
 
-        // The rubber band, over the wallpaper and its icons: a translucent fill with a solid outline,
-        // the way every desktop draws one.
+        /*
+         * The rubber band, over the wallpaper and its icons: a translucent fill with a solid outline,
+         * the way every desktop draws one.
+         */
         if (bandActive) {
             final int[] r = bandRect();
             g.pose().pushPose();
@@ -1456,9 +1526,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
 
         g.disableScissor();
-        // Hover tooltips: drawn at the base pose because the vanilla tooltip renderer translates +400 itself,
-        // landing them at DesktopZ.TOOLTIP — above every window and the taskbar. The front window's app draws
-        // its own hover hints (network/storage cells); the inventory zone defers to the real slot's item tooltip.
+        /*
+         * Hover tooltips: drawn at the base pose because the vanilla tooltip renderer translates +400 itself,
+         * landing them at DesktopZ.TOOLTIP, above every window and the taskbar. The front window's app draws
+         * its own hover hints (network/storage cells); the inventory zone defers to the real slot's item tooltip.
+         */
         final DesktopWindow tooltipWin = frontWindow();
         if (tooltipWin != null) {
             tooltipWin.renderTooltip(g, font, lmx, lmy);
@@ -1482,8 +1554,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             g.pose().popPose();
         }
 
-        // A focused app's modal dialog renders here, above every item icon and window, so the dialog and its
-        // own dim cover and darken the icons instead of them piercing through at their blit depth.
+        /*
+         * A focused app's modal dialog renders here, above every item icon and window, so the dialog and its
+         * own dim cover and darken the icons instead of them piercing through at their blit depth.
+         */
         final DesktopWindow modalWin = frontWindow();
         if (modalWin != null && modalWin.app().modalActive()) {
             g.pose().pushPose();
@@ -1517,8 +1591,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         g.pose().popPose(); // close the (ox, oy) desktop-origin translate
 
-        // The container pass posts its foreground event with the pose at the gui origin and the depth test off,
-        // so a listener draws over the finished screen without fighting the desktop's layered depth.
+        /*
+         * The container pass posts its foreground event with the pose at the gui origin and the depth test off,
+         * so a listener draws over the finished screen without fighting the desktop's layered depth.
+         */
         RenderSystem.disableDepthTest();
         g.pose().pushPose();
         g.pose().translate(leftPos, topPos, 0);
@@ -1527,8 +1603,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         RenderSystem.enableDepthTest();
     }
 
-    // The desktop paints its whole surface in the render() override above and does not call super.render(), so
-    // the container's background pass is unused — the inventory items and cursor are drawn by render() instead.
+    /*
+     * The desktop paints its whole surface in the render() override above and does not call super.render(), so
+     * the container's background pass is unused, and the inventory items and cursor are drawn by render() instead.
+     */
     @Override
     protected void renderBg(final GuiGraphics g, final float partialTick, final int mouseX, final int mouseY) {
     }
@@ -1595,7 +1673,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * Resolves a dropped desktop icon at desktop-local point ({@code dx},{@code dy}). In priority order:
      * dropping onto an open Files explorer moves the file/folder into the folder that window shows; dropping
      * onto a desktop folder moves it inside; and dropping on the bare wallpaper pins the icon to that grid
-     * cell (free positioning) and persists the spot. {@code .dat} projections cannot be moved by hand — any
+     * cell (free positioning) and persists the spot. {@code .dat} projections cannot be moved by hand, and any
      * move attempt raises the locked-file dialog instead, leaving the item where it is. Launchers have no
      * underlying file, so for them only the pin-to-cell path applies.
      */
@@ -1642,8 +1720,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
 
-        // (3) Drop on the bare wallpaper: pin the icon to the grid cell under the cursor and persist it,
-        // unless that cell already holds another icon (so two icons never stack on the same spot).
+        /*
+         * (3) Drop on the bare wallpaper: pin the icon to the grid cell under the cursor and persist it,
+         * unless that cell already holds another icon (so two icons never stack on the same spot).
+         */
         if (dy >= workTop() && dy < workBottom() && overWallpaper(dx, dy)) {
             final int cell = cellAt(dx, dy, perCol);
             final int[] cells = computeSlotCells(perCol);
@@ -1674,7 +1754,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * Handles a file dragged out of the front Files explorer and released over the bare desktop or over a
      * different explorer window: it moves the file into the destination folder (the desktop folder, or the
      * other explorer's open folder). Returns {@code true} when it consumed the drop, so the origin explorer's
-     * own in-window drop logic is skipped. A {@code .dat} cannot be moved this way — it raises the locked
+     * own in-window drop logic is skipped. A {@code .dat} cannot be moved this way; it raises the locked
      * dialog instead. Returns {@code false} when the front window is not a dragging explorer or the drop
      * lands back inside the origin window (let the app handle it).
      */
@@ -2036,8 +2116,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     private int startMenuHeight() {
         if (periodPanel()) {
-            // A period launcher is a small program list, not a Plasma menu and not a full-screen
-            // overview: it is sized by its own contents, like the classic launcher it is.
+            /*
+             * A period launcher is a small program list, not a Plasma menu and not a full-screen
+             * overview: it is sized by its own contents, like the classic launcher it is.
+             */
             return Math.max(4, launchers.size()) * MENU_ITEM_H + 8;
         }
         switch (panel) {
@@ -2058,8 +2140,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             case "frames_xp" -> XP_HEADER_H + XP_ORANGE_H
                     + Math.max(xpLeftColumnH(), xpRightLaunchers().size() * XP_ROW_H)
                     + XP_FOOTER_H + 6;
-            // A pinned grid sized to the full app set (so the panel does not resize as the search filters it).
-            // Layout: 6 top pad + search + 5 + 9 (Pinned label) + rows + 5 + footer + 5 bottom pad.
+            /*
+             * A pinned grid sized to the full app set (so the panel does not resize as the search filters it).
+             * Layout: 6 top pad + search + 5 + 9 (Pinned label) + rows + 5 + footer + 5 bottom pad.
+             */
             case "frames_11" -> {
                 final int gridRows = Math.max(1, (launchers.size() + W11_COLS - 1) / W11_COLS);
                 yield 6 + W11_SEARCH_H + 5 + 9 + gridRows * W11_TILE_H + 5 + W11_FOOTER_H + 5;
@@ -2189,8 +2273,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
         final int iconY = tbY + (TASKBAR_H - WIN11_ICON) / 2;
 
-        // Start: follows the taskbar alignment (centered as the leftmost of the centered group, or left corner),
-        // with a hover highlight — the four-pane blue logo, no text.
+        /*
+         * Start: follows the taskbar alignment (centered as the leftmost of the centered group, or left corner),
+         * with a hover highlight, the four-pane blue logo, no text.
+         */
         final int startX = win11StartX(sw);
         if (lmx >= startX && lmx < startX + WIN11_SLOT && lmy >= tbY) {
             g.fill(startX, tbY + 2, startX + WIN11_SLOT, bottom - 2, 0x18FFFFFF);
@@ -2248,8 +2334,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int h = r[3];
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF000000);
         g.fill(x, y, x + w, y + h, 0xFFFFFFE1);
-        // The tail, pointing down at the notification area it came from: a bordered wedge, drawn as an
-        // outline first and the pale fill inset into it, so it carries the same 1px edge as the box.
+        /*
+         * The tail, pointing down at the notification area it came from: a bordered wedge, drawn as an
+         * outline first and the pale fill inset into it, so it carries the same 1px edge as the box.
+         */
         final int tail = x + w - 42;
         for (int i = 0; i < 7; i++) {
             g.fill(tail + i - 1, y + h + i, tail + 14 - i, y + h + i + 1, 0xFF000000);
@@ -2296,9 +2384,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return ramUsedMb() + "/" + ramTotalMb + " MB";
     }
 
-    // --- The notification area, the same on every panel: whether the machine is on a network, a speaker, a
-    // memory bar and the clock. It is deliberately narrow — a wordy meter here left no room for the task
-    // buttons — and the figures behind the bar are one hover away. ---
+    /*
+     * The notification area, the same on every panel: whether the machine is on a network, a speaker, a
+     * memory bar and the clock. It is deliberately narrow (a wordy meter here left no room for the task
+     * buttons) and the figures behind the bar are one hover away.
+     */
     /** The task strip: where it starts, the gap between buttons, and the width one may run to. */
     private static final int TASK_X = 64;
     private static final int TASK_GAP = 4;
@@ -2569,8 +2659,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private void renderStartMenu(final GuiGraphics g, final int tbY) {
         if (periodPanel()) {
-            // A period desktop had a plain vertical launcher, not a modern Plasma menu and certainly not
-            // the GNOME overview, which belongs to a shell released a decade later.
+            /*
+             * A period desktop had a plain vertical launcher, not a modern Plasma menu and certainly not
+             * the GNOME overview, which belongs to a shell released a decade later.
+             */
             renderStartMenuPeriod(g, tbY);
             return;
         }
@@ -2657,15 +2749,15 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Whether the open launcher has a live search box (Frames 11's Start, GNOME's Activities overview). */
     private boolean searchableStart() {
-        // The period launcher is a plain program list with no search field, so it is not searchable
-        // even though the modern GNOME shell it replaces is.
+        /*
+         * The period launcher is a plain program list with no search field, so it is not searchable
+         * even though the modern GNOME shell it replaces is.
+         */
         return is(dev.jstech.computronics.os.PanelStyle.FRAMES_11)
                 || (is(dev.jstech.computronics.os.PanelStyle.GNOME) && !periodPanel());
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Linux desktop environments: panels
-    // ---------------------------------------------------------------------------------------------
 
     /**
      * The KDE Plasma / Cinnamon bottom panel: a dark bar with the launcher button on the left, one task button
@@ -2716,7 +2808,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /**
      * The panel of a Legacy-era Unix desktop, at the bottom for both KDE and GNOME. It is drawn entirely
-     * out of the skin's own primitives — a raised launcher stud, raised task buttons, a sunken clock —
+     * out of the skin's own primitives (a raised launcher stud, raised task buttons, a sunken clock)
      * so the panel is made of the same relief the windows are, instead of the flat modern band.
      */
     private void renderPeriodPanel(final GuiGraphics g, final int tbY, final int sw, final int sh,
@@ -2729,9 +2821,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         skin.button(g, font, 4, tbY + 3, 54, TASKBAR_H - 6, kde ? "K  Apps" : "▲  Menu",
                 startHot, startOpen, false);
 
-        // Task buttons: pressed when that window is the one in front, exactly as a period panel showed it.
-        // The strip's origin and its shared-out width are the ones the taskbar click handler tests against,
-        // so the button a player sees and the button they hit are the same rectangle.
+        /*
+         * Task buttons: pressed when that window is the one in front, exactly as a period panel showed it.
+         * The strip's origin and its shared-out width are the ones the taskbar click handler tests against,
+         * so the button a player sees and the button they hit are the same rectangle.
+         */
         final int taskRight = taskStripRight(sw);
         final int btnW = taskButtonW(sw);
         final DesktopWindow front = frontWindow();
@@ -2749,8 +2843,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     tbY + 8 + (active ? 1 : 0), skin.text(), false);
         }
 
-        // A sunken well on the right: the period panels all recessed their status area rather than
-        // floating the text on the band.
+        /*
+         * A sunken well on the right: the period panels all recessed their status area rather than
+         * floating the text on the band.
+         */
         final int trayX = trayLeft(sw);
         skin.field(g, trayX, tbY + 4, sw - trayX - 3, TASKBAR_H - 8, false);
         drawTray(g, tbY, sw, skin.text());
@@ -2774,9 +2870,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         drawTrayStatus(g, sw - TRAY_PAD - trayStatusWidth(), 0, theme.startText());
     }
 
-    // ---------------------------------------------------------------------------------------------
     // Linux desktop environments: launchers
-    // ---------------------------------------------------------------------------------------------
 
     /** KDE Plasma's Kickoff: a dark two-pane launcher with a places column, an app list and a session footer. */
     private void renderStartMenuKde(final GuiGraphics g, final int tbY) {
@@ -3069,7 +3163,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return true;
     }
 
-    /** Frames XP: a two-column panel — programs on the left, system places on the right — with header/footer bands. */
+    /** Frames XP: a two-column panel (programs on the left, system places on the right) with header/footer bands. */
     private void renderStartMenuXp(final GuiGraphics g, final int tbY) {
         final int x = startMenuX();
         final int w = XP_MENU_W;
@@ -3297,11 +3391,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         startSearch.setLength(0);
     }
 
-    // ---- Power ------------------------------------------------------------------------------------
-    //
-    // Shutting down used to close the window and leave the machine running — the computer stayed on
-    // the network with everything still open. The three real choices now live in one dialog, and each
-    // one reaches the machine.
+    /*
+     * Power
+     *
+     * Shutting down used to close the window and leave the machine running, so the computer stayed on
+     * the network with everything still open. The three real choices now live in one dialog, and each
+     * one reaches the machine.
+     */
 
     private static final int POWER_W = 190;
     private static final int POWER_ROW_H = 20;
@@ -3316,7 +3412,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private int powerSurfaceW;
     private int powerSurfaceH;
 
-    // ---- Taskbar context menu ---------------------------------------------------------------------
+    // Taskbar context menu
 
     private static final int TASK_MENU_W = 118;
     private static final int TASK_MENU_ROW_H = 12;
@@ -3462,8 +3558,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int rowY = y + 18 + i * POWER_ROW_H;
             if (mouseX >= x + 4 && mouseX < x + POWER_W - 4
                     && mouseY >= rowY && mouseY < rowY + POWER_ROW_H - 2) {
-                // The machine is going down or restarting: the desktop closing after this must not
-                // hand its windows back to a machine whose session has just ended.
+                /*
+                 * The machine is going down or restarting: the desktop closing after this must not
+                 * hand its windows back to a machine whose session has just ended.
+                 */
                 powerCycling = true;
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new dev.jstech.computronics.operation.payload
@@ -3659,8 +3757,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (crashing) {
             return true; // the crash screen swallows input until the reboot completes
         }
-        // The power dialog is modal: it decides the fate of the whole machine, so nothing behind it
-        // takes the click. An open taskbar menu takes the next click the same way.
+        /*
+         * The power dialog is modal: it decides the fate of the whole machine, so nothing behind it
+         * takes the click. An open taskbar menu takes the next click the same way.
+         */
         if (clickPowerDialog(mouseXAbs, mouseYAbs) || clickTaskMenu(mouseXAbs, mouseYAbs)) {
             return true;
         }
@@ -3672,8 +3772,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             return true;
         }
-        // An app-level modal dialog isolates its window: route the click to it and to nothing behind it
-        // (inventory slots, other windows, the taskbar), just like the desktop popup above.
+        /*
+         * An app-level modal dialog isolates its window: route the click to it and to nothing behind it
+         * (inventory slots, other windows, the taskbar), just like the desktop popup above.
+         */
         if (focusModal()) {
             final DesktopWindow f = frontWindow();
             if (f != null) {
@@ -3690,8 +3792,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
 
-        // The panel's menu takes the next click wherever it lands: on an entry it runs it, anywhere else it
-        // just closes, which is what a menu does.
+        /*
+         * The panel's menu takes the next click wherever it lands: on an entry it runs it, anywhere else it
+         * just closes, which is what a menu does.
+         */
         if (panelCtxOpen) {
             final int entry = panelCtxItemAt(mouseX, mouseY);
             panelCtxOpen = false;
@@ -3701,9 +3805,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
 
-        // GNOME: the top bar's Activities corner toggles the overview; the rest of the bar is inert.
-        // Only while the bar IS at the top: a period GNOME panels at the bottom, and swallowing clicks
-        // along the top edge there ate the title bars of every window parked up there.
+        /*
+         * GNOME: the top bar's Activities corner toggles the overview; the rest of the bar is inert.
+         * Only while the bar IS at the top: a period GNOME panels at the bottom, and swallowing clicks
+         * along the top edge there ate the title bars of every window parked up there.
+         */
         if (topPanel() && mouseY < TASKBAR_H) {
             if (mouseX < 64) {
                 toggleStart();
@@ -3751,8 +3857,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int idx = taskIndexAt(mouseX, sw());
             final int bxStart = idx < 0 ? 0 : taskButtonX(idx, sw());
             if (idx >= 0) {
-                // Right-click opens the window's own menu, so a program can be closed without first
-                // going to it — the thing every taskbar does and this one did not.
+                /*
+                 * Right-click opens the window's own menu, so a program can be closed without first
+                 * going to it, the thing every taskbar does and this one did not.
+                 */
                 if (button == 1) {
                     taskMenuIndex = idx;
                     taskMenuX = bxStart;
@@ -3771,8 +3879,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 return true;
             }
         }
-        // A right-click on the panel itself, clear of Start and of the buttons, opens the panel's own menu,
-        // the way every one of these desktops offers it. The Task Manager is one entry on that menu.
+        /*
+         * A right-click on the panel itself, clear of Start and of the buttons, opens the panel's own menu,
+         * the way every one of these desktops offers it. The Task Manager is one entry on that menu.
+         */
         if (button == 1 && mouseY >= tbY) {
             openPanelMenu((int) mouseX, tbY);
             return true;
@@ -3785,8 +3895,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             final int titleBtn = w.buttonAt(mouseX, mouseY);
             if (titleBtn != 0) {
-                // Press the button now; the action fires on release over the same button, so the player
-                // sees the pushed-in feedback of a real click instead of the window reacting instantly.
+                /*
+                 * Press the button now; the action fires on release over the same button, so the player
+                 * sees the pushed-in feedback of a real click instead of the window reacting instantly.
+                 */
                 bringToFront(i);
                 w.setPressedButton(titleBtn);
                 pressedBtnWindow = w;
@@ -3808,15 +3920,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             if (w.bodyHit(mouseX, mouseY)) {
                 bringToFront(i);
-                // A click landing on an active inventory slot (only the front inventory-band window has them) is
-                // a real container click: let the vanilla container drive the cursor, drag, and shift-click.
+                /*
+                 * A click landing on an active inventory slot (only the front inventory-band window has them) is
+                 * a real container click: let the vanilla container drive the cursor, drag, and shift-click.
+                 */
                 if (w.app() instanceof IInventoryBandApp && !(w.app() instanceof NetworkInteractorApp)
                         && !w.app().modalActive() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
                     return super.mouseClicked(mouseXAbs, mouseYAbs, button);
                 }
                 if (w.app() instanceof NetworkInteractorApp ni) {
-                    // Shift-click an inventory slot inserts that whole stack into the network (Network tab) or
-                    // local storage (Local tab), like MC-NET — instead of the vanilla quick-move between slots.
+                    /*
+                     * Shift-click an inventory slot inserts that whole stack into the network (Network tab) or
+                     * local storage (Local tab), like MC-NET, instead of the vanilla quick-move between slots.
+                     */
                     if (!ni.hasPopup() && hasShiftDown()) {
                         final net.minecraft.world.inventory.Slot slot = slotUnderMouse(mouseXAbs, mouseYAbs);
                         final int target = ni.shiftInsertTarget();
@@ -3827,16 +3943,20 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                             return true;
                         }
                     }
-                    // While the request/storage dialog is open it is modal over the window — even over the
-                    // inventory band — so the app gets the click instead of the vanilla container.
+                    /*
+                     * While the request/storage dialog is open it is modal over the window (even over the
+                     * inventory band) so the app gets the click instead of the vanilla container.
+                     */
                     if (!ni.hasPopup() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
                         return super.mouseClicked(mouseXAbs, mouseYAbs, button);
                     }
-                    // A held stack dropped on the item grid goes to the network (Network tab) or local storage
-                    // (Storage tab) — the desktop owns the cursor, so it routes the handoff here. Left = the
-                    // whole stack as items; right = one, or what a held container holds; and a held empty
-                    // container right-clicked on a fluid or chemical entry fills from it, so the entry under
-                    // the cursor travels with a right-click.
+                    /*
+                     * A held stack dropped on the item grid goes to the network (Network tab) or local storage
+                     * (Storage tab): the desktop owns the cursor, so it routes the handoff here. Left = the
+                     * whole stack as items; right = one, or what a held container holds; and a held empty
+                     * container right-clicked on a fluid or chemical entry fills from it, so the entry under
+                     * the cursor travels with a right-click.
+                     */
                     if (!ni.hasPopup() && !menu.getCarried().isEmpty() && (button == 0 || button == 1)) {
                         final double lx = mouseX - (w.x() + 4);
                         final double ly = mouseY - (w.y() + 18);
@@ -3888,10 +4008,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final boolean dbl = selectedIcon == slot && now - iconClickAt < 300;
             selectedIcon = slot;
             iconClickAt = now;
-            // Arm a drag of any desktop icon — a program launcher as well as a file or folder — so all of
-            // them can be freely repositioned (the launcher drag only ever pins to a cell, never moves a file).
-            // The drag does not actually begin until the cursor leaves a small dead zone, so a plain click (or
-            // a double-click) never turns into an accidental reposition.
+            /*
+             * Arm a drag of any desktop icon (a program launcher as well as a file or folder) so all of
+             * them can be freely repositioned (the launcher drag only ever pins to a cell, never moves a file).
+             * The drag does not actually begin until the cursor leaves a small dead zone, so a plain click (or
+             * a double-click) never turns into an accidental reposition.
+             */
             deskDragSlot = slot;
             deskDragging = false;
             deskDragStartX = mouseX;
@@ -3904,8 +4026,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         selectedIcon = -1;
         selectedIcons.clear();
-        // A click on empty desktop while holding a stack would make the vanilla container throw the item to the
-        // world (no slot under the cursor). Swallow it so nothing is ever dropped by clicking the wallpaper.
+        /*
+         * A click on empty desktop while holding a stack would make the vanilla container throw the item to the
+         * world (no slot under the cursor). Swallow it so nothing is ever dropped by clicking the wallpaper.
+         */
         if (!menu.getCarried().isEmpty()) {
             return true;
         }
@@ -3953,8 +4077,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             updateBandSelection();
             return true;
         }
-        // No window drag/resize in progress. While the front Network Interactor holds a stack on the cursor,
-        // a drag is the vanilla "spread across slots" gesture — hand it to the container, not the app.
+        /*
+         * No window drag/resize in progress. While the front Network Interactor holds a stack on the cursor,
+         * a drag is the vanilla "spread across slots" gesture, so hand it to the container, not the app.
+         */
         final DesktopWindow w = frontWindow();
         if (w != null && w.app() instanceof IInventoryBandApp && !menu.getCarried().isEmpty()) {
             return super.mouseDragged(mouseXAbs, mouseYAbs, button, dx, dy);
@@ -3977,8 +4103,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             bandActive = false;
             return true;
         }
-        // A title-bar button was pressed on mousedown; fire its action only if released over the same
-        // button (dragging off it cancels). Either way, clear the pushed-in state.
+        /*
+         * A title-bar button was pressed on mousedown; fire its action only if released over the same
+         * button (dragging off it cancels). Either way, clear the pushed-in state.
+         */
         if (pressedBtnWindow != null) {
             final DesktopWindow pb = pressedBtnWindow;
             final int btn = pb.pressedButton();
@@ -4002,24 +4130,30 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final boolean wasDeskDrag = deskDragging;
         deskDragging = false;
         deskDragSlot = -1;
-        // A file dragged out of a Files explorer and dropped on the bare desktop moves it into the desktop
-        // folder. Handled here, before the app sees the release, so the explorer's own in-window drop logic
-        // does not also fire. Anything else (a drop staying inside the window, or onto a removable medium)
-        // falls through to the app below.
+        /*
+         * A file dragged out of a Files explorer and dropped on the bare desktop moves it into the desktop
+         * folder. Handled here, before the app sees the release, so the explorer's own in-window drop logic
+         * does not also fire. Anything else (a drop staying inside the window, or onto a removable medium)
+         * falls through to the app below.
+         */
         if (!wasDeskDrag && dragging == null && resizing == null
                 && handleExplorerDropToDesktop(mouseX - ox(), mouseY - oy())) {
             return super.mouseReleased(mouseX, mouseY, button);
         }
-        // Route the release to the front window's app (for content drag-and-drop) unless this was a
-        // desktop-icon drag, and only when no window move/resize is in progress.
+        /*
+         * Route the release to the front window's app (for content drag-and-drop) unless this was a
+         * desktop-icon drag, and only when no window move/resize is in progress.
+         */
         if (!wasDeskDrag && dragging == null && resizing == null) {
             final DesktopWindow w = frontWindow();
             if (w != null) {
                 w.app().mouseReleased(w, mouseX - ox(), mouseY - oy(), button);
             }
         }
-        // Frames 11 edge snapping: releasing a dragged window against a screen edge tiles it (top = maximize,
-        // left/right = that half). A modern-OS gesture the earlier editions do not have.
+        /*
+         * Frames 11 edge snapping: releasing a dragged window against a screen edge tiles it (top = maximize,
+         * left/right = that half). A modern-OS gesture the earlier editions do not have.
+         */
         if (dragging != null && (is(dev.jstech.computronics.os.PanelStyle.FRAMES_11) || linuxDesktop())) {
             final int lx = (int) (mouseX - ox());
             final int ly = (int) (mouseY - oy());
@@ -4087,8 +4221,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             return true;
         }
-        // While the Start menu is open it owns the keyboard: Escape closes it, and on Frames 11 the search box
-        // takes Backspace (edit) and Enter (launch the top result). This runs before ESC reaches the desktop.
+        /*
+         * While the Start menu is open it owns the keyboard: Escape closes it, and on Frames 11 the search box
+         * takes Backspace (edit) and Enter (launch the top result). This runs before ESC reaches the desktop.
+         */
         if (startOpen) {
             if (key == 256) { // Escape
                 closeStart();
@@ -4109,9 +4245,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     }
                     return true;
                 }
-                // Swallow every other key so the open search box owns the keyboard: this stops a background
-                // window from eating letters and stops the inventory key from closing the desktop. charTyped
-                // is a separate GLFW event, so typed characters still reach the search box below.
+                /*
+                 * Swallow every other key so the open search box owns the keyboard: this stops a background
+                 * window from eating letters and stops the inventory key from closing the desktop. charTyped
+                 * is a separate GLFW event, so typed characters still reach the search box below.
+                 */
                 return true;
             }
         }
@@ -4120,8 +4258,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (key != 256 && w != null && w.app().keyPressed(key, scanCode, modifiers)) {
             return true;
         }
-        // A container screen closes on the inventory key by default; the desktop must NOT, or pressing 'E'
-        // would dismiss the whole shell. Swallow that key here.
+        /*
+         * A container screen closes on the inventory key by default; the desktop must NOT, or pressing 'E'
+         * would dismiss the whole shell. Swallow that key here.
+         */
         if (key == Minecraft.getInstance().options.keyInventory.getKey().getValue()) {
             return true;
         }
@@ -4151,14 +4291,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return null;
     }
 
-    /** Whether the front (focused) window's app has a modal dialog open — the desktop then disables everything behind it. */
+    /** Whether the front (focused) window's app has a modal dialog open, in which case the desktop disables everything behind it. */
     private boolean focusModal() {
         final DesktopWindow f = frontWindow();
         return f != null && f.app().modalActive();
     }
 
     /**
-     * Whether a desktop-local point lands on the bare wallpaper — not over any open (non-minimized) window
+     * Whether a desktop-local point lands on the bare wallpaper, not over any open (non-minimized) window
      * body or title bar. Used so a free icon drop only snaps to a cell on the empty desktop, and so a
      * cross-window drag knows the cursor is on the desktop (not a window).
      */
@@ -4191,7 +4331,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     /**
-     * The front window only if it hosts a Network Interactor — the one window that shows the player's real
+     * The front window only if it hosts a Network Interactor, the one window that shows the player's real
      * inventory slots. Returns {@code null} when the front window is another app or the desktop is bare, which
      * is exactly when the inventory slots must go inert.
      */
@@ -4205,7 +4345,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * Repositions the menu's 36 inventory slots over the focused Network Interactor window's inventory zone and
      * toggles them active, once per tick before the next render. When no Network Interactor is in front the
      * slots are switched off (not rendered, not hit-tested), so the inventory only appears inside that window.
-     * The slot grid origin is kept relative to {@code leftPos}/{@code topPos} — the offset the container renders
+     * The slot grid origin is kept relative to {@code leftPos}/{@code topPos}, the offset the container renders
      * and hit-tests slots at (since {@code leftPos == ox()} and {@code topPos == oy()}, that origin is just the
      * window-local position of the first inventory cell).
      */
@@ -4220,7 +4360,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * toggles them active. Run from {@link #containerTick()} and again at the top of {@link #render} so the
      * slots track a dragged/resized window per frame, not just per tick. When no Network Interactor is in front
      * the slots go inert (not rendered, not hit-tested), so the inventory only shows inside that window. The
-     * grid origin is window-local — since {@code leftPos == ox()} and {@code topPos == oy()}, that is exactly
+     * grid origin is window-local, and since {@code leftPos == ox()} and {@code topPos == oy()}, that is exactly
      * the offset the container measures {@code slot.x}/{@code slot.y} from. The menu only rebuilds slots when
      * the origin actually changed, so this is cheap to call every frame.
      */
@@ -4230,31 +4370,39 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             menu.setSlotsActive(false);
             return;
         }
-        // Resolve the window's rectangle for this frame first, so slot positions never lag a frame behind a
-        // drag, resize, or maximize (curX/curY are otherwise only refreshed when the window itself renders).
+        /*
+         * Resolve the window's rectangle for this frame first, so slot positions never lag a frame behind a
+         * drag, resize, or maximize (curX/curY are otherwise only refreshed when the window itself renders).
+         */
         w.resolveGeometry(sw(), sh(), bottomReserve(), workTop());
-        // The focused Network Interactor is the one that should receive network snapshots and console output,
-        // so point the static routing at it whenever it is in front (matters when two windows are open).
+        /*
+         * The focused Network Interactor is the one that should receive network snapshots and console output,
+         * so point the static routing at it whenever it is in front (matters when two windows are open).
+         */
         app.markActive();
         menu.setSlotsActive(true);
-        // The window-local top-left of the first inventory cell: past the window border + title bar to the app
-        // content, then the app's own inventory-zone offset. The inventory is a fixed, framed band pinned just
-        // above the footer; its Y uses the window's live content height (not the app's cached field) so the
-        // cells line up with their backgrounds from the very first frame. The band is always fully visible — it
-        // never scrolls and is never clipped — so every one of the 36 slots is always live.
+        /*
+         * The window-local top-left of the first inventory cell: past the window border + title bar to the app
+         * content, then the app's own inventory-zone offset. The inventory is a fixed, framed band pinned just
+         * above the footer; its Y uses the window's live content height (not the app's cached field) so the
+         * cells line up with their backgrounds from the very first frame. The band is always fully visible (it
+         * never scrolls and is never clipped) so every one of the 36 slots is always live.
+         */
         final int contentHeight = w.height() - DesktopWindow.TITLE_H - 8;
         final int contentTop = w.y() + DesktopWindow.TITLE_H + 4;
         final int originX = w.x() + 4 + app.invCellContentX(0);
         final int originY = contentTop + app.invCellContentY(0, contentHeight);
-        // The band's screen-space bounds span the full slot grid, so every one of the 36 slot rows qualifies as
-        // visible — the inventory band never scrolls and is never clipped.
+        /*
+         * The band's screen-space bounds span the full slot grid, so every one of the 36 slot rows qualifies as
+         * visible, since the inventory band never scrolls and is never clipped.
+         */
         final int bandBottom = contentTop + app.invBandBottom(contentHeight);
         menu.layoutInventory(originX, originY, originY, bandBottom);
     }
 
     /**
      * Draws the items held in the active inventory slots, plus the hover highlight, inside the desktop's
-     * translated/scissored pass right after the windows — so the items sit over the front window's inventory
+     * translated/scissored pass right after the windows, so the items sit over the front window's inventory
      * zone. Records {@link #hoveredSlot} so the carried-item and tooltip passes can use it. Coordinates are
      * desktop-local (the caller has already translated by ox()/oy()), which equals slot.x/slot.y here.
      */
@@ -4263,12 +4411,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!menu.slotsActive()) {
             return;
         }
-        // A modal dialog in the focused app disables the inventory: still draw the items (the dialog's dim
-        // darkens them) but give no hover highlight and no click target.
+        /*
+         * A modal dialog in the focused app disables the inventory: still draw the items (the dialog's dim
+         * darkens them) but give no hover highlight and no click target.
+         */
         final boolean modal = focusModal();
-        // lmx/lmy and the slot coordinates are both desktop-local (already inside the ox/oy translate).
-        // Draw the items directly at the local slot coordinates: delegating to the inherited renderSlot would
-        // add leftPos/topPos a second time (leftPos==ox()), double-offsetting the icons from their backgrounds.
+        /*
+         * lmx/lmy and the slot coordinates are both desktop-local (already inside the ox/oy translate).
+         * Draw the items directly at the local slot coordinates: delegating to the inherited renderSlot would
+         * add leftPos/topPos a second time (leftPos==ox()), double-offsetting the icons from their backgrounds.
+         */
         for (final var slot : menu.slots) {
             if (!slot.isActive()) {
                 continue;
@@ -4318,8 +4470,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     private void openApp(final String key, final IDesktopApp app) {
-        // Open at the default size, clamped to the screen — but never below the app's minimum while the
-        // screen still has room for it, so the content opens laid out (not collapsed) on a small monitor.
+        /*
+         * Open at the default size, clamped to the screen, but never below the app's minimum while the
+         * screen still has room for it, so the content opens laid out (not collapsed) on a small monitor.
+         */
         final int top = workTop();
         final int workH = workBottom() - top;
         final int availW = sw() - 16;
@@ -4339,8 +4493,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 return l.factory().get();
             }
         }
-        // A program the desktop shows no launcher for (the Task Manager) still opens, and still comes back
-        // with the session, so it is looked up by the same label the panel calls it.
+        /*
+         * A program the desktop shows no launcher for (the Task Manager) still opens, and still comes back
+         * with the session, so it is looked up by the same label the panel calls it.
+         */
         final dev.jstech.computronics.os.ProgramSpec spec = chrome == null ? null : chrome.programFor(key);
         final ProgramClient.IDesktopAppFactory factory = spec == null ? null : ProgramClient.factory(spec.id());
         return factory == null ? null : factory.create(host, monitorPos, desktopId);
@@ -4444,17 +4600,21 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     @Override
     public void removed() {
-        // The layout goes to the machine: the windows the player leaves behind are what the machine
-        // has open, for whoever looks next and after the game is closed. Not when the desktop is closing
-        // because the machine is going down — that layout belongs to a session that just ended, and the
-        // server has already cleared it.
+        /*
+         * The layout goes to the machine: the windows the player leaves behind are what the machine
+         * has open, for whoever looks next and after the game is closed. Not when the desktop is closing
+         * because the machine is going down; that layout belongs to a session that just ended, and the
+         * server has already cleared it.
+         */
         if (!powerCycling) {
             PacketDistributor.sendToServer(
                     dev.jstech.computronics.operation.payload.DesktopWindowsPayload.of(
                             host, snapshotWindows()));
         }
-        // The programs' insides stay in this client as a convenience, keyed by the same launcher keys the
-        // machine's layout uses, so a restored window picks its session back up when it is still here.
+        /*
+         * The programs' insides stay in this client as a convenience, keyed by the same launcher keys the
+         * machine's layout uses, so a restored window picks its session back up when it is still here.
+         */
         final java.util.Map<String, IDesktopApp> apps = new java.util.LinkedHashMap<>();
         for (final DesktopWindow w : windows) {
             apps.put(w.appKey(), w.app());

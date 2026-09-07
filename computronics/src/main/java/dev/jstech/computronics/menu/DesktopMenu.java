@@ -21,7 +21,7 @@ import net.minecraft.world.item.ItemStack;
  * The server-side menu the Frames desktop opens on. It carries the bound monitor and host positions plus
  * the installed OS id and the machine name, so the client can rebuild the desktop shell. Being a real
  * menu (rather than a client-only screen) gives the desktop a synchronised carried cursor and lets the
- * inventory slots a window shows be true container slots — the basis for drag, shift-click and moving
+ * inventory slots a window shows be true container slots, the basis for drag, shift-click and moving
  * items for real.
  *
  * <p>It holds the player's 36 inventory slots ({@link NetworkInteractorSlot}, indices 0-35 in vanilla
@@ -77,9 +77,11 @@ public class DesktopMenu extends AbstractContainerMenu {
         this.name = name;
         this.ramTotalMb = ramTotalMb;
         this.ramReservedMb = ramReservedMb;
-        // The player's 36 inventory slots in vanilla order: 27 main (indices 9-35) then 9 hotbar (0-8). The
-        // x/y are placeholders — the client recreates them with real positions when a window shows them
-        // (Slot.x/y are final in 1.21.1, so following a moving window means rebuilding the slot at the new spot).
+        /*
+         * The player's 36 inventory slots in vanilla order: 27 main (indices 9-35) then 9 hotbar (0-8). The
+         * x/y are placeholders, and the client recreates them with real positions when a window shows them
+         * (Slot.x/y are final in 1.21.1, so following a moving window means rebuilding the slot at the new spot).
+         */
         for (int i = 0; i < INVENTORY_SLOTS; i++) {
             addSlot(new NetworkInteractorSlot(playerInventory, inventoryIndexFor(i), 0, 0, this::slotsActive, true));
         }
@@ -93,8 +95,10 @@ public class DesktopMenu extends AbstractContainerMenu {
     /** Lets the desktop screen turn the inventory slots on (front Network Interactor window) or off. */
     public void setSlotsActive(final boolean value) {
         if (!value) {
-            // Invalidate the layout cache while the slots are inactive, so the next activation always rebuilds
-            // the slot objects — even if a new window opens at exactly the same origin the last one used.
+            /*
+             * Invalidate the layout cache while the slots are inactive, so the next activation always rebuilds
+             * the slot objects, even if a new window opens at exactly the same origin the last one used.
+             */
             laidOutX = Integer.MIN_VALUE;
             laidOutY = Integer.MIN_VALUE;
             laidOutVpTop = Integer.MIN_VALUE;
@@ -109,7 +113,7 @@ public class DesktopMenu extends AbstractContainerMenu {
      * {@link net.minecraft.world.inventory.Slot}'s {@code x}/{@code y} are final, following a moving window means
      * rebuilding each slot at its new spot; this only runs when the origin or viewport actually changed, so a
      * still window (and any in-progress drag) keeps its slot instances. The vanilla index is preserved, so server
-     * sync — which is purely by slot index — is unaffected.
+     * sync (which is purely by slot index) is unaffected.
      *
      * <p>{@code viewportTop}/{@code viewportBottom} are the screen-space bounds of the window's scrollable band:
      * a row whose 18px cell does not sit fully inside it is built {@code visible == false}, so a window shrunk
@@ -128,8 +132,10 @@ public class DesktopMenu extends AbstractContainerMenu {
         for (int i = 0; i < INVENTORY_SLOTS; i++) {
             final int row = i < 27 ? i / 9 : 3;
             final int col = i < 27 ? i % 9 : i - 27;
-            // Use the SAME row offset the app draws the slot backgrounds with (which adds the hotbar gap before
-            // row 3), so the real slots line up with their backgrounds instead of diverging on the hotbar.
+            /*
+             * Use the SAME row offset the app draws the slot backgrounds with (which adds the hotbar gap before
+             * row 3), so the real slots line up with their backgrounds instead of diverging on the hotbar.
+             */
             final int cellTop = originY
                     + dev.jstech.computronics.gui.layout.NetworkInteractorLayout.rowYOffset(row);
             final boolean visible = cellTop >= viewportTop && cellTop + 18 <= viewportBottom;
@@ -208,21 +214,27 @@ public class DesktopMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(final Player player, final int index) {
-        // Every slot belongs to the player's own inventory, so shift-click has no foreign container to push
-        // to: returning empty leaves the stack where it is (vanilla still lets the cursor and drag reorganize
-        // the inventory). Depositing a shift-clicked stack onto the network arrives in a later step.
+        /*
+         * Every slot belongs to the player's own inventory, so shift-click has no foreign container to push
+         * to: returning empty leaves the stack where it is (vanilla still lets the cursor and drag reorganize
+         * the inventory). Depositing a shift-clicked stack onto the network arrives in a later step.
+         */
         return ItemStack.EMPTY;
     }
 
     @Override
     public boolean stillValid(final Player player) {
-        // Reach is to the monitor, and the monitor must still exist and link to this computer — so the
-        // desktop closes the moment the monitor is broken or the peripheral link is severed.
+        /*
+         * Reach is to the monitor, and the monitor must still exist and link to this computer, so the
+         * desktop closes the moment the monitor is broken or the peripheral link is severed.
+         */
         if (!(player.level().getBlockEntity(monitorPos) instanceof MonitorBlockEntity monitor)) {
             return false;
         }
-        // The screen may be showing this machine because it is cabled to it, or because a Remote
-        // Control session put it there.
+        /*
+         * The screen may be showing this machine because it is cabled to it, or because a Remote
+         * Control session put it there.
+         */
         return monitor.shows(hostPos)
                 && player.distanceToSqr(monitorPos.getX() + 0.5, monitorPos.getY() + 0.5,
                 monitorPos.getZ() + 0.5) <= 64.0

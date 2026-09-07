@@ -12,7 +12,7 @@ import java.util.Optional;
 /**
  * The verbs the IQL grammar exposes. Each one maps to a network Operation when executed; this enum is
  * the pure-logic vocabulary the parser produces, so it carries no Minecraft type. {@code SHOW} is not a
- * separate verb — it is accepted as an alias of {@link #QUERY} (both read without moving items).
+ * separate verb; it is accepted as an alias of {@link #QUERY} (both read without moving items).
  */
 public enum IqlVerb {
     /** Read/inspect, without moving items. */

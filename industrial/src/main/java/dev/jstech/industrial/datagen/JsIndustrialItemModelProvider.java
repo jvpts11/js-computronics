@@ -29,8 +29,10 @@ public class JsIndustrialItemModelProvider extends ItemModelProvider {
 
     @Override
     protected void registerModels() {
-        // The block model is written by the block-state provider in the same run, so the parent is left
-        // unchecked rather than tying the two providers' order together.
+        /*
+         * The block model is written by the block-state provider in the same run, so the parent is left
+         * unchecked rather than tying the two providers' order together.
+         */
         for (final String machine : MACHINES) {
             getBuilder(machine).parent(new ModelFile.UncheckedModelFile(modLoc("block/" + machine)));
         }

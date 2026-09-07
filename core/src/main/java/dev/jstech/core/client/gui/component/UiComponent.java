@@ -33,7 +33,7 @@ public abstract class UiComponent {
     @Nullable
     private Panel parent;
 
-    // ---- geometry ----
+    // geometry
 
     /** Places the component; called by its owner before every render. Returns this, for chaining. */
     public UiComponent setBounds(final int x, final int y, final int width, final int height) {
@@ -80,7 +80,7 @@ public abstract class UiComponent {
         return new int[] {x + width / 2, y + height / 2};
     }
 
-    // ---- state ----
+    // state
 
     public boolean visible() {
         return visible;
@@ -147,7 +147,7 @@ public abstract class UiComponent {
         return enabled && visible && contains(ctx.mouseX(), ctx.mouseY());
     }
 
-    // ---- drawing and input ----
+    // drawing and input
 
     /** Draws the component in its bounds. */
     public abstract void render(GuiGraphics g, UiContext ctx);

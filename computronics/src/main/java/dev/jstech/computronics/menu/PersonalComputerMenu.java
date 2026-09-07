@@ -19,7 +19,7 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
- * Menu for the Personal Computer: a single hardware-assembly surface (motherboard, PSU, CPU, RAM, GPU, disks — each restricted to its component category and clamped to the count the installed motherboard offers) plus the player inventory.
+ * Menu for the Personal Computer: a single hardware-assembly surface (motherboard, PSU, CPU, RAM, GPU, disks, each restricted to its component category and clamped to the count the installed motherboard offers) plus the player inventory.
  */
 public class PersonalComputerMenu extends AbstractComputerMenu {
 
@@ -150,10 +150,12 @@ public class PersonalComputerMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        // Validate against the block family, not a single block: the Standard, Vintage and Legacy
-        // Personal Computers are three distinct blocks that share this menu. Checking only the
-        // Standard block would make the server reject a Vintage/Legacy PC's menu as invalid and close
-        // it the instant it opens, so its GUI would never appear.
+        /*
+         * Validate against the block family, not a single block: the Standard, Vintage and Legacy
+         * Personal Computers are three distinct blocks that share this menu. Checking only the
+         * Standard block would make the server reject a Vintage/Legacy PC's menu as invalid and close
+         * it the instant it opens, so its GUI would never appear.
+         */
         return access.evaluate((level, pos) ->
                 level.getBlockState(pos).getBlock()
                         instanceof dev.jstech.computronics.block.PersonalComputerBlock

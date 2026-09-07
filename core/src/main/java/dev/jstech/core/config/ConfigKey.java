@@ -50,9 +50,11 @@ public record ConfigKey<T>(
                     "a key cannot have both a numeric range and a string whitelist: " + path);
         }
         if (range.isPresent()) {
-            // A range's bounds must be the key's own value type, or the validator would later cast the
-            // value to the bound type and throw instead of clamping (a Boolean key with a numeric range,
-            // or an Integer value with a Long range, must be rejected here, not crash at use).
+            /*
+             * A range's bounds must be the key's own value type, or the validator would later cast the
+             * value to the bound type and throw instead of clamping (a Boolean key with a numeric range,
+             * or an Integer value with a Long range, must be rejected here, not crash at use).
+             */
             final Object min = range.get().min();
             final Object max = range.get().max();
             if (!valueClass.isInstance(min) || !valueClass.isInstance(max)) {
@@ -62,8 +64,10 @@ public record ConfigKey<T>(
             }
         }
         if (whitelist.isPresent()) {
-            // A whitelist only makes sense for string-valued keys, and the default must itself be allowed,
-            // otherwise a rejected value would be substituted with a value that is also not in the list.
+            /*
+             * A whitelist only makes sense for string-valued keys, and the default must itself be allowed,
+             * otherwise a rejected value would be substituted with a value that is also not in the list.
+             */
             if (!String.class.equals(valueClass)) {
                 throw new IllegalArgumentException(
                         "whitelist is only supported for String keys, got " + valueClass.getSimpleName());

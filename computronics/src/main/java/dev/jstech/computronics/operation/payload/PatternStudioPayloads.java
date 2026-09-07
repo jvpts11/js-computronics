@@ -79,7 +79,7 @@ public final class PatternStudioPayloads {
                         dev.jstech.computronics.client.os.PatternStudioApp.accept(payload)));
     }
 
-    // ---- resolution ----
+    // resolution
 
     /** The host at {@code hostPos} as an OS host with a workbench, if the player is at one of its monitors. */
     @Nullable
@@ -103,7 +103,7 @@ public final class PatternStudioPayloads {
         });
     }
 
-    // ---- edits ----
+    // edits
 
     private static void handleEdit(final PatternStudioEditPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
@@ -117,8 +117,10 @@ public final class PatternStudioPayloads {
             final PatternWorkbench studio = host.studio();
             String status = "";
             int tab = -1;
-            // A ghost cell takes what the player carries when the click came with nothing named: a recipe
-            // viewer's drop names the item itself, a click on a cell names the cursor.
+            /*
+             * A ghost cell takes what the player carries when the click came with nothing named: a recipe
+             * viewer's drop names the item itself, a click on a cell names the cursor.
+             */
             final ItemStack carried = player.containerMenu.getCarried();
             final ItemStack item = !payload.item().isEmpty() ? payload.item() : carried;
             switch (payload.action()) {
@@ -249,7 +251,7 @@ public final class PatternStudioPayloads {
         host.setChanged();
     }
 
-    // ---- files ----
+    // files
 
     /** The medium behind a drive key: a linked reader's disc, or the system disk. Empty when there is none. */
     private static ItemStack volumeFor(final ServerLevel level, final IOsHost host, final String key) {
@@ -469,7 +471,7 @@ public final class PatternStudioPayloads {
         return MachineCategory.genericIdOf(typeId);
     }
 
-    // ---- state ----
+    // state
 
     @Nullable
     static PatternEncoderBlockEntity encoderOf(final ServerLevel level, final IOsHost host) {

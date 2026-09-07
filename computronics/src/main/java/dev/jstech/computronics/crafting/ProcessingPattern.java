@@ -149,7 +149,7 @@ public record ProcessingPattern(List<ProcessingInput> inputs, List<ProcessingOut
         return totals;
     }
 
-    /** The primary (first) output — what a craft of this pattern aims to produce; null if none declared. */
+    /** The primary (first) output, what a craft of this pattern aims to produce; null if none declared. */
     @Nullable
     public ProcessingOutput primaryOutput() {
         return outputs.isEmpty() ? null : outputs.get(0);

@@ -24,9 +24,9 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared base for the two bus parts (Import, Export): both carry the same configuration surface — an optional
+ * Shared base for the two bus parts (Import, Export): both carry the same configuration surface (an optional
  * name (so a query can address the bus by it), a single ghost filter slot, a min/max stock window with
- * hysteresis, and a continuous/redstone mode — over a data cable face. Only the per-tick transfer direction
+ * hysteresis, and a continuous/redstone mode) over a data cable face. Only the per-tick transfer direction
  * differs, which each subclass supplies in {@link #serverTick()}.
  */
 public abstract sealed class AbstractBusPart implements ICablePart permits ImportBusPart, ExportBusPart {

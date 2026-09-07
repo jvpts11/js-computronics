@@ -15,8 +15,8 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A machine that can boot and run an operating system: the contract the whole OS stack — firmware,
- * POST, boot manager, terminals, desktops, and the CLI backend — talks to. Desk computers implement
+ * A machine that can boot and run an operating system: the contract the whole OS stack (firmware,
+ * POST, boot manager, terminals, desktops, and the CLI backend) talks to. Desk computers implement
  * it directly on their block entities; a rack implements it by delegating to the server mounted in
  * it, so every access route (a directly linked monitor, a KVM channel, ssh, remote control)
  * converges on one pipeline instead of duplicating it per machine shape.

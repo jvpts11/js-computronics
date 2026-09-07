@@ -64,7 +64,7 @@ public final class WindowGeometry {
      * The absolute scissor rectangle for content drawn at window-local {@code (x1,y1)-(x2,y2)} under a pose
      * translated by {@code (poseX, poseY)}. {@code GuiGraphics.enableScissor} ignores the pose in 1.21.1, so a
      * desktop app MUST add the pose translation itself or the clip is offset from the drawn content (clipping
-     * text and cells in the wrong place — the bug that took hours to find). Centralised and tested so that trap
+     * text and cells in the wrong place, the bug that took hours to find). Centralised and tested so that trap
      * can never silently recur.
      */
     public static Rect scissor(final int poseX, final int poseY, final int x1, final int y1,

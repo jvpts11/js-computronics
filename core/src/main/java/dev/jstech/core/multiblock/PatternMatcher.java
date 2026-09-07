@@ -16,7 +16,7 @@ import java.util.List;
 public final class PatternMatcher {
 
     private PatternMatcher() {
-        // Utility class — no instances.
+        // Utility class, no instances.
     }
 
     public static IMatchResult match(
@@ -71,7 +71,7 @@ public final class PatternMatcher {
                     long worldEncoded = encodePosition(worldX, worldY, worldZ);
 
                     if (c == MultiblockPattern.IGNORE_CHAR) {
-                        // Ignored slot — no validation, no slave registration.
+                        // Ignored slot, no validation, no slave registration.
                         continue;
                     }
 
@@ -81,14 +81,16 @@ public final class PatternMatcher {
                     }
 
                     if (c == MultiblockPattern.CONTROLLER_CHAR) {
-                        // Controller slot — must be at the controller's own
+                        // Controller slot, must be at the controller's own
                         continue;
                     }
 
-                    // Regular slot — must satisfy the matcher.
+                    // Regular slot, must satisfy the matcher.
                     IBlockMatcher matcher = pattern.mapping().get(c);
-                    // Builder validation guarantees mapping is present, but
-                    // be defensive in case of ill-constructed patterns.
+                    /*
+                     * Builder validation guarantees mapping is present, but
+                     * be defensive in case of ill-constructed patterns.
+                     */
                     if (matcher == null || !matcher.matches(actualBlockId)) {
                         return new IMatchResult.Failure(
                                 relX, relY, relZ,

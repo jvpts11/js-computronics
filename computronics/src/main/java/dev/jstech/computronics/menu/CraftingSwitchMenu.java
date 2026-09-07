@@ -20,7 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * Menu for the Crafting Switch. It holds no item slots of its own — the face config (name + active) is read
+ * Menu for the Crafting Switch. It holds no item slots of its own; the face config (name + active) is read
  * from the block entity, which the server keeps in sync via its update tag, and edited back through
  * {@code SetCraftingSwitchFacePayload}. Only the player inventory is wired here, from the shared layout.
  */

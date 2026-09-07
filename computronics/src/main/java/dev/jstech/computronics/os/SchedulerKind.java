@@ -14,10 +14,10 @@ package dev.jstech.computronics.os;
  * and in kernel definitions without pulling in the binding layer.
  */
 public enum SchedulerKind {
-    /** No multitasking scheduler — single-task or batch execution only. */
+    /** No multitasking scheduler, single-task or batch execution only. */
     NONE,
-    /** Cooperative multitasking — tasks yield voluntarily. */
+    /** Cooperative multitasking, tasks yield voluntarily. */
     COOPERATIVE,
-    /** Preemptive multitasking — the kernel forcibly context-switches tasks. */
+    /** Preemptive multitasking, the kernel forcibly context-switches tasks. */
     PREEMPTIVE
 }

@@ -19,12 +19,12 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Installing a system, made visible. Before this, the firmware wrote the system and closed the
- * window, so a player saw the screen vanish and later found the machine already installed — the
+ * window, so a player saw the screen vanish and later found the machine already installed, and the
  * single act that should feel weighty had no moment at all.
  *
  * <p>Three beats: what is about to happen and where, the work itself, and the reboot that ends it.
  * The write only goes to the server when the progress finishes, so closing the window mid-way
- * cancels cleanly. Arch and Gentoo never come here — their systems are put on the disk by hand
+ * cancels cleanly. Arch and Gentoo never come here, since their systems are put on the disk by hand
  * from a live shell, which is their whole point.
  */
 public final class OsInstallScreen extends Screen {
@@ -273,8 +273,10 @@ public final class OsInstallScreen extends Screen {
 
         static Palette of(final FirmwareKind kind) {
             return switch (kind) {
-                // The Vintage tube is monochrome: every one of these is the phosphor, lit to the
-                // brightness the colour reads at.
+                /*
+                 * The Vintage tube is monochrome: every one of these is the phosphor, lit to the
+                 * brightness the colour reads at.
+                 */
                 case CLI_BIOS -> new Palette(0xFF020602, green(0xFF141414), green(0xFF3A3A3A), green(0xFFBEBEBE),
                         green(0xFFE8E8E8), green(0xFF6A6A6A), green(0xFF63C363), green(0xFF1E1E1E));
                 case BLUE_BIOS -> new Palette(0xFF06217A, 0xFF0A2C9E, 0xFF6E8BE0, 0xFFD6DEF8,

@@ -51,8 +51,10 @@ public record OperationRecord(UUID id, byte type, StorageKey key, long requested
     public static final byte TYPE_DROP = 7;
     public static final byte TYPE_CRAFT = 8;
 
-    // Mirrors the 8-state OperationStatus: COMPLETED, COMPLETED_PARTIAL, FAILED, PROCESSING, WAITING,
-    // RESOURCE_LOCKED, PENDING, DISCARDED.
+    /*
+     * Mirrors the 8-state OperationStatus: COMPLETED, COMPLETED_PARTIAL, FAILED, PROCESSING, WAITING,
+     * RESOURCE_LOCKED, PENDING, DISCARDED.
+     */
     public static final byte STATUS_COMPLETED = 0;
     public static final byte STATUS_PARTIAL = 1;
     public static final byte STATUS_FAILED = 2;

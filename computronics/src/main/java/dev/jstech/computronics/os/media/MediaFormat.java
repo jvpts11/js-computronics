@@ -21,16 +21,16 @@ import dev.jstech.core.tier.HardwareEra;
  */
 public enum MediaFormat {
 
-    /** 3.5" floppy disk — the smallest, earliest medium. Read/write. */
+    /** 3.5" floppy disk, the smallest, earliest medium. Read/write. */
     FLOPPY(1_024),
 
-    /** CD — the Legacy-era optical medium. 700 MB class. */
+    /** CD, the Legacy-era optical medium. 700 MB class. */
     CD(8_192),
 
-    /** DVD — the Standard-era optical medium. 4.7 GB class. */
+    /** DVD, the Standard-era optical medium. 4.7 GB class. */
     DVD(65_536),
 
-    /** USB flash drive — the highest-capacity removable medium. */
+    /** USB flash drive, the highest-capacity removable medium. */
     USB(262_144);
 
     private final int capacityItems;

@@ -47,9 +47,7 @@ public final class NmsFileGameTests {
     private static final ResourceLocation SO_REDE =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_net");
 
-    // ------------------------------------------------------------------------------------------
     // Setup helper: place a Mainframe with board+CPU+RAM+PSU+disk, install the OS, return the BE.
-    // ------------------------------------------------------------------------------------------
 
     private static MainframeBlockEntity placeMainframe(final GameTestHelper helper, final BlockPos pos) {
         helper.setBlock(pos, ComputingModule.MAINFRAME.get());
@@ -77,9 +75,7 @@ public final class NmsFileGameTests {
         return mf;
     }
 
-    // ------------------------------------------------------------------------------------------
     // Tests
-    // ------------------------------------------------------------------------------------------
 
     /**
      * Writes an {@code .iql} script to the Mainframe's system disk, then asserts the file appears
@@ -235,8 +231,10 @@ public final class NmsFileGameTests {
                             fileContent, Long.MAX_VALUE, kind);
                     mf.setChanged();
 
-                    // The savedScript field may hold a different value (legacy). The file content
-                    // must match what was written to disk, independent of savedScript.
+                    /*
+                     * The savedScript field may hold a different value (legacy). The file content
+                     * must match what was written to disk, independent of savedScript.
+                     */
                     mf.setSavedScript("SOME OLD SCRIPT");
                     final Optional<String> read = DiskFilesystem.read(sysDisk, "insert.iql");
                     helper.assertTrue(read.isPresent(), "file must exist after write");

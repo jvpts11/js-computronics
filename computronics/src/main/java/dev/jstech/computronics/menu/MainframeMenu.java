@@ -19,7 +19,7 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
- * Menu for the Mainframe: the 18 hardware slots (motherboard, CPUs, RAM, GPUs, PSU — each restricted to its component category by the block entity's item handler) plus the player inventory, with powered/capacity/queues/buffer synced for the screen.
+ * Menu for the Mainframe: the 18 hardware slots (motherboard, CPUs, RAM, GPUs, PSU, each restricted to its component category by the block entity's item handler) plus the player inventory, with powered/capacity/queues/buffer synced for the screen.
  */
 public class MainframeMenu extends AbstractComputerMenu {
 
@@ -178,10 +178,12 @@ public class MainframeMenu extends AbstractComputerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        // Validate against the block family, not a single block: the Standard, Vintage and Legacy
-        // Mainframe controllers are distinct blocks that share this menu. Checking only the Standard
-        // block would make the server reject a Vintage/Legacy menu as invalid and close it the instant
-        // it opens.
+        /*
+         * Validate against the block family, not a single block: the Standard, Vintage and Legacy
+         * Mainframe controllers are distinct blocks that share this menu. Checking only the Standard
+         * block would make the server reject a Vintage/Legacy menu as invalid and close it the instant
+         * it opens.
+         */
         return access.evaluate((level, pos) ->
                 level.getBlockState(pos).getBlock()
                         instanceof dev.jstech.computronics.block.MainframeBlock

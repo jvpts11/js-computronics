@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Client to server: Remote Control asks for something. {@code action} is either a request for the
- * reachable-host list or a take-over of the machine at {@code targetPos} — the graphical route to a
+ * reachable-host list or a take-over of the machine at {@code targetPos}, the graphical route to a
  * headless server, for players who would rather not live in a shell.
  */
 public record RemoteControlPayload(BlockPos hostPos, BlockPos monitorPos, long targetPos, int action)

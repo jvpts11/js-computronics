@@ -16,7 +16,7 @@ import dev.jstech.core.tier.HardwareEra;
  * the classic blue-panel BIOS for Legacy hardware, and a modern UEFI interface for Standard and
  * any later era.
  *
- * <p>This enum is pure — it depends only on {@link HardwareEra}, which is itself pure — so it
+ * <p>This enum is pure (it depends only on {@link HardwareEra}, which is itself pure) so it
  * compiles and runs in the JUnit test sourceset without any Minecraft dependency.
  */
 public enum FirmwareKind {

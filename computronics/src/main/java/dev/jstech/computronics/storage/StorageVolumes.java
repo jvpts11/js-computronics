@@ -27,7 +27,7 @@ import java.util.UUID;
 
 /**
  * Every drive's stored items, by volume id, in one save-wide store. A drive carries its id wherever it
- * goes — between machines, racks and dimensions — and finds its contents here; the contents never ride
+ * goes (between machines, racks and dimensions) and finds its contents here; the contents never ride
  * on the item, so a drive full of thousands of types is still a tiny item to sync and compare.
  *
  * <p>Lives on the overworld's data storage so ids resolve from any dimension. A drive that is destroyed

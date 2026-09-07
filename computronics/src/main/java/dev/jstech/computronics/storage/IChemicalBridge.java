@@ -58,7 +58,7 @@ public interface IChemicalBridge {
 
     /**
      * The chemical a recipe viewer's ingredient object stands for (its mod's chemical stack type), if this
-     * bridge recognises it — how a recipe transfer reads chemical ingredients without naming the mod.
+     * bridge recognises it, which is how a recipe transfer reads chemical ingredients without naming the mod.
      */
     default Optional<ChemicalAmount> chemicalIngredient(final Object ingredient) {
         return Optional.empty();

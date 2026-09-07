@@ -12,7 +12,7 @@ import dev.jstech.core.operation.OperationPriority;
 import java.util.Objects;
 
 /**
- * A parsed IQL statement — the structured intent the server executes as a network Operation. Pure logic,
+ * A parsed IQL statement, the structured intent the server executes as a network Operation. Pure logic,
  * no Minecraft: the item stays a raw name string (resolved to a real item only when executed), so the
  * parser is unit-tested in plain Java. Optional parts use empty strings / {@code null} / sentinels rather
  * than {@code Optional} fields to keep the record flat; the accessors below say what is present.
@@ -44,7 +44,7 @@ public record IqlOperation(IqlVerb verb,
     /** Limit sentinel for "no cap". */
     public static final int NO_LIMIT = 0;
 
-    /** Item wildcard for "any item" — matches every item type (e.g. {@code MOVE * FROM A TO B}). */
+    /** Item wildcard for "any item", matching every item type (e.g. {@code MOVE * FROM A TO B}). */
     public static final String ANY_ITEM = "*";
 
     /** Whether {@link #item} is the {@code *} wildcard (every item type) rather than a concrete item. */

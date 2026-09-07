@@ -17,7 +17,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Every language the computers of this world know.
  *
- * <p>An addon may add one, and may take one away — including the one this series ships with. That is
+ * <p>An addon may add one, and may take one away, including the one this series ships with. That is
  * deliberate: a pack that wants its computers programmed in something else entirely should not have to
  * live beside a language nobody in it uses.
  *

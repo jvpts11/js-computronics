@@ -28,7 +28,7 @@ import java.util.Random;
 
 /**
  * The Task Manager: what this machine is running and what it is spending. Every desktop gets the tool it
- * really had, not one window repainted — Frames 95 the Close Program box it actually shipped, Frames XP the
+ * really had, not one window repainted: Frames 95 the Close Program box it actually shipped, Frames XP the
  * four-tab manager with its menu bar and status bar, Frames 11 the rail and the wide table, and each Linux
  * desktop the system monitor its own package brings. They all read the same machine: the memory ledger the
  * notification area draws from, the disks, the processor, and the network link.
@@ -102,7 +102,7 @@ public final class TaskManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- the machine, as this window reads it -------------------------------------------------------
+    // the machine, as this window reads it
 
     private List<RamUse> processes() {
         return data == null ? List.of() : data.ramUses();
@@ -164,8 +164,10 @@ public final class TaskManagerApp implements IDesktopApp {
         if (KIND_WINDOW.equals(use.kind())) {
             DesktopScreen.requestClose(use.label());
         } else if (KIND_PROCESS.equals(use.kind())) {
-            // A script is ended by its number: two of them can have come from the same file, and the
-            // machine is the one that knows which is which.
+            /*
+             * A script is ended by its number: two of them can have come from the same file, and the
+             * machine is the one that knows which is which.
+             */
             PacketDistributor.sendToServer(
                     new dev.jstech.computronics.operation.payload.EndProcessPayload(host, use.id()));
         } else {
@@ -196,7 +198,7 @@ public final class TaskManagerApp implements IDesktopApp {
 
     /**
      * The machine's processor load. What a computer here truly spends is the work its scripts and services
-     * do, and until the scripting language exists there is almost none of it — but a real machine is never
+     * do, and until the scripting language exists there is almost none of it, but a real machine is never
      * perfectly idle either, so the reading drifts around a small baseline instead of sitting at a dead
      * zero. The drift is deliberately smaller than any real change, so a script starting still reads clearly.
      */
@@ -230,7 +232,7 @@ public final class TaskManagerApp implements IDesktopApp {
         samples++;
     }
 
-    // ---- window ------------------------------------------------------------------------------------
+    // window
 
     @Override
     public String title() {
@@ -307,7 +309,7 @@ public final class TaskManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- Frames 95: the Close Program box ----------------------------------------------------------
+    // Frames 95: the Close Program box
 
     private void renderCloseBox(final GuiGraphics g, final Font font, final int x, final int y,
                                final int width, final int height) {
@@ -328,7 +330,7 @@ public final class TaskManagerApp implements IDesktopApp {
         button(g, font, lx + 2 * (bw + 4), by, bw, btnH, "Cancel", true);
     }
 
-    // ---- Frames XP: the four-tab manager -----------------------------------------------------------
+    // Frames XP: the four-tab manager
 
     private void renderLuna(final GuiGraphics g, final Font font, final int x, final int y,
                             final int width, final int height) {
@@ -417,7 +419,7 @@ public final class TaskManagerApp implements IDesktopApp {
         Texts.small(g, font, "Link activity over the last minute", x + 2, y + h - 8, skin.dim());
     }
 
-    // ---- Frames 11: the rail and the wide table ----------------------------------------------------
+    // Frames 11: the rail and the wide table
 
     private void renderModern(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height) {
@@ -456,7 +458,7 @@ public final class TaskManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- KDE Plasma and GNOME ----------------------------------------------------------------------
+    // KDE Plasma and GNOME
 
     private void renderPlasma(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height) {
@@ -514,7 +516,7 @@ public final class TaskManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- shared pieces ------------------------------------------------------------------------------
+    // shared pieces
 
     /** The disks page: one bar per volume, the same figures the System Monitor shows. */
     private void renderDisks(final GuiGraphics g, final Font font, final int x, final int y,
@@ -713,7 +715,7 @@ public final class TaskManagerApp implements IDesktopApp {
         return 0xFF2EA043;
     }
 
-    // ---- input --------------------------------------------------------------------------------------
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY,

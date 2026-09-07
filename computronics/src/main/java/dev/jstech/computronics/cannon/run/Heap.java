@@ -49,8 +49,10 @@ public final class Heap {
     }
 
     private final Map<Object, Entry> live = new IdentityHashMap<>();
-    // Kept beside the map because two objects are told apart by being themselves, and a map that does
-    // that has no order of its own. Writing a process down needs one, so this is it.
+    /*
+     * Kept beside the map because two objects are told apart by being themselves, and a map that does
+     * that has no order of its own. Writing a process down needs one, so this is it.
+     */
     private final List<Object> order = new ArrayList<>();
     private final long budget;
     private long used;

@@ -21,7 +21,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 
 /**
- * A plain fluid tank — the minimal external fluid I/O point used to exercise the network's everything-is-data storage: an Import Bus pulls its fluid into the network and an Export Bus pushes fluid back into it, exactly as the same buses move items.
+ * A plain fluid tank, the minimal external fluid I/O point used to exercise the network's everything-is-data storage: an Import Bus pulls its fluid into the network and an Export Bus pushes fluid back into it, exactly as the same buses move items.
  */
 public class TankBlockEntity extends BlockEntity {
 

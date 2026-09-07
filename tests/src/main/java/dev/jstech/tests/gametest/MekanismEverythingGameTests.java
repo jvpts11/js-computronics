@@ -45,7 +45,7 @@ import java.util.Random;
  * The whole-mod crafting stress battery: a large synthetic recipe graph over real Mekanism items, crafted
  * through every entry point at once, so the immensity itself flushes out boundary cases. The crafting engine
  * trusts a bench pattern (it consumes the grid and produces the declared result), so a generated dependency
- * DAG lets the network craft items that have no real bench recipe — the point is to exercise the engine, the
+ * DAG lets the network craft items that have no real bench recipe; the point is to exercise the engine, the
  * planner, and every request path across hundreds of item types, not to reproduce Mekanism's own recipes.
  *
  * <p>Randomness is seeded and the seed is logged as {@code [JSC-MEGA] seed=...}; pass {@code -Djsc.megaseed=N}
@@ -81,8 +81,10 @@ public final class MekanismEverythingGameTests {
     private static void placeSupercomputer(final GameTestHelper helper, final BlockPos hub, final int nodes) {
         helper.setBlock(hub, ComputingModule.HBW_INTERFACE.get());
         for (int i = 1; i <= nodes; i++) {
-            // A cable run east of the hub with one Supercomputer Rack beside each cable block, each
-            // seating a ready node; racks are leaves on the fabric, so they sit beside the run.
+            /*
+             * A cable run east of the hub with one Supercomputer Rack beside each cable block, each
+             * seating a ready node; racks are leaves on the fabric, so they sit beside the run.
+             */
             final BlockPos cable = hub.east(i);
             helper.setBlock(cable, ComputingModule.HPC_CABLE.get());
             final BlockPos rackPos = cable.above(); // the row in front belongs to the rig's machines
@@ -126,7 +128,7 @@ public final class MekanismEverythingGameTests {
     /**
      * A storm of invalid and extreme craft requests through both entry points, against a plain vanilla recipe:
      * non-positive and overflowing demands, an unknown item, and malformed IQL. None may crash, none may leave a
-     * stuck operation, and the network must create nothing — cobblestone plus twice the stone made can never
+     * stuck operation, and the network must create nothing, since cobblestone plus twice the stone made can never
      * exceed what was seeded. This is where the boundaries of the request path show.
      */
     @GameTest(template = ARENA, timeoutTicks = 6000)
@@ -272,7 +274,7 @@ public final class MekanismEverythingGameTests {
     /**
      * Churns through every Mekanism item in waves: a small raw pool is topped up, a wave of items is crafted
      * from it through mixed entry points (parallelized by the supercomputer), verified, then exported straight
-     * back out to free capacity — a base that crafts and drains a lot, over and over, across the whole mod. The
+     * back out to free capacity, a base that crafts and drains a lot, over and over, across the whole mod. The
      * wave model keeps storage bounded no matter how many item types exist, so it scales to the full catalogue.
      */
     @GameTest(template = ARENA, timeoutTicks = 60000)
@@ -291,9 +293,11 @@ public final class MekanismEverythingGameTests {
         LOGGER.info("[JSC-MEGA] churning {} items in waves of {} from a {}-item raw pool",
                 craftable.size(), WAVE_SIZE, RAW_POOL_SIZE);
 
-        // Every craftable item gets a depth-1 bench recipe from two random raw-pool items. The Recipe ROM holds
-        // only RECIPE_ROM_LIMIT patterns, so each wave loads its own recipes and clears them again afterwards —
-        // WAVE_SIZE stays under the limit, and the churn covers the whole catalogue without ever overflowing it.
+        /*
+         * Every craftable item gets a depth-1 bench recipe from two random raw-pool items. The Recipe ROM holds
+         * only RECIPE_ROM_LIMIT patterns, so each wave loads its own recipes and clears them again afterwards:
+         * WAVE_SIZE stays under the limit, and the churn covers the whole catalogue without ever overflowing it.
+         */
         final List<CraftingPattern> recipes = new ArrayList<>();
         for (final Item item : craftable) {
             recipes.add(benchRecipe(List.of(rawPool.get(rng.nextInt(RAW_POOL_SIZE)),
@@ -355,8 +359,10 @@ public final class MekanismEverythingGameTests {
                                     if (parsed.ok()) {
                                         cli[0].execute(parsed.operation());
                                     } else {
-                                        // A valid item id IQL cannot parse is itself worth seeing; keep the churn
-                                        // going through the shared entry point so one quirk doesn't mask the rest.
+                                        /*
+                                         * A valid item id IQL cannot parse is itself worth seeing; keep the churn
+                                         * going through the shared entry point so one quirk doesn't mask the rest.
+                                         */
                                         LOGGER.warn("[JSC-MEGA] IQL could not parse craft for {}: {}", id, parsed.error());
                                         net.mainframe().submitCraftRequest(StorageKey.of(item), REQUEST_QTY, true, "wave", null);
                                     }
@@ -416,8 +422,10 @@ public final class MekanismEverythingGameTests {
             return;
         }
 
-        // Slice a working set and split it into tiers; tier 0 is the raw stock, each higher tier is crafted
-        // from strictly lower tiers, so the whole set is reachable from the seeded leaves.
+        /*
+         * Slice a working set and split it into tiers; tier 0 is the raw stock, each higher tier is crafted
+         * from strictly lower tiers, so the whole set is reachable from the seeded leaves.
+         */
         final List<Item> set = new ArrayList<>(all.subList(0, Math.min(TARGET_COUNT, all.size())));
         final int tierSize = Math.max(1, set.size() / TIERS);
         final List<List<Item>> tiers = new ArrayList<>();
@@ -464,8 +472,10 @@ public final class MekanismEverythingGameTests {
                     helper.assertTrue(helper.getBlockEntity(CLUSTER_HUB) instanceof HbwInterfaceBlockEntity hbw
                                     && hbw.clusterOnline() && net.mainframe().supercomputerPositions().size() >= 1,
                             "the supercomputer cluster must be online and registered on the network");
-                    // Submit every target through a randomly chosen entry point: the shared craft request the
-                    // terminal/NI use, or an IQL statement run on a server-side CLI (the Command Prompt path).
+                    /*
+                     * Submit every target through a randomly chosen entry point: the shared craft request the
+                     * terminal/NI use, or an IQL statement run on a server-side CLI (the Command Prompt path).
+                     */
                     final ServerCliComputer cli = new ServerCliComputer(net.mainframe(), helper.getLevel());
                     for (final Item item : targets) {
                         if (rng.nextBoolean()) {
@@ -503,8 +513,10 @@ public final class MekanismEverythingGameTests {
                     helper.assertTrue(dropped == 0, dropped + " items leaked to the world (seed=" + seed + ")");
                 })
                 .thenExecute(() -> {
-                    // Churn: export every crafted target back out of the network, the way a SELECT / Export Bus
-                    // drains storage. Everything the network handed out must leave cleanly and free its capacity.
+                    /*
+                     * Churn: export every crafted target back out of the network, the way a SELECT / Export Bus
+                     * drains storage. Everything the network handed out must leave cleanly and free its capacity.
+                     */
                     final NetworkStorage storage = net.storage(helper.getLevel());
                     for (final Item item : targets) {
                         final long have = storage.count(item);

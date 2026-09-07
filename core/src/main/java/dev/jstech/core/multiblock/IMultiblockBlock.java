@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A block that, when placed, expands into a fixed multiblock footprint (a controller plus its part blocks). Implementing this gives every such block a uniform way to report the world cells it occupies and whether it fits at a spot, so cross-cutting features — placement validation, a placement preview, structure highlighting — can work on any multiblock without knowing which one it is. Without it, those features have to hard-code one block's geometry and silently work for that block alone.
+ * A block that, when placed, expands into a fixed multiblock footprint (a controller plus its part blocks). Implementing this gives every such block a uniform way to report the world cells it occupies and whether it fits at a spot, so cross-cutting features (placement validation, a placement preview, structure highlighting) can work on any multiblock without knowing which one it is. Without it, those features have to hard-code one block's geometry and silently work for that block alone.
  */
 public interface IMultiblockBlock {
 

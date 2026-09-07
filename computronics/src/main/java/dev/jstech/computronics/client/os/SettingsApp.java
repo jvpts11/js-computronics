@@ -71,7 +71,7 @@ public final class SettingsApp implements IDesktopApp {
     @Nullable
     private BlockPos monitorPos;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final ListView<String> nav;
     private final Panel pagePanel = new Panel();
@@ -206,7 +206,7 @@ public final class SettingsApp implements IDesktopApp {
         g.drawString(ctx.font(), item, x + 5, y + 4, tc, false);
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -442,7 +442,7 @@ public final class SettingsApp implements IDesktopApp {
         pagePanel.add(new Label("Coming in a future update", Label.Tone.DIM).setAlign(Label.Align.CENTER)).setBounds(x, y + h / 2 + 2, w, 8);
     }
 
-    // ---- small controls ----
+    // small controls
 
     private int specRow(final int x, final int y, final int w, final String label, final String value) {
         pagePanel.add(new Label(label, Label.Tone.DIM)).setBounds(x, y, w / 2, 8);
@@ -496,7 +496,7 @@ public final class SettingsApp implements IDesktopApp {
         };
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {

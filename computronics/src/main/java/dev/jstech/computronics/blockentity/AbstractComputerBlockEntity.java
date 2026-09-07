@@ -82,8 +82,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
 
     protected final Set<Long> linkedMonitors = new LinkedHashSet<>();
 
-    // The OS is no longer stored on the block entity; it lives on the system disk's SYSTEM_OS
-    // component. All OS-related state is derived at runtime by scanning the installed disk stacks.
+    /*
+     * The OS is no longer stored on the block entity; it lives on the system disk's SYSTEM_OS
+     * component. All OS-related state is derived at runtime by scanning the installed disk stacks.
+     */
 
     protected AbstractComputerBlockEntity(final BlockEntityType<?> type, final BlockPos pos,
                                           final BlockState state, final ComputerHardwareLayout layout) {
@@ -145,7 +147,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     /**
      * Whether {@code stack} is a processor this machine's board can seat: the socket has to match, and
      * so does the hardware generation. A chip that physically cannot go in the socket should not go in
-     * the slot either — letting it in only to refuse to boot tells the player nothing about why.
+     * the slot either, since letting it in only to refuse to boot tells the player nothing about why.
      */
     protected boolean isValidCpu(final ItemStack stack) {
         if (!(stack.getItem() instanceof CpuItem cpu)) {
@@ -181,7 +183,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         }
         final ItemStack boardStack = hardware.getStackInSlot(layout.motherboardSlot());
         if (!(boardStack.getItem() instanceof MotherboardItem motherboard)) {
-            // No board yet — accept the card so it can be pre-staged; the slot will be inoperative until a board arrives.
+            // No board yet, so accept the card so it can be pre-staged; the slot will be inoperative until a board arrives.
             return true;
         }
         return card.cardSpec().bus().compatibleWith(motherboard.spec().pcieGeneration());
@@ -230,15 +232,19 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     private ComputerBuild computeBuild() {
         final ItemStack boardStack = hardware.getStackInSlot(layout.motherboardSlot());
         if (!(boardStack.getItem() instanceof MotherboardItem motherboard) || !isAcceptedBoard(boardStack)) {
-            // A board this computer does not accept (wrong form factor or wrong era) yields no build, so a
-            // direct setStackInSlot or a board installed before an era gate existed can never run the machine.
+            /*
+             * A board this computer does not accept (wrong form factor or wrong era) yields no build, so a
+             * direct setStackInSlot or a board installed before an era gate existed can never run the machine.
+             */
             return null;
         }
         if (!(hardware.getStackInSlot(layout.psuSlot()).getItem() instanceof PsuItem psu)) {
             return null;
         }
-        // Every count is clamped to what the installed board exposes, so a part in a slot the board
-        // does not offer is ignored.
+        /*
+         * Every count is clamped to what the installed board exposes, so a part in a slot the board
+         * does not offer is ignored.
+         */
         final int cpuCount = Math.min(layout.cpuCount(), motherboard.spec().cpuSlots());
         final List<CpuSpec> cpus = new ArrayList<>();
         for (int i = 0; i < cpuCount; i++) {
@@ -306,10 +312,12 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         autoStart = !autoStart;
         if (autoStart && buildValid()) {
             if (!manualOn) {
-                // Auto-start bringing a machine up from off is a cold start. It writes the POST flag
-                // directly, so it has to close the desktop itself: a machine that went dark through an
-                // invalid build never passed through setPowered, and its old windows would otherwise
-                // resurface on a session that no longer exists.
+                /*
+                 * Auto-start bringing a machine up from off is a cold start. It writes the POST flag
+                 * directly, so it has to close the desktop itself: a machine that went dark through an
+                 * invalid build never passed through setPowered, and its old windows would otherwise
+                 * resurface on a session that no longer exists.
+                 */
                 needsPost = true;
                 openWindows.clear();
                 pendingInstallSlot = NO_PENDING_INSTALL;
@@ -319,9 +327,11 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         setChanged();
     }
 
-    // The power-on self-test runs once per power-up (and once per requested reboot), then the monitor
-    // boots straight into the OS. Deliberately transient: a computer that stayed on across a chunk
-    // reload does not POST again, exactly like a real machine that was never switched off.
+    /*
+     * The power-on self-test runs once per power-up (and once per requested reboot), then the monitor
+     * boots straight into the OS. Deliberately transient: a computer that stayed on across a chunk
+     * reload does not POST again, exactly like a real machine that was never switched off.
+     */
     private boolean needsPost;
 
     /** Whether the next monitor use should play the power-on self-test before booting. */
@@ -337,8 +347,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         }
     }
 
-    // A guided installer that finished writing the system but has not rebooted yet. Persisted: the
-    // machine is still in the installer after a reload, the same way it keeps its booted desktop.
+    /*
+     * A guided installer that finished writing the system but has not rebooted yet. Persisted: the
+     * machine is still in the installer after a reload, the same way it keeps its booted desktop.
+     */
     private int pendingInstallSlot = NO_PENDING_INSTALL;
 
     @Override
@@ -352,8 +364,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         setChanged();
     }
 
-    // The desktop this session booted into. Held apart from what is on disk so that installing or
-    // removing a desktop package takes effect on the next boot, not the next time the monitor is opened.
+    /*
+     * The desktop this session booted into. Held apart from what is on disk so that installing or
+     * removing a desktop package takes effect on the next boot, not the next time the monitor is opened.
+     */
     @Nullable
     private ResourceLocation bootedDesktopId;
 
@@ -369,13 +383,17 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         setChanged();
     }
 
-    // The windows open on this machine's desktop. Kept here, not in the client, so they belong to the
-    // machine: whoever opens the monitor next sees them, and they survive the game being closed.
+    /*
+     * The windows open on this machine's desktop. Kept here, not in the client, so they belong to the
+     * machine: whoever opens the monitor next sees them, and they survive the game being closed.
+     */
     private final java.util.List<dev.jstech.computronics.os.OpenWindow> openWindows =
             new java.util.ArrayList<>();
 
-    // The recipe drafts the Pattern Studio edits. Machine state like the windows: a draft half laid out when
-    // the player walks away is still there for whoever sits down next, and after the game was closed.
+    /*
+     * The recipe drafts the Pattern Studio edits. Machine state like the windows: a draft half laid out when
+     * the player walks away is still there for whoever sits down next, and after the game was closed.
+     */
     private final dev.jstech.computronics.crafting.PatternWorkbench studio =
             new dev.jstech.computronics.crafting.PatternWorkbench();
 
@@ -409,8 +427,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return buildValid() ? currentBuild().ramBuffer() : 0L;
     }
 
-    // Motherboard-derived slot availability (read from the board alone, no PSU needed,
-    // so the assembly GUI lights up usable slots as soon as a board goes in).
+    /*
+     * Motherboard-derived slot availability (read from the board alone, no PSU needed,
+     * so the assembly GUI lights up usable slots as soon as a board goes in).
+     */
 
     public int boardCpuSlots() {
         return hardware.getStackInSlot(layout.motherboardSlot()).getItem() instanceof MotherboardItem m
@@ -501,7 +521,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
                 * diskEra(disk).mbPerItem() / StorageKey.MB_EQ_PER_ITEM;
     }
 
-    /** The era a disk was made for — what an item and a system image cost on it; standard for no disk. */
+    /** The era a disk was made for, which sets what an item and a system image cost on it; standard for no disk. */
     protected static HardwareEra diskEra(final ItemStack disk) {
         return disk.getItem() instanceof DiskItem item ? item.spec().era() : HardwareEra.STANDARD;
     }
@@ -511,8 +531,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return build == null ? 0 : build.disks().size();
     }
 
-    // Host-facing slot-count names (alias the board-derived counts), so subclasses that implement
-    // IComputerTerminalHost inherit these without boilerplate.
+    /*
+     * Host-facing slot-count names (alias the board-derived counts), so subclasses that implement
+     * IComputerTerminalHost inherit these without boilerplate.
+     */
     public int cpuSlots() {
         return boardCpuSlots();
     }
@@ -569,8 +591,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         }
     }
 
-    // OS installation (shared across all computer block entities)
-    // The OS lives on the system disk's SYSTEM_OS component so it travels with the disk.
+    /*
+     * OS installation (shared across all computer block entities)
+     * The OS lives on the system disk's SYSTEM_OS component so it travels with the disk.
+     */
 
     /**
      * Returns the first installed disk stack whose {@code SYSTEM_OS} component points to a
@@ -583,8 +607,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     private int bootDiskSlot = -1;
 
     public ItemStack systemDisk() {
-        // The preferred boot disk (chosen in the firmware's boot order) wins when it holds a system; otherwise
-        // the first disk with a system boots, so a computer with two installed OSes dual-boots by choice.
+        /*
+         * The preferred boot disk (chosen in the firmware's boot order) wins when it holds a system; otherwise
+         * the first disk with a system boots, so a computer with two installed OSes dual-boots by choice.
+         */
         return dev.jstech.computronics.os.OsDisks.systemDisk(
                 layout.diskCount(), this::diskInSlot, bootDiskSlot);
     }
@@ -706,8 +732,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return installOs(osId, -1);
     }
 
-    // Which progress quarter (25/50/75%) each running build last reported, so the console gets a handful
-    // of emerge-style progress lines instead of one per second. Transient by design.
+    /*
+     * Which progress quarter (25/50/75%) each running build last reported, so the console gets a handful
+     * of emerge-style progress lines instead of one per second. Transient by design.
+     */
     private final java.util.Map<String, Integer> buildQuarterReported = new java.util.HashMap<>();
     private int liveKernelQuarterReported;
 
@@ -763,8 +791,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
                     ">>> sys-kernel/gentoo-sources: compiled. Run 'genkernel all' to build the kernel.", ok));
         }
 
-        // Completions: announced live to whoever is looking; with no console open the notice stays queued
-        // for the shell to print ahead of the next command instead.
+        /*
+         * Completions: announced live to whoever is looking; with no console open the notice stays queued
+         * for the shell to print ahead of the next command instead.
+         */
         final java.util.List<net.minecraft.server.level.ServerPlayer> viewers = consoleViewers(level);
         if (!console.settleBuilds(now).isEmpty()) {
             setChanged();
@@ -787,8 +817,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             desktopWire.add(new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload
                     .WireLine(line.text(), line.style()));
         }
-        // Every reply says whether a program has the terminal, notices included: one that said otherwise
-        // would hand the keyboard back while a program was still using it.
+        /*
+         * Every reply says whether a program has the terminal, notices included: one that said otherwise
+         * would hand the keyboard back while a program was still using it.
+         */
         final var desktop = new dev.jstech.computronics.operation.payload.DesktopShellOutputPayload(
                 false, cannon.held() != 0, "", desktopWire);
         for (final net.minecraft.server.level.ServerPlayer viewer : viewers) {
@@ -919,8 +951,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
      * the first disk. Returns false when the OS is unknown, no disk is present, or the footprint does not fit.
      */
     public boolean installOs(final ResourceLocation osId, final int preferredSlot) {
-        // Writing back through setStackInSlot makes onContentsChanged fire (setChanged + build
-        // invalidation); the block update then pushes the new disk state to watching clients.
+        /*
+         * Writing back through setStackInSlot makes onContentsChanged fire (setChanged + build
+         * invalidation); the block update then pushes the new disk state to watching clients.
+         */
         final boolean installed = dev.jstech.computronics.os.OsDisks.installOs(
                 layout.diskCount(), this::diskInSlot,
                 (stack, s) -> hardware.setStackInSlot(layout.diskStart() + s, stack),
@@ -945,9 +979,11 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             if (osId == null) {
                 continue;
             }
-            // Clear the component regardless of whether the OS id is still registered: if an addon OS was
-            // installed and the addon later removed, the id is unknown but the player must still be able to
-            // uninstall it (otherwise they would have to physically pull the disk and risk losing its files).
+            /*
+             * Clear the component regardless of whether the OS id is still registered: if an addon OS was
+             * installed and the addon later removed, the id is unknown but the player must still be able to
+             * uninstall it (otherwise they would have to physically pull the disk and risk losing its files).
+             */
             final ItemStack updated = stack.copy();
             updated.remove(ComputingModule.SYSTEM_OS.get());
             hardware.setStackInSlot(layout.diskStart() + i, updated);
@@ -959,8 +995,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         }
     }
 
-    // Peripheral ownership — the endpoint set + standard owner methods come from
-    // IPeripheralOwnerSupport; only the capacity is hardware-dependent (4 monitors per GPU).
+    /*
+     * Peripheral ownership: the endpoint set + standard owner methods come from
+     * IPeripheralOwnerSupport; only the capacity is hardware-dependent (4 monitors per GPU).
+     */
 
     @Override
     public Set<Long> peripheralEndpoints() {
@@ -981,8 +1019,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         return build.motherboard().peripheralPorts();
     }
 
-    // Network participation (default: a passive client that reads its network from a cable).
-    // The Mainframe overrides this entirely (it owns and orchestrates a network).
+    /*
+     * Network participation (default: a passive client that reads its network from a cable).
+     * The Mainframe overrides this entirely (it owns and orchestrates a network).
+     */
 
     protected abstract void registerNode(NetworkSystem system, NetworkUuid network);
 
@@ -1008,8 +1048,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             registeredNetwork = resolved;
         }
         if (wasAttached != (resolved != null)) {
-            // The desktop's notification area shows whether this machine is on a network, so a cable cut or
-            // laid has to reach the client rather than wait for the next time the monitor is opened.
+            /*
+             * The desktop's notification area shows whether this machine is on a network, so a cable cut or
+             * laid has to reach the client rather than wait for the next time the monitor is opened.
+             */
             setChanged();
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(),
                     net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
@@ -1026,9 +1068,11 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     @Override
     public void setRemoved() {
         super.setRemoved();
-        // The block's onRemove only fires on destruction; a plain chunk unload removes the block entity
-        // without it, so without this the node would stay registered in the still-loaded per-level
-        // network as a phantom. onBroken is idempotent, so the destruction path running both is safe.
+        /*
+         * The block's onRemove only fires on destruction; a plain chunk unload removes the block entity
+         * without it, so without this the node would stay registered in the still-loaded per-level
+         * network as a phantom. onBroken is idempotent, so the destruction path running both is safe.
+         */
         if (level instanceof ServerLevel serverLevel) {
             onBroken(serverLevel);
         }
@@ -1071,13 +1115,15 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
                 && device.acceptedCableTiers().contains(tier);
     }
 
-    // Console state — the Command Prompt's per-computer history and installed programs.
+    // Console state: the Command Prompt's per-computer history and installed programs.
 
     private final dev.jstech.computronics.program.ComputerConsoleState console =
             new dev.jstech.computronics.program.ComputerConsoleState();
 
-    // Script processes — the Cannon programs this machine is running, which live with the machine
-    // rather than with its system disk: they are what it is doing, not what it has installed.
+    /*
+     * Script processes: the Cannon programs this machine is running, which live with the machine
+     * rather than with its system disk: they are what it is doing, not what it has installed.
+     */
 
     private final dev.jstech.computronics.cannon.machine.MachinePrograms cannon =
             new dev.jstech.computronics.cannon.machine.MachinePrograms();
@@ -1218,13 +1264,15 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
      * The disk stack {@link #console} was read from, or null when nothing has been read yet. Identity,
      * not equality: a different stack object means a different physical drive, while writing to the same
      * drive (installing an OS, adding a program) keeps the same object and must NOT discard the state
-     * held in memory — doing that resurrected a cleared live-install session from the older disk copy.
+     * held in memory, because doing that resurrected a cleared live-install session from the older disk copy.
      */
     @Nullable
     private ItemStack consoleDisk;
 
-    // Provided here (no @Override: this base does not itself declare IComputerTerminalHost) so the
-    // computer subclasses that ARE hosts inherit it and satisfy the interface's console() method.
+    /*
+     * Provided here (no @Override: this base does not itself declare IComputerTerminalHost) so the
+     * computer subclasses that ARE hosts inherit it and satisfy the interface's console() method.
+     */
     public dev.jstech.computronics.program.ComputerConsoleState console() {
         final ItemStack disk = systemDisk();
         if (consoleDisk != disk) {
@@ -1254,17 +1302,21 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
      */
     @Override
     public void setChanged() {
-        // Every mutation of installed software ends in setChanged, so this is the one place that
-        // guarantees the disk is current before the player can pull it out. Without it, installing a
-        // program and immediately removing the drive would lose the install: the in-memory state is
-        // discarded when the slot changes, and the world may not have saved in between.
+        /*
+         * Every mutation of installed software ends in setChanged, so this is the one place that
+         * guarantees the disk is current before the player can pull it out. Without it, installing a
+         * program and immediately removing the drive would lose the install: the in-memory state is
+         * discarded when the slot changes, and the world may not have saved in between.
+         */
         flushConsoleToDisk();
         super.setChanged();
     }
 
     protected void flushConsoleToDisk() {
-        // Write back to the drive the state was read from, not to whatever is the system disk now: if a
-        // drive has just been swapped, this state belongs to the old one and must not be copied onto it.
+        /*
+         * Write back to the drive the state was read from, not to whatever is the system disk now: if a
+         * drive has just been swapped, this state belongs to the old one and must not be copied onto it.
+         */
         if (consoleDisk == null || consoleDisk.isEmpty()) {
             return;
         }
@@ -1320,8 +1372,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (tag.contains("Cannon")) {
             cannon.load(tag.getCompound("Cannon"), this);
         }
-        // A world saved before the software moved onto the disk still carries the old block-level tag;
-        // adopt it once so the machine keeps what it had, and it lands on the disk at the next save.
+        /*
+         * A world saved before the software moved onto the disk still carries the old block-level tag;
+         * adopt it once so the machine keeps what it had, and it lands on the disk at the next save.
+         */
         if (tag.contains("Console")) {
             console.load(tag.getCompound("Console"));
             consoleDisk = systemDisk(); // adopt it onto the current drive at the next flush
@@ -1333,8 +1387,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     @Override
     protected void saveAdditional(final CompoundTag tag, final HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        // Push the software onto the disk first: the hardware handler below serializes the disk stacks,
-        // and a flush after that point would be written to a copy and lost.
+        /*
+         * Push the software onto the disk first: the hardware handler below serializes the disk stacks,
+         * and a flush after that point would be written to a copy and lost.
+         */
         flushConsoleToDisk();
         tag.put(hardwareNbtKey(), hardware.serializeNBT(registries));
         tag.putBoolean("ManualOn", manualOn);
@@ -1348,8 +1404,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (nodeUuid != null) {
             tag.putString("NodeUuid", nodeUuid.asString());
         }
-        // The running session survives a reload, exactly like the POST flag: a machine that was left up
-        // with a desktop on screen must come back to that desktop, not fall to a shell.
+        /*
+         * The running session survives a reload, exactly like the POST flag: a machine that was left up
+         * with a desktop on screen must come back to that desktop, not fall to a shell.
+         */
         if (bootedDesktopId != null) {
             tag.putString("BootedDesktop", bootedDesktopId.toString());
         }
@@ -1370,8 +1428,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (!linkedMonitors.isEmpty()) {
             tag.putLongArray("LinkedMonitors", linkedMonitors.stream().mapToLong(Long::longValue).toArray());
         }
-        // The console rides on the system disk, so flush it there BEFORE the hardware handler is
-        // serialized above — otherwise the write would land on a disk stack that was already copied.
+        /*
+         * The console rides on the system disk, so flush it there BEFORE the hardware handler is
+         * serialized above, or the write would land on a disk stack that was already copied.
+         */
         saveExtra(tag, registries);
     }
 
@@ -1381,8 +1441,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
         if (!computerName.isEmpty()) {
             tag.putString("ComputerName", computerName);
         }
-        // Whether this machine is on a data network: the desktop's notification area reads it, so it has to
-        // travel to the client and be refreshed when a cable comes or goes.
+        /*
+         * Whether this machine is on a data network: the desktop's notification area reads it, so it has to
+         * travel to the client and be refreshed when a cable comes or goes.
+         */
         tag.putBoolean("Networked", networkUuid != null);
         return tag;
     }
@@ -1390,8 +1452,10 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     @Override
     public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener>
             getUpdatePacket() {
-        // Without this, a mid-session rename (which calls sendBlockUpdated) never reaches the client, so
-        // reopening the assembly screen reads a stale, empty name from the client copy of this block entity.
+        /*
+         * Without this, a mid-session rename (which calls sendBlockUpdated) never reaches the client, so
+         * reopening the assembly screen reads a stale, empty name from the client copy of this block entity.
+         */
         return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
     }
 
@@ -1399,9 +1463,11 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     public void onDataPacket(final net.minecraft.network.Connection connection,
                              final net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket packet,
                              final HolderLookup.Provider registries) {
-        // Apply only the display name from a live block update. The rest of the client state is kept in sync
-        // through the menu's ContainerData; running the full loadAdditional here would reset transient fields
-        // (power, autostart, linked monitors) to their defaults because the update tag is intentionally minimal.
+        /*
+         * Apply only the display name from a live block update. The rest of the client state is kept in sync
+         * through the menu's ContainerData; running the full loadAdditional here would reset transient fields
+         * (power, autostart, linked monitors) to their defaults because the update tag is intentionally minimal.
+         */
         final CompoundTag tag = packet.getTag();
         computerName = tag != null ? tag.getString("ComputerName") : "";
         clientNetworked = tag != null && tag.getBoolean("Networked");

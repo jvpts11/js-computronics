@@ -33,7 +33,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A structural part of the Server Rack — one of the 11 non-controller blocks of the 2x3x2 cabinet.
+ * A structural part of the Server Rack, one of the 11 non-controller blocks of the 2x3x2 cabinet.
  */
 public class ServerRackPartBlock extends Block implements EntityBlock, IRearFacingDataPort {
 
@@ -45,7 +45,7 @@ public class ServerRackPartBlock extends Block implements EntityBlock, IRearFaci
     /**
      * Whether this part belongs to a Supercomputer Rack. The parts are one shared block, and a model
      * cannot ask the controller what cabinet it is, so the controller stamps the cabinet type on each
-     * part it raises — that is what lets the whole cabinet wear one livery, not just its base block.
+     * part it raises, and that is what lets the whole cabinet wear one livery, not just its base block.
      */
     public static final BooleanProperty COMPUTE = BooleanProperty.create("compute");
 
@@ -81,9 +81,11 @@ public class ServerRackPartBlock extends Block implements EntityBlock, IRearFaci
     @Override
     public boolean connectsOnFace(final BlockState state, final net.minecraft.core.Direction face,
                                   final DataTier tier) {
-        // A compute cabinet is on the high-compute fabric only; a server cabinet takes every data tier but
-        // that one. The cable's rendered nub and the cabinet's own link follow this same rule, so a data
-        // cable on a supercomputer cabinet neither shows a connection nor makes one.
+        /*
+         * A compute cabinet is on the high-compute fabric only; a server cabinet takes every data tier but
+         * that one. The cable's rendered nub and the cabinet's own link follow this same rule, so a data
+         * cable on a supercomputer cabinet neither shows a connection nor makes one.
+         */
         return state.getValue(COMPUTE) == (tier == DataTier.HPC);
     }
 
@@ -172,8 +174,10 @@ public class ServerRackPartBlock extends Block implements EntityBlock, IRearFaci
         if (!state.is(newState.getBlock()) && level instanceof ServerLevel serverLevel
                 && level.getBlockEntity(pos) instanceof ServerRackPartBlockEntity part
                 && part.controllerPos() != null) {
-            // The controller is still present when a part is broken; read its facing
-            // so the whole cabinet dissolves. (Re-entrant calls are guarded.)
+            /*
+             * The controller is still present when a part is broken; read its facing
+             * so the whole cabinet dissolves. (Re-entrant calls are guarded.)
+             */
             final BlockState controller = level.getBlockState(part.controllerPos());
             if (controller.getBlock()
                     instanceof dev.jstech.core.multiblock.AbstractMultiblockControllerBlock owner) {

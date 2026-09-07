@@ -20,8 +20,8 @@ import java.util.Optional;
 /**
  * Client to server: the Network Interactor hands the player's held cursor stack to the network (Network tab)
  * or the host's local storage (Storage tab), mirroring the MC-NET terminal's deposit. A {@code whole} deposit
- * pushes the entire held stack as items; otherwise ONE is handed over — one item, or what a held container
- * holds — and, when the click landed on a fluid or chemical entry a held empty container could take,
+ * pushes the entire held stack as items; otherwise ONE is handed over (one item, or what a held container
+ * holds) and, when the click landed on a fluid or chemical entry a held empty container could take,
  * {@code entry} names it so the container fills from it instead.
  *
  * @param host       the computer the desktop is bound to

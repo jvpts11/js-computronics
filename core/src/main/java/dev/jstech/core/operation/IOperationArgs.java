@@ -11,5 +11,5 @@ package dev.jstech.core.operation;
  * Marker interface for typed argument records that accompany an Operation payload.
  */
 public interface IOperationArgs {
-    // Marker interface — no methods required.
+    // Marker interface, no methods required.
 }

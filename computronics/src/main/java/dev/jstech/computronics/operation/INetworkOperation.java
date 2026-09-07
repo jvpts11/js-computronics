@@ -13,7 +13,7 @@ import dev.jstech.core.operation.OperationPriority;
 import java.util.UUID;
 
 /**
- * A multi-tick network Operation the Mainframe advances over time — a SELECT, INSERT or DELETE that has been decomposed into SubOperations and streams its items respecting storage latency and the Mainframe's orchestration budget.
+ * A multi-tick network Operation the Mainframe advances over time: a SELECT, INSERT or DELETE that has been decomposed into SubOperations and streams its items respecting storage latency and the Mainframe's orchestration budget.
  */
 public interface INetworkOperation {
 

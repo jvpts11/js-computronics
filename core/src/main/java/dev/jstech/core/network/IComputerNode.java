@@ -11,7 +11,7 @@ import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.core.uuid.NodeUuid;
 
 /**
- * Sealed root for "computer-shaped" nodes in the network — Mainframes and Subframes.
+ * Sealed root for "computer-shaped" nodes in the network (Mainframes and Subframes).
  */
 public sealed interface IComputerNode extends INetworkNode permits MainframeNode, SubframeNode {
 

@@ -87,9 +87,11 @@ public final class FilesApp implements IDesktopApp {
     private String os = "frames_95";
 
     private final BlockPos host;
-    // The monitor the desktop is shown on, needed to authenticate the sanctioned .dat-to-medium item
-    // transfer (the server validates the player is within reach of this monitor). May be null when the
-    // explorer is opened outside a desktop context.
+    /*
+     * The monitor the desktop is shown on, needed to authenticate the sanctioned .dat-to-medium item
+     * transfer (the server validates the player is within reach of this monitor). May be null when the
+     * explorer is opened outside a desktop context.
+     */
     @Nullable
     private final BlockPos monitorPos;
     private String dir = "";
@@ -107,16 +109,20 @@ public final class FilesApp implements IDesktopApp {
 
     private boolean iconView;
 
-    // An inline rename edits the row named by its path, so a listing that arrives meanwhile cannot make
-    // the field commit onto a different row.
+    /*
+     * An inline rename edits the row named by its path, so a listing that arrives meanwhile cannot make
+     * the field commit onto a different row.
+     */
     private int renaming = -1;
     @Nullable
     private String renamePath;
     private String renameExt = "";
     private int volRenaming = -1;
 
-    // Drag-and-drop state: the row picked up on press, whether a drag is in progress, and the
-    // current cursor position for the drag ghost.
+    /*
+     * Drag-and-drop state: the row picked up on press, whether a drag is in progress, and the
+     * current cursor position for the drag ghost.
+     */
     private int dragRow = -1;
     private boolean dragging;
     private double dragMx;
@@ -124,9 +130,11 @@ public final class FilesApp implements IDesktopApp {
     // The folder row a drag hovers, outlined in the list; computed once per frame.
     private int dropTarget = -1;
 
-    // Rubber-band selection over the file list. Pressing on empty space below the last row starts a
-    // sweep; every row it crosses joins the selection. It never starts on a row, so the existing
-    // click-and-drag of a file into a folder keeps working untouched.
+    /*
+     * Rubber-band selection over the file list. Pressing on empty space below the last row starts a
+     * sweep; every row it crosses joins the selection. It never starts on a row, so the existing
+     * click-and-drag of a file into a folder keeps working untouched.
+     */
     private boolean bandActive;
     private double bandStartX;
     private double bandStartY;
@@ -149,7 +157,7 @@ public final class FilesApp implements IDesktopApp {
 
     private static FilesApp active;
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final Button backButton;
     private final Button forwardButton;
@@ -171,8 +179,10 @@ public final class FilesApp implements IDesktopApp {
     private final Label[] propertyValues = new Label[PROPERTY_ROWS];
     private final Button propertiesClose;
 
-    // The content rectangle and cursor of the last render: the components are laid out in it, and the
-    // click that follows arrives in the same coordinates.
+    /*
+     * The content rectangle and cursor of the last render: the components are laid out in it, and the
+     * click that follows arrives in the same coordinates.
+     */
     private int lastX;
     private int lastY;
     private int contentW = FilesLayout.DEFAULT_W;
@@ -357,7 +367,7 @@ public final class FilesApp implements IDesktopApp {
         return properties.isOpen();
     }
 
-    // ---- navigation ------------------------------------------------------------------------
+    // navigation
 
     @Override
     public void onRestored() {
@@ -465,7 +475,7 @@ public final class FilesApp implements IDesktopApp {
         return anyFile;
     }
 
-    // ---- listing ---------------------------------------------------------------------------
+    // listing
 
     private void rebuild(final List<DiskFilesPayload.WireFile> files) {
         final List<Row> built = new ArrayList<>();
@@ -633,7 +643,7 @@ public final class FilesApp implements IDesktopApp {
         return index == selected || bandRows.contains(index);
     }
 
-    // ---- the drive tree --------------------------------------------------------------------
+    // the drive tree
 
     private List<TreeItem> tree() {
         final List<TreeItem> out = new ArrayList<>();
@@ -701,14 +711,16 @@ public final class FilesApp implements IDesktopApp {
         return out;
     }
 
-    // ---- rendering -------------------------------------------------------------------------
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
-        // The front (last-rendered) explorer window owns the DiskFilesPayload routing, so two open
-        // Files windows don't leave the back one as a stale target and a closed one stops receiving.
+        /*
+         * The front (last-rendered) explorer window owns the DiskFilesPayload routing, so two open
+         * Files windows don't leave the back one as a stale target and a closed one stops receiving.
+         */
         active = this;
         lastX = x;
         lastY = y;
@@ -964,7 +976,7 @@ public final class FilesApp implements IDesktopApp {
         properties.placeIn(lastX, lastY, contentW, contentH);
     }
 
-    // ---- input -----------------------------------------------------------------------------
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
@@ -1015,8 +1027,10 @@ public final class FilesApp implements IDesktopApp {
     private void rowClicked(final int index, final int button, final double mx, final double my) {
         final boolean onRow = index >= 0 && index < rows.size();
         if (button == 1) {
-            // Right-click: select the row under the cursor and open the context menu there. A sweep
-            // survives only when the menu is opened on one of the rows it selected.
+            /*
+             * Right-click: select the row under the cursor and open the context menu there. A sweep
+             * survives only when the menu is opened on one of the rows it selected.
+             */
             if (!onRow || !bandRows.contains(index)) {
                 bandRows.clear();
             }
@@ -1028,8 +1042,10 @@ public final class FilesApp implements IDesktopApp {
         if (!onRow) {
             selected = -1;
             bandRows.clear();
-            // Pressing empty space in the list starts a sweep, in the coordinates the row hit test uses,
-            // so the band lines up with what it selects.
+            /*
+             * Pressing empty space in the list starts a sweep, in the coordinates the row hit test uses,
+             * so the band lines up with what it selects.
+             */
             if (!iconView) {
                 bandActive = true;
                 bandStartX = mx;
@@ -1158,8 +1174,10 @@ public final class FilesApp implements IDesktopApp {
             return;
         }
         final int[] r = bandRect();
-        // Only rows actually on screen are candidates. Sweeping past the bottom of the list must not
-        // reach rows scrolled out of view: they would be deleted without ever having looked selected.
+        /*
+         * Only rows actually on screen are candidates. Sweeping past the bottom of the list must not
+         * reach rows scrolled out of view: they would be deleted without ever having looked selected.
+         */
         final int first = fileList.scroll();
         final int last = Math.min(rows.size(), first + fileList.visibleRows());
         for (int i = first; i < last; i++) {
@@ -1194,8 +1212,10 @@ public final class FilesApp implements IDesktopApp {
             final boolean srcIsDat = src.file() != null && src.file().projectsItem();
             if (srcIsDat) {
                 if (mediaDest != null) {
-                    // The one sanctioned .dat action: drop onto a removable medium fires a conservative item
-                    // transfer (the stored item leaves the computer and appears on the medium), not a file move.
+                    /*
+                     * The one sanctioned .dat action: drop onto a removable medium fires a conservative item
+                     * transfer (the stored item leaves the computer and appears on the medium), not a file move.
+                     */
                     if (monitorPos != null) {
                         PacketDistributor.sendToServer(new MediumTransferPayload(host, monitorPos, src.file().path(), mediaDest));
                         request(dir);
@@ -1319,7 +1339,7 @@ public final class FilesApp implements IDesktopApp {
         return true;
     }
 
-    // ---- actions ---------------------------------------------------------------------------
+    // actions
 
     /** Opens a row: a folder navigates; an installer's setup runs; a text file opens in the Editor. */
     private void open(final Row r) {
@@ -1338,8 +1358,10 @@ public final class FilesApp implements IDesktopApp {
                 if (isSetup(r)) {
                     runSetup(r.file().path());
                 } else if (isProgram(r.file())) {
-                    // A compiled program is run, not read: it gets a terminal, the way one does anywhere
-                    // else, and prints into it.
+                    /*
+                     * A compiled program is run, not read: it gets a terminal, the way one does anywhere
+                     * else, and prints into it.
+                     */
                     DesktopScreen.requestRunAtTerminal(r.file().path());
                 } else if (!r.file().projectsItem() && isText(r.file())) {
                     openInEditor(r);
@@ -1479,8 +1501,10 @@ public final class FilesApp implements IDesktopApp {
     }
 
     private void deleteContextRow() {
-        // A sweep that selected several rows deletes all of them: selecting many and then acting on
-        // one would make the selection a lie.
+        /*
+         * A sweep that selected several rows deletes all of them: selecting many and then acting on
+         * one would make the selection a lie.
+         */
         if (bandRows.size() > 1 && bandRows.contains(ctxRow)) {
             boolean locked = false;
             for (final int index : bandRows) {
@@ -1563,7 +1587,7 @@ public final class FilesApp implements IDesktopApp {
         volumeField.setVisible(false);
     }
 
-    // ---- keyboard --------------------------------------------------------------------------
+    // keyboard
 
     @Override
     public boolean charTyped(final char c) {
@@ -1684,7 +1708,7 @@ public final class FilesApp implements IDesktopApp {
         return false;
     }
 
-    // ---- icons and helpers -----------------------------------------------------------------
+    // icons and helpers
 
     /** What to call a file of a language the machines know, or a plain description when they know none. */
     private static String languageLabel(final String ext) {

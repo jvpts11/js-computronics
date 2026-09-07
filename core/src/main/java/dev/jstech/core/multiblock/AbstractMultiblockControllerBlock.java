@@ -37,15 +37,17 @@ public abstract class AbstractMultiblockControllerBlock
         extends HorizontalDirectionalBlock
         implements EntityBlock, IMultiblockBlock {
 
-    // Per-controller process-wide reentrancy guard. onRemove fires again for every cell removed during a dissolve, so
-    // without this the teardown would recurse into itself; the controller position keys the in-flight teardown.
+    /*
+     * Per-controller process-wide reentrancy guard. onRemove fires again for every cell removed during a dissolve, so
+     * without this the teardown would recurse into itself; the controller position keys the in-flight teardown.
+     */
     private final Set<BlockPos> dissolving = ConcurrentHashMap.newKeySet();
 
     protected AbstractMultiblockControllerBlock(final Properties properties) {
         super(properties);
     }
 
-    // ---- the vary points each subclass supplies ------------------------------
+    // the vary points each subclass supplies
 
     /** Footprint geometry; also backs {@link IMultiblockBlock#footprint(BlockPos, Direction)}. */
     protected abstract IMultiblockGeometry geometry();
@@ -67,7 +69,7 @@ public abstract class AbstractMultiblockControllerBlock
     protected void onControllerBroken(final ServerLevel level, final BlockPos controller) {
     }
 
-    // ---- the shared lifecycle (identical for every controller) ----------------
+    // the shared lifecycle (identical for every controller)
 
     @Override
     public final List<BlockPos> footprint(final BlockPos origin, final Direction facing) {
@@ -78,8 +80,10 @@ public abstract class AbstractMultiblockControllerBlock
     public void setPlacedBy(final Level level, final BlockPos pos, final BlockState state,
                             @Nullable final LivingEntity placer, final ItemStack stack) {
         super.setPlacedBy(level, pos, state, placer, stack);
-        // Build the whole footprint on BOTH sides so the client predicts the structure at once; only the server binds
-        // each part back to its controller.
+        /*
+         * Build the whole footprint on BOTH sides so the client predicts the structure at once; only the server binds
+         * each part back to its controller.
+         */
         final Direction facing = state.getValue(FACING);
         final boolean server = !level.isClientSide();
         for (final BlockPos part : geometry().partPositions(pos, facing)) {
@@ -110,7 +114,7 @@ public abstract class AbstractMultiblockControllerBlock
         super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
-    /** Reentrancy-guarded teardown — also callable from a part block when it is the cell that is broken. */
+    /** Reentrancy-guarded teardown, also callable from a part block when it is the cell that is broken. */
     public void dissolve(final ServerLevel level, final BlockPos controllerPos, final Direction facing) {
         if (!dissolving.add(controllerPos.immutable())) {
             return;

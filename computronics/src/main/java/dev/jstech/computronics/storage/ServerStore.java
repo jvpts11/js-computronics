@@ -18,7 +18,7 @@ import java.util.Map;
 /**
  * A live, capacity-bounded view of one rack unit's storage: the union of the bay drives its chassis
  * claims from the rack's front-panel hotswap slots. The data lives on each drive's own disk
- * components — exactly like a computer's local disks — so pulling a drive takes its data with it,
+ * components (exactly like a computer's local disks) so pulling a drive takes its data with it,
  * and pulling the server leaves both drives and data in the rack for the next chassis.
  */
 public final class ServerStore implements IWeightedStore {
@@ -37,14 +37,20 @@ public final class ServerStore implements IWeightedStore {
     }
 
     private LocalStore drives() {
-        // A cabinet that left the world this tick still sits in shared per-tick views; it reads as empty
-        // rather than serving drives that have already dropped as items.
+        /*
+         * A cabinet that left the world this tick still sits in shared per-tick views; it reads as empty
+         * rather than serving drives that have already dropped as items.
+         */
         final List<ItemStack> claimed = rack.isRemoved() ? List.of() : rack.claimedDriveStacks(serverSlot);
-        // With the Load Balancer running, writes spread across the bay's drives instead of filling
-        // them in order — the service's whole point.
+        /*
+         * With the Load Balancer running, writes spread across the bay's drives instead of filling
+         * them in order, the service's whole point.
+         */
         return new LocalStore(claimed, () -> {
-            // Component writes on the drive stacks never pass through the item handler, so bump the
-            // bay's change counter here — this is what lets the NetworkIndex re-read only changed bays.
+            /*
+             * Component writes on the drive stacks never pass through the item handler, so bump the
+             * bay's change counter here, which is what lets the NetworkIndex re-read only changed bays.
+             */
             rack.markStorageChanged(serverSlot);
             rack.setChanged();
         }, rack.hasService(serverSlot, "load_balancer"));
@@ -58,16 +64,20 @@ public final class ServerStore implements IWeightedStore {
         if (rack.raidFailed(serverSlot)) {
             return 0L; // the array lost more members than its mode tolerates
         }
-        // A configured array presents ONE logical volume whose size its mode decides; the drives
-        // behind it are members, not separate disks.
+        /*
+         * A configured array presents ONE logical volume whose size its mode decides; the drives
+         * behind it are members, not separate disks.
+         */
         final List<Long> sizes = new ArrayList<>();
         for (final ItemStack drive : rack.claimedDriveStacks(serverSlot)) {
             if (drive.getItem() instanceof dev.jstech.computronics.item.DiskItem disk) {
                 sizes.add(disk.spec().capacityItems());
             }
         }
-        // A degraded array still presents the volume it promised, so the size is charged against the
-        // member count it was formed with rather than what is left in the bay right now.
+        /*
+         * A degraded array still presents the volume it promised, so the size is charged against the
+         * member count it was formed with rather than what is left in the bay right now.
+         */
         return mode.usableCapacity(sizes, rack.raidMemberCount(serverSlot));
     }
 
@@ -80,8 +90,10 @@ public final class ServerStore implements IWeightedStore {
     }
 
     public long freeWeight() {
-        // Bounded by the logical volume, not by the raw drives: a mirror's spare members are
-        // redundancy, never extra room.
+        /*
+         * Bounded by the logical volume, not by the raw drives: a mirror's spare members are
+         * redundancy, never extra room.
+         */
         return Math.max(0L, Math.min(capacityWeight() - usedWeight(), drives().freeWeight()));
     }
 
@@ -102,8 +114,10 @@ public final class ServerStore implements IWeightedStore {
     }
 
     public long count(final Item item) {
-        // Counting by Item aggregates every stored variant of it (named, enchanted, ...), while
-        // counting by StorageKey stays variant-exact — callers rely on both behaviors.
+        /*
+         * Counting by Item aggregates every stored variant of it (named, enchanted, ...), while
+         * counting by StorageKey stays variant-exact, and callers rely on both behaviors.
+         */
         long total = 0L;
         for (final Map.Entry<StorageKey, Long> entry : view().entrySet()) {
             if (entry.getKey().item() == item) {
@@ -117,8 +131,10 @@ public final class ServerStore implements IWeightedStore {
         if (amount <= 0L) {
             return 0L;
         }
-        // Never write past the logical volume: with an array configured the usable size is the
-        // mode's, so the surplus physical room stays reserved for redundancy.
+        /*
+         * Never write past the logical volume: with an array configured the usable size is the
+         * mode's, so the surplus physical room stays reserved for redundancy.
+         */
         final long roomNative = freeWeight() / key.weight(1L);
         return roomNative <= 0L ? 0L : drives().insert(key, Math.min(amount, roomNative));
     }

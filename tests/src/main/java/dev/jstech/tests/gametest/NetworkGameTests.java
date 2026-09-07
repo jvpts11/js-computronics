@@ -410,9 +410,11 @@ public final class NetworkGameTests {
         helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
         helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
         final PersonalComputerBlockEntity pc = placeRunningPC(helper, pcPos);
-        // Install the smallest disk (2000-item capacity) and seed it with 100 cobblestone, all private
-        // by default (0 permille). Public storage is a capacity-fraction budget: a permille of 15 on a
-        // 2000-item disk publishes a 30-item budget, so 30 of the 100 become public, 70 stay private.
+        /*
+         * Install the smallest disk (2000-item capacity) and seed it with 100 cobblestone, all private
+         * by default (0 permille). Public storage is a capacity-fraction budget: a permille of 15 on a
+         * 2000-item disk publishes a 30-item budget, so 30 of the 100 become public, 70 stay private.
+         */
         pc.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.GB_500)));
         final java.util.function.IntConsumer publish = permille ->
@@ -436,8 +438,10 @@ public final class NetworkGameTests {
                 })
                 .thenExecuteAfter(4, () -> helper.assertTrue(countIn(dest, Items.COBBLESTONE) == 0,
                         "nothing should have moved while the PC is fully private"))
-                // Publish a 30-item budget (15 permille of the 2000-item disk): 30 of the 100 become
-                // public; the other 70 stay private.
+                /*
+                 * Publish a 30-item budget (15 permille of the 2000-item disk): 30 of the 100 become
+                 * public; the other 70 stay private.
+                 */
                 .thenExecute(() -> publish.accept(15))
                 .thenExecuteAfter(4, () -> {
                     helper.assertTrue(mainframe.networkIndex().available(Items.COBBLESTONE) == 30,
@@ -453,8 +457,10 @@ public final class NetworkGameTests {
                             "the private remainder stays on the PC; got "
                                     + pc.localStore().count(StorageKey.of(Items.COBBLESTONE)));
                 })
-                // The public budget is a standing ceiling: 30 of the remaining 70 are public again, so
-                // a repeat pull yields another 30 and never reaches the private floor.
+                /*
+                 * The public budget is a standing ceiling: 30 of the remaining 70 are public again, so
+                 * a repeat pull yields another 30 and never reaches the private floor.
+                 */
                 .thenExecuteAfter(4, () -> helper.assertTrue(
                         mainframe.networkIndex().available(Items.COBBLESTONE) == 30,
                         "the budget re-exposes 30 of the remaining 70; got "
@@ -495,11 +501,13 @@ public final class NetworkGameTests {
                 .thenSucceed();
     }
 
-    // Era Personal Computers (Vintage / Legacy) — the right-click assembly GUI must open exactly
-    // like the Standard one. The three blocks share PersonalComputerBlockEntity, the menu and the
-    // screen; the era blocks only override era() and codec(). These tests open the menu through the
-    // real interaction path and verify the server keeps it open (stillValid), which is what actually
-    // decides whether the player sees the GUI.
+    /*
+     * Era Personal Computers (Vintage / Legacy): the right-click assembly GUI must open exactly
+     * like the Standard one. The three blocks share PersonalComputerBlockEntity, the menu and the
+     * screen; the era blocks only override era() and codec(). These tests open the menu through the
+     * real interaction path and verify the server keeps it open (stillValid), which is what actually
+     * decides whether the player sees the GUI.
+     */
 
     @GameTest(template = ARENA)
     public static void standardPc_rightClickOpensAndKeepsMenu(final GameTestHelper helper) {
@@ -532,16 +540,20 @@ public final class NetworkGameTests {
         final BlockPos pos = new BlockPos(2, 2, 2);
         helper.setBlock(pos, block);
 
-        // The block entity must be created for the era blocks too, or useWithoutItem's instanceof
-        // check fails silently and no menu ever opens.
+        /*
+         * The block entity must be created for the era blocks too, or useWithoutItem's instanceof
+         * check fails silently and no menu ever opens.
+         */
         if (!(helper.getBlockEntity(pos) instanceof PersonalComputerBlockEntity be)) {
             helper.fail("no PersonalComputerBlockEntity at " + pos + " for block " + block + " ("
                     + blockItem + ")");
             return;
         }
 
-        // A plain mock player (no networking, so opening menus broadcasts nothing) standing on the
-        // block, well inside the interaction reach stillValid also checks.
+        /*
+         * A plain mock player (no networking, so opening menus broadcasts nothing) standing on the
+         * block, well inside the interaction reach stillValid also checks.
+         */
         final net.minecraft.world.entity.player.Player player =
                 helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
         final BlockPos absolute = helper.absolutePos(pos);
@@ -556,8 +568,10 @@ public final class NetworkGameTests {
         // The block's own name must resolve without throwing (useWithoutItem uses it as the title).
         helper.assertTrue(block.getName() != null, "block name must resolve for " + block);
 
-        // The decisive check: the server validates the open menu against the block at the position
-        // every tick. If stillValid is false the menu is closed at once, so the player never sees it.
+        /*
+         * The decisive check: the server validates the open menu against the block at the position
+         * every tick. If stillValid is false the menu is closed at once, so the player never sees it.
+         */
         helper.assertTrue(menu.stillValid(player),
                 "the Personal Computer menu must stay valid for " + block
                         + "; a menu that is not stillValid is closed immediately, so the GUI never opens");
@@ -700,8 +714,10 @@ public final class NetworkGameTests {
         final BlockPos controller = new BlockPos(4, 2, 4);
         final Direction facing = Direction.NORTH;
         final MainframeBlockEntity be = formRunningMainframe(helper, controller, facing);
-        // The far-right part sits two blocks from the controller; a cable on its
-        // outward face is never adjacent to the controller itself.
+        /*
+         * The far-right part sits two blocks from the controller; a cable on its
+         * outward face is never adjacent to the controller itself.
+         */
         final BlockPos farPart = controller.relative(facing.getClockWise());
         final BlockPos cable = farPart.relative(facing.getClockWise());
         helper.setBlock(cable, ComputingModule.HBW_CABLE.get());
@@ -754,8 +770,10 @@ public final class NetworkGameTests {
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1)));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    // The installed OS (mc_net, 512-item footprint) reserves part of the disk;
-                    // the usable storage is the raw disk capacity minus the OS reservation.
+                    /*
+                     * The installed OS (mc_net, 512-item footprint) reserves part of the disk;
+                     * the usable storage is the raw disk capacity minus the OS reservation.
+                     */
                     final long osFootprint = be.reservedByOs();
                     final long expected = DiskSize.TB_1.capacityItems() - osFootprint;
                     helper.assertTrue(
@@ -810,9 +828,9 @@ public final class NetworkGameTests {
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos rack = new BlockPos(4, 2, 2);     // controller; footprint x[4,5] y[2,4] z[2,3]
         final BlockPos part = new BlockPos(4, 3, 2);     // a front part, one up from the controller
-        // A cable run from the part's outward face to the mainframe — it touches the
+        // A cable run from the part's outward face to the mainframe, and it touches the
         final BlockPos[] cables = {
-            new BlockPos(2, 3, 2), // against the REAR face of part (3,3,2) — parts only
+            new BlockPos(2, 3, 2), // against the REAR face of part (3,3,2), parts only
             new BlockPos(2, 2, 2), // claimed by the mainframe
         };
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
@@ -1056,8 +1074,10 @@ public final class NetworkGameTests {
                     helper.assertTrue(mainframe.networkUuid() != null, "mainframe owns a network");
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 100);
                 })
-                // Let the incremental ANALYZE index the seeded items, then hold the type so the
-                // SELECT can never finish: it stays in-flight (WAITING) until we power off.
+                /*
+                 * Let the incremental ANALYZE index the seeded items, then hold the type so the
+                 * SELECT can never finish: it stays in-flight (WAITING) until we power off.
+                 */
                 .thenExecuteAfter(3, () -> {
                     final long held = mainframe.lockType(cobble, Long.MAX_VALUE, null);
                     helper.assertTrue(held == 100, "LOCK must hold all 100 cobblestone; got " + held);
@@ -1069,8 +1089,10 @@ public final class NetworkGameTests {
                     helper.assertTrue(op[0].isWaiting(), "the SELECT must be in-flight (WAITING) before power-off");
                     mainframe.togglePower(); // power off with an Operation still in flight
                 })
-                // Powering off makes the next tick run closeDispatch(), which abandons every
-                // in-flight Operation and records it so the log keeps a trace instead of losing it.
+                /*
+                 * Powering off makes the next tick run closeDispatch(), which abandons every
+                 * in-flight Operation and records it so the log keeps a trace instead of losing it.
+                 */
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertFalse(mainframe.isRunning(), "the mainframe is powered off");
                     final boolean discarded = mainframe.recentOperations().stream()
@@ -1199,7 +1221,7 @@ public final class NetworkGameTests {
                     store.insert(Items.COBBLESTONE, 200);
 
                     helper.assertTrue(computer.networkUuid() != null, "PC must be on the network");
-                    // The PC resolves the SAME network as the server's Rack across the Router —
+                    // The PC resolves the SAME network as the server's Rack across the Router.
                     final NetworkUuid net = computer.networkUuid();
                     final NetworkStorage ns = NetworkStorage.of(helper.getLevel(), net);
                     helper.assertTrue(ns.count(Items.COBBLESTONE) == 200,
@@ -1467,11 +1489,15 @@ public final class NetworkGameTests {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
                     helper.assertTrue(computer.networkUuid() != null, "PC must be on the network");
                 })
-                // Let the Mainframe's in-RAM catalog pick up the freshly seeded items before the SELECT
-                // locks against it (the terminal only ever lets a player pick an already-indexed item).
+                /*
+                 * Let the Mainframe's in-RAM catalog pick up the freshly seeded items before the SELECT
+                 * locks against it (the terminal only ever lets a player pick an already-indexed item).
+                 */
                 .thenExecuteAfter(2, () -> {
-                    // The terminal SELECT-to-storage resolves the computer's local storage as the
-                    // destination; route the timed pull straight into it.
+                    /*
+                     * The terminal SELECT-to-storage resolves the computer's local storage as the
+                     * destination; route the timed pull straight into it.
+                     */
                     final var op = mainframe.submitNetworkSelect(Items.COBBLESTONE, 50,
                             computer.localStorage(), "storage", null);
                     helper.assertTrue(op != null, "Mainframe should dispatch the SELECT-to-storage Operation");
@@ -1504,7 +1530,7 @@ public final class NetworkGameTests {
         helper.setBlock(router, ComputingModule.PERSONAL_ROUTER.get());
         helper.setBlock(eth, ComputingModule.ETHERNET_CABLE.get());
         final PersonalComputerBlockEntity computer = placeRunningPC(helper, pc);
-        // A 500 GB disk holds 2,000 items — the SELECT below asks for more than that.
+        // A 500 GB disk holds 2,000 items, and the SELECT below asks for more than that.
         computer.getHardware().setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.GB_500)));
         helper.setBlock(rack, ComputingModule.SERVER_RACK.get().defaultBlockState()
@@ -1610,9 +1636,11 @@ public final class NetworkGameTests {
     public static void installedHardware_persistsAcrossReload(final GameTestHelper helper) {
         final BlockPos a = new BlockPos(2, 2, 2);
         final MainframeBlockEntity be = placeRunningMainframe(helper, a);
-        // Add an extra CPU and a disk on top of the valid build, so a wrong/changed hardware NBT key
-        // (the Mainframe persists under "Inventory", not the base's "Hardware") would be caught here:
-        // the reloaded build would silently lose these components.
+        /*
+         * Add an extra CPU and a disk on top of the valid build, so a wrong/changed hardware NBT key
+         * (the Mainframe persists under "Inventory", not the base's "Hardware") would be caught here:
+         * the reloaded build would silently lose these components.
+         */
         be.getInventory().setStackInSlot(MainframeBlockEntity.CPU_SLOTS_START + 1,
                 new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
         be.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
@@ -1621,8 +1649,10 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     final long capacityBefore = be.capacity();
                     final long storageBefore = be.storageItems();
-                    // The OS (installed by the setup helper) reserves part of the disk; the usable storage is
-                    // the raw disk capacity minus the OS footprint.
+                    /*
+                     * The OS (installed by the setup helper) reserves part of the disk; the usable storage is
+                     * the raw disk capacity minus the OS footprint.
+                     */
                     final long expectedStorage = DiskSize.TB_1.capacityItems() - be.reservedByOs();
                     helper.assertTrue(storageBefore == expectedStorage,
                             "build should report the disk's capacity net of the OS footprint before reload; got "
@@ -1698,10 +1728,12 @@ public final class NetworkGameTests {
 
     @GameTest(template = ARENA)
     public static void importBus_flushConservation(final GameTestHelper helper) {
-        // Break the cable while items are in the "flushed" state (extracted from source,
-        // INSERT dispatched but not yet settled) and verify nothing is silently discarded.
-        // Items must be conserved: either in network storage (if INSERT completed first)
-        // or dropped as entities at the cable position (if INSERT was still in flight).
+        /*
+         * Break the cable while items are in the "flushed" state (extracted from source,
+         * INSERT dispatched but not yet settled) and verify nothing is silently discarded.
+         * Items must be conserved: either in network storage (if INSERT completed first)
+         * or dropped as entities at the cable position (if INSERT was still in flight).
+         */
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos rack = new BlockPos(2, 2, 3);
         final MainframeBlockEntity mainframe = placeRunningMainframe(helper, m);
@@ -1727,10 +1759,12 @@ public final class NetworkGameTests {
             container.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
         }
 
-        // After SETTLE the network is live and extraction starts. FLUSH_TICKS (20) later the bus
-        // dispatches an INSERT; the HDD's disk-seek latency (10 ticks) means the INSERT is still
-        // in flight at tick SETTLE+22. Breaking the cable at that point exercises the dropContents
-        // path for in-flight flushes — items must not vanish.
+        /*
+         * After SETTLE the network is live and extraction starts. FLUSH_TICKS (20) later the bus
+         * dispatches an INSERT; the HDD's disk-seek latency (10 ticks) means the INSERT is still
+         * in flight at tick SETTLE+22. Breaking the cable at that point exercises the dropContents
+         * path for in-flight flushes, and items must not vanish.
+         */
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 22, () -> helper.destroyBlock(cableEnd))
                 .thenExecuteAfter(SETTLE, () -> {
@@ -2008,8 +2042,10 @@ public final class NetworkGameTests {
         rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
         rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_8)));
 
-        // A large INSERT: far beyond one tick of the server's RAM-bounded write rate, so it is
-        // certainly still in flight when power is cut a few ticks in.
+        /*
+         * A large INSERT: far beyond one tick of the server's RAM-bounded write rate, so it is
+         * certainly still in flight when power is cut a few ticks in.
+         */
         final long demand = 30_000L;
         final java.util.concurrent.atomic.AtomicReference<
                 dev.jstech.computronics.operation.NetworkInsertOperation> opBox =
@@ -2514,8 +2550,10 @@ public final class NetworkGameTests {
 
     // Helpers
 
-    // Package-private so the performance benchmarks (PerformanceGameTests) can reuse the same powered-up
-    // Mainframe setup without duplicating the hardware-install plumbing.
+    /*
+     * Package-private so the performance benchmarks (PerformanceGameTests) can reuse the same powered-up
+     * Mainframe setup without duplicating the hardware-install plumbing.
+     */
     static MainframeBlockEntity placeRunningMainframe(final GameTestHelper helper, final BlockPos relative) {
         return TestWorldBuilder.forGameTest(helper).placeRunningMainframe(relative);
     }
@@ -2715,9 +2753,11 @@ public final class NetworkGameTests {
      */
     @GameTest(template = ARENA)
     public static void supercomputers_craftsGoToTheOneWithRoom(final GameTestHelper helper) {
-        // A cluster is online only on a network: one Mainframe feeds a bandwidth cable along z=2, and each
-        // interface hangs off it to the south with its own fabric (HPC cable + rack) further south, far
-        // enough apart that the two fabrics never touch.
+        /*
+         * A cluster is online only on a network: one Mainframe feeds a bandwidth cable along z=2, and each
+         * interface hangs off it to the south with its own fabric (HPC cable + rack) further south, far
+         * enough apart that the two fabrics never touch.
+         */
         final BlockPos m = new BlockPos(1, 2, 2);
         final BlockPos hubA = new BlockPos(3, 2, 3);
         final BlockPos hubB = new BlockPos(6, 2, 3);
@@ -2766,7 +2806,7 @@ public final class NetworkGameTests {
     /**
      * A datacenter is made of Server Racks. The router's branch walk follows any data cable, the
      * high-compute fabric included, so a Supercomputer Rack it reaches that way must still not become a
-     * section member — while a Server Rack on another face forms its section as usual.
+     * section member, while a Server Rack on another face forms its section as usual.
      */
     @GameTest(template = ARENA)
     public static void serverRouter_ignoresSupercomputerRacks(final GameTestHelper helper) {
@@ -2873,7 +2913,7 @@ public final class NetworkGameTests {
     }
 
     /**
-     * The write a player actually makes is one stack, and it must be shared out — a batch of a whole stack
+     * The write a player actually makes is one stack, and it must be shared out, since a batch of a whole stack
      * put all 64 on the first server, so the setting looked dead however it was set. A run of single items
      * has to move down the row too, which is what the rotation is for.
      */

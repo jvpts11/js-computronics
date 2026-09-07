@@ -8,7 +8,7 @@
 package dev.jstech.core.network;
 
 /**
- * Marker for a block that joins adjacent data cables of <em>any</em> tier into a single network segment in the {@link ConnectivityIndex} — for example the Personal Router, which bridges an Ethernet segment to an HBW segment so a Personal Computer (Ethernet) reaches the HBW backbone.
+ * Marker for a block that joins adjacent data cables of <em>any</em> tier into a single network segment in the {@link ConnectivityIndex}, for example the Personal Router, which bridges an Ethernet segment to an HBW segment so a Personal Computer (Ethernet) reaches the HBW backbone.
  */
 public interface INetworkBridge {
 }

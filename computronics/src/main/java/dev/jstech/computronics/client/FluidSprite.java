@@ -16,7 +16,7 @@ import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtension
 import net.neoforged.neoforge.fluids.FluidStack;
 
 /**
- * Draws a fluid as a 16×16 icon in a GUI — the still texture from the block atlas, tinted by the fluid's colour — so a fluid row renders in the network grid the same size as an item icon.
+ * Draws a fluid as a 16×16 icon in a GUI (the still texture from the block atlas, tinted by the fluid's colour) so a fluid row renders in the network grid the same size as an item icon.
  */
 public final class FluidSprite {
 

@@ -43,7 +43,7 @@ public final class FsPaths {
     /**
      * Returns {@code true} if {@code name} is a legal single path segment: non-empty,
      * at most {@value #MAX_NAME_LENGTH} characters, containing no {@code '/'} and no
-     * ISO control characters (codepoints 0x00–0x1F and 0x7F).
+     * ISO control characters (codepoints 0x00-0x1F and 0x7F).
      *
      * @param name the candidate name to validate
      * @return true if the name is valid
@@ -65,12 +65,12 @@ public final class FsPaths {
      * Returns {@code true} if {@code path} is a legal path under the given filesystem kind.
      *
      * <ul>
-     *   <li>{@link FilesystemKind#FLAT} — the path must be a single valid name with no
+     *   <li>{@link FilesystemKind#FLAT}, the path must be a single valid name with no
      *       {@code '/'} separator.</li>
-     *   <li>{@link FilesystemKind#HIERARCHICAL} — the path is a {@code '/'}-separated
+     *   <li>{@link FilesystemKind#HIERARCHICAL}, the path is a {@code '/'}-separated
      *       sequence of segments, each of which must be a valid name. Empty segments (from
      *       leading, trailing, or consecutive slashes) are rejected.</li>
-     *   <li>{@link FilesystemKind#NONE} — always returns {@code false}.</li>
+     *   <li>{@link FilesystemKind#NONE}, always returns {@code false}.</li>
      * </ul>
      *
      * @param path the candidate path
@@ -102,7 +102,7 @@ public final class FsPaths {
     }
 
     /**
-     * Returns the file name component of a path — the last {@code '/'}-delimited segment.
+     * Returns the file name component of a path, the last {@code '/'}-delimited segment.
      * For a path with no {@code '/'}, the whole path is returned.
      *
      * @param path a non-null file path
@@ -114,7 +114,7 @@ public final class FsPaths {
     }
 
     /**
-     * Returns the parent directory of a path — everything before the last {@code '/'}.
+     * Returns the parent directory of a path, everything before the last {@code '/'}.
      * For a path with no {@code '/'} (a root-level flat name), an empty string is returned.
      *
      * @param path a non-null file path
@@ -138,7 +138,7 @@ public final class FsPaths {
     }
 
     /**
-     * Returns {@code true} if {@code path} lies directly or indirectly under {@code dir} — that is,
+     * Returns {@code true} if {@code path} lies directly or indirectly under {@code dir}, that is,
      * {@code path} starts with {@code dir + "/"}. The root directory ({@code ""}) is an ancestor of
      * every path.
      *

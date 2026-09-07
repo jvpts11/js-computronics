@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Client to server: an advanced request from the Network Interactor — pull a quantity of a type from a
+ * Client to server: an advanced request from the Network Interactor: pull a quantity of a type from a
  * chosen set of source Servers, into a chosen destination. Mirrors the MC-NET terminal's SELECT so the NI
  * reuses the same dispatch ({@code resolveDest} + {@code submitNetworkSelect}/{@code submitNetworkMove}).
  *

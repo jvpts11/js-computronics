@@ -28,9 +28,11 @@ public final class StorageVolume {
     private final boolean readOnly;
     private final Map<StorageKey, Long> items = new LinkedHashMap<>();
     private long usedWeight;
-    // Running totals per kind, kept alongside the map so the usage summary never walks the contents:
-    // a drive holding thousands of types is written to on every insert, and that walk was the cost the
-    // volume store exists to avoid.
+    /*
+     * Running totals per kind, kept alongside the map so the usage summary never walks the contents:
+     * a drive holding thousands of types is written to on every insert, and that walk was the cost the
+     * volume store exists to avoid.
+     */
     private long itemUnits;
     private long fluidUnits;
     private long chemicalUnits;

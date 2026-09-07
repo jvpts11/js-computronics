@@ -19,10 +19,10 @@ import org.jetbrains.annotations.Nullable;
  * kinds defined by {@link MediaKind}:
  *
  * <ul>
- *   <li>{@link MediaKind#OS_INSTALL} — boots an OS installer; the target OS is identified by the
+ *   <li>{@link MediaKind#OS_INSTALL}, boots an OS installer; the target OS is identified by the
  *       {@link ComputingModule#MEDIA_PAYLOAD} component (a {@link ResourceLocation}).</li>
- *   <li>{@link MediaKind#PROGRAM_INSTALL} — installs an add-on program; same payload component.</li>
- *   <li>{@link MediaKind#DATA} — carries a portable item/fluid snapshot stored in the
+ *   <li>{@link MediaKind#PROGRAM_INSTALL}, installs an add-on program; same payload component.</li>
+ *   <li>{@link MediaKind#DATA}, carries a portable item/fluid snapshot stored in the
  *       {@link ComputingModule#MEDIA_DATA} component.</li>
  * </ul>
  *

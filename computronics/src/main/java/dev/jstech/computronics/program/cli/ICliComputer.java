@@ -177,14 +177,12 @@ public interface ICliComputer {
         return List.of();
     }
 
-    /** Whether the network's IQL Engine is installed — gates the Engine's own commands in the prompt. */
+    /** Whether the network's IQL Engine is installed, which gates the Engine's own commands in the prompt. */
     default boolean iqlEngineInstalled() {
         return false;
     }
 
-    // -------------------------------------------------------------------------
     // Terminal session (DOS navigation)
-    // -------------------------------------------------------------------------
 
     /**
      * This terminal session's current drive and directory, used by the DOS command line to resolve relative paths
@@ -238,7 +236,7 @@ public interface ICliComputer {
         return false;
     }
 
-    // ---- packages (Linux package managers over the network mirror) ----
+    // packages (Linux package managers over the network mirror)
 
     /** The installed OS's package manager; {@code NONE} on media-installed platforms. */
     default dev.jstech.computronics.os.PackageManagerKind packageManager() {
@@ -301,7 +299,7 @@ public interface ICliComputer {
     /**
      * Brings every installed package up to the current build. Packages installed before a mod update
      * carry the version they were installed at, so this is what reconciles a repository that moved on
-     * without the machine — it never installs anything new.
+     * without the machine; it never installs anything new.
      */
     default OpResult packageUpdate() {
         return OpResult.fail("could not resolve mirror://");
@@ -338,7 +336,7 @@ public interface ICliComputer {
         return java.util.List.of();
     }
 
-    // ---- live installation media (the manual Arch / Gentoo installs) ----
+    // live installation media (the manual Arch / Gentoo installs)
 
     /** The live installation in progress on this computer, or null when it booted a real OS. */
     default dev.jstech.computronics.program.install.LiveInstallState liveInstall() {
@@ -375,9 +373,7 @@ public interface ICliComputer {
     default void setCurrentLocation(final DosPath.Location location) {
     }
 
-    // -------------------------------------------------------------------------
     // Filesystem (system disk)
-    // -------------------------------------------------------------------------
 
     /**
      * Lists the files visible in the current directory of the host computer's system disk.
@@ -618,7 +614,7 @@ public interface ICliComputer {
                       int indexedTypes, boolean mainframePresent) {
     }
 
-    // ---- Remote shells ---------------------------------------------------------------------------
+    // Remote shells
 
     /** Every machine on this network a remote shell could reach, by host name. */
     default List<RemoteHost> reachableHosts() {
@@ -627,7 +623,7 @@ public interface ICliComputer {
 
     /**
      * Opens a remote shell on {@code hostname}: from here on the session's commands run on that
-     * machine until it is closed. Same network means access — authentication arrives with the
+     * machine until it is closed. Same network means access, and authentication arrives with the
      * security module.
      */
     default OpResult sshConnect(final String hostname) {
@@ -646,7 +642,7 @@ public interface ICliComputer {
 
     /**
      * One machine a remote shell can reach. A machine can be addressed by any of these: the host
-     * name it answers to, the name its owner gave it, or the head of its node id — whichever the
+     * name it answers to, the name its owner gave it, or the head of its node id, whichever the
      * player has in front of them.
      *
      * @param hostname the shell host name (what the remote prompt shows)

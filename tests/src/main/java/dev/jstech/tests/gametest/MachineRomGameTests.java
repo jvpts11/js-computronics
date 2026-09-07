@@ -166,7 +166,7 @@ public final class MachineRomGameTests {
         helper.succeed();
     }
 
-    // --- builders ---
+    // builders
 
     private static CraftingComputerBlockEntity placeComputer(final GameTestHelper helper, final BlockPos pos) {
         helper.setBlock(pos, ComputingModule.CRAFTING_COMPUTER.get());

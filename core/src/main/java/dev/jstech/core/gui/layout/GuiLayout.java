@@ -14,15 +14,15 @@ import java.util.List;
  * A pure, Minecraft-free model of a screen's layout, so the layout can be unit-tested. A screen builds
  * its element rectangles here and the validators catch the layout bugs that previously only surfaced
  * in-game: solid elements overlapping, anything spilling past the panel, and text running wider than the
- * space it sits in. It lives in {@code common} (not {@code client}) because both the Menu — which places
- * the real slots — and the Screen — which draws their frames — consume the same layout, so the slot
+ * space it sits in. It lives in {@code common} (not {@code client}) because both the Menu (which places
+ * the real slots) and the Screen (which draws their frames) consume the same layout, so the slot
  * positions are validated too.
  *
  * <p>Elements come in two kinds, because not every overlap is a bug:
  * <ul>
- *   <li>{@link #box} — a <em>solid</em> element (slot, button, panel, icon). Two solids must never
+ *   <li>{@link #box}, a <em>solid</em> element (slot, button, panel, icon). Two solids must never
  *       overlap, and a solid must stay inside the panel.</li>
- *   <li>{@link #text} — a line of text. Text is routinely drawn <em>on top of</em> a panel or centered
+ *   <li>{@link #text}, a line of text. Text is routinely drawn <em>on top of</em> a panel or centered
  *       in a button, so it is excluded from the overlap check; it is only required to stay inside the
  *       panel (a label that runs off the edge is the real bug).</li>
  * </ul>
@@ -110,8 +110,8 @@ public final class GuiLayout {
     }
 
     /**
-     * Adds the standard player inventory — a 3×9 grid with its top-left at {@code (x, invY)} plus the
-     * 9-slot hotbar 58px below the grid top — on the vanilla 18px slot pitch. A convenience for the many
+     * Adds the standard player inventory, a 3×9 grid with its top-left at {@code (x, invY)} plus the
+     * 9-slot hotbar 58px below the grid top, on the vanilla 18px slot pitch. A convenience for the many
      * screens that carry the player inventory, so a layout need not re-list 36 slots by hand.
      */
     public GuiLayout playerInventory(final int x, final int invY) {
@@ -139,7 +139,7 @@ public final class GuiLayout {
     }
 
     /**
-     * Names of every <em>solid</em> element with zero width or height — a slot, button, or panel that draws
+     * Names of every <em>solid</em> element with zero width or height, a slot, button, or panel that draws
      * nothing occupies no space and almost always signals a layout computed from a wrong (often negative,
      * then clamped to zero) dimension. Text lines are exempt: an empty caption legitimately has zero width.
      */

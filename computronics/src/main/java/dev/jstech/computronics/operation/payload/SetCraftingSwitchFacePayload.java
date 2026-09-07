@@ -15,7 +15,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Client to server: edits one face of a Crafting Switch — its player-set name and/or its active toggle. The
+ * Client to server: edits one face of a Crafting Switch: its player-set name and/or its active toggle. The
  * server applies it to the switch's block entity (which then re-syncs to the client via its update tag), after
  * checking the player is in reach of the switch.
  *

@@ -17,8 +17,8 @@ import java.util.Set;
 /**
  * The storage index's own health, tracked so it stops being invisible: hot events (a drive pulled
  * out of a running bay) leave entries the index has not confirmed, and mass removals leave ghost
- * entries behind. Each has its own remedy — a reindex for unconfirmed entries, a vacuum for ghosts
- * — and the surface names exactly which item types are affected so the operator knows what the
+ * entries behind. Each has its own remedy (a reindex for unconfirmed entries, a vacuum for ghosts)
+ * and the surface names exactly which item types are affected so the operator knows what the
  * maintenance run is actually about.
  *
  * <p>Pure state with no Minecraft types: a network's health is a set of flagged type labels plus

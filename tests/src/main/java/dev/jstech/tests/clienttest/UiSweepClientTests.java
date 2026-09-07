@@ -20,8 +20,8 @@ import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * A fast render sweep over the block-backed screens that the focused client tests do not already open — the
- * server rack and router infrastructure, the Crafting Switch, and the supercomputer cluster — right-clicking
+ * A fast render sweep over the block-backed screens that the focused client tests do not already open (the
+ * server rack and router infrastructure, the Crafting Switch, and the supercomputer cluster) right-clicking
  * each in turn, screenshotting it, and confirming it actually opens and renders (a screen that opened one tick
  * and closed, or crashed the render, fails here). The assembly computers, the Pattern Encoder, the desktop and
  * its programs are covered by the other client tests.
@@ -73,8 +73,10 @@ public final class UiSweepClientTests {
         open(ctx, SWITCH, CraftingSwitchScreen.class, "crafting-switch");
         open(ctx, CLUSTER_MANAGER, ClusterManagementComputerScreen.class, "cluster-management-computer");
         open(ctx, NODE, ServerRackScreen.class, "supercomputer-rack");
-        // A rack server's desktop through a monitor. The rack names its era to the client only once its unit has
-        // travelled over, and the monitor frame (which the recipe viewer asks for every frame) must cope before.
+        /*
+         * A rack server's desktop through a monitor. The rack names its era to the client only once its unit has
+         * travelled over, and the monitor frame (which the recipe viewer asks for every frame) must cope before.
+         */
         ctx.thenTeleport(SETTLE, PLAYER_AT_RACK_MONITOR, Direction.WEST)
                 .thenRightClick(SETTLE, RACK_MONITOR)
                 .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)

@@ -20,7 +20,7 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Verifies that a content-holding block spills its stored items into the world instead of destroying them when broken — the conservation contract every machine, computer and rack now shares through {@link BlockDrops}.
+ * Verifies that a content-holding block spills its stored items into the world instead of destroying them when broken, the conservation contract every machine, computer and rack now shares through {@link BlockDrops}.
  */
 @GameTestHolder(JsTests.MODID)
 @PrefixGameTestTemplate(false)

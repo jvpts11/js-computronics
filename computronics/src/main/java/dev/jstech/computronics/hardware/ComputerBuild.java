@@ -90,8 +90,10 @@ public record ComputerBuild(MotherboardSpec motherboard,
     }
 
     public int parallelQueues() {
-        // One base CPU queue plus one extra parallel queue per installed GPU. GPUs are detected
-        // the single canonical way, through gpus(), so this never drifts from the GPU accessor.
+        /*
+         * One base CPU queue plus one extra parallel queue per installed GPU. GPUs are detected
+         * the single canonical way, through gpus(), so this never drifts from the GPU accessor.
+         */
         return 1 + gpus().size();
     }
 
@@ -113,7 +115,7 @@ public record ComputerBuild(MotherboardSpec motherboard,
 
     /**
      * The lowest staging latency across all installed RAM modules, in ticks. When no RAM is
-     * installed this returns zero — the caller already guards against an empty RAM list through
+     * installed this returns zero, and the caller already guards against an empty RAM list through
      * {@link #validate()}, so an empty list here means the build is invalid anyway.
      */
     public int bestRamLatencyTicks() {
@@ -163,8 +165,10 @@ public record ComputerBuild(MotherboardSpec motherboard,
         if (cpus.isEmpty()) {
             problems.add("no CPU installed");
         }
-        // Every computer needs RAM to do work: with a zero buffer the CPU has nothing to stage
-        // through and can move nothing. A box without RAM is not a working computer.
+        /*
+         * Every computer needs RAM to do work: with a zero buffer the CPU has nothing to stage
+         * through and can move nothing. A box without RAM is not a working computer.
+         */
         if (rams.isEmpty()) {
             problems.add("no RAM installed");
         }
@@ -205,8 +209,10 @@ public record ComputerBuild(MotherboardSpec motherboard,
                     + motherboard.diskSlots() + " disk slots");
         }
 
-        // An auto-scaling PSU dimensions its output to the build's draw, so it always satisfies the
-        // power requirement; only a fixed-wattage PSU can come up short.
+        /*
+         * An auto-scaling PSU dimensions its output to the build's draw, so it always satisfies the
+         * power requirement; only a fixed-wattage PSU can come up short.
+         */
         if (!psu.autoScaling()) {
             final int draw = powerDraw();
             if (draw > psu.wattage()) {

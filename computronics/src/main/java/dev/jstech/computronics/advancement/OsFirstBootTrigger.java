@@ -22,8 +22,8 @@ import java.util.Optional;
 /**
  * Fires when a player boots a computer into an installed operating system (opening its desktop, terminal
  * or network GUI on a monitor). An instance may name the OS it wants, so an advancement can wait for one
- * distribution in particular — the challenge advancements for the hand-installed Arch and the
- * compiled-from-source Gentoo — or accept any OS.
+ * distribution in particular (the challenge advancements for the hand-installed Arch and the
+ * compiled-from-source Gentoo) or accept any OS.
  */
 public class OsFirstBootTrigger extends SimpleCriterionTrigger<OsFirstBootTrigger.Instance> {
 

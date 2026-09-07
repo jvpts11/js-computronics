@@ -12,7 +12,7 @@ package dev.jstech.computronics.hardware;
  * installed in a slot of the same family, regardless of generation within the family.
  *
  * <p>ISA, PCI, and AGP are distinct buses with no cross-family compatibility. PCIe is one family
- * across all generations (1.0 through 6.0) — any PCIe card fits any PCIe slot electrically.
+ * across all generations (1.0 through 6.0), so any PCIe card fits any PCIe slot electrically.
  */
 public enum ExpansionBus {
     ISA("ISA"),

@@ -77,8 +77,10 @@ public class TankRenderer implements BlockEntityRenderer<TankBlockEntity> {
         // Side faces fill the sprite bottom-up by the fill fraction, so the texture never stretches.
         final float vTop = v1 - (v1 - v0) * fill;
 
-        // Vertices are wound counter-clockwise seen from outside (T x B = outward normal).
-        // TOP (+Y) and BOTTOM (-Y) map the whole sprite; sides map [vTop..v1].
+        /*
+         * Vertices are wound counter-clockwise seen from outside (T x B = outward normal).
+         * TOP (+Y) and BOTTOM (-Y) map the whole sprite; sides map [vTop..v1].
+         */
         quad(vc, pose, light, overlay, r, g, b, a, 0F, 1F, 0F,
                 x0, y1, z0, u0, v1, x0, y1, z1, u0, v0, x1, y1, z1, u1, v0, x1, y1, z0, u1, v1);
         quad(vc, pose, light, overlay, r, g, b, a, 0F, -1F, 0F,

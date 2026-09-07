@@ -105,14 +105,14 @@ public final class PatternWorkbench {
         BENCH, MACHINE, PIPELINE
     }
 
-    // ---- bench draft ----
+    // bench draft
     private final List<ItemStack> grid = new ArrayList<>(CraftingPattern.GRID_SIZE);
     private final List<String> anyTags = new ArrayList<>(CraftingPattern.GRID_SIZE);
     private String benchName = "";
     private String benchNote = "";
     private ItemStack preview = ItemStack.EMPTY;
 
-    // ---- machine draft ----
+    // machine draft
     private final DataCell[] procInputs = new DataCell[PROC_GRID];
     private final DataCell[] procOutputs = new DataCell[PROC_GRID];
     private final int[] outputChances = new int[PROC_GRID];
@@ -121,12 +121,12 @@ public final class PatternWorkbench {
     private String procName = "";
     private String procNote = "";
 
-    // ---- pipeline draft ----
+    // pipeline draft
     private final List<MultiStagePattern.Stage> stages = new ArrayList<>();
     private String pipelineName = "";
     private String pipelineNote = "";
 
-    // ---- provenance: the file the current draft of each kind was opened from, so a burn writes it back ----
+    // provenance: the file the current draft of each kind was opened from, so a burn writes it back
     private final String[] openedFile = {"", "", ""};
     private final String[] openedSource = {"", "", ""};
 
@@ -138,9 +138,7 @@ public final class PatternWorkbench {
         Arrays.fill(outputChances, ProcessingPattern.FULL_CHANCE);
     }
 
-    // ======================================================================================
     //  Bench draft
-    // ======================================================================================
 
     public List<ItemStack> grid() {
         return List.copyOf(grid);
@@ -251,9 +249,7 @@ public final class PatternWorkbench {
         remember(Kind.BENCH, source, file);
     }
 
-    // ======================================================================================
     //  Machine draft
-    // ======================================================================================
 
     @Nullable
     public DataCell procInput(final int cell) {
@@ -419,9 +415,7 @@ public final class PatternWorkbench {
         remember(Kind.MACHINE, source, file);
     }
 
-    // ======================================================================================
     //  Pipeline draft
-    // ======================================================================================
 
     public List<MultiStagePattern.Stage> stages() {
         return List.copyOf(stages);
@@ -506,9 +500,7 @@ public final class PatternWorkbench {
         remember(Kind.PIPELINE, source, file);
     }
 
-    // ======================================================================================
     //  Provenance and files
-    // ======================================================================================
 
     /** The file the {@code kind} draft was opened from ({@code ""} when it was started fresh). */
     public String openedFile(final Kind kind) {
@@ -557,9 +549,7 @@ public final class PatternWorkbench {
         };
     }
 
-    // ======================================================================================
     //  Persistence
-    // ======================================================================================
 
     public void save(final CompoundTag tag, final HolderLookup.Provider registries) {
         final RegistryOps<Tag> ops = RegistryOps.create(NbtOps.INSTANCE, registries);

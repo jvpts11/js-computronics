@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * A multi-tick INSERT: writes an item into the network's servers over time — the inverse of a SELECT. It fills the fastest-tier servers first, up to each server's free space.
+ * A multi-tick INSERT: writes an item into the network's servers over time, the inverse of a SELECT. It fills the fastest-tier servers first, up to each server's free space.
  */
 public final class NetworkInsertOperation extends AbstractTransferOperation {
 
@@ -63,7 +63,7 @@ public final class NetworkInsertOperation extends AbstractTransferOperation {
                         ramLatencies.getOrDefault(server, 0), scheduler));
         buildProgress();
         if (sourcesEmpty()) {
-            finish(); // the network is full — nothing written
+            finish(); // the network is full, nothing written
         }
     }
 

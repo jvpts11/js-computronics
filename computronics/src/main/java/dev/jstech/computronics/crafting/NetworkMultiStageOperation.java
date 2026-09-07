@@ -140,7 +140,7 @@ public final class NetworkMultiStageOperation implements IPersistentOperation {
 
     /**
      * Hands a restored pipeline the stage operation it was waiting on (or null when that stage could not be
-     * restored — the pipeline then simply starts the same stage again, which is safe because a stage only
+     * restored, and the pipeline then simply starts the same stage again, which is safe because a stage only
      * moves items once it runs).
      */
     public void adoptStage(@Nullable final INetworkOperation stage) {
@@ -191,15 +191,19 @@ public final class NetworkMultiStageOperation implements IPersistentOperation {
 
     @Nullable
     private INetworkOperation startStage(final MultiStagePattern.Stage stage) {
-        // Each stage is sized by what the stage after it consumes, never by the final quantity: nine nuggets
-        // (one ingot makes nine) smelt one ingot; one iron block (nine ingots) smelts nine.
+        /*
+         * Each stage is sized by what the stage after it consumes, never by the final quantity: nine nuggets
+         * (one ingot makes nine) smelt one ingot; one iron block (nine ingots) smelts nine.
+         */
         final long demand = pattern.stageDemands(requested)[stageIndex];
         if (stage.proc().isPresent()) {
             return mainframe.submitNetworkProcessing(stage.proc().get(), demand, requesterLabel);
         }
         if (stage.bench().isPresent()) {
-            // The stage carries its own pattern: plan with it so the pipeline runs even when the bench
-            // recipe was never loaded into a Recipe ROM on its own.
+            /*
+             * The stage carries its own pattern: plan with it so the pipeline runs even when the bench
+             * recipe was never loaded into a Recipe ROM on its own.
+             */
             final CraftingPattern bench = stage.bench().get();
             return mainframe.submitNetworkCraft(
                     StorageKey.of(bench.result()), demand, true, requesterLabel, bench);
@@ -251,9 +255,11 @@ public final class NetworkMultiStageOperation implements IPersistentOperation {
 
     @Override
     public boolean isWaiting() {
-        // While a stage is in flight the pipeline is only waiting on it: the stage is the live operation.
-        // Claiming a queue slot here would starve the stage on a single-queue Mainframe — the pipeline
-        // holds the slot to idle while the stage behind it in the list never gets ticked.
+        /*
+         * While a stage is in flight the pipeline is only waiting on it: the stage is the live operation.
+         * Claiming a queue slot here would starve the stage on a single-queue Mainframe, since the pipeline
+         * holds the slot to idle while the stage behind it in the list never gets ticked.
+         */
         return !done && currentStage != null;
     }
 

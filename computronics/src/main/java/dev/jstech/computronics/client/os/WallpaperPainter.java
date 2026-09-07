@@ -108,8 +108,10 @@ final class WallpaperPainter {
         cloud(g, (int) (w * 0.87), (int) (h * 0.18), (int) (w * 0.12), (int) (h * 0.045));
         // Grass: bright near the horizon down to a deeper green at the bottom.
         g.fillGradient(0, horizon, w, h, 0xFF74AE3E, 0xFF2F5A18);
-        // The hill the whole picture is named after: a broad crest left of centre, its sunlit rim along the
-        // top and a second, nearer rise on the right, so the field reads as land instead of a flat band.
+        /*
+         * The hill the whole picture is named after: a broad crest left of centre, its sunlit rim along the
+         * top and a second, nearer rise on the right, so the field reads as land instead of a flat band.
+         */
         final int crest = Math.max(4, (int) (h * 0.15));
         for (int x = 0; x < w; x += 2) {
             final double t = (double) x / Math.max(1, w - 1);
@@ -131,8 +133,10 @@ final class WallpaperPainter {
             }
             final int top = horizon - rise;
             final int x2 = Math.min(x + 2, w);
-            // No lit rim on this one: it is the nearer rise, and its edge reads as a silhouette against the
-            // hill behind it. A bright line there would look like a scratch across the field.
+            /*
+             * No lit rim on this one: it is the nearer rise, and its edge reads as a silhouette against the
+             * hill behind it. A bright line there would look like a scratch across the field.
+             */
             g.fill(x, top, x2, horizon, 0xFF4E8B26);
         }
         // A shade settling into the field just under the horizon, the way the far grass falls into shadow.

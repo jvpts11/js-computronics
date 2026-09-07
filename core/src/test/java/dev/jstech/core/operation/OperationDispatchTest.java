@@ -298,8 +298,10 @@ class OperationDispatchTest {
         // The most recently settled Operation keeps its terminal status...
         assertTrue(dispatch.statusOf(ids.get(299)).isTerminal(),
                 "a recent terminal status is retained");
-        // ...but an old one is evicted once the bounded history fills, falling back to the unknown-id
-        // default, so the status map can never grow without bound on a long-lived dispatcher.
+        /*
+         * ...but an old one is evicted once the bounded history fills, falling back to the unknown-id
+         * default, so the status map can never grow without bound on a long-lived dispatcher.
+         */
         assertEquals(OperationStatus.PENDING, dispatch.statusOf(ids.get(0)),
                 "an old terminal status is evicted");
     }

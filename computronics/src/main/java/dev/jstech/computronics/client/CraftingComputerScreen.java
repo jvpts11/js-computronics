@@ -21,14 +21,16 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.Locale;
 
 /**
- * Screen for the Crafting Computer's assembly surface — the same flat-dark "computer OS" skin as the
+ * Screen for the Crafting Computer's assembly surface, the same flat-dark "computer OS" skin as the
  * Personal Computer. This is a hardware-only surface: recipe files are managed by the Crafting Manager
  * program on the linked monitor, not here.
  */
 public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingComputerMenu> {
 
-    // All position/size constants live in CraftingComputerLayout so the menu, the screen
-    // and the layout unit test share one source of truth.
+    /*
+     * All position/size constants live in CraftingComputerLayout so the menu, the screen
+     * and the layout unit test share one source of truth.
+     */
     private static final int COL_R     = CraftingComputerLayout.COL_R;
     private static final int COL_R_W   = CraftingComputerLayout.COL_R_W;
     private static final int BTN_H     = CraftingComputerLayout.BTN_H;
@@ -56,7 +58,7 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
     @Override
     protected void init() {
         super.init();
-        // Name field in the header — computers are renamed here, never via an anvil.
+        // Name field in the header, since computers are renamed here, never via an anvil.
         setupNameBox(28, 8, 126, RenamePcPayload.MAX_LEN,
                 Component.literal("Name this computer...").withStyle(ChatFormatting.DARK_GRAY),
                 menu.customName(),
@@ -145,8 +147,10 @@ public class CraftingComputerScreen extends AbstractAssemblyScreen<CraftingCompu
                 JsTechTheme.text());
         final int factor = menu.craftFactorX100();
         if (factor > 0) {
-            // The Crafting Card is an accelerator with two stats: throughput (this tile's value, factor x CPU) and
-            // threads (how many of a craft's stages this computer runs at once, summed over the installed cards).
+            /*
+             * The Crafting Card is an accelerator with two stats: throughput (this tile's value, factor x CPU) and
+             * threads (how many of a craft's stages this computer runs at once, summed over the installed cards).
+             */
             JsTechTheme.tileText(g, font, COL_R, TILE_Y1, "CRAFT " + menu.craftThreads() + "T x" + formatFactor(factor),
                     JsTechTheme.fmt(menu.craftThroughput()), "it/t", JsTechTheme.accent());
         } else {

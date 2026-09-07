@@ -36,8 +36,10 @@ public abstract class AbstractAssemblyScreen<T extends AbstractContainerMenu> ex
         nameBox = new EditBox(font, leftPos + x, topPos + y, width, 11, Component.literal("Name"));
         nameBox.setBordered(false);
         nameBox.setMaxLength(maxLength);
-        // The rename field sits on a dark header strip in every era, so its text is a fixed white — the
-        // era's own text colour goes dark on the Legacy strip and the name becomes unreadable.
+        /*
+         * The rename field sits on a dark header strip in every era, so its text is a fixed white, the
+         * era's own text colour goes dark on the Legacy strip and the name becomes unreadable.
+         */
         nameBox.setTextColor(0xFFFFFFFF);
         nameBox.setHint(hint);
         nameBox.setValue(initialValue);
@@ -47,8 +49,10 @@ public abstract class AbstractAssemblyScreen<T extends AbstractContainerMenu> ex
 
     @Override
     public boolean keyPressed(final int key, final int scan, final int mods) {
-        // While the name field has focus, route typing to it and never let a key (e.g. the inventory
-        // key 'E') reach the screen and close the GUI. ESC just unfocuses the field.
+        /*
+         * While the name field has focus, route typing to it and never let a key (e.g. the inventory
+         * key 'E') reach the screen and close the GUI. ESC just unfocuses the field.
+         */
         if (nameBox != null && nameBox.isFocused()) {
             if (key == 256) {
                 nameBox.setFocused(false);

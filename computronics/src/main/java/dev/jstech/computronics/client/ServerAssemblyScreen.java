@@ -41,8 +41,10 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
     @Override
     protected void init() {
         super.init();
-        // Name field in the header — renaming a computer happens here, in its assembly GUI, never via
-        // an anvil. Each keystroke syncs the name to the held Server.
+        /*
+         * Name field in the header, since renaming a computer happens here, in its assembly GUI, never via
+         * an anvil. Each keystroke syncs the name to the held Server.
+         */
         setupNameBox(52, 8, 104, RenameServerPayload.MAX_LEN,
                 Component.literal("Name this server...").withStyle(ChatFormatting.DARK_GRAY),
                 menu.serverName(),
@@ -81,8 +83,10 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
         JsTechTheme.panel(g, x + 126, y + 26, 55, 18);
         JsTechTheme.panel(g, x + 185, y + 26, 51, 18);
 
-        // Power-headroom track. There is no storage track any more: drives live in the rack's
-        // hotswap bays, so the assembly has no storage of its own to meter.
+        /*
+         * Power-headroom track. There is no storage track any more: drives live in the rack's
+         * hotswap bays, so the assembly has no storage of its own to meter.
+         */
         final int draw = build == null ? 0 : build.powerDraw();
         final int watt = build == null ? 0 : build.psu().wattage();
         final double pf = watt <= 0 ? 0.0 : Math.min(1.0, (double) draw / watt);
@@ -146,15 +150,17 @@ public class ServerAssemblyScreen extends AbstractAssemblyScreen<ServerAssemblyM
         JsTechTheme.textS(g, font, "POWER", 8, 49, JsTechTheme.text());
         JsTechTheme.textSRight(g, font, build == null ? "-- W" : draw + "/" + watt + "W", 236, 49,
                 draw > watt ? JsTechTheme.red() : JsTechTheme.dim());
-        // Drives live in the rack's hotswap bays since the racks rework, so the assembly has no
-        // storage of its own to report — point the player at the right place instead.
+        /*
+         * Drives live in the rack's hotswap bays since the racks rework, so the assembly has no
+         * storage of its own to report, so point the player at the right place instead.
+         */
         JsTechTheme.textS(g, font, "STORAGE", 8, 59, JsTechTheme.text());
         JsTechTheme.textSRight(g, font, "drives mount in the rack bays", 236, 59, JsTechTheme.dim());
 
         // Problems strip.
         renderProblems(g, build);
 
-        // Hardware bay labels (names only — the slots show installed vs available).
+        // Hardware bay labels (names only, the slots show installed vs available).
         JsTechTheme.textS(g, font, "BOARD", 8, 87, JsTechTheme.dim());
         JsTechTheme.textS(g, font, "CPU", 52, 87, JsTechTheme.dim());
         JsTechTheme.textS(g, font, "RAM", 52, 117, JsTechTheme.dim());

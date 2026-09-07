@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Guards the readability of every text-on-background pairing the Network Management Studio draws. The Studio
- * shipped unreadable text twice (light-grey query text on white, then heavy near-black) — these contrast
+ * shipped unreadable text twice (light-grey query text on white, then heavy near-black), so these contrast
  * checks fail before such a regression reaches the game. Pure: the palette is plain data, no Minecraft.
  */
 class NmsPaletteTest {

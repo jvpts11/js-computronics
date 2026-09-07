@@ -8,7 +8,7 @@
 package dev.jstech.core.peripheral;
 
 /**
- * Marker for a block that a peripheral cable should visually connect to — a computer (owner) or a peripheral device (endpoint).
+ * Marker for a block that a peripheral cable should visually connect to, either a computer (owner) or a peripheral device (endpoint).
  */
 public interface IPeripheralConnectable {
 

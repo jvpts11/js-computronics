@@ -27,15 +27,17 @@ abstract class AbstractTerminalTab implements ITerminalTab {
         this.menu = menu;
     }
 
-    // ---- Font + position accessors -------------------------------------------------------
+    // Font + position accessors
 
     protected Font font() {
         return screen.tabFont();
     }
 
-    // ---- Palette -------------------------------------------------------------------------
-    // Delegating to JsTechTheme is semantically identical to reading the cached palette fields
-    // on the screen: the era skin is bound for the entire render pass, so the values match.
+    /*
+     * Palette
+     * Delegating to JsTechTheme is semantically identical to reading the cached palette fields
+     * on the screen: the era skin is bound for the entire render pass, so the values match.
+     */
 
     protected int OUTER() { return JsTechTheme.outer(); }
     protected int SCREEN_COL() { return JsTechTheme.screen(); }
@@ -55,7 +57,7 @@ abstract class AbstractTerminalTab implements ITerminalTab {
     protected int TAB_ON() { return JsTechTheme.tabOn(); }
     protected int HOVER() { return JsTechTheme.hover(); }
 
-    // ---- Shared rendering helpers (delegating to package-private methods on the screen) ---
+    // Shared rendering helpers (delegating to package-private methods on the screen)
 
     protected void slotBg(final GuiGraphics g, final int x, final int y) {
         screen.slotBg(g, x, y);
@@ -96,7 +98,7 @@ abstract class AbstractTerminalTab implements ITerminalTab {
         screen.moveRow(g, cx, my, mv);
     }
 
-    // ---- Shared query helpers ------------------------------------------------------------
+    // Shared query helpers
 
     protected java.util.List<dev.jstech.computronics.operation.payload.NetworkItemEntry> visibleItems() {
         return screen.visibleItems();
@@ -118,7 +120,7 @@ abstract class AbstractTerminalTab implements ITerminalTab {
         return screen.statusColor(status);
     }
 
-    // ---- Additional shared helpers -------------------------------------------------------
+    // Additional shared helpers
 
     protected static String opTypeLabel(final byte type) {
         return switch (type) {

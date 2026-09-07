@@ -93,8 +93,10 @@ public final class PeripheralLinkValidator {
             return new ILinkResult.AlreadyLinked(endpointPos, existingOwner.get());
         }
 
-        // Owner capacity check — but allow re-linking the same endpoint
-        // (idempotent re-establish after periodic validation).
+        /*
+         * Owner capacity check, but allow re-linking the same endpoint
+         * (idempotent re-establish after periodic validation).
+         */
         final List<Long> currentLinks = owner.linkedEndpoints();
         if (currentLinks.size() >= owner.maxEndpoints()
                 && !currentLinks.contains(endpointPos)) {
@@ -163,7 +165,7 @@ public final class PeripheralLinkValidator {
         for (final long src : sources) {
             for (final long neighbor : neighborLookup.neighborsOf(src)) {
                 if (neighbor == target) {
-                    // Owner adjacent to endpoint — zero cables between them.
+                    // Owner adjacent to endpoint, zero cables between them.
                     return new IPathSearchResult.Found(0);
                 }
                 if (visited.add(neighbor)

@@ -50,8 +50,8 @@ public record SubframeNode(
 
     /**
      * The dispatch queues this Subframe adds to its orchestrating Mainframe: one per GPU it carries, and
-     * none while it is idle. A Subframe brings no base queue of its own — the Mainframe's CPU is the one
-     * orchestrating — so a GPU-less Subframe only lends capacity.
+     * none while it is idle. A Subframe brings no base queue of its own (the Mainframe's CPU is the one
+     * orchestrating), so a GPU-less Subframe only lends capacity.
      */
     public int contributedQueues() {
         return orchestratingMainframeUuid.isEmpty() ? 0 : parallelQueues;

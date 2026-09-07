@@ -261,7 +261,7 @@ public final class MachinePrograms {
         }
     }
 
-    // ---------------------------------------------------------------- across a reload
+    // across a reload
 
     private static final String PROGRAMS = "programs";
     private static final String NEXT = "next";
@@ -322,7 +322,7 @@ public final class MachinePrograms {
         }
     }
 
-    // ---------------------------------------------------------------- what the machine is worth
+    // what the machine is worth
 
     /** The fewest instructions a tick, so even the oldest processor that can run this gets somewhere. */
     public static final int LEAST_PER_TICK = 32;

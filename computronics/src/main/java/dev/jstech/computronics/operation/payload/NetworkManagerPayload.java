@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: the snapshot the desktop Network Manager draws — the short network id, every node on
+ * Server to client: the snapshot the desktop Network Manager draws: the short network id, every node on
  * it, the hardware totals and the last hour's Operation statistics. The Devices and Map tabs read the node
  * list, Hardware the totals, Stats the statistics; Processes and Log arrive by their own payloads. Sent in
  * reply to {@link RequestNetworkManagerPayload}.

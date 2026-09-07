@@ -17,7 +17,7 @@ import dev.jstech.core.gui.layout.GuiLayout;
  * explorer and the right pane, horizontal between editor and grid) are where the player will later drag to
  * resize.
  *
- * <p>The validated boxes are the macro regions — they tile the window edge-to-edge and must never overlap
+ * <p>The validated boxes are the macro regions, and they tile the window edge-to-edge and must never overlap
  * nor spill out. The editor is deliberately the tallest body region (the editor dominates the screen). All
  * coordinates are relative to the window's top-left corner; the screen adds {@code leftPos}/{@code topPos}
  * at draw time and the screen draws every region from these same constants.
@@ -30,8 +30,10 @@ public final class NmsLayout {
     /** Small text scale used across the dense parts (tree, grid, status). */
     public static final float SMALL = 0.75f;
 
-    // Top strips, stacked. The DesktopWindow draws the program's title bar, so the app has none of its own:
-    // the menu bar is the top strip (TITLE_H = 0).
+    /*
+     * Top strips, stacked. The DesktopWindow draws the program's title bar, so the app has none of its own:
+     * the menu bar is the top strip (TITLE_H = 0).
+     */
     public static final int TITLE_Y = 0;
     public static final int TITLE_H = 0;
     public static final int MENU_Y = TITLE_Y + TITLE_H;   // 0
@@ -72,9 +74,7 @@ public final class NmsLayout {
     /** Grid row pitch at the small scale; the results grid lists this many visible rows by default. */
     public static final int ROW_H = 9;
 
-    // -----------------------------------------------------------------------
-    // File menu dropdown — appears below the menu bar when File is clicked.
-    // -----------------------------------------------------------------------
+    // File menu dropdown: appears below the menu bar when File is clicked.
 
     /** Number of items in the File dropdown (New / Save / Save As... / Open...). */
     public static final int FILE_DROP_ITEMS = 4;
@@ -94,9 +94,7 @@ public final class NmsLayout {
     /** Total height of the File dropdown panel (border + rows). */
     public static final int FILE_DROP_H = FILE_DROP_ITEMS * FILE_DROP_ITEM_H + 2;
 
-    // -----------------------------------------------------------------------
-    // Modal dialogs — centred in the window.
-    // -----------------------------------------------------------------------
+    // Modal dialogs: centred in the window.
 
     /** Width shared by both the Save-As and the Open picker dialogs. */
     public static final int DIALOG_W = 160;
@@ -190,7 +188,7 @@ public final class NmsLayout {
      * bounds only (registered as a single solid so it cannot spill past the window). The dropdown must not
      * touch the toolbar below it and must not extend past the right or bottom window edge.
      *
-     * <p>Only the outer dropdown box and the menu bar are registered as solid elements — they must not
+     * <p>Only the outer dropdown box and the menu bar are registered as solid elements, and they must not
      * overlap each other. The item rows are verified as text elements so their labels are bounds-checked
      * without triggering a false "overlap with the outer panel" failure.
      */
@@ -213,11 +211,11 @@ public final class NmsLayout {
      * Layout snapshot for the Save-As dialog state: the interactive EditBox widget (the only solid element
      * inside the dialog) plus the text labels. The EditBox must sit entirely within the window. The outer
      * dialog panel is represented by its corner coordinates derived from {@link #DIALOG_X} /
-     * {@link #DIALOG_SAVE_Y} — the labels being in-bounds is a sufficient proxy for the panel being in-bounds,
+     * {@link #DIALOG_SAVE_Y}, since the labels being in-bounds is a sufficient proxy for the panel being in-bounds,
      * since they sit inside it.
      *
      * <p>The dialog outer panel is not registered as a second solid because it would nest (and therefore
-     * overlap in the GuiLayout sense) with the EditBox — only non-overlapping leaf elements are solid here.
+     * overlap in the GuiLayout sense) with the EditBox, since only non-overlapping leaf elements are solid here.
      */
     public static GuiLayout saveDialogOpen() {
         final GuiLayout l = new GuiLayout(WIDTH, HEIGHT)
@@ -237,7 +235,7 @@ public final class NmsLayout {
      * within the window.
      *
      * <p>The outer dialog panel is not registered as a second solid because it would nest (and therefore
-     * overlap in the GuiLayout sense) with the rows and button — only the leaf widgets are solid here.
+     * overlap in the GuiLayout sense) with the rows and button, since only the leaf widgets are solid here.
      */
     public static GuiLayout openPickerOpen() {
         final GuiLayout l = new GuiLayout(WIDTH, HEIGHT);
@@ -249,7 +247,7 @@ public final class NmsLayout {
                     DIALOG_W - 2,
                     PICKER_ROW_H);
         }
-        // Cancel button: sits below the last picker row — verify it does not overlap any row.
+        // Cancel button: sits below the last picker row, so verify it does not overlap any row.
         l.box("cancelBtn",
                 DIALOG_X + CANCEL_BTN_REL_X,
                 DIALOG_OPEN_Y + CANCEL_BTN_REL_Y,

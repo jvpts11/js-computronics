@@ -12,7 +12,7 @@ package dev.jstech.computronics.storage;
  */
 public record DiskPrivacy(int publicPermille) {
 
-    /** A disk exposing none of its contents to the network — the default for a fresh computer disk. */
+    /** A disk exposing none of its contents to the network, the default for a fresh computer disk. */
     public static final DiskPrivacy FULLY_PRIVATE = new DiskPrivacy(0);
 
     /** A disk exposing all of its contents to the network (how a Server's disk always behaves). */

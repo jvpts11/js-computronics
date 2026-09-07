@@ -8,7 +8,7 @@
 package dev.jstech.core.tier;
 
 /**
- * Industrial Tier (T0–T9) — the central cross-module progression axis of J's Computronics.
+ * Industrial Tier (T0-T9): the central cross-module progression axis of J's Computronics.
  */
 
 public enum IndustrialTier {

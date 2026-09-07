@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * Server to client: everything the Cluster Manager shows. The machine's own state (card, reach,
  * lanes, discs), every cluster the network reaches, the selected cluster in detail (its nodes and,
- * for a supercomputer, its craft queue), the install job in flight, and — for a datacenter — the
+ * for a supercomputer, its craft queue), the install job in flight, and, for a datacenter, the
  * section's inventory and the computers a move-out can go to.
  */
 public record ClusterManagerStatePayload(Head head, List<WireCluster> clusters, Detail detail, WireJob job,
@@ -70,11 +70,13 @@ public record ClusterManagerStatePayload(Head head, List<WireCluster> clusters, 
     }
 
     /** One rack row of the selected cluster. */
-    // What one machine in a cluster is doing right now, in the order the manager checks it: a machine that
-    // is not assembled cannot be switched on, one whose bay is off cannot be installed to, and so on.
+    /*
+     * What one machine in a cluster is doing right now, in the order the manager checks it: a machine that
+     * is not assembled cannot be switched on, one whose bay is off cannot be installed to, and so on.
+     */
     /** Seated, but the hardware does not make a working computer. */
     public static final int STATE_INCOMPLETE = 0;
-    /** Assembled, but its bay switch is off — the machine has no power. */
+    /** Assembled, but its bay switch is off, so the machine has no power. */
     public static final int STATE_BAY_OFF = 1;
     /** A job is writing this machine at this moment. */
     public static final int STATE_INSTALLING = 2;

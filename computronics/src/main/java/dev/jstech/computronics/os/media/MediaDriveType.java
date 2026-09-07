@@ -11,7 +11,7 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * The kinds of media-reader peripheral block. A drive has no tier of its own — its capability is
+ * The kinds of media-reader peripheral block. A drive has no tier of its own; its capability is
  * defined by which {@link MediaFormat media formats} it can read. Each drive is a distinct block
  * (its own texture) attached to a computer via the COMPUTING peripheral cable.
  *

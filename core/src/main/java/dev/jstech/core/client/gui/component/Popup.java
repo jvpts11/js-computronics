@@ -135,8 +135,10 @@ public class Popup extends Panel {
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
         if (width() == 0 || height() == 0) {
-            // Not laid out yet (opened this very tick): the click can be placed nowhere, and it is not a
-            // click outside either.
+            /*
+             * Not laid out yet (opened this very tick): the click can be placed nowhere, and it is not a
+             * click outside either.
+             */
             return true;
         }
         if (!contains(mx, my)) {

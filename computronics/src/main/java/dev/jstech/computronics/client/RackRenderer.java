@@ -63,9 +63,11 @@ public final class RackRenderer extends GeoBlockRenderer<ServerRackBlockEntity> 
                           final float partialTick, final int packedLight, final int packedOverlay, final int colour) {
         super.preRender(poseStack, rack, model, bufferSource, buffer, isReRender, partialTick, packedLight,
                 packedOverlay, colour);
-        // The baked model is shared by every rack of this kind, so every flag is set on every render.
-        // Every row bone is decided here, including units the code has no seat for yet (a bone the
-        // model carries but nothing can mount stays hidden), so an empty row is really empty.
+        /*
+         * The baked model is shared by every rack of this kind, so every flag is set on every render.
+         * Every row bone is decided here, including units the code has no seat for yet (a bone the
+         * model carries but nothing can mount stays hidden), so an empty row is really empty.
+         */
         for (final GeoBone bone : model.topLevelBones()) {
             applyRowVisibility(rack, bone);
         }

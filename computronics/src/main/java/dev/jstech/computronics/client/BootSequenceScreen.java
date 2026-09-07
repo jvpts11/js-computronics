@@ -29,8 +29,8 @@ import java.util.Locale;
 
 /**
  * The power-on self-test: what the monitor shows between switching the computer on (or a reboot) and the
- * boot target opening. Lines appear over a few seconds in the firmware's era style — memory count, detected
- * drives, the boot device — and DEL at any point enters the firmware setup instead. When the sequence ends
+ * boot target opening. Lines appear over a few seconds in the firmware's era style (memory count, detected
+ * drives, the boot device) and DEL at any point enters the firmware setup instead. When the sequence ends
  * the client reports {@link PostCompletePayload} and the server swaps this screen for whatever boots.
  */
 public final class BootSequenceScreen extends Screen {
@@ -114,14 +114,14 @@ public final class BootSequenceScreen extends Screen {
         return false;
     }
 
-    // ---------------------------------------------------------------------------
     // Render
-    // ---------------------------------------------------------------------------
 
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
-        // Screen.render paints the dimmed backdrop itself; painting it again after our own drawing would
-        // wash the whole POST out (the double-background bug), so super runs FIRST and the content after.
+        /*
+         * Screen.render paints the dimmed backdrop itself; painting it again after our own drawing would
+         * wash the whole POST out (the double-background bug), so super runs FIRST and the content after.
+         */
         super.render(g, mouseX, mouseY, partialTick);
         final int x = (width - W) / 2;
         final int y = (height - H) / 2;
@@ -132,8 +132,10 @@ public final class BootSequenceScreen extends Screen {
             case BLUE_BIOS -> 0xFF0000A8;
             case UEFI -> 0xFF10121C;
         };
-        // The Vintage machine posts on a green-phosphor tube, which has exactly one colour: its text is
-        // that green, brighter or dimmer, never the grey-white of a later monitor.
+        /*
+         * The Vintage machine posts on a green-phosphor tube, which has exactly one colour: its text is
+         * that green, brighter or dimmer, never the grey-white of a later monitor.
+         */
         final int text = switch (kind) {
             case CLI_BIOS -> Phosphor.green(0xFFB8B8B8);
             case BLUE_BIOS -> 0xFFE8E8E8;

@@ -18,7 +18,7 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 public interface ISkin {
 
-    // ---- colours ----
+    // colours
 
     /** Primary text. */
     int text();
@@ -47,7 +47,7 @@ public interface ISkin {
     /** The text colour of a list row, given its selection state. */
     int listRowText(boolean selected);
 
-    // ---- primitives ----
+    // primitives
 
     /** A group panel: a sunken well, a soft border or a hairline, per design. */
     void panel(GuiGraphics g, int x, int y, int w, int h);

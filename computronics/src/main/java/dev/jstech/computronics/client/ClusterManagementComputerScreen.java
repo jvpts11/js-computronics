@@ -20,7 +20,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * The Cluster Management Computer's assembly surface: hardware on the left, and on the right what makes
- * it a cluster master — whether the interface card is in, how many clusters the network reaches, and
+ * it a cluster master: whether the interface card is in, how many clusters the network reaches, and
  * whether the Cluster Manager is on its disk. Everything about the clusters themselves lives in that
  * program on the linked monitor, not here.
  */

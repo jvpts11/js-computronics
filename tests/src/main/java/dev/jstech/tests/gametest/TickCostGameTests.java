@@ -49,8 +49,10 @@ public final class TickCostGameTests {
                     helper.assertTrue(seen[0].size() == 1, "the rack registered its one server; got " + seen[0].size());
                 })
                 .thenExecuteAfter(5, () -> {
-                    // Five more ticks of the rack re-registering an unchanged server: the readers' list is
-                    // the very same object, so nothing was rebuilt or copied for them.
+                    /*
+                     * Five more ticks of the rack re-registering an unchanged server: the readers' list is
+                     * the very same object, so nothing was rebuilt or copied for them.
+                     */
                     final List<ServerNode> again = NetworkSystem.get(helper.getLevel()).serversOf(net.mainframe().networkUuid());
                     helper.assertTrue(again == seen[0], "the same list is shared until the roster changes");
                 })

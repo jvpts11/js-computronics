@@ -32,7 +32,7 @@ import java.util.Map;
 
 /**
  * Battery 1, front A: the machine-crafting DATA model and {@code .craft} serialization, exhaustively and
- * adversarially — chance clamping and yield math, ingredient totals, recipe equality, item AND fluid round-trips,
+ * adversarially: chance clamping and yield math, ingredient totals, recipe equality, item AND fluid round-trips,
  * preserved chances, mixed multi-stage round-trips, and malformed/unknown content. Pure data behavior validated
  * with the registries a running server provides (StorageKey/ItemStack/FluidStack are MC types, so this is a
  * GameTest, not JUnit).
@@ -228,7 +228,7 @@ public final class MachineCraftDataGameTests {
         helper.succeed();
     }
 
-    // --- builders ---
+    // builders
 
     private static ProcessingInput in(final net.minecraft.world.item.Item item, final long amount) {
         return new ProcessingInput(StorageKey.of(item), amount);

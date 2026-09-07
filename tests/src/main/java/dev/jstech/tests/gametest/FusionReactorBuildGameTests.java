@@ -36,7 +36,7 @@ import java.util.Map;
 /**
  * The Fusion Reactor shell from raw stock to a formed multiblock, all of it through the network: every part is
  * requested with flat patterns (bench and machine side by side), made by one Metallurgic Infuser and one
- * Crafting Computer, then taken out of network storage and placed in the shape Mekanism's validator expects — 36
+ * Crafting Computer, then taken out of network storage and placed in the shape Mekanism's validator expects, 36
  * frames on the ring positions of each face and edge, and the controller, ports, glass and adapters on the
  * plus-shaped casing positions. The final assertion is Mekanism's own: the controller reports a formed reactor.
  */
@@ -224,8 +224,10 @@ public final class FusionReactorBuildGameTests {
                     seedRawStock((item, count) -> rig.net().seed(item, count));
                     loadRecipes(helper, rig.net().cc());
                 })
-                // Request the parts one after another; each craft plans its own machine steps. Assertion
-                // exceptions keep this step waiting; a real failure is recorded and checked right after.
+                /*
+                 * Request the parts one after another; each craft plans its own machine steps. Assertion
+                 * exceptions keep this step waiting; a real failure is recorded and checked right after.
+                 */
                 .thenWaitUntil(() -> {
                     if (failure[0] != null) {
                         return;

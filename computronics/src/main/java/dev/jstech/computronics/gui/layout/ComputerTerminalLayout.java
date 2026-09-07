@@ -10,10 +10,10 @@ package dev.jstech.computronics.gui.layout;
 import dev.jstech.core.gui.layout.GuiLayout;
 
 /**
- * Pure layout model for the Monitor terminal — the most complex screen, with per-tab content. This models
+ * Pure layout model for the Monitor terminal, the most complex screen, with per-tab content. This models
  * the fixed frame shared by every tab (the tab rail, the content header, the item-grid toolbar/grid/
  * deposit bar, and the player inventory) and is the single source of the inventory slot positions, which
- * {@code ComputerTerminalMenu} consumes — so the validated layout covers the real slots. Per-tab content
+ * {@code ComputerTerminalMenu} consumes, so the validated layout covers the real slots. Per-tab content
  * (popups, sliders, the storage band) is drawn by the individual tab renderers and is not modeled here.
  *
  * <p>The terminal grows when its host is a Mainframe: the inventory drops by {@link #MAINFRAME_INV_DROP}

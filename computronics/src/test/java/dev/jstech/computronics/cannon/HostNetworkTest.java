@@ -200,8 +200,10 @@ class HostNetworkTest {
 
     @Test
     void priceOf_chargesForHowMuchWasGatheredNotJustForAsking() {
-        // A sweep of the whole network is not the same question as asking after one thing, and a program
-        // doing it every tick should feel the difference.
+        /*
+         * A sweep of the whole network is not the same question as asking after one thing, and a program
+         * doing it every tick should feel the difference.
+         */
         assertTrue(dev.jstech.computronics.cannon.machine.HostNetwork.priceOf(300)
                 >= dev.jstech.computronics.cannon.machine.HostNetwork.priceOf(0) + 300,
                 "a longer answer costs more");
@@ -228,8 +230,10 @@ class HostNetworkTest {
             huge.holdings.put("a rather long name for kind number " + i,
                     new LinkedHashMap<>(Map.of("Server A", 1L)));
         }
-        // A small machine asking a big network for everything is told it does not fit, which is the
-        // honest answer and the one that says to put more memory in.
+        /*
+         * A small machine asking a big network for everything is told it does not fit, which is the
+         * honest answer and the one that says to put more memory in.
+         */
         final Loaded program = compile("        List<string> t = Network.Types();");
         final Process process = new Process(program, 8L * 1024, huge);
         process.begin(process.create(program.entryPoint()), "OnTick");
@@ -247,8 +251,10 @@ class HostNetworkTest {
                         Console.PrintLine("crafts " + craft.Count);
                 """);
         assertEquals(Process.State.FINISHED, process.state(), String.valueOf(process.message()));
-        // A kind of work the network has not done reads as zero, not as nothing, so a script can add up
-        // without asking first whether there is anything to add up.
+        /*
+         * A kind of work the network has not done reads as zero, not as nothing, so a script can add up
+         * without asking first whether there is anything to add up.
+         */
         assertEquals(List.of("12 selects, 640 moved", "crafts 0"), process.console());
     }
 

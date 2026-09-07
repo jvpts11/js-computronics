@@ -28,8 +28,10 @@ class PhosphorTest {
 
     @Test
     void green_turnsEveryColourIntoTheOnePhosphor() {
-        // Whatever goes in, what comes out is the tube's own green at some brightness: the ratio between
-        // the channels is the phosphor's, never the source colour's.
+        /*
+         * Whatever goes in, what comes out is the tube's own green at some brightness: the ratio between
+         * the channels is the phosphor's, never the source colour's.
+         */
         for (final int colour : new int[] {0xFFFFFFFF, 0xFFEF6A5A, 0xFF39D6C4, 0xFFF0B23A, 0xFF2AA7E0}) {
             final int lit = Phosphor.green(colour);
             assertTrue(greenOf(lit) >= red(lit) && greenOf(lit) >= blue(lit),
@@ -40,8 +42,10 @@ class PhosphorTest {
 
     @Test
     void green_keepsBrightnessOrderSoMeaningSurvives() {
-        // An error is dim and a heading is bright on a real monochrome monitor; that ordering is what lets
-        // a player still read the screen once the colour is gone.
+        /*
+         * An error is dim and a heading is bright on a real monochrome monitor; that ordering is what lets
+         * a player still read the screen once the colour is gone.
+         */
         assertTrue(Phosphor.luminance(Phosphor.green(0xFFFFFFFF)) > 0.0F, "white lights the tube fully");
         assertTrue(Phosphor.luminance(Phosphor.green(0xFFEF6A5A)) > 0.0F, "a red error still lights the tube");
         assertTrue(Phosphor.luminance(Phosphor.green(0xFFFFFFFF))

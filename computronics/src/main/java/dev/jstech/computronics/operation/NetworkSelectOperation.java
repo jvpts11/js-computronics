@@ -80,22 +80,28 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         this.sourceFilter = sourceFilter;
         this.waitTimeoutTicks = waitTimeoutTicks;
 
-        // Capture disk tiers and RAM latencies BEFORE locking — after the lock the net-of-locks
-        // location view no longer shows the full picture of what we reserved.
+        /*
+         * Capture disk tiers and RAM latencies BEFORE locking, because after the lock the net-of-locks
+         * location view no longer shows the full picture of what we reserved.
+         */
         final Map<NodeUuid, StorageTier> tiers = captureTiers();
         final Map<NodeUuid, Integer> ramLatencies = captureRamLatencies();
-        // Reserve the items and split the reservation into one SubOperation per server. A non-null
-        // sourceFilter restricts the pull to the picked servers (the terminal's source picker).
+        /*
+         * Reserve the items and split the reservation into one SubOperation per server. A non-null
+         * sourceFilter restricts the pull to the picked servers (the terminal's source picker).
+         */
         final Allocation plan = index.lock(operationId, key, demand, sourceFilter);
         if (!plan.covers(demand) && index.grossAvailable(key, sourceFilter) >= demand) {
-            // The items physically exist but another Operation holds (part of) them LOCKed. Hold
-            // nothing and wait for them to free up.
+            /*
+             * The items physically exist but another Operation holds (part of) them LOCKed. Hold
+             * nothing and wait for them to free up.
+             */
             index.unlock(operationId);
             waiting = true;
         } else {
             buildSources(plan, tiers, ramLatencies);
             if (sourcesEmpty()) {
-                finish(); // nothing to serve — settles immediately as FAILED
+                finish(); // nothing to serve, settles immediately as FAILED
             }
         }
     }
@@ -130,8 +136,10 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         if (settled()) {
             return;
         }
-        // Stop before moving anything more once the destination is dead — a player who logged out
-        // or a closed terminal can no longer receive items.
+        /*
+         * Stop before moving anything more once the destination is dead, since a player who logged out
+         * or a closed terminal can no longer receive items.
+         */
         if (abortWhen != null && abortWhen.getAsBoolean()) {
             finish();
             return;
@@ -153,8 +161,10 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
     protected long moveFromSource(final NodeUuid server, final long planned) {
         final long moved = tickStorage.pullFrom(server, key, planned, destination);
         if (moved > 0L) {
-            // The moved items have left the server, so drop them from the lock: this keeps the
-            // catalog from reading as over-locked to other concurrent Operations.
+            /*
+             * The moved items have left the server, so drop them from the lock: this keeps the
+             * catalog from reading as over-locked to other concurrent Operations.
+             */
             index.release(operationId, key, server, moved);
         }
         return moved;
@@ -171,8 +181,10 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
         final long gross = index.grossAvailable(key, sourceFilter);
         final Allocation plan = index.lock(operationId, key, demand, sourceFilter);
         if (plan.covers(demand) || gross < demand) {
-            // Fully covered — or the contended items have left the network entirely, so full
-            // coverage is no longer possible and the pull proceeds with what physically remains.
+            /*
+             * Fully covered, or the contended items have left the network entirely, so full
+             * coverage is no longer possible and the pull proceeds with what physically remains.
+             */
             waiting = false;
             buildSources(plan, tiers, ramLatencies);
             if (sourcesEmpty()) {

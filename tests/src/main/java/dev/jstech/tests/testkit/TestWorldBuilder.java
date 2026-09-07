@@ -173,8 +173,10 @@ public final class TestWorldBuilder {
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
-        // The Network OS is 8 MB, one item of a 500 GB HDD's 2 000 at 256 MB the item. The disk must be in
-        // place before installOs() so the footprint check passes.
+        /*
+         * The Network OS is 8 MB, one item of a 500 GB HDD's 2 000 at 256 MB the item. The disk must be in
+         * place before installOs() so the footprint check passes.
+         */
         inv.setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
         be.installOs(NETWORK_OS);
@@ -203,8 +205,10 @@ public final class TestWorldBuilder {
                 new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
         hw.setStackInSlot(PersonalComputerBlockEntity.PSU_SLOT,
                 new ItemStack(ComputingModule.PSU_650G.get()));
-        // A machine on a real base has a disk with a system on it. Without one the computer powers on into
-        // its firmware with nothing to boot, which is not what the base is meant to demonstrate.
+        /*
+         * A machine on a real base has a disk with a system on it. Without one the computer powers on into
+         * its firmware with nothing to boot, which is not what the base is meant to demonstrate.
+         */
         hw.setStackInSlot(PersonalComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
         be.installOs(DESKTOP_OS);
@@ -247,7 +251,7 @@ public final class TestWorldBuilder {
 
     /**
      * Mounts the default server at {@code slot} and slots the default pair of NVMe drives into the
-     * bay it claims — storage lives on the rack's front-panel drives, not on the Server item, so a
+     * bay it claims, since storage lives on the rack's front-panel drives, not on the Server item, so a
      * fixture that needs network storage must populate the bay too.
      */
     public static void mountDefaultServer(final ServerRackBlockEntity rack, final int slot) {
@@ -332,8 +336,8 @@ public final class TestWorldBuilder {
     }
 
     /**
-     * Builds the standard crafting network along the x axis at y=2: Mainframe (1,2,2) — HBW cable (2,2,2)
-     * with the rack beside it at (2,2,1) — Personal Router (3,2,2) — Ethernet cable (4,2,2) — Crafting
+     * Builds the standard crafting network along the x axis at y=2: Mainframe (1,2,2) to HBW cable (2,2,2)
+     * with the rack beside it at (2,2,1) to Personal Router (3,2,2) to Ethernet cable (4,2,2) to Crafting
      * Computer (5,2,2), rear toward the cable.
      */
     public CraftingNetwork buildCraftingNetwork() {

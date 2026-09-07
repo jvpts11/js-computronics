@@ -61,8 +61,10 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
     /** The most jobs waiting behind the one being written. */
     public static final int QUEUE_MAX = 8;
 
-    // The body's only motion: the disc spins and the activity lamp pulses while the head is down. No part
-    // ever moves out of the block; everything else the body shows is bone visibility set by the renderer.
+    /*
+     * The body's only motion: the disc spins and the activity lamp pulses while the head is down. No part
+     * ever moves out of the block; everything else the body shows is bone visibility set by the renderer.
+     */
     private static final software.bernie.geckolib.animation.RawAnimation WRITE =
             software.bernie.geckolib.animation.RawAnimation.begin().thenLoop("animation.pattern_encoder.write");
 
@@ -107,8 +109,10 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
 
         @Override
         public ItemStack extractItem(final int slot, final int amount, final boolean simulate) {
-            // The bay is locked while the head is on the medium: pulling the disc mid-write is how a
-            // real burner ruins one, so the encoder simply refuses.
+            /*
+             * The bay is locked while the head is on the medium: pulling the disc mid-write is how a
+             * real burner ruins one, so the encoder simply refuses.
+             */
             return locked() ? ItemStack.EMPTY : super.extractItem(slot, amount, simulate);
         }
 
@@ -135,7 +139,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
         super(ComputingModule.PATTERN_ENCODER_BE.get(), pos, state);
     }
 
-    // ---- era and media ----
+    // era and media
 
     /** The era of this encoder's chassis, which decides the media it writes. */
     public HardwareEra era() {
@@ -223,7 +227,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
         return media.extractItem(0, 1, false);
     }
 
-    // ---- jobs ----
+    // jobs
 
     /**
      * Queues a file for burning. Refused when the queue is full or the name is not one the filesystem can
@@ -329,7 +333,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
         sync();
     }
 
-    // ---- ticking ----
+    // ticking
 
     public static void serverTick(final Level level, final BlockPos pos, final BlockState state,
                                   final PatternEncoderBlockEntity be) {
@@ -364,8 +368,10 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
                     return;
                 }
                 if (!hasMedia()) {
-                    // The job waits for a disc rather than failing: the player queued it on purpose and the
-                    // display says what is missing.
+                    /*
+                     * The job waits for a disc rather than failing: the player queued it on purpose and the
+                     * display says what is missing.
+                     */
                     return;
                 }
                 final BurnRequest next = queue.peekFirst();
@@ -466,7 +472,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
         return Math.max(0L, capacity - used);
     }
 
-    // ---- IPeripheralEndpoint ----
+    // IPeripheralEndpoint
 
     @Override
     public PeripheralCableType cableType() {
@@ -514,7 +520,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements IPeriphera
         }
     }
 
-    // ---- persistence and sync ----
+    // persistence and sync
 
     private void sync() {
         if (level != null && !level.isClientSide()) {

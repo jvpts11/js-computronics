@@ -280,8 +280,10 @@ public final class CannonProcessGameTests {
                     programs.hold(id);
                     programs.tick(100000);
                     final List<String> seen = programs.unseen();
-                    // What fell off the end while nobody looked is gone, as it is on any terminal; what
-                    // is left is the newest, in order, ending with the last thing the program said.
+                    /*
+                     * What fell off the end while nobody looked is gone, as it is on any terminal; what
+                     * is left is the newest, in order, ending with the last thing the program said.
+                     */
                     helper.assertTrue(seen.size() == Library.CONSOLE_LINES,
                             "it hands over everything still kept; got " + seen.size());
                     helper.assertTrue("line 259".equals(seen.getLast()),

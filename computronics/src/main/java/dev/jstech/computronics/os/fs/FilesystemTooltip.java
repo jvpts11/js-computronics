@@ -22,7 +22,7 @@ import java.util.Map;
  * medium carrying recipe files reads as such instead of as a blank installer.
  *
  * <p>This is a client-side rendering helper (it reads {@link Screen#hasShiftDown()}); the data it
- * formats — {@link FilesystemContents} / {@link StoredFile} — stays pure.
+ * formats ({@link FilesystemContents} and {@link StoredFile}) stays pure.
  */
 public final class FilesystemTooltip {
 

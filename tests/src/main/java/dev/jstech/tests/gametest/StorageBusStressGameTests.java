@@ -93,8 +93,10 @@ public final class StorageBusStressGameTests {
                         }
                     }
                 })
-                // Let the buses churn, checking conservation the whole way: at no tick may the closed system hold
-                // more or less of any item than was seeded.
+                /*
+                 * Let the buses churn, checking conservation the whole way: at no tick may the closed system hold
+                 * more or less of any item than was seeded.
+                 */
                 .thenWaitUntil(() -> {
                     final NetworkStorage storage = NetworkStorage.of(helper.getLevel(), mainframe.networkUuid());
                     long movedToSink = 0L;

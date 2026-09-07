@@ -103,7 +103,7 @@ public final class OsGameTests {
     @GameTest(template = ARENA, timeoutTicks = 60)
     public static void os_installFromLinkedReader(final GameTestHelper helper) {
         final BlockPos mainframePos = new BlockPos(2, 2, 2);
-        final BlockPos readerPos = mainframePos.east(); // placed adjacent — no cable needed for adjacency
+        final BlockPos readerPos = mainframePos.east(); // placed adjacent, no cable needed for adjacency
 
         // Place a Mainframe with a GPU so it has peripheral ports, then add a Media Reader next to it.
         final MainframeBlockEntity mainframe = placeRunningMainframeWithDisk(helper, mainframePos);
@@ -181,13 +181,15 @@ public final class OsGameTests {
                     helper.assertFalse(mainframe.hasOs(),
                             "Mainframe must start with no OS");
 
-                    // Without an OS the tick gate never calls runDispatch(), so the dispatcher is never
-                    // created. submitSelfTest guards on dispatch == null and returns 0 (no tasks queued).
+                    /*
+                     * Without an OS the tick gate never calls runDispatch(), so the dispatcher is never
+                     * created. submitSelfTest guards on dispatch == null and returns 0 (no tasks queued).
+                     */
                     final int submitted = mainframe.submitSelfTest(3, 1);
                     helper.assertTrue(submitted == 0,
                             "submitSelfTest must return 0 while the Mainframe has no OS; got " + submitted);
 
-                    // The completed count must remain at zero — no dispatch, no progress.
+                    // The completed count must remain at zero, no dispatch, no progress.
                     helper.assertTrue(mainframe.completedOps() == 0,
                             "completedOps must be 0 before any OS; got " + mainframe.completedOps());
                 })
@@ -197,7 +199,7 @@ public final class OsGameTests {
                             "no Operations must complete while the Mainframe has no OS; completedOps="
                                     + mainframe.completedOps());
 
-                    // Install the OS — the next tick will create the dispatcher.
+                    // Install the OS, and the next tick will create the dispatcher.
                     final boolean installed = mainframe.installOs(SO_REDE);
                     helper.assertTrue(installed, "installOs must succeed after the OS gate is cleared");
                 })
@@ -234,12 +236,12 @@ public final class OsGameTests {
                 NetworkGameTests.placeRunningMainframe(helper, mainframePos);
         helper.setBlock(cablePos, ComputingModule.HBW_CABLE.get());
 
-        // Place a Server Router (Category B — no OS concept).
+        // Place a Server Router (Category B, no OS concept).
         helper.setBlock(routerPos, ComputingModule.SERVER_ROUTER.get().defaultBlockState()
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                         Direction.EAST));
 
-        // Place a Cluster Management Computer (Category A — a computer that runs a system).
+        // Place a Cluster Management Computer (Category A, a computer that runs a system).
         helper.setBlock(managerPos, ComputingModule.CLUSTER_MANAGEMENT_COMPUTER.get());
 
         helper.startSequence()
@@ -258,16 +260,14 @@ public final class OsGameTests {
                                     .AbstractComputerBlockEntity,
                             "the Cluster Management Computer is a computer: it extends AbstractComputerBlockEntity");
 
-                    // The Mainframe still owns its network — the appliance does not interfere.
+                    // The Mainframe still owns its network, and the appliance does not interfere.
                     helper.assertTrue(mainframe.networkUuid() != null,
                             "Mainframe must own a network regardless of appliance presence");
                 })
                 .thenSucceed();
     }
 
-    // -------------------------------------------------------------------------
     // Helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Places a running Mainframe with a valid hardware build AND one HDD so that storage capacity

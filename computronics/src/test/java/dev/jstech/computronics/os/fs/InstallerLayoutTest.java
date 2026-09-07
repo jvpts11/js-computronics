@@ -102,8 +102,10 @@ public final class InstallerLayoutTest {
 
     @Test
     public void entries_everyFileIsProjectedOrPlainText() {
-        // Setup, manifests, autorun and payload are virtual types the filesystem never writes; the readme
-        // and the licence are plain text so the Editor opens them, and the medium itself is locked.
+        /*
+         * Setup, manifests, autorun and payload are virtual types the filesystem never writes; the readme
+         * and the licence are plain text so the Editor opens them, and the medium itself is locked.
+         */
         for (final MediaFormat format : MediaFormat.values()) {
             for (final InstallerLayout.Entry entry : InstallerLayout.entries(format, program())) {
                 if (entry.directory()) {

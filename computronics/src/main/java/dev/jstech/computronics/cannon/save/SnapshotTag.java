@@ -153,7 +153,7 @@ public final class SnapshotTag {
                 tag.getString(STATE), tag.getString(MESSAGE), tag.getInt(SPENT));
     }
 
-    // ---------------------------------------------------------------- what the program allocated
+    // what the program allocated
 
     private static CompoundTag write(final Snapshot.IHeld one) {
         final CompoundTag tag = new CompoundTag();
@@ -235,7 +235,7 @@ public final class SnapshotTag {
         };
     }
 
-    // ---------------------------------------------------------------- what each call was doing
+    // what each call was doing
 
     private static ListTag frames(final List<Snapshot.FrameShot> shots) {
         final ListTag written = new ListTag();
@@ -266,7 +266,7 @@ public final class SnapshotTag {
         return shots;
     }
 
-    // ---------------------------------------------------------------- single values
+    // single values
 
     private static CompoundTag write(final Snapshot.IValue value) {
         final CompoundTag tag = new CompoundTag();

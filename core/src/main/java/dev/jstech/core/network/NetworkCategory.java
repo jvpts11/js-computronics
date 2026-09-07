@@ -8,7 +8,7 @@
 package dev.jstech.core.network;
 
 /**
- * Network Category — classifies how a block participates in the network.
+ * Network Category: classifies how a block participates in the network.
  */
 public enum NetworkCategory {
     A,

@@ -33,8 +33,8 @@ import java.util.List;
 
 /**
  * Operations in flight must survive the world being saved and reopened: the Mainframe writes them into its
- * NBT and resumes them after the boot. These tests replay that round trip server-side — snapshot the running
- * Mainframe's NBT, replace the block, load the snapshot into the fresh block entity — and check the craft
+ * NBT and resumes them after the boot. These tests replay that round trip server-side: snapshot the running
+ * Mainframe's NBT, replace the block, load the snapshot into the fresh block entity, and check the craft
  * carries on where it stopped instead of vanishing.
  */
 @GameTestHolder(JsTests.MODID)
@@ -92,8 +92,10 @@ public final class OperationResumeGameTests {
                     snapshot[0] = net.mainframe().saveWithoutMetadata(helper.getLevel().registryAccess());
                     helper.assertTrue(snapshot[0].contains("ActiveOperations"),
                             "the Mainframe's NBT must carry the in-flight operation");
-                    // Replace the block: the old block entity is torn down like a reload would tear it down,
-                    // and the fresh one gets the saved NBT, exactly as loading the chunk would give it.
+                    /*
+                     * Replace the block: the old block entity is torn down like a reload would tear it down,
+                     * and the fresh one gets the saved NBT, exactly as loading the chunk would give it.
+                     */
                     world.setBlock(MAINFRAME, Blocks.AIR);
                 })
                 .thenExecuteAfter(SETTLE, () -> {

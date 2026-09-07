@@ -52,9 +52,11 @@ public final class NetworkIndex {
     public dev.jstech.computronics.operation.index.IndexHealth health() {
         return health;
     }
-    // Player-issued holds: one reservation per item type, kept alive until an explicit unlock so that
-    // every other Operation contending for that type WAITs. Distinct from the per-Operation locks above
-    // (those are keyed by the Operation's id and freed when it settles).
+    /*
+     * Player-issued holds: one reservation per item type, kept alive until an explicit unlock so that
+     * every other Operation contending for that type WAITs. Distinct from the per-Operation locks above
+     * (those are keyed by the Operation's id and freed when it settles).
+     */
     private final Map<StorageKey, ManualLock> manualLocks = new LinkedHashMap<>();
 
     private record ManualLock(UUID id, long amount) {
@@ -76,8 +78,10 @@ public final class NetworkIndex {
                 }
             });
         }
-        // A Personal Computer contributes only its published share. With the default-private permille
-        // this adds nothing until the owner moves a slider, so a fresh PC stays invisible to SELECT.
+        /*
+         * A Personal Computer contributes only its published share. With the default-private permille
+         * this adds nothing until the owner moves a slider, so a fresh PC stays invisible to SELECT.
+         */
         for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
             if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
                 indexPc(pcBe, pc.nodeUuid());
@@ -107,8 +111,10 @@ public final class NetworkIndex {
                 }
             });
         }
-        // The same changes-only pass for Personal Computers, keyed on the PC's storage counter (bumped
-        // both by a disk-content change and by a slider write, so re-publishing re-reads the view).
+        /*
+         * The same changes-only pass for Personal Computers, keyed on the PC's storage counter (bumped
+         * both by a disk-content change and by a slider write, so re-publishing re-reads the view).
+         */
         final Map<NodeUuid, PersonalComputerBlockEntity> livePcs = new LinkedHashMap<>();
         for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
             if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
@@ -127,10 +133,12 @@ public final class NetworkIndex {
             }
         }
         if (dirty.isEmpty() && gone.isEmpty()) {
-            return; // nothing changed — the whole pass cost only counter comparisons
+            return; // nothing changed, the whole pass cost only counter comparisons
         }
-        // A node that left the network takes rows with it: those types were pointing at storage that
-        // is no longer there, which is exactly what a vacuum exists to sweep up.
+        /*
+         * A node that left the network takes rows with it: those types were pointing at storage that
+         * is no longer there, which is exactly what a vacuum exists to sweep up.
+         */
         for (final NodeUuid node : gone) {
             final List<String> orphaned = typesHeldBy(node);
             if (!orphaned.isEmpty()) {
@@ -318,9 +326,11 @@ public final class NetworkIndex {
     }
 
     private void indexPc(final PersonalComputerBlockEntity pc, final NodeUuid node) {
-        // A PC contributes only its published share, indexed at the slowest tier so it always sorts
-        // last among SELECT sources — Servers are served first, a PC's published storage only as a
-        // fallback. The private remainder is absent from publicView(), so SELECT can never reach it.
+        /*
+         * A PC contributes only its published share, indexed at the slowest tier so it always sorts
+         * last among SELECT sources: Servers are served first, a PC's published storage only as a
+         * fallback. The private remainder is absent from publicView(), so SELECT can never reach it.
+         */
         pc.localStore().publicView().forEach((key, quantity) -> {
             if (quantity > 0L) {
                 catalog.computeIfAbsent(key, k -> new ArrayList<>())
@@ -341,8 +351,10 @@ public final class NetworkIndex {
         if (stack.getItem() instanceof ServerItem) {
             final ComputerBuild build = ServerItem.build(stack);
             if (build != null) {
-                // A cabinet over its thermal budget slows every machine in it, so the throughput a
-                // server can promise the network drops with it.
+                /*
+                 * A cabinet over its thermal budget slows every machine in it, so the throughput a
+                 * server can promise the network drops with it.
+                 */
                 return rack.throttled(Math.min(build.totalCapacity(), build.ramBuffer()));
             }
         }
@@ -350,8 +362,10 @@ public final class NetworkIndex {
     }
 
     private static StorageTier tierOf(final ServerRackBlockEntity rack, final int slot) {
-        // A server's drives live in the rack's front-panel bays, so its access tier is the fastest
-        // drive the unit claims there — the Server item itself carries no disks.
+        /*
+         * A server's drives live in the rack's front-panel bays, so its access tier is the fastest
+         * drive the unit claims there, since the Server item itself carries no disks.
+         */
         StorageTier fastest = StorageTier.HDD;
         for (final ItemStack drive : rack.claimedDriveStacks(slot)) {
             if (drive.getItem() instanceof dev.jstech.computronics.item.DiskItem disk) {
@@ -380,7 +394,7 @@ public final class NetworkIndex {
         return 0;
     }
 
-    // Query (reads the in-RAM catalog, net of locks — never touches disks)
+    // Query (reads the in-RAM catalog, net of locks, never touches disks)
 
     public long available(final Item item) {
         return available(StorageKey.of(item));
@@ -415,9 +429,11 @@ public final class NetworkIndex {
         return out;
     }
 
-    // The room every server has, measured once per tick: walking every cabinet costs a few
-    // microseconds a server, and a busy base builds dozens of INSERTs a tick. Each INSERT reserves what
-    // it plans to write, so the ones after it in the same tick see the room that is really left.
+    /*
+     * The room every server has, measured once per tick: walking every cabinet costs a few
+     * microseconds a server, and a busy base builds dozens of INSERTs a tick. Each INSERT reserves what
+     * it plans to write, so the ones after it in the same tick see the room that is really left.
+     */
     private long roomTick = Long.MIN_VALUE;
     private final Map<NodeUuid, ItemLocation> room = new LinkedHashMap<>();
 
@@ -526,7 +542,7 @@ public final class NetworkIndex {
         final UUID id = UUID.randomUUID();
         final Allocation plan = lock(id, key, demand, allowed);
         if (plan.allocated() <= 0L) {
-            locks.unlock(id); // reserved nothing — leave no empty holder behind
+            locks.unlock(id); // reserved nothing, leave no empty holder behind
             return 0L;
         }
         manualLocks.put(key, new ManualLock(id, plan.allocated()));
@@ -597,7 +613,7 @@ public final class NetworkIndex {
         return weight;
     }
 
-    // DROP (destruction — irreversible; only the Mainframe Maintenance tab calls this)
+    // DROP (destruction, irreversible; only the Mainframe Maintenance tab calls this)
 
     @org.jetbrains.annotations.Nullable
     private static ServerStore storeOf(final ServerLevel level, final NodeUuid server) {

@@ -20,8 +20,10 @@ public record SelfTestOperationTask(int workUnits) implements IOperationTask {
 
     @Override
     public IOperationResult run(final IOperationContext context) {
-        // Pure, allocation-free arithmetic over an immutable input — never touches
-        // the world, exactly as an Operation's Layer-A work must behave.
+        /*
+         * Pure, allocation-free arithmetic over an immutable input; it never touches
+         * the world, exactly as an Operation's Layer-A work must behave.
+         */
         long accumulator = 0L;
         for (int i = 1; i <= workUnits; i++) {
             accumulator += (long) (Math.sqrt(i) * 1024.0) ^ (long) i;

@@ -10,7 +10,7 @@ package dev.jstech.computronics.storage;
 import java.util.List;
 
 /**
- * One kind of data behind a block face — items, fluids, chemicals — and the four things the network ever
+ * One kind of data behind a block face (items, fluids, chemicals) and the four things the network ever
  * does with it: put some in, take some out, count it, list it. Every {@link StorageKey.Kind} has exactly one
  * channel type; {@link ExternalDataPort} is nothing but the channels a face offers, keyed by kind, so a new
  * kind of data cannot be wired into one path and forgotten in another.

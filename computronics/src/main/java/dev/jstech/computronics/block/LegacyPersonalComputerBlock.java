@@ -13,7 +13,7 @@ import dev.jstech.core.tier.HardwareEra;
 /**
  * The Legacy-era Personal Computer: the same machine as the Standard one, but built on a Legacy
  * consumer ATX board and wearing the Legacy skin. A Legacy board is not interchangeable with a
- * Standard one even though both are ATX — each PC accepts only a board of its own era.
+ * Standard one even though both are ATX, since each PC accepts only a board of its own era.
  */
 public class LegacyPersonalComputerBlock extends PersonalComputerBlock {
 

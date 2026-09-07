@@ -17,8 +17,8 @@ import org.jetbrains.annotations.Nullable;
  * <p>This interface lives in common code so the block classes can reference it without importing
  * any client-only class. The client-side implementation is registered in
  * {@link dev.jstech.computronics.client.ComputingClientSetup} during the
- * {@link net.neoforged.neoforge.client.event.RegisterMenuScreensEvent}; until then — on dedicated
- * servers — the holder remains {@code null} and any call is silently skipped.
+ * {@link net.neoforged.neoforge.client.event.RegisterMenuScreensEvent}; until then (on dedicated
+ * servers) the holder remains {@code null} and any call is silently skipped.
  */
 @FunctionalInterface
 public interface IFirmwareScreenOpener {

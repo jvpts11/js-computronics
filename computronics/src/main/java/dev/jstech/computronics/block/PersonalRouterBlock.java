@@ -31,7 +31,7 @@ public class PersonalRouterBlock extends net.minecraft.world.level.block.Horizon
 
     public PersonalRouterBlock(final Properties properties) {
         super(properties);
-        // Facing is purely cosmetic (the status panel) — cables still connect on every side.
+        // Facing is purely cosmetic (the status panel); cables still connect on every side.
         registerDefaultState(stateDefinition.any().setValue(FACING, net.minecraft.core.Direction.NORTH));
     }
 

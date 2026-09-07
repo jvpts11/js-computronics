@@ -126,9 +126,11 @@ public final class Lexer {
         return Token.of(keyword, text, startLine, startColumn);
     }
 
-    // A number is digits, an optional fractional part, and an optional suffix naming its type. A
-    // letter that is not one of the suffixes is part of the mistake, so it is consumed with it and
-    // the whole run is quoted back: "12abc" reads better than "12" followed by a stray name.
+    /*
+     * A number is digits, an optional fractional part, and an optional suffix naming its type. A
+     * letter that is not one of the suffixes is part of the mistake, so it is consumed with it and
+     * the whole run is quoted back: "12abc" reads better than "12" followed by a stray name.
+     */
     private Token scanNumber(final int startIndex, final int startLine, final int startColumn) {
         while (this.index < this.source.length() && Character.isDigit(this.peek())) {
             this.advance();

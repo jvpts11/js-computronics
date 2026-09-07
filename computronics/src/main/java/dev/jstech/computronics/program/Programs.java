@@ -17,8 +17,8 @@ import java.util.List;
 
 /**
  * Well-known program ids and a thin CLI-facing view over the single program registry
- * ({@link OsRegistry}). The descriptors themselves — platforms, hardware minimums, host scope, display
- * name — live on {@link ProgramSpec} and are registered once through the addon API, so there is no longer
+ * ({@link OsRegistry}). The descriptors themselves (platforms, hardware minimums, host scope, display
+ * name) live on {@link ProgramSpec} and are registered once through the addon API, so there is no longer
  * a second, parallel program store here. These constants are just the ids the mod's own code refers to.
  */
 public final class Programs {

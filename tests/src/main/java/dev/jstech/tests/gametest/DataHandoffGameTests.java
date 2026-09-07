@@ -41,7 +41,7 @@ import java.util.Optional;
 
 /**
  * What passes between a player's hands and a computer. A stack handed over as items is stored as its item,
- * the way a chest takes it — a bucket included. Handing over what a held container HOLDS stores the fluid or
+ * the way a chest takes it, a bucket included. Handing over what a held container HOLDS stores the fluid or
  * chemical and returns the container emptied, never stored as an item. A held empty container over a fluid or
  * chemical entry fills from it. Every route (cursor, slot, inventory; terminal or desktop) goes through the
  * same handoff, so a bucket that works on the terminal works on the desktop too.
@@ -236,7 +236,7 @@ public final class DataHandoffGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     player.containerMenu.setCarried(new ItemStack(Items.WATER_BUCKET));
-                    // Handed over as items — a left click or a shift-click — the bucket is what goes in.
+                    // Handed over as items (a left click or a shift-click), the bucket is what goes in.
                     final DataHandoff.Outcome outcome = DataHandoff.intoNetwork(net.mainframe(), helper.getLevel(),
                             net.mainframe().networkUuid(), player, DataHandoff.cursor(player), 1, false, "test", () -> { });
                     helper.assertTrue(outcome == DataHandoff.Outcome.DEPOSITED, "the bucket must deposit; got " + outcome);

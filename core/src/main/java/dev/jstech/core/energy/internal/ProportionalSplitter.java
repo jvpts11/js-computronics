@@ -27,8 +27,10 @@ public final class ProportionalSplitter {
             return Map.of();
         }
 
-        // Effective ceiling per recipient = min(demand, cap).
-        // LinkedHashMap preserves insertion order for deterministic tiebreaks.
+        /*
+         * Effective ceiling per recipient = min(demand, cap).
+         * LinkedHashMap preserves insertion order for deterministic tiebreaks.
+         */
         final Map<Long, Long> effectiveCap = new LinkedHashMap<>();
         long totalEffectiveDemand = 0L;
         for (final Map.Entry<Long, Long> e : demand.entrySet()) {
@@ -57,9 +59,11 @@ public final class ProportionalSplitter {
         final BigInteger avail = BigInteger.valueOf(available);
         final BigInteger total = BigInteger.valueOf(totalEffectiveDemand);
         for (final Map.Entry<Long, Long> e : effectiveCap.entrySet()) {
-            // base = floor(available * effDemand / totalEffectiveDemand). The product can exceed a long
-            // for late-tier supplies, so compute it in 128-bit precision; both the quotient (at most
-            // `available`) and the remainder (below the total) fit back into a long without loss.
+            /*
+             * base = floor(available * effDemand / totalEffectiveDemand). The product can exceed a long
+             * for late-tier supplies, so compute it in 128-bit precision; both the quotient (at most
+             * `available`) and the remainder (below the total) fit back into a long without loss.
+             */
             final BigInteger product = avail.multiply(BigInteger.valueOf(e.getValue()));
             final BigInteger[] divRem = product.divideAndRemainder(total);
             final long base = divRem[0].longValueExact();

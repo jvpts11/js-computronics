@@ -14,8 +14,8 @@ import java.util.Locale;
 /**
  * The manual installation of a source/live distribution, as a state machine the live shell drives: the
  * player runs the real steps in order (partition, mount, bootstrap the base system, fstab, chroot, kernel,
- * bootloader, password, reboot) and gets the genuine error when a step is out of order. Pure — no
- * Minecraft types — so the whole sequence is unit-tested; the shell supplies the world facts it needs
+ * bootloader, password, reboot) and gets the genuine error when a step is out of order. Pure (no
+ * Minecraft types) so the whole sequence is unit-tested; the shell supplies the world facts it needs
  * through {@link Env} (the disks present, whether the network mirror answers, the current tick).
  *
  * <p>Arch: {@code lsblk, mkfs.ext4, mount, pacstrap, genfstab, arch-chroot, grub-install, passwd, exit,
@@ -341,7 +341,7 @@ public final class LiveInstallState {
                         "grub-install /dev/sdX | passwd | exit | reboot");
     }
 
-    // ---- persistence (a compact key=value string, so the console state stays free of NBT here) ----
+    // persistence (a compact key=value string, so the console state stays free of NBT here)
 
     public String serialize() {
         return distro.name() + ";" + device + ";" + (formatted ? 1 : 0) + ";" + (mounted ? 1 : 0) + ";" + (base ? 1 : 0)

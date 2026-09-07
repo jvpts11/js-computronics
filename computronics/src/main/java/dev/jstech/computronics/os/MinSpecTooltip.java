@@ -53,12 +53,16 @@ public final class MinSpecTooltip {
         if (prog == null) {
             return lines;
         }
-        // The OS requirement is the headline the player cares about, so it is highlighted (aqua) after a
-        // muted "Requires" label; the raw hardware minimums follow in grey.
+        /*
+         * The OS requirement is the headline the player cares about, so it is highlighted (aqua) after a
+         * muted "Requires" label; the raw hardware minimums follow in grey.
+         */
         lines.add(Component.literal("Requires ").withStyle(ChatFormatting.GRAY)
                 .append(Component.literal(minOsLabel(prog)).withStyle(ChatFormatting.AQUA)));
-        // The era floor sits with the hardware minimums because that is what it is: a machine of an
-        // older generation cannot run it at any clock speed.
+        /*
+         * The era floor sits with the hardware minimums because that is what it is: a machine of an
+         * older generation cannot run it at any clock speed.
+         */
         if (prog.minEra() != dev.jstech.core.tier.HardwareEra.VINTAGE) {
             // Worded exactly like the OS line above: the same requirement must not read as two rules.
             lines.add(needsEra(prog.minEra()));

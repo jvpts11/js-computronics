@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * An immutable value representing a single file stored on a disk.
  *
- * <p>{@code content} is the serialised file payload as a UTF-8 string — plain text for text
+ * <p>{@code content} is the serialised file payload as a UTF-8 string: plain text for text
  * types ({@link FileType#IQL}, {@link FileType#TXT}, etc.) and a serialised representation
  * for binary-ish types such as {@link FileType#CRAFT}.
  *

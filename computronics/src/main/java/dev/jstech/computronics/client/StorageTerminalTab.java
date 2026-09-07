@@ -16,7 +16,7 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 final class StorageTerminalTab extends AbstractTerminalTab {
 
-    // Layout constants — mirror ComputerTerminalScreen; update together if layout changes.
+    // Layout constants, mirroring ComputerTerminalScreen; update together if layout changes.
     private static final int STORAGE_SHIFT = 8;
     private static final int STORAGE_NET_ROWS = 3;
     private static final int SLIDER_TRACK0_DY = 1;
@@ -56,7 +56,7 @@ final class StorageTerminalTab extends AbstractTerminalTab {
                 NET_X + DEPOSIT_W / 2, DEPOSIT_Y + STORAGE_SHIFT + 3, holding ? ACCENT() : DIM());
     }
 
-    // ---- Slider band rendering -------------------------------------------------------
+    // Slider band rendering
 
     private void sliderBandBg(final GuiGraphics g, final int cx, final int cy, final int cw) {
         final int bandTop = cy + 18;

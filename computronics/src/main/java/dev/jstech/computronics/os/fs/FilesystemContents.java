@@ -28,7 +28,7 @@ import java.util.Set;
  *
  * <p>Files are stored by their full path; directories are normally implicit in those paths, but a
  * hierarchical volume also keeps a separate set of directory paths so an <em>empty</em> folder
- * (one with no files yet) still persists. Directories cost no disk weight — only files consume
+ * (one with no files yet) still persists. Directories cost no disk weight; only files consume
  * space. Flat volumes (MC-DOS) never populate the directory set, so they behave exactly as before.
  *
  * <p>Persistence and network sync mirror the {@code ServerStorageContents} pattern: a private
@@ -40,7 +40,7 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
     /** An empty filesystem (no files and no directories). */
     public static final FilesystemContents EMPTY = new FilesystemContents(Map.of(), Set.of());
 
-    /** Compact constructor — defensive copy and unmodifiable wrapping of both collections. */
+    /** Compact constructor: defensive copy and unmodifiable wrapping of both collections. */
     public FilesystemContents {
         files = Collections.unmodifiableMap(new LinkedHashMap<>(files));
         directories = Collections.unmodifiableSet(new LinkedHashSet<>(directories));
@@ -56,9 +56,7 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
         this(files, Set.of());
     }
 
-    // -------------------------------------------------------------------------
     // Codec / StreamCodec (mirrors ServerStorageContents)
-    // -------------------------------------------------------------------------
 
     /**
      * One persisted line: path + extension string + content.
@@ -114,9 +112,7 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
                     ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list(4096)), FilesystemContents::toDirs,
                     FilesystemContents::fromParts);
 
-    // -------------------------------------------------------------------------
     // Space accounting
-    // -------------------------------------------------------------------------
 
     /**
      * Returns the total disk weight consumed by all stored files, in mB-equivalents on a disk of
@@ -130,9 +126,7 @@ public record FilesystemContents(Map<String, StoredFile> files, Set<String> dire
         return sum;
     }
 
-    // -------------------------------------------------------------------------
     // Immutable mutations
-    // -------------------------------------------------------------------------
 
     /**
      * Returns a new {@link FilesystemContents} with {@code file} added (or replacing any

@@ -10,7 +10,7 @@ package dev.jstech.core.peripheral;
 import java.util.Optional;
 
 /**
- * Contract for a BlockEntity that is the LINKED endpoint of a peripheral connection — the "client" side of the link.
+ * Contract for a BlockEntity that is the LINKED endpoint of a peripheral connection, the "client" side of the link.
  */
 public interface IPeripheralEndpoint {
 

@@ -88,8 +88,10 @@ public final class CraftFile {
         return Optional.of(result.getOrThrow());
     }
 
-    // --- Typed .craft for machine recipes. A wrapper tags the kind so parse can route; the legacy bench
-    // .craft above stays untagged for back-compat, and typeOf() reports "craft" for it.
+    /*
+     * Typed .craft for machine recipes. A wrapper tags the kind so parse can route; the legacy bench
+     * .craft above stays untagged for back-compat, and typeOf() reports "craft" for it.
+     */
 
     public static Optional<String> serializeProcessing(final ProcessingPattern pattern,
                                                        final HolderLookup.Provider registries) {
@@ -118,7 +120,7 @@ public final class CraftFile {
                 return c.getString("type");
             }
         } catch (final Exception ignored) {
-            // not parseable as a tagged compound — treat as legacy bench
+            // not parseable as a tagged compound, treat as legacy bench
         }
         return "craft";
     }

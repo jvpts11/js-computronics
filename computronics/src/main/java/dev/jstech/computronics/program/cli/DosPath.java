@@ -91,8 +91,10 @@ public final class DosPath {
         char drive = current.drive();
         final List<String> base;
         if (in.length() >= 2 && in.charAt(1) == ':' && Character.isLetter(in.charAt(0))) {
-            // Drive-qualified: switch drive. We do not track a per-drive current directory, so a bare "C:" or a
-            // "C:path" both resolve from that drive's root.
+            /*
+             * Drive-qualified: switch drive. We do not track a per-drive current directory, so a bare "C:" or a
+             * "C:path" both resolve from that drive's root.
+             */
             drive = Character.toUpperCase(in.charAt(0));
             in = in.substring(2);
             if (in.startsWith("\\") || in.startsWith("/")) {

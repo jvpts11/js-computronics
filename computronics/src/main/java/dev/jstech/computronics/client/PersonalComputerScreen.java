@@ -43,7 +43,7 @@ public class PersonalComputerScreen extends AbstractAssemblyScreen<PersonalCompu
     @Override
     protected void init() {
         super.init();
-        // Name field in the header — a PC is renamed here, in its assembly GUI, never via an anvil.
+        // Name field in the header, since a PC is renamed here, in its assembly GUI, never via an anvil.
         setupNameBox(28, 8, 126, RenamePcPayload.MAX_LEN,
                 Component.literal("Name this PC...").withStyle(ChatFormatting.DARK_GRAY),
                 menu.customName(),
@@ -66,8 +66,10 @@ public class PersonalComputerScreen extends AbstractAssemblyScreen<PersonalCompu
         if (menu.boardCpuSlots() > 0) {
             JsTechTheme.slot(g, x + 44, y + 40);
         }
-        // The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
-        // screen draws exactly what the menu exposes — one source of truth, no duplicated cap literal.
+        /*
+         * The board-derived counts are already clamped to the chassis bays in the BlockEntity, so the
+         * screen draws exactly what the menu exposes, one source of truth, no duplicated cap literal.
+         */
         final int ram = menu.boardRamSlots();
         final int gpu = menu.boardPcieSlots();
         final int disk = menu.boardDiskSlots();

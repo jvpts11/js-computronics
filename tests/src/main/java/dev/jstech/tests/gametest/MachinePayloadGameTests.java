@@ -27,7 +27,7 @@ import java.util.List;
 
 /**
  * Battery 1, front M: every new Slice C payload survives a StreamCodec encode/decode with the buffer fully
- * consumed — including the regrouped {@link CraftManagerStatePayload} (the MediaBlock sub-record that keeps it
+ * consumed, including the regrouped {@link CraftManagerStatePayload} (the MediaBlock sub-record that keeps it
  * within the 6-pair composite limit) carrying a full machine list.
  */
 @GameTestHolder(JsTests.MODID)
@@ -108,8 +108,10 @@ public final class MachinePayloadGameTests {
 
     @GameTest(template = ARENA)
     public static void patternStudioState_streamCodecRoundTrip(final GameTestHelper helper) {
-        // The state is hand-written on the wire (far more than six fields): a full, busy state must go
-        // through and come back field for field.
+        /*
+         * The state is hand-written on the wire (far more than six fields): a full, busy state must go
+         * through and come back field for field.
+         */
         final var bench = new ArrayList<PatternStudioStatePayload.BenchCell>();
         for (int i = 0; i < 9; i++) {
             bench.add(new PatternStudioStatePayload.BenchCell(

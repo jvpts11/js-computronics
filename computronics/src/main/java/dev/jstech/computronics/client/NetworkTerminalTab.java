@@ -13,7 +13,7 @@ import net.minecraft.client.gui.GuiGraphics;
 /** The Network tab: virtual item grid drawn from the network snapshot. */
 final class NetworkTerminalTab extends AbstractTerminalTab {
 
-    // Grid constants — mirror ComputerTerminalScreen layout values; update together if layout changes.
+    // Grid constants, mirroring ComputerTerminalScreen layout values; update together if layout changes.
     private static final int NET_ROWS = 4;
     private static final int NET_X = 68;
     private static final int DEPOSIT_W = 160; // NET_COLS * 18 - 2

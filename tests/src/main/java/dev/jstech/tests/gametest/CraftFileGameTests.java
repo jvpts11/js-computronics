@@ -80,7 +80,7 @@ public final class CraftFileGameTests {
     /**
      * Writes a {@code .craft} file onto a disk, asserts it appears in {@link DiskFilesystem#list},
      * then reads and parses it back, and finally clears the pattern from the ROM and loads it
-     * again from the file — verifying the full save → list → load round-trip.
+     * again from the file, verifying the full save → list → load round-trip.
      */
     @GameTest(template = ARENA)
     public static void craftFile_saveListLoadRoundTrip(final GameTestHelper helper) {
@@ -125,8 +125,10 @@ public final class CraftFileGameTests {
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    // --- SAVE ---
-                    // Serialize the first ROM pattern and write it to the system disk.
+                    /*
+                     * SAVE
+                     * Serialize the first ROM pattern and write it to the system disk.
+                     */
                     final ItemStack sysDisk = cc.systemDisk();
                     helper.assertFalse(sysDisk.isEmpty(), "system disk must be present after installOs");
 
@@ -142,7 +144,7 @@ public final class CraftFileGameTests {
                             "write must return OK; got: " + writeResult);
                     cc.setChanged();
 
-                    // --- LIST ---
+                    // LIST
                     final List<DiskFilesystem.FileEntry> entries =
                             DiskFilesystem.list(sysDisk, "", FilesystemKind.FLAT);
                     final long craftCount = entries.stream()
@@ -153,8 +155,10 @@ public final class CraftFileGameTests {
                     helper.assertTrue(DiskFilesystem.exists(sysDisk, "test_recipe.craft"),
                             "exists() must confirm the written file");
 
-                    // --- LOAD ---
-                    // Clear the ROM so we can verify the load re-adds the pattern.
+                    /*
+                     * LOAD
+                     * Clear the ROM so we can verify the load re-adds the pattern.
+                     */
                     cc.removePattern(0);
                     helper.assertTrue(cc.romUsed() == 0, "ROM must be empty after removePattern");
 

@@ -78,7 +78,7 @@ public final class IqlEngine {
 
     private Outcome runDefinition(final IqlDefinition definition, final int depth) {
         if (!mainframe.isIqlEngineActive()) {
-            return Outcome.fail("the IQL Engine is not running on the Mainframe — install and start it first");
+            return Outcome.fail("the IQL Engine is not running on the Mainframe, install and start it first");
         }
         return switch (definition.verb()) {
             case CREATE -> create(definition);

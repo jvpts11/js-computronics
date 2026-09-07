@@ -18,9 +18,9 @@ import java.util.Set;
 /**
  * A small multi-line text editor for the Network Management Studio's query pane: the stock {@code EditBox} is
  * single-line, and the Studio wants a real editor where {@code ENTER} breaks a line and the IQL is syntax-coloured
- * (keywords blue, strings red, the rest near-black — the classic SSMS palette). It keeps the text as a list of lines
+ * (keywords blue, strings red, the rest near-black, the classic SSMS palette). It keeps the text as a list of lines
  * with a cursor; the screen drives it (key/char events, the caret blink tick) and asks it to paint into the editor
- * rectangle. No selection or horizontal scroll — a long line is simply broken with {@code ENTER}.
+ * rectangle. No selection or horizontal scroll, so a long line is simply broken with {@code ENTER}.
  */
 final class IqlEditor {
 
@@ -49,7 +49,7 @@ final class IqlEditor {
         lines.add("");
     }
 
-    /** The whole text, lines joined by newlines — what gets sent to the server. */
+    /** The whole text, lines joined by newlines, what gets sent to the server. */
     String value() {
         return String.join("\n", lines);
     }
@@ -63,7 +63,7 @@ final class IqlEditor {
         return true;
     }
 
-    /** Replaces the whole text — used to restore a persisted script into a freshly opened, empty editor. */
+    /** Replaces the whole text, used to restore a persisted script into a freshly opened, empty editor. */
     void setValue(final String text) {
         lines.clear();
         if (text == null || text.isEmpty()) {

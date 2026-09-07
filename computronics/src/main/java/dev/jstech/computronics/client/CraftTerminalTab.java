@@ -21,7 +21,7 @@ import java.util.List;
  */
 final class CraftTerminalTab extends AbstractTerminalTab {
 
-    // Layout constants — mirror ComputerTerminalScreen; update together if layout changes.
+    // Layout constants, mirroring ComputerTerminalScreen; update together if layout changes.
     private static final int NET_X = 68;
     private static final int CRAFT_COLS = 9;
     private static final int CRAFT_ROWS = 2;
@@ -81,8 +81,10 @@ final class CraftTerminalTab extends AbstractTerminalTab {
 
     @Override
     public void renderTabLabels(final GuiGraphics g, final int cx, final int cy, final int cw) {
-        // Note: this method uses screen-relative Y constants directly (CRAFT_GRID_Y, etc.),
-        // matching the original craftLabels which didn't use the cy parameter.
+        /*
+         * Note: this method uses screen-relative Y constants directly (CRAFT_GRID_Y, etc.),
+         * matching the original craftLabels which didn't use the cy parameter.
+         */
         final var catalog = menu.craftCatalog();
         g.drawString(font(), "CRAFTABLE", NET_X, 30, DIM(), false);
         g.drawString(font(), catalog.size() + (catalog.size() == 1 ? " pattern" : " patterns"),

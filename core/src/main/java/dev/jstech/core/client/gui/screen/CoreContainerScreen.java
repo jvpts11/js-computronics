@@ -34,8 +34,10 @@ public abstract class CoreContainerScreen<T extends AbstractContainerMenu>
             final float partialTick) {
         this.renderBackground(graphics, mouseX, mouseY, partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
-        // Vanilla AbstractContainerScreen renders tooltips for hovered
-        // slots when this is called after super.
+        /*
+         * Vanilla AbstractContainerScreen renders tooltips for hovered
+         * slots when this is called after super.
+         */
         this.renderTooltip(graphics, mouseX, mouseY);
     }
 

@@ -10,7 +10,7 @@ package dev.jstech.core.operation;
 import java.util.function.Supplier;
 
 /**
- * The handle an {@link IOperationTask} uses while it runs on a virtual thread. The task does its CPU-bound work on the virtual thread, but anything that touches the world, a block entity or the live network index must go back to the main (server) thread — that is what this context provides. Disk latency and throughput are paced by waiting on whole game ticks, so the whole system stays deterministic (tick-based, never wall-clock).
+ * The handle an {@link IOperationTask} uses while it runs on a virtual thread. The task does its CPU-bound work on the virtual thread, but anything that touches the world, a block entity or the live network index must go back to the main (server) thread, and that is what this context provides. Disk latency and throughput are paced by waiting on whole game ticks, so the whole system stays deterministic (tick-based, never wall-clock).
  */
 public interface IOperationContext {
 
@@ -35,7 +35,7 @@ public interface IOperationContext {
     }
 
     /**
-     * Blocks this virtual thread until {@code ticks} server ticks have elapsed — the deterministic way
+     * Blocks this virtual thread until {@code ticks} server ticks have elapsed, the deterministic way
      * to model disk read latency (HDD/SSD/NVMe) and throughput pacing without a wall-clock sleep.
      *
      * @throws OperationCancelledException if the dispatcher is shut down while waiting

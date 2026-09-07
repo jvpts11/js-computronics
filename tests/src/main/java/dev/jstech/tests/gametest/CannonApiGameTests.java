@@ -73,8 +73,10 @@ public final class CannonApiGameTests {
                 new ItemStack(ComputingModule.PSU_650G.get()));
         hw.setStackInSlot(CraftingComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
-        // Frames XP, because that is the oldest system the language is allowed on and the oldest one
-        // with drives a program can write to at all.
+        /*
+         * Frames XP, because that is the oldest system the language is allowed on and the oldest one
+         * with drives a program can write to at all.
+         */
         computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp"));
         return computer;
     }
@@ -165,8 +167,10 @@ public final class CannonApiGameTests {
                     final var shell = new dev.jstech.computronics.program.ServerCliComputer(
                             computer, helper.getLevel());
                     shell.writeFile("notes.txt", "one");
-                    // A name that comes back from a listing has to be the name that opens the file. It
-                    // is the only thing a program can do with it.
+                    /*
+                     * A name that comes back from a listing has to be the name that opens the file. It
+                     * is the only thing a program can do with it.
+                     */
                     final MachinePrograms.Started started = computer.cannon().start("ls.asm", listing("""
                             class Ls {
                                 static void Main() {
@@ -237,8 +241,10 @@ public final class CannonApiGameTests {
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
-                    // The socket holds a four-core Ascent X4 965 at 3400 on a Standard board, with 8 GB
-                    // in the slot and Frames XP on the disk: what the machine reports has to be that.
+                    /*
+                     * The socket holds a four-core Ascent X4 965 at 3400 on a Standard board, with 8 GB
+                     * in the slot and Frames XP on the disk: what the machine reports has to be that.
+                     */
                     helper.assertTrue(said.size() == 3, "it says its three lines; got " + said);
                     helper.assertTrue(said.get(0).equals("4 at 3400 standard"),
                             "the processor is the one in the socket; got " + said.get(0));
@@ -392,8 +398,10 @@ public final class CannonApiGameTests {
                             "the network takes the ask; got " + said);
                 })
                 .thenExecuteAfter(20, () -> {
-                    // The row the network wrote down has to name the script, not just say a program did
-                    // it: a base runs many at once and the player has to know which one to go and fix.
+                    /*
+                     * The row the network wrote down has to name the script, not just say a program did
+                     * it: a base runs many at once and the player has to know which one to go and fix.
+                     */
                     final List<dev.jstech.computronics.operation.payload.OperationRecord> log =
                             wired.mainframe().recentOperations();
                     helper.assertFalse(log.isEmpty(), "the network wrote the work down");
@@ -498,8 +506,10 @@ public final class CannonApiGameTests {
                     helper.assertTrue(back != null && back.files().equals(packed.files()),
                             "and it comes back unchanged");
 
-                    // And a computer on the network installs it: the files land in a folder of its own,
-                    // and the machine knows it has a program a player wrote.
+                    /*
+                     * And a computer on the network installs it: the files land in a folder of its own,
+                     * and the machine knows it has a program a player wrote.
+                     */
                     computer.console().install(
                             dev.jstech.computronics.program.cli.CannonCommands.RUNTIME);
                     final var installed = shell.packageInstall("stockwatch");

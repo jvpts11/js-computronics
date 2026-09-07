@@ -13,7 +13,7 @@ import dev.jstech.core.client.gui.theme.EraTheme;
 /**
  * The Network Management Studio's color palette, kept apart from {@link NmsThemes} so it stays pure (an
  * {@link EraPalette} is plain data, while {@link NmsThemes} drags in Minecraft through {@link EraTheme}).
- * That lets the palette's text/background contrast be unit-tested — the Studio shipped unreadable-text bugs
+ * That lets the palette's text/background contrast be unit-tested, since the Studio shipped unreadable-text bugs
  * twice, so the readable-contrast guarantee now lives in a test over these exact values.
  */
 public final class NmsPalette {

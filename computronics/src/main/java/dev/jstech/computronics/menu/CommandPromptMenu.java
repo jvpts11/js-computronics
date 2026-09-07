@@ -20,7 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A slotless menu for the Command Prompt. It holds no inventory — the console is driven entirely by command payloads — but being a real menu lets the server validate that the player has this prompt open for this host before running a typed line, exactly as the graphical terminal does.
+ * A slotless menu for the Command Prompt. It holds no inventory (the console is driven entirely by command payloads) but being a real menu lets the server validate that the player has this prompt open for this host before running a typed line, exactly as the graphical terminal does.
  */
 public class CommandPromptMenu extends AbstractContainerMenu {
 
@@ -29,8 +29,10 @@ public class CommandPromptMenu extends AbstractContainerMenu {
     @Nullable
     private final HardwareEra era;
     private final ContainerLevelAccess access;
-    // A POSIX (Linux) terminal: the shell id ("" for a DOS-family OS), the host name and the OS label, so the
-    // client can draw the login banner and the initial prompt before the first server round-trip.
+    /*
+     * A POSIX (Linux) terminal: the shell id ("" for a DOS-family OS), the host name and the OS label, so the
+     * client can draw the login banner and the initial prompt before the first server round-trip.
+     */
     private final String shellId;
     private final String hostname;
     private final String osLabel;
@@ -150,9 +152,11 @@ public class CommandPromptMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(final Player player) {
-        // The player sits at the MONITOR, not at the machine: reach is measured there, so a remote
-        // session over a screen keeps working however far the machine itself is. The machine still
-        // has to be alive and shown by that screen.
+        /*
+         * The player sits at the MONITOR, not at the machine: reach is measured there, so a remote
+         * session over a screen keeps working however far the machine itself is. The machine still
+         * has to be alive and shown by that screen.
+         */
         return access.evaluate((level, pos) -> {
             if (!(level.getBlockEntity(pos) instanceof IComputerTerminalHost) || !sessionAlive(level, pos)) {
                 return false;
@@ -170,8 +174,8 @@ public class CommandPromptMenu extends AbstractContainerMenu {
 
     /**
      * The console dies with its machine: powering the computer off, pulling the system disk, or ejecting a
-     * live installer's medium closes the terminal on the next tick (the monitor then shows the firmware —
-     * or nothing — on its next use).
+     * live installer's medium closes the terminal on the next tick (the monitor then shows the firmware,
+     * or nothing, on its next use).
      */
     static boolean sessionAlive(final net.minecraft.world.level.Level level, final BlockPos pos) {
         if (level.getBlockEntity(pos)

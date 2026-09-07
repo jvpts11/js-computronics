@@ -63,8 +63,10 @@ class UuidPropagationTest {
 
     @Test
     void conflict_preservesArgumentOrder() {
-        // The 'first' field of Conflict must mirror the 'sideA' input,
-        // not be sorted or normalized in any way.
+        /*
+         * The 'first' field of Conflict must mirror the 'sideA' input,
+         * not be sorted or normalized in any way.
+         */
         var a = NetworkUuid.random();
         var b = NetworkUuid.random();
         var resultAB = (IPropagationResult.Conflict)

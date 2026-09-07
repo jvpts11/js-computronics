@@ -31,7 +31,7 @@ import java.util.Set;
  *
  * <p>The {@link #list} method includes both real stored files and the read-only
  * {@link StorageProjection} that mirrors the disk's item/fluid storage as {@code .dat} entries.
- * The {@link #read} and {@link #delete} methods reject {@code .dat} entries — items leave only via
+ * The {@link #read} and {@link #delete} methods reject {@code .dat} entries, since items leave only via
  * the Network Interactor.
  */
 public final class DiskFilesystem {
@@ -59,9 +59,7 @@ public final class DiskFilesystem {
     private DiskFilesystem() {
     }
 
-    // -------------------------------------------------------------------------
     // FileEntry
-    // -------------------------------------------------------------------------
 
     /**
      * A single entry returned by {@link #list}: the file path, type, disk-space weight in
@@ -82,9 +80,7 @@ public final class DiskFilesystem {
         }
     }
 
-    // -------------------------------------------------------------------------
     // WriteResult
-    // -------------------------------------------------------------------------
 
     /**
      * The outcome of a {@link #write} call.
@@ -103,9 +99,7 @@ public final class DiskFilesystem {
         READ_ONLY
     }
 
-    // -------------------------------------------------------------------------
     // list
-    // -------------------------------------------------------------------------
 
     /**
      * Lists the files visible in the given directory of a disk.
@@ -171,9 +165,7 @@ public final class DiskFilesystem {
         return List.copyOf(result);
     }
 
-    // -------------------------------------------------------------------------
     // read
-    // -------------------------------------------------------------------------
 
     /**
      * Reads the content of a real user file at {@code path} on the disk.
@@ -181,7 +173,7 @@ public final class DiskFilesystem {
      * <p>Returns {@link Optional#empty()} if:
      * <ul>
      *   <li>the path does not exist in the {@code FILESYSTEM} component, or</li>
-     *   <li>the file's type is a virtual projection (i.e. a {@code .dat} entry — items only
+     *   <li>the file's type is a virtual projection (i.e. a {@code .dat} entry, where items only
      *       leave storage via the Network Interactor).</li>
      * </ul>
      *
@@ -199,9 +191,7 @@ public final class DiskFilesystem {
         return Optional.of(file.content());
     }
 
-    // -------------------------------------------------------------------------
     // write
-    // -------------------------------------------------------------------------
 
     /**
      * Creates or overwrites a file at {@code path} on the disk.
@@ -259,14 +249,12 @@ public final class DiskFilesystem {
         return WriteResult.OK;
     }
 
-    // -------------------------------------------------------------------------
     // delete
-    // -------------------------------------------------------------------------
 
     /**
      * Deletes a real file at {@code path} from the disk.
      *
-     * <p>Returns {@code false} — without mutation — if the path does not exist as a real stored
+     * <p>Returns {@code false}, without mutation, if the path does not exist as a real stored
      * file or if the path corresponds to a {@code .dat} virtual projection (items cannot be removed
      * this way; use the Network Interactor instead).
      *
@@ -304,9 +292,7 @@ public final class DiskFilesystem {
         return true;
     }
 
-    // -------------------------------------------------------------------------
     // exists
-    // -------------------------------------------------------------------------
 
     /**
      * Returns {@code true} if a real stored file exists at {@code path} on the disk.
@@ -340,15 +326,13 @@ public final class DiskFilesystem {
         return candidate;
     }
 
-    // -------------------------------------------------------------------------
     // mkdir
-    // -------------------------------------------------------------------------
 
     /**
      * Creates an empty directory at {@code path}. Only the {@link FilesystemKind#HIERARCHICAL}
      * model supports real folders; flat and absent filesystems return {@code false}.
      *
-     * <p>Returns {@code false} — without mutation — when the path is invalid for {@code kind}, or
+     * <p>Returns {@code false}, without mutation, when the path is invalid for {@code kind}, or
      * when it already exists as a stored file or directory. Directories cost no disk weight, so no
      * free-space check is needed.
      *
@@ -370,9 +354,7 @@ public final class DiskFilesystem {
         return true;
     }
 
-    // -------------------------------------------------------------------------
     // listDirs
-    // -------------------------------------------------------------------------
 
     /**
      * Lists the immediate subdirectories of {@code dir} on a hierarchical disk.
@@ -411,19 +393,19 @@ public final class DiskFilesystem {
                 dirs.add(prefix + remainder.substring(0, slash));
             }
         }
-        // Virtual "Storage" directory: the .dat projection of the storage volume lives under "Storage/"
-        // (see list()), but those entries come from the volume, not the FILESYSTEM component, so
-        // nothing else implies a "Storage" parent here. Surface it at the root when the disk holds
-        // stored items, so the Files app drive tree can reach the projected .dat files.
+        /*
+         * Virtual "Storage" directory: the .dat projection of the storage volume lives under "Storage/"
+         * (see list()), but those entries come from the volume, not the FILESYSTEM component, so
+         * nothing else implies a "Storage" parent here. Surface it at the root when the disk holds
+         * stored items, so the Files app drive tree can reach the projected .dat files.
+         */
         if (dir.isEmpty() && !DriveVolumes.peek(disk).isEmpty()) {
             dirs.add("Storage");
         }
         return List.copyOf(dirs);
     }
 
-    // -------------------------------------------------------------------------
     // rmdir
-    // -------------------------------------------------------------------------
 
     /**
      * Removes the directory at {@code path} and everything nested under it (subdirectories and
@@ -467,9 +449,7 @@ public final class DiskFilesystem {
         return changed;
     }
 
-    // -------------------------------------------------------------------------
     // move
-    // -------------------------------------------------------------------------
 
     /**
      * Moves a file or directory {@code src} into directory {@code destDir} on a hierarchical disk,
@@ -505,7 +485,7 @@ public final class DiskFilesystem {
     /**
      * Re-keys a file or directory from {@code src} to the full path {@code dest}.
      *
-     * <p>Returns {@code false} — without mutation — when the kind is not hierarchical, the
+     * <p>Returns {@code false}, without mutation, when the kind is not hierarchical, the
      * destination is the source, the destination path is invalid, the source does not exist, the
      * source is a {@code .dat} projection, the destination already holds a file, or the move would
      * place a directory inside its own subtree.
@@ -542,9 +522,11 @@ public final class DiskFilesystem {
         if (src.equals(dest) || FsPaths.isUnder(src, dest)) {
             return false;
         }
-        // Reject relocating onto an already-occupied destination: re-keying the files into an existing
-        // directory (or over an existing file) would silently overwrite colliding entries and destroy
-        // data. Mirrors the collision guard on the file-rename branch above.
+        /*
+         * Reject relocating onto an already-occupied destination: re-keying the files into an existing
+         * directory (or over an existing file) would silently overwrite colliding entries and destroy
+         * data. Mirrors the collision guard on the file-rename branch above.
+         */
         if (fs.hasDir(dest) || fs.files().containsKey(dest)
                 || fs.files().keySet().stream().anyMatch(p -> FsPaths.isUnder(dest, p))) {
             return false;

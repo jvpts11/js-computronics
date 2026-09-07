@@ -8,7 +8,7 @@
 package dev.jstech.core.client.gui.theme;
 
 /**
- * Style flags layered on top of a {@link EraPalette}. These drive the optional, era-specific surface overlays —
+ * Style flags layered on top of a {@link EraPalette}. These drive the optional, era-specific surface overlays;
  * all of them are sharp/square (no rounded corners ever). Every overlay is a no-op when its flag is off or its
  * color is {@code 0}, which is exactly what lets the STANDARD style reproduce today's output byte-for-byte.
  *
@@ -31,7 +31,7 @@ public record EraStyle(
         int glowColor,
         float fontScaleSmall) {
 
-    /** A flat style with every overlay disabled — the STANDARD baseline. {@code small} is the only live value. */
+    /** A flat style with every overlay disabled, the STANDARD baseline. {@code small} is the only live value. */
     public static EraStyle flat(final float fontScaleSmall) {
         return new EraStyle(false, false, false, 0, 0, 0, 0, fontScaleSmall);
     }

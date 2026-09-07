@@ -15,13 +15,15 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 final class MaintenanceTerminalTab extends AbstractTerminalTab {
 
-    // Layout constants — mirror ComputerTerminalScreen; update together if layout changes.
+    // Layout constants, mirroring ComputerTerminalScreen; update together if layout changes.
     private static final int MNT_TILE_ROW1_Y = 32;
     private static final int MNT_TILE_ROW2_Y = 56;
     private static final int MNT_TILE_H = 22;
     private static final int MNT_ACTIONS_Y = 82;
-    // The health strip takes the ACTIONS caption's line when the index needs attention: the state of
-    // the index is worth more than a decorative label, and the layout below stays where it was.
+    /*
+     * The health strip takes the ACTIONS caption's line when the index needs attention: the state of
+     * the index is worth more than a decorative label, and the layout below stays where it was.
+     */
     private static final int MNT_HEALTH_H = 10;
     private static final int MNT_BTN_ROW1_Y = 94;
     private static final int MNT_BTN_REINDEX_Y = 112;

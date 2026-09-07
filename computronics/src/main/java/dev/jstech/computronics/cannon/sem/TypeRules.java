@@ -198,8 +198,10 @@ public final class TypeRules {
         return null;
     }
 
-    // Two values can be compared when one fits the other: numbers against numbers, a reference
-    // against a reference it could be, and null against anything a reference.
+    /*
+     * Two values can be compared when one fits the other: numbers against numbers, a reference
+     * against a reference it could be, and null against anything a reference.
+     */
     private boolean comparable(final ITypeSymbol left, final ITypeSymbol right) {
         if (this.isNumeric(left) && this.isNumeric(right)) {
             return true;

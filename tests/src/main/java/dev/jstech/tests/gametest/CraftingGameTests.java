@@ -55,8 +55,10 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 200)
     public static void studio_benchDraftBurnsOntoMediaAtTheLinkedEncoder(final GameTestHelper helper) {
-        // The workbench lives on the computer; the encoder beside it is its burner. One oak log resolves to
-        // four planks through the recipe book, and the burned file reads back as that pattern.
+        /*
+         * The workbench lives on the computer; the encoder beside it is its burner. One oak log resolves to
+         * four planks through the recipe book, and the burned file reads back as that pattern.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos encoderPos = new BlockPos(5, 2, 3); // adjacent to the Crafting Computer at (5,2,2)
         helper.setBlock(encoderPos, ComputingModule.PATTERN_ENCODER.get());
@@ -181,7 +183,7 @@ public final class CraftingGameTests {
         helper.succeed();
     }
 
-    // CRAFT engine — end to end over a real network
+    // CRAFT engine: end to end over a real network
 
     @GameTest(template = ARENA, timeoutTicks = 200)
     public static void craft_executesSinglePatternEndToEnd(final GameTestHelper helper) {
@@ -278,8 +280,10 @@ public final class CraftingGameTests {
                     net.cc.loadPattern(planksPattern(4));
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // One log on each server, so an 8-plank craft (2 logs) must draw from both — the case
-                    // where the lock-order server and the drained server once diverged and left reservations.
+                    /*
+                     * One log on each server, so an 8-plank craft (2 logs) must draw from both, the case
+                     * where the lock-order server and the drained server once diverged and left reservations.
+                     */
                     net.rack.getServerStorage(0).insert(Items.OAK_LOG, 1);
                     net.rack.getServerStorage(1).insert(Items.OAK_LOG, 1);
                 })
@@ -326,8 +330,10 @@ public final class CraftingGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    // Each visual bay block covers two rack-unit rows (bay b = rows 2b and 2b+1),
-                    // so servers in U0, U2 and U4 light the controller, second column and upper bay.
+                    /*
+                     * Each visual bay block covers two rack-unit rows (bay b = rows 2b and 2b+1),
+                     * so servers in U0, U2 and U4 light the controller, second column and upper bay.
+                     */
                     rackBe.getServers().setStackInSlot(0, ComputingModule.defaultServer());
                     rackBe.getServers().setStackInSlot(2, ComputingModule.defaultServer());
                     rackBe.getServers().setStackInSlot(4, ComputingModule.defaultServer());
@@ -361,7 +367,7 @@ public final class CraftingGameTests {
                 .thenSucceed();
     }
 
-    // Supercomputer — Phi slots and parallel orchestration
+    // Supercomputer: Phi slots and parallel orchestration
 
     @GameTest(template = ARENA)
     public static void cluster_surveyAssignsSlotsAndBudget(final GameTestHelper helper) {
@@ -401,7 +407,7 @@ public final class CraftingGameTests {
                     net.cc.loadPattern(planksPattern(4));
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // No cluster yet: two long crafts — the second must wait its turn.
+                    // No cluster yet: two long crafts, and the second must wait its turn.
                     first.set(net.mainframe.submitNetworkCraft(
                             storageKey(Items.OAK_PLANKS), 12000, false, "test"));
                     second.set(net.mainframe.submitNetworkCraft(
@@ -418,13 +424,17 @@ public final class CraftingGameTests {
                     second.get().abandon();
                 })
                 .thenExecuteAfter(SETTLE, () -> {
-                    // Raise a cluster on the backbone: interface against the HBW cable,
-                    // one rated node behind it.
+                    /*
+                     * Raise a cluster on the backbone: interface against the HBW cable,
+                     * one rated node behind it.
+                     */
                     placeCluster(helper, new BlockPos(2, 2, 3), 1);
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // Smaller than phase one: the first run consumed some logs before being
-                    // abandoned, and BOTH locks must still be fully coverable at once.
+                    /*
+                     * Smaller than phase one: the first run consumed some logs before being
+                     * abandoned, and BOTH locks must still be fully coverable at once.
+                     */
                     first.set(net.mainframe.submitNetworkCraft(
                             storageKey(Items.OAK_PLANKS), 8000, false, "test"));
                     second.set(net.mainframe.submitNetworkCraft(
@@ -475,8 +485,10 @@ public final class CraftingGameTests {
                     helper.assertTrue(opHolder.get() != null, "the large craft is accepted");
                 })
                 .thenExecuteAfter(4, () -> {
-                    // The single request fanned out: it claimed one computer per supercomputer slot. The executor
-                    // list persists after the craft settles, so this is robust to the craft finishing fast.
+                    /*
+                     * The single request fanned out: it claimed one computer per supercomputer slot. The executor
+                     * list persists after the craft settles, so this is robust to the craft finishing fast.
+                     */
                     helper.assertTrue(opHolder.get().executorCount() >= 2,
                             "one large craft fans out across both crafting computers; executors="
                                     + opHolder.get().executorCount());
@@ -516,8 +528,10 @@ public final class CraftingGameTests {
         for (int i = 1; i <= nodes; i++) {
             final BlockPos cable = hub.east(i);
             helper.setBlock(cable, ComputingModule.HPC_CABLE.get());
-            // Above the cable, not beside it: the fixtures' computers and cables occupy the row in
-            // front, and a rack dropped there would overwrite them.
+            /*
+             * Above the cable, not beside it: the fixtures' computers and cables occupy the row in
+             * front, and a rack dropped there would overwrite them.
+             */
             final BlockPos rackPos = cable.above();
             helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
             if (helper.getBlockEntity(rackPos)
@@ -740,9 +754,11 @@ public final class CraftingGameTests {
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
                     }
-                    // Load ONLY a multi-stage recipe for stone. The recursive craft planner unwraps processing
-                    // patterns but never multi-stage ones, so it is blind to this recipe — which is why the CLI
-                    // and IQL, before they shared the terminal's entry point, could not craft it.
+                    /*
+                     * Load ONLY a multi-stage recipe for stone. The recursive craft planner unwraps processing
+                     * patterns but never multi-stage ones, so it is blind to this recipe, which is why the CLI
+                     * and IQL, before they shared the terminal's entry point, could not craft it.
+                     */
                     final var proc = new dev.jstech.computronics.crafting.ProcessingPattern(
                             List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
@@ -758,8 +774,10 @@ public final class CraftingGameTests {
                     // The old recursive-plan path cannot make stone: no bench or processing pattern produces it.
                     helper.assertTrue(net.mainframe.submitNetworkCraft(stone, 1, true, "test") == null,
                             "the recursive planner must be blind to a multi-stage-only recipe");
-                    // The shared entry point the CLI/IQL, terminal and Network Interactor all route through finds
-                    // the recipe by its result and runs the pipeline.
+                    /*
+                     * The shared entry point the CLI/IQL, terminal and Network Interactor all route through finds
+                     * the recipe by its result and runs the pipeline.
+                     */
                     helper.assertTrue(net.mainframe.submitCraftRequest(stone, 1, true, "test (Shell)", null) != null,
                             "the shared craft entry point must run the multi-stage recipe");
                 })
@@ -945,8 +963,10 @@ public final class CraftingGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> net.seed(helper, Items.COBBLESTONE, 256))
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // Cobblestone has no compressor recipe, so neither op completes — they just contend; with the
-                    // default maxJobs=1 only one may run on the machine at a time.
+                    /*
+                     * Cobblestone has no compressor recipe, so neither op completes, they just contend; with the
+                     * default maxJobs=1 only one may run on the machine at a time.
+                     */
                     op1.set(net.mainframe.submitNetworkProcessing(cobblePattern(machineType), 999, "a"));
                     op2.set(net.mainframe.submitNetworkProcessing(cobblePattern(machineType), 999, "b"));
                 })
@@ -1078,7 +1098,7 @@ public final class CraftingGameTests {
                     helper.assertTrue(moved == inserted, "all the fluid moves out of the network");
                     helper.assertTrue(storage.count(water) == 0, "the network fluid is fully drained");
                     helper.assertTrue(tank.getFluidAmount() == inserted,
-                            "the sink holds exactly what left — fluid conserved (" + inserted + " mB)");
+                            "the sink holds exactly what left, fluid conserved (" + inserted + " mB)");
                 })
                 .thenSucceed();
     }
@@ -1101,8 +1121,10 @@ public final class CraftingGameTests {
                     before[0] = totalOf(helper, net, machine, Items.COBBLESTONE);
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // No output ever appears (the machine has no cobblestone recipe) and the timeout is short, so
-                    // the op times out after feeding some inputs. None of those inputs may be lost.
+                    /*
+                     * No output ever appears (the machine has no cobblestone recipe) and the timeout is short, so
+                     * the op times out after feeding some inputs. None of those inputs may be lost.
+                     */
                     final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
                             List.of(new dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput(
                                     dev.jstech.computronics.storage.StorageKey.of(Items.COBBLESTONE), 1L)),
@@ -1143,8 +1165,10 @@ public final class CraftingGameTests {
                     before[1] = totalOf(helper, net, machine, Items.STONE);
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // Fire 50 ops at the single machine at once. maxJobs caps the active one; the rest WAIT.
-                    // The queue must not crash (the snapshot-iteration fix) and nothing may be created or lost.
+                    /*
+                     * Fire 50 ops at the single machine at once. maxJobs caps the active one; the rest WAIT.
+                     * The queue must not crash (the snapshot-iteration fix) and nothing may be created or lost.
+                     */
                     for (int i = 0; i < 50; i++) {
                         net.mainframe.submitNetworkProcessing(cobblePattern(machineType), 4, "op" + i);
                     }
@@ -1304,7 +1328,7 @@ public final class CraftingGameTests {
                         }
                     }
                     helper.assertTrue(inSink == total,
-                            "the sink holds exactly the load — items conserved at scale (" + total + ")");
+                            "the sink holds exactly the load, items conserved at scale (" + total + ")");
                 })
                 .thenSucceed();
     }
@@ -1326,7 +1350,7 @@ public final class CraftingGameTests {
                     helper.assertTrue(moved == inserted, "the whole large load moves out in one go");
                     helper.assertTrue(storage.count(water) == 0, "the network is fully drained, nothing stuck");
                     helper.assertTrue(tank.getFluidAmount() == inserted,
-                            "the sink holds exactly the load — conserved at scale (" + inserted + " mB)");
+                            "the sink holds exactly the load, conserved at scale (" + inserted + " mB)");
                 })
                 .thenSucceed();
     }
@@ -1382,9 +1406,11 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA)
     public static void processing_remoteMachineIsDeclaredAndDrivenThroughBuses(final GameTestHelper helper) {
-        // The machine does NOT touch the switch at all: it hangs off the crafting cable, reached only through
-        // a Crafting Input Bus (feeding, from above) and a Crafting Receiving Bus (collecting, from below).
-        // The switch must discover it over the cable and the engine must drive it end to end.
+        /*
+         * The machine does NOT touch the switch at all: it hangs off the crafting cable, reached only through
+         * a Crafting Input Bus (feeding, from above) and a Crafting Receiving Bus (collecting, from below).
+         * The switch must discover it over the cable and the engine must drive it end to end.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos cable = new BlockPos(5, 2, 3);
         final BlockPos sw = new BlockPos(5, 2, 4);
@@ -1453,9 +1479,11 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA)
     public static void processing_sidedMachineRoutesThroughInputAndReceivingBuses(final GameTestHelper helper) {
-        // A vanilla furnace is a sided machine: raw items only enter through the TOP and products only leave
-        // through the BOTTOM — the side face the switch touches accepts nothing. The crafting buses must carry
-        // the I/O: an Input Bus on a cable above feeds it, a Receiving Bus on a cable below collects from it.
+        /*
+         * A vanilla furnace is a sided machine: raw items only enter through the TOP and products only leave
+         * through the BOTTOM, and the side face the switch touches accepts nothing. The crafting buses must carry
+         * the I/O: an Input Bus on a cable above feeds it, a Receiving Bus on a cable below collects from it.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos cable = new BlockPos(5, 2, 3);
         final BlockPos sw = new BlockPos(5, 2, 4);
@@ -1478,8 +1506,10 @@ public final class CraftingGameTests {
                                 new dev.jstech.computronics.block.part.ReceivingBusPart());
                     }
                     net.seed(helper, Items.RAW_IRON, 32);
-                    // Pre-load finished ingots in the furnace's OUTPUT slot: collecting them proves the
-                    // Receiving Bus path without waiting out a real 200-tick smelt.
+                    /*
+                     * Pre-load finished ingots in the furnace's OUTPUT slot: collecting them proves the
+                     * Receiving Bus path without waiting out a real 200-tick smelt.
+                     */
                     if (helper.getBlockEntity(furnace) instanceof FurnaceBlockEntity fb) {
                         fb.setItem(2, new ItemStack(Items.IRON_INGOT, 8));
                     }
@@ -1558,7 +1588,7 @@ public final class CraftingGameTests {
                 : dev.jstech.computronics.crafting.MachineCatalog.machineIds()) {
             ids.add(id.toString());
         }
-        // Real processing machines must be present — vanilla and this mod's own.
+        // Real processing machines must be present, both vanilla and this mod's own.
         for (final String required : new String[]{
                 "minecraft:furnace", "minecraft:blast_furnace", "minecraft:smoker", "minecraft:brewing_stand",
                 "minecraft:crafter", "minecraft:hopper", "jsindustrial:macerator", "jsindustrial:compressor"}) {
@@ -1575,9 +1605,11 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 200)
     public static void multiStage_mixedPipelineRunsProcThenBench(final GameTestHelper helper) {
-        // A two-stage pipeline mixing both stage kinds: a processing stage (compressor: cobblestone -> stone)
-        // followed by a bench stage (stone -> stone button). The processing output must flow through network
-        // storage into the bench stage, and the whole pipeline must settle COMPLETED.
+        /*
+         * A two-stage pipeline mixing both stage kinds: a processing stage (compressor: cobblestone -> stone)
+         * followed by a bench stage (stone -> stone button). The processing output must flow through network
+         * storage into the bench stage, and the whole pipeline must settle COMPLETED.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos cable = new BlockPos(5, 2, 3);
         final BlockPos sw = new BlockPos(5, 2, 4);
@@ -1599,8 +1631,10 @@ public final class CraftingGameTests {
                                     .CompressorBlockEntity compressor) {
                         compressor.getInventory().setStackInSlot(1, new ItemStack(Items.STONE, 8));
                     }
-                    // Deliberately do NOT load the bench pattern into the Recipe ROM: a multi-stage's
-                    // bench stage must run from the pattern embedded in the stage itself.
+                    /*
+                     * Deliberately do NOT load the bench pattern into the Recipe ROM: a multi-stage's
+                     * bench stage must run from the pattern embedded in the stage itself.
+                     */
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final var proc = new dev.jstech.computronics.crafting.ProcessingPattern(
@@ -1616,8 +1650,10 @@ public final class CraftingGameTests {
                     opHolder.set(net.mainframe.submitNetworkMultiStage(multi, 1, "test"));
                     helper.assertTrue(opHolder.get() != null, "the mixed multi-stage operation is accepted");
                 })
-                // The bench-craft tests alone allow 40 ticks; this window covers the processing stage,
-                // the pipeline handoff, and the timed bench craft.
+                /*
+                 * The bench-craft tests alone allow 40 ticks; this window covers the processing stage,
+                 * the pipeline handoff, and the timed bench craft.
+                 */
                 .thenExecuteAfter(80, () -> {
                     helper.assertTrue(opHolder.get().isDone(), "the mixed pipeline must settle");
                     helper.assertTrue(opHolder.get().toRecord().status()
@@ -1635,8 +1671,10 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 200)
     public static void multiStage_failedStageFailsThePipelineAndConserves(final GameTestHelper helper) {
-        // Stage 1 targets a machine that does not exist, so it times out FAILED. The pipeline must fail with
-        // it, stage 2 must never run, and the network's inputs must be conserved.
+        /*
+         * Stage 1 targets a machine that does not exist, so it times out FAILED. The pipeline must fail with
+         * it, stage 2 must never run, and the network's inputs must be conserved.
+         */
         final Network net = buildCraftingNetwork(helper);
         final var opHolder = new java.util.concurrent.atomic.AtomicReference<
                 dev.jstech.computronics.crafting.NetworkMultiStageOperation>();
@@ -1674,9 +1712,11 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 200)
     public static void processing_fillModeFeedsManyLotsPerCycle(final GameTestHelper helper) {
-        // The Machines tab's One/Fill toggle: with feedMax on, one feed cycle keeps delivering lots until the
-        // machine is full, instead of the default single lot every cooldown. After a few ticks the machine
-        // must hold far more input than the One mode's one-lot-per-4-ticks pace could ever deliver.
+        /*
+         * The Machines tab's One/Fill toggle: with feedMax on, one feed cycle keeps delivering lots until the
+         * machine is full, instead of the default single lot every cooldown. After a few ticks the machine
+         * must hold far more input than the One mode's one-lot-per-4-ticks pace could ever deliver.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos cable = new BlockPos(5, 2, 3);
         final BlockPos sw = new BlockPos(5, 2, 4);
@@ -1728,8 +1768,10 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 200)
     public static void machineCategory_genericPatternDrivesRemoteBusMachine(final GameTestHelper helper) {
-        // A remote machine discovered over the crafting cable inherits its origin face's category, so a
-        // generic pattern must resolve it and drive the whole craft end to end — feed, collect, storage.
+        /*
+         * A remote machine discovered over the crafting cable inherits its origin face's category, so a
+         * generic pattern must resolve it and drive the whole craft end to end: feed, collect, storage.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos cable = new BlockPos(5, 2, 3);
         final BlockPos sw = new BlockPos(5, 2, 4);
@@ -1805,10 +1847,12 @@ public final class CraftingGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 400)
     public static void journey_encodeLoadAndCraftAcrossTheFullChain(final GameTestHelper helper) {
-        // The player's whole path, server-side: encode a recipe onto a floppy at the Pattern Encoder, carry
-        // the floppy to a drive linked to the Crafting Computer, read and load it into the Recipe ROM (the
-        // exact steps the Crafting Manager's Load button runs), then request the craft through the same
-        // entry point the terminal's request popup uses, and watch the result land in network storage.
+        /*
+         * The player's whole path, server-side: encode a recipe onto a floppy at the Pattern Encoder, carry
+         * the floppy to a drive linked to the Crafting Computer, read and load it into the Recipe ROM (the
+         * exact steps the Crafting Manager's Load button runs), then request the craft through the same
+         * entry point the terminal's request popup uses, and watch the result land in network storage.
+         */
         final Network net = buildCraftingNetwork(helper);
         final BlockPos encoderPos = new BlockPos(5, 2, 1); // adjacent to the Crafting Computer at (5,2,2)
         final BlockPos drivePos = new BlockPos(5, 2, 3); // adjacent to the Crafting Computer at (5,2,2)
@@ -1825,8 +1869,10 @@ public final class CraftingGameTests {
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // 1) Author the pattern on the computer's workbench and send it to the linked encoder, exactly
-                    //    as the Studio's Burn button does.
+                    /*
+                     * 1) Author the pattern on the computer's workbench and send it to the linked encoder, exactly
+                     *    as the Studio's Burn button does.
+                     */
                     helper.assertTrue(encoder.ownerPos() != null && encoder.ownerPos().equals(net.cc.getBlockPos()),
                             "the encoder must link to the adjacent Crafting Computer; got " + encoder.ownerPos());
                     final var studio = net.cc.studio();
@@ -1854,8 +1900,10 @@ public final class CraftingGameTests {
                     drive.mediaSlot().setStackInSlot(0, disc);
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    // 3) The drive auto-links to the adjacent Crafting Computer over the peripheral system —
-                    //    this link is what lets the Crafting Manager list the medium as a volume.
+                    /*
+                     * 3) The drive auto-links to the adjacent Crafting Computer over the peripheral system;
+                     *    this link is what lets the Crafting Manager list the medium as a volume.
+                     */
                     helper.assertTrue(drive.ownerPos() != null
                                     && drive.ownerPos().equals(helper.absolutePos(new BlockPos(5, 2, 2))),
                             "the DVD drive must auto-link to the Crafting Computer; got " + drive.ownerPos());
@@ -1883,8 +1931,10 @@ public final class CraftingGameTests {
                     final var ccMenu = new dev.jstech.computronics.menu.CraftingComputerMenu(
                             1, player.getInventory(), net.cc);
                     helper.assertTrue(ccMenu.stillValid(player), "the Crafting Computer menu stays open");
-                    // Stock the ingredients now: the craft planner reads the incremental network index,
-                    // which needs a tick to absorb a direct store write before the request is planned.
+                    /*
+                     * Stock the ingredients now: the craft planner reads the incremental network index,
+                     * which needs a tick to absorb a direct store write before the request is planned.
+                     */
                     net.seed(helper, Items.OAK_LOG, 8);
                 })
                 .thenExecuteAfter(SETTLE, () -> {

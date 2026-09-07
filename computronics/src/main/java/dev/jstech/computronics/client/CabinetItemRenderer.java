@@ -38,9 +38,11 @@ public final class CabinetItemRenderer extends GeoItemRenderer<CabinetBlockItem>
                           final int packedOverlay, final int colour) {
         super.preRender(poseStack, item, model, bufferSource, buffer, isReRender, partialTick, packedLight,
                 packedOverlay, colour);
-        // 16 model units make a block: shrink the cabinet's longest side to FILL of one block, then
-        // bring the middle of the cabinet onto the item's own middle. Scaling first means the offset is
-        // read in blocks of the cabinet's own space, which is how the fit is written.
+        /*
+         * 16 model units make a block: shrink the cabinet's longest side to FILL of one block, then
+         * bring the middle of the cabinet onto the item's own middle. Scaling first means the offset is
+         * read in blocks of the cabinet's own space, which is how the fit is written.
+         */
         final CabinetBlockItem.Fit fit = item.fit();
         final float scale = FILL * 16.0F / fit.span();
         poseStack.scale(scale, scale, scale);

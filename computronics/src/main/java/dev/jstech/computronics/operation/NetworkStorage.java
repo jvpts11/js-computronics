@@ -67,8 +67,10 @@ public final class NetworkStorage {
         if (cached != null && cached.level() == level && cached.gameTime() == now) {
             return cached.storage();
         }
-        // A view is good for one tick. Anything older only pins the racks (and their drives) of a network
-        // nobody is asking about any more, possibly in a level that has since unloaded.
+        /*
+         * A view is good for one tick. Anything older only pins the racks (and their drives) of a network
+         * nobody is asking about any more, possibly in a level that has since unloaded.
+         */
         VIEWS.values().removeIf(view -> view.gameTime() != now || view.level() != level);
         final NetworkStorage built = build(level, network);
         VIEWS.put(network, new TickView(level, now, built));
@@ -96,8 +98,10 @@ public final class NetworkStorage {
                 }
             });
         }
-        // A Personal Computer contributes only the published share of its disks, as a SELECT-source.
-        // With the default-private permille this list is empty until the owner publishes some storage.
+        /*
+         * A Personal Computer contributes only the published share of its disks, as a SELECT-source.
+         * With the default-private permille this list is empty until the owner publishes some storage.
+         */
         for (final NetworkSystem.PersonalComputerNode pc : system.personalComputersOf(network)) {
             if (level.getBlockEntity(BlockPos.of(pc.pos())) instanceof PersonalComputerBlockEntity pcBe) {
                 entries.add(new Entry(pc.nodeUuid(), new PcPublicNodeStore(pcBe.localStore()), false));
@@ -227,7 +231,7 @@ public final class NetworkStorage {
     }
 
     /**
-     * Pulls up to {@code amount} of {@code key} from one node straight into the destination — the per-source
+     * Pulls up to {@code amount} of {@code key} from one node straight into the destination, the per-source
      * step of a SELECT, found by node in constant time instead of a walk over the whole network.
      */
     public long pullFrom(final NodeUuid node, final StorageKey key, final long amount, final IDataSink destination) {

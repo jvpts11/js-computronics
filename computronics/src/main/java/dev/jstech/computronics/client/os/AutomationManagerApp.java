@@ -82,7 +82,7 @@ public final class AutomationManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- components ----
+    // components
     private final Panel root = new Panel();
     private final Label loadingLabel;
     private final Label engineLabel;
@@ -205,7 +205,7 @@ public final class AutomationManagerApp implements IDesktopApp {
         return data.engineOnline() ? data.engineLabel() + " online" : "No engine - install the Automation Engine on the Mainframe";
     }
 
-    // ---- rendering ----
+    // rendering
 
     @Override
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
@@ -395,7 +395,7 @@ public final class AutomationManagerApp implements IDesktopApp {
         }
     }
 
-    // ---- input ----
+    // input
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {

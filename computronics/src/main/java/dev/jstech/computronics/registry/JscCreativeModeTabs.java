@@ -88,9 +88,11 @@ public final class JscCreativeModeTabs {
                         output.accept(ComputingModule.DVD_ROM.get());
                         output.accept(ComputingModule.DVD_RW.get());
                         output.accept(ComputingModule.USB_FLASH_DRIVE.get());
-                        // Pre-stamped OS installers, one per registered OS, straight from the single registry.
-                        // The medium follows the software's era through one rule (InstallMedia): Vintage on
-                        // a floppy, Legacy on a CD, a Standard system on a bootable flash drive.
+                        /*
+                         * Pre-stamped OS installers, one per registered OS, straight from the single registry.
+                         * The medium follows the software's era through one rule (InstallMedia): Vintage on
+                         * a floppy, Legacy on a CD, a Standard system on a bootable flash drive.
+                         */
                         for (final dev.jstech.computronics.os.OsDef os
                                 : dev.jstech.computronics.os.OsBootstrap.builtinOses()) {
                             final ItemStack disc = new ItemStack(mediumFor(
@@ -99,9 +101,11 @@ public final class JscCreativeModeTabs {
                             MediaItem.setPayload(disc, os.id());
                             output.accept(disc);
                         }
-                        // Program installers, one per installable program, on the medium of the generation
-                        // the program was written in: a Standard application on a DVD, a Standard service on
-                        // a flash drive. Size never decides, so a small server daemon is no longer a floppy.
+                        /*
+                         * Program installers, one per installable program, on the medium of the generation
+                         * the program was written in: a Standard application on a DVD, a Standard service on
+                         * a flash drive. Size never decides, so a small server daemon is no longer a floppy.
+                         */
                         for (final dev.jstech.computronics.os.ProgramSpec program
                                 : dev.jstech.computronics.os.OsBootstrap.builtinPrograms()) {
                             if (!program.installable()) {
@@ -165,8 +169,10 @@ public final class JscCreativeModeTabs {
                         for (final ComputingModule.DiskEntry disk : ComputingModule.DISKS) {
                             output.accept(disk.item().get());
                         }
-                        // Per-era hardware catalog, ordered Vintage to Singularity so the progression
-                        // reads cleanly in the tab.
+                        /*
+                         * Per-era hardware catalog, ordered Vintage to Singularity so the progression
+                         * reads cleanly in the tab.
+                         */
                         for (final net.minecraft.world.item.Item hardware
                                 : dev.jstech.computronics.HardwareItems.creativeOrder()) {
                             output.accept(hardware);

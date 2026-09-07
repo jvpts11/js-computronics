@@ -8,7 +8,7 @@
 package dev.jstech.core.tier;
 
 /**
- * Hardware Era — the progression axis for computational hardware (motherboards, CPUs, RAM, storage).
+ * Hardware Era: the progression axis for computational hardware (motherboards, CPUs, RAM, storage).
  *
  * <p>This is pure domain logic with no Minecraft dependency, so it stays unit-testable. When an era
  * has to back a block-state property, the binding layer stores its {@link #level()} as an
@@ -50,7 +50,7 @@ public enum HardwareEra {
     }
 
     /**
-     * The megabytes one item — or a bucket of fluid, which weighs the same — takes on a disk of this era: a
+     * The megabytes one item (or a bucket of fluid, which weighs the same) takes on a disk of this era: a
      * wider word makes a bigger record. Older hardware therefore packs more into the same megabytes, which
      * is how a 20 MB vintage drive holds anything at all, and a 500 GB standard one holds 2 000 items.
      */
@@ -72,7 +72,7 @@ public enum HardwareEra {
     }
 
     /**
-     * The bytes one thousandth of an item weighs on this era's disks — an item weighs 1 000 of those
+     * The bytes one thousandth of an item weighs on this era's disks, where an item weighs 1 000 of those
      * units, the same unit a millibucket of fluid weighs one of. A file of N bytes costs
      * {@code ceil(N / bytesPerMbEq())} of them.
      */

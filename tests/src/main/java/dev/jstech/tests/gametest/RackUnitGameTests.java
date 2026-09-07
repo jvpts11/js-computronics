@@ -37,7 +37,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * The rack-unit model of the Server Rack: front-panel hotswap slots belong to the rack, a mounted
  * chassis claims the drive and gadget slots of the rows it occupies, and server storage is the
- * union of the claimed bay drives — so drives (and their data) stay in the rack when the server
+ * union of the claimed bay drives, so drives (and their data) stay in the rack when the server
  * itself is pulled.
  */
 @GameTestHolder(JsTests.MODID)
@@ -85,8 +85,10 @@ public final class RackUnitGameTests {
         final Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    // Half a block up the controller's front is texel 16: the second rack unit from the
-                    // bottom, which is row 6 counted from the top.
+                    /*
+                     * Half a block up the controller's front is texel 16: the second rack unit from the
+                     * bottom, which is row 6 counted from the top.
+                     */
                     player.setItemInHand(InteractionHand.MAIN_HAND, ComputingModule.defaultServer());
                     helper.useBlock(pos, player, hitOn(helper, pos, Direction.NORTH, 0.5));
                     helper.assertTrue(rack.getServers().getStackInSlot(6).getItem() instanceof ServerItem,
@@ -455,8 +457,10 @@ public final class RackUnitGameTests {
                     final long stored = rack.getServerStorage(0).insert(StorageKey.of(Items.COBBLESTONE), 900L);
                     helper.assertTrue(stored == 900L, "the mirror must accept 900 items; got " + stored);
 
-                    // Pull a member: the volume survives and the drive comes out blank, so nothing
-                    // is duplicated into the player's hands.
+                    /*
+                     * Pull a member: the volume survives and the drive comes out blank, so nothing
+                     * is duplicated into the player's hands.
+                     */
                     final ItemStack pulled = rack.getFrontSlots().extractItem(0, 1, false);
                     helper.assertTrue(DriveVolumes.contents(pulled).items().isEmpty(),
                             "a pulled array member must come out blank - never a second copy");
@@ -617,7 +621,7 @@ public final class RackUnitGameTests {
     /**
      * The era of the machine on the active channel, asked of a cabinet in every state a player can put
      * it in. A server's hardware is a data component, so a machine that was never assembled carries a
-     * container with no slots at all — reading the board out of it must answer "no era", not throw.
+     * container with no slots at all, where reading the board out of it must answer "no era", not throw.
      */
     @GameTest(template = ARENA)
     public static void displayEra_followsTheActiveChannelAndSurvivesBareHardware(final GameTestHelper helper) {
@@ -636,8 +640,10 @@ public final class RackUnitGameTests {
                     helper.assertTrue(rack.installedEra() != null,
                             "an assembled machine reports the era of its board");
 
-                    // Two machines and no KVM: the monitor cannot say which one it means, so there is
-                    // no channel to read an era from.
+                    /*
+                     * Two machines and no KVM: the monitor cannot say which one it means, so there is
+                     * no channel to read an era from.
+                     */
                     rack.getServers().setStackInSlot(1, ComputingModule.defaultServer());
                     helper.assertTrue(rack.installedEra() == null,
                             "two machines without a KVM switch address none");
@@ -674,8 +680,10 @@ public final class RackUnitGameTests {
                     final var node = new dev.jstech.computronics.item.ServerHardwareHandler(player, hand);
                     helper.assertTrue(node.insertItem(slot, phi.copy(), false).isEmpty(),
                             "a node's expansion slot takes the co-processor");
-                    // The second slot is for the GPU a machine needs to be sat at — not for a second
-                    // co-processor, which the cluster would never count.
+                    /*
+                     * The second slot is for the GPU a machine needs to be sat at, not for a second
+                     * co-processor, which the cluster would never count.
+                     */
                     helper.assertTrue(!node.insertItem(slot + 1, phi.copy(), true).isEmpty(),
                             "a node seats exactly one co-processor");
                     helper.assertTrue(node.insertItem(slot + 1, gpu.copy(), true).isEmpty(),
@@ -715,8 +723,10 @@ public final class RackUnitGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(rack.thermalThrottlePercent() == 100,
                             "an empty cabinet runs free");
-                    // Fill the cabinet with accelerator-laden machines: this is the dense rack the
-                    // thermal budget exists for (plain servers stay comfortably inside it).
+                    /*
+                     * Fill the cabinet with accelerator-laden machines: this is the dense rack the
+                     * thermal budget exists for (plain servers stay comfortably inside it).
+                     */
                     for (int row = 0; row < 4; row++) {
                         rack.getServers().setStackInSlot(row, hotServer());
                     }
@@ -757,9 +767,11 @@ public final class RackUnitGameTests {
                     helper.assertTrue(!rack.hasService(0, "load_balancer"),
                             "a fresh server runs no services");
 
-                    // Load Balancer: each write goes to the emptiest drive, so the bay evens out
-                    // instead of filling drive after drive. The first write lands anywhere; what the
-                    // service changes is where the SECOND one goes.
+                    /*
+                     * Load Balancer: each write goes to the emptiest drive, so the bay evens out
+                     * instead of filling drive after drive. The first write lands anywhere; what the
+                     * service changes is where the SECOND one goes.
+                     */
                     final long perDrive = ((DiskItem) nvmeDrive().getItem()).spec().capacityItems();
                     rack.getServerStorage(0).insert(StorageKey.of(Items.COBBLESTONE), perDrive / 4);
                     rack.consoleOf(0).install("jsc:load_balancer");
@@ -776,8 +788,10 @@ public final class RackUnitGameTests {
                     helper.assertTrue(fullest == emptiest,
                             "two equal writes leave the bay even; " + fullest + " vs " + emptiest);
 
-                    // Integrity Monitor: the machine re-reads its own bay, so a hot pull leaves the
-                    // index clean instead of stale.
+                    /*
+                     * Integrity Monitor: the machine re-reads its own bay, so a hot pull leaves the
+                     * index clean instead of stale.
+                     */
                     rack.consoleOf(0).install("jsc:integrity_monitor");
                     mainframe.networkIndex().health().onFullRebuild();
                     rack.getFrontSlots().extractItem(0, 1, false);

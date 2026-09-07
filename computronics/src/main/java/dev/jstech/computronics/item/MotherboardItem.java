@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * A motherboard item — the chassis that bounds a build (socket and counts of CPU/RAM/PCIe slots).
+ * A motherboard item, the chassis that bounds a build (socket and counts of CPU/RAM/PCIe slots).
  */
 public class MotherboardItem extends SpecItem<MotherboardSpec> {
 
@@ -44,8 +44,10 @@ public class MotherboardItem extends SpecItem<MotherboardSpec> {
                 .sorted(Comparator.comparingInt(RamGeneration::ordinal))
                 .map(RamGeneration::name)
                 .collect(Collectors.joining(" / "));
-        // The board is where a build succeeds or fails, so it spells out exactly what its slots take:
-        // the socket, the memory generations, and the bus version cards are held to.
+        /*
+         * The board is where a build succeeds or fails, so it spells out exactly what its slots take:
+         * the socket, the memory generations, and the bus version cards are held to.
+         */
         tooltip.add(Component.literal(
                 spec.cpuSlots() + "x " + spec.socket().name() + "  |  "
                         + spec.ramSlots() + " RAM (" + ramTypes + ")  |  "

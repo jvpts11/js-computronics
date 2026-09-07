@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * The Mainframe — the network's orchestrator.
+ * The Mainframe, the network's orchestrator.
  */
 public class MainframeBlock extends AbstractMultiblockControllerBlock
         implements dev.jstech.core.network.IDataNetworkConnectable,
@@ -58,7 +58,7 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
 
     /**
      * The hardware era this Mainframe belongs to. It selects the block's skin and gates which MTX board
-     * installs — only a board of this same era is accepted and counted in the build. The base is
+     * installs: only a board of this same era is accepted and counted in the build. The base is
      * {@link dev.jstech.core.tier.HardwareEra#STANDARD}; the Vintage and Legacy variants
      * override it.
      */
@@ -72,7 +72,7 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     }
 
     /**
-     * The item this Mainframe drops and is picked as — its own era variant. Overridden per era so a
+     * The item this Mainframe drops and is picked as: its own era variant. Overridden per era so a
      * broken or pick-blocked Mainframe yields the matching era's item.
      */
     protected net.minecraft.world.item.Item blockItem() {
@@ -86,8 +86,10 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
 
     @Override
     public java.util.Set<dev.jstech.core.network.DataTier> acceptedCableTiers() {
-        // The Mainframe sits on the HBW backbone; it never takes an Ethernet
-        // access link directly (a Personal Router bridges that).
+        /*
+         * The Mainframe sits on the HBW backbone; it never takes an Ethernet
+         * access link directly (a Personal Router bridges that).
+         */
         return java.util.Set.of(dev.jstech.core.network.DataTier.T2_HBW);
     }
 
@@ -148,8 +150,10 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
         final Level level = context.getLevel();
         final List<BlockPos> obstructedBlocks = getObstructedBlocks(level, context.getClickedPos(), facing);
         if (!obstructedBlocks.isEmpty()) {
-            // No room for the 3x2x2 structure — cancel placement, item not consumed, and outline the
-            // obstructing cells with particles so the player can see what is in the way.
+            /*
+             * No room for the 3x2x2 structure, so cancel placement, item not consumed, and outline the
+             * obstructing cells with particles so the player can see what is in the way.
+             */
             spawnMisplaceParticles(level, obstructedBlocks);
             return null;
         }
@@ -159,12 +163,16 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     @Override
     protected InteractionResult useWithoutItem(final BlockState state, final Level level, final BlockPos pos,
                                                final Player player, final BlockHitResult hit) {
-        // The Mainframe block is hardware only: clicking it always opens the hardware-assembly GUI
-        // (the same one its parts open). All software (firmware, OS) is used on a linked monitor.
+        /*
+         * The Mainframe block is hardware only: clicking it always opens the hardware-assembly GUI
+         * (the same one its parts open). All software (firmware, OS) is used on a linked monitor.
+         */
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof MainframeBlockEntity mainframe) {
-            // Sneaking takes the service panel off the card bay (or puts it back): the processors,
-            // memory and cards are only ever seen through that opening.
+            /*
+             * Sneaking takes the service panel off the card bay (or puts it back): the processors,
+             * memory and cards are only ever seen through that opening.
+             */
             if (player.isShiftKeyDown()) {
                 mainframe.toggleServicePanel();
                 return InteractionResult.sidedSuccess(false);

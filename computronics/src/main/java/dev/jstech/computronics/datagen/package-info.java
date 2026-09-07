@@ -6,6 +6,6 @@
  * This file is part of J's Computronics.
  */
 /**
- * Data generation entry points — recipes, loot tables, tags, advancements, worldgen JSON, language files.
+ * Data generation entry points: recipes, loot tables, tags, advancements, worldgen JSON, language files.
  */
 package dev.jstech.computronics.datagen;

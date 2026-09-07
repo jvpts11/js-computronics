@@ -15,8 +15,8 @@ import java.util.Map;
 
 /**
  * Turns a craft request into the plan the craft runs: the full quantity when the network can make it, else
- * (when the requester allows a partial) as much as it can. Pure CPU over immutable inputs — the patterns,
- * the machines and a stock snapshot — so it runs the same on the main thread or on a virtual thread.
+ * (when the requester allows a partial) as much as it can. Pure CPU over immutable inputs (the patterns,
+ * the machines and a stock snapshot) so it runs the same on the main thread or on a virtual thread.
  */
 public final class CraftPlanning {
 

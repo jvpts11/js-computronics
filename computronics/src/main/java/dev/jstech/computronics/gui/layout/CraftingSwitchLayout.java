@@ -12,7 +12,7 @@ import dev.jstech.core.gui.layout.GuiLayout;
 /**
  * Pure layout for the Crafting Switch screen, with no Minecraft dependency so {@link #layout()} can be
  * unit-tested. Master-detail: a left list of the six faces (five can host a machine, one carries the crafting
- * cable to the computer) and a right detail panel for the selected face — its detected machine, an editable
+ * cable to the computer) and a right detail panel for the selected face: its detected machine, an editable
  * name, and an active toggle. The menu places the player inventory from these constants and the screen draws
  * its frame from the same ones, so screen, menu and test share one source of truth.
  *

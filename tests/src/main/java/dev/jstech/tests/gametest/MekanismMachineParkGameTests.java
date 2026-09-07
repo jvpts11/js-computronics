@@ -35,7 +35,7 @@ import java.util.List;
  * The Mekanism machine classes the Fusion Reactor build needs, each driven by the network through the crafting
  * switch: the Metallurgic Infuser and the Osmium Compressor (an "extra" slot fed through the bottom face), the
  * Crusher (the plain electric family), and finally the whole alloy chain ending in Fusion Reactor Frames on the
- * bench — once as one multi-stage pipeline, once as flat patterns the planner composes on its own.
+ * bench: once as one multi-stage pipeline, once as flat patterns the planner composes on its own.
  */
 @GameTestHolder(JsTests.MODID)
 @PrefixGameTestTemplate(false)
@@ -215,8 +215,10 @@ public final class MekanismMachineParkGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 4000)
     public static void pipeline_makesFusionReactorFramesFromRawMaterials(final GameTestHelper helper) {
-        // Strategy B, "by stages": one multi-stage pattern walks copper up the alloy ladder in the infuser
-        // (infused -> reinforced -> atomic) and ends on the bench with the frame recipe, from raw stock only.
+        /*
+         * Strategy B, "by stages": one multi-stage pattern walks copper up the alloy ladder in the infuser
+         * (infused -> reinforced -> atomic) and ends on the bench with the frame recipe, from raw stock only.
+         */
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
         final INetworkOperation[] op = new INetworkOperation[1];
@@ -264,9 +266,11 @@ public final class MekanismMachineParkGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 4000)
     public static void flatPatterns_makeFusionReactorFramesFromRawMaterials(final GameTestHelper helper) {
-        // Strategy A, "flat patterns": one pattern per recipe in the Recipe ROM and a single request for the
-        // frames. The planner walks the tree itself (bench <- machine <- machine <- machine) and the craft runs
-        // each machine step as a processing operation of its own before the bench step.
+        /*
+         * Strategy A, "flat patterns": one pattern per recipe in the Recipe ROM and a single request for the
+         * frames. The planner walks the tree itself (bench <- machine <- machine <- machine) and the craft runs
+         * each machine step as a processing operation of its own before the bench step.
+         */
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
         final INetworkOperation[] op = new INetworkOperation[1];
@@ -320,8 +324,10 @@ public final class MekanismMachineParkGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 4000)
     public static void cliCraft_plansTheAlloyChainFromTheCommandLine(final GameTestHelper helper) {
-        // The command-line route (MC-NET / MC-DOS shells): "operation craft" on the Crafting Computer's console
-        // must reach the same planner and drive the same machine steps as the desktop request.
+        /*
+         * The command-line route (MC-NET / MC-DOS shells): "operation craft" on the Crafting Computer's console
+         * must reach the same planner and drive the same machine steps as the desktop request.
+         */
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
         helper.startSequence()
@@ -370,9 +376,11 @@ public final class MekanismMachineParkGameTests {
 
     @GameTest(template = ARENA, timeoutTicks = 4000)
     public static void flatPatterns_craftSurvivesAReloadWhileItsMachineStepRuns(final GameTestHelper helper) {
-        // The Mainframe is torn down and rebuilt from its NBT while the first infuser step is running. The
-        // machine step resumes on its own; the craft must wait for it and then finish from what it made,
-        // instead of planning the alloy a second time (which the drained raw stock could not even cover).
+        /*
+         * The Mainframe is torn down and rebuilt from its NBT while the first infuser step is running. The
+         * machine step resumes on its own; the craft must wait for it and then finish from what it made,
+         * instead of planning the alloy a second time (which the drained raw stock could not even cover).
+         */
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
         final BlockPos mainframePos = new BlockPos(1, 2, 2);

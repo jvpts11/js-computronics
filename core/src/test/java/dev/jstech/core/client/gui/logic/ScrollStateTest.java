@@ -88,8 +88,10 @@ class ScrollStateTest {
 
     @Test
     void visibleCount_partialLastPage() {
-        // 25 items, 10 visible, scrolled to bottom -> offset 15, shows 15..25 = 10.
-        // But test a genuinely partial case: 13 items, 10 visible.
+        /*
+         * 25 items, 10 visible, scrolled to bottom -> offset 15, shows 15..25 = 10.
+         * But test a genuinely partial case: 13 items, 10 visible.
+         */
         ScrollState s = ScrollState.of(13, 10).scrolledToBottom();
         // maxOffset = 3, visible 3..13 = 10 rows.
         assertEquals(3, s.firstVisibleIndex());

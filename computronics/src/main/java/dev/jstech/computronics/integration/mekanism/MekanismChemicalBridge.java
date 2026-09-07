@@ -32,7 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Mekanism's chemicals (gases, infusions, pigments, slurries — one unified registry since 10.7) as network
+ * Mekanism's chemicals (gases, infusions, pigments, slurries, one unified registry since 10.7) as network
  * data. The block capability is recreated by its registered name, so the bridge depends on the Mekanism API
  * jar alone and on nothing from the mod's internals.
  */
@@ -65,8 +65,10 @@ final class MekanismChemicalBridge implements IChemicalBridge {
 
     @Override
     public Optional<IChemicalPort> itemPortFor(final ItemStack stack) {
-        // Mekanism's item handlers are backed by the stack's own data components, so the port writes straight
-        // into the stack it was made for.
+        /*
+         * Mekanism's item handlers are backed by the stack's own data components, so the port writes straight
+         * into the stack it was made for.
+         */
         final IChemicalHandler handler = stack.getCapability(ITEM_CHEMICAL_HANDLER);
         return handler == null ? Optional.empty() : Optional.of(new HandlerPort(handler));
     }

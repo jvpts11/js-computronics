@@ -35,8 +35,10 @@ public final class FilteredDataPort implements IDataPort {
 
     @Override
     public boolean isEmpty() {
-        // Emptiness is about whether the face is reachable at all, not about the filter: a filtered but present
-        // face is still a live port, so the engine keeps it in the composite.
+        /*
+         * Emptiness is about whether the face is reachable at all, not about the filter: a filtered but present
+         * face is still a live port, so the engine keeps it in the composite.
+         */
         return delegate.isEmpty();
     }
 

@@ -42,8 +42,10 @@ public final class NetworkSystem {
 
     private final NodeRegistry<Long, ServerRouterElement> routers = new NodeRegistry<>();
 
-    // Every per-network / per-node registry, collected so clear() resets them all together and a newly
-    // added one can never be left out again (crafting and supercomputer nodes once were).
+    /*
+     * Every per-network / per-node registry, collected so clear() resets them all together and a newly
+     * added one can never be left out again (crafting and supercomputer nodes once were).
+     */
     private final List<java.util.Map<?, ?>> registries = List.of(
             mainframesByNetwork, mainframePosByNetwork, serverLocations);
     private final List<NodeRegistry<?, ?>> nodeRegistries = List.of(
@@ -79,7 +81,7 @@ public final class NetworkSystem {
         return level.getData(CoreAttachments.NETWORK_SYSTEM.get());
     }
 
-    // ConnectivityIndex facade — works in Phase 0
+    // ConnectivityIndex facade, works in Phase 0
 
     public ConnectivityIndex connectivity() {
         return connectivity;
@@ -93,7 +95,7 @@ public final class NetworkSystem {
         return connectivity.inSameNetwork(a, b);
     }
 
-    // Mainframe / Subframe registry — works in Phase 0 with snapshots
+    // Mainframe / Subframe registry, works in Phase 0 with snapshots
 
     public void registerMainframe(MainframeNode mainframe) {
         java.util.Objects.requireNonNull(mainframe, "mainframe must not be null");
@@ -136,8 +138,10 @@ public final class NetworkSystem {
 
     public void registerServer(ServerNode server) {
         java.util.Objects.requireNonNull(server, "server must not be null");
-        // Idempotent by node UUID: a Rack re-registering each tick never duplicates, and an unchanged
-        // snapshot leaves every reader's list untouched.
+        /*
+         * Idempotent by node UUID: a Rack re-registering each tick never duplicates, and an unchanged
+         * snapshot leaves every reader's list untouched.
+         */
         servers.register(server.networkUuid(), server.nodeUuid(), server);
     }
 
@@ -250,7 +254,7 @@ public final class NetworkSystem {
         return routers.of(networkUuid);
     }
 
-    // Phase 1+ stubs — depend on runtime topology / BlockEntities
+    // Phase 1+ stubs, they depend on runtime topology / BlockEntities
 
     public Optional<NodeUuid> nodeByPosition(long encodedPos) {
         throw new UnsupportedOperationException(

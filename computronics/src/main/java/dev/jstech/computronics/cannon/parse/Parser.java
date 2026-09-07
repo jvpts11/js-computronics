@@ -79,7 +79,7 @@ public final class Parser {
         return new CompilationUnit(file, types);
     }
 
-    // ---------------------------------------------------------------- declarations
+    // declarations
 
     private IDecl.ITypeDecl parseTypeDeclaration() {
         final Set<IDecl.Modifier> modifiers = this.parseModifiers();
@@ -206,9 +206,11 @@ public final class Parser {
         return bases;
     }
 
-    // A member starts with its modifiers, then a shape that says what it is: the class's own name
-    // before a parenthesis is a constructor, "event" is an event, and otherwise a type and a name
-    // are followed by parentheses for a method, a brace for a property, or neither for a field.
+    /*
+     * A member starts with its modifiers, then a shape that says what it is: the class's own name
+     * before a parenthesis is a constructor, "event" is an event, and otherwise a type and a name
+     * are followed by parentheses for a method, a brace for a property, or neither for a field.
+     */
     private IDecl.IMemberDecl parseMember(final String className) {
         final Set<IDecl.Modifier> modifiers = this.parseModifiers();
         final Token start = this.peek();
@@ -283,8 +285,10 @@ public final class Parser {
                 start.line(), start.column());
     }
 
-    // The short form only: "{ get; private set; }". A body on an accessor is a v2 feature, so a
-    // brace where the semicolon belongs is reported as the missing semicolon it is.
+    /*
+     * The short form only: "{ get; private set; }". A body on an accessor is a v2 feature, so a
+     * brace where the semicolon belongs is reported as the missing semicolon it is.
+     */
     private IDecl.IMemberDecl parseProperty(final Set<IDecl.Modifier> modifiers, final TypeRef type,
                                           final String name, final Token start) {
         this.advance();
@@ -358,7 +362,7 @@ public final class Parser {
         return parameters;
     }
 
-    // ---------------------------------------------------------------- types
+    // types
 
     private TypeRef parseReturnType() {
         if (this.check(TokenKind.VOID)) {
@@ -396,8 +400,10 @@ public final class Parser {
         return new TypeRef(start.text(), arguments, arrayRank, start.line(), start.column());
     }
 
-    // "Map<string, List<int>>" ends on one token holding two closing angles, so the first one is
-    // taken here and the token is left behind as the second.
+    /*
+     * "Map<string, List<int>>" ends on one token holding two closing angles, so the first one is
+     * taken here and the token is left behind as the second.
+     */
     private void closeTypeArguments() {
         if (this.match(TokenKind.GREATER)) {
             return;
@@ -415,8 +421,10 @@ public final class Parser {
         return kind == TokenKind.IDENTIFIER || kind == TokenKind.VAR || BUILT_IN_TYPES.contains(kind);
     }
 
-    // Looks past a type without reporting anything, and answers where it ends, or -1 if what is
-    // there is not a type at all. Used only to tell a declaration from an expression.
+    /*
+     * Looks past a type without reporting anything, and answers where it ends, or -1 if what is
+     * there is not a type at all. Used only to tell a declaration from an expression.
+     */
     private int scanType(final int from) {
         int at = from;
         if (!this.isTypeStart(this.kindAt(at))) {
@@ -453,7 +461,7 @@ public final class Parser {
         return at;
     }
 
-    // ---------------------------------------------------------------- statements
+    // statements
 
     private IStmt.Block parseBlock() {
         final Token start = this.peek();
@@ -693,15 +701,19 @@ public final class Parser {
         return new IStmt.LocalDecl(type, name, initializer, start.line(), start.column());
     }
 
-    // A type followed by a name is a declaration; anything else at the head of a statement is an
-    // expression. This is the one place the grammar genuinely needs more than one token of lookahead.
+    /*
+     * A type followed by a name is a declaration; anything else at the head of a statement is an
+     * expression. This is the one place the grammar genuinely needs more than one token of lookahead.
+     */
     private boolean looksLikeDeclaration() {
         final int after = this.scanType(this.position);
         return after > this.position && this.kindAt(after) == TokenKind.IDENTIFIER;
     }
 
-    // Evaluating a value and throwing it away is always a mistake, so only the forms that do
-    // something are allowed to stand alone.
+    /*
+     * Evaluating a value and throwing it away is always a mistake, so only the forms that do
+     * something are allowed to stand alone.
+     */
     private boolean isStatementExpression(final IExpr expression) {
         return switch (expression) {
             case IExpr.Call ignored -> true;
@@ -713,7 +725,7 @@ public final class Parser {
         };
     }
 
-    // ---------------------------------------------------------------- expressions
+    // expressions
 
     private IExpr parseExpression() {
         return this.parseAssignment();
@@ -770,8 +782,10 @@ public final class Parser {
                 condition == null ? this.peek().column() : condition.column());
     }
 
-    // One table instead of nine near-identical methods; the index is the precedence level, lowest
-    // binding first, exactly as C# orders them.
+    /*
+     * One table instead of nine near-identical methods; the index is the precedence level, lowest
+     * binding first, exactly as C# orders them.
+     */
     private static final TokenKind[][] BINARY_LEVELS = {
         {TokenKind.OR_OR},
         {TokenKind.AND_AND},
@@ -868,9 +882,11 @@ public final class Parser {
         return this.parsePostfix();
     }
 
-    // "(int) x" is a conversion and "(a) + b" is a sum in brackets. The rule is the one C# uses: a
-    // built-in type name always converts, and any other name only converts when what follows could
-    // start a value on its own.
+    /*
+     * "(int) x" is a conversion and "(a) + b" is a sum in brackets. The rule is the one C# uses: a
+     * built-in type name always converts, and any other name only converts when what follows could
+     * start a value on its own.
+     */
     private boolean isCastAhead() {
         if (!this.check(TokenKind.LEFT_PAREN) || this.isLambdaAhead()) {
             return false;
@@ -967,8 +983,10 @@ public final class Parser {
         return arguments;
     }
 
-    // "out value" hands over a place that already exists; "out int value" and "out var value" declare
-    // it right there, which is where a player wants it when the call is the only reason it exists.
+    /*
+     * "out value" hands over a place that already exists; "out int value" and "out var value" declare
+     * it right there, which is where a player wants it when the call is the only reason it exists.
+     */
     private IExpr parseOutArgument() {
         final Token start = this.advance();
         final int afterType = this.scanType(this.position);
@@ -1012,8 +1030,10 @@ public final class Parser {
             default:
                 break;
         }
-        // A built-in type name can stand where a value does, as the receiver of one of its own
-        // methods: "string.Format(...)" and "int.Parse(...)" read the way a player expects.
+        /*
+         * A built-in type name can stand where a value does, as the receiver of one of its own
+         * methods: "string.Format(...)" and "int.Parse(...)" read the way a player expects.
+         */
         if (BUILT_IN_TYPES.contains(start.kind()) && this.kindAt(this.position + 1) == TokenKind.DOT) {
             this.advance();
             return new IExpr.Name(start.text(), start.line(), start.column());
@@ -1079,10 +1099,12 @@ public final class Parser {
         return new IExpr.Lambda(parameters, body, null, start.line(), start.column());
     }
 
-    // ---------------------------------------------------------------- recovery and cursor
+    // recovery and cursor
 
-    // After a mistake, run to the next place a declaration can plausibly start, so the rest of the
-    // file is still read and the player sees every other mistake in one go.
+    /*
+     * After a mistake, run to the next place a declaration can plausibly start, so the rest of the
+     * file is still read and the player sees every other mistake in one go.
+     */
     private void skipToTypeDeclaration() {
         while (!this.atEnd()) {
             if (TYPE_DECLARATION_STARTS.contains(this.peek().kind()) || MODIFIERS.contains(this.peek().kind())) {
@@ -1153,8 +1175,10 @@ public final class Parser {
         return token;
     }
 
-    // Reports and does not consume, so the caller decides how to recover rather than losing a token
-    // that might be the start of the next good construct.
+    /*
+     * Reports and does not consume, so the caller decides how to recover rather than losing a token
+     * that might be the start of the next good construct.
+     */
     private boolean expect(final TokenKind kind) {
         if (this.check(kind)) {
             this.advance();

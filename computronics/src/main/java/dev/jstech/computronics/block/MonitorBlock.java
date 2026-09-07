@@ -106,25 +106,31 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
         }
         final BlockPos owner = monitor.ownerPos();
         if (owner == null) {
-            // Explain WHY the screen is dark instead of a generic "not linked", so a missing GPU
-            // (the most common cause) or a full host is obvious rather than silent.
+            /*
+             * Explain WHY the screen is dark instead of a generic "not linked", so a missing GPU
+             * (the most common cause) or a full host is obvious rather than silent.
+             */
             if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
                 serverPlayer.displayClientMessage(diagnoseUnlinked(level, pos), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
 
-        // The monitor mirrors the linked computer's OS: the screen depends on the installed OS, not on
-        // the monitor. The desktop, terminal and network GUI are all server-opened container menus; the
-        // firmware setup is a client-only screen the server requests via OpenComputerUiPayload; with no
-        // OS the screen stays dark with a hint.
+        /*
+         * The monitor mirrors the linked computer's OS: the screen depends on the installed OS, not on
+         * the monitor. The desktop, terminal and network GUI are all server-opened container menus; the
+         * firmware setup is a client-only screen the server requests via OpenComputerUiPayload; with no
+         * OS the screen stays dark with a hint.
+         */
         if (level.isClientSide()) {
             // The server (which alone knows the installed OS) decides and opens the right screen.
             return InteractionResult.SUCCESS;
         }
         if (player instanceof ServerPlayer serverPlayer) {
-            // Using the monitor directly always means "show me MY machine": any remote session this
-            // screen was holding ends here.
+            /*
+             * Using the monitor directly always means "show me MY machine": any remote session this
+             * screen was holding ends here.
+             */
             monitor.setRemoteSession(null);
             bootOrPost(serverPlayer, level, pos, owner);
         }
@@ -132,14 +138,16 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     }
 
     /**
-     * The monitor-use entry point: a powered-off computer shows nothing (no boot, no firmware — the screen
+     * The monitor-use entry point: a powered-off computer shows nothing (no boot, no firmware, the screen
      * has no signal); a freshly powered-on or rebooting one plays the power-on self-test first (DEL during
      * it enters the firmware setup); otherwise the boot target opens directly.
      */
     public static void bootOrPost(final ServerPlayer player, final Level level, final BlockPos monitorPos,
                                   final BlockPos owner) {
-        // A rack holding several machines has to be told which one the monitor means: that is what
-        // the KVM Switch is for. Without one the screen cannot address a bay at all.
+        /*
+         * A rack holding several machines has to be told which one the monitor means: that is what
+         * the KVM Switch is for. Without one the screen cannot address a bay at all.
+         */
         if (level.getBlockEntity(owner)
                 instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity rack) {
             final java.util.List<Integer> computers = rack.computerSlots();
@@ -286,15 +294,19 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     public static void openBootTarget(final ServerPlayer player, final Level level, final BlockPos monitorPos,
                                       final BlockPos owner) {
         final BlockEntity ownerBe = level.getBlockEntity(owner);
-        // A powered-off computer opens nothing, whichever path asked for the boot (monitor use, a firmware
-        // action, a reboot): the screen simply has no signal until the machine is switched on.
+        /*
+         * A powered-off computer opens nothing, whichever path asked for the boot (monitor use, a firmware
+         * action, a reboot): the screen simply has no signal until the machine is switched on.
+         */
         if (ownerBe instanceof IOsHost gate) {
             if (!gate.isRunning()) {
                 player.displayClientMessage(Component.translatable("block.jsc.monitor.no_power"), true);
                 return;
             }
-            // Drop a live-install session whose medium was pulled out, so the boot below falls back to
-            // the firmware (or the disk system) instead of resurrecting the installer shell.
+            /*
+             * Drop a live-install session whose medium was pulled out, so the boot below falls back to
+             * the firmware (or the disk system) instead of resurrecting the installer shell.
+             */
             gate.validateOsSession();
         }
         final BootController.BootTarget target = BootController.targetForComputer(ownerBe);
@@ -336,13 +348,17 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
             final String name = level.getBlockState(owner).getBlock().getName().getString();
             final net.minecraft.resources.ResourceLocation osId = c.installedOsId();
             final Component title = level.getBlockState(owner).getBlock().getName();
-            // The machine's RAM and what its system, desktop and services already hold: the desktop weighs
-            // the windows it opens against the rest.
+            /*
+             * The machine's RAM and what its system, desktop and services already hold: the desktop weighs
+             * the windows it opens against the rest.
+             */
             final int ramTotalMb = c.ramTotalMb();
             final int ramReservedMb = c.ramReservedMb();
-            // The desktop environment: the OS's bundled one (Frames) or the Linux package installed.
-            // The desktop this session booted, not whatever is on disk right now: a package installed
-            // since the machine came up belongs to the next boot.
+            /*
+             * The desktop environment: the OS's bundled one (Frames) or the Linux package installed.
+             * The desktop this session booted, not whatever is on disk right now: a package installed
+             * since the machine came up belongs to the next boot.
+             */
             final net.minecraft.resources.ResourceLocation desktopId =
                     c.bootedDesktopId() != null ? c.bootedDesktopId() : osId;
             player.openMenu(new SimpleMenuProvider(
@@ -359,8 +375,10 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
         if (level.getBlockEntity(owner) instanceof IOsHost host) {
             final HardwareEra era = host.displayEra();
             final Component title = level.getBlockState(owner).getBlock().getName();
-            // A POSIX (Linux) OS gets a login banner and a bash-style prompt: tell the client which shell,
-            // host name and OS it is booting so it can draw them before the first command round-trip.
+            /*
+             * A POSIX (Linux) OS gets a login banner and a bash-style prompt: tell the client which shell,
+             * host name and OS it is booting so it can draw them before the first command round-trip.
+             */
             final dev.jstech.computronics.os.OsDef os = host.installedOs();
             final dev.jstech.computronics.program.install.LiveInstallState live =
                     host.console() == null ? null : host.console().liveInstall();
@@ -385,8 +403,10 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                         : "";
                 osLabel = os == null ? "" : os.displayName();
             }
-            // Each platform gets its own console screen: the Linux TTY (installed distributions and live
-            // media), the MC-DOS terminal, and the MC-NET Command Prompt window — never each other's.
+            /*
+             * Each platform gets its own console screen: the Linux TTY (installed distributions and live
+             * media), the MC-DOS terminal, and the MC-NET Command Prompt window, never each other's.
+             */
             final boolean tty = posix || live != null;
             final boolean dos = !tty && os != null
                     && os.platform() == dev.jstech.computronics.os.Platform.MC_DOS;

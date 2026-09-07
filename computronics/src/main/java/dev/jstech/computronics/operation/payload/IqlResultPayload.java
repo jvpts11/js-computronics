@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: the result of a Network Management Studio statement — a status message (and whether
+ * Server to client: the result of a Network Management Studio statement: a status message (and whether
  * it succeeded) plus the result-set rows for a read, which the Studio renders as a grid.
  */
 public record IqlResultPayload(boolean ok, String message, List<Row> rows) implements CustomPacketPayload {

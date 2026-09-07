@@ -8,7 +8,7 @@
 package dev.jstech.computronics.hardware;
 
 /**
- * The physical form factor of a motherboard — the chassis standard that decides which computer a board fits into, the way a real board's size and mounting decide which case accepts it.
+ * The physical form factor of a motherboard, the chassis standard that decides which computer a board fits into, the way a real board's size and mounting decide which case accepts it.
  */
 public enum FormFactor {
 

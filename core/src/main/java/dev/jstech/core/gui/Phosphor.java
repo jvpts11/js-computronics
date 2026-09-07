@@ -11,8 +11,8 @@ package dev.jstech.core.gui;
  * A monochrome monitor has one colour.
  *
  * <p>The tube of the Vintage era is a green-phosphor CRT: every pixel it can light is the same green,
- * brighter or dimmer. Screens that run on such a monitor were written with the full palette anyway —
- * white headings, cyan system lines, red errors, amber warnings — which no monitor of that decade could
+ * brighter or dimmer. Screens that run on such a monitor were written with the full palette anyway:
+ * white headings, cyan system lines, red errors, amber warnings, which no monitor of that decade could
  * have shown. This maps any colour to what that tube would actually display: the phosphor, lit in
  * proportion to how bright the original colour reads. Errors stay legible because red is dim and
  * headings still stand out because white is full brightness, so the meaning survives the filter.

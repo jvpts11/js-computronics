@@ -14,7 +14,7 @@ import net.neoforged.neoforge.items.SlotItemHandler;
 import java.util.function.IntSupplier;
 
 /**
- * A hardware slot usable only while its relative index is within the count the installed motherboard offers — so the CPU/RAM/PCIe/disk bays appear and accept parts according to the board, and none of them do until a board is installed (the limit is then 0). Shared by every computer-assembly menu so the board-gated slot behaves identically everywhere.
+ * A hardware slot usable only while its relative index is within the count the installed motherboard offers, so the CPU/RAM/PCIe/disk bays appear and accept parts according to the board, and none of them do until a board is installed (the limit is then 0). Shared by every computer-assembly menu so the board-gated slot behaves identically everywhere.
  */
 final class BoardSlot extends SlotItemHandler {
 
@@ -30,8 +30,10 @@ final class BoardSlot extends SlotItemHandler {
 
     @Override
     public boolean isActive() {
-        // Within the board's slot count, or already holding a part — so a component is never
-        // trapped behind a smaller board swapped in later.
+        /*
+         * Within the board's slot count, or already holding a part, so a component is never
+         * trapped behind a smaller board swapped in later.
+         */
         return relativeIndex < boardLimit.getAsInt() || hasItem();
     }
 
