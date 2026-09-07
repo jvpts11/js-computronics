@@ -18,13 +18,13 @@ import java.util.List;
  * to the correct face instead of relying on the machine to reject the wrong one. A {@code null} filter passes
  * everything, so an unfiltered bus behaves exactly like the raw face.
  */
-public final class FilteredDataPort implements DataPort {
+public final class FilteredDataPort implements IDataPort {
 
-    private final DataPort delegate;
+    private final IDataPort delegate;
     @Nullable
     private final StorageKey filter;
 
-    public FilteredDataPort(final DataPort delegate, @Nullable final StorageKey filter) {
+    public FilteredDataPort(final IDataPort delegate, @Nullable final StorageKey filter) {
         this.delegate = delegate;
         this.filter = filter;
     }

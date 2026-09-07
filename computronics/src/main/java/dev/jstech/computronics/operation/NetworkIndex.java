@@ -313,7 +313,7 @@ public final class NetworkIndex {
                     onDone.run();
                 }
             });
-            return dev.jstech.core.operation.OperationResult.success();
+            return dev.jstech.core.operation.IOperationResult.success();
         }, dev.jstech.core.operation.OperationPriority.MEDIUM_HIGH);
     }
 

@@ -56,7 +56,7 @@ class OperationDispatchTest {
     @Test
     void successfulTask_completes() {
         dispatch = new OperationDispatch(1);
-        final UUID id = dispatch.submit(context -> OperationResult.success(), OperationPriority.MEDIUM);
+        final UUID id = dispatch.submit(context -> IOperationResult.success(), OperationPriority.MEDIUM);
         tickUntilTerminal(id);
         assertEquals(OperationStatus.COMPLETED, dispatch.statusOf(id));
     }
@@ -95,7 +95,7 @@ class OperationDispatchTest {
         final UUID id = dispatch.submit(context -> {
             taskThread.set(Thread.currentThread());
             context.onMainThread(() -> sideEffectThread.set(Thread.currentThread()));
-            return OperationResult.success();
+            return IOperationResult.success();
         }, OperationPriority.MEDIUM);
 
         tickUntilTerminal(id);
@@ -113,11 +113,11 @@ class OperationDispatchTest {
         final List<String> order = new CopyOnWriteArrayList<>();
         final UUID low = dispatch.submit(context -> {
             order.add("low");
-            return OperationResult.success();
+            return IOperationResult.success();
         }, OperationPriority.LOW);
         final UUID high = dispatch.submit(context -> {
             order.add("high");
-            return OperationResult.success();
+            return IOperationResult.success();
         }, OperationPriority.HIGH);
 
         tickUntilTerminal(low);
@@ -133,7 +133,7 @@ class OperationDispatchTest {
         final AtomicInteger concurrent = new AtomicInteger();
         final AtomicInteger maxConcurrent = new AtomicInteger();
 
-        final OperationTask blocking = context -> {
+        final IOperationTask blocking = context -> {
             maxConcurrent.accumulateAndGet(concurrent.incrementAndGet(), Math::max);
             try {
                 release.await();
@@ -141,7 +141,7 @@ class OperationDispatchTest {
                 Thread.currentThread().interrupt();
             }
             concurrent.decrementAndGet();
-            return OperationResult.success();
+            return IOperationResult.success();
         };
 
         final UUID a = dispatch.submit(blocking, OperationPriority.MEDIUM);
@@ -168,7 +168,7 @@ class OperationDispatchTest {
     @Test
     void cancelPending_discards() {
         dispatch = new OperationDispatch(1);
-        final UUID id = dispatch.submit(context -> OperationResult.success(), OperationPriority.MEDIUM);
+        final UUID id = dispatch.submit(context -> IOperationResult.success(), OperationPriority.MEDIUM);
         assertTrue(dispatch.cancel(id));
         assertEquals(OperationStatus.DISCARDED, dispatch.statusOf(id));
         assertEquals(0, dispatch.pendingCount());
@@ -193,9 +193,9 @@ class OperationDispatchTest {
     @Test
     void completedAndFailedCounts_tallyTerminalOutcomes() {
         dispatch = new OperationDispatch(1);
-        final UUID ok = dispatch.submit(context -> OperationResult.success(), OperationPriority.MEDIUM);
+        final UUID ok = dispatch.submit(context -> IOperationResult.success(), OperationPriority.MEDIUM);
         tickUntilTerminal(ok);
-        final UUID bad = dispatch.submit(context -> OperationResult.failure("nope"), OperationPriority.MEDIUM);
+        final UUID bad = dispatch.submit(context -> IOperationResult.failure("nope"), OperationPriority.MEDIUM);
         tickUntilTerminal(bad);
         assertEquals(1L, dispatch.completedCount());
         assertEquals(1L, dispatch.failedCount());
@@ -222,7 +222,7 @@ class OperationDispatchTest {
                 return 7 * 6;
             });
             value.set(result);
-            return OperationResult.success();
+            return IOperationResult.success();
         }, OperationPriority.MEDIUM);
 
         tickUntilTerminal(id);
@@ -237,7 +237,7 @@ class OperationDispatchTest {
         dispatch = new OperationDispatch(1);
         final UUID id = dispatch.submit(context -> {
             context.awaitTicks(3);
-            return OperationResult.success();
+            return IOperationResult.success();
         }, OperationPriority.MEDIUM);
 
         // Tick 1 promotes the task; it then blocks until three ticks have elapsed from that point.
@@ -265,7 +265,7 @@ class OperationDispatchTest {
                 cancelled.set(Boolean.TRUE);
                 throw expected;
             }
-            return OperationResult.success();
+            return IOperationResult.success();
         }, OperationPriority.MEDIUM);
 
         dispatch.tick(); // promote and let it enter the long wait
@@ -290,7 +290,7 @@ class OperationDispatchTest {
         dispatch = new OperationDispatch(4);
         final List<UUID> ids = new java.util.ArrayList<>();
         for (int i = 0; i < 300; i++) {
-            ids.add(dispatch.submit(context -> OperationResult.success(), OperationPriority.MEDIUM));
+            ids.add(dispatch.submit(context -> IOperationResult.success(), OperationPriority.MEDIUM));
         }
         for (final UUID id : ids) {
             tickUntilTerminal(id);

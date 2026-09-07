@@ -11,7 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
 import dev.jstech.computronics.blockentity.ServerRackPartBlockEntity;
 import dev.jstech.core.network.DataTier;
-import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.IRearFacingDataPort;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -35,7 +35,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A structural part of the Server Rack — one of the 11 non-controller blocks of the 2x3x2 cabinet.
  */
-public class ServerRackPartBlock extends Block implements EntityBlock, RearFacingDataPort {
+public class ServerRackPartBlock extends Block implements EntityBlock, IRearFacingDataPort {
 
     public static final MapCodec<ServerRackPartBlock> CODEC = simpleCodec(ServerRackPartBlock::new);
 

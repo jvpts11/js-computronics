@@ -21,7 +21,7 @@ import java.util.Map;
  * components — exactly like a computer's local disks — so pulling a drive takes its data with it,
  * and pulling the server leaves both drives and data in the rack for the next chassis.
  */
-public final class ServerStore implements WeightedStore {
+public final class ServerStore implements IWeightedStore {
 
     private final ServerRackBlockEntity rack;
     private final int serverSlot;

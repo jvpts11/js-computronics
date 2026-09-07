@@ -16,7 +16,7 @@ import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.ServerStore;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.network.NetworkSystem;
-import dev.jstech.core.operation.LatencyScheduler;
+import dev.jstech.core.operation.ILatencyScheduler;
 import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.core.uuid.NodeUuid;
 import net.minecraft.core.BlockPos;
@@ -39,7 +39,7 @@ public final class NetworkInsertOperation extends AbstractTransferOperation {
 
     public NetworkInsertOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
                                   final long demand, final String sourceLabel, final NetworkIndex index,
-                                  @Nullable final LatencyScheduler scheduler) {
+                                  @Nullable final ILatencyScheduler scheduler) {
         super(level, network, key, demand);
         this.sourceLabel = sourceLabel;
 

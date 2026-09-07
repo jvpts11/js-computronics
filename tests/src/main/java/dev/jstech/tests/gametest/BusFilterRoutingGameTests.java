@@ -11,7 +11,7 @@ import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.block.part.ImportBusPart;
 import dev.jstech.computronics.blockentity.DataCableBlockEntity;
 import dev.jstech.computronics.storage.CompositeDataPort;
-import dev.jstech.computronics.storage.DataPort;
+import dev.jstech.computronics.storage.IDataPort;
 import dev.jstech.computronics.storage.ExternalDataPort;
 import dev.jstech.computronics.storage.FilteredDataPort;
 import dev.jstech.computronics.storage.StorageKey;
@@ -61,9 +61,9 @@ public final class BusFilterRoutingGameTests {
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         final StorageKey dirt = StorageKey.of(Items.DIRT);
         final StorageKey stone = StorageKey.of(Items.STONE);
-        final DataPort portA = new FilteredDataPort(new ExternalDataPort(faceA, null), cobble);
-        final DataPort portB = new FilteredDataPort(new ExternalDataPort(faceB, null), dirt);
-        final DataPort composite = CompositeDataPort.of(List.of(portA, portB));
+        final IDataPort portA = new FilteredDataPort(new ExternalDataPort(faceA, null), cobble);
+        final IDataPort portB = new FilteredDataPort(new ExternalDataPort(faceB, null), dirt);
+        final IDataPort composite = CompositeDataPort.of(List.of(portA, portB));
 
         // The cobblestone route reaches only the cobblestone-filtered face.
         final long insertedCobble = composite.insert(cobble, 10, false);
@@ -96,7 +96,7 @@ public final class BusFilterRoutingGameTests {
     public static void unfilteredPort_carriesAnyKey(final GameTestHelper helper) {
         // An empty filter is a wildcard, so an unfiltered bus behaves exactly like the raw machine face.
         final ItemStackHandler face = new ItemStackHandler(1);
-        final DataPort wild = new FilteredDataPort(new ExternalDataPort(face, null), null);
+        final IDataPort wild = new FilteredDataPort(new ExternalDataPort(face, null), null);
         final long inserted = wild.insert(StorageKey.of(Items.STONE), 7, false);
         helper.assertTrue(inserted == 7 && face.getStackInSlot(0).getCount() == 7,
                 "a null filter must carry anything; face held " + face.getStackInSlot(0).getCount());

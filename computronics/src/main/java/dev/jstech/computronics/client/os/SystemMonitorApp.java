@@ -33,7 +33,7 @@ import java.util.function.Supplier;
  * snapshot the Settings app already builds, so it needs no server code of its own, and re-requests it on a
  * slow cadence so the storage bars track items being stored.
  */
-public final class SystemMonitorApp implements DesktopApp {
+public final class SystemMonitorApp implements IDesktopApp {
 
     private static final int REFRESH_FRAMES = 40;
     private static final int C_GREEN = 0xFF2EA043;

@@ -12,12 +12,12 @@ import dev.jstech.computronics.block.DataCableBlock;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.CpuSpec;
 import dev.jstech.computronics.hardware.DiskSpec;
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import dev.jstech.computronics.hardware.FormFactor;
 import dev.jstech.computronics.hardware.RamSpec;
 import dev.jstech.computronics.item.CpuItem;
 import dev.jstech.computronics.item.DiskItem;
-import dev.jstech.computronics.item.ExpansionCardItem;
+import dev.jstech.computronics.item.IExpansionCardItem;
 import dev.jstech.computronics.item.MotherboardItem;
 import dev.jstech.computronics.item.PsuItem;
 import dev.jstech.computronics.item.RamItem;
@@ -25,10 +25,10 @@ import dev.jstech.computronics.os.OsDef;
 import dev.jstech.computronics.os.OsRegistry;
 import dev.jstech.computronics.os.fs.SystemLayout;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.IDataNetworkConnectable;
 import dev.jstech.core.network.DataTier;
 import dev.jstech.core.network.NetworkSystem;
-import dev.jstech.core.peripheral.PeripheralOwnerSupport;
+import dev.jstech.core.peripheral.IPeripheralOwnerSupport;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.core.uuid.NodeUuid;
@@ -55,7 +55,7 @@ import java.util.Set;
  * Shared base for every computer that is a BLOCK (Personal Computer, Mainframe, Crafting Computer, and future ones such as Subframe / Supercomputer / AI Server).
  */
 public abstract class AbstractComputerBlockEntity extends BlockEntity
-        implements PeripheralOwnerSupport, dev.jstech.computronics.os.OsHost {
+        implements IPeripheralOwnerSupport, dev.jstech.computronics.os.IOsHost {
 
     protected static final long NO_CABLE = Long.MIN_VALUE;
 
@@ -176,7 +176,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     }
 
     protected boolean isValidPcieCard(final ItemStack stack) {
-        if (!(stack.getItem() instanceof ExpansionCardItem card)) {
+        if (!(stack.getItem() instanceof IExpansionCardItem card)) {
             return false;
         }
         final ItemStack boardStack = hardware.getStackInSlot(layout.motherboardSlot());
@@ -254,9 +254,9 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
             }
         }
         final int pcieCount = Math.min(layout.pcieCount(), motherboard.spec().pcieSlots());
-        final List<ExpansionCardSpec> pcieCards = new ArrayList<>();
+        final List<IExpansionCardSpec> pcieCards = new ArrayList<>();
         for (int i = 0; i < pcieCount; i++) {
-            if (hardware.getStackInSlot(layout.pcieStart() + i).getItem() instanceof ExpansionCardItem card) {
+            if (hardware.getStackInSlot(layout.pcieStart() + i).getItem() instanceof IExpansionCardItem card) {
                 pcieCards.add(card.cardSpec());
             }
         }
@@ -449,7 +449,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
      */
     @Nullable
     public HardwareEra displayEra() {
-        return getBlockState().getBlock() instanceof dev.jstech.computronics.block.EraChassisBlock chassis
+        return getBlockState().getBlock() instanceof dev.jstech.computronics.block.IEraChassisBlock chassis
                 ? chassis.chassisEra()
                 : installedEra();
     }
@@ -512,7 +512,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     }
 
     // Host-facing slot-count names (alias the board-derived counts), so subclasses that implement
-    // ComputerTerminalHost inherit these without boilerplate.
+    // IComputerTerminalHost inherit these without boilerplate.
     public int cpuSlots() {
         return boardCpuSlots();
     }
@@ -960,7 +960,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     }
 
     // Peripheral ownership — the endpoint set + standard owner methods come from
-    // PeripheralOwnerSupport; only the capacity is hardware-dependent (4 monitors per GPU).
+    // IPeripheralOwnerSupport; only the capacity is hardware-dependent (4 monitors per GPU).
 
     @Override
     public Set<Long> peripheralEndpoints() {
@@ -1047,14 +1047,14 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
 
     /**
      * The faces on which this computer will accept a data cable, derived from the block's
-     * {@link dev.jstech.core.network.DataNetworkConnectable#connectsOnFace} so the
+     * {@link dev.jstech.core.network.IDataNetworkConnectable#connectsOnFace} so the
      * device's attachment and the cable's rendered connection always agree. A standalone computer
      * reports only its rear; the Mainframe (a separate block entity) and the cluster nodes keep every
      * face.
      */
     protected java.util.List<Direction> cableSearchFaces() {
         final BlockState state = getBlockState();
-        if (state.getBlock() instanceof dev.jstech.core.network.DataNetworkConnectable device) {
+        if (state.getBlock() instanceof dev.jstech.core.network.IDataNetworkConnectable device) {
             final java.util.List<Direction> faces = new java.util.ArrayList<>(Direction.values().length);
             for (final Direction direction : Direction.values()) {
                 if (device.connectsOnFace(state, direction)) {
@@ -1067,7 +1067,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     }
 
     protected boolean acceptsTier(final DataTier tier) {
-        return getBlockState().getBlock() instanceof DataNetworkConnectable device
+        return getBlockState().getBlock() instanceof IDataNetworkConnectable device
                 && device.acceptedCableTiers().contains(tier);
     }
 
@@ -1082,7 +1082,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     private final dev.jstech.computronics.cannon.machine.MachinePrograms cannon =
             new dev.jstech.computronics.cannon.machine.MachinePrograms();
 
-    private final dev.jstech.computronics.cannon.run.Host cannonHost =
+    private final dev.jstech.computronics.cannon.run.IHost cannonHost =
             new dev.jstech.computronics.cannon.machine.MachineHost(this);
 
     /** The Cannon programs this machine is running. */
@@ -1097,7 +1097,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
      * off, which is the truthful answer and not an error.
      */
     public long networkStock(final String item) {
-        if (this instanceof dev.jstech.computronics.terminal.ComputerTerminalHost terminal
+        if (this instanceof dev.jstech.computronics.terminal.IComputerTerminalHost terminal
                 && level instanceof ServerLevel server) {
             long sum = 0;
             for (final var holding
@@ -1111,7 +1111,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
 
     /** The prompt this machine's shell would show, for giving it back when a program lets go. */
     private String shellPrompt() {
-        if (this instanceof dev.jstech.computronics.terminal.ComputerTerminalHost host
+        if (this instanceof dev.jstech.computronics.terminal.IComputerTerminalHost host
                 && level instanceof ServerLevel server) {
             return new dev.jstech.computronics.program.ServerCliComputer(host, server).prompt();
         }
@@ -1119,7 +1119,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     }
 
     /** The clock those programs read, which is this machine's own world. */
-    public dev.jstech.computronics.cannon.run.Host cannonHost() {
+    public dev.jstech.computronics.cannon.run.IHost cannonHost() {
         return cannonHost;
     }
 
@@ -1223,7 +1223,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     @Nullable
     private ItemStack consoleDisk;
 
-    // Provided here (no @Override: this base does not itself declare ComputerTerminalHost) so the
+    // Provided here (no @Override: this base does not itself declare IComputerTerminalHost) so the
     // computer subclasses that ARE hosts inherit it and satisfy the interface's console() method.
     public dev.jstech.computronics.program.ComputerConsoleState console() {
         final ItemStack disk = systemDisk();

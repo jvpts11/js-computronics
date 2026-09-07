@@ -21,7 +21,7 @@ public record MainframeNode(NodeUuid nodeUuid,
                                long ownCapacity,
                                FailoverRole failoverRole,
                                Optional<NodeUuid> failoverPartnerUuid,
-                               long lastHeartbeatTick) implements ComputerNode{
+                               long lastHeartbeatTick) implements IComputerNode{
 
     public MainframeNode {
         Objects.requireNonNull(nodeUuid, "nodeUuid must not be null");

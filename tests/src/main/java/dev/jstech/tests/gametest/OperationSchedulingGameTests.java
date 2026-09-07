@@ -20,7 +20,7 @@ import dev.jstech.computronics.program.ServerCliComputer;
 import dev.jstech.computronics.program.cli.CliCommands;
 import dev.jstech.computronics.program.cli.CliShell;
 import dev.jstech.computronics.storage.ExternalDataPort;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
@@ -227,7 +227,7 @@ public final class OperationSchedulingGameTests {
                 // planned against an index that does not know the items yet settles FAILED on the spot.
                 .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))
                 .thenExecuteAfter(2, () -> {
-                    final ServerCliComputer cli = new ServerCliComputer((ComputerTerminalHost) computer, helper.getLevel());
+                    final ServerCliComputer cli = new ServerCliComputer((IComputerTerminalHost) computer, helper.getLevel());
                     final CliShell shell = CliCommands.newShell(50);
 
                     helper.assertTrue(cliContains(shell.run("operation select 30 cobblestone priority high", cli),

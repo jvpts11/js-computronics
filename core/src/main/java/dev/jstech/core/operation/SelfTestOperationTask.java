@@ -10,7 +10,7 @@ package dev.jstech.core.operation;
 /**
  * A diagnostic Operation that does a bounded amount of deterministic CPU-bound work on its virtual thread and then succeeds.
  */
-public record SelfTestOperationTask(int workUnits) implements OperationTask {
+public record SelfTestOperationTask(int workUnits) implements IOperationTask {
 
     public SelfTestOperationTask {
         if (workUnits < 0) {
@@ -19,7 +19,7 @@ public record SelfTestOperationTask(int workUnits) implements OperationTask {
     }
 
     @Override
-    public OperationResult run(final OperationContext context) {
+    public IOperationResult run(final IOperationContext context) {
         // Pure, allocation-free arithmetic over an immutable input — never touches
         // the world, exactly as an Operation's Layer-A work must behave.
         long accumulator = 0L;
@@ -28,7 +28,7 @@ public record SelfTestOperationTask(int workUnits) implements OperationTask {
         }
         // Reference the result so the loop cannot be optimized away.
         return accumulator == Long.MIN_VALUE
-                ? OperationResult.failure("self-test overflow")
-                : OperationResult.success();
+                ? IOperationResult.failure("self-test overflow")
+                : IOperationResult.success();
     }
 }

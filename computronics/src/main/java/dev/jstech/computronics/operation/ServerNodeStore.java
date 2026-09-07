@@ -14,9 +14,9 @@ import net.minecraft.world.item.Item;
 import java.util.Map;
 
 /**
- * A {@link NodeStore} over a Server's whole store: a Server is always fully public, so this just forwards to the underlying {@link ServerStore}.
+ * An {@link INodeStore} over a Server's whole store: a Server is always fully public, so this just forwards to the underlying {@link ServerStore}.
  */
-final class ServerNodeStore implements NodeStore {
+final class ServerNodeStore implements INodeStore {
 
     private final ServerStore store;
 

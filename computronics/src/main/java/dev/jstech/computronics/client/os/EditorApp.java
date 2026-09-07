@@ -28,7 +28,7 @@ import java.util.Locale;
  * goes through the filesystem on the server and the status line reports the result. Tab moves between
  * the name and the text; a file opened from the explorer keeps its name (rename it there).
  */
-public final class EditorApp implements DesktopApp {
+public final class EditorApp implements IDesktopApp {
 
     private static final int NAME_H = 13;
     private static final int STATUS_H = 10;

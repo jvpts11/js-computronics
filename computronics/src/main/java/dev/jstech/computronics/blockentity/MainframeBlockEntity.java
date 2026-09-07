@@ -13,14 +13,14 @@ import dev.jstech.computronics.block.MainframeStructure;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.FormFactor;
 import dev.jstech.core.network.ConnectivityIndex;
-import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.IDataNetworkConnectable;
 import dev.jstech.core.network.DataTier;
 import dev.jstech.core.network.FailoverRole;
 import dev.jstech.core.network.MainframeNode;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.operation.OperationDispatch;
 import dev.jstech.core.operation.OperationPriority;
-import dev.jstech.core.operation.OperationTask;
+import dev.jstech.core.operation.IOperationTask;
 import dev.jstech.core.operation.SelfTestOperationTask;
 import dev.jstech.core.persistence.NetworkRegistrySavedData;
 import dev.jstech.core.uuid.NetworkUuid;
@@ -47,7 +47,7 @@ import java.util.Set;
  * The Mainframe BlockEntity: the binding that turns installed hardware item stacks into a {@link ComputerBuild} and exposes the powered state, capacity and parallel-queue count. Unlike the passive computers it shares a base with, the Mainframe OWNS and orchestrates a data network rather than reading one from a cable.
  */
 public class MainframeBlockEntity extends AbstractComputerBlockEntity
-        implements dev.jstech.computronics.terminal.ComputerTerminalHost,
+        implements dev.jstech.computronics.terminal.IComputerTerminalHost,
         software.bernie.geckolib.animatable.GeoBlockEntity {
 
     @Override
@@ -277,7 +277,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     private int dispatchQueues;
     private final dev.jstech.computronics.operation.NetworkIndex networkIndex =
             new dev.jstech.computronics.operation.NetworkIndex();
-    private final java.util.List<dev.jstech.computronics.operation.NetworkOperation>
+    private final java.util.List<dev.jstech.computronics.operation.INetworkOperation>
             activeOperations = new java.util.ArrayList<>();
     private long completedTotal;
     // Operations that were in flight when the world was saved, waiting for the first booted tick to resume.
@@ -550,7 +550,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
     }
 
-    public boolean submitOperation(final OperationTask task, final OperationPriority priority) {
+    public boolean submitOperation(final IOperationTask task, final OperationPriority priority) {
         if (dispatch == null || !isRunning()) {
             return false;
         }
@@ -696,7 +696,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     @Override
     protected boolean acceptsTier(final DataTier tier) {
-        return getBlockState().getBlock() instanceof DataNetworkConnectable device
+        return getBlockState().getBlock() instanceof IDataNetworkConnectable device
                 && device.acceptedCableTiers().contains(tier);
     }
 
@@ -759,7 +759,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
             // DISCARDED so a conflict or power-off leaves a trace in the log instead of vanishing.
             for (final var operation : activeOperations) {
                 if (keepPersistent && operation instanceof dev.jstech.computronics.operation
-                        .PersistentOperation persistent && !persistent.isEphemeral()) {
+                        .IPersistentOperation persistent && !persistent.isEphemeral()) {
                     continue; // already saved with the block entity; it resumes on reload
                 }
                 operation.abandon();
@@ -769,7 +769,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 recordOperation(operation.toRecord().withStatus(
                         dev.jstech.computronics.operation.payload
                                 .OperationRecord.STATUS_DISCARDED));
-                post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Discarded(
+                post(net -> new dev.jstech.core.event.IOperationLifecycleEvent.Discarded(
                         net, operation.operationId(), operation.typeId()));
             }
             activeOperations.clear();
@@ -850,7 +850,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkSelect(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel) {
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jstech.computronics.operation.payload.OperationRecord.TYPE_SELECT, null);
     }
@@ -858,7 +858,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkSelect(
             final net.minecraft.world.item.Item item, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel) {
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel) {
         return submitNetworkSelect(dev.jstech.computronics.storage.StorageKey.of(item),
                 demand, destination, destinationLabel);
     }
@@ -866,7 +866,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkSelect(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel,
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel,
             final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jstech.computronics.operation.payload.OperationRecord.TYPE_SELECT, sources);
@@ -875,7 +875,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkSelect(
             final net.minecraft.world.item.Item item, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel,
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel,
             final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         return submitNetworkSelect(dev.jstech.computronics.storage.StorageKey.of(item),
                 demand, destination, destinationLabel, sources);
@@ -884,7 +884,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkMove(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel,
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel,
             final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jstech.computronics.operation.payload.OperationRecord.TYPE_MOVE, sources);
@@ -893,7 +893,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkDelete(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel) {
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel) {
         return submitPull(key, demand, destination, destinationLabel,
                 dev.jstech.computronics.operation.payload.OperationRecord.TYPE_DELETE, null);
     }
@@ -901,7 +901,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     public dev.jstech.computronics.operation.NetworkSelectOperation submitNetworkDelete(
             final net.minecraft.world.item.Item item, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel) {
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel) {
         return submitNetworkDelete(dev.jstech.computronics.storage.StorageKey.of(item),
                 demand, destination, destinationLabel);
     }
@@ -909,7 +909,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     @Nullable
     private dev.jstech.computronics.operation.NetworkSelectOperation submitPull(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
-            final dev.jstech.computronics.storage.DataSink destination, final String destinationLabel,
+            final dev.jstech.computronics.storage.IDataSink destination, final String destinationLabel,
             final byte recordType,
             final java.util.Set<dev.jstech.core.uuid.NodeUuid> sources) {
         // A SELECT/MOVE/DELETE also needs the dispatcher; without an OS the Operation would never tick and would
@@ -1148,7 +1148,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     public dev.jstech.computronics.crafting.NetworkProcessingOperation submitNetworkProcessing(
             final dev.jstech.computronics.crafting.ProcessingPattern pattern, final long demand,
             final String requesterLabel,
-            @Nullable final dev.jstech.computronics.crafting.CraftIo io) {
+            @Nullable final dev.jstech.computronics.crafting.ICraftIo io) {
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel serverLevel) || networkUuid() == null
                 || demand <= 0) {
             return null;
@@ -1187,7 +1187,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * the resulting operation settles. Returns the operation, or null if nothing on the network makes {@code key}.
      */
     @Nullable
-    public dev.jstech.computronics.operation.NetworkOperation submitCraftRequest(
+    public dev.jstech.computronics.operation.INetworkOperation submitCraftRequest(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
             final boolean partial, final String label, @Nullable final Runnable onSettle) {
         return submitCraftRequest(key, demand, partial, label, onSettle, true);
@@ -1200,7 +1200,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * have a multi-stage recipe; everything else routes the same way regardless.
      */
     @Nullable
-    public dev.jstech.computronics.operation.NetworkOperation submitCraftRequest(
+    public dev.jstech.computronics.operation.INetworkOperation submitCraftRequest(
             final dev.jstech.computronics.storage.StorageKey key, final long demand,
             final boolean partial, final String label, @Nullable final Runnable onSettle,
             final boolean preferMultiStage) {
@@ -1358,7 +1358,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         final boolean expired = expiry > 0L && savedAt > 0L && level.getGameTime() - savedAt >= expiry;
         final int liveBefore = activeOperations.size();
         final HolderLookup.Provider registries = level.registryAccess();
-        final java.util.Map<java.util.UUID, dev.jstech.computronics.operation.NetworkOperation>
+        final java.util.Map<java.util.UUID, dev.jstech.computronics.operation.INetworkOperation>
                 byId = new java.util.HashMap<>();
         final java.util.Set<java.util.UUID> completedStages = new java.util.HashSet<>();
         final java.util.List<dev.jstech.computronics.crafting.NetworkMultiStageOperation>
@@ -1369,10 +1369,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         for (int i = 0; i < saved.size(); i++) {
             final CompoundTag tag = saved.getCompound(i);
             final java.util.UUID savedId = tag.hasUUID(
-                    dev.jstech.computronics.operation.PersistentOperation.ID_KEY)
-                    ? tag.getUUID(dev.jstech.computronics.operation.PersistentOperation.ID_KEY)
+                    dev.jstech.computronics.operation.IPersistentOperation.ID_KEY)
+                    ? tag.getUUID(dev.jstech.computronics.operation.IPersistentOperation.ID_KEY)
                     : java.util.UUID.randomUUID();
-            switch (tag.getString(dev.jstech.computronics.operation.PersistentOperation.KIND_KEY)) {
+            switch (tag.getString(dev.jstech.computronics.operation.IPersistentOperation.KIND_KEY)) {
                 case dev.jstech.computronics.crafting.NetworkProcessingOperation.KIND -> {
                     final var op = dev.jstech.computronics.crafting.NetworkProcessingOperation
                             .restore(tag, level, networkUuid(), craftingComputerPositions(), registries);
@@ -1463,12 +1463,12 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * grows while the Operation is passed over and is dropped when it settles, so a starved Operation that
      * finally wins a slot keeps it instead of falling straight back behind the newcomers.
      */
-    private final java.util.Map<dev.jstech.computronics.operation.NetworkOperation, Integer> deferredTicks =
+    private final java.util.Map<dev.jstech.computronics.operation.INetworkOperation, Integer> deferredTicks =
             new java.util.IdentityHashMap<>();
     /** The Operations the last tick granted a queue slot to; the views report the rest as PENDING. */
-    private java.util.Set<dev.jstech.computronics.operation.NetworkOperation> lastGranted = java.util.Set.of();
+    private java.util.Set<dev.jstech.computronics.operation.INetworkOperation> lastGranted = java.util.Set.of();
     /** Per in-flight Operation: ticks spent waiting (queued or on a lock) and ticks spent running. */
-    private final java.util.Map<dev.jstech.computronics.operation.NetworkOperation, int[]> timing =
+    private final java.util.Map<dev.jstech.computronics.operation.INetworkOperation, int[]> timing =
             new java.util.IdentityHashMap<>();
     private static final int WAITED = 0;
     private static final int RAN = 1;
@@ -1476,10 +1476,10 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     private final dev.jstech.core.operation.OperationStatistics statistics =
             new dev.jstech.core.operation.OperationStatistics();
 
-    private void countTick(final dev.jstech.computronics.operation.NetworkOperation operation, final int slot) {
+    private void countTick(final dev.jstech.computronics.operation.INetworkOperation operation, final int slot) {
         final int[] counted = timing.computeIfAbsent(operation, o -> new int[2]);
         if (slot == RAN && counted[RAN] == 0) {
-            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Started(
+            post(net -> new dev.jstech.core.event.IOperationLifecycleEvent.Started(
                     net, operation.operationId(), operation.typeId()));
         }
         counted[slot]++;
@@ -1489,23 +1489,23 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * Takes an Operation into the in-flight list and announces it on the series' event bus. Every
      * submission and every resume goes through here, so the bus sees each Operation exactly once.
      */
-    private void track(final dev.jstech.computronics.operation.NetworkOperation operation) {
+    private void track(final dev.jstech.computronics.operation.INetworkOperation operation) {
         activeOperations.add(operation);
-        post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Created(
+        post(net -> new dev.jstech.core.event.IOperationLifecycleEvent.Created(
                 net, operation.operationId(), operation.typeId()));
     }
 
     /** Posts one settled Operation's outcome: completed, failed (short), or discarded. */
-    private void postSettled(final dev.jstech.computronics.operation.NetworkOperation operation,
+    private void postSettled(final dev.jstech.computronics.operation.INetworkOperation operation,
                              final dev.jstech.computronics.operation.payload.OperationRecord record) {
         if (record.completed()) {
-            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Completed(net,
+            post(net -> new dev.jstech.core.event.IOperationLifecycleEvent.Completed(net,
                     operation.operationId(), operation.typeId(), (long) record.waitedTicks() + record.ranTicks()));
         } else if (record.status() == dev.jstech.computronics.operation.payload.OperationRecord.STATUS_DISCARDED) {
-            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Discarded(net,
+            post(net -> new dev.jstech.core.event.IOperationLifecycleEvent.Discarded(net,
                     operation.operationId(), operation.typeId()));
         } else {
-            post(net -> new dev.jstech.core.event.OperationLifecycleEvent.Failed(net,
+            post(net -> new dev.jstech.core.event.IOperationLifecycleEvent.Failed(net,
                     operation.operationId(), operation.typeId(), settleReason(record)));
         }
     }
@@ -1525,7 +1525,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * one, dropping its Operations on the way out) there is nobody to tell, so nothing is built or posted.
      */
     private void post(final java.util.function.Function<NetworkUuid,
-            dev.jstech.core.event.OperationLifecycleEvent> event) {
+            dev.jstech.core.event.IOperationLifecycleEvent> event) {
         final NetworkUuid net = networkUuid();
         if (net != null) {
             dev.jstech.core.JsCore.events().post(event.apply(net));
@@ -1533,7 +1533,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     /** The scheduler's timing of an in-flight Operation as {@code [waited, ran]}, zeros before its first tick. */
-    private int[] timingOf(final dev.jstech.computronics.operation.NetworkOperation operation) {
+    private int[] timingOf(final dev.jstech.computronics.operation.INetworkOperation operation) {
         final int[] counted = timing.get(operation);
         return counted == null ? new int[2] : counted;
     }
@@ -1585,20 +1585,20 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         }
         // Iterate a snapshot: a multi-stage operation submits its sub-stage into activeOperations mid-tick,
         // which would otherwise be a concurrent modification. The new stage simply ticks next tick.
-        final java.util.List<dev.jstech.computronics.operation.NetworkOperation> snapshot =
+        final java.util.List<dev.jstech.computronics.operation.INetworkOperation> snapshot =
                 new java.util.ArrayList<>(activeOperations);
         // The queue slots go to the ready Operations by effective priority (level plus aging), submission
         // order inside a level. Re-deciding every tick means a higher-priority request takes over a slot the
         // next tick instead of waiting for whatever was streaming to finish.
         final java.util.List<dev.jstech.core.operation.exec.QueueArbiter.Candidate<
-                dev.jstech.computronics.operation.NetworkOperation>> ready = new java.util.ArrayList<>();
+                dev.jstech.computronics.operation.INetworkOperation>> ready = new java.util.ArrayList<>();
         for (final var operation : snapshot) {
             if (!operation.isDone() && !operation.isWaiting() && occupiesQueue(operation)) {
                 ready.add(new dev.jstech.core.operation.exec.QueueArbiter.Candidate<>(
                         operation, operation.priority(), deferredTicks.getOrDefault(operation, 0)));
             }
         }
-        final java.util.Set<dev.jstech.computronics.operation.NetworkOperation> granted =
+        final java.util.Set<dev.jstech.computronics.operation.INetworkOperation> granted =
                 java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         granted.addAll(dev.jstech.core.operation.exec.QueueArbiter.grant(ready, slots,
                 dev.jstech.core.operation.OperationBalance.priorityAgingTicks()));
@@ -1625,7 +1625,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 deferredTicks.merge(operation, 1, Integer::sum);
             }
         }
-        final java.util.Iterator<dev.jstech.computronics.operation.NetworkOperation> it =
+        final java.util.Iterator<dev.jstech.computronics.operation.INetworkOperation> it =
                 activeOperations.iterator();
         while (it.hasNext()) {
             final var operation = it.next();
@@ -1718,7 +1718,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * crafting-card throughput (card x CPU), shared among the steps that computer drives at once — the card, not
      * the machine, sets the crafting speed. Everything else runs at the Mainframe's own orchestration capacity.
      */
-    private long machineFeedBudget(final dev.jstech.computronics.operation.NetworkOperation operation,
+    private long machineFeedBudget(final dev.jstech.computronics.operation.INetworkOperation operation,
                                    final long effectiveCapacity,
                                    final java.util.Map<net.minecraft.core.BlockPos, Integer> stepsPerComputer) {
         if (operation instanceof dev.jstech.computronics.crafting.NetworkProcessingOperation proc) {
@@ -1741,13 +1741,13 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
      * the crafting threads gate one craft's concurrent stages. Every non-stage operation occupies a queue.
      */
     private static boolean occupiesQueue(
-            final dev.jstech.computronics.operation.NetworkOperation operation) {
+            final dev.jstech.computronics.operation.INetworkOperation operation) {
         return !(operation instanceof dev.jstech.computronics.crafting.NetworkProcessingOperation proc
                 && proc.isNested());
     }
 
     /** The operations in flight right now, for views that need the live objects rather than the log. */
-    public java.util.List<dev.jstech.computronics.operation.NetworkOperation> liveOperations() {
+    public java.util.List<dev.jstech.computronics.operation.INetworkOperation> liveOperations() {
         return java.util.List.copyOf(activeOperations);
     }
 
@@ -1776,7 +1776,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     /** The in-flight Operation with this id, or null when it has settled or never existed. */
     @Nullable
-    public dev.jstech.computronics.operation.NetworkOperation findOperation(final java.util.UUID id) {
+    public dev.jstech.computronics.operation.INetworkOperation findOperation(final java.util.UUID id) {
         for (final var operation : activeOperations) {
             if (id.equals(operation.operationId())) {
                 return operation;
@@ -1831,7 +1831,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         setChanged();
     }
 
-    // ComputerTerminalHost — read-only monitoring for the Monitor terminal
+    // IComputerTerminalHost — read-only monitoring for the Monitor terminal
 
     @Override
     public boolean computerRunning() {
@@ -1904,7 +1904,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     @Override
-    public dev.jstech.computronics.storage.DataSink localStorage() {
+    public dev.jstech.computronics.storage.IDataSink localStorage() {
         return new dev.jstech.computronics.storage.StoreSink(localStore());
     }
 
@@ -2157,7 +2157,7 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         // Operations in flight resume after a reload: save their state (plus any not yet resumed).
         final net.minecraft.nbt.ListTag inFlight = new net.minecraft.nbt.ListTag();
         for (final var operation : activeOperations) {
-            if (operation instanceof dev.jstech.computronics.operation.PersistentOperation persistent
+            if (operation instanceof dev.jstech.computronics.operation.IPersistentOperation persistent
                     && !operation.isDone() && !persistent.isEphemeral()) {
                 // A craft's machine steps read and write its in-memory pool, which does not survive a reload, so
                 // they are not persisted; the parent craft re-plans and re-creates them from the handed-back pool.

@@ -17,9 +17,9 @@ import dev.jstech.computronics.os.fs.FsPaths;
 import dev.jstech.computronics.os.media.FormattedMediaItem;
 import dev.jstech.computronics.os.media.MediaFormat;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralEndpoint;
+import dev.jstech.core.peripheral.IPeripheralEndpoint;
 import dev.jstech.core.peripheral.PeripheralLinkValidator;
-import dev.jstech.core.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.IPeripheralOwner;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -55,7 +55,7 @@ import java.util.Optional;
  * <p>The encoder comes in three eras, and each writes the media of its day: a Vintage encoder writes floppy
  * disks, a Legacy one writes CDs, a Standard one writes DVDs, CDs and USB sticks (and no floppies).
  */
-public class PatternEncoderBlockEntity extends BlockEntity implements PeripheralEndpoint,
+public class PatternEncoderBlockEntity extends BlockEntity implements IPeripheralEndpoint,
         software.bernie.geckolib.animatable.GeoBlockEntity {
 
     /** The most jobs waiting behind the one being written. */
@@ -350,7 +350,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements Peripheral
             PeripheralLinks.discoverOwner(level, self)
                     .ifPresent(ownerPos -> validator.tryEstablishLink(ownerPos, self));
         } else {
-            final boolean ownerPresent = level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner;
+            final boolean ownerPresent = level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof IPeripheralOwner;
             if (!ownerPresent || !validator.isLinkStillValid(linkedOwner, self, PeripheralCableType.COMPUTING)) {
                 unlink(level);
             }
@@ -466,7 +466,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements Peripheral
         return Math.max(0L, capacity - used);
     }
 
-    // ---- PeripheralEndpoint ----
+    // ---- IPeripheralEndpoint ----
 
     @Override
     public PeripheralCableType cableType() {
@@ -500,7 +500,7 @@ public class PatternEncoderBlockEntity extends BlockEntity implements Peripheral
 
     /** Breaks the link from this side, freeing the computer's endpoint slot. Safe with no link. */
     public void unlink(final ServerLevel level) {
-        if (linkedOwner != null && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner owner) {
+        if (linkedOwner != null && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof IPeripheralOwner owner) {
             owner.onEndpointUnlinked(worldPosition.asLong());
         }
         onOwnerUnlinked();

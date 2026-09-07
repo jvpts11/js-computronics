@@ -11,7 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
 import dev.jstech.core.network.DataTier;
-import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.IRearFacingDataPort;
 import dev.jstech.core.util.BlockDrops;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
@@ -37,8 +37,8 @@ import org.jetbrains.annotations.Nullable;
  * The Personal Computer: the player's hands-on access point to the network, assembled on a consumer ATX board.
  */
 public class PersonalComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort, EraChassisBlock,
-        dev.jstech.core.peripheral.PeripheralConnectable {
+        implements EntityBlock, IRearFacingDataPort, IEraChassisBlock,
+        dev.jstech.core.peripheral.IPeripheralConnectable {
 
     @Override
     public dev.jstech.core.peripheral.PeripheralCableType peripheralType() {

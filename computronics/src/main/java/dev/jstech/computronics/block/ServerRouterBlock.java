@@ -11,8 +11,8 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.ServerRouterBlockEntity;
 import dev.jstech.computronics.menu.ServerRouterMenu;
-import dev.jstech.core.network.DataNetworkConnectable;
-import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.IDataNetworkConnectable;
+import dev.jstech.core.network.INetworkBridge;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * The Server Router: a network topology element that switches the network and groups Server Racks into datacenter sections, one per output face.
  */
 public class ServerRouterBlock extends net.minecraft.world.level.block.HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable, NetworkBridge {
+        implements EntityBlock, IDataNetworkConnectable, INetworkBridge {
 
     public static final MapCodec<ServerRouterBlock> CODEC = simpleCodec(ServerRouterBlock::new);
 

@@ -7,9 +7,9 @@
  */
 package dev.jstech.core.energy.internal;
 
-import dev.jstech.core.energy.EnergyCable;
+import dev.jstech.core.energy.IEnergyCable;
 import dev.jstech.core.energy.EnergyDistributionResult;
-import dev.jstech.core.energy.EnergyNode;
+import dev.jstech.core.energy.IEnergyNode;
 import dev.jstech.core.energy.internal.EnergyFlowGraph;
 
 import java.util.ArrayList;
@@ -24,11 +24,11 @@ import java.util.Map;
  */
 public final class EnergyNetwork {
 
-    private final Map<Long, EnergyNode> nodes = new LinkedHashMap<>();
-    private final Map<Long, EnergyCable> cables = new LinkedHashMap<>();
+    private final Map<Long, IEnergyNode> nodes = new LinkedHashMap<>();
+    private final Map<Long, IEnergyCable> cables = new LinkedHashMap<>();
     private final Map<Long, List<Long>> adjacency = new HashMap<>();
 
-    public void addNode(final long pos, final EnergyNode node) {
+    public void addNode(final long pos, final IEnergyNode node) {
         if (nodes.containsKey(pos) || cables.containsKey(pos)) {
             throw new IllegalStateException(
                     "Position already occupied: " + pos);
@@ -37,7 +37,7 @@ public final class EnergyNetwork {
         adjacency.computeIfAbsent(pos, k -> new ArrayList<>());
     }
 
-    public void addCable(final long pos, final EnergyCable cable) {
+    public void addCable(final long pos, final IEnergyCable cable) {
         if (nodes.containsKey(pos) || cables.containsKey(pos)) {
             throw new IllegalStateException(
                     "Position already occupied: " + pos);

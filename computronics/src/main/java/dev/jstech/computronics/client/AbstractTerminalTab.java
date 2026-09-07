@@ -13,11 +13,11 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * Base for all {@link TerminalTab} implementations. Holds the screen and menu references that
+ * Base for all {@link ITerminalTab} implementations. Holds the screen and menu references that
  * every tab needs, and provides named accessors for palette colours and the shared drawing
  * helpers that live on the parent screen.
  */
-abstract class AbstractTerminalTab implements TerminalTab {
+abstract class AbstractTerminalTab implements ITerminalTab {
 
     protected final ComputerTerminalScreen screen;
     protected final ComputerTerminalMenu menu;

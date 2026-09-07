@@ -9,7 +9,7 @@ package dev.jstech.tests.gametest;
 
 import dev.jstech.computronics.operation.DataHandoff;
 import dev.jstech.computronics.storage.ChemicalBridges;
-import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.IChemicalPort;
 import dev.jstech.computronics.storage.DataContainers;
 import dev.jstech.computronics.storage.LocalStore;
 import dev.jstech.computronics.storage.StorageKey;
@@ -183,7 +183,7 @@ public final class DataHandoffGameTests {
         world.placeFromItem(TANK, tank(CHEMICAL_TANK));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final Optional<ChemicalPort> port = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK), Direction.UP);
+                    final Optional<IChemicalPort> port = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK), Direction.UP);
                     helper.assertTrue(port.isPresent() && port.get().fill(OXYGEN, 800, false) == 800, "the chemical tank must take 800 mB of oxygen");
                 })
                 .thenExecuteAfter(2, () -> {
@@ -259,7 +259,7 @@ public final class DataHandoffGameTests {
         final Player player = player(helper);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final Optional<ChemicalPort> port = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK), Direction.UP);
+                    final Optional<IChemicalPort> port = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK), Direction.UP);
                     helper.assertTrue(port.isPresent() && port.get().fill(OXYGEN, 800, false) == 800, "the chemical tank must take 800 mB of oxygen");
                 })
                 .thenExecuteAfter(2, () -> {

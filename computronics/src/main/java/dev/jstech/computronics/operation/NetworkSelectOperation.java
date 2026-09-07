@@ -11,9 +11,9 @@ import dev.jstech.computronics.hardware.StorageTier;
 import dev.jstech.computronics.operation.index.Allocation;
 import dev.jstech.computronics.operation.index.ItemLocation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
-import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.IDataSink;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.core.operation.LatencyScheduler;
+import dev.jstech.core.operation.ILatencyScheduler;
 import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.core.uuid.NodeUuid;
 import net.minecraft.server.level.ServerLevel;
@@ -36,13 +36,13 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
     public static final int DEFAULT_WAIT_TIMEOUT_TICKS =
             dev.jstech.core.operation.OperationBalance.DEFAULT_WAITING_TIMEOUT_TICKS;
 
-    private final DataSink destination;
+    private final IDataSink destination;
     private final String destinationLabel;
     private final byte recordType;
     private final UUID operationId;
     private final NetworkIndex index;
     @Nullable
-    private final LatencyScheduler scheduler;
+    private final ILatencyScheduler scheduler;
     private final Set<NodeUuid> sourceFilter;
     private final int waitTimeoutTicks;
 
@@ -55,20 +55,20 @@ public final class NetworkSelectOperation extends AbstractTransferOperation {
     private BooleanSupplier abortWhen;
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
-                                  final long demand, final DataSink destination,
+                                  final long demand, final IDataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
-                                  @Nullable final LatencyScheduler scheduler,
+                                  @Nullable final ILatencyScheduler scheduler,
                                   final Set<NodeUuid> sourceFilter) {
         this(level, network, key, demand, destination, destinationLabel, recordType, operationId, index,
                 scheduler, sourceFilter, dev.jstech.core.operation.OperationBalance.waitingTimeoutTicks());
     }
 
     public NetworkSelectOperation(final ServerLevel level, final NetworkUuid network, final StorageKey key,
-                                  final long demand, final DataSink destination,
+                                  final long demand, final IDataSink destination,
                                   final String destinationLabel, final byte recordType,
                                   final UUID operationId, final NetworkIndex index,
-                                  @Nullable final LatencyScheduler scheduler,
+                                  @Nullable final ILatencyScheduler scheduler,
                                   final Set<NodeUuid> sourceFilter, final int waitTimeoutTicks) {
         super(level, network, key, demand);
         this.destination = destination;

@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.cannon.machine;
 
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  * <p>It asks the machine for its world every time rather than holding on to one, because a block entity
  * is read out of a save before it is placed in a world and its programs come back with it.
  */
-public record MachineHost(BlockEntity machine) implements Host {
+public record MachineHost(BlockEntity machine) implements IHost {
 
     /** The length of a Minecraft day in ticks. */
     private static final long DAY = 24_000L;
@@ -50,7 +50,7 @@ public record MachineHost(BlockEntity machine) implements Host {
     @Override
     public Reply call(final String owner, final String member, final java.util.List<Object> arguments,
                       final String caller, final int line) {
-        final dev.jstech.computronics.program.cli.CliComputer computer = this.asComputer();
+        final dev.jstech.computronics.program.cli.ICliComputer computer = this.asComputer();
         if (computer == null) {
             throw new dev.jstech.computronics.cannon.run.Halt(
                     dev.jstech.computronics.cannon.run.Halt.Reason.NO_SUCH_MEMBER, line,
@@ -85,8 +85,8 @@ public record MachineHost(BlockEntity machine) implements Host {
      * save and not yet placed in a world.
      */
     @org.jetbrains.annotations.Nullable
-    private dev.jstech.computronics.program.cli.CliComputer asComputer() {
-        if (this.machine instanceof dev.jstech.computronics.terminal.ComputerTerminalHost terminal
+    private dev.jstech.computronics.program.cli.ICliComputer asComputer() {
+        if (this.machine instanceof dev.jstech.computronics.terminal.IComputerTerminalHost terminal
                 && this.machine.getLevel() instanceof net.minecraft.server.level.ServerLevel level) {
             return new dev.jstech.computronics.program.ServerCliComputer(terminal, level);
         }

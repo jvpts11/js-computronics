@@ -13,7 +13,7 @@ import dev.jstech.core.uuid.NodeUuid;
 /**
  * Sealed root for any participant of the data network with a persistent identity (Category B and C nodes).
  */
-public sealed interface INetworkNode permits ComputerNode, ServiceNode{
+public sealed interface INetworkNode permits IComputerNode, IServiceNode{
 
     NodeUuid nodeUuid();
 

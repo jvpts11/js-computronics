@@ -9,7 +9,7 @@ package dev.jstech.computronics.program;
 
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.program.iql.IqlCondition;
+import dev.jstech.computronics.program.iql.IIqlCondition;
 import dev.jstech.computronics.program.iql.IqlConditionParser;
 import dev.jstech.computronics.program.iql.IqlDefinition;
 import dev.jstech.computronics.program.iql.IqlDuration;
@@ -109,7 +109,7 @@ public final class IqlJobAgent {
 
     private boolean shouldFireWhen(final IqlSavedObject job, final MainframeBlockEntity mainframe,
                                    final ServerLevel level) {
-        final IqlCondition condition;
+        final IIqlCondition condition;
         try {
             condition = IqlConditionParser.parse(job.triggerSpec());
         } catch (final IllegalArgumentException e) {

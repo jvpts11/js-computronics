@@ -25,7 +25,7 @@ import dev.jstech.computronics.program.ServerCliComputer;
 import dev.jstech.computronics.program.cli.CliCommands;
 import dev.jstech.computronics.program.cli.CliShell;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.operation.OperationBalance;
 import dev.jstech.core.util.ShortId;
 import dev.jstech.tests.JsTests;
@@ -194,7 +194,7 @@ public final class OperationCancelGameTests {
         rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
         rackBe.insertDrive(0, new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
         final String[] shortId = new String[1];
-        final ServerCliComputer cli = new ServerCliComputer((ComputerTerminalHost) computer, helper.getLevel());
+        final ServerCliComputer cli = new ServerCliComputer((IComputerTerminalHost) computer, helper.getLevel());
         final CliShell shell = CliCommands.newShell(50);
         helper.startSequence()
                 // Seed a tick ahead of the prompt: the index catalogues the stock on the next tick, and a pull

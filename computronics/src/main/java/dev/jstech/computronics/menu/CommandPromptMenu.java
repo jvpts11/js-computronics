@@ -8,7 +8,7 @@
 package dev.jstech.computronics.menu;
 
 import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -154,7 +154,7 @@ public class CommandPromptMenu extends AbstractContainerMenu {
         // session over a screen keeps working however far the machine itself is. The machine still
         // has to be alive and shown by that screen.
         return access.evaluate((level, pos) -> {
-            if (!(level.getBlockEntity(pos) instanceof ComputerTerminalHost) || !sessionAlive(level, pos)) {
+            if (!(level.getBlockEntity(pos) instanceof IComputerTerminalHost) || !sessionAlive(level, pos)) {
                 return false;
             }
             if (!(level.getBlockEntity(monitorPos)

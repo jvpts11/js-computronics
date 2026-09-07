@@ -20,18 +20,18 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * The registered {@link ChemicalBridge}s. With no bridge (no chemical mod present) every query answers "no
+ * The registered {@link IChemicalBridge}s. With no bridge (no chemical mod present) every query answers "no
  * such chemical", so chemical keys are inert data the network can still store, move and display by id.
  */
 public final class ChemicalBridges {
 
-    private static final List<ChemicalBridge> BRIDGES = new CopyOnWriteArrayList<>();
+    private static final List<IChemicalBridge> BRIDGES = new CopyOnWriteArrayList<>();
     private static final int DEFAULT_TINT = 0xFF8FA3B7;
 
     private ChemicalBridges() {
     }
 
-    public static void register(final ChemicalBridge bridge) {
+    public static void register(final IChemicalBridge bridge) {
         BRIDGES.add(bridge);
     }
 
@@ -40,9 +40,9 @@ public final class ChemicalBridges {
     }
 
     /** The first bridge that offers a chemical port on the block at {@code pos}. */
-    public static Optional<ChemicalPort> portFor(final Level level, final BlockPos pos, @Nullable final Direction side) {
-        for (final ChemicalBridge bridge : BRIDGES) {
-            final Optional<ChemicalPort> port = bridge.portFor(level, pos, side);
+    public static Optional<IChemicalPort> portFor(final Level level, final BlockPos pos, @Nullable final Direction side) {
+        for (final IChemicalBridge bridge : BRIDGES) {
+            final Optional<IChemicalPort> port = bridge.portFor(level, pos, side);
             if (port.isPresent()) {
                 return port;
             }
@@ -55,7 +55,7 @@ public final class ChemicalBridges {
         if (stack.isEmpty()) {
             return Optional.empty();
         }
-        for (final ChemicalBridge bridge : BRIDGES) {
+        for (final IChemicalBridge bridge : BRIDGES) {
             final Optional<ResourceLocation> chemical = bridge.chemicalOf(stack);
             if (chemical.isPresent()) {
                 return chemical;
@@ -68,12 +68,12 @@ public final class ChemicalBridges {
      * The chemical port of an item that carries chemicals, from the first bridge that recognises it. The port
      * edits {@code stack} in place.
      */
-    public static Optional<ChemicalPort> itemPortFor(final ItemStack stack) {
+    public static Optional<IChemicalPort> itemPortFor(final ItemStack stack) {
         if (stack.isEmpty()) {
             return Optional.empty();
         }
-        for (final ChemicalBridge bridge : BRIDGES) {
-            final Optional<ChemicalPort> port = bridge.itemPortFor(stack);
+        for (final IChemicalBridge bridge : BRIDGES) {
+            final Optional<IChemicalPort> port = bridge.itemPortFor(stack);
             if (port.isPresent()) {
                 return port;
             }
@@ -82,9 +82,9 @@ public final class ChemicalBridges {
     }
 
     /** The chemical a recipe viewer's ingredient object stands for, from the first bridge that recognises it. */
-    public static Optional<ChemicalBridge.ChemicalAmount> chemicalIngredient(final Object ingredient) {
-        for (final ChemicalBridge bridge : BRIDGES) {
-            final Optional<ChemicalBridge.ChemicalAmount> chemical = bridge.chemicalIngredient(ingredient);
+    public static Optional<IChemicalBridge.ChemicalAmount> chemicalIngredient(final Object ingredient) {
+        for (final IChemicalBridge bridge : BRIDGES) {
+            final Optional<IChemicalBridge.ChemicalAmount> chemical = bridge.chemicalIngredient(ingredient);
             if (chemical.isPresent()) {
                 return chemical;
             }
@@ -94,7 +94,7 @@ public final class ChemicalBridges {
 
     /** Whether any bridge knows {@code recipe} to meter its chemical input per tick. */
     public static boolean perTickUsage(final Object recipe) {
-        for (final ChemicalBridge bridge : BRIDGES) {
+        for (final IChemicalBridge bridge : BRIDGES) {
             if (bridge.perTickUsage(recipe)) {
                 return true;
             }
@@ -103,7 +103,7 @@ public final class ChemicalBridges {
     }
 
     public static boolean exists(final ResourceLocation chemical) {
-        for (final ChemicalBridge bridge : BRIDGES) {
+        for (final IChemicalBridge bridge : BRIDGES) {
             if (bridge.exists(chemical)) {
                 return true;
             }
@@ -112,7 +112,7 @@ public final class ChemicalBridges {
     }
 
     public static Component displayName(final ResourceLocation chemical) {
-        for (final ChemicalBridge bridge : BRIDGES) {
+        for (final IChemicalBridge bridge : BRIDGES) {
             if (bridge.exists(chemical)) {
                 return bridge.displayName(chemical);
             }
@@ -121,7 +121,7 @@ public final class ChemicalBridges {
     }
 
     public static int tint(final ResourceLocation chemical) {
-        for (final ChemicalBridge bridge : BRIDGES) {
+        for (final IChemicalBridge bridge : BRIDGES) {
             if (bridge.exists(chemical)) {
                 return bridge.tint(chemical);
             }

@@ -20,7 +20,7 @@ import net.minecraft.world.level.block.SoundType;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A part item: right-clicking a data cable attaches a {@link CablePart} of this item's type to one of the cable's faces, like an AE2 bus snapping onto a cable.
+ * A part item: right-clicking a data cable attaches an {@link ICablePart} of this item's type to one of the cable's faces, like an AE2 bus snapping onto a cable.
  */
 public class CablePartItem extends Item {
 

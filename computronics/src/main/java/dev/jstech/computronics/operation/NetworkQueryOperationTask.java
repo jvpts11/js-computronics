@@ -8,9 +8,9 @@
 package dev.jstech.computronics.operation;
 
 import dev.jstech.computronics.operation.payload.ComputingPayloads;
-import dev.jstech.core.operation.OperationContext;
-import dev.jstech.core.operation.OperationResult;
-import dev.jstech.core.operation.OperationTask;
+import dev.jstech.core.operation.IOperationContext;
+import dev.jstech.core.operation.IOperationResult;
+import dev.jstech.core.operation.IOperationTask;
 import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,7 +19,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * A QUERY Operation dispatched by the network's Mainframe: it reads the network's aggregate item view and pushes a fresh snapshot to the requesting player's Network tab.
  */
-public final class NetworkQueryOperationTask implements OperationTask {
+public final class NetworkQueryOperationTask implements IOperationTask {
 
     private final ServerLevel level;
     private final NetworkUuid network;
@@ -34,11 +34,11 @@ public final class NetworkQueryOperationTask implements OperationTask {
     }
 
     @Override
-    public OperationResult run(final OperationContext context) {
+    public IOperationResult run(final IOperationContext context) {
         if (player == null) {
-            return OperationResult.success();
+            return IOperationResult.success();
         }
         context.onMainThread(() -> ComputingPayloads.sendSnapshot(player, level, network));
-        return OperationResult.success();
+        return IOperationResult.success();
     }
 }

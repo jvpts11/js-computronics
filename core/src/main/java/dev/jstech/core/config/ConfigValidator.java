@@ -10,18 +10,18 @@ package dev.jstech.core.config;
 import java.util.Objects;
 
 /**
- * Validates a raw value against a {@link ConfigKey}, returning a {@link ConfigValidationResult}.
+ * Validates a raw value against a {@link ConfigKey}, returning an {@link IConfigValidationResult}.
  */
 public final class ConfigValidator {
 
-    private final ConfigLogger logger;
+    private final IConfigLogger logger;
 
-    public ConfigValidator(final ConfigLogger logger) {
+    public ConfigValidator(final IConfigLogger logger) {
         this.logger = Objects.requireNonNull(logger, "logger must not be null");
     }
 
     @SuppressWarnings("unchecked")
-    public <T> ConfigValidationResult<T> validate(
+    public <T> IConfigValidationResult<T> validate(
             final ConfigKey<T> key,
             final Object rawValue) {
         Objects.requireNonNull(key, "key must not be null");
@@ -31,7 +31,7 @@ public final class ConfigValidator {
             final String reason = "value for key '" + key.dottedPath()
                     + "' is null; using default";
             logger.warn(reason);
-            return new ConfigValidationResult.Rejected<>(
+            return new IConfigValidationResult.Rejected<>(
                     key.defaultValue(), reason);
         }
 
@@ -43,7 +43,7 @@ public final class ConfigValidator {
                     + ", got " + rawValue.getClass().getSimpleName()
                     + "; using default";
             logger.warn(reason);
-            return new ConfigValidationResult.Rejected<>(
+            return new IConfigValidationResult.Rejected<>(
                     key.defaultValue(), reason);
         }
 
@@ -57,7 +57,7 @@ public final class ConfigValidator {
                     + key.dottedPath() + "' is not one of " + key.whitelist().get()
                     + "; using default '" + key.defaultValue() + "'";
             logger.warn(reason);
-            return new ConfigValidationResult.Rejected<>(key.defaultValue(), reason);
+            return new IConfigValidationResult.Rejected<>(key.defaultValue(), reason);
         }
 
         // Rule 4: numeric out of range -> Clamped.
@@ -74,10 +74,10 @@ public final class ConfigValidator {
                         + range.min() + ", " + range.max()
                         + "]; clamped to " + clamped;
                 logger.warn(reason);
-                return new ConfigValidationResult.Clamped<>(clamped, typedValue);
+                return new IConfigValidationResult.Clamped<>(clamped, typedValue);
             }
         }
 
-        return new ConfigValidationResult.Valid<>(typedValue);
+        return new IConfigValidationResult.Valid<>(typedValue);
     }
 }

@@ -15,7 +15,7 @@ import dev.jstech.computronics.program.ServerCliComputer;
 import dev.jstech.computronics.program.cli.CliCommands;
 import dev.jstech.computronics.program.cli.CliShell;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -98,7 +98,7 @@ public final class IndexMaintenanceGameTests {
                 .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))
                 .thenExecuteAfter(2, () -> {
                     // The maintenance verbs run on the Mainframe's own prompt.
-                    final ServerCliComputer cli = new ServerCliComputer((ComputerTerminalHost) mainframe, helper.getLevel());
+                    final ServerCliComputer cli = new ServerCliComputer((IComputerTerminalHost) mainframe, helper.getLevel());
                     final CliShell shell = CliCommands.newShell(50);
                     helper.assertTrue(cliContains(shell.run("reindex", cli), "REINDEX started"),
                             "the prompt answers at once and the rebuild runs on");

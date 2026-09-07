@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Values;
@@ -36,7 +36,7 @@ class HostFileTest {
     private static final int PLENTY = 1_000_000;
 
     /** A machine with nothing in the world but a handful of files. */
-    private static final class Drive implements Host {
+    private static final class Drive implements IHost {
 
         private final Map<String, String> files = new LinkedHashMap<>();
 
@@ -211,7 +211,7 @@ class HostFileTest {
     /** The same run, on the host that answers for nothing at all. */
     private static Process run2(final String body) {
         final Loaded program = load(body);
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         process.step(PLENTY);
         return process;

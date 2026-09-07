@@ -10,7 +10,7 @@ package dev.jstech.computronics.block;
 import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
-import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.IDataNetworkConnectable;
 import dev.jstech.core.network.DataTier;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The HBW Interface: the single point where a Supercomputer cluster meets the network.
  */
-public class HbwInterfaceBlock extends Block implements EntityBlock, DataNetworkConnectable {
+public class HbwInterfaceBlock extends Block implements EntityBlock, IDataNetworkConnectable {
 
     public static final MapCodec<HbwInterfaceBlock> CODEC = simpleCodec(HbwInterfaceBlock::new);
 

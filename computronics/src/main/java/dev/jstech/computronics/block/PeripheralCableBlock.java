@@ -9,7 +9,7 @@ package dev.jstech.computronics.block;
 
 import com.mojang.serialization.MapCodec;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 /**
  * The Peripheral Cable (T1, {@code COMPUTING}): a short-range point-to-point link between a computer and a peripheral (Monitor, Drive, Printer).
  */
-public class PeripheralCableBlock extends PipeBlock implements PeripheralConnectable {
+public class PeripheralCableBlock extends PipeBlock implements IPeripheralConnectable {
 
     public static final MapCodec<PeripheralCableBlock> CODEC = simpleCodec(PeripheralCableBlock::new);
 
@@ -71,7 +71,7 @@ public class PeripheralCableBlock extends PipeBlock implements PeripheralConnect
 
     private boolean connectsTo(final LevelAccessor level, final BlockPos pos, final Direction direction) {
         final var neighbor = level.getBlockState(pos.relative(direction)).getBlock();
-        return neighbor instanceof PeripheralConnectable connectable
+        return neighbor instanceof IPeripheralConnectable connectable
                 && connectable.peripheralType() == peripheralType();
     }
 }

@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.item;
 
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import dev.jstech.computronics.hardware.GpuSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -19,14 +19,14 @@ import java.util.List;
 /**
  * A GPU component item.
  */
-public class GpuItem extends SpecItem<GpuSpec> implements ExpansionCardItem {
+public class GpuItem extends SpecItem<GpuSpec> implements IExpansionCardItem {
 
     public GpuItem(final Properties properties, final GpuSpec spec) {
         super(properties, spec);
     }
 
     @Override
-    public ExpansionCardSpec cardSpec() {
+    public IExpansionCardSpec cardSpec() {
         return spec();
     }
 

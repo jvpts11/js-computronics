@@ -100,21 +100,21 @@ class ConfigValidatorTest {
         ConfigKey<Long> key = ConfigKey.ranged(
                 List.of("k"), Long.class, 50L, new ConfigKeyRange<>(0L, 100L));
 
-        ConfigValidationResult<Long> result = validator.validate(key, 75L);
+        IConfigValidationResult<Long> result = validator.validate(key, 75L);
 
-        assertInstanceOf(ConfigValidationResult.Valid.class, result);
+        assertInstanceOf(IConfigValidationResult.Valid.class, result);
         assertEquals(75L, result.value());
         assertTrue(log.messages.isEmpty());
     }
 
     @Test
     void validate_validBoolean_returnsValid() {
-        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
         ConfigKey<Boolean> key = ConfigKey.of(List.of("k"), Boolean.class, true);
 
-        ConfigValidationResult<Boolean> result = validator.validate(key, false);
+        IConfigValidationResult<Boolean> result = validator.validate(key, false);
 
-        assertInstanceOf(ConfigValidationResult.Valid.class, result);
+        assertInstanceOf(IConfigValidationResult.Valid.class, result);
         assertEquals(false, result.value());
     }
 
@@ -126,10 +126,10 @@ class ConfigValidatorTest {
                 List.of("balance", "macerator", "fe_per_tick"),
                 Long.class, 100L, new ConfigKeyRange<>(10L, 1000L));
 
-        ConfigValidationResult<Long> result = validator.validate(key, 5L);
+        IConfigValidationResult<Long> result = validator.validate(key, 5L);
 
-        ConfigValidationResult.Clamped<Long> clamped = assertInstanceOf(
-                ConfigValidationResult.Clamped.class, result);
+        IConfigValidationResult.Clamped<Long> clamped = assertInstanceOf(
+                IConfigValidationResult.Clamped.class, result);
         assertEquals(10L, clamped.value());
         assertEquals(5L, clamped.original());
         assertEquals(1, log.messages.size());
@@ -144,10 +144,10 @@ class ConfigValidatorTest {
         ConfigKey<Long> key = ConfigKey.ranged(
                 List.of("k"), Long.class, 100L, new ConfigKeyRange<>(10L, 1000L));
 
-        ConfigValidationResult<Long> result = validator.validate(key, 5000L);
+        IConfigValidationResult<Long> result = validator.validate(key, 5000L);
 
-        ConfigValidationResult.Clamped<Long> clamped = assertInstanceOf(
-                ConfigValidationResult.Clamped.class, result);
+        IConfigValidationResult.Clamped<Long> clamped = assertInstanceOf(
+                IConfigValidationResult.Clamped.class, result);
         assertEquals(1000L, clamped.value());
         assertEquals(5000L, clamped.original());
         assertEquals(1, log.messages.size());
@@ -155,14 +155,14 @@ class ConfigValidatorTest {
 
     @Test
     void validate_doublesInRange_works() {
-        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
         ConfigKey<Double> key = ConfigKey.ranged(
                 List.of("k"), Double.class, 1.0, new ConfigKeyRange<>(0.5, 2.0));
 
-        ConfigValidationResult<Double> result = validator.validate(key, 0.25);
+        IConfigValidationResult<Double> result = validator.validate(key, 0.25);
 
-        ConfigValidationResult.Clamped<Double> clamped = assertInstanceOf(
-                ConfigValidationResult.Clamped.class, result);
+        IConfigValidationResult.Clamped<Double> clamped = assertInstanceOf(
+                IConfigValidationResult.Clamped.class, result);
         assertEquals(0.5, clamped.value());
     }
 
@@ -172,10 +172,10 @@ class ConfigValidatorTest {
         ConfigValidator validator = new ConfigValidator(log);
         ConfigKey<Long> key = ConfigKey.of(List.of("k"), Long.class, 42L);
 
-        ConfigValidationResult<Long> result = validator.validate(key, null);
+        IConfigValidationResult<Long> result = validator.validate(key, null);
 
-        ConfigValidationResult.Rejected<Long> rejected = assertInstanceOf(
-                ConfigValidationResult.Rejected.class, result);
+        IConfigValidationResult.Rejected<Long> rejected = assertInstanceOf(
+                IConfigValidationResult.Rejected.class, result);
         assertEquals(42L, rejected.value());
         assertEquals(1, log.messages.size());
         assertTrue(log.messages.get(0).contains("null"));
@@ -188,10 +188,10 @@ class ConfigValidatorTest {
         ConfigKey<Long> key = ConfigKey.of(List.of("k"), Long.class, 42L);
 
         // User puts a string where a long was expected.
-        ConfigValidationResult<Long> result = validator.validate(key, "not a number");
+        IConfigValidationResult<Long> result = validator.validate(key, "not a number");
 
-        ConfigValidationResult.Rejected<Long> rejected = assertInstanceOf(
-                ConfigValidationResult.Rejected.class, result);
+        IConfigValidationResult.Rejected<Long> rejected = assertInstanceOf(
+                IConfigValidationResult.Rejected.class, result);
         assertEquals(42L, rejected.value());
         assertEquals(1, log.messages.size());
         assertTrue(log.messages.get(0).contains("wrong type"));
@@ -199,13 +199,13 @@ class ConfigValidatorTest {
 
     @Test
     void whitelisted_validValue_returnsValid() {
-        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
         ConfigKey<String> key = ConfigKey.whitelisted(
                 List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
 
-        ConfigValidationResult<String> result = validator.validate(key, "STANDARD");
+        IConfigValidationResult<String> result = validator.validate(key, "STANDARD");
 
-        assertInstanceOf(ConfigValidationResult.Valid.class, result);
+        assertInstanceOf(IConfigValidationResult.Valid.class, result);
         assertEquals("STANDARD", result.value());
     }
 
@@ -216,10 +216,10 @@ class ConfigValidatorTest {
         ConfigKey<String> key = ConfigKey.whitelisted(
                 List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
 
-        ConfigValidationResult<String> result = validator.validate(key, "ORACLE");
+        IConfigValidationResult<String> result = validator.validate(key, "ORACLE");
 
-        ConfigValidationResult.Rejected<String> rejected = assertInstanceOf(
-                ConfigValidationResult.Rejected.class, result);
+        IConfigValidationResult.Rejected<String> rejected = assertInstanceOf(
+                IConfigValidationResult.Rejected.class, result);
         assertEquals("SIMPLE", rejected.value());
         assertEquals(1, log.messages.size());
         assertTrue(log.messages.get(0).contains("computing.sql_dialect"));
@@ -227,25 +227,25 @@ class ConfigValidatorTest {
 
     @Test
     void whitelisted_isCaseSensitive_lowercaseRejected() {
-        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
         ConfigKey<String> key = ConfigKey.whitelisted(
                 List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
 
-        ConfigValidationResult<String> result = validator.validate(key, "standard");
+        IConfigValidationResult<String> result = validator.validate(key, "standard");
 
-        assertInstanceOf(ConfigValidationResult.Rejected.class, result);
+        assertInstanceOf(IConfigValidationResult.Rejected.class, result);
         assertEquals("SIMPLE", result.value());
     }
 
     @Test
     void whitelisted_nullValue_rejectedWithDefault() {
-        ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
+        ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
         ConfigKey<String> key = ConfigKey.whitelisted(
                 List.of("computing", "sql_dialect"), "SIMPLE", List.of("SIMPLE", "STANDARD"));
 
-        ConfigValidationResult<String> result = validator.validate(key, null);
+        IConfigValidationResult<String> result = validator.validate(key, null);
 
-        assertInstanceOf(ConfigValidationResult.Rejected.class, result);
+        assertInstanceOf(IConfigValidationResult.Rejected.class, result);
         assertEquals("SIMPLE", result.value());
     }
 
@@ -312,7 +312,7 @@ class ConfigValidatorTest {
         assertEquals(b, snapshot.get(1));
     }
 
-    private static final class RecordingLogger implements ConfigLogger {
+    private static final class RecordingLogger implements IConfigLogger {
         final List<String> messages = new ArrayList<>();
 
         @Override

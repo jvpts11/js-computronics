@@ -69,7 +69,7 @@ import java.util.Set;
  * lists' layout rather than draw in it. The geometry lives in {@link FilesLayout}, where a test proves
  * nothing overlaps.
  */
-public final class FilesApp implements DesktopApp {
+public final class FilesApp implements IDesktopApp {
 
     private static final long DOUBLE_CLICK_MS = 300L;
     private static final int HISTORY_MAX = 32;

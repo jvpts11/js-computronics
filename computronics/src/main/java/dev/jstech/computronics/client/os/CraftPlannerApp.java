@@ -38,7 +38,7 @@ import java.util.Locale;
  * The catalogue and the plan are computed server-side; the Craft button submits the same request the
  * terminal and Network Interactor use.
  */
-public final class CraftPlannerApp implements DesktopApp {
+public final class CraftPlannerApp implements IDesktopApp {
 
     private static final int REFRESH_FRAMES = 60;
     private static final int C_GOOD = 0xFF2EA043;

@@ -20,7 +20,7 @@ import dev.jstech.computronics.cannon.asm.AsmType;
 import dev.jstech.computronics.cannon.asm.AsmWriter;
 import dev.jstech.computronics.cannon.asm.Instruction;
 import dev.jstech.computronics.cannon.asm.Opcode;
-import dev.jstech.computronics.cannon.asm.Operand;
+import dev.jstech.computronics.cannon.asm.IOperand;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,29 +71,29 @@ class AsmRoundTripTest {
                 Instruction.of(Opcode.RET))));
         monitor.addMethod(new AsmMethod("OnTick", "void", List.of(), false, 3, List.of(
                 Instruction.of(Opcode.LDTHIS),
-                Instruction.of(Opcode.LDFLD, new Operand.Field(null, "counts")),
-                Instruction.of(Opcode.LDSTR, new Operand.Text("minecraft:diamond")),
-                Instruction.of(Opcode.CALL, new Operand.Method("Map", "TryGet",
+                Instruction.of(Opcode.LDFLD, new IOperand.Field(null, "counts")),
+                Instruction.of(Opcode.LDSTR, new IOperand.Text("minecraft:diamond")),
+                Instruction.of(Opcode.CALL, new IOperand.Method("Map", "TryGet",
                         List.of("string", "out int"), "bool")),
-                Instruction.of(Opcode.STLOC, new Operand.Slot(1)),
-                Instruction.of(Opcode.BRFALSE, new Operand.Label("L1")),
-                Instruction.of(Opcode.LDLOC, new Operand.Slot(1)),
+                Instruction.of(Opcode.STLOC, new IOperand.Slot(1)),
+                Instruction.of(Opcode.BRFALSE, new IOperand.Label("L1")),
+                Instruction.of(Opcode.LDLOC, new IOperand.Slot(1)),
                 Instruction.of(Opcode.LDTHIS),
-                Instruction.of(Opcode.LDFLD, new Operand.Field(null, "threshold")),
-                Instruction.of(Opcode.BGE, new Operand.Label("L1")),
-                Instruction.of(Opcode.LDC_I4, new Operand.I4(1)).saying("LogLevel.WARN"),
-                Instruction.of(Opcode.LDSTR, new Operand.Text("low; and \"quoted\"")),
-                Instruction.of(Opcode.CALL, new Operand.Method("Mainframe", "Log",
+                Instruction.of(Opcode.LDFLD, new IOperand.Field(null, "threshold")),
+                Instruction.of(Opcode.BGE, new IOperand.Label("L1")),
+                Instruction.of(Opcode.LDC_I4, new IOperand.I4(1)).saying("LogLevel.WARN"),
+                Instruction.of(Opcode.LDSTR, new IOperand.Text("low; and \"quoted\"")),
+                Instruction.of(Opcode.CALL, new IOperand.Method("Mainframe", "Log",
                         List.of("int", "string"), "void")),
-                Instruction.of(Opcode.LDC_I8, new Operand.I8(9000000000L)),
-                Instruction.of(Opcode.LDC_R4, new Operand.R4(1.5f)),
-                Instruction.of(Opcode.LDC_R8, new Operand.R8(2.25)),
+                Instruction.of(Opcode.LDC_I8, new IOperand.I8(9000000000L)),
+                Instruction.of(Opcode.LDC_R4, new IOperand.R4(1.5f)),
+                Instruction.of(Opcode.LDC_R8, new IOperand.R8(2.25)),
                 Instruction.of(Opcode.CONV_R8),
-                Instruction.of(Opcode.NEWOBJ, new Operand.Constructor("Monitor", List.of("int"))),
-                Instruction.of(Opcode.NEWARR, new Operand.Type("int")),
-                Instruction.of(Opcode.CASTCLASS, new Operand.Type("List<string>")),
-                Instruction.of(Opcode.LDSFLD, new Operand.Field("LogLevel", "WARN")),
-                Instruction.of(Opcode.SYS, new Operand.Text("Network.Current")),
+                Instruction.of(Opcode.NEWOBJ, new IOperand.Constructor("Monitor", List.of("int"))),
+                Instruction.of(Opcode.NEWARR, new IOperand.Type("int")),
+                Instruction.of(Opcode.CASTCLASS, new IOperand.Type("List<string>")),
+                Instruction.of(Opcode.LDSFLD, new IOperand.Field("LogLevel", "WARN")),
+                Instruction.of(Opcode.SYS, new IOperand.Text("Network.Current")),
                 Instruction.of(Opcode.POP),
                 Instruction.of(Opcode.RET).labelled("L1"))));
         program.addType(monitor);
@@ -109,13 +109,13 @@ class AsmRoundTripTest {
         monitor.addField(new AsmType.Field("threshold", "int", false));
         monitor.addMethod(new AsmMethod("OnTick", "void", List.of(), false, 1, List.of(
                 Instruction.of(Opcode.LDTHIS),
-                Instruction.of(Opcode.LDFLD, new Operand.Field(null, "threshold")),
-                Instruction.of(Opcode.LDC_I4, new Operand.I4(100)),
-                Instruction.of(Opcode.BLT, new Operand.Label("L1")),
+                Instruction.of(Opcode.LDFLD, new IOperand.Field(null, "threshold")),
+                Instruction.of(Opcode.LDC_I4, new IOperand.I4(100)),
+                Instruction.of(Opcode.BLT, new IOperand.Label("L1")),
                 Instruction.of(Opcode.RET),
-                Instruction.of(Opcode.LDC_I4, new Operand.I4(1)).labelled("L1").saying("LogLevel.WARN"),
-                Instruction.of(Opcode.LDSTR, new Operand.Text("stock is low")),
-                Instruction.of(Opcode.CALL, new Operand.Method("Mainframe", "Log",
+                Instruction.of(Opcode.LDC_I4, new IOperand.I4(1)).labelled("L1").saying("LogLevel.WARN"),
+                Instruction.of(Opcode.LDSTR, new IOperand.Text("stock is low")),
+                Instruction.of(Opcode.CALL, new IOperand.Method("Mainframe", "Log",
                         List.of("int", "string"), "void")),
                 Instruction.of(Opcode.RET))));
         program.addType(monitor);
@@ -175,16 +175,16 @@ class AsmRoundTripTest {
     void read_keepsWhatEachOperandHeld() {
         final AsmType monitor = this.read(AsmWriter.write(sample())).type("Monitor");
         final List<Instruction> body = monitor.methods().get(1).body();
-        assertEquals(new Operand.Text("minecraft:diamond"), body.get(2).operand());
-        assertEquals(new Operand.Method("Map", "TryGet", List.of("string", "out int"), "bool"),
+        assertEquals(new IOperand.Text("minecraft:diamond"), body.get(2).operand());
+        assertEquals(new IOperand.Method("Map", "TryGet", List.of("string", "out int"), "bool"),
                 body.get(3).operand());
-        assertEquals(new Operand.Text("low; and \"quoted\""), body.get(11).operand());
-        assertEquals(new Operand.I8(9000000000L), body.get(13).operand());
-        assertEquals(new Operand.R4(1.5f), body.get(14).operand());
-        assertEquals(new Operand.R8(2.25), body.get(15).operand());
-        assertEquals(new Operand.Constructor("Monitor", List.of("int")), body.get(17).operand());
-        assertEquals(new Operand.Type("List<string>"), body.get(19).operand());
-        assertEquals(new Operand.Field("LogLevel", "WARN"), body.get(20).operand());
+        assertEquals(new IOperand.Text("low; and \"quoted\""), body.get(11).operand());
+        assertEquals(new IOperand.I8(9000000000L), body.get(13).operand());
+        assertEquals(new IOperand.R4(1.5f), body.get(14).operand());
+        assertEquals(new IOperand.R8(2.25), body.get(15).operand());
+        assertEquals(new IOperand.Constructor("Monitor", List.of("int")), body.get(17).operand());
+        assertEquals(new IOperand.Type("List<string>"), body.get(19).operand());
+        assertEquals(new IOperand.Field("LogLevel", "WARN"), body.get(20).operand());
     }
 
     @Test

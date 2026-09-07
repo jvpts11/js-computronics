@@ -48,11 +48,11 @@ public final class ClientTestContext {
 
     /** One unit of work; returns true once it has finished (a one-shot step finishes on its first tick). */
     @FunctionalInterface
-    public interface Step {
+    public interface IStep {
         boolean tick();
     }
 
-    record Queued(int delay, String label, Step step) {
+    record Queued(int delay, String label, IStep step) {
     }
 
     private final Minecraft mc;
@@ -88,7 +88,7 @@ public final class ClientTestContext {
 
     /** Runs {@code action} on the integrated server's thread and waits for it to complete. */
     public ClientTestContext thenServer(final int delayTicks, final Consumer<ServerLevel> action) {
-        queue.add(new Queued(delayTicks, "server", new Step() {
+        queue.add(new Queued(delayTicks, "server", new IStep() {
             private CompletableFuture<Void> pending;
 
             @Override
@@ -130,7 +130,7 @@ public final class ClientTestContext {
      */
     public ClientTestContext thenWaitUntil(final BooleanSupplier condition, final int maxTicks, final String what,
                                            final java.util.function.Supplier<String> diagnostics) {
-        queue.add(new Queued(0, "wait:" + what, new Step() {
+        queue.add(new Queued(0, "wait:" + what, new IStep() {
             private int waited;
 
             @Override
@@ -162,7 +162,7 @@ public final class ClientTestContext {
     public ClientTestContext thenWaitUntilServer(final java.util.function.Predicate<ServerLevel> condition,
                                                  final int maxTicks, final String what,
                                                  final java.util.function.Function<ServerLevel, String> diagnostics) {
-        queue.add(new Queued(0, "waitServer:" + what, new Step() {
+        queue.add(new Queued(0, "waitServer:" + what, new IStep() {
             private int waited;
             private CompletableFuture<Boolean> probe;
 
@@ -217,7 +217,7 @@ public final class ClientTestContext {
      * so whatever the test checks afterwards went through NBT and the level save. Any open screen is closed.
      */
     public ClientTestContext thenSaveAndReload(final int delayTicks) {
-        queue.add(new Queued(delayTicks, "saveAndReload", new Step() {
+        queue.add(new Queued(delayTicks, "saveAndReload", new IStep() {
             private int phase;
             private int waited;
 

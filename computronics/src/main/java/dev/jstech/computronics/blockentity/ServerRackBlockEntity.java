@@ -52,9 +52,9 @@ import java.util.UUID;
  * components), never by the Server item.
  */
 public class ServerRackBlockEntity extends BlockEntity
-        implements dev.jstech.core.peripheral.PeripheralOwnerSupport,
-        dev.jstech.computronics.os.OsHost,
-        dev.jstech.computronics.terminal.ComputerTerminalHost,
+        implements dev.jstech.core.peripheral.IPeripheralOwnerSupport,
+        dev.jstech.computronics.os.IOsHost,
+        dev.jstech.computronics.terminal.IComputerTerminalHost,
         software.bernie.geckolib.animatable.GeoBlockEntity {
 
     // ---- the cabinet as one model: what the renderer needs to know about every row ----
@@ -219,8 +219,8 @@ public class ServerRackBlockEntity extends BlockEntity
         public boolean isItemValid(final int slot, final ItemStack stack) {
             // Servers and rack equipment (KVM, UPS, cooling) bid for the same rack units, but a
             // computer only mounts in the cabinet its chassis belongs to.
-            final dev.jstech.computronics.rack.MountableRackUnit unit =
-                    dev.jstech.computronics.rack.MountableRackUnit.of(stack);
+            final dev.jstech.computronics.rack.IMountableRackUnit unit =
+                    dev.jstech.computronics.rack.IMountableRackUnit.of(stack);
             if (unit == null || !acceptsChassis(stack)) {
                 return false;
             }
@@ -271,7 +271,7 @@ public class ServerRackBlockEntity extends BlockEntity
         /** The windows open on this machine's desktop; machine state that rides on the Server item. */
         final List<dev.jstech.computronics.os.OpenWindow> openWindows = new ArrayList<>();
         /** A guided installer that wrote the system but is still waiting for its reboot. */
-        int pendingInstallSlot = dev.jstech.computronics.os.OsHost.NO_PENDING_INSTALL;
+        int pendingInstallSlot = dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL;
         /** The recipe drafts the Pattern Studio edits on this machine; ride on the Server item like the windows. */
         final dev.jstech.computronics.crafting.PatternWorkbench studio =
                 new dev.jstech.computronics.crafting.PatternWorkbench();
@@ -295,7 +295,7 @@ public class ServerRackBlockEntity extends BlockEntity
                 state.openWindows.addAll(dev.jstech.computronics.os.OpenWindow.loadAll(
                         saved.getList("OpenWindows", net.minecraft.nbt.Tag.TAG_COMPOUND)));
                 state.pendingInstallSlot = saved.contains("PendingInstall") ? saved.getInt("PendingInstall")
-                        : dev.jstech.computronics.os.OsHost.NO_PENDING_INSTALL;
+                        : dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL;
                 if (saved.contains("Studio") && getLevel() != null) {
                     state.studio.load(saved.getCompound("Studio"), getLevel().registryAccess());
                 }
@@ -350,7 +350,7 @@ public class ServerRackBlockEntity extends BlockEntity
             tag.put("OpenWindows",
                     dev.jstech.computronics.os.OpenWindow.saveAll(state.openWindows));
         }
-        if (state.pendingInstallSlot != dev.jstech.computronics.os.OsHost.NO_PENDING_INSTALL) {
+        if (state.pendingInstallSlot != dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL) {
             tag.putInt("PendingInstall", state.pendingInstallSlot);
         }
         if (getLevel() != null) {
@@ -503,7 +503,7 @@ public class ServerRackBlockEntity extends BlockEntity
         // Off or a cold start, no desktop survives — the bay switch is this machine's power button,
         // and writing needsPost directly here had let it skip the clearing setNeedsPost does.
         unitState(slot).openWindows.clear();
-        unitState(slot).pendingInstallSlot = dev.jstech.computronics.os.OsHost.NO_PENDING_INSTALL;
+        unitState(slot).pendingInstallSlot = dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL;
         flushConsole(slot);
         setChanged();
     }
@@ -551,7 +551,7 @@ public class ServerRackBlockEntity extends BlockEntity
                 continue;
             }
             final RackLayout.Unit unit = dev.jstech.computronics.rack
-                    .MountableRackUnit.unitAt(servers.getStackInSlot(i), i);
+                    .IMountableRackUnit.unitAt(servers.getStackInSlot(i), i);
             if (unit != null) {
                 mounted.add(unit);
             }
@@ -1208,7 +1208,7 @@ public class ServerRackBlockEntity extends BlockEntity
     }
 
     /** The machine seated in {@code row} as a host of its own, independent of the monitor's channel. */
-    public dev.jstech.computronics.os.OsHost unitHost(final int row) {
+    public dev.jstech.computronics.os.IOsHost unitHost(final int row) {
         return new RackUnitHost(this, row);
     }
 
@@ -1245,7 +1245,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return -1;
     }
 
-    // OsHost — the machine identity and its bay-backed disks.
+    // IOsHost — the machine identity and its bay-backed disks.
 
     @Override
     public boolean isRunning() {
@@ -1272,7 +1272,7 @@ public class ServerRackBlockEntity extends BlockEntity
     @Override
     public int pendingInstallSlot() {
         final int slot = soleComputerSlot();
-        return slot < 0 ? dev.jstech.computronics.os.OsHost.NO_PENDING_INSTALL
+        return slot < 0 ? dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL
                 : unitState(slot).pendingInstallSlot;
     }
 
@@ -1335,7 +1335,7 @@ public class ServerRackBlockEntity extends BlockEntity
             if (value) {
                 unitState(slot).openWindows.clear(); // a restart closes everything
                 unitState(slot).pendingInstallSlot = // and is what a finished installer was waiting for
-                        dev.jstech.computronics.os.OsHost.NO_PENDING_INSTALL;
+                        dev.jstech.computronics.os.IOsHost.NO_PENDING_INSTALL;
             }
             // Write it through immediately: the flag lives on the Server item, and a world that unloads
             // before the next save would otherwise forget that this machine had finished booting.
@@ -1631,7 +1631,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return installedEra();
     }
 
-    // ComputerTerminalHost — the physical terminal's monitoring surface over the same machine.
+    // IComputerTerminalHost — the physical terminal's monitoring surface over the same machine.
 
     @Override
     public boolean computerRunning() {
@@ -1756,7 +1756,7 @@ public class ServerRackBlockEntity extends BlockEntity
     }
 
     @Override
-    public dev.jstech.computronics.storage.DataSink localStorage() {
+    public dev.jstech.computronics.storage.IDataSink localStorage() {
         return new dev.jstech.computronics.storage.StoreSink(localStore());
     }
 
@@ -1771,7 +1771,7 @@ public class ServerRackBlockEntity extends BlockEntity
         return false;
     }
 
-    // PeripheralOwnerSupport — monitors and media readers cable to the rack itself.
+    // IPeripheralOwnerSupport — monitors and media readers cable to the rack itself.
 
     @Override
     public Set<Long> peripheralEndpoints() {

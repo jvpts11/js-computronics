@@ -17,7 +17,7 @@ import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.crafting.CraftingPattern;
 import dev.jstech.computronics.crafting.NetworkRecipe;
 import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
@@ -141,7 +141,7 @@ public final class MekanismParallelLoadGameTests {
         final TestWorldBuilder world = rig.world();
         final StorageKey frame = MekanismRig.itemKey(MekanismRig.generators("fusion_reactor_frame"));
         placeClusterOffline(world); // present but OFF at submit → the craft claims a single computer exclusively
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         // The longest run of consecutive ticks the craft held a cluster slot after the cluster came online. With
         // the stale-latch bug, a fanned-out craft never releases the slot, so it stays held for a whole machine
         // step (dozens of ticks); with the fix it is taken and freed within one tick per machine step.
@@ -201,7 +201,7 @@ public final class MekanismParallelLoadGameTests {
         final StorageKey frame = MekanismRig.itemKey(MekanismRig.generators("fusion_reactor_frame"));
         final StorageKey dust = MekanismRig.itemKey(MekanismRig.mek("dust_iron"));
         final StorageKey infused = MekanismRig.itemKey(MekanismRig.mek("alloy_infused"));
-        final NetworkOperation[] ops = new NetworkOperation[3];
+        final INetworkOperation[] ops = new INetworkOperation[3];
         // The second machine and its buses, further down the run.
         world.setBlock(new BlockPos(5, 2, 8), ComputingModule.CRAFTING_CABLE.get());
         world.setBlock(CABLE_2_WEST, ComputingModule.CRAFTING_CABLE.get());
@@ -280,7 +280,7 @@ public final class MekanismParallelLoadGameTests {
                             "still running: " + rig.net().mainframe().activeOperationRecords());
                 })
                 .thenExecute(() -> {
-                    for (final NetworkOperation op : ops) {
+                    for (final INetworkOperation op : ops) {
                         helper.assertTrue(op.toRecord().status() == OperationRecord.STATUS_COMPLETED,
                                 "every request must complete; " + op.toRecord());
                     }

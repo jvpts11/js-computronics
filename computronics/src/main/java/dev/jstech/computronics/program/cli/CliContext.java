@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Everything a command receives when it runs: the arguments after the command word, the computer to act on, the output buffer to write into, and the shell itself (so {@code help} can list its peers). Pure data — no Minecraft types — so a command is exercised in a unit test with a fake computer.
  */
-public record CliContext(List<String> args, CliComputer computer, CliOutput out, CliShell shell) {
+public record CliContext(List<String> args, ICliComputer computer, CliOutput out, CliShell shell) {
 
     /** The argument at {@code index}, or {@code ""} when there are fewer arguments than that. */
     public String arg(final int index) {

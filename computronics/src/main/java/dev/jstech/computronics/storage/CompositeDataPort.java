@@ -18,22 +18,22 @@ import java.util.Set;
  * so the engine feeds and collects through all of them without caring which face holds what. Transfers try the
  * faces in order and stop as soon as the amount is satisfied; counts and listings are unions.
  */
-public final class CompositeDataPort implements DataPort {
+public final class CompositeDataPort implements IDataPort {
 
-    private final List<DataPort> faces;
+    private final List<IDataPort> faces;
 
-    private CompositeDataPort(final List<? extends DataPort> faces) {
+    private CompositeDataPort(final List<? extends IDataPort> faces) {
         this.faces = List.copyOf(faces);
     }
 
     /** One face is returned as is; several are joined. An empty list yields an empty port. */
-    public static DataPort of(final List<? extends DataPort> faces) {
+    public static IDataPort of(final List<? extends IDataPort> faces) {
         return faces.size() == 1 ? faces.get(0) : new CompositeDataPort(faces);
     }
 
     @Override
     public boolean isEmpty() {
-        for (final DataPort face : faces) {
+        for (final IDataPort face : faces) {
             if (!face.isEmpty()) {
                 return false;
             }
@@ -44,7 +44,7 @@ public final class CompositeDataPort implements DataPort {
     @Override
     public long insert(final StorageKey key, final long amount, final boolean simulate) {
         long moved = 0L;
-        for (final DataPort face : faces) {
+        for (final IDataPort face : faces) {
             if (moved >= amount) {
                 break;
             }
@@ -56,7 +56,7 @@ public final class CompositeDataPort implements DataPort {
     @Override
     public long extract(final StorageKey key, final long amount, final boolean simulate) {
         long moved = 0L;
-        for (final DataPort face : faces) {
+        for (final IDataPort face : faces) {
             if (moved >= amount) {
                 break;
             }
@@ -70,7 +70,7 @@ public final class CompositeDataPort implements DataPort {
         // Faces of one machine usually see the same tanks and slots, so the count is the largest view, not the
         // sum: a tank visible from two faces still holds its contents once.
         long most = 0L;
-        for (final DataPort face : faces) {
+        for (final IDataPort face : faces) {
             most = Math.max(most, face.count(key));
         }
         return most;
@@ -79,7 +79,7 @@ public final class CompositeDataPort implements DataPort {
     @Override
     public List<StorageKey> available() {
         final Set<StorageKey> keys = new LinkedHashSet<>();
-        for (final DataPort face : faces) {
+        for (final IDataPort face : faces) {
             keys.addAll(face.available());
         }
         return new ArrayList<>(keys);

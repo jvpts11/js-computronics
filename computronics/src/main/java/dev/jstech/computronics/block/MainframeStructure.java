@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.block;
 
-import dev.jstech.core.multiblock.BlockMatcher;
+import dev.jstech.core.multiblock.IBlockMatcher;
 import dev.jstech.core.multiblock.MultiblockPattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -42,7 +42,7 @@ public final class MainframeStructure {
     public static final MultiblockPattern PATTERN = MultiblockPattern.builder("mainframe")
             .layer("P#P", "PPP")
             .layer("PPP", "PPP")
-            .where('P', BlockMatcher.any())
+            .where('P', IBlockMatcher.any())
             .build();
 
     private MainframeStructure() {

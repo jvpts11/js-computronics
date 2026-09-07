@@ -21,7 +21,7 @@ import java.util.Optional;
 public final class OperationTypeRegistry {
     private final Map<String, OperationType<?>> registry = new HashMap<>();
 
-    public <T extends OperationArgs> OperationType<T> register(OperationType<T> type) {
+    public <T extends IOperationArgs> OperationType<T> register(OperationType<T> type) {
         if (registry.containsKey(type.id())) {
             throw new IllegalStateException(
                     "Operation type already registered: " + type.id());

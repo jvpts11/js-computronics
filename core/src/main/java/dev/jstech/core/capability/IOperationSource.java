@@ -13,5 +13,5 @@ import dev.jstech.core.network.NetworkCategory;
  * Contract for a {@link NetworkCategory#C Category C} node that can DISPATCH Operations to the network.
  */
 public interface IOperationSource extends INetworkNodeCapability{
-    // Phase 1+: UUID dispatch(OperationType<?> type, OperationArgs args);
+    // Phase 1+: UUID dispatch(OperationType<?> type, IOperationArgs args);
 }

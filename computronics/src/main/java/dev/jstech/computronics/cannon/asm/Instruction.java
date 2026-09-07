@@ -15,7 +15,7 @@ import java.util.Objects;
  * <p>A label marks the line so a branch can name it, and a comment is there for the player reading
  * the listing rather than for the machine, which is the whole point of the assembly being text.
  */
-public record Instruction(String label, Opcode opcode, Operand operand, String comment) {
+public record Instruction(String label, Opcode opcode, IOperand operand, String comment) {
 
     public Instruction {
         Objects.requireNonNull(opcode, "opcode");
@@ -27,7 +27,7 @@ public record Instruction(String label, Opcode opcode, Operand operand, String c
     }
 
     /** An instruction with its operand. */
-    public static Instruction of(final Opcode opcode, final Operand operand) {
+    public static Instruction of(final Opcode opcode, final IOperand operand) {
         return new Instruction(null, opcode, operand, null);
     }
 

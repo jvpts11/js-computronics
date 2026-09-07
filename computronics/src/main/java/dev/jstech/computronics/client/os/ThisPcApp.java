@@ -55,7 +55,7 @@ import java.util.function.Supplier;
  * <p>The card and the page are components; the page is rebuilt from each listing the server sends,
  * a row per drive with its own buttons, and scrolls as one.
  */
-public final class ThisPcApp implements DesktopApp {
+public final class ThisPcApp implements IDesktopApp {
 
     /** The usage bar's segments: the system, the items stored, and the files/programs. */
     private static final int SEG_OS = 0xFF3F77C8;

@@ -11,9 +11,9 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.core.network.DataTier;
-import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.IRearFacingDataPort;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
 import dev.jstech.core.util.BlockDrops;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * The Crafting Computer block: an ATX-class computer that executes recipes for the network.
  */
 public class CraftingComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort, PeripheralConnectable, EraChassisBlock {
+        implements EntityBlock, IRearFacingDataPort, IPeripheralConnectable, IEraChassisBlock {
 
     public static final MapCodec<CraftingComputerBlock> CODEC = simpleCodec(CraftingComputerBlock::new);
 

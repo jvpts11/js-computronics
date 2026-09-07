@@ -14,11 +14,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A {@link CoreScreen} that hosts a row of {@link GuiTab}s with a content area below the tab bar.
+ * A {@link CoreScreen} that hosts a row of {@link IGuiTab}s with a content area below the tab bar.
  */
 public abstract class TabbedScreen extends CoreScreen {
 
-    private final List<GuiTab> tabs = new ArrayList<>();
+    private final List<IGuiTab> tabs = new ArrayList<>();
     private int activeTabIndex = 0;
 
     protected int tabBarHeight = 20;
@@ -27,7 +27,7 @@ public abstract class TabbedScreen extends CoreScreen {
         super(title);
     }
 
-    protected void addTab(final GuiTab tab) {
+    protected void addTab(final IGuiTab tab) {
         tabs.add(tab);
     }
 

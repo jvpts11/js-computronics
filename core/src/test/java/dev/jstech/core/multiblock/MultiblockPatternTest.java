@@ -48,7 +48,7 @@ class MultiblockPatternTest {
                         "CCC",
                         "CCC"
                 )
-                .where('C', BlockMatcher.exact("jsc:casing"))
+                .where('C', IBlockMatcher.exact("jsc:casing"))
                 .build();
         assertEquals(3, p.sizeX());
         assertEquals(3, p.sizeY());
@@ -72,7 +72,7 @@ class MultiblockPatternTest {
         assertThrows(IllegalStateException.class, () ->
                 MultiblockPattern.builder("noctrl")
                         .layer("CCC")
-                        .where('C', BlockMatcher.exact("jsc:casing"))
+                        .where('C', IBlockMatcher.exact("jsc:casing"))
                         .build()
         );
     }
@@ -118,9 +118,9 @@ class MultiblockPatternTest {
     void mappingReservedChar_throws() {
         var b = MultiblockPattern.builder("reserved");
         assertThrows(IllegalArgumentException.class,
-                () -> b.where('#', BlockMatcher.exact("jsc:x")));
+                () -> b.where('#', IBlockMatcher.exact("jsc:x")));
         assertThrows(IllegalArgumentException.class,
-                () -> b.where(' ', BlockMatcher.exact("jsc:y")));
+                () -> b.where(' ', IBlockMatcher.exact("jsc:y")));
     }
 
     @Test
@@ -139,13 +139,13 @@ class MultiblockPatternTest {
     void mapping_isUnmodifiable() {
         var p = MultiblockPattern.builder("imm")
                 .layer("C#")
-                .where('C', BlockMatcher.exact("jsc:casing"))
+                .where('C', IBlockMatcher.exact("jsc:casing"))
                 .build();
         var map = p.mapping();
         assertEquals(1, map.size());
         assertTrue(map.containsKey('C'));
         assertThrows(UnsupportedOperationException.class,
-                () -> map.put('X', BlockMatcher.any()));
+                () -> map.put('X', IBlockMatcher.any()));
     }
 
     @Test
@@ -156,7 +156,7 @@ class MultiblockPatternTest {
                         "#C",
                         "CC"
                 )
-                .where('C', BlockMatcher.exact("jsc:casing"))
+                .where('C', IBlockMatcher.exact("jsc:casing"))
                 .build();
         assertEquals(0, p.controllerX());
         assertEquals(0, p.controllerY());

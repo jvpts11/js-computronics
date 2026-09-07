@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.cannon.run;
 
-import dev.jstech.computronics.cannon.asm.Operand;
+import dev.jstech.computronics.cannon.asm.IOperand;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,7 +37,7 @@ public final class Library {
     }
 
     private final Heap heap;
-    private final Host host;
+    private final IHost host;
     private final List<String> console = new ArrayList<>();
     private final Random random = new Random(0);
     private int written;
@@ -45,11 +45,11 @@ public final class Library {
     /** The class this process was started from, which is how the world knows which program asked. */
     private final String caller;
 
-    public Library(final Heap heap, final Host host) {
+    public Library(final Heap heap, final IHost host) {
         this(heap, host, "");
     }
 
-    public Library(final Heap heap, final Host host, final String caller) {
+    public Library(final Heap heap, final IHost host, final String caller) {
         this.heap = heap;
         this.host = host;
         this.caller = caller == null ? "" : caller;
@@ -161,7 +161,7 @@ public final class Library {
         if (this.host.provides(owner)) {
             // To the machine, being asked for a value and being asked to do something are the same
             // question with different names, so a property goes out as a call that takes nothing.
-            final Host.Reply reply = this.host.call(owner, name, List.of(), this.caller, line);
+            final IHost.Reply reply = this.host.call(owner, name, List.of(), this.caller, line);
             this.owed += Math.max(0, reply.cost() - 1);
             return this.adopt(reply.value(), line);
         }
@@ -169,7 +169,7 @@ public final class Library {
     }
 
     /** Runs one of the calls the runtime answers for. */
-    public Answer call(final Operand.Method named, final Object self, final List<Object> arguments,
+    public Answer call(final IOperand.Method named, final Object self, final List<Object> arguments,
                        final int line) {
         return switch (named.owner()) {
             case "Console" -> this.console(named.name(), arguments);
@@ -200,7 +200,7 @@ public final class Library {
      * with it across a reload. The machine is only asked what the numbers are, once a tick, for
      * everything being watched at all.
      */
-    private Answer watchOrOutward(final Operand.Method named, final List<Object> arguments,
+    private Answer watchOrOutward(final IOperand.Method named, final List<Object> arguments,
                                   final int line) {
         if (this.owner == null || !"Network".equals(named.owner()) || !named.name().startsWith("Watch")) {
             return this.outward(named, arguments, line);
@@ -227,12 +227,12 @@ public final class Library {
      * answer was worth. Everything else about it is settled here, in the one place that already knows how
      * much a thing costs to hold.
      */
-    private Answer outward(final Operand.Method named, final List<Object> arguments, final int line) {
+    private Answer outward(final IOperand.Method named, final List<Object> arguments, final int line) {
         if (!this.host.provides(named.owner())) {
             throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line,
                     "the runtime does not answer for " + named.owner());
         }
-        final Host.Reply reply =
+        final IHost.Reply reply =
                 this.host.call(named.owner(), named.name(), arguments, this.caller, line);
         this.owed += Math.max(0, reply.cost() - 1);
         final List<Object> filled = new ArrayList<>();

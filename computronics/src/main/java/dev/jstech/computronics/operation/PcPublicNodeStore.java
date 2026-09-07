@@ -14,9 +14,9 @@ import net.minecraft.world.item.Item;
 import java.util.Map;
 
 /**
- * A {@link NodeStore} exposing only the published share of a Personal Computer's disk-backed storage. The network can SELECT from a PC's public area but never write into it (a PC is a read-only source), so {@link #insert} accepts nothing and the private remainder is invisible here.
+ * An {@link INodeStore} exposing only the published share of a Personal Computer's disk-backed storage. The network can SELECT from a PC's public area but never write into it (a PC is a read-only source), so {@link #insert} accepts nothing and the private remainder is invisible here.
  */
-final class PcPublicNodeStore implements NodeStore {
+final class PcPublicNodeStore implements INodeStore {
 
     private final LocalStore store;
 

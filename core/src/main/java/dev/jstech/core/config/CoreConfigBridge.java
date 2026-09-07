@@ -50,7 +50,7 @@ public final class CoreConfigBridge {
     /** Validates the file's current values and pushes them into the balance; also what a reload does. */
     public static void applyAll() {
         for (final ConfigKey<?> key : CoreConfigKeys.registry().allKeys()) {
-            final ConfigValidationResult<?> result = VALIDATOR.validate(key, CoreServerConfig.rawValue(key));
+            final IConfigValidationResult<?> result = VALIDATOR.validate(key, CoreServerConfig.rawValue(key));
             CoreConfigKeys.apply(key, result.value());
         }
     }

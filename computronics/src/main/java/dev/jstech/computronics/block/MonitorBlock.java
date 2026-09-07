@@ -15,12 +15,12 @@ import dev.jstech.computronics.menu.CommandPromptMenu;
 import dev.jstech.computronics.menu.ComputerTerminalMenu;
 import dev.jstech.computronics.operation.payload.OpenComputerUiPayload;
 import dev.jstech.computronics.os.FirmwareKind;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.boot.BootController;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
-import dev.jstech.core.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralOwner;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
@@ -50,11 +50,11 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The Monitor: a peripheral that displays the interface of the computer it is linked to (over a Peripheral Cable, ≤ 16 blocks).
  *
- * <p>Implements {@link EraChassisBlock} so era-specific subclasses ({@link VintageMonitorBlock},
+ * <p>Implements {@link IEraChassisBlock} so era-specific subclasses ({@link VintageMonitorBlock},
  * {@link LegacyMonitorBlock}) each wear their own era's textures and the {@code LIT} blockstate
  * texture resolves to the correct on-screen OS style.
  */
-public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBlock, PeripheralConnectable, EraChassisBlock {
+public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBlock, IPeripheralConnectable, IEraChassisBlock {
 
     public static final MapCodec<MonitorBlock> CODEC = simpleCodec(MonitorBlock::new);
 
@@ -188,7 +188,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
      * it installed is no longer on that disk (formatted, pulled), there is nothing to reboot into and
      * the pending install is dropped.
      */
-    public static Entry entryFor(final OsHost computer) {
+    public static Entry entryFor(final IOsHost computer) {
         if (!computer.isRunning()) {
             return Entry.NO_POWER;
         }
@@ -196,20 +196,20 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
             return Entry.POST;
         }
         final int slot = computer.pendingInstallSlot();
-        if (slot != OsHost.NO_PENDING_INSTALL) {
+        if (slot != IOsHost.NO_PENDING_INSTALL) {
             final boolean systemStillThere = slot < 0 ? computer.hasOs()
                     : dev.jstech.computronics.os.OsDisks.hasSystem(computer.diskInSlot(slot));
             if (systemStillThere) {
                 return Entry.INSTALLER;
             }
-            computer.setPendingInstallSlot(OsHost.NO_PENDING_INSTALL);
+            computer.setPendingInstallSlot(IOsHost.NO_PENDING_INSTALL);
         }
         return Entry.BOOT;
     }
 
     private static void openSession(final ServerPlayer player, final Level level, final BlockPos monitorPos,
                                     final BlockPos owner) {
-        if (level.getBlockEntity(owner) instanceof OsHost computer) {
+        if (level.getBlockEntity(owner) instanceof IOsHost computer) {
             switch (entryFor(computer)) {
                 case NO_POWER -> {
                     player.displayClientMessage(Component.translatable("block.jsc.monitor.no_power"), true);
@@ -232,7 +232,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
 
     /** Sends the client the finished installer's reboot prompt for the system it just put on the disk. */
     private static void openInstallerPrompt(final ServerPlayer player, final Level level, final BlockPos monitorPos,
-                                            final BlockPos owner, final OsHost computer) {
+                                            final BlockPos owner, final IOsHost computer) {
         final int slot = computer.pendingInstallSlot();
         final HardwareEra era = computer.displayEra();
         final FirmwareKind kind = FirmwareKind.forEra(era != null ? era : HardwareEra.STANDARD);
@@ -272,7 +272,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
                                 final BlockPos owner) {
         final BlockEntity ownerBe = level.getBlockEntity(owner);
         final String name = level.getBlockState(owner).getBlock().getName().getString();
-        final HardwareEra era = ownerBe instanceof OsHost c ? c.displayEra() : null;
+        final HardwareEra era = ownerBe instanceof IOsHost c ? c.displayEra() : null;
         final FirmwareKind kind = FirmwareKind.forEra(era != null ? era : HardwareEra.STANDARD);
         PacketDistributor.sendToPlayer(player, new dev.jstech.computronics.operation.payload
                 .OpenPostPayload(owner, monitorPos, kind.ordinal(), name));
@@ -288,7 +288,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
         final BlockEntity ownerBe = level.getBlockEntity(owner);
         // A powered-off computer opens nothing, whichever path asked for the boot (monitor use, a firmware
         // action, a reboot): the screen simply has no signal until the machine is switched on.
-        if (ownerBe instanceof OsHost gate) {
+        if (ownerBe instanceof IOsHost gate) {
             if (!gate.isRunning()) {
                 player.displayClientMessage(Component.translatable("block.jsc.monitor.no_power"), true);
                 return;
@@ -306,7 +306,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
         }
         // Booting into an installed OS is an advancement criterion (the live installers do not count yet).
         if (target != BootController.BootTarget.FIRMWARE
-                && ownerBe instanceof OsHost c && c.installedOsId() != null
+                && ownerBe instanceof IOsHost c && c.installedOsId() != null
                 && (c.console() == null || c.console().liveInstall() == null)) {
             dev.jstech.computronics.ComputingModule.OS_FIRST_BOOT.get()
                     .trigger(player, c.installedOsId());
@@ -324,7 +324,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     private static void openFirmwareUi(final ServerPlayer player, final Level level, final BlockPos monitorPos,
                                        final BlockPos owner, final BlockEntity ownerBe) {
         final String name = level.getBlockState(owner).getBlock().getName().getString();
-        final HardwareEra era = ownerBe instanceof OsHost c ? c.displayEra() : null;
+        final HardwareEra era = ownerBe instanceof IOsHost c ? c.displayEra() : null;
         final FirmwareKind kind = FirmwareKind.forEra(era != null ? era : HardwareEra.STANDARD);
         PacketDistributor.sendToPlayer(player, new OpenComputerUiPayload(owner, monitorPos, kind.ordinal(), name));
     }
@@ -332,7 +332,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     /** Opens the desktop shell (a real container menu) for the host's installed FULL_DESKTOP OS. */
     private static void openDesktopUi(final ServerPlayer player, final Level level, final BlockPos monitorPos,
                                       final BlockPos owner, final BlockEntity ownerBe) {
-        if (ownerBe instanceof OsHost c && c.installedOsId() != null) {
+        if (ownerBe instanceof IOsHost c && c.installedOsId() != null) {
             final String name = level.getBlockState(owner).getBlock().getName().getString();
             final net.minecraft.resources.ResourceLocation osId = c.installedOsId();
             final Component title = level.getBlockState(owner).getBlock().getName();
@@ -356,7 +356,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
     /** Opens the Command Prompt (the sole shell of a terminal-only OS) on this monitor for its host. */
     private static void openCommandPrompt(final ServerPlayer player, final Level level,
                                           final BlockPos monitorPos, final BlockPos owner) {
-        if (level.getBlockEntity(owner) instanceof OsHost host) {
+        if (level.getBlockEntity(owner) instanceof IOsHost host) {
             final HardwareEra era = host.displayEra();
             final Component title = level.getBlockState(owner).getBlock().getName();
             // A POSIX (Linux) OS gets a login banner and a bash-style prompt: tell the client which shell,
@@ -378,7 +378,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
             } else {
                 shellId = posix && os != null ? os.shellId() : "";
                 hostname = posix
-                        && host instanceof dev.jstech.computronics.terminal.ComputerTerminalHost terminalHost
+                        && host instanceof dev.jstech.computronics.terminal.IComputerTerminalHost terminalHost
                         && level instanceof net.minecraft.server.level.ServerLevel serverLevel
                         ? new dev.jstech.computronics.program.ServerCliComputer(terminalHost, serverLevel)
                                 .hostname()
@@ -405,7 +405,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
 
     private static void openTerminal(final ServerPlayer player, final Level level,
                                      final BlockPos monitorPos, final BlockPos owner) {
-        if (level.getBlockEntity(owner) instanceof ComputerTerminalHost host) {
+        if (level.getBlockEntity(owner) instanceof IComputerTerminalHost host) {
             final Component title = level.getBlockState(owner).getBlock().getName();
             // Reopen on the tab the player last used here (persisted on the Monitor).
             final int initialTab =
@@ -430,7 +430,7 @@ public class MonitorBlock extends HorizontalDirectionalBlock implements EntityBl
         if (host.isEmpty()) {
             return Component.translatable("block.jsc.monitor.no_computer");
         }
-        if (serverLevel.getBlockEntity(BlockPos.of(host.getAsLong())) instanceof PeripheralOwner owner) {
+        if (serverLevel.getBlockEntity(BlockPos.of(host.getAsLong())) instanceof IPeripheralOwner owner) {
             if (owner.maxEndpoints() <= 0) {
                 return Component.translatable("block.jsc.monitor.no_gpu");
             }

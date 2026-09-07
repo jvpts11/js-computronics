@@ -53,7 +53,7 @@ import java.util.Locale;
  * <p>The content is a tree of the core's components, laid out every frame from the window's size; the app
  * keeps the draft state the server sends and the callbacks that send edits back.
  */
-public final class PatternStudioApp implements InventoryBandApp {
+public final class PatternStudioApp implements IInventoryBandApp {
 
     private static final int TAB_H = PatternStudioLayout.TAB_H;
     private static final int RAIL_W = 112;

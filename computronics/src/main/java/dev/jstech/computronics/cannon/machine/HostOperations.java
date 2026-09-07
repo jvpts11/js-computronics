@@ -8,10 +8,10 @@
 package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Values;
 import dev.jstech.computronics.operation.MoveLabels;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import java.util.List;
 import java.util.Locale;
 
@@ -50,7 +50,7 @@ public final class HostOperations {
      *
      * @param script the name of the program asking, for the row it leaves in the network's log
      */
-    public static Host.Reply call(final CliComputer computer, final String script, final String member,
+    public static IHost.Reply call(final ICliComputer computer, final String script, final String member,
                                   final List<Object> arguments, final int line) {
         if (!computer.onNetwork()) {
             throw new Halt(Halt.Reason.NO_NETWORK, line, "this computer is not on a network");
@@ -65,20 +65,20 @@ public final class HostOperations {
                     arguments.size() < 2 ? "" : String.valueOf(arguments.get(1))));
             case "List" -> {
                 final Values.ListValue all = new Values.ListValue();
-                for (final CliComputer.ActiveOp op : computer.activeOps()) {
+                for (final ICliComputer.ActiveOp op : computer.activeOps()) {
                     all.items().add(shot(op));
                 }
-                yield Host.Reply.of(all, HostNetwork.priceOf(all.size()));
+                yield IHost.Reply.of(all, HostNetwork.priceOf(all.size()));
             }
             case "Get" -> {
                 final String id = item(arguments);
-                for (final CliComputer.ActiveOp op : computer.activeOps()) {
+                for (final ICliComputer.ActiveOp op : computer.activeOps()) {
                     if (op.id().equalsIgnoreCase(id)) {
-                        yield Host.Reply.of(shot(op), READ);
+                        yield IHost.Reply.of(shot(op), READ);
                     }
                 }
                 // An operation that has settled is no longer in flight, and saying so is the answer.
-                yield Host.Reply.of(null, READ);
+                yield IHost.Reply.of(null, READ);
             }
             default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Operations has no " + member);
         };
@@ -91,14 +91,14 @@ public final class HostOperations {
      * nothing that crafts the thing, and a script has to be able to carry on and try something else. So
      * it is answered, not thrown.
      */
-    private static Host.Reply asked(final CliComputer.OpResult result) {
+    private static IHost.Reply asked(final ICliComputer.OpResult result) {
         final Values.Obj made = new Values.Obj("AskResult");
         made.set("Ok", result.ok());
         made.set("Message", result.message());
-        return Host.Reply.of(made, SUBMIT);
+        return IHost.Reply.of(made, SUBMIT);
     }
 
-    private static Values.Obj shot(final CliComputer.ActiveOp op) {
+    private static Values.Obj shot(final ICliComputer.ActiveOp op) {
         final Values.Obj made = new Values.Obj("OperationInfo");
         made.set("Id", op.id());
         made.set("Type", op.type().toLowerCase(Locale.ROOT));

@@ -7,8 +7,8 @@
  */
 package dev.jstech.computronics.integration.mekanism;
 
-import dev.jstech.computronics.storage.ChemicalBridge;
-import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.IChemicalBridge;
+import dev.jstech.computronics.storage.IChemicalPort;
 import mekanism.api.Action;
 import mekanism.api.MekanismAPI;
 import mekanism.api.chemical.Chemical;
@@ -36,7 +36,7 @@ import java.util.Set;
  * data. The block capability is recreated by its registered name, so the bridge depends on the Mekanism API
  * jar alone and on nothing from the mod's internals.
  */
-final class MekanismChemicalBridge implements ChemicalBridge {
+final class MekanismChemicalBridge implements IChemicalBridge {
 
     /** Mekanism's sided block capability for chemical handlers; capabilities are interned by name. */
     // The item form of the same capability: what a filled tank item or a hohlraum holds.
@@ -48,7 +48,7 @@ final class MekanismChemicalBridge implements ChemicalBridge {
                     IChemicalHandler.class);
 
     @Override
-    public Optional<ChemicalPort> portFor(final Level level, final BlockPos pos, @Nullable final Direction side) {
+    public Optional<IChemicalPort> portFor(final Level level, final BlockPos pos, @Nullable final Direction side) {
         final IChemicalHandler handler = level.getCapability(CHEMICAL_HANDLER, pos, side);
         return handler == null ? Optional.empty() : Optional.of(new HandlerPort(handler));
     }
@@ -64,7 +64,7 @@ final class MekanismChemicalBridge implements ChemicalBridge {
     }
 
     @Override
-    public Optional<ChemicalPort> itemPortFor(final ItemStack stack) {
+    public Optional<IChemicalPort> itemPortFor(final ItemStack stack) {
         // Mekanism's item handlers are backed by the stack's own data components, so the port writes straight
         // into the stack it was made for.
         final IChemicalHandler handler = stack.getCapability(ITEM_CHEMICAL_HANDLER);
@@ -110,7 +110,7 @@ final class MekanismChemicalBridge implements ChemicalBridge {
     }
 
     /** A chemical port over one handler; amounts are millibuckets on both sides. */
-    private record HandlerPort(IChemicalHandler handler) implements ChemicalPort {
+    private record HandlerPort(IChemicalHandler handler) implements IChemicalPort {
 
         private static Action action(final boolean simulate) {
             return simulate ? Action.SIMULATE : Action.EXECUTE;

@@ -9,11 +9,11 @@ package dev.jstech.computronics.cannon.sem;
 
 import dev.jstech.computronics.cannon.CannonError;
 import dev.jstech.computronics.cannon.DiagnosticBag;
-import dev.jstech.computronics.cannon.ast.Decl;
-import dev.jstech.computronics.cannon.ast.Expr;
-import dev.jstech.computronics.cannon.ast.Node;
+import dev.jstech.computronics.cannon.ast.IDecl;
+import dev.jstech.computronics.cannon.ast.IExpr;
+import dev.jstech.computronics.cannon.ast.INode;
 import dev.jstech.computronics.cannon.ast.Operator;
-import dev.jstech.computronics.cannon.ast.Stmt;
+import dev.jstech.computronics.cannon.ast.IStmt;
 import dev.jstech.computronics.cannon.ast.TypeRef;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -52,7 +52,7 @@ public final class BodyChecker {
     private final SemanticModel model;
 
     private NamedType currentType;
-    private TypeSymbol returnType = TypeSymbol.Primitive.VOID;
+    private ITypeSymbol returnType = ITypeSymbol.Primitive.VOID;
     private Scope scope = new Scope(null);
     private boolean staticContext;
     private boolean inConstructor;
@@ -72,39 +72,39 @@ public final class BodyChecker {
     /** Checks every body in every type the program declares. */
     public void check(final List<NamedType> types) {
         for (final NamedType type : types) {
-            final Decl.TypeDecl source = this.declarations.source(type);
+            final IDecl.ITypeDecl source = this.declarations.source(type);
             this.diagnostics.setFile(this.declarations.fileOf(type));
-            if (source instanceof Decl.ClassDecl declaration) {
+            if (source instanceof IDecl.ClassDecl declaration) {
                 this.checkClass(type, declaration);
-            } else if (source instanceof Decl.EnumDecl declaration) {
+            } else if (source instanceof IDecl.EnumDecl declaration) {
                 this.checkEnum(type, declaration);
             }
         }
     }
 
-    private void checkClass(final NamedType type, final Decl.ClassDecl declaration) {
+    private void checkClass(final NamedType type, final IDecl.ClassDecl declaration) {
         this.currentType = type;
-        for (final Decl.MemberDecl member : declaration.members()) {
+        for (final IDecl.IMemberDecl member : declaration.members()) {
             switch (member) {
-                case Decl.FieldDecl field -> this.checkFieldInitializer(field);
-                case Decl.MethodDecl method -> this.checkMethod(method);
-                case Decl.ConstructorDecl constructor -> this.checkConstructor(type, constructor);
-                case Decl.PropertyDecl ignored -> { }
-                case Decl.EventDecl ignored -> { }
+                case IDecl.FieldDecl field -> this.checkFieldInitializer(field);
+                case IDecl.MethodDecl method -> this.checkMethod(method);
+                case IDecl.ConstructorDecl constructor -> this.checkConstructor(type, constructor);
+                case IDecl.PropertyDecl ignored -> { }
+                case IDecl.EventDecl ignored -> { }
             }
         }
     }
 
     // An enum's numbers are the one place outside a body where an expression can appear.
-    private void checkEnum(final NamedType type, final Decl.EnumDecl declaration) {
+    private void checkEnum(final NamedType type, final IDecl.EnumDecl declaration) {
         this.currentType = type;
-        this.begin(true, TypeSymbol.Primitive.VOID, false);
-        for (final Decl.EnumConstant constant : declaration.constants()) {
+        this.begin(true, ITypeSymbol.Primitive.VOID, false);
+        for (final IDecl.EnumConstant constant : declaration.constants()) {
             if (constant.value() == null) {
                 continue;
             }
-            this.expect(this.check(constant.value(), TypeSymbol.Primitive.INT),
-                    TypeSymbol.Primitive.INT, constant.value());
+            this.expect(this.check(constant.value(), ITypeSymbol.Primitive.INT),
+                    ITypeSymbol.Primitive.INT, constant.value());
             // The number has to be there in the source, not worked out from it: an enum's numbers are
             // what the assembly and every saved file are written with, so they are read, never computed.
             if (numberOf(constant.value()) == null) {
@@ -115,44 +115,44 @@ public final class BodyChecker {
     }
 
     /** The number an enum's constant was written as, or null if it was written some other way. */
-    public static Integer numberOf(final Expr expression) {
-        if (expression instanceof Expr.Literal literal && literal.value() instanceof Integer value) {
+    public static Integer numberOf(final IExpr expression) {
+        if (expression instanceof IExpr.Literal literal && literal.value() instanceof Integer value) {
             return value;
         }
-        if (expression instanceof Expr.Unary unary && unary.operator() == Operator.NEGATE
-                && !unary.postfix() && unary.operand() instanceof Expr.Literal literal
+        if (expression instanceof IExpr.Unary unary && unary.operator() == Operator.NEGATE
+                && !unary.postfix() && unary.operand() instanceof IExpr.Literal literal
                 && literal.value() instanceof Integer value) {
             return -value;
         }
         return null;
     }
 
-    private void checkFieldInitializer(final Decl.FieldDecl field) {
+    private void checkFieldInitializer(final IDecl.FieldDecl field) {
         if (field.initializer() == null) {
             return;
         }
-        final TypeSymbol declared = this.declarations.resolve(field.type());
-        this.begin(field.modifiers().contains(Decl.Modifier.STATIC), TypeSymbol.Primitive.VOID, false);
+        final ITypeSymbol declared = this.declarations.resolve(field.type());
+        this.begin(field.modifiers().contains(IDecl.Modifier.STATIC), ITypeSymbol.Primitive.VOID, false);
         this.expect(this.check(field.initializer(), declared), declared, field.initializer());
     }
 
-    private void checkMethod(final Decl.MethodDecl method) {
+    private void checkMethod(final IDecl.MethodDecl method) {
         if (method.body() == null) {
             return;
         }
-        final TypeSymbol declared = this.declarations.resolve(method.returnType());
-        this.begin(method.modifiers().contains(Decl.Modifier.STATIC), declared, false);
+        final ITypeSymbol declared = this.declarations.resolve(method.returnType());
+        this.begin(method.modifiers().contains(IDecl.Modifier.STATIC), declared, false);
         this.declareParameters(method.parameters());
         this.checkBlock(method.body(), false);
         this.checkOutParameters(method.parameters(), method.body(), method);
-        if (declared != TypeSymbol.Primitive.VOID && !alwaysReturns(method.body())) {
+        if (declared != ITypeSymbol.Primitive.VOID && !alwaysReturns(method.body())) {
             this.report(method.line(), method.column(),
                     CannonError.MISSING_RETURN_VALUE, declared.describe());
         }
     }
 
-    private void checkConstructor(final NamedType type, final Decl.ConstructorDecl constructor) {
-        this.begin(false, TypeSymbol.Primitive.VOID, true);
+    private void checkConstructor(final NamedType type, final IDecl.ConstructorDecl constructor) {
+        this.begin(false, ITypeSymbol.Primitive.VOID, true);
         this.declareParameters(constructor.parameters());
         if (constructor.chained() != null) {
             this.checkChainedCall(type, constructor.chained());
@@ -163,7 +163,7 @@ public final class BodyChecker {
         this.checkOutParameters(constructor.parameters(), constructor.body(), constructor);
     }
 
-    private void checkChainedCall(final NamedType type, final Decl.ConstructorCall chained) {
+    private void checkChainedCall(final NamedType type, final IDecl.ConstructorCall chained) {
         final NamedType target = chained.base() ? type.base() : type;
         if (target == null) {
             this.report(chained.line(), chained.column(), CannonError.NO_BASE_CLASS, type.name());
@@ -173,10 +173,10 @@ public final class BodyChecker {
         this.callConstructor(target, target, chained.arguments(), chained);
     }
 
-    private void declareParameters(final List<Decl.Parameter> parameters) {
-        for (final Decl.Parameter parameter : parameters) {
-            final TypeSymbol type = this.declarations.resolve(parameter.type());
-            final Binding.Variable variable = new Binding.Variable(parameter.name(), type, true);
+    private void declareParameters(final List<IDecl.Parameter> parameters) {
+        for (final IDecl.Parameter parameter : parameters) {
+            final ITypeSymbol type = this.declarations.resolve(parameter.type());
+            final IBinding.Variable variable = new IBinding.Variable(parameter.name(), type, true);
             if (!this.scope.declare(variable)) {
                 this.report(parameter.line(), parameter.column(),
                         CannonError.DUPLICATE_DECLARATION, parameter.name());
@@ -185,7 +185,7 @@ public final class BodyChecker {
         }
     }
 
-    private void begin(final boolean isStatic, final TypeSymbol returns, final boolean constructor) {
+    private void begin(final boolean isStatic, final ITypeSymbol returns, final boolean constructor) {
         this.scope = new Scope(null);
         this.staticContext = isStatic;
         this.returnType = returns;
@@ -196,70 +196,70 @@ public final class BodyChecker {
 
     // ---------------------------------------------------------------- statements
 
-    private void checkBlock(final Stmt.Block block, final boolean newScope) {
+    private void checkBlock(final IStmt.Block block, final boolean newScope) {
         final Scope saved = this.scope;
         if (newScope) {
             this.scope = new Scope(saved);
         }
-        for (final Stmt statement : block.statements()) {
+        for (final IStmt statement : block.statements()) {
             this.checkStatement(statement);
         }
         this.scope = saved;
     }
 
-    private void checkStatement(final Stmt statement) {
+    private void checkStatement(final IStmt statement) {
         switch (statement) {
-            case Stmt.Block block -> this.checkBlock(block, true);
-            case Stmt.If branch -> {
+            case IStmt.Block block -> this.checkBlock(block, true);
+            case IStmt.If branch -> {
                 this.condition(branch.condition());
                 this.checkStatement(branch.then());
                 if (branch.otherwise() != null) {
                     this.checkStatement(branch.otherwise());
                 }
             }
-            case Stmt.While loop -> {
+            case IStmt.While loop -> {
                 this.condition(loop.condition());
                 this.loopDepth++;
                 this.checkStatement(loop.body());
                 this.loopDepth--;
             }
-            case Stmt.DoWhile loop -> {
+            case IStmt.DoWhile loop -> {
                 this.loopDepth++;
                 this.checkStatement(loop.body());
                 this.loopDepth--;
                 this.condition(loop.condition());
             }
-            case Stmt.For loop -> this.checkFor(loop);
-            case Stmt.ForEach loop -> this.checkForEach(loop);
-            case Stmt.Switch choice -> this.checkSwitch(choice);
-            case Stmt.Break stop -> {
+            case IStmt.For loop -> this.checkFor(loop);
+            case IStmt.ForEach loop -> this.checkForEach(loop);
+            case IStmt.Switch choice -> this.checkSwitch(choice);
+            case IStmt.Break stop -> {
                 if (this.loopDepth == 0 && this.switchDepth == 0) {
                     this.report(stop.line(), stop.column(), CannonError.BREAK_OUTSIDE_LOOP);
                 }
             }
-            case Stmt.Continue next -> {
+            case IStmt.Continue next -> {
                 if (this.loopDepth == 0) {
                     this.report(next.line(), next.column(), CannonError.CONTINUE_OUTSIDE_LOOP);
                 }
             }
-            case Stmt.Return give -> this.checkReturn(give);
-            case Stmt.LocalDecl local -> this.checkLocal(local);
-            case Stmt.ExprStmt expression -> this.check(expression.expression(), null);
-            case Stmt.Dispose dispose -> this.checkDispose(dispose);
-            case Stmt.Empty ignored -> { }
+            case IStmt.Return give -> this.checkReturn(give);
+            case IStmt.LocalDecl local -> this.checkLocal(local);
+            case IStmt.ExprStmt expression -> this.check(expression.expression(), null);
+            case IStmt.Dispose dispose -> this.checkDispose(dispose);
+            case IStmt.Empty ignored -> { }
         }
     }
 
-    private void checkFor(final Stmt.For loop) {
+    private void checkFor(final IStmt.For loop) {
         final Scope saved = this.scope;
         this.scope = new Scope(saved);
-        for (final Stmt initializer : loop.initializers()) {
+        for (final IStmt initializer : loop.initializers()) {
             this.checkStatement(initializer);
         }
         if (loop.condition() != null) {
             this.condition(loop.condition());
         }
-        for (final Expr update : loop.updates()) {
+        for (final IExpr update : loop.updates()) {
             this.check(update, null);
         }
         this.loopDepth++;
@@ -268,21 +268,21 @@ public final class BodyChecker {
         this.scope = saved;
     }
 
-    private void checkForEach(final Stmt.ForEach loop) {
-        final TypeSymbol source = this.check(loop.source(), null);
-        final TypeSymbol element = this.rules.elementOf(source);
+    private void checkForEach(final IStmt.ForEach loop) {
+        final ITypeSymbol source = this.check(loop.source(), null);
+        final ITypeSymbol element = this.rules.elementOf(source);
         if (element == null) {
             this.report(loop.line(), loop.column(), CannonError.NOT_A_COLLECTION, source.describe());
         }
-        final TypeSymbol found = element == null ? TypeSymbol.Special.ERROR : element;
-        final TypeSymbol declared = isInferred(loop.type()) ? found : this.declarations.resolve(loop.type());
+        final ITypeSymbol found = element == null ? ITypeSymbol.Special.ERROR : element;
+        final ITypeSymbol declared = isInferred(loop.type()) ? found : this.declarations.resolve(loop.type());
         if (!this.rules.isAssignable(found, declared)) {
             this.report(loop.line(), loop.column(),
                     CannonError.CANNOT_CONVERT, found.describe(), declared.describe());
         }
         final Scope saved = this.scope;
         this.scope = new Scope(saved);
-        final Binding.Variable variable = new Binding.Variable(loop.name(), declared, false);
+        final IBinding.Variable variable = new IBinding.Variable(loop.name(), declared, false);
         if (!this.scope.declare(variable)) {
             this.report(loop.line(), loop.column(), CannonError.DUPLICATE_DECLARATION, loop.name());
         }
@@ -293,23 +293,23 @@ public final class BodyChecker {
         this.scope = saved;
     }
 
-    private void checkSwitch(final Stmt.Switch choice) {
-        final TypeSymbol value = this.check(choice.value(), null);
+    private void checkSwitch(final IStmt.Switch choice) {
+        final ITypeSymbol value = this.check(choice.value(), null);
         final Set<String> seen = new HashSet<>();
         this.switchDepth++;
-        for (final Stmt.SwitchSection section : choice.sections()) {
-            for (final Expr label : section.labels()) {
-                final TypeSymbol labelType = this.check(label, value);
+        for (final IStmt.SwitchSection section : choice.sections()) {
+            for (final IExpr label : section.labels()) {
+                final ITypeSymbol labelType = this.check(label, value);
                 if (!this.rules.isAssignable(labelType, value)) {
                     this.report(label.line(), label.column(),
                             CannonError.CANNOT_CONVERT, labelType.describe(), value.describe());
-                } else if (label instanceof Expr.Literal literal && !seen.add(String.valueOf(literal.value()))) {
+                } else if (label instanceof IExpr.Literal literal && !seen.add(String.valueOf(literal.value()))) {
                     this.report(label.line(), label.column(), CannonError.DUPLICATE_SWITCH_LABEL);
                 }
             }
             final Scope saved = this.scope;
             this.scope = new Scope(saved);
-            for (final Stmt statement : section.statements()) {
+            for (final IStmt statement : section.statements()) {
                 this.checkStatement(statement);
             }
             this.scope = saved;
@@ -317,25 +317,25 @@ public final class BodyChecker {
         this.switchDepth--;
     }
 
-    private void checkReturn(final Stmt.Return give) {
+    private void checkReturn(final IStmt.Return give) {
         if (give.value() == null) {
-            if (this.returnType != TypeSymbol.Primitive.VOID) {
+            if (this.returnType != ITypeSymbol.Primitive.VOID) {
                 this.report(give.line(), give.column(),
                         CannonError.MISSING_RETURN_VALUE, this.returnType.describe());
             }
             return;
         }
-        final TypeSymbol value = this.check(give.value(), this.returnType);
-        if (this.returnType == TypeSymbol.Primitive.VOID) {
+        final ITypeSymbol value = this.check(give.value(), this.returnType);
+        if (this.returnType == ITypeSymbol.Primitive.VOID) {
             this.report(give.line(), give.column(), CannonError.UNEXPECTED_RETURN_VALUE);
             return;
         }
         this.expect(value, this.returnType, give.value());
     }
 
-    private void checkLocal(final Stmt.LocalDecl local) {
-        final TypeSymbol declared = isInferred(local.type()) ? this.inferred(local) : this.written(local);
-        final Binding.Variable variable = new Binding.Variable(local.name(), declared, false);
+    private void checkLocal(final IStmt.LocalDecl local) {
+        final ITypeSymbol declared = isInferred(local.type()) ? this.inferred(local) : this.written(local);
+        final IBinding.Variable variable = new IBinding.Variable(local.name(), declared, false);
         if (!this.scope.declare(variable)) {
             this.report(local.line(), local.column(),
                     CannonError.DUPLICATE_DECLARATION, local.name());
@@ -345,40 +345,40 @@ public final class BodyChecker {
 
     // "var" takes the type of what it is given, which means it has to be given something, and
     // something with a type of its own: null and a call that gives nothing back have neither.
-    private TypeSymbol inferred(final Stmt.LocalDecl local) {
+    private ITypeSymbol inferred(final IStmt.LocalDecl local) {
         if (local.initializer() == null) {
             this.report(local.line(), local.column(),
                     CannonError.CANNOT_CONVERT, "nothing", INFERRED);
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final TypeSymbol found = this.check(local.initializer(), null);
-        if (found == TypeSymbol.Special.NULL || found == TypeSymbol.Primitive.VOID) {
+        final ITypeSymbol found = this.check(local.initializer(), null);
+        if (found == ITypeSymbol.Special.NULL || found == ITypeSymbol.Primitive.VOID) {
             this.report(local.line(), local.column(),
                     CannonError.CANNOT_CONVERT, found.describe(), INFERRED);
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return found;
     }
 
-    private TypeSymbol written(final Stmt.LocalDecl local) {
-        final TypeSymbol declared = this.declarations.resolve(local.type());
+    private ITypeSymbol written(final IStmt.LocalDecl local) {
+        final ITypeSymbol declared = this.declarations.resolve(local.type());
         if (local.initializer() != null) {
             this.expect(this.check(local.initializer(), declared), declared, local.initializer());
         }
         return declared;
     }
 
-    private void checkDispose(final Stmt.Dispose dispose) {
-        final TypeSymbol target = this.check(dispose.target(), null);
+    private void checkDispose(final IStmt.Dispose dispose) {
+        final ITypeSymbol target = this.check(dispose.target(), null);
         if (!this.rules.isError(target) && !this.rules.isReference(target)) {
             this.report(dispose.line(), dispose.column(),
                     CannonError.CANNOT_DISPOSE, target.describe());
         }
     }
 
-    private void condition(final Expr expression) {
-        final TypeSymbol type = this.check(expression, TypeSymbol.Primitive.BOOL);
-        if (!this.rules.isError(type) && type != TypeSymbol.Primitive.BOOL) {
+    private void condition(final IExpr expression) {
+        final ITypeSymbol type = this.check(expression, ITypeSymbol.Primitive.BOOL);
+        if (!this.rules.isError(type) && type != ITypeSymbol.Primitive.BOOL) {
             this.report(expression.line(), expression.column(),
                     CannonError.CONDITION_MUST_BE_BOOL, type.describe());
         }
@@ -391,142 +391,142 @@ public final class BodyChecker {
 
     // A method that gives something back has to do it on every way out. This knows the shapes that
     // certainly leave; anything else counts as a path that falls off the end.
-    private static boolean alwaysReturns(final Stmt statement) {
+    private static boolean alwaysReturns(final IStmt statement) {
         return switch (statement) {
-            case Stmt.Return ignored -> true;
-            case Stmt.Block block -> block.statements().stream().anyMatch(BodyChecker::alwaysReturns);
-            case Stmt.If branch -> branch.otherwise() != null
+            case IStmt.Return ignored -> true;
+            case IStmt.Block block -> block.statements().stream().anyMatch(BodyChecker::alwaysReturns);
+            case IStmt.If branch -> branch.otherwise() != null
                     && alwaysReturns(branch.then()) && alwaysReturns(branch.otherwise());
-            case Stmt.While loop -> isAlwaysTrue(loop.condition());
-            case Stmt.DoWhile loop -> alwaysReturns(loop.body()) || isAlwaysTrue(loop.condition());
-            case Stmt.For loop -> loop.condition() == null || isAlwaysTrue(loop.condition());
-            case Stmt.Switch choice -> choice.sections().stream().anyMatch(Stmt.SwitchSection::fallback)
+            case IStmt.While loop -> isAlwaysTrue(loop.condition());
+            case IStmt.DoWhile loop -> alwaysReturns(loop.body()) || isAlwaysTrue(loop.condition());
+            case IStmt.For loop -> loop.condition() == null || isAlwaysTrue(loop.condition());
+            case IStmt.Switch choice -> choice.sections().stream().anyMatch(IStmt.SwitchSection::fallback)
                     && choice.sections().stream().allMatch(section ->
                             section.statements().stream().anyMatch(BodyChecker::alwaysReturns));
             default -> false;
         };
     }
 
-    private static boolean isAlwaysTrue(final Expr condition) {
-        return condition instanceof Expr.Literal literal && Boolean.TRUE.equals(literal.value());
+    private static boolean isAlwaysTrue(final IExpr condition) {
+        return condition instanceof IExpr.Literal literal && Boolean.TRUE.equals(literal.value());
     }
 
     // ---------------------------------------------------------------- expressions
 
-    private TypeSymbol check(final Expr expression, final TypeSymbol expected) {
+    private ITypeSymbol check(final IExpr expression, final ITypeSymbol expected) {
         if (expression == null) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final TypeSymbol type = switch (expression) {
-            case Expr.Literal literal -> this.literalType(literal);
-            case Expr.Name name -> this.nameType(name, expected);
-            case Expr.This self -> this.thisType(self);
-            case Expr.Base base -> this.baseType(base);
-            case Expr.Unary unary -> this.unaryType(unary);
-            case Expr.Binary binary -> this.binaryType(binary);
-            case Expr.Assign assign -> this.assignType(assign);
-            case Expr.Conditional conditional -> this.conditionalType(conditional, expected);
-            case Expr.Call call -> this.callType(call);
-            case Expr.Member member -> this.memberType(member, expected);
-            case Expr.Index index -> this.indexType(index);
-            case Expr.New created -> this.newType(created);
-            case Expr.NewArray created -> this.newArrayType(created);
-            case Expr.Cast cast -> this.castType(cast);
-            case Expr.TypeTest test -> this.typeTestType(test);
-            case Expr.Lambda lambda -> this.lambdaType(lambda, expected);
-            case Expr.OutArgument outward -> this.outArgumentType(outward, expected);
+        final ITypeSymbol type = switch (expression) {
+            case IExpr.Literal literal -> this.literalType(literal);
+            case IExpr.Name name -> this.nameType(name, expected);
+            case IExpr.This self -> this.thisType(self);
+            case IExpr.Base base -> this.baseType(base);
+            case IExpr.Unary unary -> this.unaryType(unary);
+            case IExpr.Binary binary -> this.binaryType(binary);
+            case IExpr.Assign assign -> this.assignType(assign);
+            case IExpr.Conditional conditional -> this.conditionalType(conditional, expected);
+            case IExpr.Call call -> this.callType(call);
+            case IExpr.Member member -> this.memberType(member, expected);
+            case IExpr.Index index -> this.indexType(index);
+            case IExpr.New created -> this.newType(created);
+            case IExpr.NewArray created -> this.newArrayType(created);
+            case IExpr.Cast cast -> this.castType(cast);
+            case IExpr.TypeTest test -> this.typeTestType(test);
+            case IExpr.Lambda lambda -> this.lambdaType(lambda, expected);
+            case IExpr.OutArgument outward -> this.outArgumentType(outward, expected);
         };
         this.model.setType(expression, type);
         return type;
     }
 
-    private TypeSymbol literalType(final Expr.Literal literal) {
+    private ITypeSymbol literalType(final IExpr.Literal literal) {
         return switch (literal.kind()) {
-            case INT_LITERAL -> TypeSymbol.Primitive.INT;
-            case LONG_LITERAL -> TypeSymbol.Primitive.LONG;
-            case FLOAT_LITERAL -> TypeSymbol.Primitive.FLOAT;
-            case DOUBLE_LITERAL -> TypeSymbol.Primitive.DOUBLE;
-            case CHAR_LITERAL -> TypeSymbol.Primitive.CHAR;
+            case INT_LITERAL -> ITypeSymbol.Primitive.INT;
+            case LONG_LITERAL -> ITypeSymbol.Primitive.LONG;
+            case FLOAT_LITERAL -> ITypeSymbol.Primitive.FLOAT;
+            case DOUBLE_LITERAL -> ITypeSymbol.Primitive.DOUBLE;
+            case CHAR_LITERAL -> ITypeSymbol.Primitive.CHAR;
             case STRING_LITERAL -> this.builtIns.stringType();
-            case TRUE, FALSE -> TypeSymbol.Primitive.BOOL;
-            default -> TypeSymbol.Special.NULL;
+            case TRUE, FALSE -> ITypeSymbol.Primitive.BOOL;
+            default -> ITypeSymbol.Special.NULL;
         };
     }
 
-    private TypeSymbol nameType(final Expr.Name name, final TypeSymbol expected) {
-        final Binding.Variable variable = this.scope.lookup(name.identifier());
+    private ITypeSymbol nameType(final IExpr.Name name, final ITypeSymbol expected) {
+        final IBinding.Variable variable = this.scope.lookup(name.identifier());
         if (variable != null) {
             this.model.setBinding(name, variable);
             return variable.type();
         }
         if (this.currentType != null) {
-            final List<MemberSymbol> members = lookup(this.currentType, name.identifier());
+            final List<IMemberSymbol> members = lookup(this.currentType, name.identifier());
             if (!members.isEmpty()) {
                 return this.bindMember(name, this.currentType, members, expected, Access.IMPLICIT);
             }
         }
-        final TypeSymbol type = this.namedType(name.identifier());
+        final ITypeSymbol type = this.namedType(name.identifier());
         if (type != null) {
-            this.model.setBinding(name, new Binding.TypeName(type));
+            this.model.setBinding(name, new IBinding.TypeName(type));
             return type;
         }
         this.report(name.line(), name.column(), CannonError.UNKNOWN_NAME, name.identifier());
-        return TypeSymbol.Special.ERROR;
+        return ITypeSymbol.Special.ERROR;
     }
 
-    private TypeSymbol namedType(final String name) {
+    private ITypeSymbol namedType(final String name) {
         final NamedType declared = this.model.declaredType(name);
         return declared != null ? declared : this.builtIns.type(name, 0);
     }
 
-    private TypeSymbol thisType(final Expr.This self) {
+    private ITypeSymbol thisType(final IExpr.This self) {
         if (this.staticContext) {
             this.report(self.line(), self.column(), CannonError.THIS_IN_STATIC, "this");
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        return this.currentType == null ? TypeSymbol.Special.ERROR : this.currentType;
+        return this.currentType == null ? ITypeSymbol.Special.ERROR : this.currentType;
     }
 
-    private TypeSymbol baseType(final Expr.Base base) {
+    private ITypeSymbol baseType(final IExpr.Base base) {
         if (this.staticContext) {
             this.report(base.line(), base.column(), CannonError.THIS_IN_STATIC, "base");
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         if (this.currentType == null || this.currentType.base() == null) {
             this.report(base.line(), base.column(), CannonError.NO_BASE_CLASS,
                     this.currentType == null ? "?" : this.currentType.name());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return this.currentType.base();
     }
 
-    private TypeSymbol unaryType(final Expr.Unary unary) {
-        final TypeSymbol operand = this.check(unary.operand(), null);
-        final TypeSymbol result = this.rules.unaryResult(unary.operator(), operand);
+    private ITypeSymbol unaryType(final IExpr.Unary unary) {
+        final ITypeSymbol operand = this.check(unary.operand(), null);
+        final ITypeSymbol result = this.rules.unaryResult(unary.operator(), operand);
         if (result == null) {
             this.report(unary.line(), unary.column(), CannonError.OPERATOR_ON_TYPE,
                     unary.operator().text(), operand.describe());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return result;
     }
 
-    private TypeSymbol binaryType(final Expr.Binary binary) {
-        final TypeSymbol left = this.check(binary.left(), null);
-        final TypeSymbol right = this.check(binary.right(), null);
-        final TypeSymbol result = this.rules.binaryResult(binary.operator(), left, right);
+    private ITypeSymbol binaryType(final IExpr.Binary binary) {
+        final ITypeSymbol left = this.check(binary.left(), null);
+        final ITypeSymbol right = this.check(binary.right(), null);
+        final ITypeSymbol result = this.rules.binaryResult(binary.operator(), left, right);
         if (result == null) {
             this.report(binary.line(), binary.column(), CannonError.OPERATOR_ON_TYPES,
                     binary.operator().text(), left.describe(), right.describe());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return result;
     }
 
-    private TypeSymbol conditionalType(final Expr.Conditional conditional, final TypeSymbol expected) {
+    private ITypeSymbol conditionalType(final IExpr.Conditional conditional, final ITypeSymbol expected) {
         this.condition(conditional.condition());
-        final TypeSymbol whenTrue = this.check(conditional.whenTrue(), expected);
-        final TypeSymbol whenFalse = this.check(conditional.whenFalse(), expected);
+        final ITypeSymbol whenTrue = this.check(conditional.whenTrue(), expected);
+        final ITypeSymbol whenFalse = this.check(conditional.whenFalse(), expected);
         if (this.rules.isAssignable(whenFalse, whenTrue)) {
             return whenTrue;
         }
@@ -535,23 +535,23 @@ public final class BodyChecker {
         }
         this.report(conditional.line(), conditional.column(),
                 CannonError.CANNOT_CONVERT, whenFalse.describe(), whenTrue.describe());
-        return TypeSymbol.Special.ERROR;
+        return ITypeSymbol.Special.ERROR;
     }
 
-    private TypeSymbol indexType(final Expr.Index index) {
-        final TypeSymbol target = this.check(index.target(), null);
-        final TypeSymbol key = this.check(index.index(), null);
-        final TypeSymbol result = this.rules.indexResult(target, key);
+    private ITypeSymbol indexType(final IExpr.Index index) {
+        final ITypeSymbol target = this.check(index.target(), null);
+        final ITypeSymbol key = this.check(index.index(), null);
+        final ITypeSymbol result = this.rules.indexResult(target, key);
         if (result == null) {
             this.report(index.line(), index.column(), CannonError.CANNOT_INDEX,
                     target.describe(), key.describe());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return result;
     }
 
-    private TypeSymbol newType(final Expr.New created) {
-        final TypeSymbol type = this.declarations.resolve(created.type());
+    private ITypeSymbol newType(final IExpr.New created) {
+        final ITypeSymbol type = this.declarations.resolve(created.type());
         final NamedType named = this.rules.named(type);
         if (named == null || named.kind() != NamedType.Kind.CLASS) {
             if (!this.rules.isError(type)) {
@@ -559,19 +559,19 @@ public final class BodyChecker {
                         CannonError.CANNOT_CREATE, type.describe());
             }
             this.checkArguments(created.arguments());
-            return this.rules.isError(type) ? TypeSymbol.Special.ERROR : type;
+            return this.rules.isError(type) ? ITypeSymbol.Special.ERROR : type;
         }
         this.callConstructor(named, type, created.arguments(), created);
         return type;
     }
 
     // A class with no constructor of its own can be made with no arguments and nothing else.
-    private void callConstructor(final NamedType named, final TypeSymbol type, final List<Expr> arguments,
-                                 final Node at) {
-        final List<MemberSymbol.MethodSymbol> candidates = new ArrayList<>();
-        for (final MemberSymbol member : named.members()) {
-            if (member instanceof MemberSymbol.ConstructorSymbol constructor) {
-                candidates.add(new MemberSymbol.MethodSymbol(named, named.name(), type,
+    private void callConstructor(final NamedType named, final ITypeSymbol type, final List<IExpr> arguments,
+                                 final INode at) {
+        final List<IMemberSymbol.MethodSymbol> candidates = new ArrayList<>();
+        for (final IMemberSymbol member : named.members()) {
+            if (member instanceof IMemberSymbol.ConstructorSymbol constructor) {
+                candidates.add(new IMemberSymbol.MethodSymbol(named, named.name(), type,
                         constructor.parameters(), constructor.modifiers()));
             }
         }
@@ -586,16 +586,16 @@ public final class BodyChecker {
         this.callWith(candidates, arguments, named.name(), at);
     }
 
-    private TypeSymbol newArrayType(final Expr.NewArray created) {
-        final TypeSymbol element = this.declarations.resolve(created.elementType());
-        this.expect(this.check(created.length(), TypeSymbol.Primitive.INT),
-                TypeSymbol.Primitive.INT, created.length());
-        return new TypeSymbol.ArrayType(element);
+    private ITypeSymbol newArrayType(final IExpr.NewArray created) {
+        final ITypeSymbol element = this.declarations.resolve(created.elementType());
+        this.expect(this.check(created.length(), ITypeSymbol.Primitive.INT),
+                ITypeSymbol.Primitive.INT, created.length());
+        return new ITypeSymbol.ArrayType(element);
     }
 
-    private TypeSymbol castType(final Expr.Cast cast) {
-        final TypeSymbol target = this.declarations.resolve(cast.type());
-        final TypeSymbol value = this.check(cast.value(), null);
+    private ITypeSymbol castType(final IExpr.Cast cast) {
+        final ITypeSymbol target = this.declarations.resolve(cast.type());
+        final ITypeSymbol value = this.check(cast.value(), null);
         if (!this.rules.isAssignable(value, target) && !this.rules.isAssignable(target, value)) {
             this.report(cast.line(), cast.column(),
                     CannonError.CANNOT_CONVERT, value.describe(), target.describe());
@@ -603,9 +603,9 @@ public final class BodyChecker {
         return target;
     }
 
-    private TypeSymbol typeTestType(final Expr.TypeTest test) {
-        final TypeSymbol value = this.check(test.value(), null);
-        final TypeSymbol target = this.declarations.resolve(test.type());
+    private ITypeSymbol typeTestType(final IExpr.TypeTest test) {
+        final ITypeSymbol value = this.check(test.value(), null);
+        final ITypeSymbol target = this.declarations.resolve(test.type());
         final String written = test.conversion() ? "as" : "is";
         if (!this.rules.isError(value) && !this.rules.isReference(value)) {
             this.report(test.line(), test.column(),
@@ -614,29 +614,29 @@ public final class BodyChecker {
         if (test.conversion() && !this.rules.isError(target) && !this.rules.isReference(target)) {
             this.report(test.line(), test.column(),
                     CannonError.OPERATOR_ON_TYPE, written, target.describe());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        return test.conversion() ? target : TypeSymbol.Primitive.BOOL;
+        return test.conversion() ? target : ITypeSymbol.Primitive.BOOL;
     }
 
     // ---------------------------------------------------------------- members
 
-    private TypeSymbol memberType(final Expr.Member member, final TypeSymbol expected) {
-        final TypeSymbol target = this.check(member.target(), null);
+    private ITypeSymbol memberType(final IExpr.Member member, final ITypeSymbol expected) {
+        final ITypeSymbol target = this.check(member.target(), null);
         if (this.rules.isError(target)) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final Access access = this.model.bindingOf(member.target()) instanceof Binding.TypeName
+        final Access access = this.model.bindingOf(member.target()) instanceof IBinding.TypeName
                 ? Access.TYPE : Access.INSTANCE;
-        final List<MemberSymbol> found = this.membersOf(target, member.name(), member);
+        final List<IMemberSymbol> found = this.membersOf(target, member.name(), member);
         return found.isEmpty()
-                ? TypeSymbol.Special.ERROR
+                ? ITypeSymbol.Special.ERROR
                 : this.bindMember(member, target, found, expected, access);
     }
 
-    private List<MemberSymbol> membersOf(final TypeSymbol target, final String name, final Node at) {
+    private List<IMemberSymbol> membersOf(final ITypeSymbol target, final String name, final INode at) {
         final NamedType named = this.rules.named(target);
-        final List<MemberSymbol> found = named == null ? List.of() : lookup(named, name);
+        final List<IMemberSymbol> found = named == null ? List.of() : lookup(named, name);
         if (found.isEmpty()) {
             this.report(at.line(), at.column(),
                     CannonError.NO_SUCH_MEMBER, target.describe(), name);
@@ -646,54 +646,54 @@ public final class BodyChecker {
 
     // A name that turned out to be a member: a value if it holds one, and a method only where a
     // delegate of the same shape is wanted, which is how a handler is handed over without brackets.
-    private TypeSymbol bindMember(final Expr expression, final TypeSymbol receiver,
-                                  final List<MemberSymbol> members, final TypeSymbol expected,
+    private ITypeSymbol bindMember(final IExpr expression, final ITypeSymbol receiver,
+                                  final List<IMemberSymbol> members, final ITypeSymbol expected,
                                   final Access access) {
-        final MemberSymbol first = members.getFirst();
-        if (first instanceof MemberSymbol.MethodSymbol) {
+        final IMemberSymbol first = members.getFirst();
+        if (first instanceof IMemberSymbol.MethodSymbol) {
             return this.methodGroupType(expression, receiver, members, expected, access);
         }
         if (!this.checkAccess(expression, first, access)) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final List<TypeSymbol> arguments = this.rules.arguments(receiver);
-        final TypeSymbol type = switch (first) {
-            case MemberSymbol.FieldSymbol field -> this.rules.substitute(field.type(), arguments);
-            case MemberSymbol.PropertySymbol property -> this.rules.substitute(property.type(), arguments);
-            case MemberSymbol.EventSymbol event -> event.delegateType();
-            default -> TypeSymbol.Special.ERROR;
+        final List<ITypeSymbol> arguments = this.rules.arguments(receiver);
+        final ITypeSymbol type = switch (first) {
+            case IMemberSymbol.FieldSymbol field -> this.rules.substitute(field.type(), arguments);
+            case IMemberSymbol.PropertySymbol property -> this.rules.substitute(property.type(), arguments);
+            case IMemberSymbol.EventSymbol event -> event.delegateType();
+            default -> ITypeSymbol.Special.ERROR;
         };
-        this.model.setBinding(expression, new Binding.Member(first, type));
+        this.model.setBinding(expression, new IBinding.Member(first, type));
         return type;
     }
 
-    private TypeSymbol methodGroupType(final Expr expression, final TypeSymbol receiver,
-                                       final List<MemberSymbol> members, final TypeSymbol expected,
+    private ITypeSymbol methodGroupType(final IExpr expression, final ITypeSymbol receiver,
+                                       final List<IMemberSymbol> members, final ITypeSymbol expected,
                                        final Access access) {
         final NamedType wanted = this.rules.named(expected);
         if (wanted == null || wanted.kind() != NamedType.Kind.DELEGATE || wanted.invoke() == null) {
             this.report(expression.line(), expression.column(),
                     CannonError.METHOD_AS_VALUE, members.getFirst().name());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final List<TypeSymbol> wantedArguments = this.rules.arguments(expected);
-        final List<TypeSymbol> ownArguments = this.rules.arguments(receiver);
-        for (final MemberSymbol member : members) {
-            final MemberSymbol.MethodSymbol candidate = (MemberSymbol.MethodSymbol) member;
+        final List<ITypeSymbol> wantedArguments = this.rules.arguments(expected);
+        final List<ITypeSymbol> ownArguments = this.rules.arguments(receiver);
+        for (final IMemberSymbol member : members) {
+            final IMemberSymbol.MethodSymbol candidate = (IMemberSymbol.MethodSymbol) member;
             if (this.matchesShape(candidate, wanted.invoke(), wantedArguments, ownArguments)
                     && this.checkAccess(expression, candidate, access)) {
-                this.model.setBinding(expression, new Binding.Member(candidate, expected));
+                this.model.setBinding(expression, new IBinding.Member(candidate, expected));
                 this.model.setCall(expression, candidate);
                 return expected;
             }
         }
         this.report(expression.line(), expression.column(),
                 CannonError.LAMBDA_SHAPE, expected.describe());
-        return TypeSymbol.Special.ERROR;
+        return ITypeSymbol.Special.ERROR;
     }
 
-    private boolean matchesShape(final MemberSymbol.MethodSymbol candidate, final MemberSymbol.MethodSymbol shape,
-                                 final List<TypeSymbol> wantedArguments, final List<TypeSymbol> ownArguments) {
+    private boolean matchesShape(final IMemberSymbol.MethodSymbol candidate, final IMemberSymbol.MethodSymbol shape,
+                                 final List<ITypeSymbol> wantedArguments, final List<ITypeSymbol> ownArguments) {
         if (candidate.parameters().size() != shape.parameters().size()) {
             return false;
         }
@@ -701,17 +701,17 @@ public final class BodyChecker {
             if (shape.parameters().get(i).outward() != candidate.parameters().get(i).outward()) {
                 return false;
             }
-            final TypeSymbol wanted = this.rules.substitute(shape.parameters().get(i).type(), wantedArguments);
-            final TypeSymbol given = this.rules.substitute(candidate.parameters().get(i).type(), ownArguments);
+            final ITypeSymbol wanted = this.rules.substitute(shape.parameters().get(i).type(), wantedArguments);
+            final ITypeSymbol given = this.rules.substitute(candidate.parameters().get(i).type(), ownArguments);
             if (!wanted.equals(given)) {
                 return false;
             }
         }
-        final TypeSymbol wantedReturn = this.rules.substitute(shape.returnType(), wantedArguments);
+        final ITypeSymbol wantedReturn = this.rules.substitute(shape.returnType(), wantedArguments);
         return this.rules.isAssignable(this.rules.substitute(candidate.returnType(), ownArguments), wantedReturn);
     }
 
-    private boolean checkAccess(final Expr expression, final MemberSymbol member, final Access access) {
+    private boolean checkAccess(final IExpr expression, final IMemberSymbol member, final Access access) {
         switch (access) {
             case TYPE:
                 if (!member.isStatic()) {
@@ -739,104 +739,104 @@ public final class BodyChecker {
 
     // ---------------------------------------------------------------- calls
 
-    private TypeSymbol callType(final Expr.Call call) {
-        if (call.callee() instanceof Expr.Name name && this.scope.lookup(name.identifier()) == null
+    private ITypeSymbol callType(final IExpr.Call call) {
+        if (call.callee() instanceof IExpr.Name name && this.scope.lookup(name.identifier()) == null
                 && this.currentType != null) {
-            final List<MemberSymbol> members = lookup(this.currentType, name.identifier());
-            if (!members.isEmpty() && members.getFirst() instanceof MemberSymbol.MethodSymbol) {
+            final List<IMemberSymbol> members = lookup(this.currentType, name.identifier());
+            if (!members.isEmpty() && members.getFirst() instanceof IMemberSymbol.MethodSymbol) {
                 return this.callMembers(call, name, this.currentType, members,
                         name.identifier(), Access.IMPLICIT);
             }
         }
-        if (call.callee() instanceof Expr.Member member) {
+        if (call.callee() instanceof IExpr.Member member) {
             return this.callThroughMember(call, member);
         }
         return this.invoke(call, this.check(call.callee(), null));
     }
 
-    private TypeSymbol callThroughMember(final Expr.Call call, final Expr.Member member) {
-        final TypeSymbol target = this.check(member.target(), null);
+    private ITypeSymbol callThroughMember(final IExpr.Call call, final IExpr.Member member) {
+        final ITypeSymbol target = this.check(member.target(), null);
         if (this.rules.isError(target)) {
             this.checkArguments(call.arguments());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final Access access = this.model.bindingOf(member.target()) instanceof Binding.TypeName
+        final Access access = this.model.bindingOf(member.target()) instanceof IBinding.TypeName
                 ? Access.TYPE : Access.INSTANCE;
-        final List<MemberSymbol> members = this.membersOf(target, member.name(), member);
+        final List<IMemberSymbol> members = this.membersOf(target, member.name(), member);
         if (members.isEmpty()) {
             this.checkArguments(call.arguments());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        if (members.getFirst() instanceof MemberSymbol.MethodSymbol) {
+        if (members.getFirst() instanceof IMemberSymbol.MethodSymbol) {
             return this.callMembers(call, member, target, members, member.name(), access);
         }
-        final TypeSymbol held = this.bindMember(member, target, members, null, access);
+        final ITypeSymbol held = this.bindMember(member, target, members, null, access);
         this.model.setType(member, held);
         return this.invoke(call, held);
     }
 
     // Calling something that holds a delegate: a local, a parameter, a field, a property or an event.
-    private TypeSymbol invoke(final Expr.Call call, final TypeSymbol callee) {
+    private ITypeSymbol invoke(final IExpr.Call call, final ITypeSymbol callee) {
         if (this.rules.isError(callee)) {
             this.checkArguments(call.arguments());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         final NamedType named = this.rules.named(callee);
         if (named == null || named.kind() != NamedType.Kind.DELEGATE || named.invoke() == null) {
             this.report(call.line(), call.column(), CannonError.CANNOT_CALL, callee.describe());
             this.checkArguments(call.arguments());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         this.checkEventRaise(call);
-        final List<TypeSymbol> arguments = this.rules.arguments(callee);
-        final MemberSymbol.MethodSymbol invoke = this.fill(named.invoke(), arguments);
+        final List<ITypeSymbol> arguments = this.rules.arguments(callee);
+        final IMemberSymbol.MethodSymbol invoke = this.fill(named.invoke(), arguments);
         this.callWith(List.of(invoke), call.arguments(), named.name(), call);
         return invoke.returnType();
     }
 
     // Raising an event is only allowed where it was declared, as in the language this one borrows
     // from: everywhere else an event is something to subscribe to, not something to fire.
-    private void checkEventRaise(final Expr.Call call) {
-        if (this.model.bindingOf(call.callee()) instanceof Binding.Member member
-                && member.member() instanceof MemberSymbol.EventSymbol event
+    private void checkEventRaise(final IExpr.Call call) {
+        if (this.model.bindingOf(call.callee()) instanceof IBinding.Member member
+                && member.member() instanceof IMemberSymbol.EventSymbol event
                 && event.owner() != this.currentType) {
             this.report(call.line(), call.column(), CannonError.EVENT_OUTSIDE_ITS_TYPE);
         }
     }
 
-    private TypeSymbol callMembers(final Expr.Call call, final Expr callee, final TypeSymbol receiver,
-                                   final List<MemberSymbol> members, final String name, final Access access) {
+    private ITypeSymbol callMembers(final IExpr.Call call, final IExpr callee, final ITypeSymbol receiver,
+                                   final List<IMemberSymbol> members, final String name, final Access access) {
         if (!this.checkAccess(callee, members.getFirst(), access)) {
             this.checkArguments(call.arguments());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final List<TypeSymbol> arguments = this.rules.arguments(receiver);
-        final List<MemberSymbol.MethodSymbol> candidates = new ArrayList<>();
-        for (final MemberSymbol member : members) {
-            if (member instanceof MemberSymbol.MethodSymbol method) {
+        final List<ITypeSymbol> arguments = this.rules.arguments(receiver);
+        final List<IMemberSymbol.MethodSymbol> candidates = new ArrayList<>();
+        for (final IMemberSymbol member : members) {
+            if (member instanceof IMemberSymbol.MethodSymbol method) {
                 candidates.add(this.fill(method, arguments));
             }
         }
-        final MemberSymbol.MethodSymbol chosen = this.callWith(candidates, call.arguments(), name, call);
+        final IMemberSymbol.MethodSymbol chosen = this.callWith(candidates, call.arguments(), name, call);
         if (chosen != null) {
-            this.model.setBinding(callee, new Binding.Member(chosen, chosen.returnType()));
+            this.model.setBinding(callee, new IBinding.Member(chosen, chosen.returnType()));
         }
-        return chosen == null ? TypeSymbol.Special.ERROR : chosen.returnType();
+        return chosen == null ? ITypeSymbol.Special.ERROR : chosen.returnType();
     }
 
     // A method read off a filled-in collection has its stand-in types replaced by what that
     // collection holds, so List<string>.Get gives back a string and not a T.
-    private MemberSymbol.MethodSymbol fill(final MemberSymbol.MethodSymbol method,
-                                           final List<TypeSymbol> arguments) {
+    private IMemberSymbol.MethodSymbol fill(final IMemberSymbol.MethodSymbol method,
+                                           final List<ITypeSymbol> arguments) {
         if (arguments.isEmpty()) {
             return method;
         }
-        final List<MemberSymbol.ParameterSymbol> parameters = new ArrayList<>();
-        for (final MemberSymbol.ParameterSymbol parameter : method.parameters()) {
-            parameters.add(new MemberSymbol.ParameterSymbol(parameter.name(),
+        final List<IMemberSymbol.ParameterSymbol> parameters = new ArrayList<>();
+        for (final IMemberSymbol.ParameterSymbol parameter : method.parameters()) {
+            parameters.add(new IMemberSymbol.ParameterSymbol(parameter.name(),
                     this.rules.substitute(parameter.type(), arguments), parameter.outward()));
         }
-        return new MemberSymbol.MethodSymbol(method.owner(), method.name(),
+        return new IMemberSymbol.MethodSymbol(method.owner(), method.name(),
                 this.rules.substitute(method.returnType(), arguments), parameters, method.modifiers());
     }
 
@@ -845,17 +845,17 @@ public final class BodyChecker {
      * knows what it is being handed to, so it is left out of the choosing and checked afterwards,
      * against the version that won.
      */
-    private MemberSymbol.MethodSymbol callWith(final List<MemberSymbol.MethodSymbol> candidates,
-                                               final List<Expr> arguments, final String name, final Node at) {
-        final List<TypeSymbol> given = new ArrayList<>();
-        for (final Expr argument : arguments) {
-            final boolean waits = argument instanceof Expr.Lambda
+    private IMemberSymbol.MethodSymbol callWith(final List<IMemberSymbol.MethodSymbol> candidates,
+                                               final List<IExpr> arguments, final String name, final INode at) {
+        final List<ITypeSymbol> given = new ArrayList<>();
+        for (final IExpr argument : arguments) {
+            final boolean waits = argument instanceof IExpr.Lambda
                     || waitsForItsParameter(argument) || this.isMethodGroup(argument);
             given.add(waits ? null : this.check(argument, null));
         }
-        final List<MemberSymbol.MethodSymbol> fitting = new ArrayList<>();
+        final List<IMemberSymbol.MethodSymbol> fitting = new ArrayList<>();
         int best = -1;
-        for (final MemberSymbol.MethodSymbol candidate : candidates) {
+        for (final IMemberSymbol.MethodSymbol candidate : candidates) {
             final int score = this.score(candidate, given, arguments);
             if (score < 0) {
                 continue;
@@ -874,9 +874,9 @@ public final class BodyChecker {
         if (fitting.size() > 1) {
             this.report(at.line(), at.column(), CannonError.AMBIGUOUS_CALL, name);
         }
-        final MemberSymbol.MethodSymbol chosen = fitting.getFirst();
+        final IMemberSymbol.MethodSymbol chosen = fitting.getFirst();
         this.checkAgainst(chosen, arguments, given);
-        if (at instanceof Expr expression) {
+        if (at instanceof IExpr expression) {
             this.model.setCall(expression, chosen);
         }
         return chosen;
@@ -884,19 +884,19 @@ public final class BodyChecker {
 
     // When only one version could have been meant, saying which argument is wrong beats saying that
     // none of them fit: with a single version there is nothing to choose between.
-    private MemberSymbol.MethodSymbol reportNoFit(final List<MemberSymbol.MethodSymbol> candidates,
-                                                  final List<Expr> arguments, final List<TypeSymbol> given,
-                                                  final String name, final Node at) {
-        final List<MemberSymbol.MethodSymbol> sameCount = new ArrayList<>();
-        for (final MemberSymbol.MethodSymbol candidate : candidates) {
+    private IMemberSymbol.MethodSymbol reportNoFit(final List<IMemberSymbol.MethodSymbol> candidates,
+                                                  final List<IExpr> arguments, final List<ITypeSymbol> given,
+                                                  final String name, final INode at) {
+        final List<IMemberSymbol.MethodSymbol> sameCount = new ArrayList<>();
+        for (final IMemberSymbol.MethodSymbol candidate : candidates) {
             if (candidate.parameters().size() == given.size()) {
                 sameCount.add(candidate);
             }
         }
         if (sameCount.size() == 1) {
-            final MemberSymbol.MethodSymbol only = sameCount.getFirst();
+            final IMemberSymbol.MethodSymbol only = sameCount.getFirst();
             this.checkAgainst(only, arguments, given);
-            if (at instanceof Expr expression) {
+            if (at instanceof IExpr expression) {
                 this.model.setCall(expression, only);
             }
             return only;
@@ -904,18 +904,18 @@ public final class BodyChecker {
         this.report(at.line(), at.column(), CannonError.NO_MATCHING_OVERLOAD, name);
         for (int i = 0; i < arguments.size(); i++) {
             if (given.get(i) == null) {
-                this.check(arguments.get(i), TypeSymbol.Special.ERROR);
+                this.check(arguments.get(i), ITypeSymbol.Special.ERROR);
             }
         }
         return null;
     }
 
-    private void checkAgainst(final MemberSymbol.MethodSymbol chosen, final List<Expr> arguments,
-                              final List<TypeSymbol> given) {
+    private void checkAgainst(final IMemberSymbol.MethodSymbol chosen, final List<IExpr> arguments,
+                              final List<ITypeSymbol> given) {
         for (int i = 0; i < arguments.size(); i++) {
-            final MemberSymbol.ParameterSymbol parameter = chosen.parameters().get(i);
-            final Expr argument = arguments.get(i);
-            final boolean outward = argument instanceof Expr.OutArgument;
+            final IMemberSymbol.ParameterSymbol parameter = chosen.parameters().get(i);
+            final IExpr argument = arguments.get(i);
+            final boolean outward = argument instanceof IExpr.OutArgument;
             if (parameter.outward() != outward) {
                 this.report(argument.line(), argument.column(), parameter.outward()
                         ? CannonError.OUT_ARGUMENT_EXPECTED : CannonError.OUT_ARGUMENT_UNEXPECTED,
@@ -938,20 +938,20 @@ public final class BodyChecker {
     // How well a version fits: an exact type counts double, a conversion counts once, and anything
     // that does not fit at all rules the version out. An outward argument fits only an outward
     // parameter, and only exactly, because the method writes straight into the place it is given.
-    private int score(final MemberSymbol.MethodSymbol candidate, final List<TypeSymbol> given,
-                      final List<Expr> arguments) {
+    private int score(final IMemberSymbol.MethodSymbol candidate, final List<ITypeSymbol> given,
+                      final List<IExpr> arguments) {
         if (candidate.parameters().size() != given.size()) {
             return -1;
         }
         int total = 0;
         for (int i = 0; i < given.size(); i++) {
-            final MemberSymbol.ParameterSymbol parameter = candidate.parameters().get(i);
-            final boolean outward = arguments.get(i) instanceof Expr.OutArgument;
+            final IMemberSymbol.ParameterSymbol parameter = candidate.parameters().get(i);
+            final boolean outward = arguments.get(i) instanceof IExpr.OutArgument;
             if (outward != parameter.outward()) {
                 return -1;
             }
-            final TypeSymbol wanted = parameter.type();
-            final TypeSymbol argument = given.get(i);
+            final ITypeSymbol wanted = parameter.type();
+            final ITypeSymbol argument = given.get(i);
             if (argument == null) {
                 if (outward) {
                     total += 2;
@@ -973,30 +973,30 @@ public final class BodyChecker {
         return total;
     }
 
-    private void checkArguments(final List<Expr> arguments) {
-        for (final Expr argument : arguments) {
+    private void checkArguments(final List<IExpr> arguments) {
+        for (final IExpr argument : arguments) {
             this.check(argument, null);
         }
     }
 
     // ---------------------------------------------------------------- assignment and lambdas
 
-    private TypeSymbol assignType(final Expr.Assign assign) {
-        final TypeSymbol target = this.check(assign.target(), null);
-        final Binding binding = this.model.bindingOf(assign.target());
-        if (binding instanceof Binding.Member member
-                && member.member() instanceof MemberSymbol.EventSymbol event) {
+    private ITypeSymbol assignType(final IExpr.Assign assign) {
+        final ITypeSymbol target = this.check(assign.target(), null);
+        final IBinding binding = this.model.bindingOf(assign.target());
+        if (binding instanceof IBinding.Member member
+                && member.member() instanceof IMemberSymbol.EventSymbol event) {
             return this.subscribe(assign, event);
         }
-        final TypeSymbol value = this.check(assign.value(), target);
+        final ITypeSymbol value = this.check(assign.value(), target);
         if (this.rules.isError(target) || !this.writable(assign, binding)) {
-            return this.rules.isError(target) ? TypeSymbol.Special.ERROR : target;
+            return this.rules.isError(target) ? ITypeSymbol.Special.ERROR : target;
         }
         if (assign.operator() == Operator.ASSIGN) {
             this.expect(value, target, assign.value());
             return target;
         }
-        final TypeSymbol combined = this.rules.binaryResult(assign.operator(), target, value);
+        final ITypeSymbol combined = this.rules.binaryResult(assign.operator(), target, value);
         if (combined == null || !this.rules.isAssignable(combined, target)) {
             this.report(assign.line(), assign.column(), CannonError.OPERATOR_ON_TYPES,
                     assign.operator().text() + "=", target.describe(), value.describe());
@@ -1004,28 +1004,28 @@ public final class BodyChecker {
         return target;
     }
 
-    private TypeSymbol subscribe(final Expr.Assign assign, final MemberSymbol.EventSymbol event) {
+    private ITypeSymbol subscribe(final IExpr.Assign assign, final IMemberSymbol.EventSymbol event) {
         if (assign.operator() != Operator.ADD && assign.operator() != Operator.SUBTRACT) {
             this.report(assign.line(), assign.column(), CannonError.OPERATOR_ON_TYPE,
                     assign.operator().text() + "=", event.delegateType().name());
             this.check(assign.value(), event.delegateType());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         this.expect(this.check(assign.value(), event.delegateType()), event.delegateType(), assign.value());
         return event.delegateType();
     }
 
-    private boolean writable(final Expr.Assign assign, final Binding binding) {
-        if (!(binding instanceof Binding.Member member)) {
+    private boolean writable(final IExpr.Assign assign, final IBinding binding) {
+        if (!(binding instanceof IBinding.Member member)) {
             return true;
         }
-        if (member.member() instanceof MemberSymbol.FieldSymbol field && field.isReadOnly()
+        if (member.member() instanceof IMemberSymbol.FieldSymbol field && field.isReadOnly()
                 && !(this.inConstructor && field.owner() == this.currentType)) {
             this.report(assign.line(), assign.column(),
                     CannonError.CANNOT_ASSIGN_READONLY, field.name());
             return false;
         }
-        if (member.member() instanceof MemberSymbol.PropertySymbol property && !property.writable()) {
+        if (member.member() instanceof IMemberSymbol.PropertySymbol property && !property.writable()) {
             this.report(assign.line(), assign.column(),
                     CannonError.CANNOT_ASSIGN_READONLY, property.name());
             return false;
@@ -1033,31 +1033,31 @@ public final class BodyChecker {
         return true;
     }
 
-    private TypeSymbol lambdaType(final Expr.Lambda lambda, final TypeSymbol expected) {
+    private ITypeSymbol lambdaType(final IExpr.Lambda lambda, final ITypeSymbol expected) {
         final NamedType wanted = this.rules.named(expected);
         if (wanted == null || wanted.kind() != NamedType.Kind.DELEGATE || wanted.invoke() == null) {
             if (!this.rules.isError(expected)) {
                 this.report(lambda.line(), lambda.column(), CannonError.LAMBDA_SHAPE,
                         expected == null ? "nothing" : expected.describe());
             }
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        final MemberSymbol.MethodSymbol shape = this.fill(wanted.invoke(), this.rules.arguments(expected));
+        final IMemberSymbol.MethodSymbol shape = this.fill(wanted.invoke(), this.rules.arguments(expected));
         if (shape.parameters().size() != lambda.parameters().size()) {
             this.report(lambda.line(), lambda.column(),
                     CannonError.LAMBDA_SHAPE, expected.describe());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         final Scope saved = this.scope;
-        final TypeSymbol savedReturn = this.returnType;
+        final ITypeSymbol savedReturn = this.returnType;
         this.scope = new Scope(saved);
         this.declareLambdaParameters(lambda, shape);
         this.returnType = shape.returnType();
         if (lambda.block() != null) {
             this.checkBlock(lambda.block(), false);
         } else {
-            final TypeSymbol body = this.check(lambda.body(), shape.returnType());
-            if (shape.returnType() != TypeSymbol.Primitive.VOID) {
+            final ITypeSymbol body = this.check(lambda.body(), shape.returnType());
+            if (shape.returnType() != ITypeSymbol.Primitive.VOID) {
                 this.expect(body, shape.returnType(), lambda.body());
             }
         }
@@ -1067,16 +1067,16 @@ public final class BodyChecker {
         return expected;
     }
 
-    private void declareLambdaParameters(final Expr.Lambda lambda, final MemberSymbol.MethodSymbol shape) {
+    private void declareLambdaParameters(final IExpr.Lambda lambda, final IMemberSymbol.MethodSymbol shape) {
         for (int i = 0; i < lambda.parameters().size(); i++) {
-            final Decl.Parameter parameter = lambda.parameters().get(i);
+            final IDecl.Parameter parameter = lambda.parameters().get(i);
             if (parameter.outward() != shape.parameters().get(i).outward()) {
                 this.report(parameter.line(), parameter.column(), shape.parameters().get(i).outward()
                         ? CannonError.OUT_ARGUMENT_EXPECTED : CannonError.OUT_ARGUMENT_UNEXPECTED,
                         shape.parameters().get(i).name());
             }
-            final TypeSymbol fromShape = shape.parameters().get(i).type();
-            TypeSymbol type = fromShape;
+            final ITypeSymbol fromShape = shape.parameters().get(i).type();
+            ITypeSymbol type = fromShape;
             if (parameter.type() != null) {
                 type = this.declarations.resolve(parameter.type());
                 if (!type.equals(fromShape)) {
@@ -1084,7 +1084,7 @@ public final class BodyChecker {
                             CannonError.CANNOT_CONVERT, fromShape.describe(), type.describe());
                 }
             }
-            final Binding.Variable variable = new Binding.Variable(parameter.name(), type, true);
+            final IBinding.Variable variable = new IBinding.Variable(parameter.name(), type, true);
             if (!this.scope.declare(variable)) {
                 this.report(parameter.line(), parameter.column(),
                         CannonError.DUPLICATE_DECLARATION, parameter.name());
@@ -1098,14 +1098,14 @@ public final class BodyChecker {
     // The place a method is being asked to write into: a local it declares here, a local that already
     // exists, or a field. Written as var, the local takes whatever the method fills in, which is only
     // known once the version of the method has been chosen.
-    private TypeSymbol outArgumentType(final Expr.OutArgument argument, final TypeSymbol expected) {
+    private ITypeSymbol outArgumentType(final IExpr.OutArgument argument, final ITypeSymbol expected) {
         if (argument.type() != null) {
-            final TypeSymbol type = isInferred(argument.type())
+            final ITypeSymbol type = isInferred(argument.type())
                     ? expected : this.declarations.resolve(argument.type());
             if (type == null || this.rules.isError(type)) {
-                return TypeSymbol.Special.ERROR;
+                return ITypeSymbol.Special.ERROR;
             }
-            final Binding.Variable variable = new Binding.Variable(argument.name(), type, false);
+            final IBinding.Variable variable = new IBinding.Variable(argument.name(), type, false);
             if (!this.scope.declare(variable)) {
                 this.report(argument.line(), argument.column(),
                         CannonError.DUPLICATE_DECLARATION, argument.name());
@@ -1114,35 +1114,35 @@ public final class BodyChecker {
             this.model.setDeclared(argument, variable);
             return type;
         }
-        final Binding.Variable variable = this.scope.lookup(argument.name());
+        final IBinding.Variable variable = this.scope.lookup(argument.name());
         if (variable != null) {
             this.model.setBinding(argument, variable);
             return variable.type();
         }
-        final List<MemberSymbol> members = this.currentType == null
+        final List<IMemberSymbol> members = this.currentType == null
                 ? List.of() : lookup(this.currentType, argument.name());
         if (!members.isEmpty()) {
-            if (members.getFirst() instanceof MemberSymbol.FieldSymbol field && !field.isReadOnly()) {
-                this.model.setBinding(argument, new Binding.Member(field, field.type()));
+            if (members.getFirst() instanceof IMemberSymbol.FieldSymbol field && !field.isReadOnly()) {
+                this.model.setBinding(argument, new IBinding.Member(field, field.type()));
                 return field.type();
             }
             this.report(argument.line(), argument.column(), CannonError.OUT_NOT_A_PLACE, argument.name());
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         this.report(argument.line(), argument.column(), CannonError.UNKNOWN_NAME, argument.name());
-        return TypeSymbol.Special.ERROR;
+        return ITypeSymbol.Special.ERROR;
     }
 
-    private static boolean waitsForItsParameter(final Expr argument) {
-        return argument instanceof Expr.OutArgument outward && isInferred(outward.type());
+    private static boolean waitsForItsParameter(final IExpr argument) {
+        return argument instanceof IExpr.OutArgument outward && isInferred(outward.type());
     }
 
     // An outward parameter has to be given a value on every way out of the method, because the caller
     // is promised one. This walks the body carrying whether it has been given yet, and says so at the
     // first way out that has not.
-    private void checkOutParameters(final List<Decl.Parameter> parameters, final Stmt.Block body,
-                                    final Node at) {
-        for (final Decl.Parameter parameter : parameters) {
+    private void checkOutParameters(final List<IDecl.Parameter> parameters, final IStmt.Block body,
+                                    final INode at) {
+        for (final IDecl.Parameter parameter : parameters) {
             if (!parameter.outward()) {
                 continue;
             }
@@ -1152,37 +1152,37 @@ public final class BodyChecker {
         }
     }
 
-    private boolean flow(final Stmt statement, final String name, final boolean assigned) {
+    private boolean flow(final IStmt statement, final String name, final boolean assigned) {
         return switch (statement) {
-            case Stmt.Block block -> {
+            case IStmt.Block block -> {
                 boolean now = assigned;
-                for (final Stmt inner : block.statements()) {
+                for (final IStmt inner : block.statements()) {
                     now = this.flow(inner, name, now);
                 }
                 yield now;
             }
-            case Stmt.ExprStmt expression -> assigned || writesTo(expression.expression(), name);
-            case Stmt.LocalDecl local -> assigned || writesTo(local.initializer(), name);
-            case Stmt.Return give -> {
+            case IStmt.ExprStmt expression -> assigned || writesTo(expression.expression(), name);
+            case IStmt.LocalDecl local -> assigned || writesTo(local.initializer(), name);
+            case IStmt.Return give -> {
                 if (!assigned && !writesTo(give.value(), name)) {
                     this.report(give.line(), give.column(), CannonError.OUT_NOT_ASSIGNED, name);
                 }
                 yield true;
             }
-            case Stmt.If branch -> {
+            case IStmt.If branch -> {
                 final boolean then = this.flow(branch.then(), name, assigned);
                 final boolean otherwise = branch.otherwise() == null
                         ? assigned : this.flow(branch.otherwise(), name, assigned);
                 yield then && otherwise;
             }
-            case Stmt.DoWhile loop -> this.flow(loop.body(), name, assigned);
-            case Stmt.While loop -> this.aside(loop.body(), name, assigned);
-            case Stmt.For loop -> this.aside(loop.body(), name, assigned);
-            case Stmt.ForEach loop -> this.aside(loop.body(), name, assigned);
-            case Stmt.Switch choice -> {
-                for (final Stmt.SwitchSection section : choice.sections()) {
+            case IStmt.DoWhile loop -> this.flow(loop.body(), name, assigned);
+            case IStmt.While loop -> this.aside(loop.body(), name, assigned);
+            case IStmt.For loop -> this.aside(loop.body(), name, assigned);
+            case IStmt.ForEach loop -> this.aside(loop.body(), name, assigned);
+            case IStmt.Switch choice -> {
+                for (final IStmt.SwitchSection section : choice.sections()) {
                     boolean now = assigned;
-                    for (final Stmt inner : section.statements()) {
+                    for (final IStmt inner : section.statements()) {
                         now = this.flow(inner, name, now);
                     }
                 }
@@ -1194,32 +1194,32 @@ public final class BodyChecker {
 
     // A body that may not run at all cannot be counted on to have given the value, but a way out
     // inside it still has to be checked.
-    private boolean aside(final Stmt body, final String name, final boolean assigned) {
+    private boolean aside(final IStmt body, final String name, final boolean assigned) {
         this.flow(body, name, assigned);
         return assigned;
     }
 
     // Whether evaluating this expression gives the name a value: an assignment to it, or handing it
     // to a method as the place to fill in. A lambda's body does not count, because it runs later.
-    private static boolean writesTo(final Expr expression, final String name) {
+    private static boolean writesTo(final IExpr expression, final String name) {
         return switch (expression) {
             case null -> false;
-            case Expr.Assign assign -> (assign.operator() == Operator.ASSIGN
-                    && assign.target() instanceof Expr.Name target && target.identifier().equals(name))
+            case IExpr.Assign assign -> (assign.operator() == Operator.ASSIGN
+                    && assign.target() instanceof IExpr.Name target && target.identifier().equals(name))
                     || writesTo(assign.target(), name) || writesTo(assign.value(), name);
-            case Expr.OutArgument outward -> outward.name().equals(name);
-            case Expr.Binary binary -> writesTo(binary.left(), name) || writesTo(binary.right(), name);
-            case Expr.Unary unary -> writesTo(unary.operand(), name);
-            case Expr.Conditional conditional -> writesTo(conditional.condition(), name);
-            case Expr.Call call -> writesTo(call.callee(), name)
+            case IExpr.OutArgument outward -> outward.name().equals(name);
+            case IExpr.Binary binary -> writesTo(binary.left(), name) || writesTo(binary.right(), name);
+            case IExpr.Unary unary -> writesTo(unary.operand(), name);
+            case IExpr.Conditional conditional -> writesTo(conditional.condition(), name);
+            case IExpr.Call call -> writesTo(call.callee(), name)
                     || call.arguments().stream().anyMatch(argument -> writesTo(argument, name));
-            case Expr.Member member -> writesTo(member.target(), name);
-            case Expr.Index index -> writesTo(index.target(), name) || writesTo(index.index(), name);
-            case Expr.New created -> created.arguments().stream()
+            case IExpr.Member member -> writesTo(member.target(), name);
+            case IExpr.Index index -> writesTo(index.target(), name) || writesTo(index.index(), name);
+            case IExpr.New created -> created.arguments().stream()
                     .anyMatch(argument -> writesTo(argument, name));
-            case Expr.NewArray created -> writesTo(created.length(), name);
-            case Expr.Cast cast -> writesTo(cast.value(), name);
-            case Expr.TypeTest test -> writesTo(test.value(), name);
+            case IExpr.NewArray created -> writesTo(created.length(), name);
+            case IExpr.Cast cast -> writesTo(cast.value(), name);
+            case IExpr.TypeTest test -> writesTo(test.value(), name);
             default -> false;
         };
     }
@@ -1237,29 +1237,29 @@ public final class BodyChecker {
 
     // A name or a member that turns out to be a method, written without brackets. Like a lambda, it
     // has no type of its own until it is known what it is being handed to.
-    private boolean isMethodGroup(final Expr expression) {
-        if (expression instanceof Expr.Name name) {
+    private boolean isMethodGroup(final IExpr expression) {
+        if (expression instanceof IExpr.Name name) {
             if (this.scope.lookup(name.identifier()) != null || this.currentType == null) {
                 return false;
             }
-            final List<MemberSymbol> found = lookup(this.currentType, name.identifier());
-            return !found.isEmpty() && found.getFirst() instanceof MemberSymbol.MethodSymbol;
+            final List<IMemberSymbol> found = lookup(this.currentType, name.identifier());
+            return !found.isEmpty() && found.getFirst() instanceof IMemberSymbol.MethodSymbol;
         }
-        if (expression instanceof Expr.Member member) {
+        if (expression instanceof IExpr.Member member) {
             this.quiet++;
-            final TypeSymbol target = this.check(member.target(), null);
+            final ITypeSymbol target = this.check(member.target(), null);
             this.quiet--;
             final NamedType named = this.rules.named(target);
             if (named == null) {
                 return false;
             }
-            final List<MemberSymbol> found = lookup(named, member.name());
-            return !found.isEmpty() && found.getFirst() instanceof MemberSymbol.MethodSymbol;
+            final List<IMemberSymbol> found = lookup(named, member.name());
+            return !found.isEmpty() && found.getFirst() instanceof IMemberSymbol.MethodSymbol;
         }
         return false;
     }
 
-    private void expect(final TypeSymbol given, final TypeSymbol wanted, final Node at) {
+    private void expect(final ITypeSymbol given, final ITypeSymbol wanted, final INode at) {
         if (!this.rules.isAssignable(given, wanted)) {
             this.report(at.line(), at.column(),
                     CannonError.CANNOT_CONVERT, given.describe(), wanted.describe());
@@ -1268,24 +1268,24 @@ public final class BodyChecker {
 
     // The nearest declaration wins. A class that writes a method its interface also declares would
     // otherwise offer the same method twice and every call of it would look ambiguous.
-    private static List<MemberSymbol> lookup(final NamedType type, final String name) {
-        final List<MemberSymbol> found = new ArrayList<>();
-        for (final MemberSymbol member : type.allMembers()) {
-            if (!member.name().equals(name) || member instanceof MemberSymbol.ConstructorSymbol) {
+    private static List<IMemberSymbol> lookup(final NamedType type, final String name) {
+        final List<IMemberSymbol> found = new ArrayList<>();
+        for (final IMemberSymbol member : type.allMembers()) {
+            if (!member.name().equals(name) || member instanceof IMemberSymbol.ConstructorSymbol) {
                 continue;
             }
             if (found.isEmpty()) {
                 found.add(member);
                 continue;
             }
-            if (!(found.getFirst() instanceof MemberSymbol.MethodSymbol)
-                    || !(member instanceof MemberSymbol.MethodSymbol method)) {
+            if (!(found.getFirst() instanceof IMemberSymbol.MethodSymbol)
+                    || !(member instanceof IMemberSymbol.MethodSymbol method)) {
                 continue;
             }
             boolean alreadyThere = false;
-            for (final MemberSymbol seen : found) {
+            for (final IMemberSymbol seen : found) {
                 alreadyThere = alreadyThere
-                        || sameSignature((MemberSymbol.MethodSymbol) seen, method);
+                        || sameSignature((IMemberSymbol.MethodSymbol) seen, method);
             }
             if (!alreadyThere) {
                 found.add(member);
@@ -1294,8 +1294,8 @@ public final class BodyChecker {
         return found;
     }
 
-    private static boolean sameSignature(final MemberSymbol.MethodSymbol left,
-                                         final MemberSymbol.MethodSymbol right) {
+    private static boolean sameSignature(final IMemberSymbol.MethodSymbol left,
+                                         final IMemberSymbol.MethodSymbol right) {
         if (left.parameters().size() != right.parameters().size()) {
             return false;
         }

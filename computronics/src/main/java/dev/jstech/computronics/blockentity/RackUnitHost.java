@@ -9,7 +9,7 @@ package dev.jstech.computronics.blockentity;
 
 import dev.jstech.computronics.os.OpenWindow;
 import dev.jstech.computronics.os.OsDef;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.program.ComputerConsoleState;
 import dev.jstech.core.peripheral.PeripheralCableType;
 import dev.jstech.core.tier.HardwareEra;
@@ -29,7 +29,7 @@ import java.util.Set;
  * them — does not have to touch the KVM. Stateless: it holds nothing but the rack and the row, and
  * every call runs through the rack's own code path.
  */
-public record RackUnitHost(ServerRackBlockEntity rack, int row) implements OsHost {
+public record RackUnitHost(ServerRackBlockEntity rack, int row) implements IOsHost {
 
     @Override
     public boolean isRunning() {

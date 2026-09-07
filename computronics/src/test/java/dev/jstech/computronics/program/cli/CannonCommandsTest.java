@@ -195,7 +195,7 @@ class CannonCommandsTest {
     void cannon_listsWhatIsRunningAndSaysWhenNothingIs() {
         this.computer.add(CannonCommands.RUNTIME);
         assertTrue(this.run("cannon ps").contains("no Cannon programs are running"));
-        this.computer.running.add(new CliComputer.CannonProcess(1, "Monitor", "running", 2048, 65536));
+        this.computer.running.add(new ICliComputer.CannonProcess(1, "Monitor", "running", 2048, 65536));
         final String out = this.run("cannon ps");
         assertTrue(out.contains("Monitor"), out);
         assertTrue(out.contains("2 KB of 64 KB"), out);
@@ -231,7 +231,7 @@ class CannonCommandsTest {
     }
 
     /** A computer with a disk, a list of installed packages, and a note of what it was asked to run. */
-    private static final class Fake implements CliComputer {
+    private static final class Fake implements ICliComputer {
 
         private final Map<String, String> files = new LinkedHashMap<>();
         private final List<ProgramInfo> installed = new ArrayList<>();
@@ -336,13 +336,13 @@ class CannonCommandsTest {
             return OpResult.fail("no network");
         }
 
-        @Override public List<StoredItem> query(final dev.jstech.computronics.program.iql.IqlCondition where,
+        @Override public List<StoredItem> query(final dev.jstech.computronics.program.iql.IIqlCondition where,
                 final String server, final int limit) {
             return List.of();
         }
 
         @Override public List<StoredItem> queryObject(final String object,
-                final dev.jstech.computronics.program.iql.IqlCondition where, final String server,
+                final dev.jstech.computronics.program.iql.IIqlCondition where, final String server,
                 final int limit) {
             return List.of();
         }

@@ -11,10 +11,10 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.blockentity.MainframePartBlockEntity;
 import dev.jstech.computronics.menu.MainframeMenu;
-import dev.jstech.core.network.DataNetworkConnectable;
+import dev.jstech.core.network.IDataNetworkConnectable;
 import dev.jstech.core.network.DataTier;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -40,7 +40,7 @@ import org.jetbrains.annotations.Nullable;
  * A structural part of the Mainframe multiblock — one of the 11 non-controller blocks.
  */
 public class MainframePartBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable, PeripheralConnectable {
+        implements EntityBlock, IDataNetworkConnectable, IPeripheralConnectable {
 
     public static final MapCodec<MainframePartBlock> CODEC = simpleCodec(MainframePartBlock::new);
 

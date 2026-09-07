@@ -25,7 +25,7 @@ class OperationTypeRegistryTest {
     /**
      * A no-op args record used purely for testing the registry shape.
      */
-    private record DummyArgs(int value) implements OperationArgs {}
+    private record DummyArgs(int value) implements IOperationArgs {}
 
     private OperationTypeRegistry registry;
 

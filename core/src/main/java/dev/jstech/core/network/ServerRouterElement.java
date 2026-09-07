@@ -19,7 +19,7 @@ public record ServerRouterElement(
         NetworkUuid networkUuid,
         long pos,
         IndustrialTier tier
-) implements NetworkTopologyElement {
+) implements INetworkTopologyElement {
 
     public ServerRouterElement {
         Objects.requireNonNull(networkUuid, "networkUuid must not be null");

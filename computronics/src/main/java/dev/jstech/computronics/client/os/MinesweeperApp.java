@@ -23,7 +23,7 @@ import java.util.Locale;
  * number colours). All rules live in the pure {@link MinesweeperGame}; the board component only draws it
  * and turns clicks into reveals and flags.
  */
-public final class MinesweeperApp implements DesktopApp {
+public final class MinesweeperApp implements IDesktopApp {
 
     private static final int FACE = 0xFFC0C0C0;
     private static final int BEVEL_LIGHT = 0xFFFFFFFF;

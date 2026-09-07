@@ -233,7 +233,7 @@ public final class BootSequenceScreen extends Screen {
     private HardwareEra era() {
         final Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(computerPos)
-                instanceof dev.jstech.computronics.os.OsHost be) {
+                instanceof dev.jstech.computronics.os.IOsHost be) {
             return be.displayEra();
         }
         return HardwareEra.STANDARD;

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Library;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
@@ -65,7 +65,7 @@ class ProcessTest {
 
     private static Process run(final String before, final String body, final long heap) {
         final Loaded program = load(before, body);
-        final Process process = new Process(program, heap, Host.still());
+        final Process process = new Process(program, heap, IHost.still());
         final Values.Obj self = process.create(program.entryPoint());
         assertNotNull(self);
         process.begin(self, "OnTick");
@@ -280,7 +280,7 @@ class ProcessTest {
     @Test
     void run_spendsOnlyTheBudgetItIsGiven() {
         final Loaded program = load("", "        for (int i = 0; i < 1000; i++) { }");
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         assertEquals(5, process.step(5));
         assertEquals(Process.State.RUNNING, process.state());
@@ -289,7 +289,7 @@ class ProcessTest {
     @Test
     void run_runsWhatWasQueuedAfterTheWorkThatWasAlreadyThere() {
         final Loaded program = load("", "        Console.PrintLine(\"tick\");");
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         final Values.Obj self = process.create(program.entryPoint());
         process.begin(self, "OnTick");
         process.post(process.handlerFor(self, "Note"), List.of(1));
@@ -304,7 +304,7 @@ class ProcessTest {
     @Test
     void run_spendsNothingWhileItIsWaiting() {
         final Loaded program = load("", "        Console.PrintLine(\"after\");");
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         process.park();
         assertEquals(0, process.step(PLENTY));
@@ -331,7 +331,7 @@ class ProcessTest {
                     public void OnDestroy() { }
                 }
                 """);
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         assertEquals(5, process.step(5));
         assertEquals(Process.State.RUNNING, process.state());
@@ -360,7 +360,7 @@ class ProcessTest {
                     public void OnDestroy() { }
                 }
                 """);
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         process.step(PLENTY);
         assertFinished(process);
@@ -374,7 +374,7 @@ class ProcessTest {
                             Console.PrintLine("round " + i);
                         }
                 """);
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         int guard = 0;
         while (process.state() == Process.State.RUNNING && guard < 1000) {

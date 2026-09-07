@@ -30,7 +30,7 @@ public enum CablePartType {
         return id >= 0 && id < BY_ID.length ? BY_ID[id] : null;
     }
 
-    public CablePart create() {
+    public ICablePart create() {
         return switch (this) {
             case IMPORT -> new ImportBusPart();
             case EXPORT -> new ExportBusPart();

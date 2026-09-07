@@ -7,7 +7,7 @@
  */
 package dev.jstech.core.client.gui.component;
 
-import dev.jstech.core.client.gui.skin.Skin;
+import dev.jstech.core.client.gui.skin.ISkin;
 import net.minecraft.client.gui.Font;
 
 /**
@@ -20,7 +20,7 @@ import net.minecraft.client.gui.Font;
  * @param mouseY      the cursor, in the same coordinates the components are laid out in
  * @param partialTick the render partial tick
  */
-public record UiContext(Skin skin, Font font, int mouseX, int mouseY, float partialTick) {
+public record UiContext(ISkin skin, Font font, int mouseX, int mouseY, float partialTick) {
 
     /** Whether the cursor is inside the rectangle. */
     public boolean over(final int x, final int y, final int w, final int h) {

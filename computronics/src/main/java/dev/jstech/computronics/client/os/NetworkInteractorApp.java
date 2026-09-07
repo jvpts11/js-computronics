@@ -82,7 +82,7 @@ import java.util.Set;
  * <p>The content is a tree of the core's components laid out every frame from the pure layout's zones, so
  * the drawn cells, the real container slots and the hit-tests agree at every size.
  */
-public final class NetworkInteractorApp implements InventoryBandApp {
+public final class NetworkInteractorApp implements IInventoryBandApp {
 
     // Labels kept short so all five tabs fit the strip; "Local"/"Network" abbreviate the longer mock names.
     private static final List<String> TABS = List.of("Status", "Local", "Network", "Crafting", "Operations");

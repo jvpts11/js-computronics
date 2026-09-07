@@ -8,8 +8,8 @@
 package dev.jstech.computronics.cannon.sem;
 
 import dev.jstech.computronics.cannon.Shape;
-import dev.jstech.computronics.cannon.ast.Expr;
-import dev.jstech.computronics.cannon.ast.Node;
+import dev.jstech.computronics.cannon.ast.IExpr;
+import dev.jstech.computronics.cannon.ast.INode;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -25,41 +25,41 @@ import java.util.Map;
  */
 public final class SemanticModel {
 
-    private final Map<Expr, TypeSymbol> types = new IdentityHashMap<>();
-    private final Map<Expr, Binding> bindings = new IdentityHashMap<>();
-    private final Map<Expr, MemberSymbol> calls = new IdentityHashMap<>();
-    private final Map<Node, Binding.Variable> places = new IdentityHashMap<>();
+    private final Map<IExpr, ITypeSymbol> types = new IdentityHashMap<>();
+    private final Map<IExpr, IBinding> bindings = new IdentityHashMap<>();
+    private final Map<IExpr, IMemberSymbol> calls = new IdentityHashMap<>();
+    private final Map<INode, IBinding.Variable> places = new IdentityHashMap<>();
     private final List<NamedType> declared = new ArrayList<>();
     private NamedType entryPoint;
     private Shape shape = Shape.SCRIPT;
 
     /** Records what an expression's type is. */
-    public void setType(final Expr expression, final TypeSymbol type) {
-        this.types.put(expression, type == null ? TypeSymbol.Special.ERROR : type);
+    public void setType(final IExpr expression, final ITypeSymbol type) {
+        this.types.put(expression, type == null ? ITypeSymbol.Special.ERROR : type);
     }
 
     /** The type of an expression, or null if it was never checked. */
-    public TypeSymbol typeOf(final Expr expression) {
+    public ITypeSymbol typeOf(final IExpr expression) {
         return this.types.get(expression);
     }
 
     /** Records what a name turned out to be. */
-    public void setBinding(final Expr expression, final Binding binding) {
+    public void setBinding(final IExpr expression, final IBinding binding) {
         this.bindings.put(expression, binding);
     }
 
     /** What a name turned out to be, or null. */
-    public Binding bindingOf(final Expr expression) {
+    public IBinding bindingOf(final IExpr expression) {
         return this.bindings.get(expression);
     }
 
     /** Records which method or constructor a call resolved to. */
-    public void setCall(final Expr expression, final MemberSymbol member) {
+    public void setCall(final IExpr expression, final IMemberSymbol member) {
         this.calls.put(expression, member);
     }
 
     /** The method or constructor a call resolved to, or null. */
-    public MemberSymbol callOf(final Expr expression) {
+    public IMemberSymbol callOf(final IExpr expression) {
         return this.calls.get(expression);
     }
 
@@ -71,12 +71,12 @@ public final class SemanticModel {
      * in. Every mention of the name binds to the same variable this records, so numbering the
      * declarations is enough to number every use.
      */
-    public void setDeclared(final Node site, final Binding.Variable variable) {
+    public void setDeclared(final INode site, final IBinding.Variable variable) {
         this.places.put(site, variable);
     }
 
     /** The variable a declaration site brings into being, or null. */
-    public Binding.Variable declaredAt(final Node site) {
+    public IBinding.Variable declaredAt(final INode site) {
         return this.places.get(site);
     }
 

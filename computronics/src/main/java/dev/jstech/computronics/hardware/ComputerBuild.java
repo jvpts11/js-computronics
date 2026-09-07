@@ -16,7 +16,7 @@ import java.util.Objects;
  */
 public record ComputerBuild(MotherboardSpec motherboard,
                             List<CpuSpec> cpus,
-                            List<ExpansionCardSpec> pcieCards,
+                            List<IExpansionCardSpec> pcieCards,
                             List<RamSpec> rams,
                             PsuSpec psu,
                             List<DiskSpec> disks) {
@@ -31,14 +31,14 @@ public record ComputerBuild(MotherboardSpec motherboard,
     }
 
     public ComputerBuild(final MotherboardSpec motherboard, final List<CpuSpec> cpus,
-                         final List<ExpansionCardSpec> pcieCards, final List<RamSpec> rams,
+                         final List<IExpansionCardSpec> pcieCards, final List<RamSpec> rams,
                          final PsuSpec psu) {
         this(motherboard, cpus, pcieCards, rams, psu, List.of());
     }
 
     public List<GpuSpec> gpus() {
         final List<GpuSpec> out = new ArrayList<>();
-        for (final ExpansionCardSpec card : pcieCards) {
+        for (final IExpansionCardSpec card : pcieCards) {
             if (card instanceof GpuSpec gpu) {
                 out.add(gpu);
             }
@@ -63,7 +63,7 @@ public record ComputerBuild(MotherboardSpec motherboard,
 
     /** Whether any card is seated in a slot older than itself, and so held below its rated speed. */
     public boolean hasBandwidthLimitedCard() {
-        for (final ExpansionCardSpec card : pcieCards) {
+        for (final IExpansionCardSpec card : pcieCards) {
             if (card.bus().bandwidthFactorIn(motherboard.pcieGeneration()) < 1.0) {
                 return true;
             }
@@ -71,9 +71,9 @@ public record ComputerBuild(MotherboardSpec motherboard,
         return false;
     }
 
-    public List<ExpansionCardSpec> cardsOfKind(final ExpansionCardKind kind) {
-        final List<ExpansionCardSpec> out = new ArrayList<>();
-        for (final ExpansionCardSpec card : pcieCards) {
+    public List<IExpansionCardSpec> cardsOfKind(final ExpansionCardKind kind) {
+        final List<IExpansionCardSpec> out = new ArrayList<>();
+        for (final IExpansionCardSpec card : pcieCards) {
             if (card.kind() == kind) {
                 out.add(card);
             }
@@ -145,7 +145,7 @@ public record ComputerBuild(MotherboardSpec motherboard,
         for (final CpuSpec cpu : cpus) {
             draw += cpu.tdpWatts();
         }
-        for (final ExpansionCardSpec card : pcieCards) {
+        for (final IExpansionCardSpec card : pcieCards) {
             draw += card.tdpWatts();
         }
         for (final RamSpec ram : rams) {
@@ -183,7 +183,7 @@ public record ComputerBuild(MotherboardSpec motherboard,
             problems.add("too many PCIe cards: " + pcieCards.size() + " installed, "
                     + motherboard.pcieSlots() + " PCIe slots");
         }
-        for (final ExpansionCardSpec card : pcieCards) {
+        for (final IExpansionCardSpec card : pcieCards) {
             if (!card.bus().compatibleWith(motherboard.pcieGeneration())) {
                 problems.add("expansion card bus family " + card.bus().busFamily()
                         + " is not compatible with board bus " + motherboard.pcieGeneration().busFamily());

@@ -21,7 +21,7 @@ public record SubframeNode(
         long ownCapacity,
         java.util.Optional<NodeUuid> orchestratingMainframeUuid,
         int parallelQueues
-) implements ComputerNode {
+) implements IComputerNode {
 
     /** A Subframe with no GPUs of its own: it lends capacity, not queues. */
     public SubframeNode(final NodeUuid nodeUuid, final NetworkUuid networkUuid, final long ownCapacity,

@@ -24,7 +24,7 @@ public final class PeripheralLinkValidator {
      * Looks up the cable type at a position, or empty if no cable of any peripheral type is present.
      */
     @FunctionalInterface
-    public interface CableLookup {
+    public interface ICableLookup {
         Optional<PeripheralCableType> cableTypeAt(long pos);
     }
 
@@ -32,65 +32,65 @@ public final class PeripheralLinkValidator {
      * Looks up an owner BlockEntity at a position, or empty if no owner is present.
      */
     @FunctionalInterface
-    public interface OwnerLookup {
-        Optional<PeripheralOwner> ownerAt(long pos);
+    public interface IOwnerLookup {
+        Optional<IPeripheralOwner> ownerAt(long pos);
     }
 
     /**
      * Looks up an endpoint BlockEntity at a position, or empty if no endpoint is present.
      */
     @FunctionalInterface
-    public interface EndpointLookup {
-        Optional<PeripheralEndpoint> endpointAt(long pos);
+    public interface IEndpointLookup {
+        Optional<IPeripheralEndpoint> endpointAt(long pos);
     }
 
     /**
      * Provides the 6 face-adjacent neighbors of a given position.
      */
     @FunctionalInterface
-    public interface NeighborLookup {
+    public interface INeighborLookup {
         List<Long> neighborsOf(long pos);
     }
 
-    private final CableLookup cableLookup;
-    private final OwnerLookup ownerLookup;
-    private final EndpointLookup endpointLookup;
-    private final NeighborLookup neighborLookup;
+    private final ICableLookup cableLookup;
+    private final IOwnerLookup ownerLookup;
+    private final IEndpointLookup endpointLookup;
+    private final INeighborLookup neighborLookup;
 
     public PeripheralLinkValidator(
-            final CableLookup cableLookup,
-            final OwnerLookup ownerLookup,
-            final EndpointLookup endpointLookup,
-            final NeighborLookup neighborLookup) {
+            final ICableLookup cableLookup,
+            final IOwnerLookup ownerLookup,
+            final IEndpointLookup endpointLookup,
+            final INeighborLookup neighborLookup) {
         this.cableLookup = cableLookup;
         this.ownerLookup = ownerLookup;
         this.endpointLookup = endpointLookup;
         this.neighborLookup = neighborLookup;
     }
 
-    public LinkResult tryEstablishLink(
+    public ILinkResult tryEstablishLink(
             final long ownerPos,
             final long endpointPos) {
 
-        final Optional<PeripheralOwner> ownerOpt = ownerLookup.ownerAt(ownerPos);
-        final Optional<PeripheralEndpoint> endpointOpt = endpointLookup.endpointAt(endpointPos);
+        final Optional<IPeripheralOwner> ownerOpt = ownerLookup.ownerAt(ownerPos);
+        final Optional<IPeripheralEndpoint> endpointOpt = endpointLookup.endpointAt(endpointPos);
 
         if (ownerOpt.isEmpty() || endpointOpt.isEmpty()) {
-            return new LinkResult.NoPathFound(ownerPos, endpointPos);
+            return new ILinkResult.NoPathFound(ownerPos, endpointPos);
         }
 
-        final PeripheralOwner owner = ownerOpt.get();
-        final PeripheralEndpoint endpoint = endpointOpt.get();
+        final IPeripheralOwner owner = ownerOpt.get();
+        final IPeripheralEndpoint endpoint = endpointOpt.get();
 
         if (owner.cableType() != endpoint.cableType()) {
-            return new LinkResult.CableTypeMismatch(
+            return new ILinkResult.CableTypeMismatch(
                     owner.cableType(), endpoint.cableType());
         }
 
         // Endpoint cardinality check: at most one owner.
         final Optional<Long> existingOwner = endpoint.linkedOwner();
         if (existingOwner.isPresent() && existingOwner.get() != ownerPos) {
-            return new LinkResult.AlreadyLinked(endpointPos, existingOwner.get());
+            return new ILinkResult.AlreadyLinked(endpointPos, existingOwner.get());
         }
 
         // Owner capacity check — but allow re-linking the same endpoint
@@ -98,24 +98,24 @@ public final class PeripheralLinkValidator {
         final List<Long> currentLinks = owner.linkedEndpoints();
         if (currentLinks.size() >= owner.maxEndpoints()
                 && !currentLinks.contains(endpointPos)) {
-            return new LinkResult.OwnerAtCapacity(
+            return new ILinkResult.OwnerAtCapacity(
                     ownerPos, currentLinks.size(), owner.maxEndpoints());
         }
 
         final PeripheralCableType requiredType = owner.cableType();
-        final PathSearchResult pathResult = findPath(
+        final IPathSearchResult pathResult = findPath(
                 ownerPos, endpointPos, requiredType);
 
         return switch (pathResult) {
-            case PathSearchResult.Found(int length) -> {
+            case IPathSearchResult.Found(int length) -> {
                 owner.onEndpointLinked(endpointPos);
                 endpoint.onOwnerLinked(ownerPos);
-                yield new LinkResult.Established(ownerPos, endpointPos, length);
+                yield new ILinkResult.Established(ownerPos, endpointPos, length);
             }
-            case PathSearchResult.NotFound notFound ->
-                    new LinkResult.NoPathFound(ownerPos, endpointPos);
-            case PathSearchResult.TooLong(int length, int max) ->
-                    new LinkResult.ExceedsMaxLength(
+            case IPathSearchResult.NotFound notFound ->
+                    new ILinkResult.NoPathFound(ownerPos, endpointPos);
+            case IPathSearchResult.TooLong(int length, int max) ->
+                    new ILinkResult.ExceedsMaxLength(
                             ownerPos, endpointPos, length, max);
         };
     }
@@ -125,7 +125,7 @@ public final class PeripheralLinkValidator {
             final long endpointPos,
             final PeripheralCableType cableType) {
         return findPath(ownerPos, endpointPos, cableType)
-                instanceof PathSearchResult.Found;
+                instanceof IPathSearchResult.Found;
     }
 
     // ─── BFS internals ──────────────────────────────────────────────────────
@@ -133,19 +133,19 @@ public final class PeripheralLinkValidator {
     /**
      * Internal sealed result of the path-finding step.
      */
-    private sealed interface PathSearchResult
-            permits PathSearchResult.Found,
-            PathSearchResult.NotFound,
-            PathSearchResult.TooLong {
+    private sealed interface IPathSearchResult
+            permits IPathSearchResult.Found,
+            IPathSearchResult.NotFound,
+            IPathSearchResult.TooLong {
 
-        record Found(int length) implements PathSearchResult {}
+        record Found(int length) implements IPathSearchResult {}
 
-        record NotFound() implements PathSearchResult {}
+        record NotFound() implements IPathSearchResult {}
 
-        record TooLong(int length, int max) implements PathSearchResult {}
+        record TooLong(int length, int max) implements IPathSearchResult {}
     }
 
-    private PathSearchResult findPath(
+    private IPathSearchResult findPath(
             final long source,
             final long target,
             final PeripheralCableType requiredType) {
@@ -164,7 +164,7 @@ public final class PeripheralLinkValidator {
             for (final long neighbor : neighborLookup.neighborsOf(src)) {
                 if (neighbor == target) {
                     // Owner adjacent to endpoint — zero cables between them.
-                    return new PathSearchResult.Found(0);
+                    return new IPathSearchResult.Found(0);
                 }
                 if (visited.add(neighbor)
                         && cableLookup.cableTypeAt(neighbor)
@@ -183,9 +183,9 @@ public final class PeripheralLinkValidator {
                 if (neighbor == target) {
                     // First reach is shortest path (BFS invariant).
                     if (distance <= maxLength) {
-                        return new PathSearchResult.Found(distance);
+                        return new IPathSearchResult.Found(distance);
                     }
-                    return new PathSearchResult.TooLong(distance, maxLength);
+                    return new IPathSearchResult.TooLong(distance, maxLength);
                 }
                 if (!visited.add(neighbor)) {
                     continue;
@@ -197,12 +197,12 @@ public final class PeripheralLinkValidator {
             }
         }
 
-        return new PathSearchResult.NotFound();
+        return new IPathSearchResult.NotFound();
     }
 
     // ─── Adjacency helper for tests ─────────────────────────────────────────
 
-    public static NeighborLookup adjacencyFrom(
+    public static INeighborLookup adjacencyFrom(
             final Map<Long, List<Long>> adjacency) {
         return pos -> adjacency.getOrDefault(pos, List.of());
     }

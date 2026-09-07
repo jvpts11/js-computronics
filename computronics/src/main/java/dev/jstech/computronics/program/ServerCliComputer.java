@@ -20,19 +20,19 @@ import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.os.FilesystemKind;
 import dev.jstech.computronics.os.KernelDef;
 import dev.jstech.computronics.os.OsDef;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.OsRegistry;
 import dev.jstech.computronics.os.fs.DiskFilesystem;
 import dev.jstech.computronics.os.fs.FileType;
 import dev.jstech.computronics.os.fs.FsPaths;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import dev.jstech.computronics.program.cli.DosPath;
 import dev.jstech.computronics.program.iql.IqlOperation;
 import dev.jstech.computronics.program.iql.IqlParseResult;
 import dev.jstech.computronics.program.iql.IqlParser;
 import dev.jstech.computronics.program.iql.IqlVerb;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.util.ShortId;
 import dev.jstech.core.uuid.NetworkUuid;
@@ -50,15 +50,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Backs the Command Prompt's {@link CliComputer} facade with a real computer and its network. Every command the shell runs ultimately calls one of these methods on the server; effecting verbs route through the same Mainframe operation dispatch the graphical terminal uses, so the CLI is a true alternative interface, not a parallel code path.
+ * Backs the Command Prompt's {@link ICliComputer} facade with a real computer and its network. Every command the shell runs ultimately calls one of these methods on the server; effecting verbs route through the same Mainframe operation dispatch the graphical terminal uses, so the CLI is a true alternative interface, not a parallel code path.
  */
-public final class ServerCliComputer implements CliComputer {
+public final class ServerCliComputer implements ICliComputer {
 
-    private final ComputerTerminalHost host;
+    private final IComputerTerminalHost host;
     private final BlockEntity hostBlock;
     private final ServerLevel level;
 
-    public ServerCliComputer(final ComputerTerminalHost host, final ServerLevel level) {
+    public ServerCliComputer(final IComputerTerminalHost host, final ServerLevel level) {
         this.host = host;
         this.hostBlock = (BlockEntity) host;
         this.level = level;
@@ -67,7 +67,7 @@ public final class ServerCliComputer implements CliComputer {
     @Override
     public String name() {
         // The Mainframe has no custom name; its kind is shown by type() instead.
-        if (hostBlock instanceof OsHost computer) {
+        if (hostBlock instanceof IOsHost computer) {
             return computer.customName();
         }
         return "";
@@ -98,7 +98,7 @@ public final class ServerCliComputer implements CliComputer {
     @Override
     public String nodeId() {
         final NodeUuid node;
-        if (hostBlock instanceof OsHost computer) {
+        if (hostBlock instanceof IOsHost computer) {
             node = computer.nodeUuid();
         } else if (hostBlock instanceof MainframeBlockEntity mainframe) {
             node = mainframe.nodeUuid();
@@ -179,7 +179,7 @@ public final class ServerCliComputer implements CliComputer {
             });
         }
         for (final BlockEntity candidate : candidates) {
-            if (candidate == hostBlock || !(candidate instanceof ComputerTerminalHost terminalHost)) {
+            if (candidate == hostBlock || !(candidate instanceof IComputerTerminalHost terminalHost)) {
                 continue;
             }
             final String hostname = new ServerCliComputer(terminalHost, level).hostname();
@@ -193,7 +193,7 @@ public final class ServerCliComputer implements CliComputer {
     public List<RemoteHost> reachableHosts() {
         final List<RemoteHost> hosts = new ArrayList<>();
         reachableMachines().forEach((hostname, machine) -> {
-            final ServerCliComputer remote = new ServerCliComputer((ComputerTerminalHost) machine, level);
+            final ServerCliComputer remote = new ServerCliComputer((IComputerTerminalHost) machine, level);
             final dev.jstech.computronics.os.OsDef os = remote.installedOsDef();
             hosts.add(new RemoteHost(hostname, remote.name(), remote.nodeId(),
                     os == null ? "" : os.displayName(), remote.type(), remote.running()));
@@ -214,7 +214,7 @@ public final class ServerCliComputer implements CliComputer {
             return matches;
         }
         reachableMachines().forEach((hostname, machine) -> {
-            final ServerCliComputer remote = new ServerCliComputer((ComputerTerminalHost) machine, level);
+            final ServerCliComputer remote = new ServerCliComputer((IComputerTerminalHost) machine, level);
             final dev.jstech.computronics.os.OsDef os = remote.installedOsDef();
             final boolean hit = hostname.equalsIgnoreCase(needle)
                     || remote.name().equalsIgnoreCase(needle)
@@ -243,7 +243,7 @@ public final class ServerCliComputer implements CliComputer {
                     + String.join(", ", matches.keySet()) + ") - use the host name or node id");
         }
         final BlockEntity target = matches.values().iterator().next();
-        final ServerCliComputer remote = new ServerCliComputer((ComputerTerminalHost) target, level);
+        final ServerCliComputer remote = new ServerCliComputer((IComputerTerminalHost) target, level);
         if (!remote.running()) {
             return OpResult.fail("ssh: connect to host " + hostname + ": machine is powered off");
         }
@@ -283,7 +283,7 @@ public final class ServerCliComputer implements CliComputer {
     }
 
     @Override
-    public List<StoredItem> query(final dev.jstech.computronics.program.iql.IqlCondition where,
+    public List<StoredItem> query(final dev.jstech.computronics.program.iql.IIqlCondition where,
                                   final String server, final int limit) {
         final NetworkUuid net = host.networkUuid();
         if (net == null) {
@@ -292,7 +292,7 @@ public final class ServerCliComputer implements CliComputer {
         // WHERE server=X scopes the read to that server; every other field is evaluated per item, so the
         // full condition (qty < 100, name contains "ore", damaged = true, ...) really filters now.
         final String serverName = (server == null || server.isBlank())
-                ? dev.jstech.computronics.program.iql.IqlCondition.firstValue(where, "server")
+                ? dev.jstech.computronics.program.iql.IIqlCondition.firstValue(where, "server")
                 : server;
         final NetworkStorage storage;
         final String scopedServer;
@@ -360,7 +360,7 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public List<StoredItem> queryObject(final String object,
-                                        final dev.jstech.computronics.program.iql.IqlCondition where,
+                                        final dev.jstech.computronics.program.iql.IIqlCondition where,
                                         final String server, final int limit) {
         return switch (object.toLowerCase(java.util.Locale.ROOT)) {
             case "items", "*" -> query(where, server, limit); // '*' means every item, like SELECT *
@@ -578,7 +578,7 @@ public final class ServerCliComputer implements CliComputer {
         if (prefix.isEmpty()) {
             return OpResult.fail("which operation?");
         }
-        for (final dev.jstech.computronics.operation.NetworkOperation operation : mainframe.liveOperations()) {
+        for (final dev.jstech.computronics.operation.INetworkOperation operation : mainframe.liveOperations()) {
             final String full = operation.operationId().toString();
             if (full.startsWith(prefix) && prefix.length() >= ShortId.of(full).length()) {
                 operation.setPriority(wanted);
@@ -598,7 +598,7 @@ public final class ServerCliComputer implements CliComputer {
         if (wanted.isEmpty()) {
             return OpResult.fail("usage: cancel <id>   (see 'ops')");
         }
-        for (final dev.jstech.computronics.operation.NetworkOperation operation : mainframe.liveOperations()) {
+        for (final dev.jstech.computronics.operation.INetworkOperation operation : mainframe.liveOperations()) {
             final String full = operation.operationId().toString();
             // The prompt shows the short id; accept it, or any longer prefix of the full id.
             if (full.startsWith(wanted) && wanted.length() >= ShortId.of(full).length()) {
@@ -783,7 +783,7 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public List<String> peripherals() {
-        if (hostBlock instanceof dev.jstech.core.peripheral.PeripheralOwnerSupport owner) {
+        if (hostBlock instanceof dev.jstech.core.peripheral.IPeripheralOwnerSupport owner) {
             final List<String> rows = new ArrayList<>();
             for (final long endpoint : owner.peripheralEndpoints()) {
                 final BlockPos pos = BlockPos.of(endpoint);
@@ -820,7 +820,7 @@ public final class ServerCliComputer implements CliComputer {
 
     /** The platform of the OS installed on the host computer, or {@code null} when it cannot be resolved. */
     private dev.jstech.computronics.os.Platform hostPlatform() {
-        if (host instanceof dev.jstech.computronics.os.OsHost oc) {
+        if (host instanceof dev.jstech.computronics.os.IOsHost oc) {
             final dev.jstech.computronics.os.OsDef os =
                     dev.jstech.computronics.os.OsRegistry.getOs(oc.installedOsId());
             return os == null ? null : os.platform();
@@ -876,7 +876,7 @@ public final class ServerCliComputer implements CliComputer {
         }
         // Program install gate: the OS platform must be supported and the hardware must meet the program's
         // CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
-        if (host instanceof dev.jstech.computronics.os.OsHost oc
+        if (host instanceof dev.jstech.computronics.os.IOsHost oc
                 && !dev.jstech.computronics.os.OsRegistry.canInstallProgram(
                         oc.installedOsId(), program.id(),
                         oc.maxCpuMhz(), oc.totalVramMb(), oc.systemDiskFreeMb())) {
@@ -907,7 +907,7 @@ public final class ServerCliComputer implements CliComputer {
         // displayEra, not installedEra: a Vintage or Legacy chassis IS that generation whatever board
         // sits in it, and that chassis is the only way a machine of an older era exists right now.
         final dev.jstech.core.tier.HardwareEra era =
-                hostBlock instanceof OsHost computer ? computer.displayEra() : null;
+                hostBlock instanceof IOsHost computer ? computer.displayEra() : null;
         if (era != null && dev.jstech.computronics.os.OsGating.canInstall(spec.minEra(), era)) {
             return null;
         }
@@ -920,7 +920,7 @@ public final class ServerCliComputer implements CliComputer {
     /** Whether a media reader linked to this computer holds a PROGRAM_INSTALL medium for {@code programId}. */
     private boolean hasInstallMediumFor(final ResourceLocation programId) {
         if (!(host instanceof dev.jstech.computronics.os
-                .OsHost computer)) {
+                .IOsHost computer)) {
             return false;
         }
         for (final long endpoint : computer.linkedEndpoints()) {
@@ -1048,7 +1048,7 @@ public final class ServerCliComputer implements CliComputer {
 
     /** Applies the statement's {@code PRIORITY} to a freshly submitted Operation; a null submission passes through. */
     @org.jetbrains.annotations.Nullable
-    private static <T extends dev.jstech.computronics.operation.NetworkOperation> T prioritize(
+    private static <T extends dev.jstech.computronics.operation.INetworkOperation> T prioritize(
             @org.jetbrains.annotations.Nullable final T operation, final IqlOperation statement) {
         if (operation != null) {
             operation.setPriority(statement.priority());
@@ -1101,7 +1101,7 @@ public final class ServerCliComputer implements CliComputer {
         }
         // A DELETE that names a bus EXPORTS to that bus's external inventory (the "leaves the network" sense);
         // a DROP, or a DELETE with no target, trashes via a sink that accepts everything and keeps nothing.
-        dev.jstech.computronics.storage.DataSink target = (k, amount, simulate) -> amount;
+        dev.jstech.computronics.storage.IDataSink target = (k, amount, simulate) -> amount;
         if ("DELETE".equals(verb) && op.to() != null && !op.to().isBlank()) {
             final dev.jstech.computronics.block.part.NamedBus.Located bus =
                     dev.jstech.computronics.block.part.NamedBus.find(level, host.networkUuid(), op.to());
@@ -1159,7 +1159,7 @@ public final class ServerCliComputer implements CliComputer {
         if (dest == null) {
             return OpResult.fail("no server or bus named '" + op.to() + "'");
         }
-        final dev.jstech.computronics.storage.DataSink destSink = serverSink(dest);
+        final dev.jstech.computronics.storage.IDataSink destSink = serverSink(dest);
         if (destSink == null) {
             return OpResult.fail("the destination server is unavailable");
         }
@@ -1259,11 +1259,11 @@ public final class ServerCliComputer implements CliComputer {
         return null;
     }
 
-    private dev.jstech.computronics.storage.DataSink serverSink(final NodeUuid node) {
+    private dev.jstech.computronics.storage.IDataSink serverSink(final NodeUuid node) {
         return NetworkSystem.get(level).locationOf(node)
                 .map(loc -> level.getBlockEntity(BlockPos.of(loc.rackPos()))
                         instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity rack
-                        ? (dev.jstech.computronics.storage.DataSink)
+                        ? (dev.jstech.computronics.storage.IDataSink)
                                 new dev.jstech.computronics.storage.StoreSink(
                                         rack.getServerStorage(loc.slot()))
                         : null)
@@ -1357,7 +1357,7 @@ public final class ServerCliComputer implements CliComputer {
      * Returns an empty list when the host is not a computer.
      */
     private java.util.List<DiskCtx> driveTable() {
-        if (!(hostBlock instanceof OsHost computer)) {
+        if (!(hostBlock instanceof IOsHost computer)) {
             return java.util.List.of();
         }
         final java.util.List<DiskCtx> table = new ArrayList<>();
@@ -1460,7 +1460,7 @@ public final class ServerCliComputer implements CliComputer {
 
     /** The shell family of the OS installed on {@code host} (DOS when it has no OS or is not a computer). */
     public static dev.jstech.computronics.os.ShellFamily shellFamilyOf(final Object host) {
-        if (host instanceof OsHost computer) {
+        if (host instanceof IOsHost computer) {
             final OsDef os = computer.installedOs();
             final KernelDef kernel = os == null ? null : OsRegistry.getKernel(os.kernelId());
             if (kernel != null) {
@@ -1502,7 +1502,7 @@ public final class ServerCliComputer implements CliComputer {
     // ---- packages: the Linux package managers over the network's Mirror service ----
 
     private OsDef installedOsDef() {
-        return hostBlock instanceof OsHost c ? c.installedOs() : null;
+        return hostBlock instanceof IOsHost c ? c.installedOs() : null;
     }
 
     @Override
@@ -1784,7 +1784,7 @@ public final class ServerCliComputer implements CliComputer {
             return done ? OpResult.ok("Setting up " + spec.commandName() + " ... done")
                     : OpResult.fail(spec.commandName() + " could not be set up");
         }
-        if (hostBlock instanceof OsHost oc
+        if (hostBlock instanceof IOsHost oc
                 && !OsRegistry.canInstallProgram(oc.installedOsId(), spec.id(), oc.maxCpuMhz(), oc.totalVramMb(),
                         oc.systemDiskFreeMb())) {
             return OpResult.fail(spec.commandName() + ": unmet requirements (hardware or free disk space)");
@@ -1848,7 +1848,7 @@ public final class ServerCliComputer implements CliComputer {
      * faster hardware compiles faster (balancing estimate, clamped to a few seconds ... half an hour).
      */
     private long buildTicks(final dev.jstech.computronics.os.ProgramSpec spec) {
-        final int cpu = Math.max(100, hostBlock instanceof OsHost c ? c.maxCpuMhz() : 100);
+        final int cpu = Math.max(100, hostBlock instanceof IOsHost c ? c.maxCpuMhz() : 100);
         final long seconds = Math.max(5L, Math.min(1800L, Math.max(16L, spec.minDiskMb()) * 1000L / cpu));
         return seconds * 20L;
     }
@@ -1860,7 +1860,7 @@ public final class ServerCliComputer implements CliComputer {
         final dev.jstech.computronics.program.ComputerConsoleState theirs = host.console();
         if (theirs != null && theirs.communityProgram(wanted) != null) {
             // Its own files and nothing else: what was written when it was installed.
-            for (final CliComputer.FsEntry file
+            for (final ICliComputer.FsEntry file
                     : listDisk(COMMUNITY_DIR + "/" + wanted).entries()) {
                 // The listing's name is the whole last segment, extension and all.
                 deleteFile(COMMUNITY_DIR + "/" + wanted + "/" + file.name());
@@ -1917,7 +1917,7 @@ public final class ServerCliComputer implements CliComputer {
             if (target.isEmpty()) {
                 return OpResult.fail("format: drive " + letter + ": drive not ready");
             }
-            if (letter == 'C' && hostBlock instanceof OsHost computer && computer.hasOs()) {
+            if (letter == 'C' && hostBlock instanceof IOsHost computer && computer.hasOs()) {
                 return OpResult.fail("format: cannot format drive C: - the running system lives on it");
             }
             // Formatting erases everything the volume carries: the system, the filesystem, the item
@@ -1944,7 +1944,7 @@ public final class ServerCliComputer implements CliComputer {
 
     @Override
     public SystemInfo systemInfo() {
-        if (!(hostBlock instanceof OsHost computer) || computer.installedOs() == null) {
+        if (!(hostBlock instanceof IOsHost computer) || computer.installedOs() == null) {
             return null;
         }
         final dev.jstech.computronics.os.OsDef os = computer.installedOs();
@@ -2025,7 +2025,7 @@ public final class ServerCliComputer implements CliComputer {
         final dev.jstech.computronics.program.ComputerConsoleState console = host.console();
         final dev.jstech.computronics.program.install.LiveInstallState state =
                 console == null ? null : console.liveInstall();
-        if (state == null || !(hostBlock instanceof OsHost computer)) {
+        if (state == null || !(hostBlock instanceof IOsHost computer)) {
             return OpResult.fail("no live medium is booted");
         }
         // The devices the live system sees: every installed disk, in slot order (sda, sdb, ...).
@@ -2074,7 +2074,7 @@ public final class ServerCliComputer implements CliComputer {
             return currentLocation().dosPath() + ">";
         }
         final String cwd = dev.jstech.computronics.program.cli.PosixPath.renderForPrompt(currentLocation());
-        final OsDef os = hostBlock instanceof OsHost c ? c.installedOs() : null;
+        final OsDef os = hostBlock instanceof IOsHost c ? c.installedOs() : null;
         final boolean zsh = os != null && os.shellId().equals("zsh");
         return zsh ? "player@" + hostname() + " " + cwd + " %" : "player@" + hostname() + ":" + cwd + "$";
     }

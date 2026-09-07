@@ -10,10 +10,10 @@ package dev.jstech.computronics.cannon.parse;
 import dev.jstech.computronics.cannon.CannonError;
 import dev.jstech.computronics.cannon.DiagnosticBag;
 import dev.jstech.computronics.cannon.ast.CompilationUnit;
-import dev.jstech.computronics.cannon.ast.Decl;
-import dev.jstech.computronics.cannon.ast.Expr;
+import dev.jstech.computronics.cannon.ast.IDecl;
+import dev.jstech.computronics.cannon.ast.IExpr;
 import dev.jstech.computronics.cannon.ast.Operator;
-import dev.jstech.computronics.cannon.ast.Stmt;
+import dev.jstech.computronics.cannon.ast.IStmt;
 import dev.jstech.computronics.cannon.ast.TypeRef;
 import dev.jstech.computronics.cannon.lex.Token;
 import dev.jstech.computronics.cannon.lex.TokenKind;
@@ -63,10 +63,10 @@ public final class Parser {
 
     /** Reads the whole file. The unit holds every type the parser managed to read. */
     public CompilationUnit parse(final String file) {
-        final List<Decl.TypeDecl> types = new ArrayList<>();
+        final List<IDecl.ITypeDecl> types = new ArrayList<>();
         while (!this.atEnd()) {
             final int before = this.position;
-            final Decl.TypeDecl type = this.parseTypeDeclaration();
+            final IDecl.ITypeDecl type = this.parseTypeDeclaration();
             if (type != null) {
                 types.add(type);
             } else {
@@ -81,8 +81,8 @@ public final class Parser {
 
     // ---------------------------------------------------------------- declarations
 
-    private Decl.TypeDecl parseTypeDeclaration() {
-        final Set<Decl.Modifier> modifiers = this.parseModifiers();
+    private IDecl.ITypeDecl parseTypeDeclaration() {
+        final Set<IDecl.Modifier> modifiers = this.parseModifiers();
         final Token start = this.peek();
         if (this.match(TokenKind.CLASS)) {
             return this.parseClass(modifiers, start);
@@ -101,14 +101,14 @@ public final class Parser {
         return null;
     }
 
-    private Decl.TypeDecl parseClass(final Set<Decl.Modifier> modifiers, final Token start) {
+    private IDecl.ITypeDecl parseClass(final Set<IDecl.Modifier> modifiers, final Token start) {
         final String name = this.expectIdentifier();
         final List<TypeRef> bases = this.parseBaseList();
-        final List<Decl.MemberDecl> members = new ArrayList<>();
+        final List<IDecl.IMemberDecl> members = new ArrayList<>();
         if (this.expect(TokenKind.LEFT_BRACE)) {
             while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
                 final int before = this.position;
-                final Decl.MemberDecl member = this.parseMember(name);
+                final IDecl.IMemberDecl member = this.parseMember(name);
                 if (member != null) {
                     members.add(member);
                 } else {
@@ -120,17 +120,17 @@ public final class Parser {
             }
             this.expect(TokenKind.RIGHT_BRACE);
         }
-        return new Decl.ClassDecl(modifiers, name, bases, members, start.line(), start.column());
+        return new IDecl.ClassDecl(modifiers, name, bases, members, start.line(), start.column());
     }
 
-    private Decl.TypeDecl parseInterface(final Set<Decl.Modifier> modifiers, final Token start) {
+    private IDecl.ITypeDecl parseInterface(final Set<IDecl.Modifier> modifiers, final Token start) {
         final String name = this.expectIdentifier();
         final List<TypeRef> bases = this.parseBaseList();
-        final List<Decl.MethodDecl> methods = new ArrayList<>();
+        final List<IDecl.MethodDecl> methods = new ArrayList<>();
         if (this.expect(TokenKind.LEFT_BRACE)) {
             while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
                 final int before = this.position;
-                final Decl.MethodDecl method = this.parseInterfaceMethod();
+                final IDecl.MethodDecl method = this.parseInterfaceMethod();
                 if (method != null) {
                     methods.add(method);
                 } else {
@@ -142,35 +142,35 @@ public final class Parser {
             }
             this.expect(TokenKind.RIGHT_BRACE);
         }
-        return new Decl.InterfaceDecl(modifiers, name, bases, methods, start.line(), start.column());
+        return new IDecl.InterfaceDecl(modifiers, name, bases, methods, start.line(), start.column());
     }
 
-    private Decl.MethodDecl parseInterfaceMethod() {
-        final Set<Decl.Modifier> modifiers = this.parseModifiers();
+    private IDecl.MethodDecl parseInterfaceMethod() {
+        final Set<IDecl.Modifier> modifiers = this.parseModifiers();
         final Token start = this.peek();
         final TypeRef returnType = this.parseReturnType();
         if (returnType == null) {
             return null;
         }
         final String name = this.expectIdentifier();
-        final List<Decl.Parameter> parameters = this.parseParameters();
+        final List<IDecl.Parameter> parameters = this.parseParameters();
         this.expect(TokenKind.SEMICOLON);
-        return new Decl.MethodDecl(modifiers, returnType, name, parameters, null, start.line(), start.column());
+        return new IDecl.MethodDecl(modifiers, returnType, name, parameters, null, start.line(), start.column());
     }
 
-    private Decl.TypeDecl parseEnum(final Set<Decl.Modifier> modifiers, final Token start) {
+    private IDecl.ITypeDecl parseEnum(final Set<IDecl.Modifier> modifiers, final Token start) {
         final String name = this.expectIdentifier();
-        final List<Decl.EnumConstant> constants = new ArrayList<>();
+        final List<IDecl.EnumConstant> constants = new ArrayList<>();
         if (this.expect(TokenKind.LEFT_BRACE)) {
             while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
                 final int before = this.position;
                 final Token constantStart = this.peek();
                 final String constantName = this.expectIdentifier();
-                Expr value = null;
+                IExpr value = null;
                 if (this.match(TokenKind.ASSIGN)) {
                     value = this.parseExpression();
                 }
-                constants.add(new Decl.EnumConstant(constantName, value,
+                constants.add(new IDecl.EnumConstant(constantName, value,
                         constantStart.line(), constantStart.column()));
                 if (!this.match(TokenKind.COMMA)) {
                     break;
@@ -181,15 +181,15 @@ public final class Parser {
             }
             this.expect(TokenKind.RIGHT_BRACE);
         }
-        return new Decl.EnumDecl(modifiers, name, constants, start.line(), start.column());
+        return new IDecl.EnumDecl(modifiers, name, constants, start.line(), start.column());
     }
 
-    private Decl.TypeDecl parseDelegate(final Set<Decl.Modifier> modifiers, final Token start) {
+    private IDecl.ITypeDecl parseDelegate(final Set<IDecl.Modifier> modifiers, final Token start) {
         final TypeRef returnType = this.parseReturnType();
         final String name = this.expectIdentifier();
-        final List<Decl.Parameter> parameters = this.parseParameters();
+        final List<IDecl.Parameter> parameters = this.parseParameters();
         this.expect(TokenKind.SEMICOLON);
-        return new Decl.DelegateDecl(modifiers, returnType, name, parameters, start.line(), start.column());
+        return new IDecl.DelegateDecl(modifiers, returnType, name, parameters, start.line(), start.column());
     }
 
     private List<TypeRef> parseBaseList() {
@@ -209,8 +209,8 @@ public final class Parser {
     // A member starts with its modifiers, then a shape that says what it is: the class's own name
     // before a parenthesis is a constructor, "event" is an event, and otherwise a type and a name
     // are followed by parentheses for a method, a brace for a property, or neither for a field.
-    private Decl.MemberDecl parseMember(final String className) {
-        final Set<Decl.Modifier> modifiers = this.parseModifiers();
+    private IDecl.IMemberDecl parseMember(final String className) {
+        final Set<IDecl.Modifier> modifiers = this.parseModifiers();
         final Token start = this.peek();
 
         if (this.match(TokenKind.EVENT)) {
@@ -220,7 +220,7 @@ public final class Parser {
             }
             final String name = this.expectIdentifier();
             this.expect(TokenKind.SEMICOLON);
-            return new Decl.EventDecl(modifiers, type, name, start.line(), start.column());
+            return new IDecl.EventDecl(modifiers, type, name, start.line(), start.column());
         }
 
         if (this.check(TokenKind.IDENTIFIER) && start.text().equals(className)
@@ -236,33 +236,33 @@ public final class Parser {
         final String name = this.expectIdentifier();
 
         if (this.check(TokenKind.LEFT_PAREN)) {
-            final List<Decl.Parameter> parameters = this.parseParameters();
-            Stmt.Block body = null;
+            final List<IDecl.Parameter> parameters = this.parseParameters();
+            IStmt.Block body = null;
             if (this.check(TokenKind.LEFT_BRACE)) {
                 body = this.parseBlock();
             } else {
                 this.expect(TokenKind.SEMICOLON);
             }
-            return new Decl.MethodDecl(modifiers, type, name, parameters, body, start.line(), start.column());
+            return new IDecl.MethodDecl(modifiers, type, name, parameters, body, start.line(), start.column());
         }
 
         if (this.check(TokenKind.LEFT_BRACE)) {
             return this.parseProperty(modifiers, type, name, start);
         }
 
-        Expr initializer = null;
+        IExpr initializer = null;
         if (this.match(TokenKind.ASSIGN)) {
             initializer = this.parseExpression();
         }
         this.expect(TokenKind.SEMICOLON);
-        return new Decl.FieldDecl(modifiers, type, name, initializer, start.line(), start.column());
+        return new IDecl.FieldDecl(modifiers, type, name, initializer, start.line(), start.column());
     }
 
-    private Decl.MemberDecl parseConstructor(final Set<Decl.Modifier> modifiers, final Token start,
+    private IDecl.IMemberDecl parseConstructor(final Set<IDecl.Modifier> modifiers, final Token start,
                                              final String className) {
         this.advance();
-        final List<Decl.Parameter> parameters = this.parseParameters();
-        Decl.ConstructorCall chained = null;
+        final List<IDecl.Parameter> parameters = this.parseParameters();
+        IDecl.ConstructorCall chained = null;
         if (this.match(TokenKind.COLON)) {
             final Token chainStart = this.peek();
             final boolean base = this.check(TokenKind.BASE);
@@ -272,34 +272,34 @@ public final class Parser {
                 this.diagnostics.error(chainStart.line(), chainStart.column(),
                         CannonError.EXPECTED_TOKEN, TokenKind.BASE.describe(), chainStart.describe());
             }
-            final List<Expr> arguments = this.parseArguments();
-            chained = new Decl.ConstructorCall(base, arguments, chainStart.line(), chainStart.column());
+            final List<IExpr> arguments = this.parseArguments();
+            chained = new IDecl.ConstructorCall(base, arguments, chainStart.line(), chainStart.column());
         }
-        final Stmt.Block body = this.check(TokenKind.LEFT_BRACE) ? this.parseBlock() : null;
+        final IStmt.Block body = this.check(TokenKind.LEFT_BRACE) ? this.parseBlock() : null;
         if (body == null) {
             this.expect(TokenKind.SEMICOLON);
         }
-        return new Decl.ConstructorDecl(modifiers, className, parameters, chained, body,
+        return new IDecl.ConstructorDecl(modifiers, className, parameters, chained, body,
                 start.line(), start.column());
     }
 
     // The short form only: "{ get; private set; }". A body on an accessor is a v2 feature, so a
     // brace where the semicolon belongs is reported as the missing semicolon it is.
-    private Decl.MemberDecl parseProperty(final Set<Decl.Modifier> modifiers, final TypeRef type,
+    private IDecl.IMemberDecl parseProperty(final Set<IDecl.Modifier> modifiers, final TypeRef type,
                                           final String name, final Token start) {
         this.advance();
-        Decl.Accessor getter = null;
-        Decl.Accessor setter = null;
+        IDecl.Accessor getter = null;
+        IDecl.Accessor setter = null;
         while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
             final int before = this.position;
-            final Set<Decl.Modifier> accessorModifiers = this.parseModifiers();
+            final Set<IDecl.Modifier> accessorModifiers = this.parseModifiers();
             final Token word = this.peek();
             if (this.check(TokenKind.IDENTIFIER) && "get".equals(word.text())) {
                 this.advance();
-                getter = new Decl.Accessor(accessorModifiers, word.line(), word.column());
+                getter = new IDecl.Accessor(accessorModifiers, word.line(), word.column());
             } else if (this.check(TokenKind.IDENTIFIER) && "set".equals(word.text())) {
                 this.advance();
-                setter = new Decl.Accessor(accessorModifiers, word.line(), word.column());
+                setter = new IDecl.Accessor(accessorModifiers, word.line(), word.column());
             } else {
                 this.diagnostics.error(word.line(), word.column(), CannonError.EXPECTED_MEMBER, word.describe());
                 break;
@@ -310,19 +310,19 @@ public final class Parser {
             }
         }
         this.expect(TokenKind.RIGHT_BRACE);
-        return new Decl.PropertyDecl(modifiers, type, name, getter, setter, start.line(), start.column());
+        return new IDecl.PropertyDecl(modifiers, type, name, getter, setter, start.line(), start.column());
     }
 
-    private Set<Decl.Modifier> parseModifiers() {
-        final Set<Decl.Modifier> modifiers = EnumSet.noneOf(Decl.Modifier.class);
+    private Set<IDecl.Modifier> parseModifiers() {
+        final Set<IDecl.Modifier> modifiers = EnumSet.noneOf(IDecl.Modifier.class);
         while (MODIFIERS.contains(this.peek().kind())) {
             final Token word = this.advance();
-            final Decl.Modifier modifier = switch (word.kind()) {
-                case PUBLIC -> Decl.Modifier.PUBLIC;
-                case PRIVATE -> Decl.Modifier.PRIVATE;
-                case PROTECTED -> Decl.Modifier.PROTECTED;
-                case STATIC -> Decl.Modifier.STATIC;
-                default -> Decl.Modifier.READONLY;
+            final IDecl.Modifier modifier = switch (word.kind()) {
+                case PUBLIC -> IDecl.Modifier.PUBLIC;
+                case PRIVATE -> IDecl.Modifier.PRIVATE;
+                case PROTECTED -> IDecl.Modifier.PROTECTED;
+                case STATIC -> IDecl.Modifier.STATIC;
+                default -> IDecl.Modifier.READONLY;
             };
             if (!modifiers.add(modifier)) {
                 this.diagnostics.error(word.line(), word.column(),
@@ -332,8 +332,8 @@ public final class Parser {
         return modifiers;
     }
 
-    private List<Decl.Parameter> parseParameters() {
-        final List<Decl.Parameter> parameters = new ArrayList<>();
+    private List<IDecl.Parameter> parseParameters() {
+        final List<IDecl.Parameter> parameters = new ArrayList<>();
         if (!this.expect(TokenKind.LEFT_PAREN)) {
             return parameters;
         }
@@ -346,7 +346,7 @@ public final class Parser {
                 break;
             }
             final String name = this.expectIdentifier();
-            parameters.add(new Decl.Parameter(outward, type, name, start.line(), start.column()));
+            parameters.add(new IDecl.Parameter(outward, type, name, start.line(), start.column()));
             if (!this.match(TokenKind.COMMA)) {
                 break;
             }
@@ -455,15 +455,15 @@ public final class Parser {
 
     // ---------------------------------------------------------------- statements
 
-    private Stmt.Block parseBlock() {
+    private IStmt.Block parseBlock() {
         final Token start = this.peek();
-        final List<Stmt> statements = new ArrayList<>();
+        final List<IStmt> statements = new ArrayList<>();
         if (!this.expect(TokenKind.LEFT_BRACE)) {
-            return new Stmt.Block(statements, start.line(), start.column());
+            return new IStmt.Block(statements, start.line(), start.column());
         }
         while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
             final int before = this.position;
-            final Stmt statement = this.parseStatement();
+            final IStmt statement = this.parseStatement();
             if (statement != null) {
                 statements.add(statement);
             }
@@ -472,17 +472,17 @@ public final class Parser {
             }
         }
         this.expect(TokenKind.RIGHT_BRACE);
-        return new Stmt.Block(statements, start.line(), start.column());
+        return new IStmt.Block(statements, start.line(), start.column());
     }
 
-    private Stmt parseStatement() {
+    private IStmt parseStatement() {
         final Token start = this.peek();
         switch (start.kind()) {
             case LEFT_BRACE:
                 return this.parseBlock();
             case SEMICOLON:
                 this.advance();
-                return new Stmt.Empty(start.line(), start.column());
+                return new IStmt.Empty(start.line(), start.column());
             case IF:
                 return this.parseIf();
             case WHILE:
@@ -498,11 +498,11 @@ public final class Parser {
             case BREAK:
                 this.advance();
                 this.expect(TokenKind.SEMICOLON);
-                return new Stmt.Break(start.line(), start.column());
+                return new IStmt.Break(start.line(), start.column());
             case CONTINUE:
                 this.advance();
                 this.expect(TokenKind.SEMICOLON);
-                return new Stmt.Continue(start.line(), start.column());
+                return new IStmt.Continue(start.line(), start.column());
             case RETURN:
                 return this.parseReturn();
             case DISPOSE:
@@ -512,95 +512,95 @@ public final class Parser {
         }
     }
 
-    private Stmt parseIf() {
+    private IStmt parseIf() {
         final Token start = this.advance();
         this.expect(TokenKind.LEFT_PAREN);
-        final Expr condition = this.parseExpression();
+        final IExpr condition = this.parseExpression();
         this.expect(TokenKind.RIGHT_PAREN);
-        final Stmt then = this.parseStatement();
-        Stmt otherwise = null;
+        final IStmt then = this.parseStatement();
+        IStmt otherwise = null;
         if (this.match(TokenKind.ELSE)) {
             otherwise = this.parseStatement();
         }
-        return new Stmt.If(condition, then, otherwise, start.line(), start.column());
+        return new IStmt.If(condition, then, otherwise, start.line(), start.column());
     }
 
-    private Stmt parseWhile() {
+    private IStmt parseWhile() {
         final Token start = this.advance();
         this.expect(TokenKind.LEFT_PAREN);
-        final Expr condition = this.parseExpression();
+        final IExpr condition = this.parseExpression();
         this.expect(TokenKind.RIGHT_PAREN);
-        final Stmt body = this.parseStatement();
-        return new Stmt.While(condition, body, start.line(), start.column());
+        final IStmt body = this.parseStatement();
+        return new IStmt.While(condition, body, start.line(), start.column());
     }
 
-    private Stmt parseDoWhile() {
+    private IStmt parseDoWhile() {
         final Token start = this.advance();
-        final Stmt body = this.parseStatement();
+        final IStmt body = this.parseStatement();
         this.expect(TokenKind.WHILE);
         this.expect(TokenKind.LEFT_PAREN);
-        final Expr condition = this.parseExpression();
+        final IExpr condition = this.parseExpression();
         this.expect(TokenKind.RIGHT_PAREN);
         this.expect(TokenKind.SEMICOLON);
-        return new Stmt.DoWhile(body, condition, start.line(), start.column());
+        return new IStmt.DoWhile(body, condition, start.line(), start.column());
     }
 
-    private Stmt parseFor() {
+    private IStmt parseFor() {
         final Token start = this.advance();
         this.expect(TokenKind.LEFT_PAREN);
-        final List<Stmt> initializers = new ArrayList<>();
+        final List<IStmt> initializers = new ArrayList<>();
         if (!this.check(TokenKind.SEMICOLON)) {
             if (this.looksLikeDeclaration()) {
                 initializers.add(this.parseLocalDeclaration(false));
             } else {
                 do {
                     final Token at = this.peek();
-                    final Expr expression = this.parseExpression();
+                    final IExpr expression = this.parseExpression();
                     if (expression != null) {
-                        initializers.add(new Stmt.ExprStmt(expression, at.line(), at.column()));
+                        initializers.add(new IStmt.ExprStmt(expression, at.line(), at.column()));
                     }
                 } while (this.match(TokenKind.COMMA));
             }
         }
         this.expect(TokenKind.SEMICOLON);
-        final Expr condition = this.check(TokenKind.SEMICOLON) ? null : this.parseExpression();
+        final IExpr condition = this.check(TokenKind.SEMICOLON) ? null : this.parseExpression();
         this.expect(TokenKind.SEMICOLON);
-        final List<Expr> updates = new ArrayList<>();
+        final List<IExpr> updates = new ArrayList<>();
         if (!this.check(TokenKind.RIGHT_PAREN)) {
             do {
-                final Expr update = this.parseExpression();
+                final IExpr update = this.parseExpression();
                 if (update != null) {
                     updates.add(update);
                 }
             } while (this.match(TokenKind.COMMA));
         }
         this.expect(TokenKind.RIGHT_PAREN);
-        final Stmt body = this.parseStatement();
-        return new Stmt.For(initializers, condition, updates, body, start.line(), start.column());
+        final IStmt body = this.parseStatement();
+        return new IStmt.For(initializers, condition, updates, body, start.line(), start.column());
     }
 
-    private Stmt parseForEach() {
+    private IStmt parseForEach() {
         final Token start = this.advance();
         this.expect(TokenKind.LEFT_PAREN);
         final TypeRef type = this.parseTypeRef();
         final String name = this.expectIdentifier();
         this.expect(TokenKind.IN);
-        final Expr source = this.parseExpression();
+        final IExpr source = this.parseExpression();
         this.expect(TokenKind.RIGHT_PAREN);
-        final Stmt body = this.parseStatement();
-        return new Stmt.ForEach(type, name, source, body, start.line(), start.column());
+        final IStmt body = this.parseStatement();
+        return new IStmt.ForEach(type, name, source, body, start.line(), start.column());
     }
 
-    private Stmt parseSwitch() {
+    private IStmt parseSwitch() {
         final Token start = this.advance();
         this.expect(TokenKind.LEFT_PAREN);
-        final Expr value = this.parseExpression();
+        final IExpr value = this.parseExpression();
         this.expect(TokenKind.RIGHT_PAREN);
-        final List<Stmt.SwitchSection> sections = new ArrayList<>();
+        final List<IStmt.SwitchSection> sections = new ArrayList<>();
         if (this.expect(TokenKind.LEFT_BRACE)) {
             while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
                 final int before = this.position;
-                final Stmt.SwitchSection section = this.parseSwitchSection();
+                final IStmt.SwitchSection section = this.parseSwitchSection();
                 if (section != null) {
                     sections.add(section);
                 }
@@ -610,16 +610,16 @@ public final class Parser {
             }
             this.expect(TokenKind.RIGHT_BRACE);
         }
-        return new Stmt.Switch(value, sections, start.line(), start.column());
+        return new IStmt.Switch(value, sections, start.line(), start.column());
     }
 
-    private Stmt.SwitchSection parseSwitchSection() {
+    private IStmt.SwitchSection parseSwitchSection() {
         final Token start = this.peek();
-        final List<Expr> labels = new ArrayList<>();
+        final List<IExpr> labels = new ArrayList<>();
         boolean fallback = false;
         while (this.check(TokenKind.CASE) || this.check(TokenKind.DEFAULT)) {
             if (this.match(TokenKind.CASE)) {
-                final Expr label = this.parseExpression();
+                final IExpr label = this.parseExpression();
                 if (label != null) {
                     labels.add(label);
                 }
@@ -634,11 +634,11 @@ public final class Parser {
                     CannonError.EXPECTED_TOKEN, TokenKind.CASE.describe(), start.describe());
             return null;
         }
-        final List<Stmt> statements = new ArrayList<>();
+        final List<IStmt> statements = new ArrayList<>();
         while (!this.check(TokenKind.CASE) && !this.check(TokenKind.DEFAULT)
                 && !this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
             final int before = this.position;
-            final Stmt statement = this.parseStatement();
+            final IStmt statement = this.parseStatement();
             if (statement != null) {
                 statements.add(statement);
             }
@@ -646,29 +646,29 @@ public final class Parser {
                 this.advance();
             }
         }
-        return new Stmt.SwitchSection(labels, fallback, statements, start.line(), start.column());
+        return new IStmt.SwitchSection(labels, fallback, statements, start.line(), start.column());
     }
 
-    private Stmt parseReturn() {
+    private IStmt parseReturn() {
         final Token start = this.advance();
-        final Expr value = this.check(TokenKind.SEMICOLON) ? null : this.parseExpression();
+        final IExpr value = this.check(TokenKind.SEMICOLON) ? null : this.parseExpression();
         this.expect(TokenKind.SEMICOLON);
-        return new Stmt.Return(value, start.line(), start.column());
+        return new IStmt.Return(value, start.line(), start.column());
     }
 
-    private Stmt parseDispose() {
+    private IStmt parseDispose() {
         final Token start = this.advance();
-        final Expr target = this.parseExpression();
+        final IExpr target = this.parseExpression();
         this.expect(TokenKind.SEMICOLON);
-        return new Stmt.Dispose(target, start.line(), start.column());
+        return new IStmt.Dispose(target, start.line(), start.column());
     }
 
-    private Stmt parseDeclarationOrExpressionStatement() {
+    private IStmt parseDeclarationOrExpressionStatement() {
         if (this.looksLikeDeclaration()) {
             return this.parseLocalDeclaration(true);
         }
         final Token start = this.peek();
-        final Expr expression = this.parseExpression();
+        final IExpr expression = this.parseExpression();
         if (expression == null) {
             return null;
         }
@@ -676,21 +676,21 @@ public final class Parser {
             this.diagnostics.error(start.line(), start.column(), CannonError.NOT_A_STATEMENT);
         }
         this.expect(TokenKind.SEMICOLON);
-        return new Stmt.ExprStmt(expression, start.line(), start.column());
+        return new IStmt.ExprStmt(expression, start.line(), start.column());
     }
 
-    private Stmt parseLocalDeclaration(final boolean terminated) {
+    private IStmt parseLocalDeclaration(final boolean terminated) {
         final Token start = this.peek();
         final TypeRef type = this.parseTypeRef();
         final String name = this.expectIdentifier();
-        Expr initializer = null;
+        IExpr initializer = null;
         if (this.match(TokenKind.ASSIGN)) {
             initializer = this.parseExpression();
         }
         if (terminated) {
             this.expect(TokenKind.SEMICOLON);
         }
-        return new Stmt.LocalDecl(type, name, initializer, start.line(), start.column());
+        return new IStmt.LocalDecl(type, name, initializer, start.line(), start.column());
     }
 
     // A type followed by a name is a declaration; anything else at the head of a statement is an
@@ -702,12 +702,12 @@ public final class Parser {
 
     // Evaluating a value and throwing it away is always a mistake, so only the forms that do
     // something are allowed to stand alone.
-    private boolean isStatementExpression(final Expr expression) {
+    private boolean isStatementExpression(final IExpr expression) {
         return switch (expression) {
-            case Expr.Call ignored -> true;
-            case Expr.Assign ignored -> true;
-            case Expr.New ignored -> true;
-            case Expr.Unary unary -> unary.operator() == Operator.INCREMENT
+            case IExpr.Call ignored -> true;
+            case IExpr.Assign ignored -> true;
+            case IExpr.New ignored -> true;
+            case IExpr.Unary unary -> unary.operator() == Operator.INCREMENT
                     || unary.operator() == Operator.DECREMENT;
             default -> false;
         };
@@ -715,22 +715,22 @@ public final class Parser {
 
     // ---------------------------------------------------------------- expressions
 
-    private Expr parseExpression() {
+    private IExpr parseExpression() {
         return this.parseAssignment();
     }
 
-    private Expr parseAssignment() {
-        final Expr left = this.parseConditional();
+    private IExpr parseAssignment() {
+        final IExpr left = this.parseConditional();
         final Operator operator = this.assignmentOperator(this.peek().kind());
         if (operator == null || left == null) {
             return left;
         }
         final Token at = this.advance();
-        final Expr value = this.parseAssignment();
+        final IExpr value = this.parseAssignment();
         if (!this.isAssignable(left)) {
             this.diagnostics.error(at.line(), at.column(), CannonError.INVALID_ASSIGNMENT_TARGET);
         }
-        return new Expr.Assign(left, operator, value, left.line(), left.column());
+        return new IExpr.Assign(left, operator, value, left.line(), left.column());
     }
 
     private Operator assignmentOperator(final TokenKind kind) {
@@ -750,22 +750,22 @@ public final class Parser {
         };
     }
 
-    private boolean isAssignable(final Expr expression) {
-        return expression instanceof Expr.Name
-                || expression instanceof Expr.Member
-                || expression instanceof Expr.Index;
+    private boolean isAssignable(final IExpr expression) {
+        return expression instanceof IExpr.Name
+                || expression instanceof IExpr.Member
+                || expression instanceof IExpr.Index;
     }
 
-    private Expr parseConditional() {
-        final Expr condition = this.parseBinary(0);
+    private IExpr parseConditional() {
+        final IExpr condition = this.parseBinary(0);
         if (!this.check(TokenKind.QUESTION)) {
             return condition;
         }
         this.advance();
-        final Expr whenTrue = this.parseAssignment();
+        final IExpr whenTrue = this.parseAssignment();
         this.expect(TokenKind.COLON);
-        final Expr whenFalse = this.parseAssignment();
-        return new Expr.Conditional(condition, whenTrue, whenFalse,
+        final IExpr whenFalse = this.parseAssignment();
+        return new IExpr.Conditional(condition, whenTrue, whenFalse,
                 condition == null ? this.peek().line() : condition.line(),
                 condition == null ? this.peek().column() : condition.column());
     }
@@ -788,16 +788,16 @@ public final class Parser {
     /** The level that also carries {@code is} and {@code as}, which bind like a comparison. */
     private static final int RELATIONAL_LEVEL = 6;
 
-    private Expr parseBinary(final int level) {
+    private IExpr parseBinary(final int level) {
         if (level >= BINARY_LEVELS.length) {
             return this.parseUnary();
         }
-        Expr left = this.parseBinary(level + 1);
+        IExpr left = this.parseBinary(level + 1);
         while (true) {
             if (level == RELATIONAL_LEVEL && (this.check(TokenKind.IS) || this.check(TokenKind.AS))) {
                 final Token at = this.advance();
                 final TypeRef type = this.parseTypeRef();
-                left = new Expr.TypeTest(left, type, at.is(TokenKind.AS),
+                left = new IExpr.TypeTest(left, type, at.is(TokenKind.AS),
                         left == null ? at.line() : left.line(), left == null ? at.column() : left.column());
                 continue;
             }
@@ -805,8 +805,8 @@ public final class Parser {
             if (kind == null) {
                 return left;
             }
-            final Expr right = this.parseBinary(level + 1);
-            left = new Expr.Binary(this.binaryOperator(kind), left, right,
+            final IExpr right = this.parseBinary(level + 1);
+            left = new IExpr.Binary(this.binaryOperator(kind), left, right,
                     left == null ? this.peek().line() : left.line(),
                     left == null ? this.peek().column() : left.column());
         }
@@ -835,27 +835,27 @@ public final class Parser {
         };
     }
 
-    private Expr parseUnary() {
+    private IExpr parseUnary() {
         final Token start = this.peek();
         switch (start.kind()) {
             case NOT:
                 this.advance();
-                return new Expr.Unary(Operator.NOT, this.parseUnary(), false, start.line(), start.column());
+                return new IExpr.Unary(Operator.NOT, this.parseUnary(), false, start.line(), start.column());
             case MINUS:
                 this.advance();
-                return new Expr.Unary(Operator.NEGATE, this.parseUnary(), false, start.line(), start.column());
+                return new IExpr.Unary(Operator.NEGATE, this.parseUnary(), false, start.line(), start.column());
             case PLUS:
                 this.advance();
-                return new Expr.Unary(Operator.PLUS, this.parseUnary(), false, start.line(), start.column());
+                return new IExpr.Unary(Operator.PLUS, this.parseUnary(), false, start.line(), start.column());
             case TILDE:
                 this.advance();
-                return new Expr.Unary(Operator.COMPLEMENT, this.parseUnary(), false, start.line(), start.column());
+                return new IExpr.Unary(Operator.COMPLEMENT, this.parseUnary(), false, start.line(), start.column());
             case PLUS_PLUS:
                 this.advance();
-                return new Expr.Unary(Operator.INCREMENT, this.parseUnary(), false, start.line(), start.column());
+                return new IExpr.Unary(Operator.INCREMENT, this.parseUnary(), false, start.line(), start.column());
             case MINUS_MINUS:
                 this.advance();
-                return new Expr.Unary(Operator.DECREMENT, this.parseUnary(), false, start.line(), start.column());
+                return new IExpr.Unary(Operator.DECREMENT, this.parseUnary(), false, start.line(), start.column());
             default:
                 break;
         }
@@ -863,7 +863,7 @@ public final class Parser {
             this.advance();
             final TypeRef type = this.parseTypeRef();
             this.expect(TokenKind.RIGHT_PAREN);
-            return new Expr.Cast(type, this.parseUnary(), start.line(), start.column());
+            return new IExpr.Cast(type, this.parseUnary(), start.line(), start.column());
         }
         return this.parsePostfix();
     }
@@ -911,31 +911,31 @@ public final class Parser {
         }
     }
 
-    private Expr parsePostfix() {
-        Expr expression = this.parsePrimary();
+    private IExpr parsePostfix() {
+        IExpr expression = this.parsePrimary();
         while (true) {
             if (this.check(TokenKind.DOT)) {
                 final Token dot = this.advance();
                 final String name = this.expectIdentifier();
-                expression = new Expr.Member(expression, name,
+                expression = new IExpr.Member(expression, name,
                         expression == null ? dot.line() : expression.line(),
                         expression == null ? dot.column() : expression.column());
             } else if (this.check(TokenKind.LEFT_PAREN)) {
                 final Token at = this.peek();
-                final List<Expr> arguments = this.parseArguments();
-                expression = new Expr.Call(expression, arguments,
+                final List<IExpr> arguments = this.parseArguments();
+                expression = new IExpr.Call(expression, arguments,
                         expression == null ? at.line() : expression.line(),
                         expression == null ? at.column() : expression.column());
             } else if (this.check(TokenKind.LEFT_BRACKET)) {
                 final Token at = this.advance();
-                final Expr index = this.parseExpression();
+                final IExpr index = this.parseExpression();
                 this.expect(TokenKind.RIGHT_BRACKET);
-                expression = new Expr.Index(expression, index,
+                expression = new IExpr.Index(expression, index,
                         expression == null ? at.line() : expression.line(),
                         expression == null ? at.column() : expression.column());
             } else if (this.check(TokenKind.PLUS_PLUS) || this.check(TokenKind.MINUS_MINUS)) {
                 final Token at = this.advance();
-                expression = new Expr.Unary(at.is(TokenKind.PLUS_PLUS) ? Operator.INCREMENT : Operator.DECREMENT,
+                expression = new IExpr.Unary(at.is(TokenKind.PLUS_PLUS) ? Operator.INCREMENT : Operator.DECREMENT,
                         expression, true,
                         expression == null ? at.line() : expression.line(),
                         expression == null ? at.column() : expression.column());
@@ -945,14 +945,14 @@ public final class Parser {
         }
     }
 
-    private List<Expr> parseArguments() {
-        final List<Expr> arguments = new ArrayList<>();
+    private List<IExpr> parseArguments() {
+        final List<IExpr> arguments = new ArrayList<>();
         if (!this.expect(TokenKind.LEFT_PAREN)) {
             return arguments;
         }
         while (!this.check(TokenKind.RIGHT_PAREN) && !this.atEnd()) {
             final int before = this.position;
-            final Expr argument = this.check(TokenKind.OUT) ? this.parseOutArgument() : this.parseExpression();
+            final IExpr argument = this.check(TokenKind.OUT) ? this.parseOutArgument() : this.parseExpression();
             if (argument != null) {
                 arguments.add(argument);
             }
@@ -969,7 +969,7 @@ public final class Parser {
 
     // "out value" hands over a place that already exists; "out int value" and "out var value" declare
     // it right there, which is where a player wants it when the call is the only reason it exists.
-    private Expr parseOutArgument() {
+    private IExpr parseOutArgument() {
         final Token start = this.advance();
         final int afterType = this.scanType(this.position);
         TypeRef type = null;
@@ -977,22 +977,22 @@ public final class Parser {
             type = this.parseTypeRef();
         }
         final String name = this.expectIdentifier();
-        return new Expr.OutArgument(type, name, start.line(), start.column());
+        return new IExpr.OutArgument(type, name, start.line(), start.column());
     }
 
-    private Expr parsePrimary() {
+    private IExpr parsePrimary() {
         final Token start = this.peek();
         if (LITERALS.contains(start.kind())) {
             this.advance();
-            return new Expr.Literal(start.kind(), start.value(), start.line(), start.column());
+            return new IExpr.Literal(start.kind(), start.value(), start.line(), start.column());
         }
         switch (start.kind()) {
             case THIS:
                 this.advance();
-                return new Expr.This(start.line(), start.column());
+                return new IExpr.This(start.line(), start.column());
             case BASE:
                 this.advance();
-                return new Expr.Base(start.line(), start.column());
+                return new IExpr.Base(start.line(), start.column());
             case NEW:
                 return this.parseNew();
             case IDENTIFIER:
@@ -1000,13 +1000,13 @@ public final class Parser {
                     return this.parseShorthandLambda();
                 }
                 this.advance();
-                return new Expr.Name(start.text(), start.line(), start.column());
+                return new IExpr.Name(start.text(), start.line(), start.column());
             case LEFT_PAREN:
                 if (this.isLambdaAhead()) {
                     return this.parseLambda();
                 }
                 this.advance();
-                final Expr grouped = this.parseExpression();
+                final IExpr grouped = this.parseExpression();
                 this.expect(TokenKind.RIGHT_PAREN);
                 return grouped;
             default:
@@ -1016,36 +1016,36 @@ public final class Parser {
         // methods: "string.Format(...)" and "int.Parse(...)" read the way a player expects.
         if (BUILT_IN_TYPES.contains(start.kind()) && this.kindAt(this.position + 1) == TokenKind.DOT) {
             this.advance();
-            return new Expr.Name(start.text(), start.line(), start.column());
+            return new IExpr.Name(start.text(), start.line(), start.column());
         }
         this.diagnostics.error(start.line(), start.column(), CannonError.EXPECTED_EXPRESSION, start.describe());
         return null;
     }
 
-    private Expr parseNew() {
+    private IExpr parseNew() {
         final Token start = this.advance();
         final TypeRef type = this.parseTypeRef();
         if (this.check(TokenKind.LEFT_BRACKET)) {
             this.advance();
-            final Expr length = this.parseExpression();
+            final IExpr length = this.parseExpression();
             this.expect(TokenKind.RIGHT_BRACKET);
-            return new Expr.NewArray(type, length, start.line(), start.column());
+            return new IExpr.NewArray(type, length, start.line(), start.column());
         }
-        final List<Expr> arguments = this.parseArguments();
-        return new Expr.New(type, arguments, start.line(), start.column());
+        final List<IExpr> arguments = this.parseArguments();
+        return new IExpr.New(type, arguments, start.line(), start.column());
     }
 
-    private Expr parseShorthandLambda() {
+    private IExpr parseShorthandLambda() {
         final Token name = this.advance();
         this.advance();
-        final List<Decl.Parameter> parameters = List.of(
-                new Decl.Parameter(false, null, name.text(), name.line(), name.column()));
+        final List<IDecl.Parameter> parameters = List.of(
+                new IDecl.Parameter(false, null, name.text(), name.line(), name.column()));
         return this.finishLambda(parameters, name);
     }
 
-    private Expr parseLambda() {
+    private IExpr parseLambda() {
         final Token start = this.peek();
-        final List<Decl.Parameter> parameters = new ArrayList<>();
+        final List<IDecl.Parameter> parameters = new ArrayList<>();
         this.advance();
         while (!this.check(TokenKind.RIGHT_PAREN) && !this.atEnd()) {
             final int before = this.position;
@@ -1057,7 +1057,7 @@ public final class Parser {
                 type = this.parseTypeRef();
             }
             final String name = this.expectIdentifier();
-            parameters.add(new Decl.Parameter(outward, type, name, at.line(), at.column()));
+            parameters.add(new IDecl.Parameter(outward, type, name, at.line(), at.column()));
             if (!this.match(TokenKind.COMMA)) {
                 break;
             }
@@ -1070,13 +1070,13 @@ public final class Parser {
         return this.finishLambda(parameters, start);
     }
 
-    private Expr finishLambda(final List<Decl.Parameter> parameters, final Token start) {
+    private IExpr finishLambda(final List<IDecl.Parameter> parameters, final Token start) {
         if (this.check(TokenKind.LEFT_BRACE)) {
-            final Stmt.Block block = this.parseBlock();
-            return new Expr.Lambda(parameters, null, block, start.line(), start.column());
+            final IStmt.Block block = this.parseBlock();
+            return new IExpr.Lambda(parameters, null, block, start.line(), start.column());
         }
-        final Expr body = this.parseExpression();
-        return new Expr.Lambda(parameters, body, null, start.line(), start.column());
+        final IExpr body = this.parseExpression();
+        return new IExpr.Lambda(parameters, body, null, start.line(), start.column());
     }
 
     // ---------------------------------------------------------------- recovery and cursor

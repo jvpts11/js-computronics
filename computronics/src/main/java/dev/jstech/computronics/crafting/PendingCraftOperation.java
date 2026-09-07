@@ -9,12 +9,12 @@ package dev.jstech.computronics.crafting;
 
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.operation.ComputingOperations;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.operation.OperationDispatch;
 import dev.jstech.core.operation.OperationPriority;
-import dev.jstech.core.operation.OperationResult;
+import dev.jstech.core.operation.IOperationResult;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -30,7 +30,7 @@ import java.util.UUID;
  * placeholder collected meanwhile — and the placeholder steps aside without a log entry of its own. A
  * request nothing can make settles FAILED here, and one cancelled while planning settles DISCARDED.
  */
-public final class PendingCraftOperation implements NetworkOperation {
+public final class PendingCraftOperation implements INetworkOperation {
 
     private final MainframeBlockEntity mainframe;
     private final StorageKey key;
@@ -65,7 +65,7 @@ public final class PendingCraftOperation implements NetworkOperation {
         dispatch.submit(context -> {
             final CraftPlanning.Planned planned = CraftPlanning.plan(key, demand, partial, patterns, machines, stock);
             context.onMainThread(() -> deliver(planned));
-            return OperationResult.success();
+            return IOperationResult.success();
         }, priority);
     }
 

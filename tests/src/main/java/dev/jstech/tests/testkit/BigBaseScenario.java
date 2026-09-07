@@ -378,7 +378,7 @@ public final class BigBaseScenario {
     }
 
     /** Something to do to every cabinet just placed: mount its units. */
-    private interface RackFiller {
+    private interface IRackFiller {
         void fill(ServerRackBlockEntity rack);
     }
 
@@ -391,7 +391,7 @@ public final class BigBaseScenario {
     private static List<ServerRackBlockEntity> placeCabinetRow(final TestWorldBuilder world, final Block cable,
                                                                final Block rackBlock, final int x, final int start,
                                                                final Direction away, final int count,
-                                                               final RackFiller filler) {
+                                                               final IRackFiller filler) {
         final int step = away.getStepZ();
         final int perSide = (count + 1) / 2;
         for (int i = 0; i <= 2 * perSide; i++) {

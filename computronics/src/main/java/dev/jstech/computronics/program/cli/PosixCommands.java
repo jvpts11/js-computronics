@@ -22,7 +22,7 @@ public final class PosixCommands {
     }
 
     /** The POSIX-only commands (the shared verbs are added by {@link CliCommands}). */
-    public static List<CliCommand> all() {
+    public static List<ICliCommand> all() {
         return List.of(
                 new Ls(),
                 new Pwd(),
@@ -55,7 +55,7 @@ public final class PosixCommands {
      * own flags but all resolving packages against the network's Mirror service. Only the manager the installed
      * OS ships is available, so {@code apt} does not exist on Arch and {@code pacman} does not exist on Ubuntu.
      */
-    static final class PackageManagerCommand implements CliCommand {
+    static final class PackageManagerCommand implements ICliCommand {
         private final dev.jstech.computronics.os.PackageManagerKind kind;
 
         PackageManagerCommand(final dev.jstech.computronics.os.PackageManagerKind kind) {
@@ -76,7 +76,7 @@ public final class PosixCommands {
             };
         }
 
-        @Override public boolean available(final CliComputer computer) {
+        @Override public boolean available(final ICliComputer computer) {
             return computer.packageManager() == kind;
         }
 
@@ -136,7 +136,7 @@ public final class PosixCommands {
             }
             final String name = pkg.trim().split("\\s+")[0];
             ctx.out().dim("Resolving mirror://mainframe ...");
-            final CliComputer.OpResult result = ctx.computer().packageInstall(name);
+            final ICliComputer.OpResult result = ctx.computer().packageInstall(name);
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {
@@ -150,7 +150,7 @@ public final class PosixCommands {
                 return;
             }
             final String name = pkg.trim().split("\\s+")[0];
-            final CliComputer.OpResult result = ctx.computer().packageRemove(name);
+            final ICliComputer.OpResult result = ctx.computer().packageRemove(name);
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {
@@ -165,7 +165,7 @@ public final class PosixCommands {
             }
             final String needle = term.trim().toLowerCase(Locale.ROOT);
             boolean any = false;
-            for (final CliComputer.PackageInfo p : ctx.computer().packagesAvailable()) {
+            for (final ICliComputer.PackageInfo p : ctx.computer().packagesAvailable()) {
                 if (!needle.isEmpty() && !p.name().contains(needle)
                         && !p.description().toLowerCase(Locale.ROOT).contains(needle)) {
                     continue;
@@ -183,7 +183,7 @@ public final class PosixCommands {
 
         private void installed(final CliContext ctx) {
             boolean any = false;
-            for (final CliComputer.PackageInfo p : ctx.computer().packagesAvailable()) {
+            for (final ICliComputer.PackageInfo p : ctx.computer().packagesAvailable()) {
                 if (p.installed()) {
                     any = true;
                     ctx.out().row(p.name(), p.description());
@@ -209,7 +209,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Mkfs implements CliCommand {
+    static final class Mkfs implements ICliCommand {
         @Override public String name() { return "mkfs.ext4"; }
 
         @Override public java.util.List<String> aliases() { return java.util.List.of("mkfs"); }
@@ -226,9 +226,9 @@ public final class PosixCommands {
             final String raw = ctx.arg(0);
             final String device = raw.startsWith("/dev/") ? raw.substring(5) : raw;
             // Resolve the device name back to its drive: "sda" also matches the "sda1" system partition.
-            for (final CliComputer.MountInfo mount : ctx.computer().mounts()) {
+            for (final ICliComputer.MountInfo mount : ctx.computer().mounts()) {
                 if (mount.device().equals(device) || mount.device().startsWith(device)) {
-                    final CliComputer.OpResult result = ctx.computer().formatDrive(mount.drive());
+                    final ICliComputer.OpResult result = ctx.computer().formatDrive(mount.drive());
                     if (result.ok()) {
                         ctx.out().dim("mke2fs 1.47 (JSC)");
                         ctx.out().ok("Creating filesystem on /dev/" + device + " ... done");
@@ -242,7 +242,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Screenfetch implements CliCommand {
+    static final class Screenfetch implements ICliCommand {
 
         // One small ASCII mark per distribution, printed beside the system readout.
         private static final java.util.Map<String, String[]> LOGOS = java.util.Map.of(
@@ -366,7 +366,7 @@ public final class PosixCommands {
 
         @Override public String usage() { return ""; }
 
-        @Override public boolean available(final CliComputer computer) {
+        @Override public boolean available(final ICliComputer computer) {
             // A package the Mirror serves, not a built-in: 'command not found' until it is installed —
             // the classic first thing to apt install on a fresh system.
             return computer.hasProgram(
@@ -374,7 +374,7 @@ public final class PosixCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer.SystemInfo info = ctx.computer().systemInfo();
+            final ICliComputer.SystemInfo info = ctx.computer().systemInfo();
             if (info == null) {
                 ctx.out().error("screenfetch: no operating system installed");
                 return;
@@ -427,7 +427,7 @@ public final class PosixCommands {
         return PosixPath.toDos(posixPath);
     }
 
-    static final class Ls implements CliCommand {
+    static final class Ls implements ICliCommand {
         @Override public String name() { return "ls"; }
 
         @Override public String summary() { return "list directory contents"; }
@@ -445,17 +445,17 @@ public final class PosixCommands {
                     dir = a;
                 }
             }
-            final CliComputer.FsResult result = ctx.computer().listDisk(dos(dir));
+            final ICliComputer.FsResult result = ctx.computer().listDisk(dos(dir));
             if (!result.ok()) {
                 ctx.out().error("ls: " + result.message());
                 return;
             }
-            final List<CliComputer.FsEntry> entries = result.entries();
+            final List<ICliComputer.FsEntry> entries = result.entries();
             if (entries.isEmpty()) {
                 return;
             }
             if (longFormat) {
-                for (final CliComputer.FsEntry e : entries) {
+                for (final ICliComputer.FsEntry e : entries) {
                     final String mode = (e.isDir() ? "d" : "-") + (e.readOnly() ? "r--r--r--" : "rw-r--r--");
                     ctx.out().row(mode + "  " + e.name() + (e.isDir() ? "/" : ""),
                             e.isDir() ? "" : String.format(Locale.ROOT, "%,d mB", e.weightMbEq()));
@@ -463,7 +463,7 @@ public final class PosixCommands {
                 return;
             }
             final StringBuilder line = new StringBuilder();
-            for (final CliComputer.FsEntry e : entries) {
+            for (final ICliComputer.FsEntry e : entries) {
                 if (line.length() > 0) {
                     line.append("  ");
                 }
@@ -473,7 +473,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Pwd implements CliCommand {
+    static final class Pwd implements ICliCommand {
         @Override public String name() { return "pwd"; }
 
         @Override public String summary() { return "print the current directory"; }
@@ -483,7 +483,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Cd implements CliCommand {
+    static final class Cd implements ICliCommand {
         @Override public String name() { return "cd"; }
 
         @Override public String summary() { return "change the current directory (home when no argument)"; }
@@ -492,14 +492,14 @@ public final class PosixCommands {
 
         @Override public void run(final CliContext ctx) {
             final String target = ctx.hasArgs() ? ctx.rest(0) : "~";
-            final CliComputer.FsResult result = ctx.computer().changeDir(dos(target));
+            final ICliComputer.FsResult result = ctx.computer().changeDir(dos(target));
             if (!result.ok()) {
                 ctx.out().error("cd: " + result.message());
             }
         }
     }
 
-    static final class Cat implements CliCommand {
+    static final class Cat implements ICliCommand {
         @Override public String name() { return "cat"; }
 
         @Override public String summary() { return "print the content of a file"; }
@@ -511,7 +511,7 @@ public final class PosixCommands {
                 ctx.out().error("usage: cat <file>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().readFile(dos(ctx.arg(0)));
+            final ICliComputer.FsResult result = ctx.computer().readFile(dos(ctx.arg(0)));
             if (!result.ok()) {
                 ctx.out().error("cat: " + result.message());
                 return;
@@ -522,7 +522,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Rm implements CliCommand {
+    static final class Rm implements ICliCommand {
         @Override public String name() { return "rm"; }
 
         @Override public String summary() { return "remove a file"; }
@@ -534,14 +534,14 @@ public final class PosixCommands {
                 ctx.out().error("usage: rm <file>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().deleteFile(dos(ctx.arg(0)));
+            final ICliComputer.FsResult result = ctx.computer().deleteFile(dos(ctx.arg(0)));
             if (!result.ok()) {
                 ctx.out().error("rm: " + result.message());
             }
         }
     }
 
-    static final class Mkdir implements CliCommand {
+    static final class Mkdir implements ICliCommand {
         @Override public String name() { return "mkdir"; }
 
         @Override public String summary() { return "create a directory"; }
@@ -553,14 +553,14 @@ public final class PosixCommands {
                 ctx.out().error("usage: mkdir <directory>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().makeDir(dos(ctx.rest(0)));
+            final ICliComputer.FsResult result = ctx.computer().makeDir(dos(ctx.rest(0)));
             if (!result.ok()) {
                 ctx.out().error("mkdir: " + result.message());
             }
         }
     }
 
-    static final class Rmdir implements CliCommand {
+    static final class Rmdir implements ICliCommand {
         @Override public String name() { return "rmdir"; }
 
         @Override public String summary() { return "remove an empty directory"; }
@@ -572,14 +572,14 @@ public final class PosixCommands {
                 ctx.out().error("usage: rmdir <directory>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().removeDir(dos(ctx.rest(0)));
+            final ICliComputer.FsResult result = ctx.computer().removeDir(dos(ctx.rest(0)));
             if (!result.ok()) {
                 ctx.out().error("rmdir: " + result.message());
             }
         }
     }
 
-    static final class Cp implements CliCommand {
+    static final class Cp implements ICliCommand {
         @Override public String name() { return "cp"; }
 
         @Override public String summary() { return "copy a file to another location"; }
@@ -591,14 +591,14 @@ public final class PosixCommands {
                 ctx.out().error("usage: cp <source> <destination>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().copyPath(dos(ctx.arg(0)), dos(ctx.arg(1)));
+            final ICliComputer.FsResult result = ctx.computer().copyPath(dos(ctx.arg(0)), dos(ctx.arg(1)));
             if (!result.ok()) {
                 ctx.out().error("cp: " + result.message());
             }
         }
     }
 
-    static final class Mv implements CliCommand {
+    static final class Mv implements ICliCommand {
         @Override public String name() { return "mv"; }
 
         @Override public String summary() { return "move a file into a directory, or rename it"; }
@@ -613,7 +613,7 @@ public final class PosixCommands {
             final String dest = ctx.arg(1);
             // A bare new name (no slash, no path form) is a rename; anything else moves into a directory.
             final boolean rename = !dest.contains("/") && !dest.startsWith("~") && !dest.equals(".") && !dest.equals("..");
-            final CliComputer.FsResult result = rename
+            final ICliComputer.FsResult result = rename
                     ? ctx.computer().renamePath(dos(ctx.arg(0)), dest)
                     : ctx.computer().movePath(dos(ctx.arg(0)), dos(dest));
             if (!result.ok()) {
@@ -622,7 +622,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Touch implements CliCommand {
+    static final class Touch implements ICliCommand {
         @Override public String name() { return "touch"; }
 
         @Override public String summary() { return "create an empty file"; }
@@ -634,14 +634,14 @@ public final class PosixCommands {
                 ctx.out().error("usage: touch <file>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().writeFile(dos(ctx.arg(0)), "");
+            final ICliComputer.FsResult result = ctx.computer().writeFile(dos(ctx.arg(0)), "");
             if (!result.ok()) {
                 ctx.out().error("touch: " + result.message());
             }
         }
     }
 
-    static final class Write implements CliCommand {
+    static final class Write implements ICliCommand {
         @Override public String name() { return "write"; }
 
         @Override public String summary() { return "create or overwrite a file with the given text"; }
@@ -653,7 +653,7 @@ public final class PosixCommands {
                 ctx.out().error("usage: write <file> <text...>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().writeFile(dos(ctx.arg(0)), ctx.rest(1));
+            final ICliComputer.FsResult result = ctx.computer().writeFile(dos(ctx.arg(0)), ctx.rest(1));
             if (!result.ok()) {
                 ctx.out().error("write: " + result.message());
             } else if (!result.message().isEmpty()) {
@@ -662,7 +662,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Run implements CliCommand {
+    static final class Run implements ICliCommand {
         @Override public String name() { return "run"; }
 
         @Override public String summary() { return "execute an .iql script"; }
@@ -674,7 +674,7 @@ public final class PosixCommands {
                 ctx.out().error("usage: run <file.iql>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().runScript(dos(ctx.arg(0)));
+            final ICliComputer.FsResult result = ctx.computer().runScript(dos(ctx.arg(0)));
             if (!result.ok()) {
                 ctx.out().error("run: " + result.message());
                 return;
@@ -691,7 +691,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Clear implements CliCommand, CliShell.ClearMarker {
+    static final class Clear implements ICliCommand, CliShell.IClearMarker {
         @Override public String name() { return "clear"; }
 
         @Override public String summary() { return "clear the terminal"; }
@@ -701,7 +701,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Man implements CliCommand {
+    static final class Man implements ICliCommand {
         @Override public String name() { return "man"; }
 
         @Override public String summary() { return "show the manual entry for a command"; }
@@ -713,7 +713,7 @@ public final class PosixCommands {
                 ctx.out().error("What manual page do you want?");
                 return;
             }
-            final CliCommand command = ctx.shell().find(ctx.arg(0));
+            final ICliCommand command = ctx.shell().find(ctx.arg(0));
             if (command == null) {
                 ctx.out().error("No manual entry for " + ctx.arg(0));
                 return;
@@ -728,7 +728,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Uname implements CliCommand {
+    static final class Uname implements ICliCommand {
         @Override public String name() { return "uname"; }
 
         @Override public String summary() { return "print system information"; }
@@ -744,7 +744,7 @@ public final class PosixCommands {
         }
     }
 
-    static final class Hostname implements CliCommand {
+    static final class Hostname implements ICliCommand {
         @Override public String name() { return "hostname"; }
 
         @Override public String summary() { return "print this computer's host name"; }
@@ -754,19 +754,19 @@ public final class PosixCommands {
         }
     }
 
-    static final class Df implements CliCommand {
+    static final class Df implements ICliCommand {
         @Override public String name() { return "df"; }
 
         @Override public String summary() { return "report filesystem space usage"; }
 
         @Override public void run(final CliContext ctx) {
-            final List<CliComputer.MountInfo> mounts = ctx.computer().mounts();
+            final List<ICliComputer.MountInfo> mounts = ctx.computer().mounts();
             if (mounts.isEmpty()) {
                 ctx.out().error("df: no filesystems mounted");
                 return;
             }
             ctx.out().row("Filesystem       Size   Used   Avail  Use%", "Mounted on");
-            for (final CliComputer.MountInfo m : mounts) {
+            for (final ICliComputer.MountInfo m : mounts) {
                 final String mount = PosixPath.render(DosPath.Location.root(m.drive()));
                 if (!m.ready()) {
                     ctx.out().row(String.format(Locale.ROOT, "/dev/%s%s", m.device(), "  (no medium)"), mount);

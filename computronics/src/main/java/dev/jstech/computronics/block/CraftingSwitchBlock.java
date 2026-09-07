@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
  * discovers the computer over the crafting cable.
  */
 public class CraftingSwitchBlock extends Block
-        implements EntityBlock, dev.jstech.core.network.DataNetworkConnectable {
+        implements EntityBlock, dev.jstech.core.network.IDataNetworkConnectable {
 
     public CraftingSwitchBlock(final Properties properties) {
         super(properties);

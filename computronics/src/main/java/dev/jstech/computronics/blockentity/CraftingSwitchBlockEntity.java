@@ -287,7 +287,7 @@ public class CraftingSwitchBlockEntity extends BlockEntity {
                     final var machineBlock = level.getBlockState(machinePos).getBlock();
                     // Network hardware is never a machine, even when a bus happens to point at it.
                     if (machineBlock instanceof DataCableBlock
-                            || machineBlock instanceof dev.jstech.core.network.DataNetworkConnectable
+                            || machineBlock instanceof dev.jstech.core.network.IDataNetworkConnectable
                             || !declared.add(machinePos) || level.getBlockEntity(machinePos) == null) {
                         continue;
                     }

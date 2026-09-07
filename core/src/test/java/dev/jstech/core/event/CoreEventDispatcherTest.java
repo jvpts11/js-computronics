@@ -32,21 +32,21 @@ class CoreEventDispatcherTest {
         return UUID.randomUUID();
     }
 
-    private static OperationLifecycleEvent.Created created() {
-        return new OperationLifecycleEvent.Created(net(), op(), TYPE);
+    private static IOperationLifecycleEvent.Created created() {
+        return new IOperationLifecycleEvent.Created(net(), op(), TYPE);
     }
 
-    private static OperationLifecycleEvent.Started started() {
-        return new OperationLifecycleEvent.Started(net(), op(), TYPE);
+    private static IOperationLifecycleEvent.Started started() {
+        return new IOperationLifecycleEvent.Started(net(), op(), TYPE);
     }
 
     @Test
     void singleListener_receivesEvent() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
-        List<OperationLifecycleEvent.Created> received = new ArrayList<>();
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class, received::add);
+        List<IOperationLifecycleEvent.Created> received = new ArrayList<>();
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class, received::add);
 
-        OperationLifecycleEvent.Created event = created();
+        IOperationLifecycleEvent.Created event = created();
         dispatcher.post(event);
 
         assertEquals(1, received.size());
@@ -56,16 +56,16 @@ class CoreEventDispatcherTest {
     @Test
     void noListeners_postIsNoOp() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
-        OperationLifecycleEvent.Created event = created();
+        IOperationLifecycleEvent.Created event = created();
         // Must not throw; just returns.
-        OperationLifecycleEvent.Created result = dispatcher.post(event);
+        IOperationLifecycleEvent.Created result = dispatcher.post(event);
         assertEquals(event, result);
     }
 
     @Test
     void postReturnsEvent_forFluentChaining() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
-        OperationLifecycleEvent.Created event = created();
+        IOperationLifecycleEvent.Created event = created();
         assertEquals(event, dispatcher.post(event));
     }
 
@@ -73,11 +73,11 @@ class CoreEventDispatcherTest {
     void multipleListeners_invokedInRegistrationOrder() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         List<Integer> order = new ArrayList<>();
-        dispatcher.subscribe(OperationLifecycleEvent.Started.class,
+        dispatcher.subscribe(IOperationLifecycleEvent.Started.class,
                 e -> order.add(1));
-        dispatcher.subscribe(OperationLifecycleEvent.Started.class,
+        dispatcher.subscribe(IOperationLifecycleEvent.Started.class,
                 e -> order.add(2));
-        dispatcher.subscribe(OperationLifecycleEvent.Started.class,
+        dispatcher.subscribe(IOperationLifecycleEvent.Started.class,
                 e -> order.add(3));
 
         dispatcher.post(started());
@@ -89,13 +89,13 @@ class CoreEventDispatcherTest {
     void subscribeToSealedRoot_receivesAllChildren() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        dispatcher.subscribe(OperationLifecycleEvent.class, e -> count.incrementAndGet());
+        dispatcher.subscribe(IOperationLifecycleEvent.class, e -> count.incrementAndGet());
 
         dispatcher.post(created());
         dispatcher.post(started());
-        dispatcher.post(new OperationLifecycleEvent.Completed(net(), op(), TYPE, 100L));
-        dispatcher.post(new OperationLifecycleEvent.Failed(net(), op(), TYPE, "test"));
-        dispatcher.post(new OperationLifecycleEvent.Discarded(net(), op(), TYPE));
+        dispatcher.post(new IOperationLifecycleEvent.Completed(net(), op(), TYPE, 100L));
+        dispatcher.post(new IOperationLifecycleEvent.Failed(net(), op(), TYPE, "test"));
+        dispatcher.post(new IOperationLifecycleEvent.Discarded(net(), op(), TYPE));
 
         assertEquals(5, count.get());
     }
@@ -104,7 +104,7 @@ class CoreEventDispatcherTest {
     void subscribeToConcreteType_doesNotReceiveSiblings() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger createdCount = new AtomicInteger();
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class,
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class,
                 e -> createdCount.incrementAndGet());
 
         dispatcher.post(created());
@@ -170,7 +170,7 @@ class CoreEventDispatcherTest {
     void subscribeWithNullListener_throws() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         assertThrows(NullPointerException.class, () ->
-                dispatcher.subscribe(OperationLifecycleEvent.Created.class, null));
+                dispatcher.subscribe(IOperationLifecycleEvent.Created.class, null));
     }
 
     @Test
@@ -183,8 +183,8 @@ class CoreEventDispatcherTest {
     void subscribedClassCount_reflectsRegistrations() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         assertEquals(0, dispatcher.subscribedClassCount());
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class, e -> { });
-        dispatcher.subscribe(OperationLifecycleEvent.Started.class, e -> { });
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class, e -> { });
+        dispatcher.subscribe(IOperationLifecycleEvent.Started.class, e -> { });
         assertEquals(2, dispatcher.subscribedClassCount());
     }
 
@@ -193,12 +193,12 @@ class CoreEventDispatcherTest {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger kept = new AtomicInteger();
         AtomicInteger dropped = new AtomicInteger();
-        java.util.function.Consumer<OperationLifecycleEvent.Created> keep = e -> kept.incrementAndGet();
-        java.util.function.Consumer<OperationLifecycleEvent.Created> drop = e -> dropped.incrementAndGet();
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class, keep);
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class, drop);
+        java.util.function.Consumer<IOperationLifecycleEvent.Created> keep = e -> kept.incrementAndGet();
+        java.util.function.Consumer<IOperationLifecycleEvent.Created> drop = e -> dropped.incrementAndGet();
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class, keep);
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class, drop);
 
-        dispatcher.unsubscribe(OperationLifecycleEvent.Created.class, drop);
+        dispatcher.unsubscribe(IOperationLifecycleEvent.Created.class, drop);
         dispatcher.post(created());
 
         assertEquals(1, kept.get());
@@ -209,19 +209,19 @@ class CoreEventDispatcherTest {
     @Test
     void unsubscribe_lastListenerDropsTheClass() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
-        java.util.function.Consumer<OperationLifecycleEvent.Created> only = e -> { };
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class, only);
-        dispatcher.unsubscribe(OperationLifecycleEvent.Created.class, only);
+        java.util.function.Consumer<IOperationLifecycleEvent.Created> only = e -> { };
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class, only);
+        dispatcher.unsubscribe(IOperationLifecycleEvent.Created.class, only);
         assertEquals(0, dispatcher.subscribedClassCount());
         // Unknown listeners and classes are ignored, never an error.
-        dispatcher.unsubscribe(OperationLifecycleEvent.Started.class, e -> { });
+        dispatcher.unsubscribe(IOperationLifecycleEvent.Started.class, e -> { });
     }
 
     @Test
     void clear_removesAllSubscriptions() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class,
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class,
                 e -> count.incrementAndGet());
 
         dispatcher.clear();
@@ -236,18 +236,18 @@ class CoreEventDispatcherTest {
         assertEquals("operation.lifecycle.created", created().eventId());
         assertEquals("operation.lifecycle.started", started().eventId());
         assertEquals("operation.lifecycle.completed",
-                new OperationLifecycleEvent.Completed(net(), op(), TYPE, 100L).eventId());
+                new IOperationLifecycleEvent.Completed(net(), op(), TYPE, 100L).eventId());
         assertEquals("operation.lifecycle.failed",
-                new OperationLifecycleEvent.Failed(net(), op(), TYPE, "err").eventId());
+                new IOperationLifecycleEvent.Failed(net(), op(), TYPE, "err").eventId());
         assertEquals("operation.lifecycle.discarded",
-                new OperationLifecycleEvent.Discarded(net(), op(), TYPE).eventId());
+                new IOperationLifecycleEvent.Discarded(net(), op(), TYPE).eventId());
     }
 
     @Test
     void operationLifecycleEvents_carryTheOperationAndItsType() {
         final UUID id = op();
-        final OperationLifecycleEvent.Completed event =
-                new OperationLifecycleEvent.Completed(net(), id, "jsc:craft", 40L);
+        final IOperationLifecycleEvent.Completed event =
+                new IOperationLifecycleEvent.Completed(net(), id, "jsc:craft", 40L);
         assertEquals(id, event.operationId());
         assertEquals("jsc:craft", event.typeId());
         assertEquals(40L, event.durationTicks());
@@ -262,30 +262,30 @@ class CoreEventDispatcherTest {
     @Test
     void completed_negativeDuration_throws() {
         assertThrows(IllegalArgumentException.class, () ->
-                new OperationLifecycleEvent.Completed(net(), op(), TYPE, -1L));
+                new IOperationLifecycleEvent.Completed(net(), op(), TYPE, -1L));
     }
 
     @Test
     void failed_nullReason_throws() {
         assertThrows(NullPointerException.class, () ->
-                new OperationLifecycleEvent.Failed(net(), op(), TYPE, null));
+                new IOperationLifecycleEvent.Failed(net(), op(), TYPE, null));
     }
 
     @Test
     void created_nullTypeOrId_throws() {
         assertThrows(NullPointerException.class, () ->
-                new OperationLifecycleEvent.Created(net(), null, TYPE));
+                new IOperationLifecycleEvent.Created(net(), null, TYPE));
         assertThrows(NullPointerException.class, () ->
-                new OperationLifecycleEvent.Created(net(), op(), null));
+                new IOperationLifecycleEvent.Created(net(), op(), null));
     }
 
     @Test
     void post_deliversToAncestorInterfaceSubscriber() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        // CoreEvent is a SUPERinterface of the event's direct interface (OperationLifecycleEvent), so it
+        // ICoreEvent is a SUPERinterface of the event's direct interface (IOperationLifecycleEvent), so it
         // is only reached once the whole interface graph is walked, not just the direct interfaces.
-        dispatcher.subscribe(CoreEvent.class, e -> count.incrementAndGet());
+        dispatcher.subscribe(ICoreEvent.class, e -> count.incrementAndGet());
 
         dispatcher.post(created());
 
@@ -296,10 +296,10 @@ class CoreEventDispatcherTest {
     void post_allowsAListenerToMutateSubscriptionsMidDispatch() {
         CoreEventDispatcher dispatcher = new CoreEventDispatcher();
         AtomicInteger count = new AtomicInteger();
-        dispatcher.subscribe(OperationLifecycleEvent.Created.class, e -> {
+        dispatcher.subscribe(IOperationLifecycleEvent.Created.class, e -> {
             count.incrementAndGet();
             // Subscribing and clearing during dispatch must not throw ConcurrentModificationException.
-            dispatcher.subscribe(OperationLifecycleEvent.Started.class, x -> { });
+            dispatcher.subscribe(IOperationLifecycleEvent.Started.class, x -> { });
             dispatcher.clear();
         });
 

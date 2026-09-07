@@ -33,7 +33,7 @@ import java.util.Random;
  * desktop the system monitor its own package brings. They all read the same machine: the memory ledger the
  * notification area draws from, the disks, the processor, and the network link.
  */
-public final class TaskManagerApp implements DesktopApp {
+public final class TaskManagerApp implements IDesktopApp {
 
     /** The shape this window takes, decided by the desktop it opened on. */
     private enum Form { CLOSE_BOX, LUNA, MODERN, PLASMA, GNOME }

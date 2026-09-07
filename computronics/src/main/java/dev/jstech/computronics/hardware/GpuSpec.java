@@ -18,7 +18,7 @@ public record GpuSpec(HardwareEra era,
                       PcieGeneration bus,
                       int cores,
                       int vramMb,
-                      int tdpWatts) implements ExpansionCardSpec {
+                      int tdpWatts) implements IExpansionCardSpec {
 
     public GpuSpec {
         Objects.requireNonNull(era, "era must not be null");

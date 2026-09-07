@@ -8,7 +8,7 @@
 package dev.jstech.computronics.item;
 
 import dev.jstech.computronics.hardware.CraftingCardSpec;
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -19,14 +19,14 @@ import java.util.List;
 /**
  * A Crafting Card component item: the PCIe card a Crafting Computer needs to execute recipes.
  */
-public class CraftingCardItem extends SpecItem<CraftingCardSpec> implements ExpansionCardItem {
+public class CraftingCardItem extends SpecItem<CraftingCardSpec> implements IExpansionCardItem {
 
     public CraftingCardItem(final Properties properties, final CraftingCardSpec spec) {
         super(properties, spec);
     }
 
     @Override
-    public ExpansionCardSpec cardSpec() {
+    public IExpansionCardSpec cardSpec() {
         return spec();
     }
 

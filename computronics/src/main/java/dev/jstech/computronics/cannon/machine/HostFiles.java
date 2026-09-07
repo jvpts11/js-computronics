@@ -8,9 +8,9 @@
 package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Values;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import java.util.List;
 
 /**
@@ -36,37 +36,37 @@ public final class HostFiles {
     }
 
     /** Answers one of them against a real machine. */
-    public static Host.Reply call(final CliComputer computer, final String member,
+    public static IHost.Reply call(final ICliComputer computer, final String member,
                                   final List<Object> arguments, final int line) {
         final String path = arguments.isEmpty() ? "" : String.valueOf(arguments.getFirst());
         return switch (member) {
-            case "Exists" -> Host.Reply.of(computer.readFile(path).ok(), LOOK);
+            case "Exists" -> IHost.Reply.of(computer.readFile(path).ok(), LOOK);
             case "Read" -> {
-                final CliComputer.FsResult read = computer.readFile(path);
+                final ICliComputer.FsResult read = computer.readFile(path);
                 if (!read.ok()) {
                     throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, read.message());
                 }
-                yield Host.Reply.of(read.message(), READ);
+                yield IHost.Reply.of(read.message(), READ);
             }
             case "TryRead" -> {
                 // The out parameter comes back beside the answer: found, and what was found.
-                final CliComputer.FsResult read = computer.readFile(path);
-                yield new Host.Reply(read.ok(), List.of(read.ok() ? read.message() : ""), READ);
+                final ICliComputer.FsResult read = computer.readFile(path);
+                yield new IHost.Reply(read.ok(), List.of(read.ok() ? read.message() : ""), READ);
             }
-            case "Write" -> Host.Reply.of(
+            case "Write" -> IHost.Reply.of(
                     computer.writeFile(path, text(arguments)).ok(), WRITE);
             case "Append" -> {
-                final CliComputer.FsResult had = computer.readFile(path);
+                final ICliComputer.FsResult had = computer.readFile(path);
                 final String before = had.ok() ? had.message() : "";
-                yield Host.Reply.of(computer.writeFile(path, before + text(arguments)).ok(), WRITE);
+                yield IHost.Reply.of(computer.writeFile(path, before + text(arguments)).ok(), WRITE);
             }
-            case "Delete" -> Host.Reply.of(computer.deleteFile(path).ok(), WRITE);
-            case "MkDir" -> Host.Reply.of(computer.makeDir(path).ok(), WRITE);
+            case "Delete" -> IHost.Reply.of(computer.deleteFile(path).ok(), WRITE);
+            case "MkDir" -> IHost.Reply.of(computer.makeDir(path).ok(), WRITE);
             case "List" -> {
                 final Values.ListValue names = new Values.ListValue();
-                final CliComputer.FsResult listing = computer.listDisk(path);
+                final ICliComputer.FsResult listing = computer.listDisk(path);
                 if (listing.ok()) {
-                    for (final CliComputer.FsEntry entry : listing.entries()) {
+                    for (final ICliComputer.FsEntry entry : listing.entries()) {
                         /*
                          * The name is the whole last segment of the path, extension included, so a name
                          * a program is handed is a name it can turn round and open. A folder ends in a
@@ -76,7 +76,7 @@ public final class HostFiles {
                         names.items().add(entry.isDir() ? entry.name() + "/" : entry.name());
                     }
                 }
-                yield Host.Reply.of(names, READ);
+                yield IHost.Reply.of(names, READ);
             }
             default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "File has no " + member);
         };

@@ -11,7 +11,7 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
-import dev.jstech.core.multiblock.MultiblockGeometry;
+import dev.jstech.core.multiblock.IMultiblockGeometry;
 import dev.jstech.core.multiblock.MultiblockPatternGeometry;
 import dev.jstech.core.util.BlockDrops;
 import dev.jstech.core.util.BlockEntityTickers;
@@ -41,8 +41,8 @@ import java.util.List;
  * The Mainframe — the network's orchestrator.
  */
 public class MainframeBlock extends AbstractMultiblockControllerBlock
-        implements dev.jstech.core.network.DataNetworkConnectable,
-        dev.jstech.core.peripheral.PeripheralConnectable, EraChassisBlock {
+        implements dev.jstech.core.network.IDataNetworkConnectable,
+        dev.jstech.core.peripheral.IPeripheralConnectable, IEraChassisBlock {
 
     public static final MapCodec<MainframeBlock> CODEC = simpleCodec(MainframeBlock::new);
 
@@ -97,7 +97,7 @@ public class MainframeBlock extends AbstractMultiblockControllerBlock
     }
 
     @Override
-    protected MultiblockGeometry geometry() {
+    protected IMultiblockGeometry geometry() {
         return new MultiblockPatternGeometry(MainframeStructure.PATTERN);
     }
 

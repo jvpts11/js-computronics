@@ -53,7 +53,7 @@ import java.util.function.Supplier;
  * <p>The tabs, the tables, the hardware readout, the scrollbars and the detail dialog are components; the
  * map is a canvas of its own, since its nodes are dragged, panned and zoomed rather than listed.
  */
-public final class NetworkManagerApp implements DesktopApp {
+public final class NetworkManagerApp implements IDesktopApp {
 
     private static final List<String> TABS = List.of("Devices", "Processes", "Hardware", "Map", "Log", "Stats");
     private static final int TAB_DEVICES = 0;

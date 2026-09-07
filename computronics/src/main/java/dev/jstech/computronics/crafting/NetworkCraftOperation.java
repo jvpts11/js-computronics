@@ -11,7 +11,7 @@ import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.operation.NetworkIndex;
 import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.operation.PersistentOperation;
+import dev.jstech.computronics.operation.IPersistentOperation;
 import dev.jstech.computronics.operation.index.Allocation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
@@ -38,7 +38,7 @@ import java.util.UUID;
 /**
  * A multi-tick CRAFT: executes a {@link CraftPlanner.Plan} on a Crafting Computer.
  */
-public final class NetworkCraftOperation implements PersistentOperation {
+public final class NetworkCraftOperation implements IPersistentOperation {
 
     public static final String KIND = "craft";
 
@@ -443,7 +443,7 @@ public final class NetworkCraftOperation implements PersistentOperation {
 
     /**
      * Whether the pool already holds at least one run of each of {@code step}'s non-raw inputs. Raw inputs are
-     * drawn from the servers this craft locked (by the pool CraftIo) and are available while the reservation
+     * drawn from the servers this craft locked (by the pool ICraftIo) and are available while the reservation
      * holds; an intermediate must have been produced into the pool by an upstream step first.
      */
     private boolean machineInputsReady(final CraftPlanner.Step step) {
@@ -469,11 +469,11 @@ public final class NetworkCraftOperation implements PersistentOperation {
      * reads from and writes to the network, so a machine already in motion still delivers its output to storage
      * instead of into a pool nothing hands back.
      */
-    private CraftIo poolIo() {
-        return new CraftIo() {
+    private ICraftIo poolIo() {
+        return new ICraftIo() {
             @Override
             public long select(final StorageKey key, final long amount,
-                               final dev.jstech.computronics.storage.DataSink into) {
+                               final dev.jstech.computronics.storage.IDataSink into) {
                 if (done) {
                     return NetworkStorage.of(level, network).select(key, amount, into);
                 }

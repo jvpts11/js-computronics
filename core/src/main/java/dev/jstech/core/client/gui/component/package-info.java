@@ -7,7 +7,7 @@
  */
 /**
  * The components a program's content is built from: buttons, fields, tabs, lists, grids, popups and the
- * panel that holds them. Each keeps its own state and draws through a {@link dev.jstech.core.client.gui.skin.Skin},
+ * panel that holds them. Each keeps its own state and draws through a {@link dev.jstech.core.client.gui.skin.ISkin},
  * so a program written once looks like whichever desktop it runs on, and a mod or an addon writes a program
  * by composing them instead of painting pixels and hit-testing rectangles by hand.
  */

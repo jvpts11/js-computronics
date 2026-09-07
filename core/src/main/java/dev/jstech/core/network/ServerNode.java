@@ -20,7 +20,7 @@ public record ServerNode(
         NodeUuid nodeUuid,
         NetworkUuid networkUuid,
         long storageItems
-) implements ServiceNode{
+) implements IServiceNode{
     public ServerNode {
         Objects.requireNonNull(nodeUuid, "nodeUuid must not be null");
         Objects.requireNonNull(networkUuid, "networkUuid must not be null");

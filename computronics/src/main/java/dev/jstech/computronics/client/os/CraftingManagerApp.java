@@ -47,7 +47,7 @@ import java.util.Set;
  * one the app shows a banner and disables the buttons. The Machines tab lists the crafting network's
  * machines by type, each with a pause and a feed switch, and a jobs cap per type.
  */
-public final class CraftingManagerApp implements DesktopApp {
+public final class CraftingManagerApp implements IDesktopApp {
 
     private static final int WARN_BG = 0xFFFCE3A1;
     private static final int WARN_TEXT = 0xFF6B4E00;

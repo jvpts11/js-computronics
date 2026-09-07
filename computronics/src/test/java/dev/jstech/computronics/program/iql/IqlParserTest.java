@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.jstech.computronics.program.iql.IqlCondition.Comparison;
-import dev.jstech.computronics.program.iql.IqlCondition.Op;
+import dev.jstech.computronics.program.iql.IIqlCondition.Comparison;
+import dev.jstech.computronics.program.iql.IIqlCondition.Op;
 import dev.jstech.core.operation.OperationPriority;
 import org.junit.jupiter.api.Test;
 

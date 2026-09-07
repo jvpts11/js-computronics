@@ -10,7 +10,7 @@ package dev.jstech.computronics.blockentity;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.block.DataCableBlock;
 import dev.jstech.core.network.ConnectivityIndex;
-import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.INetworkBridge;
 import dev.jstech.core.network.NetworkSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -47,7 +47,7 @@ public class PersonalRouterBlockEntity extends BlockEntity {
         for (final Direction direction : Direction.values()) {
             final BlockPos neighborPos = worldPosition.relative(direction);
             final var block = serverLevel.getBlockState(neighborPos).getBlock();
-            if (block instanceof DataCableBlock || block instanceof NetworkBridge) {
+            if (block instanceof DataCableBlock || block instanceof INetworkBridge) {
                 neighbors.add(neighborPos.asLong());
             }
         }

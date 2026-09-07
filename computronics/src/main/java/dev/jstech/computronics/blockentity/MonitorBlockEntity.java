@@ -12,9 +12,9 @@ import dev.jstech.computronics.PeripheralLinks;
 import dev.jstech.computronics.block.MonitorBlock;
 import dev.jstech.computronics.menu.ComputerTerminalMenu;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralEndpoint;
+import dev.jstech.core.peripheral.IPeripheralEndpoint;
 import dev.jstech.core.peripheral.PeripheralLinkValidator;
-import dev.jstech.core.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.IPeripheralOwner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -31,9 +31,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Optional;
 
 /**
- * BlockEntity for a Monitor: a {@code COMPUTING} {@link PeripheralEndpoint} that displays a computer's interface.
+ * BlockEntity for a Monitor: a {@code COMPUTING} {@link IPeripheralEndpoint} that displays a computer's interface.
  */
-public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoint {
+public class MonitorBlockEntity extends BlockEntity implements IPeripheralEndpoint {
 
     private static final int BOOT_DELAY = 20;
 
@@ -128,7 +128,7 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
         } else {
             // Drop the link if the computer is gone or the cable path is broken.
             final boolean ownerPresent =
-                    level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner;
+                    level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof IPeripheralOwner;
             if (!ownerPresent
                     || !validator.isLinkStillValid(linkedOwner, self, PeripheralCableType.COMPUTING)) {
                 unlink(level);
@@ -146,7 +146,7 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
         // LIT = true only when the linked computer is actively running — not just linked but powered off.
         final boolean computerRunning = linkedOwner != null
                 && level.getBlockEntity(BlockPos.of(linkedOwner))
-                        instanceof dev.jstech.computronics.os.OsHost host
+                        instanceof dev.jstech.computronics.os.IOsHost host
                 && host.isRunning();
         if (!computerRunning) {
             bootTicks = 0;
@@ -166,7 +166,7 @@ public class MonitorBlockEntity extends BlockEntity implements PeripheralEndpoin
 
     public void unlink(final ServerLevel level) {
         if (linkedOwner != null
-                && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner owner) {
+                && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof IPeripheralOwner owner) {
             owner.onEndpointUnlinked(worldPosition.asLong());
         }
         onOwnerUnlinked();

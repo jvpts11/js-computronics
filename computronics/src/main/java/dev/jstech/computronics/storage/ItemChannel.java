@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Set;
 
 /** The item slots of a block face, as a data channel. */
-public record ItemChannel(IItemHandler items) implements DataChannel {
+public record ItemChannel(IItemHandler items) implements IDataChannel {
 
     @Override
     public StorageKey.Kind kind() {

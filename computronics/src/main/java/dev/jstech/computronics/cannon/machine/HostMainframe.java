@@ -8,9 +8,9 @@
 package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Values;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import java.util.List;
 import java.util.Locale;
 
@@ -35,23 +35,23 @@ public final class HostMainframe {
     }
 
     /** Answers one of them. */
-    public static Host.Reply call(final CliComputer computer, final String member,
+    public static IHost.Reply call(final ICliComputer computer, final String member,
                                   final List<Object> arguments, final int line) {
         if ("Online".equals(member)) {
-            return Host.Reply.of(computer.onNetwork() && computer.network().mainframePresent(), GLANCE);
+            return IHost.Reply.of(computer.onNetwork() && computer.network().mainframePresent(), GLANCE);
         }
         if (!computer.onNetwork()) {
             throw new Halt(Halt.Reason.NO_NETWORK, line, "this computer is not on a network");
         }
         return switch (member) {
-            case "PeakToday" -> Host.Reply.of(computer.peakOperationsToday(), GLANCE);
-            case "Stats" -> Host.Reply.of(stats(computer, kind(arguments)), READ);
+            case "PeakToday" -> IHost.Reply.of(computer.peakOperationsToday(), GLANCE);
+            case "Stats" -> IHost.Reply.of(stats(computer, kind(arguments)), READ);
             case "Work" -> {
                 final Values.ListValue all = new Values.ListValue();
-                for (final CliComputer.OperationStat stat : computer.operationStats()) {
+                for (final ICliComputer.OperationStat stat : computer.operationStats()) {
                     all.items().add(shot(stat));
                 }
-                yield Host.Reply.of(all, HostNetwork.priceOf(all.size()));
+                yield IHost.Reply.of(all, HostNetwork.priceOf(all.size()));
             }
             default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Mainframe has no " + member);
         };
@@ -63,16 +63,16 @@ public final class HostMainframe {
      * <p>A kind it has not run reads as zeroes rather than as nothing, so a script can add up and
      * compare without asking first whether there is anything to add up.
      */
-    private static Values.Obj stats(final CliComputer computer, final String kind) {
-        for (final CliComputer.OperationStat stat : computer.operationStats()) {
+    private static Values.Obj stats(final ICliComputer computer, final String kind) {
+        for (final ICliComputer.OperationStat stat : computer.operationStats()) {
             if (stat.type().equalsIgnoreCase(kind)) {
                 return shot(stat);
             }
         }
-        return shot(new CliComputer.OperationStat(kind, 0, 0, 0, 0, 0L));
+        return shot(new ICliComputer.OperationStat(kind, 0, 0, 0, 0, 0L));
     }
 
-    private static Values.Obj shot(final CliComputer.OperationStat stat) {
+    private static Values.Obj shot(final ICliComputer.OperationStat stat) {
         final Values.Obj made = new Values.Obj("WorkStat");
         made.set("Type", stat.type().toLowerCase(Locale.ROOT));
         made.set("Count", stat.count());

@@ -18,70 +18,70 @@ public final class UuidPropagation {
         //Utility Class - no instances.
     }
 
-    public static PropagationResult propagate(
+    public static IPropagationResult propagate(
             Optional<NetworkUuid> sideA,
             Optional<NetworkUuid> sideB
     ) {
         if (sideA.isEmpty() && sideB.isEmpty()) {
-            return PropagationResult.empty();
+            return IPropagationResult.empty();
         }
         if (sideA.isEmpty()) {
-            return PropagationResult.inherit(sideB.orElseThrow());
+            return IPropagationResult.inherit(sideB.orElseThrow());
         }
         if (sideB.isEmpty()) {
-            return PropagationResult.inherit(sideA.orElseThrow());
+            return IPropagationResult.inherit(sideA.orElseThrow());
         }
         // Both present.
         var a = sideA.orElseThrow();
         var b = sideB.orElseThrow();
         if (a.equals(b)) {
-            return PropagationResult.same(a);
+            return IPropagationResult.same(a);
         }
-        return PropagationResult.conflict(a, b);
+        return IPropagationResult.conflict(a, b);
     }
 
     /**
      * Outcome of a propagation step.
      */
-    public sealed interface PropagationResult
-            permits PropagationResult.Empty,
-            PropagationResult.Inherit,
-            PropagationResult.Same,
-            PropagationResult.Conflict {
+    public sealed interface IPropagationResult
+            permits IPropagationResult.Empty,
+            IPropagationResult.Inherit,
+            IPropagationResult.Same,
+            IPropagationResult.Conflict {
 
         /**
          * Both endpoints are empty.
          */
-        record Empty() implements PropagationResult {}
+        record Empty() implements IPropagationResult {}
 
         /**
          * One endpoint had a UUID; the other now inherits it.
          */
-        record Inherit(NetworkUuid uuid) implements PropagationResult {}
+        record Inherit(NetworkUuid uuid) implements IPropagationResult {}
 
         /**
          * Both endpoints already share the same UUID.
          */
-        record Same(NetworkUuid uuid) implements PropagationResult {}
+        record Same(NetworkUuid uuid) implements IPropagationResult {}
 
         /**
          * Both endpoints had different UUIDs.
          */
-        record Conflict(NetworkUuid first, NetworkUuid second) implements PropagationResult {}
+        record Conflict(NetworkUuid first, NetworkUuid second) implements IPropagationResult {}
 
-        static PropagationResult empty() {
+        static IPropagationResult empty() {
             return new Empty();
         }
 
-        static PropagationResult inherit(NetworkUuid uuid) {
+        static IPropagationResult inherit(NetworkUuid uuid) {
             return new Inherit(uuid);
         }
 
-        static PropagationResult same(NetworkUuid uuid) {
+        static IPropagationResult same(NetworkUuid uuid) {
             return new Same(uuid);
         }
 
-        static PropagationResult conflict(NetworkUuid first, NetworkUuid second) {
+        static IPropagationResult conflict(NetworkUuid first, NetworkUuid second) {
             return new Conflict(first, second);
         }
     }

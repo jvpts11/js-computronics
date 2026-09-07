@@ -7,7 +7,7 @@
  */
 package dev.jstech.core.network;
 
-import dev.jstech.core.network.ConnectivityIndex.PlacementResult;
+import dev.jstech.core.network.ConnectivityIndex.IPlacementResult;
 import dev.jstech.core.uuid.NetworkUuid;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,7 +65,7 @@ class ConnectivityIndexTest {
     @Test
     void placeIsolatedCable_returnsIsolated() {
         var result = index.onCablePlaced(pos(0, 0, 0), Set.of());
-        assertInstanceOf(PlacementResult.Isolated.class, result);
+        assertInstanceOf(IPlacementResult.Isolated.class, result);
         assertEquals(1, index.size());
         assertEquals(1, index.componentCount());
     }
@@ -90,7 +90,7 @@ class ConnectivityIndexTest {
         var result = index.onCablePlaced(
                 pos(0, 0, 0),
                 Set.of(pos(1, 0, 0), pos(-1, 0, 0)));
-        assertInstanceOf(PlacementResult.Isolated.class, result);
+        assertInstanceOf(IPlacementResult.Isolated.class, result);
         assertEquals(1, index.size());
         assertEquals(1, index.componentCount());
     }
@@ -100,7 +100,7 @@ class ConnectivityIndexTest {
         // Place A first (isolated), then B adjacent to A — neither has UUID.
         index.onCablePlaced(pos(0, 0, 0), Set.of());
         var result = index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
-        assertInstanceOf(PlacementResult.MergedWithoutUuid.class, result);
+        assertInstanceOf(IPlacementResult.MergedWithoutUuid.class, result);
         assertEquals(2, index.size());
         assertEquals(1, index.componentCount());
         assertTrue(index.inSameNetwork(pos(0, 0, 0), pos(1, 0, 0)));
@@ -115,7 +115,7 @@ class ConnectivityIndexTest {
         index.assignUuid(pos(0, 0, 0), uuid);
         // Place B adjacent to A — B inherits A's UUID.
         var result = index.onCablePlaced(pos(1, 0, 0), Set.of(pos(0, 0, 0)));
-        var inherited = assertInstanceOf(PlacementResult.Inherited.class, result);
+        var inherited = assertInstanceOf(IPlacementResult.Inherited.class, result);
         assertEquals(uuid, inherited.uuid());
         // Both positions report the inherited UUID.
         assertEquals(uuid, index.networkOf(pos(0, 0, 0)).orElseThrow());
@@ -134,7 +134,7 @@ class ConnectivityIndexTest {
         var result = index.onCablePlaced(
                 pos(5, 0, 0),
                 Set.of(pos(0, 0, 0), pos(10, 0, 0)));
-        var inherited = assertInstanceOf(PlacementResult.Inherited.class, result);
+        var inherited = assertInstanceOf(IPlacementResult.Inherited.class, result);
         assertEquals(uuid, inherited.uuid());
         assertEquals(1, index.componentCount());
     }
@@ -155,7 +155,7 @@ class ConnectivityIndexTest {
         var result = index.onCablePlaced(
                 pos(5, 0, 0),
                 Set.of(pos(0, 0, 0), pos(10, 0, 0)));
-        var conflict = assertInstanceOf(PlacementResult.Conflict.class, result);
+        var conflict = assertInstanceOf(IPlacementResult.Conflict.class, result);
         // The exact "first" UUID depends on iteration order of Set; what
         // matters is that BOTH UUIDs appear in the conflict report.
         Set<NetworkUuid> reported = Set.of(conflict.first(), conflict.second());

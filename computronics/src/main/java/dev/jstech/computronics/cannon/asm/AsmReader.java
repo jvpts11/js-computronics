@@ -229,7 +229,7 @@ public final class AsmReader {
             this.diagnostics.error(line, 1, CannonError.MISSING_OPERAND, word);
             return;
         }
-        final Operand operand = opcode.takesOperand()
+        final IOperand operand = opcode.takesOperand()
                 ? this.readOperand(opcode, operandText, line) : null;
         if (opcode.takesOperand() && operand == null) {
             return;
@@ -237,27 +237,27 @@ public final class AsmReader {
         this.method.add(new Instruction(label, opcode, operand, comment), line);
     }
 
-    private Operand readOperand(final Opcode opcode, final String text, final int line) {
+    private IOperand readOperand(final Opcode opcode, final String text, final int line) {
         try {
             return switch (opcode.shape()) {
                 case I4, SLOT -> {
                     final int value = Integer.parseInt(text);
                     yield opcode.shape() == Opcode.Shape.SLOT
-                            ? new Operand.Slot(value) : new Operand.I4(value);
+                            ? new IOperand.Slot(value) : new IOperand.I4(value);
                 }
-                case I8 -> new Operand.I8(Long.parseLong(text));
-                case R4 -> new Operand.R4(Float.parseFloat(text));
-                case R8 -> new Operand.R8(Double.parseDouble(text));
-                case TEXT -> new Operand.Text(unquote(text));
-                case LABEL -> new Operand.Label(text);
+                case I8 -> new IOperand.I8(Long.parseLong(text));
+                case R4 -> new IOperand.R4(Float.parseFloat(text));
+                case R8 -> new IOperand.R8(Double.parseDouble(text));
+                case TEXT -> new IOperand.Text(unquote(text));
+                case LABEL -> new IOperand.Label(text);
                 case FIELD -> {
                     final int dot = text.lastIndexOf('.');
-                    yield dot < 0 ? new Operand.Field(null, text)
-                            : new Operand.Field(text.substring(0, dot), text.substring(dot + 1));
+                    yield dot < 0 ? new IOperand.Field(null, text)
+                            : new IOperand.Field(text.substring(0, dot), text.substring(dot + 1));
                 }
                 case METHOD -> this.readMethodOperand(text, line);
                 case CONSTRUCTOR -> this.readConstructorOperand(text, line);
-                default -> new Operand.Type(text);
+                default -> new IOperand.Type(text);
             };
         } catch (final NumberFormatException notANumber) {
             this.diagnostics.error(line, 1, CannonError.MALFORMED_OPERAND, text, opcode.text());
@@ -265,7 +265,7 @@ public final class AsmReader {
         }
     }
 
-    private Operand readMethodOperand(final String text, final int line) {
+    private IOperand readMethodOperand(final String text, final int line) {
         final int open = text.indexOf('(');
         final int close = text.indexOf(')', open + 1);
         final int arrow = text.indexOf("->", close < 0 ? 0 : close);
@@ -279,18 +279,18 @@ public final class AsmReader {
             this.diagnostics.error(line, 1, CannonError.MALFORMED_OPERAND, text, "call");
             return null;
         }
-        return new Operand.Method(head.substring(0, dot).trim(), head.substring(dot + 1).trim(),
+        return new IOperand.Method(head.substring(0, dot).trim(), head.substring(dot + 1).trim(),
                 splitTypes(text.substring(open + 1, close)), text.substring(arrow + 2).trim());
     }
 
-    private Operand readConstructorOperand(final String text, final int line) {
+    private IOperand readConstructorOperand(final String text, final int line) {
         final int open = text.indexOf('(');
         final int close = text.lastIndexOf(')');
         if (open < 0 || close < open) {
             this.diagnostics.error(line, 1, CannonError.MALFORMED_OPERAND, text, "newobj");
             return null;
         }
-        return new Operand.Constructor(text.substring(0, open).trim(),
+        return new IOperand.Constructor(text.substring(0, open).trim(),
                 splitTypes(text.substring(open + 1, close)));
     }
 
@@ -321,7 +321,7 @@ public final class AsmReader {
         }
         final List<Instruction> instructions = built.instructions();
         for (int i = 0; i < instructions.size(); i++) {
-            if (instructions.get(i).operand() instanceof Operand.Label target
+            if (instructions.get(i).operand() instanceof IOperand.Label target
                     && !marked.contains(target.name())) {
                 this.diagnostics.error(built.lineOf(i), 1, CannonError.UNKNOWN_LABEL, target.name());
             }

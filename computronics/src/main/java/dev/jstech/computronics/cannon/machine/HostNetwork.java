@@ -8,9 +8,9 @@
 package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Values;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import java.util.List;
 
 /**
@@ -50,21 +50,21 @@ public final class HostNetwork {
     }
 
     /** Answers one of them. */
-    public static Host.Reply call(final CliComputer computer, final String member,
+    public static IHost.Reply call(final ICliComputer computer, final String member,
                                   final List<Object> arguments, final int line) {
         if ("Online".equals(member)) {
-            return Host.Reply.of(computer.onNetwork(), GLANCE);
+            return IHost.Reply.of(computer.onNetwork(), GLANCE);
         }
         if ("Current".equals(member)) {
-            return Host.Reply.of(computer.onNetwork() ? computer.networkId() : null, GLANCE);
+            return IHost.Reply.of(computer.onNetwork() ? computer.networkId() : null, GLANCE);
         }
         if (!computer.onNetwork()) {
             throw new Halt(Halt.Reason.NO_NETWORK, line, "this computer is not on a network");
         }
         return switch (member) {
-            case "Capacity" -> Host.Reply.of(computer.networkUse().capacity(), READ);
-            case "Used" -> Host.Reply.of(computer.networkUse().stored(), READ);
-            case "Total" -> Host.Reply.of(total(computer, name(arguments)), READ);
+            case "Capacity" -> IHost.Reply.of(computer.networkUse().capacity(), READ);
+            case "Used" -> IHost.Reply.of(computer.networkUse().stored(), READ);
+            case "Total" -> IHost.Reply.of(total(computer, name(arguments)), READ);
             case "Types" -> rows(types(computer));
             case "Find" -> rows(find(computer, name(arguments)));
             case "Servers" -> rows(servers(computer));
@@ -73,8 +73,8 @@ public final class HostNetwork {
     }
 
     /** A list, priced by how long it is. */
-    private static Host.Reply rows(final Values.ListValue all) {
-        return Host.Reply.of(all, priceOf(all.size()));
+    private static IHost.Reply rows(final Values.ListValue all) {
+        return IHost.Reply.of(all, priceOf(all.size()));
     }
 
     /**
@@ -88,25 +88,25 @@ public final class HostNetwork {
     }
 
     /** How much of that the whole network holds, counting every server that has any. */
-    private static long total(final CliComputer computer, final String item) {
+    private static long total(final ICliComputer computer, final String item) {
         long sum = 0;
-        for (final CliComputer.Holding holding : computer.find(item)) {
+        for (final ICliComputer.Holding holding : computer.find(item)) {
             sum += holding.quantity();
         }
         return sum;
     }
 
-    private static Values.ListValue types(final CliComputer computer) {
+    private static Values.ListValue types(final ICliComputer computer) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CliComputer.StoredItem item : computer.query(null, "", EVERYTHING)) {
+        for (final ICliComputer.StoredItem item : computer.query(null, "", EVERYTHING)) {
             all.items().add(item.name());
         }
         return all;
     }
 
-    private static Values.ListValue find(final CliComputer computer, final String item) {
+    private static Values.ListValue find(final ICliComputer computer, final String item) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CliComputer.Holding holding : computer.find(item)) {
+        for (final ICliComputer.Holding holding : computer.find(item)) {
             final Values.Obj made = new Values.Obj("HoldingInfo");
             made.set("Server", holding.server());
             made.set("Quantity", holding.quantity());
@@ -115,9 +115,9 @@ public final class HostNetwork {
         return all;
     }
 
-    private static Values.ListValue servers(final CliComputer computer) {
+    private static Values.ListValue servers(final ICliComputer computer) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CliComputer.ServerUse row : computer.servers()) {
+        for (final ICliComputer.ServerUse row : computer.servers()) {
             final Values.Obj made = new Values.Obj("ServerInfo");
             made.set("Name", row.name());
             made.set("Stored", row.stored());

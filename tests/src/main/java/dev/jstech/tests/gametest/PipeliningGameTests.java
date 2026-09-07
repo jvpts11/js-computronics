@@ -15,7 +15,7 @@ import dev.jstech.computronics.blockentity.DataCableBlockEntity;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.crafting.NetworkRecipe;
 import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
@@ -145,7 +145,7 @@ public final class PipeliningGameTests {
                 new ItemStack(ComputingModule.GPU_HD_7970.get()));
         final StorageKey reinforced = MekanismRig.itemKey(ALLOY_REINFORCED);
         final StorageKey infused = MekanismRig.itemKey(ALLOY_INFUSED);
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         final boolean[] sawBothRunning = {false};
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {

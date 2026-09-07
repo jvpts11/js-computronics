@@ -21,16 +21,16 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A block face as the network sees it: the {@link DataChannel} of every kind of data the block offers there,
+ * A block face as the network sees it: the {@link IDataChannel} of every kind of data the block offers there,
  * so "everything is data" meets a real machine in one place. Production code builds ports with
  * {@link #at(Level, BlockPos, Direction)}, which asks {@link DataChannels} for every kind; the handler
  * constructors exist for tests and for callers that already hold a specific capability.
  */
-public final class ExternalDataPort implements DataPort {
+public final class ExternalDataPort implements IDataPort {
 
-    private final Map<StorageKey.Kind, DataChannel> channels;
+    private final Map<StorageKey.Kind, IDataChannel> channels;
 
-    private ExternalDataPort(final Map<StorageKey.Kind, DataChannel> channels) {
+    private ExternalDataPort(final Map<StorageKey.Kind, IDataChannel> channels) {
         this.channels = channels;
     }
 
@@ -44,7 +44,7 @@ public final class ExternalDataPort implements DataPort {
     }
 
     public ExternalDataPort(@Nullable final IItemHandler items, @Nullable final IFluidHandler fluids,
-                            @Nullable final ChemicalPort chemicals) {
+                            @Nullable final IChemicalPort chemicals) {
         this.channels = new EnumMap<>(StorageKey.Kind.class);
         if (items != null) {
             channels.put(StorageKey.Kind.ITEM, new ItemChannel(items));
@@ -68,32 +68,32 @@ public final class ExternalDataPort implements DataPort {
     }
 
     @Nullable
-    private DataChannel channel(final StorageKey key) {
+    private IDataChannel channel(final StorageKey key) {
         return channels.get(key.kind());
     }
 
     @Override
     public long insert(final StorageKey key, final long amount, final boolean simulate) {
-        final DataChannel channel = channel(key);
+        final IDataChannel channel = channel(key);
         return channel == null ? 0L : channel.insert(key, amount, simulate);
     }
 
     @Override
     public long extract(final StorageKey key, final long amount, final boolean simulate) {
-        final DataChannel channel = channel(key);
+        final IDataChannel channel = channel(key);
         return channel == null ? 0L : channel.extract(key, amount, simulate);
     }
 
     @Override
     public long count(final StorageKey key) {
-        final DataChannel channel = channel(key);
+        final IDataChannel channel = channel(key);
         return channel == null ? 0L : channel.count(key);
     }
 
     @Override
     public List<StorageKey> available() {
         final List<StorageKey> keys = new ArrayList<>();
-        for (final DataChannel channel : channels.values()) {
+        for (final IDataChannel channel : channels.values()) {
             keys.addAll(channel.available());
         }
         return keys;

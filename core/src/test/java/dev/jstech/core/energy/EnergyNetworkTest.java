@@ -337,9 +337,9 @@ class EnergyNetworkTest {
     }
 
     /**
-     * Mutable test-only EnergyNode.
+     * Mutable test-only IEnergyNode.
      */
-    private static final class TestNode implements EnergyNode {
+    private static final class TestNode implements IEnergyNode {
         private final EnergyNodeRole role;
         private long supply;
         private long demand;
@@ -393,8 +393,8 @@ class EnergyNetworkTest {
     }
 
     /**
-     * Trivial test-only EnergyCable.
+     * Trivial test-only IEnergyCable.
      */
-    private record TestCable(EnergyTier tier) implements EnergyCable {
+    private record TestCable(EnergyTier tier) implements IEnergyCable {
     }
 }

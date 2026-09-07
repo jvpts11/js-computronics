@@ -17,7 +17,7 @@ import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
 import dev.jstech.computronics.hardware.DiskSize;
 import dev.jstech.computronics.hardware.StorageTier;
 import dev.jstech.computronics.operation.payload.ComputingPayloads;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.media.MediaItem;
 import dev.jstech.computronics.os.media.MediaKind;
 import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
@@ -98,13 +98,13 @@ public final class OsInstallGameTests {
                     helper.assertTrue(MonitorBlock.entryFor(mainframe) == MonitorBlock.Entry.BOOT,
                             "before the install a running machine boots its target");
                     finishInstaller(helper, mainframe);
-                    helper.assertTrue(mainframe.pendingInstallSlot() != OsHost.NO_PENDING_INSTALL,
+                    helper.assertTrue(mainframe.pendingInstallSlot() != IOsHost.NO_PENDING_INSTALL,
                             "the machine remembers it is still in the installer");
                     helper.assertTrue(MonitorBlock.entryFor(mainframe) == MonitorBlock.Entry.INSTALLER,
                             "reopening the monitor returns to the installer's reboot prompt, not the system");
                     // The reboot the prompt asks for: a restart, as the firmware's boot-disk action performs.
                     mainframe.setNeedsPost(true);
-                    helper.assertTrue(mainframe.pendingInstallSlot() == OsHost.NO_PENDING_INSTALL,
+                    helper.assertTrue(mainframe.pendingInstallSlot() == IOsHost.NO_PENDING_INSTALL,
                             "the restart ends the installer");
                     helper.assertTrue(MonitorBlock.entryFor(mainframe) == MonitorBlock.Entry.POST,
                             "the restart runs POST");
@@ -156,7 +156,7 @@ public final class OsInstallGameTests {
                     helper.assertTrue(failure != null && failure.contains("Legacy") && failure.contains("Vintage"),
                             "the refusal names the era the system needs and the machine's own, got: " + failure);
                     helper.assertTrue(!pc.hasOs(), "nothing was written to the disk");
-                    helper.assertTrue(pc.pendingInstallSlot() == OsHost.NO_PENDING_INSTALL,
+                    helper.assertTrue(pc.pendingInstallSlot() == IOsHost.NO_PENDING_INSTALL,
                             "no reboot is pending after a refused install");
                 })
                 .thenSucceed();
@@ -173,7 +173,7 @@ public final class OsInstallGameTests {
                     helper.assertTrue(MonitorBlock.entryFor(mainframe) == MonitorBlock.Entry.INSTALLER,
                             "the installer waits for its reboot");
                     mainframe.togglePower(); // off
-                    helper.assertTrue(mainframe.pendingInstallSlot() == OsHost.NO_PENDING_INSTALL,
+                    helper.assertTrue(mainframe.pendingInstallSlot() == IOsHost.NO_PENDING_INSTALL,
                             "switching the machine off drops the installer session");
                     helper.assertTrue(MonitorBlock.entryFor(mainframe) == MonitorBlock.Entry.NO_POWER,
                             "an off machine has no signal");
@@ -198,7 +198,7 @@ public final class OsInstallGameTests {
                     // A formatted or pulled disk leaves nothing to reboot into: the pending install is dropped.
                     mainframe.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START, ItemStack.EMPTY);
                     helper.assertTrue(MonitorBlock.entryFor(mainframe) == MonitorBlock.Entry.BOOT
-                                    && mainframe.pendingInstallSlot() == OsHost.NO_PENDING_INSTALL,
+                                    && mainframe.pendingInstallSlot() == IOsHost.NO_PENDING_INSTALL,
                             "with the installed disk gone the machine falls back to its boot target");
                 })
                 .thenSucceed();
@@ -215,14 +215,14 @@ public final class OsInstallGameTests {
         TestWorldBuilder.mountDefaultServer(rack, 0);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final OsHost unit = rack.unitHost(0);
+                    final IOsHost unit = rack.unitHost(0);
                     unit.setPendingInstallSlot(0);
                     helper.assertTrue(unit.pendingInstallSlot() == 0, "the unit remembers its pending reboot");
                     final CompoundTag onItem = rack.getServers().getStackInSlot(0).get(ComputingModule.SERVER_CONSOLE.get());
                     helper.assertTrue(onItem != null && onItem.getInt("PendingInstall") == 0,
                             "the pending reboot is flushed onto the Server item with the rest of its session");
                     rack.toggleBayPower(0); // the bay switch is this machine's power button
-                    helper.assertTrue(unit.pendingInstallSlot() == OsHost.NO_PENDING_INSTALL,
+                    helper.assertTrue(unit.pendingInstallSlot() == IOsHost.NO_PENDING_INSTALL,
                             "switching the bay off drops the installer session");
                     final CompoundTag after = rack.getServers().getStackInSlot(0).get(ComputingModule.SERVER_CONSOLE.get());
                     helper.assertTrue(after == null || !after.contains("PendingInstall"),

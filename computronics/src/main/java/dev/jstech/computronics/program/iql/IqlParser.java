@@ -152,8 +152,8 @@ public final class IqlParser {
     private static final class Clauses {
         private String from = "";
         private String to = "";
-        private IqlCondition where;
-        private IqlCondition guard;
+        private IIqlCondition where;
+        private IIqlCondition guard;
         private String orderBy = "";
         private boolean descending;
         private int limit = IqlOperation.NO_LIMIT;
@@ -239,9 +239,9 @@ public final class IqlParser {
     }
 
     /** Parses a condition from the shared cursor and advances past it. */
-    private IqlCondition parseConditionAtCursor() {
+    private IIqlCondition parseConditionAtCursor() {
         final IqlConditionParser conditionParser = new IqlConditionParser(tokens, pos);
-        final IqlCondition condition = conditionParser.parseCondition();
+        final IIqlCondition condition = conditionParser.parseCondition();
         pos = conditionParser.position();
         return condition;
     }

@@ -7,8 +7,8 @@
  */
 package dev.jstech.core.energy.internal;
 
-import dev.jstech.core.energy.EnergyCable;
-import dev.jstech.core.energy.EnergyNode;
+import dev.jstech.core.energy.IEnergyCable;
+import dev.jstech.core.energy.IEnergyNode;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -26,13 +26,13 @@ import java.util.Set;
  */
 public final class EnergyFlowGraph {
 
-    private final Map<Long, EnergyNode> nodes;
-    private final Map<Long, EnergyCable> cables;
+    private final Map<Long, IEnergyNode> nodes;
+    private final Map<Long, IEnergyCable> cables;
     private final Map<Long, List<Long>> adjacency;
 
     public EnergyFlowGraph(
-            final Map<Long, EnergyNode> nodes,
-            final Map<Long, EnergyCable> cables,
+            final Map<Long, IEnergyNode> nodes,
+            final Map<Long, IEnergyCable> cables,
             final Map<Long, List<Long>> adjacency) {
         this.nodes = Map.copyOf(nodes);
         this.cables = Map.copyOf(cables);
@@ -59,7 +59,7 @@ public final class EnergyFlowGraph {
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(e -> {
                     final long pos = e.getKey();
-                    final EnergyNode node = e.getValue();
+                    final IEnergyNode node = e.getValue();
                     if (node.role().canSupply()) {
                         final long s = Math.max(0L, node.supply());
                         if (s > 0) {
@@ -91,7 +91,7 @@ public final class EnergyFlowGraph {
 
         // 3: remaining throughput per cable (Long.MAX_VALUE for T7).
         final Map<Long, Long> remainingThroughput = new HashMap<>();
-        for (final Map.Entry<Long, EnergyCable> e : cables.entrySet()) {
+        for (final Map.Entry<Long, IEnergyCable> e : cables.entrySet()) {
             remainingThroughput.put(e.getKey(), e.getValue().maxThroughput());
         }
 

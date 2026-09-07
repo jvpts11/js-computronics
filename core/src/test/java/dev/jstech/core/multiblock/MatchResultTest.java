@@ -21,8 +21,8 @@ class MatchResultTest {
     @Test
     void success_storesRotationAndSlaves() {
         var slaves = List.of(100L, 200L, 300L);
-        MatchResult r = new MatchResult.Success(Rotation.EAST, slaves);
-        var s = assertInstanceOf(MatchResult.Success.class, r);
+        IMatchResult r = new IMatchResult.Success(Rotation.EAST, slaves);
+        var s = assertInstanceOf(IMatchResult.Success.class, r);
         assertSame(Rotation.EAST, s.rotation());
         assertEquals(3, s.slavePositions().size());
     }
@@ -32,7 +32,7 @@ class MatchResultTest {
         var slaves = new java.util.ArrayList<Long>();
         slaves.add(1L);
         slaves.add(2L);
-        var s = new MatchResult.Success(Rotation.NORTH, slaves);
+        var s = new IMatchResult.Success(Rotation.NORTH, slaves);
         // Mutating the original list does not affect the result's view.
         slaves.add(3L);
         assertEquals(2, s.slavePositions().size());
@@ -44,19 +44,19 @@ class MatchResultTest {
     @Test
     void success_rejectsNullRotation() {
         assertThrows(NullPointerException.class,
-                () -> new MatchResult.Success(null, List.of()));
+                () -> new IMatchResult.Success(null, List.of()));
     }
 
     @Test
     void success_rejectsNullSlaves() {
         assertThrows(NullPointerException.class,
-                () -> new MatchResult.Success(Rotation.NORTH, null));
+                () -> new IMatchResult.Success(Rotation.NORTH, null));
     }
 
     @Test
     void failure_storesAllFields() {
-        MatchResult r = new MatchResult.Failure(1, 2, 3, 'C', "minecraft:stone");
-        var f = assertInstanceOf(MatchResult.Failure.class, r);
+        IMatchResult r = new IMatchResult.Failure(1, 2, 3, 'C', "minecraft:stone");
+        var f = assertInstanceOf(IMatchResult.Failure.class, r);
         assertEquals(1, f.relX());
         assertEquals(2, f.relY());
         assertEquals(3, f.relZ());
@@ -67,6 +67,6 @@ class MatchResultTest {
     @Test
     void failure_rejectsNullActualBlockId() {
         assertThrows(NullPointerException.class,
-                () -> new MatchResult.Failure(0, 0, 0, 'X', null));
+                () -> new IMatchResult.Failure(0, 0, 0, 'X', null));
     }
 }

@@ -9,7 +9,7 @@ package dev.jstech.tests.gametest;
 
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.storage.ChemicalBridges;
-import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.IChemicalPort;
 import dev.jstech.computronics.storage.ExternalDataPort;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
@@ -189,7 +189,7 @@ public final class FusionReactorIgnitionGameTests {
                     final NetworkStorage storage = net.storage(helper.getLevel());
                     helper.assertTrue(storage.insert(fuel, 2000) == 2000, "2 000 mB of D-T fuel must go in as data");
                     // Network -> chemical tank: the tank will fill the Hohlraum from it.
-                    final Optional<ChemicalPort> tankPort = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(TANK), Direction.UP);
+                    final Optional<IChemicalPort> tankPort = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(TANK), Direction.UP);
                     helper.assertTrue(tankPort.isPresent(), "the tank must expose a chemical port");
                     final long toTank = storage.select(fuel, 1000, new ExternalDataPort(null, null, tankPort.get()));
                     helper.assertTrue(toTank == 1000, "1 000 mB of fuel must reach the tank; got " + toTank);
@@ -200,7 +200,7 @@ public final class FusionReactorIgnitionGameTests {
                 })
                 // The tank drains 10 mB into the Hohlraum: full when the tank is down to 990.
                 .thenWaitUntil(() -> {
-                    final Optional<ChemicalPort> tankPort = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(TANK), Direction.UP);
+                    final Optional<IChemicalPort> tankPort = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(TANK), Direction.UP);
                     helper.assertTrue(tankPort.isPresent() && tankPort.get().count(FUEL) <= 990,
                             "the tank must fill the Hohlraum; tank holds " + tankPort.map(p -> p.count(FUEL)).orElse(-1L));
                 })
@@ -245,7 +245,7 @@ public final class FusionReactorIgnitionGameTests {
                     final Object data = multiblock(helper.getBlockEntity(CONTROLLER));
                     helper.assertTrue(flag(data, "isBurning"), "the reactor must keep burning on metered network fuel; tick " + sustained[0]
                             + " plasma=" + number(data, "getPlasmaTemp"));
-                    final Optional<ChemicalPort> port = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(NORTH_PORT), Direction.NORTH);
+                    final Optional<IChemicalPort> port = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(NORTH_PORT), Direction.NORTH);
                     final long fed = port.isEmpty() ? 0 : net.storage(helper.getLevel()).select(fuel, 2, new ExternalDataPort(null, null, port.get()));
                     fedTotal[0] += fed;
                     helper.assertTrue(fed == 2, "the port must take the network's 2 mB every tick; took " + fed);

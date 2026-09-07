@@ -14,10 +14,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.jstech.computronics.cannon.ast.Decl;
-import dev.jstech.computronics.cannon.ast.Expr;
+import dev.jstech.computronics.cannon.ast.IDecl;
+import dev.jstech.computronics.cannon.ast.IExpr;
 import dev.jstech.computronics.cannon.ast.Operator;
-import dev.jstech.computronics.cannon.ast.Stmt;
+import dev.jstech.computronics.cannon.ast.IStmt;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -29,11 +29,11 @@ class ParserTest {
     }
 
     /** Parses a method body and hands back its statements, asserting nothing went wrong on the way. */
-    private static List<Stmt> body(final String statements) {
+    private static List<IStmt> body(final String statements) {
         final CannonFrontEnd.Result result = parse("class C { void M() { " + statements + " } }");
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
-        final Decl.MethodDecl method = (Decl.MethodDecl) type.members().getFirst();
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("C");
+        final IDecl.MethodDecl method = (IDecl.MethodDecl) type.members().getFirst();
         return method.body().statements();
     }
 
@@ -60,27 +60,27 @@ class ParserTest {
                 }
                 """);
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("Monitor");
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("Monitor");
         assertEquals(List.of("IScript"), type.bases().stream().map(base -> base.name()).toList());
         assertEquals(6, type.members().size());
-        assertInstanceOf(Decl.FieldDecl.class, type.members().get(0));
-        assertInstanceOf(Decl.FieldDecl.class, type.members().get(1));
-        assertInstanceOf(Decl.PropertyDecl.class, type.members().get(2));
-        assertInstanceOf(Decl.EventDecl.class, type.members().get(3));
-        assertInstanceOf(Decl.ConstructorDecl.class, type.members().get(4));
-        assertInstanceOf(Decl.MethodDecl.class, type.members().get(5));
+        assertInstanceOf(IDecl.FieldDecl.class, type.members().get(0));
+        assertInstanceOf(IDecl.FieldDecl.class, type.members().get(1));
+        assertInstanceOf(IDecl.PropertyDecl.class, type.members().get(2));
+        assertInstanceOf(IDecl.EventDecl.class, type.members().get(3));
+        assertInstanceOf(IDecl.ConstructorDecl.class, type.members().get(4));
+        assertInstanceOf(IDecl.MethodDecl.class, type.members().get(5));
     }
 
     @Test
     void parse_keepsTheAccessWrittenOnEachHalfOfAProperty() {
         final CannonFrontEnd.Result result = parse("class C { public int Count { get; private set; } }");
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
-        final Decl.PropertyDecl property = (Decl.PropertyDecl) type.members().getFirst();
-        assertEquals(Set.of(Decl.Modifier.PUBLIC), property.modifiers());
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("C");
+        final IDecl.PropertyDecl property = (IDecl.PropertyDecl) type.members().getFirst();
+        assertEquals(Set.of(IDecl.Modifier.PUBLIC), property.modifiers());
         assertNotNull(property.getter());
         assertTrue(property.getter().modifiers().isEmpty());
-        assertEquals(Set.of(Decl.Modifier.PRIVATE), property.setter().modifiers());
+        assertEquals(Set.of(IDecl.Modifier.PRIVATE), property.setter().modifiers());
     }
 
     @Test
@@ -90,19 +90,19 @@ class ParserTest {
                 class C { public event StockHandler Changed; }
                 """);
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.DelegateDecl handler = (Decl.DelegateDecl) result.unit().type("StockHandler");
+        final IDecl.DelegateDecl handler = (IDecl.DelegateDecl) result.unit().type("StockHandler");
         assertEquals("void", handler.returnType().name());
         assertEquals(1, handler.parameters().size());
         assertEquals("StockEvent", handler.parameters().getFirst().type().name());
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
-        assertEquals("StockHandler", ((Decl.EventDecl) type.members().getFirst()).type().name());
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("C");
+        assertEquals("StockHandler", ((IDecl.EventDecl) type.members().getFirst()).type().name());
     }
 
     @Test
     void parse_readsAnInterfaceAsSignaturesWithoutBodies() {
         final CannonFrontEnd.Result result = parse("interface IScript { void OnInit(); void OnTick(); }");
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.InterfaceDecl type = (Decl.InterfaceDecl) result.unit().type("IScript");
+        final IDecl.InterfaceDecl type = (IDecl.InterfaceDecl) result.unit().type("IScript");
         assertEquals(2, type.methods().size());
         assertNull(type.methods().getFirst().body());
     }
@@ -111,7 +111,7 @@ class ParserTest {
     void parse_readsAnEnumWithAndWithoutExplicitValues() {
         final CannonFrontEnd.Result result = parse("enum LogLevel { INFO, WARN = 2, ERROR }");
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.EnumDecl type = (Decl.EnumDecl) result.unit().type("LogLevel");
+        final IDecl.EnumDecl type = (IDecl.EnumDecl) result.unit().type("LogLevel");
         assertEquals(3, type.constants().size());
         assertNull(type.constants().getFirst().value());
         assertNotNull(type.constants().get(1).value());
@@ -119,49 +119,49 @@ class ParserTest {
 
     @Test
     void parse_bindsOperatorsByPrecedence() {
-        final List<Stmt> statements = body("int x = 1 + 2 * 3;");
-        final Expr.Binary sum = (Expr.Binary) ((Stmt.LocalDecl) statements.getFirst()).initializer();
+        final List<IStmt> statements = body("int x = 1 + 2 * 3;");
+        final IExpr.Binary sum = (IExpr.Binary) ((IStmt.LocalDecl) statements.getFirst()).initializer();
         assertEquals(Operator.ADD, sum.operator());
-        assertEquals(Operator.MULTIPLY, ((Expr.Binary) sum.right()).operator());
+        assertEquals(Operator.MULTIPLY, ((IExpr.Binary) sum.right()).operator());
     }
 
     @Test
     void parse_bindsAssignmentFromTheRight() {
-        final List<Stmt> statements = body("int a = 0; int b = 0; int c = 0; a = b = c;");
-        final Expr.Assign assign = (Expr.Assign) ((Stmt.ExprStmt) statements.get(3)).expression();
-        assertEquals("a", ((Expr.Name) assign.target()).identifier());
-        assertEquals("b", ((Expr.Name) ((Expr.Assign) assign.value()).target()).identifier());
+        final List<IStmt> statements = body("int a = 0; int b = 0; int c = 0; a = b = c;");
+        final IExpr.Assign assign = (IExpr.Assign) ((IStmt.ExprStmt) statements.get(3)).expression();
+        assertEquals("a", ((IExpr.Name) assign.target()).identifier());
+        assertEquals("b", ((IExpr.Name) ((IExpr.Assign) assign.value()).target()).identifier());
     }
 
     @Test
     void parse_tellsALocalDeclarationFromAnExpression() {
-        final List<Stmt> statements = body("Network n = Network.Current; n.Query(\"minecraft:diamond\");");
-        assertInstanceOf(Stmt.LocalDecl.class, statements.get(0));
-        assertEquals("Network", ((Stmt.LocalDecl) statements.get(0)).type().name());
-        assertInstanceOf(Expr.Call.class, ((Stmt.ExprStmt) statements.get(1)).expression());
+        final List<IStmt> statements = body("Network n = Network.Current; n.Query(\"minecraft:diamond\");");
+        assertInstanceOf(IStmt.LocalDecl.class, statements.get(0));
+        assertEquals("Network", ((IStmt.LocalDecl) statements.get(0)).type().name());
+        assertInstanceOf(IExpr.Call.class, ((IStmt.ExprStmt) statements.get(1)).expression());
     }
 
     @Test
     void parse_tellsACastFromAValueInBrackets() {
-        final List<Stmt> statements = body("int a = 1; double b = (double) a; int c = (a) + a;");
-        assertInstanceOf(Expr.Cast.class, ((Stmt.LocalDecl) statements.get(1)).initializer());
-        assertInstanceOf(Expr.Binary.class, ((Stmt.LocalDecl) statements.get(2)).initializer());
+        final List<IStmt> statements = body("int a = 1; double b = (double) a; int c = (a) + a;");
+        assertInstanceOf(IExpr.Cast.class, ((IStmt.LocalDecl) statements.get(1)).initializer());
+        assertInstanceOf(IExpr.Binary.class, ((IStmt.LocalDecl) statements.get(2)).initializer());
     }
 
     @Test
     void parse_readsBothLambdaForms() {
-        final List<Stmt> statements = body("""
+        final List<IStmt> statements = body("""
                 Network.Watch("minecraft:diamond", (e) => e.Total);
                 Network.Watch("minecraft:iron", (StockEvent e) => { Console.PrintLine("hit"); });
                 Time.Every(20, () => Console.PrintLine("tick"));
                 """);
-        final Expr.Lambda inline = lambdaArgument(statements.get(0), 1);
+        final IExpr.Lambda inline = lambdaArgument(statements.get(0), 1);
         assertEquals(1, inline.parameters().size());
         assertNull(inline.parameters().getFirst().type());
         assertNotNull(inline.body());
         assertNull(inline.block());
 
-        final Expr.Lambda braced = lambdaArgument(statements.get(1), 1);
+        final IExpr.Lambda braced = lambdaArgument(statements.get(1), 1);
         assertEquals("StockEvent", braced.parameters().getFirst().type().name());
         assertNotNull(braced.block());
         assertNull(braced.body());
@@ -183,61 +183,61 @@ class ParserTest {
                 }
                 """);
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
-        final Decl.MethodDecl find = (Decl.MethodDecl) type.members().getFirst();
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("C");
+        final IDecl.MethodDecl find = (IDecl.MethodDecl) type.members().getFirst();
         assertFalse(find.parameters().getFirst().outward());
         assertTrue(find.parameters().get(1).outward());
 
-        final List<Stmt> statements = ((Decl.MethodDecl) type.members().get(1)).body().statements();
+        final List<IStmt> statements = ((IDecl.MethodDecl) type.members().get(1)).body().statements();
         assertNull(outArgument(statements.get(1)).type());
         assertEquals("int", outArgument(statements.get(2)).type().name());
         assertEquals("var", outArgument(statements.get(3)).type().name());
         assertEquals("c", outArgument(statements.get(3)).name());
     }
 
-    private static Expr.OutArgument outArgument(final Stmt statement) {
-        final Expr.Call call = (Expr.Call) ((Stmt.ExprStmt) statement).expression();
-        return (Expr.OutArgument) call.arguments().get(1);
+    private static IExpr.OutArgument outArgument(final IStmt statement) {
+        final IExpr.Call call = (IExpr.Call) ((IStmt.ExprStmt) statement).expression();
+        return (IExpr.OutArgument) call.arguments().get(1);
     }
 
     @Test
     void parse_splitsTheClosingAnglesOfANestedGeneric() {
-        final List<Stmt> statements = body("Map<string, List<int>> m = new Map<string, List<int>>();");
-        final Stmt.LocalDecl local = (Stmt.LocalDecl) statements.getFirst();
+        final List<IStmt> statements = body("Map<string, List<int>> m = new Map<string, List<int>>();");
+        final IStmt.LocalDecl local = (IStmt.LocalDecl) statements.getFirst();
         assertEquals("Map", local.type().name());
         assertEquals(2, local.type().arguments().size());
         assertEquals("List<int>", local.type().arguments().get(1).describe());
-        assertInstanceOf(Expr.New.class, local.initializer());
+        assertInstanceOf(IExpr.New.class, local.initializer());
     }
 
     @Test
     void parse_readsAnArrayTypeItsAllocationAndItsElements() {
-        final List<Stmt> statements = body("int[] slots = new int[8]; slots[0] = 1;");
-        final Stmt.LocalDecl local = (Stmt.LocalDecl) statements.getFirst();
+        final List<IStmt> statements = body("int[] slots = new int[8]; slots[0] = 1;");
+        final IStmt.LocalDecl local = (IStmt.LocalDecl) statements.getFirst();
         assertEquals(1, local.type().arrayRank());
-        assertInstanceOf(Expr.NewArray.class, local.initializer());
-        assertInstanceOf(Expr.Index.class, ((Expr.Assign) ((Stmt.ExprStmt) statements.get(1)).expression()).target());
+        assertInstanceOf(IExpr.NewArray.class, local.initializer());
+        assertInstanceOf(IExpr.Index.class, ((IExpr.Assign) ((IStmt.ExprStmt) statements.get(1)).expression()).target());
     }
 
     @Test
     void parse_readsEveryLoopForm() {
-        final List<Stmt> statements = body("""
+        final List<IStmt> statements = body("""
                 for (int i = 0; i < 8; i++) { }
                 while (true) { break; }
                 do { continue; } while (false);
                 foreach (string id in Network.Types()) { }
                 """);
-        assertInstanceOf(Stmt.For.class, statements.get(0));
-        assertInstanceOf(Stmt.While.class, statements.get(1));
-        assertInstanceOf(Stmt.DoWhile.class, statements.get(2));
-        final Stmt.ForEach each = (Stmt.ForEach) statements.get(3);
+        assertInstanceOf(IStmt.For.class, statements.get(0));
+        assertInstanceOf(IStmt.While.class, statements.get(1));
+        assertInstanceOf(IStmt.DoWhile.class, statements.get(2));
+        final IStmt.ForEach each = (IStmt.ForEach) statements.get(3);
         assertEquals("string", each.type().name());
         assertEquals("id", each.name());
     }
 
     @Test
     void parse_groupsSwitchLabelsThatShareTheirStatements() {
-        final List<Stmt> statements = body("""
+        final List<IStmt> statements = body("""
                 int n = 1;
                 switch (n) {
                     case 1:
@@ -248,7 +248,7 @@ class ParserTest {
                         break;
                 }
                 """);
-        final Stmt.Switch choice = (Stmt.Switch) statements.get(1);
+        final IStmt.Switch choice = (IStmt.Switch) statements.get(1);
         assertEquals(2, choice.sections().size());
         assertEquals(2, choice.sections().getFirst().labels().size());
         assertEquals(2, choice.sections().getFirst().statements().size());
@@ -257,17 +257,17 @@ class ParserTest {
 
     @Test
     void parse_readsDisposeAsAStatementOfItsOwn() {
-        final List<Stmt> statements = body("Network n = Network.Current; dispose n;");
-        final Stmt.Dispose dispose = (Stmt.Dispose) statements.get(1);
-        assertEquals("n", ((Expr.Name) dispose.target()).identifier());
+        final List<IStmt> statements = body("Network n = Network.Current; dispose n;");
+        final IStmt.Dispose dispose = (IStmt.Dispose) statements.get(1);
+        assertEquals("n", ((IExpr.Name) dispose.target()).identifier());
     }
 
     @Test
     void parse_readsAConstructorThatChainsToItsBase() {
         final CannonFrontEnd.Result result = parse("class C { public C(int a) : base(a) { } }");
         assertTrue(result.ok(), () -> String.join("\n", result.lines()));
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
-        final Decl.ConstructorDecl constructor = (Decl.ConstructorDecl) type.members().getFirst();
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("C");
+        final IDecl.ConstructorDecl constructor = (IDecl.ConstructorDecl) type.members().getFirst();
         assertEquals("C", constructor.name());
         assertTrue(constructor.chained().base());
         assertEquals(1, constructor.chained().arguments().size());
@@ -275,11 +275,11 @@ class ParserTest {
 
     @Test
     void parse_readsTheTypeQuestionsAndTheConditional() {
-        final List<Stmt> statements = body("object o = null; bool b = o is string; string s = o as string;"
+        final List<IStmt> statements = body("object o = null; bool b = o is string; string s = o as string;"
                 + " int n = b ? 1 : 2;");
-        assertFalse(((Expr.TypeTest) ((Stmt.LocalDecl) statements.get(1)).initializer()).conversion());
-        assertTrue(((Expr.TypeTest) ((Stmt.LocalDecl) statements.get(2)).initializer()).conversion());
-        assertInstanceOf(Expr.Conditional.class, ((Stmt.LocalDecl) statements.get(3)).initializer());
+        assertFalse(((IExpr.TypeTest) ((IStmt.LocalDecl) statements.get(1)).initializer()).conversion());
+        assertTrue(((IExpr.TypeTest) ((IStmt.LocalDecl) statements.get(2)).initializer()).conversion());
+        assertInstanceOf(IExpr.Conditional.class, ((IStmt.LocalDecl) statements.get(3)).initializer());
     }
 
     @Test
@@ -311,9 +311,9 @@ class ParserTest {
     void parse_keepsReadingTheMembersAfterABadOne() {
         final CannonFrontEnd.Result result = parse("class C { int ; int Good() { return 1; } }");
         assertFalse(result.ok());
-        final Decl.ClassDecl type = (Decl.ClassDecl) result.unit().type("C");
+        final IDecl.ClassDecl type = (IDecl.ClassDecl) result.unit().type("C");
         assertTrue(type.members().stream()
-                .anyMatch(member -> member instanceof Decl.MethodDecl && "Good".equals(member.name())));
+                .anyMatch(member -> member instanceof IDecl.MethodDecl && "Good".equals(member.name())));
     }
 
     @Test
@@ -330,8 +330,8 @@ class ParserTest {
         assertNotNull(result.unit());
     }
 
-    private static Expr.Lambda lambdaArgument(final Stmt statement, final int index) {
-        final Expr.Call call = (Expr.Call) ((Stmt.ExprStmt) statement).expression();
-        return (Expr.Lambda) call.arguments().get(index);
+    private static IExpr.Lambda lambdaArgument(final IStmt statement, final int index) {
+        final IExpr.Call call = (IExpr.Call) ((IStmt.ExprStmt) statement).expression();
+        return (IExpr.Lambda) call.arguments().get(index);
     }
 }

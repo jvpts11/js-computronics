@@ -13,7 +13,7 @@ import dev.jstech.computronics.datacenter.DatacenterSection;
 import dev.jstech.computronics.hardware.ClusterInterfaceCardSpec;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.ExpansionCardKind;
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import dev.jstech.computronics.hardware.FormFactor;
 import dev.jstech.computronics.hardware.PcieGeneration;
 import dev.jstech.computronics.item.ClusterInterfaceCardItem;
@@ -21,16 +21,16 @@ import dev.jstech.computronics.item.MotherboardItem;
 import dev.jstech.computronics.item.ServerItem;
 import dev.jstech.computronics.os.OsDef;
 import dev.jstech.computronics.os.OsGating;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.OsRegistry;
 import dev.jstech.computronics.os.ProgramSpec;
 import dev.jstech.computronics.os.media.MediaKind;
 import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
 import dev.jstech.computronics.rack.RackChassis;
-import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.IDataSink;
 import dev.jstech.computronics.storage.LocalStore;
 import dev.jstech.computronics.storage.StoreSink;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.core.uuid.NetworkUuid;
@@ -59,7 +59,7 @@ import java.util.Set;
  * goes through the same per-node hosts a player reaches rack by rack, with the same gates: a shortcut,
  * never a loophole. A cluster works without one.
  */
-public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockEntity implements ComputerTerminalHost {
+public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockEntity implements IComputerTerminalHost {
 
     // The same consumer/workstation slot layout as a Personal Computer.
     public static final int MOTHERBOARD_SLOT = 0;
@@ -149,7 +149,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         if (build == null) {
             return null;
         }
-        for (final ExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CLUSTER_INTERFACE)) {
+        for (final IExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CLUSTER_INTERFACE)) {
             if (card instanceof ClusterInterfaceCardSpec spec) {
                 return spec;
             }
@@ -297,8 +297,8 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
     }
 
     /** Each node of a cluster as a host of its own, keyed by rack row. */
-    public Map<NodeRef, OsHost> hostsOf(final ClusterRef ref) {
-        final Map<NodeRef, OsHost> hosts = new LinkedHashMap<>();
+    public Map<NodeRef, IOsHost> hostsOf(final ClusterRef ref) {
+        final Map<NodeRef, IOsHost> hosts = new LinkedHashMap<>();
         for (final NodeRef node : nodesOf(ref)) {
             if (level != null && level.getBlockEntity(node.rack()) instanceof ServerRackBlockEntity rack) {
                 hosts.put(node, rack.unitHost(node.row()));
@@ -530,7 +530,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
                 j.skippedNames.add("missing rack");
                 continue;
             }
-            final OsHost host = rack.unitHost(node.row());
+            final IOsHost host = rack.unitHost(node.row());
             final String name = nodeName(rack, node.row());
             final String skip = skipReason(j, host, rack, node.row());
             if (skip != null) {
@@ -565,7 +565,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
 
     /** Why a node is left out of a job, or null when it takes the install. */
     @Nullable
-    private static String skipReason(final InstallJob j, final OsHost host, final ServerRackBlockEntity rack, final int row) {
+    private static String skipReason(final InstallJob j, final IOsHost host, final ServerRackBlockEntity rack, final int row) {
         if (!rack.bayPowerOn(row)) {
             return "bay off";
         }
@@ -594,7 +594,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
         return null;
     }
 
-    private static boolean apply(final InstallJob j, final OsHost host) {
+    private static boolean apply(final InstallJob j, final IOsHost host) {
         if (j.kind == JobKind.SYSTEM) {
             if (!host.installOs(j.medium.id())) {
                 return false;
@@ -613,7 +613,7 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
     }
 
     /** Writing time on a node: fourteen seconds on a 2 GHz machine, longer on slower ones, bounded. */
-    static int installTicks(final OsHost host) {
+    static int installTicks(final IOsHost host) {
         final int mhz = Math.max(200, host.maxCpuMhz());
         return Math.max(INSTALL_TICKS_MIN, Math.min(INSTALL_TICKS_MAX, (int) (INSTALL_TICKS_AT_2GHZ * 2000L / mhz)));
     }
@@ -662,11 +662,11 @@ public class ClusterManagementComputerBlockEntity extends AbstractComputerBlockE
     }
 
     @Override
-    public DataSink localStorage() {
+    public IDataSink localStorage() {
         return new StoreSink(localStore());
     }
 
-    // ---- ComputerTerminalHost: the monitor's read-only view ----
+    // ---- IComputerTerminalHost: the monitor's read-only view ----
 
     @Override
     public boolean computerRunning() {

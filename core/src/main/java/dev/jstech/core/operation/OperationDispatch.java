@@ -22,11 +22,11 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 /**
- * The Operation dispatcher: runs CPU-bound Operation work on virtual threads while keeping every world mutation on the main (server) thread. A task does its computation on a virtual thread and uses its {@link OperationContext} to bounce world reads/writes back to the main thread and to wait on whole game ticks — so disk latency and throughput are paced deterministically by ticks, never by a wall clock. Multiple disks (one task per server) therefore process in parallel without ever touching the world off-thread.
+ * The Operation dispatcher: runs CPU-bound Operation work on virtual threads while keeping every world mutation on the main (server) thread. A task does its computation on a virtual thread and uses its {@link IOperationContext} to bounce world reads/writes back to the main thread and to wait on whole game ticks — so disk latency and throughput are paced deterministically by ticks, never by a wall clock. Multiple disks (one task per server) therefore process in parallel without ever touching the world off-thread.
  */
-public final class OperationDispatch implements AutoCloseable, LatencyScheduler {
+public final class OperationDispatch implements AutoCloseable, ILatencyScheduler {
 
-    private record PendingOp(UUID id, OperationTask task, OperationPriority priority, long sequence) {
+    private record PendingOp(UUID id, IOperationTask task, OperationPriority priority, long sequence) {
     }
 
     private static final Comparator<PendingOp> ORDER =
@@ -64,7 +64,7 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
         this.workers = Executors.newVirtualThreadPerTaskExecutor();
     }
 
-    public UUID submit(final OperationTask task, final OperationPriority priority) {
+    public UUID submit(final IOperationTask task, final OperationPriority priority) {
         Objects.requireNonNull(task, "task must not be null");
         Objects.requireNonNull(priority, "priority must not be null");
         final UUID id = UUID.randomUUID();
@@ -142,26 +142,26 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
     }
 
     private void dispatch(final PendingOp op) {
-        final OperationContext context = new DispatchContext();
+        final IOperationContext context = new DispatchContext();
         workers.execute(() -> {
-            OperationResult result;
+            IOperationResult result;
             try {
                 result = op.task().run(context);
                 if (result == null) {
-                    result = OperationResult.failure("task returned a null result");
+                    result = IOperationResult.failure("task returned a null result");
                 }
             } catch (final OperationCancelledException cancelled) {
-                result = OperationResult.failure("cancelled");
+                result = IOperationResult.failure("cancelled");
             } catch (final Throwable throwable) {
-                result = OperationResult.failure(throwable.toString());
+                result = IOperationResult.failure(throwable.toString());
             }
-            final OperationResult finalResult = result;
+            final IOperationResult finalResult = result;
             mainThreadActions.add(() -> complete(op.id(), finalResult));
         });
     }
 
-    private void complete(final UUID id, final OperationResult result) {
-        if (result instanceof OperationResult.Success) {
+    private void complete(final UUID id, final IOperationResult result) {
+        if (result instanceof IOperationResult.Success) {
             statuses.put(id, OperationStatus.COMPLETED);
             completed++;
         } else {
@@ -243,7 +243,7 @@ public final class OperationDispatch implements AutoCloseable, LatencyScheduler 
     }
 
     /** The per-task handle: marshals work to the main thread and waits on ticks, all virtual-thread-safe. */
-    private final class DispatchContext implements OperationContext {
+    private final class DispatchContext implements IOperationContext {
 
         @Override
         public void onMainThread(final Runnable mainThreadAction) {

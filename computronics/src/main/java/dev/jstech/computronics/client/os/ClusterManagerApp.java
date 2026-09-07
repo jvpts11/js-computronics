@@ -54,7 +54,7 @@ import java.util.Locale;
  * are components laid out every frame from the window's size; the job panel's lane overlay and the
  * warning bands are drawn by hand around them.
  */
-public final class ClusterManagerApp implements DesktopApp {
+public final class ClusterManagerApp implements IDesktopApp {
 
     private static final String[] LADDER = {"x8", "x16", "x32", "x64", "x128", "x256"};
     private static final String[] MODELS = {"5100", "7120", "7290", "9000"};

@@ -19,7 +19,7 @@ import java.util.List;
  * members; a symbol that had to be complete at birth could never describe a class holding a field of
  * its own type.
  */
-public final class NamedType implements TypeSymbol {
+public final class NamedType implements ITypeSymbol {
 
     /** Which of the four kinds of named type this is. */
     public enum Kind {
@@ -33,10 +33,10 @@ public final class NamedType implements TypeSymbol {
     private final Kind kind;
     private final List<String> typeParameters;
     private final boolean builtIn;
-    private final List<MemberSymbol> members = new ArrayList<>();
+    private final List<IMemberSymbol> members = new ArrayList<>();
     private final List<NamedType> interfaces = new ArrayList<>();
     private NamedType base;
-    private MemberSymbol.MethodSymbol invoke;
+    private IMemberSymbol.MethodSymbol invoke;
 
     public NamedType(final String name, final Kind kind, final List<String> typeParameters, final boolean builtIn) {
         this.name = name;
@@ -96,28 +96,28 @@ public final class NamedType implements TypeSymbol {
     }
 
     /** Everything declared directly on this type. */
-    public List<MemberSymbol> members() {
+    public List<IMemberSymbol> members() {
         return Collections.unmodifiableList(this.members);
     }
 
     /** Adds a member while the types are being filled in. */
-    public void addMember(final MemberSymbol member) {
+    public void addMember(final IMemberSymbol member) {
         this.members.add(member);
     }
 
     /** For a delegate, the shape of the method it stands for. */
-    public MemberSymbol.MethodSymbol invoke() {
+    public IMemberSymbol.MethodSymbol invoke() {
         return this.invoke;
     }
 
     /** Sets a delegate's shape while the types are being filled in. */
-    public void setInvoke(final MemberSymbol.MethodSymbol invoke) {
+    public void setInvoke(final IMemberSymbol.MethodSymbol invoke) {
         this.invoke = invoke;
     }
 
     /** Everything declared here and on every type above it, nearest first. */
-    public List<MemberSymbol> allMembers() {
-        final List<MemberSymbol> all = new ArrayList<>(this.members);
+    public List<IMemberSymbol> allMembers() {
+        final List<IMemberSymbol> all = new ArrayList<>(this.members);
         for (NamedType above = this.base; above != null; above = above.base) {
             all.addAll(above.members);
         }

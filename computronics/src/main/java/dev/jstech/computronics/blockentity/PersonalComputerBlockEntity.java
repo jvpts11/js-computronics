@@ -12,11 +12,11 @@ import dev.jstech.computronics.block.PersonalComputerBlock;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.FormFactor;
 import dev.jstech.computronics.item.DiskItem;
-import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.IDataSink;
 import dev.jstech.computronics.storage.LocalStore;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.computronics.storage.StoreSink;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.core.BlockPos;
@@ -35,7 +35,7 @@ import java.util.Set;
  * The Personal Computer: the player's hands-on access point to the network, assembled on a consumer ATX board (one CPU, four RAM, four PCIe, one PSU, two disks).
  */
 public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
-        implements ComputerTerminalHost {
+        implements IComputerTerminalHost {
 
     // Slot layout — kept public so the assembly Menu and Screen address slots by name.
     public static final int MOTHERBOARD_SLOT = 0;
@@ -187,11 +187,11 @@ public class PersonalComputerBlockEntity extends AbstractComputerBlockEntity
     }
 
     @Override
-    public DataSink localStorage() {
+    public IDataSink localStorage() {
         return new StoreSink(localStore());
     }
 
-    // ComputerTerminalHost — read-only monitoring (the rest is inherited from the base)
+    // IComputerTerminalHost — read-only monitoring (the rest is inherited from the base)
 
     @Override
     public boolean computerRunning() {

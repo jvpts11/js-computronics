@@ -9,7 +9,7 @@ package dev.jstech.computronics.operation;
 
 import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
 import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.IDataSink;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.network.ServerNode;
@@ -36,7 +36,7 @@ public final class NetworkStorage {
     /**
      * One node's store paired with the node identity that selects it for filtering, and whether it accepts inserts (a PC's public area is a read-only SELECT-source).
      */
-    private record Entry(NodeUuid node, NodeStore store, boolean acceptsInsert) {
+    private record Entry(NodeUuid node, INodeStore store, boolean acceptsInsert) {
     }
 
     private final List<Entry> entries;
@@ -187,15 +187,15 @@ public final class NetworkStorage {
         return perServer;
     }
 
-    public long select(final StorageKey key, final long amount, final DataSink destination) {
+    public long select(final StorageKey key, final long amount, final IDataSink destination) {
         return select(key, amount, destination, null);
     }
 
-    public long select(final Item item, final long amount, final DataSink destination) {
+    public long select(final Item item, final long amount, final IDataSink destination) {
         return select(StorageKey.of(item), amount, destination, null);
     }
 
-    public long select(final StorageKey key, final long amount, final DataSink destination,
+    public long select(final StorageKey key, final long amount, final IDataSink destination,
                        @Nullable final Set<NodeUuid> allowed) {
         long total = 0L;
         for (final long pulled : selectBreakdown(key, amount, destination, allowed).values()) {
@@ -205,7 +205,7 @@ public final class NetworkStorage {
     }
 
     public Map<NodeUuid, Long> selectBreakdown(final StorageKey key, final long amount,
-                                               final DataSink destination,
+                                               final IDataSink destination,
                                                @Nullable final Set<NodeUuid> allowed) {
         final Map<NodeUuid, Long> pulled = new LinkedHashMap<>();
         long moved = 0L;
@@ -230,13 +230,13 @@ public final class NetworkStorage {
      * Pulls up to {@code amount} of {@code key} from one node straight into the destination — the per-source
      * step of a SELECT, found by node in constant time instead of a walk over the whole network.
      */
-    public long pullFrom(final NodeUuid node, final StorageKey key, final long amount, final DataSink destination) {
+    public long pullFrom(final NodeUuid node, final StorageKey key, final long amount, final IDataSink destination) {
         final Entry entry = byNode.get(node);
         return entry == null ? 0L : pull(entry.store(), key, amount, destination);
     }
 
     /** Moves batches of {@code key} from one store into the destination until the amount, the store or the destination runs out. */
-    private static long pull(final NodeStore store, final StorageKey key, final long amount, final DataSink destination) {
+    private static long pull(final INodeStore store, final StorageKey key, final long amount, final IDataSink destination) {
         final long batchSize = key.batch();
         long moved = 0L;
         long available = store.count(key);

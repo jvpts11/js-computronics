@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.program.cli;
 
-import dev.jstech.computronics.program.iql.IqlCondition;
+import dev.jstech.computronics.program.iql.IIqlCondition;
 import dev.jstech.computronics.program.iql.IqlOperation;
 import dev.jstech.computronics.program.iql.IqlParseResult;
 import dev.jstech.computronics.program.iql.IqlParser;
@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The shell verbs that ship with the mod. Each is a small, self-contained {@link CliCommand}; add-ons add their own the same way. They talk only to the {@link CliComputer} facade, so the whole set is exercised in unit tests against a fake computer.
+ * The shell verbs that ship with the mod. Each is a small, self-contained {@link ICliCommand}; add-ons add their own the same way. They talk only to the {@link ICliComputer} facade, so the whole set is exercised in unit tests against a fake computer.
  */
 public final class BuiltinCommands {
 
@@ -35,9 +35,9 @@ public final class BuiltinCommands {
             "pckmgr");
 
     /** The verbs both shell families share (network, programs, config, maintenance); no DOS file verbs. */
-    public static List<CliCommand> shared() {
-        final List<CliCommand> out = new java.util.ArrayList<>();
-        for (final CliCommand command : all()) {
+    public static List<ICliCommand> shared() {
+        final List<ICliCommand> out = new java.util.ArrayList<>();
+        for (final ICliCommand command : all()) {
             if (!DOS_ONLY.contains(command.name())) {
                 out.add(command);
             }
@@ -45,8 +45,8 @@ public final class BuiltinCommands {
         return out;
     }
 
-    public static List<CliCommand> all() {
-        final List<CliCommand> out = new java.util.ArrayList<>(base());
+    public static List<ICliCommand> all() {
+        final List<ICliCommand> out = new java.util.ArrayList<>(base());
         // The toolchain's verbs come from the toolchain, so adding one there is enough to have it. Two
         // lists of the same commands is two lists that eventually disagree, and the one that loses is
         // always the one a player types into.
@@ -54,7 +54,7 @@ public final class BuiltinCommands {
         return List.copyOf(out);
     }
 
-    private static List<CliCommand> base() {
+    private static List<ICliCommand> base() {
         return List.of(
                 new Help(),
                 new Clear(),
@@ -108,7 +108,7 @@ public final class BuiltinCommands {
 
     // --- meta -------------------------------------------------------------------------------------
 
-    static final class Help implements CliCommand {
+    static final class Help implements ICliCommand {
         @Override public String name() {
             return "help";
         }
@@ -127,7 +127,7 @@ public final class BuiltinCommands {
 
         @Override public void run(final CliContext ctx) {
             if (ctx.hasArgs()) {
-                final CliCommand command = ctx.shell().find(ctx.arg(0));
+                final ICliCommand command = ctx.shell().find(ctx.arg(0));
                 if (command == null) {
                     ctx.out().error("no such command: " + ctx.arg(0));
                     return;
@@ -140,7 +140,7 @@ public final class BuiltinCommands {
                 return;
             }
             ctx.out().header("commands");
-            for (final CliCommand command : ctx.shell().commands()) {
+            for (final ICliCommand command : ctx.shell().commands()) {
                 if (command.available(ctx.computer())) {
                     ctx.out().row("  " + command.name(), command.summary());
                 }
@@ -150,7 +150,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Clear implements CliCommand, CliShell.ClearMarker {
+    static final class Clear implements ICliCommand, CliShell.IClearMarker {
         @Override public String name() {
             return "cls";
         }
@@ -164,7 +164,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Echo implements CliCommand {
+    static final class Echo implements ICliCommand {
         @Override public String name() {
             return "echo";
         }
@@ -182,7 +182,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Version implements CliCommand {
+    static final class Version implements ICliCommand {
         @Override public String name() {
             return "version";
         }
@@ -202,7 +202,7 @@ public final class BuiltinCommands {
 
     // --- this computer ----------------------------------------------------------------------------
 
-    static final class Whoami implements CliCommand {
+    static final class Whoami implements ICliCommand {
         @Override public String name() {
             return "whoami";
         }
@@ -212,14 +212,14 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer c = ctx.computer();
+            final ICliComputer c = ctx.computer();
             ctx.out().row("name", c.name().isEmpty() ? "(unnamed)" : c.name());
             ctx.out().row("type", c.type());
             ctx.out().row("node", c.nodeId());
         }
     }
 
-    static final class Status implements CliCommand {
+    static final class Status implements ICliCommand {
         @Override public String name() {
             return "status";
         }
@@ -233,7 +233,7 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer c = ctx.computer();
+            final ICliComputer c = ctx.computer();
             ctx.out().styled(c.running() ? "ONLINE" : "OFFLINE", c.running() ? CliStyle.OK : CliStyle.ERROR);
             ctx.out().row("cpu", group(c.cpuCapacity()) + " it/t");
             ctx.out().row("ram", group(c.ramBuffer()) + " it");
@@ -246,7 +246,7 @@ public final class BuiltinCommands {
      * server administrable from any terminal. {@code ssh} with no argument lists what is reachable;
      * {@code exit} on a connected session comes back to the local shell.
      */
-    static final class Ssh implements CliCommand {
+    static final class Ssh implements ICliCommand {
         @Override public String name() {
             return "ssh";
         }
@@ -260,15 +260,15 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer computer = ctx.computer();
+            final ICliComputer computer = ctx.computer();
             if (!ctx.hasArgs()) {
-                final List<CliComputer.RemoteHost> hosts = computer.reachableHosts();
+                final List<ICliComputer.RemoteHost> hosts = computer.reachableHosts();
                 if (hosts.isEmpty()) {
                     ctx.out().error("ssh: no other computers reachable on this network");
                     return;
                 }
                 ctx.out().line("Reachable hosts:");
-                for (final CliComputer.RemoteHost host : hosts) {
+                for (final ICliComputer.RemoteHost host : hosts) {
                     // Name what the player can actually type: the host name, the machine's own name
                     // and its node id all address it.
                     final StringBuilder detail = new StringBuilder();
@@ -288,7 +288,7 @@ public final class BuiltinCommands {
                 ctx.out().line("ssh <host name | machine name | node | os> to connect; exit to come back.");
                 return;
             }
-            final CliComputer.OpResult result = computer.sshConnect(ctx.arg(0));
+            final ICliComputer.OpResult result = computer.sshConnect(ctx.arg(0));
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {
@@ -303,7 +303,7 @@ public final class BuiltinCommands {
      * software the same way. Linux distributions keep their own managers (apt, dnf, pacman, emerge);
      * this is the Frames-side equivalent, and it speaks to the same Mirror.
      */
-    static final class Pckmgr implements CliCommand {
+    static final class Pckmgr implements ICliCommand {
         @Override public String name() {
             return "pckmgr";
         }
@@ -317,7 +317,7 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer computer = ctx.computer();
+            final ICliComputer computer = ctx.computer();
             final String verb = ctx.hasArgs() ? ctx.arg(0).toLowerCase(Locale.ROOT) : "";
             switch (verb) {
                 case "install" -> requireName(ctx, computer::packageInstall);
@@ -348,7 +348,7 @@ public final class BuiltinCommands {
         }
 
         private static void requireName(final CliContext ctx,
-                                        final java.util.function.Function<String, CliComputer.OpResult> action) {
+                                        final java.util.function.Function<String, ICliComputer.OpResult> action) {
             if (ctx.argCount() < 2) {
                 ctx.out().error("pckmgr: this verb needs a package name");
                 return;
@@ -356,7 +356,7 @@ public final class BuiltinCommands {
             report(ctx, action.apply(ctx.arg(1)));
         }
 
-        private static void report(final CliContext ctx, final CliComputer.OpResult result) {
+        private static void report(final CliContext ctx, final ICliComputer.OpResult result) {
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {
@@ -373,14 +373,14 @@ public final class BuiltinCommands {
          */
         private static void listPackages(final CliContext ctx, final String filter,
                                          final boolean onlyInstalled) {
-            final List<CliComputer.PackageInfo> packages = ctx.computer().packagesAvailable();
+            final List<ICliComputer.PackageInfo> packages = ctx.computer().packagesAvailable();
             if (packages.isEmpty()) {
                 ctx.out().error("could not resolve mirror:// - no package source reachable");
                 return;
             }
             final String needle = filter == null ? "" : filter.toLowerCase(Locale.ROOT);
             int shown = 0;
-            for (final CliComputer.PackageInfo info : packages) {
+            for (final ICliComputer.PackageInfo info : packages) {
                 if (onlyInstalled && !info.installed()) {
                     continue;
                 }
@@ -405,7 +405,7 @@ public final class BuiltinCommands {
     }
 
     /** Leaves a remote shell. With no session open there is nothing to leave but the window. */
-    static final class Exit implements CliCommand {
+    static final class Exit implements ICliCommand {
         @Override public String name() {
             return "exit";
         }
@@ -419,7 +419,7 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer.OpResult result = ctx.computer().sshDisconnect();
+            final ICliComputer.OpResult result = ctx.computer().sshDisconnect();
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {
@@ -428,7 +428,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Net implements CliCommand {
+    static final class Net implements ICliCommand {
         @Override public String name() {
             return "net";
         }
@@ -442,7 +442,7 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer.NetSummary n = ctx.computer().network();
+            final ICliComputer.NetSummary n = ctx.computer().network();
             if (!n.linked()) {
                 ctx.out().error("not on a network");
                 return;
@@ -456,7 +456,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Devices implements CliCommand {
+    static final class Devices implements ICliCommand {
         @Override public String name() {
             return "devices";
         }
@@ -481,7 +481,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class ProgramsList implements CliCommand {
+    static final class ProgramsList implements ICliCommand {
         @Override public String name() {
             return "programs";
         }
@@ -495,12 +495,12 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final List<CliComputer.ProgramInfo> programs = ctx.computer().programs();
+            final List<ICliComputer.ProgramInfo> programs = ctx.computer().programs();
             if (programs.isEmpty()) {
                 ctx.out().dim("no programs installed");
                 return;
             }
-            for (final CliComputer.ProgramInfo program : programs) {
+            for (final ICliComputer.ProgramInfo program : programs) {
                 ctx.out().row("  " + program.name(), program.id());
             }
         }
@@ -508,7 +508,7 @@ public final class BuiltinCommands {
 
     // --- storage ----------------------------------------------------------------------------------
 
-    static final class Find implements CliCommand {
+    static final class Find implements ICliCommand {
         @Override public String name() {
             return "find";
         }
@@ -526,12 +526,12 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: find <item>");
                 return;
             }
-            final List<CliComputer.Holding> holdings = ctx.computer().find(ctx.rest(0));
+            final List<ICliComputer.Holding> holdings = ctx.computer().find(ctx.rest(0));
             if (holdings.isEmpty()) {
                 ctx.out().dim("no server holds '" + ctx.rest(0) + "'");
                 return;
             }
-            for (final CliComputer.Holding holding : holdings) {
+            for (final ICliComputer.Holding holding : holdings) {
                 ctx.out().row(holding.server(), group(holding.quantity()));
             }
         }
@@ -539,7 +539,7 @@ public final class BuiltinCommands {
 
     // --- operations -------------------------------------------------------------------------------
 
-    static final class Lock implements CliCommand {
+    static final class Lock implements ICliCommand {
         @Override public String name() {
             return "lock";
         }
@@ -568,12 +568,12 @@ public final class BuiltinCommands {
             // "lock <quantity> <item>" reserves an amount; "lock <item>" holds everything available.
             final long qty = ctx.longArg(0);
             final String item = qty > 0L && ctx.argCount() >= 2 ? ctx.rest(1) : ctx.rest(0);
-            final CliComputer.OpResult result = ctx.computer().lock(item, qty > 0L ? qty : 0L);
+            final ICliComputer.OpResult result = ctx.computer().lock(item, qty > 0L ? qty : 0L);
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Unlock implements CliCommand {
+    static final class Unlock implements ICliCommand {
         @Override public String name() {
             return "unlock";
         }
@@ -595,12 +595,12 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: unlock <item>");
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().unlock(ctx.rest(0));
+            final ICliComputer.OpResult result = ctx.computer().unlock(ctx.rest(0));
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Locks implements CliCommand {
+    static final class Locks implements ICliCommand {
         @Override public String name() {
             return "locks";
         }
@@ -614,18 +614,18 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final List<CliComputer.StoredItem> held = ctx.computer().locks();
+            final List<ICliComputer.StoredItem> held = ctx.computer().locks();
             if (held.isEmpty()) {
                 ctx.out().dim("no items are locked");
                 return;
             }
-            for (final CliComputer.StoredItem row : held) {
+            for (final ICliComputer.StoredItem row : held) {
                 ctx.out().row(row.name(), group(row.quantity()));
             }
         }
     }
 
-    static final class Ops implements CliCommand {
+    static final class Ops implements ICliCommand {
         @Override public String name() {
             return "ops";
         }
@@ -639,12 +639,12 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final List<CliComputer.ActiveOp> ops = ctx.computer().activeOps();
+            final List<ICliComputer.ActiveOp> ops = ctx.computer().activeOps();
             if (ops.isEmpty()) {
                 ctx.out().dim("no operations running");
                 return;
             }
-            for (final CliComputer.ActiveOp op : ops) {
+            for (final ICliComputer.ActiveOp op : ops) {
                 final String head = op.id() + "  " + op.type() + " " + op.item();
                 final String tail = op.priority() + " " + op.status() + " " + group(op.progress()) + "/"
                         + group(op.total());
@@ -653,7 +653,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Stats implements CliCommand {
+    static final class Stats implements ICliCommand {
         @Override public String name() {
             return "stats";
         }
@@ -671,13 +671,13 @@ public final class BuiltinCommands {
                 ctx.out().error("not on a network");
                 return;
             }
-            final List<CliComputer.OperationStat> stats = ctx.computer().operationStats();
+            final List<ICliComputer.OperationStat> stats = ctx.computer().operationStats();
             ctx.out().dim("peak " + ctx.computer().peakOperationsToday() + " in flight today");
             if (stats.isEmpty()) {
                 ctx.out().dim("no operations settled in the last hour");
                 return;
             }
-            for (final CliComputer.OperationStat stat : stats) {
+            for (final ICliComputer.OperationStat stat : stats) {
                 final String tail = stat.count() + " ops  wait " + ticks(stat.averageWait()) + "  run "
                         + ticks(stat.averageRun()) + "  fail " + stat.shortfallPercent() + "%  moved "
                         + group(stat.moved());
@@ -690,7 +690,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Cancel implements CliCommand {
+    static final class Cancel implements ICliCommand {
         @Override public String name() {
             return "cancel";
         }
@@ -716,12 +716,12 @@ public final class BuiltinCommands {
                 ctx.out().error("not on a network");
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().cancelOperation(ctx.arg(0));
+            final ICliComputer.OpResult result = ctx.computer().cancelOperation(ctx.arg(0));
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Operation implements CliCommand {
+    static final class Operation implements ICliCommand {
         private static final int QUERY_LIMIT = 64;
 
         @Override public String name() {
@@ -757,24 +757,24 @@ public final class BuiltinCommands {
                     return;
                 }
                 final int limit = op.limit() > 0 ? op.limit() : QUERY_LIMIT;
-                final List<CliComputer.StoredItem> items = ctx.computer().queryObject(op.item(),
+                final List<ICliComputer.StoredItem> items = ctx.computer().queryObject(op.item(),
                         op.where(), "", limit);
                 if (items.isEmpty()) {
                     ctx.out().dim("no rows");
                     return;
                 }
-                for (final CliComputer.StoredItem item : items) {
+                for (final ICliComputer.StoredItem item : items) {
                     ctx.out().row(item.detail().isEmpty() ? item.name() : item.name() + " · " + item.detail(),
                             group(item.quantity()));
                 }
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().execute(op);
+            final ICliComputer.OpResult result = ctx.computer().execute(op);
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Install implements CliCommand {
+    static final class Install implements ICliCommand {
         @Override public String name() {
             return "install";
         }
@@ -792,12 +792,12 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: install <program-id>   (see 'programs')");
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().install(ctx.arg(0));
+            final ICliComputer.OpResult result = ctx.computer().install(ctx.arg(0));
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Uninstall implements CliCommand {
+    static final class Uninstall implements ICliCommand {
         @Override public String name() {
             return "uninstall";
         }
@@ -815,12 +815,12 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: uninstall <program-id>   (see 'programs')");
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().packageRemove(ctx.arg(0));
+            final ICliComputer.OpResult result = ctx.computer().packageRemove(ctx.arg(0));
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Format implements CliCommand {
+    static final class Format implements ICliCommand {
         @Override public String name() {
             return "format";
         }
@@ -851,14 +851,14 @@ public final class BuiltinCommands {
                 ctx.out().dim("Run 'format " + drive + ": /y' to proceed.");
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().formatDrive(drive);
+            final ICliComputer.OpResult result = ctx.computer().formatDrive(drive);
             for (final String line : result.message().split("\n", -1)) {
                 ctx.out().styled(line, result.ok() ? CliStyle.OK : CliStyle.ERROR);
             }
         }
     }
 
-    static final class Store implements CliCommand {
+    static final class Store implements ICliCommand {
         @Override public String name() {
             return "store";
         }
@@ -887,7 +887,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class IqlEngineCommand implements CliCommand {
+    static final class IqlEngineCommand implements ICliCommand {
         @Override public String name() {
             return "iqlengine";
         }
@@ -904,17 +904,17 @@ public final class BuiltinCommands {
             return "start|stop|status";
         }
 
-        @Override public boolean available(final CliComputer computer) {
+        @Override public boolean available(final ICliComputer computer) {
             return computer.iqlEngineInstalled(); // shown only after 'install iqlengine'
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer.OpResult result = ctx.computer().engineControl(ctx.hasArgs() ? ctx.arg(0) : "status");
+            final ICliComputer.OpResult result = ctx.computer().engineControl(ctx.hasArgs() ? ctx.arg(0) : "status");
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
-    static final class Services implements CliCommand {
+    static final class Services implements ICliCommand {
         @Override public String name() {
             return "services";
         }
@@ -923,23 +923,23 @@ public final class BuiltinCommands {
             return "list the network's services and their state";
         }
 
-        @Override public boolean available(final CliComputer computer) {
+        @Override public boolean available(final ICliComputer computer) {
             return computer.iqlEngineInstalled();
         }
 
         @Override public void run(final CliContext ctx) {
-            final List<CliComputer.ServiceStatus> services = ctx.computer().services();
+            final List<ICliComputer.ServiceStatus> services = ctx.computer().services();
             if (services.isEmpty()) {
                 ctx.out().dim("no services");
                 return;
             }
-            for (final CliComputer.ServiceStatus service : services) {
+            for (final ICliComputer.ServiceStatus service : services) {
                 ctx.out().row("  " + service.name(), service.state());
             }
         }
     }
 
-    static final class Maint implements CliCommand {
+    static final class Maint implements ICliCommand {
         private final String verb;
         private final String action;
 
@@ -957,7 +957,7 @@ public final class BuiltinCommands {
         }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer.OpResult result = ctx.computer().maintenance(action);
+            final ICliComputer.OpResult result = ctx.computer().maintenance(action);
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
@@ -973,7 +973,7 @@ public final class BuiltinCommands {
      * manager) instead of the installed OS, which is how the player reaches it once a system is installed.
      */
     /** Installs or reports the Mirror, the Mainframe's package repository the Linux package managers use. */
-    static final class MirrorCommand implements CliCommand {
+    static final class MirrorCommand implements ICliCommand {
         @Override public String name() { return "mirror"; }
 
         @Override public String summary() { return "install or check the Mirror package service on the Mainframe"; }
@@ -981,7 +981,7 @@ public final class BuiltinCommands {
         @Override public String usage() { return "install|status"; }
 
         @Override public void run(final CliContext ctx) {
-            final CliComputer.OpResult result = ctx.computer().mirrorControl(ctx.hasArgs() ? ctx.arg(0) : "status");
+            final ICliComputer.OpResult result = ctx.computer().mirrorControl(ctx.hasArgs() ? ctx.arg(0) : "status");
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {
@@ -990,7 +990,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Reboot implements CliCommand {
+    static final class Reboot implements ICliCommand {
         @Override public String name() { return "reboot"; }
 
         @Override public List<String> aliases() { return List.of("restart"); }
@@ -1011,7 +1011,7 @@ public final class BuiltinCommands {
         }
     }
 
-    static final class Dir implements CliCommand {
+    static final class Dir implements ICliCommand {
         @Override public String name() { return "dir"; }
 
         @Override public String summary() { return "list the contents of a directory"; }
@@ -1020,7 +1020,7 @@ public final class BuiltinCommands {
 
         @Override public void run(final CliContext ctx) {
             final String dir = ctx.hasArgs() ? ctx.rest(0) : "";
-            final CliComputer.FsResult result = ctx.computer().listDisk(dir);
+            final ICliComputer.FsResult result = ctx.computer().listDisk(dir);
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
@@ -1028,7 +1028,7 @@ public final class BuiltinCommands {
             ctx.out().accent(" Directory of "
                     + DosPath.resolve(ctx.computer().currentLocation(), dir).dosPath());
             ctx.out().blank();
-            final List<CliComputer.FsEntry> entries = result.entries();
+            final List<ICliComputer.FsEntry> entries = result.entries();
             if (entries.isEmpty()) {
                 ctx.out().dim("File Not Found");
                 return;
@@ -1036,7 +1036,7 @@ public final class BuiltinCommands {
             int dirs = 0;
             int files = 0;
             long bytes = 0L;
-            for (final CliComputer.FsEntry entry : entries) {
+            for (final ICliComputer.FsEntry entry : entries) {
                 final String stamp = formatStamp(entry.modified());
                 if (entry.isDir()) {
                     dirs++;
@@ -1075,7 +1075,7 @@ public final class BuiltinCommands {
      * Prints the content of a file on the system disk to the console.
      * Refuses to open {@code .dat} (read-only storage projections).
      */
-    static final class Type implements CliCommand {
+    static final class Type implements ICliCommand {
         @Override public String name() { return "type"; }
 
         @Override public String summary() { return "print the content of a file"; }
@@ -1087,7 +1087,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: type <file>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().readFile(ctx.arg(0));
+            final ICliComputer.FsResult result = ctx.computer().readFile(ctx.arg(0));
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
@@ -1108,7 +1108,7 @@ public final class BuiltinCommands {
      * Deletes a file from the system disk. Refuses to delete {@code .dat} storage projections;
      * use the Network Interactor to move items out of disk storage.
      */
-    static final class Del implements CliCommand {
+    static final class Del implements ICliCommand {
         @Override public String name() { return "del"; }
 
         @Override public List<String> aliases() { return List.of("erase"); }
@@ -1122,7 +1122,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: del <file>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().deleteFile(ctx.arg(0));
+            final ICliComputer.FsResult result = ctx.computer().deleteFile(ctx.arg(0));
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
@@ -1135,7 +1135,7 @@ public final class BuiltinCommands {
      * Creates or overwrites a file on the system disk with the given text. The file type is inferred
      * from the extension; non-editable types ({@code .dat}, {@code .log}) are refused.
      */
-    static final class Write implements CliCommand {
+    static final class Write implements ICliCommand {
         @Override public String name() { return "write"; }
 
         @Override public List<String> aliases() { return List.of("save"); }
@@ -1149,7 +1149,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: write <file> <text...>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().writeFile(ctx.arg(0), ctx.rest(1));
+            final ICliComputer.FsResult result = ctx.computer().writeFile(ctx.arg(0), ctx.rest(1));
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
@@ -1162,7 +1162,7 @@ public final class BuiltinCommands {
      * Reads a {@code .iql} file from the system disk and executes it as an IQL statement, routing
      * through the same dispatch path as the {@code operation} command.
      */
-    static final class Run implements CliCommand {
+    static final class Run implements ICliCommand {
         @Override public String name() { return "run"; }
 
         @Override public String summary() { return "execute an .iql script from the system disk"; }
@@ -1174,13 +1174,13 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: run <file.iql>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().runScript(ctx.arg(0));
+            final ICliComputer.FsResult result = ctx.computer().runScript(ctx.arg(0));
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
             }
             // Forward the underlying OpResult style: OK in green, fail in red.
-            final CliComputer.OpResult op = result.opResult();
+            final ICliComputer.OpResult op = result.opResult();
             if (op != null) {
                 ctx.out().styled(op.message(), op.ok() ? CliStyle.OK : CliStyle.ERROR);
             } else {
@@ -1193,7 +1193,7 @@ public final class BuiltinCommands {
      * Shows or changes the current directory. With no argument it prints the current path (DOS
      * behaviour); with a path it changes to that directory relative to the current one.
      */
-    static final class Cd implements CliCommand {
+    static final class Cd implements ICliCommand {
         @Override public String name() { return "cd"; }
 
         @Override public List<String> aliases() { return List.of("chdir"); }
@@ -1207,7 +1207,7 @@ public final class BuiltinCommands {
                 ctx.out().line(ctx.computer().currentLocation().dosPath());
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().changeDir(ctx.rest(0));
+            final ICliComputer.FsResult result = ctx.computer().changeDir(ctx.rest(0));
             if (!result.ok()) {
                 ctx.out().error(result.message());
             }
@@ -1215,7 +1215,7 @@ public final class BuiltinCommands {
     }
 
     /** Creates a directory on the current drive. */
-    static final class Mkdir implements CliCommand {
+    static final class Mkdir implements ICliCommand {
         @Override public String name() { return "mkdir"; }
 
         @Override public List<String> aliases() { return List.of("md"); }
@@ -1229,7 +1229,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: mkdir <directory>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().makeDir(ctx.rest(0));
+            final ICliComputer.FsResult result = ctx.computer().makeDir(ctx.rest(0));
             if (!result.ok()) {
                 ctx.out().error(result.message());
             }
@@ -1237,7 +1237,7 @@ public final class BuiltinCommands {
     }
 
     /** Removes an empty directory from the current drive. */
-    static final class Rmdir implements CliCommand {
+    static final class Rmdir implements ICliCommand {
         @Override public String name() { return "rmdir"; }
 
         @Override public List<String> aliases() { return List.of("rd"); }
@@ -1251,7 +1251,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: rmdir <directory>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().removeDir(ctx.rest(0));
+            final ICliComputer.FsResult result = ctx.computer().removeDir(ctx.rest(0));
             if (!result.ok()) {
                 ctx.out().error(result.message());
             }
@@ -1259,7 +1259,7 @@ public final class BuiltinCommands {
     }
 
     /** Copies a file (or directory subtree) to a new location. */
-    static final class Copy implements CliCommand {
+    static final class Copy implements ICliCommand {
         @Override public String name() { return "copy"; }
 
         @Override public String summary() { return "copy a file to another location"; }
@@ -1271,7 +1271,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: copy <source> <destination>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().copyPath(ctx.arg(0), ctx.arg(1));
+            final ICliComputer.FsResult result = ctx.computer().copyPath(ctx.arg(0), ctx.arg(1));
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
@@ -1281,7 +1281,7 @@ public final class BuiltinCommands {
     }
 
     /** Moves a file (or directory subtree) into another directory. */
-    static final class Move implements CliCommand {
+    static final class Move implements ICliCommand {
         @Override public String name() { return "move"; }
 
         @Override public String summary() { return "move a file into another directory"; }
@@ -1293,7 +1293,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: move <source> <directory>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().movePath(ctx.arg(0), ctx.arg(1));
+            final ICliComputer.FsResult result = ctx.computer().movePath(ctx.arg(0), ctx.arg(1));
             if (!result.ok()) {
                 ctx.out().error(result.message());
                 return;
@@ -1303,7 +1303,7 @@ public final class BuiltinCommands {
     }
 
     /** Shows or changes this computer's settings — the MC-DOS front-end for the Settings app. */
-    static final class Config implements CliCommand {
+    static final class Config implements ICliCommand {
         @Override public String name() { return "config"; }
 
         @Override public String summary() { return "show or change this computer's settings"; }
@@ -1328,13 +1328,13 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: config <key> <value>  (or 'config' to list)");
                 return;
             }
-            final CliComputer.OpResult result = ctx.computer().setConfig(ctx.arg(0), ctx.rest(1));
+            final ICliComputer.OpResult result = ctx.computer().setConfig(ctx.arg(0), ctx.rest(1));
             ctx.out().styled(result.message(), result.ok() ? CliStyle.OK : CliStyle.ERROR);
         }
     }
 
     /** Renames a file or directory in place. */
-    static final class Ren implements CliCommand {
+    static final class Ren implements ICliCommand {
         @Override public String name() { return "ren"; }
 
         @Override public List<String> aliases() { return List.of("rename"); }
@@ -1348,7 +1348,7 @@ public final class BuiltinCommands {
                 ctx.out().error("usage: ren <file> <new name>");
                 return;
             }
-            final CliComputer.FsResult result = ctx.computer().renamePath(ctx.arg(0), ctx.arg(1));
+            final ICliComputer.FsResult result = ctx.computer().renamePath(ctx.arg(0), ctx.arg(1));
             if (!result.ok()) {
                 ctx.out().error(result.message());
             }

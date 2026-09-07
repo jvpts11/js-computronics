@@ -9,7 +9,7 @@ package dev.jstech.tests.gametest;
 
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.storage.ChemicalBridges;
-import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.IChemicalPort;
 import dev.jstech.computronics.storage.ExternalDataPort;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
@@ -117,8 +117,8 @@ public final class ChemicalDataGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     // A fresh tank takes input on every face and only gives output through its front (north).
-                    final Optional<ChemicalPort> input = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(pos), Direction.UP);
-                    final Optional<ChemicalPort> output = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(pos), Direction.NORTH);
+                    final Optional<IChemicalPort> input = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(pos), Direction.UP);
+                    final Optional<IChemicalPort> output = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(pos), Direction.NORTH);
                     helper.assertTrue(input.isPresent() && output.isPresent(), "the bridge must expose the tank's chemical handler on both faces");
                     final long filled = input.get().fill(OXYGEN, 500, false);
                     helper.assertTrue(filled == 500, "the tank must take 500 mB of oxygen; took " + filled);
@@ -176,7 +176,7 @@ public final class ChemicalDataGameTests {
         final StorageKey oxygen = StorageKey.chemical(OXYGEN);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
+                    final Optional<IChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().fill(OXYGEN, 500, false) == 500, "the tank must take 500 mB of oxygen");
                     if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computronics.blockentity.DataCableBlockEntity cable) {
                         cable.addPart(Direction.SOUTH, new dev.jstech.computronics.block.part.ImportBusPart());
@@ -186,7 +186,7 @@ public final class ChemicalDataGameTests {
                         "the Import Bus must bring the oxygen into the network as data; got " + net.storage(helper.getLevel()).count(oxygen)
                                 + " active=" + net.mainframe().activeOperationRecords()))
                 .thenExecute(() -> {
-                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
+                    final Optional<IChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().count(OXYGEN) == 0, "the tank must be drained; holds "
                             + tank.map(t -> t.count(OXYGEN)).orElse(-1L));
                     helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) == 500, "exactly 500 mB must be in the network");
@@ -207,7 +207,7 @@ public final class ChemicalDataGameTests {
         final ItemStack[] filterItem = {ItemStack.EMPTY};
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
+                    final Optional<IChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().fill(OXYGEN, 100, false) == 100, "tank A must take 100 mB of oxygen");
                     net.storage(helper.getLevel()).insert(oxygen, 2000);
                     // Pick tank A up: the item keeps its gas, and that item is the filter.
@@ -233,12 +233,12 @@ public final class ChemicalDataGameTests {
                     }
                 })
                 .thenWaitUntil(() -> {
-                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_B), Direction.UP);
+                    final Optional<IChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_B), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().count(OXYGEN) >= 300, "the Export Bus must push oxygen into tank B; holds "
                             + tank.map(t -> t.count(OXYGEN)).orElse(-1L) + " active=" + net.mainframe().activeOperationRecords());
                 })
                 .thenExecuteAfter(40, () -> {
-                    final Optional<ChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_B), Direction.UP);
+                    final Optional<IChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_B), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().count(OXYGEN) == 300, "the max must hold tank B at 300 mB; holds "
                             + tank.map(t -> t.count(OXYGEN)).orElse(-1L));
                     helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) == 1700, "the network must have handed over exactly 300 mB; holds "

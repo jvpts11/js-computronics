@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Declarative description of a multiblock structure: a 3D char matrix of "slots" plus a mapping from each char to a {@link BlockMatcher}.
+ * Declarative description of a multiblock structure: a 3D char matrix of "slots" plus a mapping from each char to an {@link IBlockMatcher}.
  */
 public final class MultiblockPattern {
 
@@ -22,7 +22,7 @@ public final class MultiblockPattern {
 
     private final String name;
     private final char[][][] layers; // layers[y][z][x]
-    private final Map<Character, BlockMatcher> mapping;
+    private final Map<Character, IBlockMatcher> mapping;
     private final int controllerX;
     private final int controllerY;
     private final int controllerZ;
@@ -30,7 +30,7 @@ public final class MultiblockPattern {
     private MultiblockPattern(
             String name,
             char[][][] layers,
-            Map<Character, BlockMatcher> mapping,
+            Map<Character, IBlockMatcher> mapping,
             int controllerX,
             int controllerY,
             int controllerZ
@@ -52,7 +52,7 @@ public final class MultiblockPattern {
         return layers[y][z][x];
     }
 
-    public Map<Character, BlockMatcher> mapping() {
+    public Map<Character, IBlockMatcher> mapping() {
         return java.util.Collections.unmodifiableMap(mapping);
     }
 
@@ -74,7 +74,7 @@ public final class MultiblockPattern {
     public static final class Builder {
         private final String name;
         private final java.util.List<String[]> layers = new java.util.ArrayList<>();
-        private final Map<Character, BlockMatcher> mapping = new HashMap<>();
+        private final Map<Character, IBlockMatcher> mapping = new HashMap<>();
 
         private Builder(String name) {
             this.name = Objects.requireNonNull(name, "name must not be null");
@@ -110,7 +110,7 @@ public final class MultiblockPattern {
             return this;
         }
 
-        public Builder where(char c, BlockMatcher matcher) {
+        public Builder where(char c, IBlockMatcher matcher) {
             Objects.requireNonNull(matcher, "matcher must not be null");
             if (c == CONTROLLER_CHAR || c == IGNORE_CHAR) {
                 throw new IllegalArgumentException(

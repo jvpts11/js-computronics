@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Snapshot;
@@ -52,7 +52,7 @@ class SnapshotTest {
 
     /** Runs a tick straight through, for the answer a run through saves has to match. */
     private static Process straight(final Loaded program) {
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         process.step(PLENTY);
         return process;
@@ -63,12 +63,12 @@ class SnapshotTest {
      * every slice, which is what a world being saved and loaded does to it.
      */
     private static Process throughSaves(final Loaded program) {
-        Process process = new Process(program, ROOM, Host.still());
+        Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         for (int i = 0; i < PATIENCE && process.state() == Process.State.RUNNING; i++) {
             process.step(SLICE);
             final Snapshot shot = process.save();
-            process = Process.restore(program, shot, Host.still());
+            process = Process.restore(program, shot, IHost.still());
         }
         return process;
     }

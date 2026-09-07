@@ -1238,7 +1238,7 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
                     final var cli = new dev.jstech.computronics.program.ServerCliComputer(
-                            (dev.jstech.computronics.terminal.ComputerTerminalHost) computer,
+                            (dev.jstech.computronics.terminal.IComputerTerminalHost) computer,
                             helper.getLevel());
                     final var shell = dev.jstech.computronics.program.cli.CliCommands.newShell(50);
 
@@ -1283,7 +1283,7 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
                     final var cli = new dev.jstech.computronics.program.ServerCliComputer(
-                            (dev.jstech.computronics.terminal.ComputerTerminalHost) computer,
+                            (dev.jstech.computronics.terminal.IComputerTerminalHost) computer,
                             helper.getLevel());
                     final var read = dev.jstech.computronics.program.iql.IqlParser.tryParse(
                             "QUERY items");
@@ -1308,7 +1308,7 @@ public final class NetworkGameTests {
                     // The Object Explorer snapshot must mirror the real network, not a static example tree.
                     final var schema = dev.jstech.computronics.operation.payload.ComputingPayloads
                             .nmsSchema(helper.getLevel(),
-                                    (dev.jstech.computronics.terminal.ComputerTerminalHost) computer);
+                                    (dev.jstech.computronics.terminal.IComputerTerminalHost) computer);
                     helper.assertTrue(schema.networkLabel().startsWith("jsc-net-"),
                             "the Object Explorer must show the real network label");
                     helper.assertFalse(schema.servers().isEmpty(),
@@ -1344,7 +1344,7 @@ public final class NetworkGameTests {
                 .thenExecuteAfter(SETTLE + 6, () -> {
                     rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200);
                     final var cli = new dev.jstech.computronics.program.ServerCliComputer(
-                            (dev.jstech.computronics.terminal.ComputerTerminalHost) computer,
+                            (dev.jstech.computronics.terminal.IComputerTerminalHost) computer,
                             helper.getLevel());
                     // 'install iqlengine' (the normal install command) installs the Engine service on the Mainframe.
                     helper.assertTrue(cli.install("iqlengine").ok(),
@@ -1364,7 +1364,7 @@ public final class NetworkGameTests {
                     // The NMS Object Explorer snapshot must reflect the real catalog, not mock examples.
                     final var schema = dev.jstech.computronics.operation.payload.ComputingPayloads
                             .nmsSchema(helper.getLevel(),
-                                    (dev.jstech.computronics.terminal.ComputerTerminalHost) computer);
+                                    (dev.jstech.computronics.terminal.IComputerTerminalHost) computer);
                     helper.assertTrue(schema.engine().views().contains("stock"),
                             "the NMS Object Explorer must list the created view");
                     helper.assertTrue("running".equals(schema.engine().state()),
@@ -3162,8 +3162,8 @@ public final class NetworkGameTests {
                 .setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING,
                         net.minecraft.core.Direction.NORTH));
         final net.minecraft.world.level.block.state.BlockState state = helper.getBlockState(pc);
-        final dev.jstech.core.network.DataNetworkConnectable block =
-                (dev.jstech.core.network.DataNetworkConnectable) state.getBlock();
+        final dev.jstech.core.network.IDataNetworkConnectable block =
+                (dev.jstech.core.network.IDataNetworkConnectable) state.getBlock();
         // A north-facing computer's rear is south: only that face takes a cable.
         helper.assertTrue(block.connectsOnFace(state, net.minecraft.core.Direction.SOUTH),
                 "the rear (south) face must accept a cable");
@@ -3177,7 +3177,7 @@ public final class NetworkGameTests {
         final BlockPos mf = new BlockPos(4, 2, 2);
         helper.setBlock(mf, ComputingModule.MAINFRAME.get());
         final net.minecraft.world.level.block.state.BlockState mfState = helper.getBlockState(mf);
-        if (mfState.getBlock() instanceof dev.jstech.core.network.DataNetworkConnectable mainframe) {
+        if (mfState.getBlock() instanceof dev.jstech.core.network.IDataNetworkConnectable mainframe) {
             helper.assertTrue(mainframe.connectsOnFace(mfState, net.minecraft.core.Direction.EAST),
                     "the Mainframe accepts a cable on any face");
             helper.assertTrue(mainframe.connectsOnFace(mfState, net.minecraft.core.Direction.UP),

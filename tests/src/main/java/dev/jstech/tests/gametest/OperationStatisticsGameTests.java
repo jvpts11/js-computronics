@@ -16,7 +16,7 @@ import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.program.ServerCliComputer;
 import dev.jstech.computronics.program.cli.CliCommands;
 import dev.jstech.computronics.program.cli.CliShell;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.core.operation.OperationStatistics;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
@@ -129,7 +129,7 @@ public final class OperationStatisticsGameTests {
                 .setValue(HorizontalDirectionalBlock.FACING, Direction.SOUTH));
         final ServerRackBlockEntity rackBe = world.blockEntity(rack, ServerRackBlockEntity.class);
         TestWorldBuilder.mountDefaultServer(rackBe, 0);
-        final ServerCliComputer cli = new ServerCliComputer((ComputerTerminalHost) computer, helper.getLevel());
+        final ServerCliComputer cli = new ServerCliComputer((IComputerTerminalHost) computer, helper.getLevel());
         final CliShell shell = CliCommands.newShell(60);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 6, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 200))

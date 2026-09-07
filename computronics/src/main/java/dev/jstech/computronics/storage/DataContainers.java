@@ -71,9 +71,9 @@ public final class DataContainers {
                         : Optional.of(new Drained(StorageKey.of(taken), taken.getAmount(), handler.getContainer()));
             }
         }
-        final Optional<ChemicalPort> chemicals = ChemicalBridges.itemPortFor(one);
+        final Optional<IChemicalPort> chemicals = ChemicalBridges.itemPortFor(one);
         if (chemicals.isPresent()) {
-            final ChemicalPort port = chemicals.get();
+            final IChemicalPort port = chemicals.get();
             for (final ResourceLocation chemical : port.available()) {
                 final long taken = port.drain(chemical, Math.min(roomWeight, port.count(chemical)), false);
                 if (taken > 0L) {

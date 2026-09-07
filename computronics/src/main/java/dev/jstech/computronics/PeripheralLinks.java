@@ -10,9 +10,9 @@ package dev.jstech.computronics;
 import dev.jstech.computronics.block.PeripheralCableBlock;
 import dev.jstech.computronics.blockentity.MainframePartBlockEntity;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralEndpoint;
+import dev.jstech.core.peripheral.IPeripheralEndpoint;
 import dev.jstech.core.peripheral.PeripheralLinkValidator;
-import dev.jstech.core.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.IPeripheralOwner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -48,34 +48,34 @@ public final class PeripheralLinks {
                 ? Optional.of(cable.peripheralType()) : Optional.empty();
     }
 
-    private static Optional<PeripheralOwner> ownerAt(final ServerLevel level, final long pos) {
-        return level.getBlockEntity(BlockPos.of(pos)) instanceof PeripheralOwner owner
+    private static Optional<IPeripheralOwner> ownerAt(final ServerLevel level, final long pos) {
+        return level.getBlockEntity(BlockPos.of(pos)) instanceof IPeripheralOwner owner
                 ? Optional.of(owner) : Optional.empty();
     }
 
     private static OptionalLong resolveOwnerPos(final ServerLevel level, final long pos,
                                                 final PeripheralCableType type) {
         final BlockEntity be = level.getBlockEntity(BlockPos.of(pos));
-        if (be instanceof PeripheralOwner owner && owner.cableType() == type) {
+        if (be instanceof IPeripheralOwner owner && owner.cableType() == type) {
             return OptionalLong.of(pos);
         }
         if (be instanceof MainframePartBlockEntity part && part.controllerPos() != null
-                && level.getBlockEntity(part.controllerPos()) instanceof PeripheralOwner owner
+                && level.getBlockEntity(part.controllerPos()) instanceof IPeripheralOwner owner
                 && owner.cableType() == type) {
             return OptionalLong.of(part.controllerPos().asLong());
         }
         // A rack cabinet spans several blocks; a cable touching any part links to its controller.
         if (be instanceof dev.jstech.computronics.blockentity.ServerRackPartBlockEntity part
                 && part.controllerPos() != null
-                && level.getBlockEntity(part.controllerPos()) instanceof PeripheralOwner owner
+                && level.getBlockEntity(part.controllerPos()) instanceof IPeripheralOwner owner
                 && owner.cableType() == type) {
             return OptionalLong.of(part.controllerPos().asLong());
         }
         return OptionalLong.empty();
     }
 
-    private static Optional<PeripheralEndpoint> endpointAt(final ServerLevel level, final long pos) {
-        return level.getBlockEntity(BlockPos.of(pos)) instanceof PeripheralEndpoint endpoint
+    private static Optional<IPeripheralEndpoint> endpointAt(final ServerLevel level, final long pos) {
+        return level.getBlockEntity(BlockPos.of(pos)) instanceof IPeripheralEndpoint endpoint
                 ? Optional.of(endpoint) : Optional.empty();
     }
 

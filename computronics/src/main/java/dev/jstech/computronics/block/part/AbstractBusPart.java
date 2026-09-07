@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
  * hysteresis, and a continuous/redstone mode — over a data cable face. Only the per-tick transfer direction
  * differs, which each subclass supplies in {@link #serverTick()}.
  */
-public abstract sealed class AbstractBusPart implements CablePart permits ImportBusPart, ExportBusPart {
+public abstract sealed class AbstractBusPart implements ICablePart permits ImportBusPart, ExportBusPart {
 
     public static final int MODE_CONTINUOUS = 0;
     public static final int MODE_REDSTONE = 1;

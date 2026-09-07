@@ -17,7 +17,7 @@ import java.util.Objects;
  * and how many pairs of brackets followed it. Whether the name exists, and whether a collection was
  * given the right number of arguments, is settled once the symbol table exists.
  */
-public record TypeRef(String name, List<TypeRef> arguments, int arrayRank, int line, int column) implements Node {
+public record TypeRef(String name, List<TypeRef> arguments, int arrayRank, int line, int column) implements INode {
 
     public TypeRef {
         Objects.requireNonNull(name, "name");

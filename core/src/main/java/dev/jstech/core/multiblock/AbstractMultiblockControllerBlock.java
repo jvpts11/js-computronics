@@ -35,7 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public abstract class AbstractMultiblockControllerBlock
         extends HorizontalDirectionalBlock
-        implements EntityBlock, MultiblockBlock {
+        implements EntityBlock, IMultiblockBlock {
 
     // Per-controller process-wide reentrancy guard. onRemove fires again for every cell removed during a dissolve, so
     // without this the teardown would recurse into itself; the controller position keys the in-flight teardown.
@@ -47,8 +47,8 @@ public abstract class AbstractMultiblockControllerBlock
 
     // ---- the vary points each subclass supplies ------------------------------
 
-    /** Footprint geometry; also backs {@link MultiblockBlock#footprint(BlockPos, Direction)}. */
-    protected abstract MultiblockGeometry geometry();
+    /** Footprint geometry; also backs {@link IMultiblockBlock#footprint(BlockPos, Direction)}. */
+    protected abstract IMultiblockGeometry geometry();
 
     /** True only for a block that belongs to THIS controller's part set. */
     protected abstract boolean isOwnPart(BlockState state);

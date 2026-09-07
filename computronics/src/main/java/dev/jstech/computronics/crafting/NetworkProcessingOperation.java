@@ -9,10 +9,10 @@ package dev.jstech.computronics.crafting;
 
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity;
-import dev.jstech.computronics.operation.PersistentOperation;
+import dev.jstech.computronics.operation.IPersistentOperation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.CompositeDataPort;
-import dev.jstech.computronics.storage.DataPort;
+import dev.jstech.computronics.storage.IDataPort;
 import dev.jstech.computronics.storage.ExternalDataPort;
 import dev.jstech.computronics.storage.FilteredDataPort;
 import dev.jstech.computronics.storage.StorageKey;
@@ -38,7 +38,7 @@ import java.util.UUID;
  * only guided the plan, never the runtime). If nothing progresses within the pattern's timeout, it settles
  * partial/failed. Items and fluids feed in the same way; collecting a fluid back into the network is a follow-up.
  */
-public final class NetworkProcessingOperation implements PersistentOperation {
+public final class NetworkProcessingOperation implements IPersistentOperation {
 
     private static final int FEED_INTERVAL = 4;
     public static final String KIND = "processing";
@@ -71,9 +71,9 @@ public final class NetworkProcessingOperation implements PersistentOperation {
     private boolean concurrencyBlocked;
     // Where inputs are drawn from and outputs returned to: the network by default; a craft's isolated pool for a
     // machine step run inside a recursive craft, so concurrent steps pipeline without racing on network stock.
-    private final CraftIo io;
+    private final ICraftIo io;
     private final boolean ephemeral;
-    // A machine step run inside a craft (given a pool CraftIo) is "nested": it is one stage of the parent craft,
+    // A machine step run inside a craft (given a pool ICraftIo) is "nested": it is one stage of the parent craft,
     // so it is NOT logged as an operation of its own — the parent's log entry carries it as a sub-operation.
     private final boolean nested;
 
@@ -88,7 +88,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
                                       final ProcessingPattern pattern, final long requested,
                                       final List<BlockPos> candidateComputers, final UUID operationId,
                                       final String requesterLabel,
-                                      @org.jetbrains.annotations.Nullable final CraftIo io) {
+                                      @org.jetbrains.annotations.Nullable final ICraftIo io) {
         this.level = level;
         this.network = network;
         this.pattern = pattern;
@@ -96,7 +96,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         this.candidateComputers = List.copyOf(candidateComputers);
         this.operationId = operationId;
         this.requesterLabel = requesterLabel;
-        this.io = io != null ? io : CraftIo.network(level, network);
+        this.io = io != null ? io : ICraftIo.network(level, network);
         // A craft's machine step reads and writes that craft's isolated pool through {@code io}, but it still
         // persists across a reload: on resume it is rebuilt with the network as its I/O and finishes whatever the
         // machine still holds into the network, where the re-planned parent craft counts it as stock. So nothing
@@ -130,8 +130,8 @@ public final class NetworkProcessingOperation implements PersistentOperation {
         }
         // Sided machines route through crafting buses when present: an Input Bus aimed at the machine carries
         // the deliveries, a Receiving Bus the pickups. Without buses both ride the switch-touched face.
-        final DataPort inPort = portFor(dev.jstech.computronics.block.part.CablePartType.INPUT);
-        final DataPort outPort = portFor(dev.jstech.computronics.block.part.CablePartType.RECEIVING);
+        final IDataPort inPort = portFor(dev.jstech.computronics.block.part.CablePartType.INPUT);
+        final IDataPort outPort = portFor(dev.jstech.computronics.block.part.CablePartType.RECEIVING);
         if (inPort.isEmpty() && outPort.isEmpty()) {
             machine = null; // the machine was broken/removed; re-resolve next tick
             return;
@@ -423,8 +423,8 @@ public final class NetworkProcessingOperation implements PersistentOperation {
      * key, so a machine fed two ingredients from two sides routes each to the correct face; an unfiltered bus
      * carries anything. Without a bus, the switch-touched face serves both directions.
      */
-    private DataPort portFor(final dev.jstech.computronics.block.part.CablePartType kind) {
-        final List<DataPort> faces = new java.util.ArrayList<>();
+    private IDataPort portFor(final dev.jstech.computronics.block.part.CablePartType kind) {
+        final List<IDataPort> faces = new java.util.ArrayList<>();
         for (final Direction d : Direction.values()) {
             final net.minecraft.core.BlockPos cablePos = machine.machinePos().relative(d);
             if (level.getBlockEntity(cablePos)
@@ -461,7 +461,7 @@ public final class NetworkProcessingOperation implements PersistentOperation {
      * kept topped up with as much as the whole request still needs, so a tank never starves a machine that
      * could run faster than one lot every few ticks — the pattern's amount only sets the ratio.
      */
-    private long deliverOwed(final DataPort inPort, final long budgetWeight) {
+    private long deliverOwed(final IDataPort inPort, final long budgetWeight) {
         final List<ProcessingPattern.ProcessingInput> inputs = pattern.inputs();
         long movedWeight = 0L;
         for (int i = 0; i < inputs.size() && movedWeight < budgetWeight; i++) {

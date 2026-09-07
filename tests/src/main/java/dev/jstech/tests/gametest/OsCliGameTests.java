@@ -19,9 +19,9 @@ import dev.jstech.computronics.os.ShellFamily;
 import dev.jstech.computronics.os.fs.DiskFilesystem;
 import dev.jstech.computronics.os.fs.FileType;
 import dev.jstech.computronics.program.ServerCliComputer;
-import dev.jstech.computronics.program.cli.CliCommand;
+import dev.jstech.computronics.program.cli.ICliCommand;
 import dev.jstech.computronics.program.cli.CliCommands;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import dev.jstech.tests.JsTests;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
@@ -77,7 +77,7 @@ public final class OsCliGameTests {
         for (final ShellFamily family : ShellFamily.values()) {
             for (final boolean live : new boolean[] {false, true}) {
                 final List<ConsoleInitPayload.WireCommand> commands = new ArrayList<>();
-                for (final CliCommand command : CliCommands.commandsFor(family, live)) {
+                for (final ICliCommand command : CliCommands.commandsFor(family, live)) {
                     commands.add(new ConsoleInitPayload.WireCommand(command.name(), command.usage()));
                 }
                 final ConsoleInitPayload payload = new ConsoleInitPayload(BlockPos.ZERO, List.of(), commands, List.of());
@@ -120,11 +120,11 @@ public final class OsCliGameTests {
 
                     // Drive the listDisk method directly.
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.listDisk("");
+                    final ICliComputer.FsResult result = cli.listDisk("");
 
                     helper.assertTrue(result.ok(),
                             "listDisk must succeed with mc_dos installed; got: " + result.message());
-                    final List<CliComputer.FsEntry> entries = result.entries();
+                    final List<ICliComputer.FsEntry> entries = result.entries();
                     final boolean found = entries.stream().anyMatch(e -> e.name().equals("test.iql"));
                     helper.assertTrue(found,
                             "listDisk must include test.iql; got entries: " + entries);
@@ -144,7 +144,7 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.listDisk("");
+                    final ICliComputer.FsResult result = cli.listDisk("");
                     helper.assertFalse(result.ok(),
                             "listDisk must fail when no OS is installed");
                 })
@@ -171,7 +171,7 @@ public final class OsCliGameTests {
                             1000L, FilesystemKind.FLAT);
 
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.readFile("query.iql");
+                    final ICliComputer.FsResult result = cli.readFile("query.iql");
 
                     helper.assertTrue(result.ok(),
                             "readFile must succeed for an existing .iql file; got: " + result.message());
@@ -192,7 +192,7 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.readFile("nonexistent.iql");
+                    final ICliComputer.FsResult result = cli.readFile("nonexistent.iql");
                     helper.assertFalse(result.ok(),
                             "readFile on a missing file must return a failure result");
                 })
@@ -221,12 +221,12 @@ public final class OsCliGameTests {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
 
                     // Deletion must succeed.
-                    final CliComputer.FsResult delResult = cli.deleteFile("temp.txt");
+                    final ICliComputer.FsResult delResult = cli.deleteFile("temp.txt");
                     helper.assertTrue(delResult.ok(),
                             "deleteFile must succeed for an existing file; got: " + delResult.message());
 
                     // The file must no longer be readable.
-                    final CliComputer.FsResult readResult = cli.readFile("temp.txt");
+                    final ICliComputer.FsResult readResult = cli.readFile("temp.txt");
                     helper.assertFalse(readResult.ok(),
                             "readFile after del must fail; got ok with: " + readResult.message());
                 })
@@ -244,7 +244,7 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.deleteFile("ghost.txt");
+                    final ICliComputer.FsResult result = cli.deleteFile("ghost.txt");
                     helper.assertFalse(result.ok(),
                             "deleteFile on a missing file must return failure");
                 })
@@ -260,7 +260,7 @@ public final class OsCliGameTests {
      * an OK result via the same IQL dispatch path as the {@code operation} command.
      *
      * <p>The Mainframe has no network here, so an effecting statement that reaches the network
-     * (e.g. SELECT) will fail at dispatch; we assert on the {@link CliComputer.FsResult#ok()}
+     * (e.g. SELECT) will fail at dispatch; we assert on the {@link ICliComputer.FsResult#ok()}
      * flag of the script execution itself: a parse error or missing-file error counts as a test
      * failure; a dispatch-level failure ("no Mainframe") is acceptable and still proves the
      * script was read and parsed correctly.
@@ -278,7 +278,7 @@ public final class OsCliGameTests {
                             "SELECT 64 Cobblestone", 1000L, FilesystemKind.FLAT);
 
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.runScript("daily.iql");
+                    final ICliComputer.FsResult result = cli.runScript("daily.iql");
 
                     // The script must have been found and parsed successfully.
                     // A network-dispatch failure is acceptable (no network here);
@@ -308,7 +308,7 @@ public final class OsCliGameTests {
                             1000L, FilesystemKind.FLAT);
 
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.runScript("notes.txt");
+                    final ICliComputer.FsResult result = cli.runScript("notes.txt");
                     helper.assertFalse(result.ok(),
                             "runScript on a .txt file must fail");
                     helper.assertTrue(result.message().contains("iql"),
@@ -328,7 +328,7 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult result = cli.runScript("missing.iql");
+                    final ICliComputer.FsResult result = cli.runScript("missing.iql");
                     helper.assertFalse(result.ok(),
                             "runScript on a missing file must return failure");
                 })
@@ -352,11 +352,11 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult write = cli.writeFile("notes.txt", content);
+                    final ICliComputer.FsResult write = cli.writeFile("notes.txt", content);
                     helper.assertTrue(write.ok(),
                             "writeFile must succeed for a .txt file; got: " + write.message());
 
-                    final CliComputer.FsResult read = cli.readFile("notes.txt");
+                    final ICliComputer.FsResult read = cli.readFile("notes.txt");
                     helper.assertTrue(read.ok() && content.equals(read.message()),
                             "readFile must return the written content; got: " + read.message());
                 })
@@ -375,7 +375,7 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult write = cli.writeFile("cobblestone.dat", "x");
+                    final ICliComputer.FsResult write = cli.writeFile("cobblestone.dat", "x");
                     helper.assertFalse(write.ok(),
                             "writeFile must reject a .dat (read-only) file type");
                 })
@@ -393,7 +393,7 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final CliComputer.FsResult write = cli.writeFile("a.txt", "hi");
+                    final ICliComputer.FsResult write = cli.writeFile("a.txt", "hi");
                     helper.assertFalse(write.ok(),
                             "writeFile must fail when no OS is installed");
                 })
@@ -434,7 +434,7 @@ public final class OsCliGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
                     helper.assertTrue(cli.makeDir("Docs").ok(), "mkdir Docs must succeed");
-                    final CliComputer.FsResult listing = cli.listDisk("");
+                    final ICliComputer.FsResult listing = cli.listDisk("");
                     helper.assertTrue(listing.ok(), "dir must succeed");
                     final boolean hasDir = listing.entries().stream()
                             .anyMatch(e -> e.isDir() && e.name().equals("Docs"));
@@ -476,7 +476,7 @@ public final class OsCliGameTests {
                     helper.assertTrue(cli.writeFile("a.txt", "payload").ok(), "write a.txt must succeed");
                     helper.assertTrue(cli.copyPath("a.txt", "b.txt").ok(), "copy a.txt b.txt must succeed");
                     helper.assertTrue(cli.readFile("a.txt").ok(), "source must still exist after copy");
-                    final CliComputer.FsResult copy = cli.readFile("b.txt");
+                    final ICliComputer.FsResult copy = cli.readFile("b.txt");
                     helper.assertTrue(copy.ok() && copy.message().equals("payload"),
                             "copy must contain the source content");
                 })
@@ -556,7 +556,7 @@ public final class OsCliGameTests {
                     helper.assertTrue(cli.currentLocation().drive() == 'D',
                             "current drive must be D after switching; got " + cli.currentLocation().dosPath());
                     helper.assertTrue(cli.writeFile("note.txt", "on-d").ok(), "write on D: must succeed");
-                    final CliComputer.FsResult readD = cli.readFile("note.txt");
+                    final ICliComputer.FsResult readD = cli.readFile("note.txt");
                     helper.assertTrue(readD.ok() && readD.message().equals("on-d"),
                             "read on D: must return the D: content");
                     // Back to C:; the D: file must not be visible there.
@@ -567,7 +567,7 @@ public final class OsCliGameTests {
                     helper.assertTrue(cli.writeFile("src.txt", "payload").ok(), "write on C: must succeed");
                     helper.assertTrue(cli.copyPath("src.txt", "D:\\copy.txt").ok(),
                             "cross-drive copy C: -> D: must succeed");
-                    final CliComputer.FsResult copied = cli.readFile("D:\\copy.txt");
+                    final ICliComputer.FsResult copied = cli.readFile("D:\\copy.txt");
                     helper.assertTrue(copied.ok() && copied.message().equals("payload"),
                             "the cross-drive copy on D: must hold the source content");
                     // An unmapped drive letter fails cleanly.

@@ -44,7 +44,7 @@ import java.util.Locale;
  * routes back through {@link #accept}. The input is a command line with Up/Down history, like a real
  * shell; the output above it is a list of the scrollback wrapped to the window's width.
  */
-public final class ShellApp implements DesktopApp {
+public final class ShellApp implements IDesktopApp {
 
     private static final int LINE_H = 9;
     private static final int PAD = 3;

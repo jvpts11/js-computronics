@@ -36,7 +36,7 @@ class ServerNodeTest {
     @Test
     void server_isServiceNode() {
         ServerNode server = new ServerNode(nodeUuid(), networkUuid(), 1024L);
-        assertInstanceOf(ServiceNode.class, server);
+        assertInstanceOf(IServiceNode.class, server);
         assertInstanceOf(INetworkNode.class, server);
     }
 

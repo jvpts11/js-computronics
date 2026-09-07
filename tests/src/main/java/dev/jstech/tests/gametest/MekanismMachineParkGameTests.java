@@ -14,7 +14,7 @@ import dev.jstech.computronics.crafting.MultiStagePattern;
 import dev.jstech.computronics.crafting.NetworkProcessingOperation;
 import dev.jstech.computronics.crafting.NetworkRecipe;
 import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
@@ -104,7 +104,7 @@ public final class MekanismMachineParkGameTests {
         return new CraftingPattern(grid, new ItemStack(MekanismRig.item(FRAME), 4));
     }
 
-    private static void assertCompleted(final GameTestHelper helper, final NetworkOperation op, final String what) {
+    private static void assertCompleted(final GameTestHelper helper, final INetworkOperation op, final String what) {
         helper.assertTrue(op.toRecord().status() == OperationRecord.STATUS_COMPLETED,
                 what + " must complete; status=" + op.toRecord().status());
     }
@@ -219,7 +219,7 @@ public final class MekanismMachineParkGameTests {
         // (infused -> reinforced -> atomic) and ends on the bench with the frame recipe, from raw stock only.
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     MekanismRig.mountBuses(helper);
@@ -269,7 +269,7 @@ public final class MekanismMachineParkGameTests {
         // each machine step as a processing operation of its own before the bench step.
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     MekanismRig.mountBuses(helper);
@@ -346,7 +346,7 @@ public final class MekanismMachineParkGameTests {
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final var cli = new dev.jstech.computronics.program.ServerCliComputer(
-                            (dev.jstech.computronics.terminal.ComputerTerminalHost) rig.net().cc(), helper.getLevel());
+                            (dev.jstech.computronics.terminal.IComputerTerminalHost) rig.net().cc(), helper.getLevel());
                     final var shell = dev.jstech.computronics.program.cli.CliCommands.newShell(50);
                     final var response = shell.run("operation craft 4 " + FRAME, cli);
                     final boolean queued = response.lines().stream().anyMatch(l -> l.text().contains("CRAFT queued"));

@@ -9,7 +9,7 @@ package dev.jstech.computronics.client;
 
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.block.FirmwareScreenOpener;
+import dev.jstech.computronics.block.IFirmwareScreenOpener;
 import dev.jstech.computronics.client.os.DesktopScreen;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
@@ -37,16 +37,16 @@ public final class ComputingClientSetup {
     @SubscribeEvent
     public static void registerScreens(final RegisterMenuScreensEvent event) {
         // Wire the client-side firmware screen opener so blocks can open it without importing Minecraft.
-        FirmwareScreenOpener.Holder.set((pos, monitorPos, kind, name) ->
+        IFirmwareScreenOpener.Holder.set((pos, monitorPos, kind, name) ->
                 Minecraft.getInstance().setScreen(new FirmwareScreen(pos, monitorPos, kind, name)));
-        dev.jstech.computronics.block.PostScreenOpener.Holder.set((pos, monitorPos, kind, name) ->
+        dev.jstech.computronics.block.IPostScreenOpener.Holder.set((pos, monitorPos, kind, name) ->
                 Minecraft.getInstance().setScreen(new BootSequenceScreen(pos, monitorPos, kind, name)));
-        dev.jstech.computronics.block.InstallDoneScreenOpener.Holder.set(
+        dev.jstech.computronics.block.IInstallDoneScreenOpener.Holder.set(
                 (pos, monitorPos, kind, osName, targetLabel, targetSlot, failure) -> Minecraft.getInstance().setScreen(
                         failure.isEmpty()
                                 ? OsInstallScreen.completed(pos, monitorPos, kind, osName, targetLabel, targetSlot)
                                 : OsInstallScreen.failed(pos, monitorPos, kind, osName, targetLabel, failure)));
-        dev.jstech.computronics.block.KvmScreenOpener.Holder.set(payload ->
+        dev.jstech.computronics.block.IKvmScreenOpener.Holder.set(payload ->
                 Minecraft.getInstance().setScreen(new KvmChannelScreen(payload)));
 
         event.register(ComputingModule.DESKTOP_MENU.get(), DesktopScreen::new);

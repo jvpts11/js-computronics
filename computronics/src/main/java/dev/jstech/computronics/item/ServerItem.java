@@ -11,7 +11,7 @@ import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.CpuSpec;
 import dev.jstech.computronics.hardware.DiskSpec;
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import dev.jstech.computronics.hardware.MotherboardSpec;
 import dev.jstech.computronics.hardware.PsuSpec;
 import dev.jstech.computronics.hardware.RamSpec;
@@ -33,7 +33,7 @@ import java.util.UUID;
  * so storage moves with the bay, never with this item.
  */
 public class ServerItem extends Item
-        implements dev.jstech.computronics.rack.MountableRackUnit {
+        implements dev.jstech.computronics.rack.IMountableRackUnit {
 
     private final dev.jstech.computronics.rack.RackChassis chassis;
 
@@ -120,7 +120,7 @@ public class ServerItem extends Item
         PsuSpec psu = null;
         final List<CpuSpec> cpus = new ArrayList<>();
         final List<RamSpec> rams = new ArrayList<>();
-        final List<ExpansionCardSpec> pcieCards = new ArrayList<>();
+        final List<IExpansionCardSpec> pcieCards = new ArrayList<>();
         final List<DiskSpec> disks = new ArrayList<>();
         for (final ItemStack part : parts) {
             if (part.getItem() instanceof MotherboardItem m) {
@@ -131,7 +131,7 @@ public class ServerItem extends Item
                 cpus.add(c.spec());
             } else if (part.getItem() instanceof RamItem r) {
                 rams.add(r.spec());
-            } else if (part.getItem() instanceof ExpansionCardItem card) {
+            } else if (part.getItem() instanceof IExpansionCardItem card) {
                 pcieCards.add(card.cardSpec());
             } else if (part.getItem() instanceof DiskItem d) {
                 disks.add(d.spec());

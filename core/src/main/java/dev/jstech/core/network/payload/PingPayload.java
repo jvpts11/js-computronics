@@ -18,7 +18,7 @@ import net.minecraft.resources.ResourceLocation;
  * A minimal bidirectional payload carrying a single timestamp, used to measure round-trip latency and as the canonical payload template.
  */
 public record PingPayload(PingData data)
-        implements CustomPacketPayload, CorePayload {
+        implements CustomPacketPayload, ICorePayload {
 
     public PingPayload(final long timestamp) {
         this(new PingData(timestamp));

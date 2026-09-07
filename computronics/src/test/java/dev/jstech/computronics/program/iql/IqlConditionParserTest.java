@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import dev.jstech.computronics.program.iql.IqlCondition.And;
-import dev.jstech.computronics.program.iql.IqlCondition.Comparison;
-import dev.jstech.computronics.program.iql.IqlCondition.Op;
-import dev.jstech.computronics.program.iql.IqlCondition.Or;
+import dev.jstech.computronics.program.iql.IIqlCondition.And;
+import dev.jstech.computronics.program.iql.IIqlCondition.Comparison;
+import dev.jstech.computronics.program.iql.IIqlCondition.Op;
+import dev.jstech.computronics.program.iql.IIqlCondition.Or;
 import org.junit.jupiter.api.Test;
 
 class IqlConditionParserTest {
@@ -70,14 +70,14 @@ class IqlConditionParserTest {
 
     @Test
     void parse_notNegatesNextPrimary() {
-        final IqlCondition.Not not = assertInstanceOf(IqlCondition.Not.class, IqlConditionParser.parse("NOT enchant = silk_touch"));
+        final IIqlCondition.Not not = assertInstanceOf(IIqlCondition.Not.class, IqlConditionParser.parse("NOT enchant = silk_touch"));
         assertInstanceOf(Comparison.class, not.inner());
     }
 
     @Test
     void parse_evaluatesParsedTreeAgainstRow() {
-        // The parsed tree is the same one IqlCondition evaluates, so a round-trip through matches works.
-        final IqlCondition c = IqlConditionParser.parse("qty < 100 AND enchant = mending");
+        // The parsed tree is the same one IIqlCondition evaluates, so a round-trip through matches works.
+        final IIqlCondition c = IqlConditionParser.parse("qty < 100 AND enchant = mending");
         assertEquals(Boolean.TRUE, c.matches(field -> switch (field) {
             case "qty" -> "40";
             case "enchant" -> "mending";

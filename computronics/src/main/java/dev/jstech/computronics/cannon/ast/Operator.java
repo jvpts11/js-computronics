@@ -12,7 +12,7 @@ package dev.jstech.computronics.cannon.ast;
  *
  * <p>The parser resolves the spelling once: a minus in front of a value is {@link #NEGATE} and a
  * minus between two is {@link #SUBTRACT}, and a compound assignment keeps the arithmetic operator
- * beside {@link Expr.Assign}, so no later stage has to read the source text again.
+ * beside {@link IExpr.Assign}, so no later stage has to read the source text again.
  */
 public enum Operator {
 

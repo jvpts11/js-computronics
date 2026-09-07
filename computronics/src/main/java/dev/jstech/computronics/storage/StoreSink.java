@@ -8,13 +8,13 @@
 package dev.jstech.computronics.storage;
 
 /**
- * A {@link DataSink} over any {@link WeightedStore}, so a timed SELECT/MOVE can stream any data (items or fluids) into a Server's store or a computer's local storage, bounded by the store's free data weight.
+ * An {@link IDataSink} over any {@link IWeightedStore}, so a timed SELECT/MOVE can stream any data (items or fluids) into a Server's store or a computer's local storage, bounded by the store's free data weight.
  */
-public final class StoreSink implements DataSink {
+public final class StoreSink implements IDataSink {
 
-    private final WeightedStore store;
+    private final IWeightedStore store;
 
-    public StoreSink(final WeightedStore store) {
+    public StoreSink(final IWeightedStore store) {
         this.store = store;
     }
 

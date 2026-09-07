@@ -12,7 +12,7 @@ import dev.jstech.computronics.cannon.DiagnosticBag;
 import dev.jstech.computronics.cannon.SourceFile;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Snapshot;
@@ -67,7 +67,7 @@ public final class CannonSnapshotGameTests {
     }
 
     private static Process straight(final Loaded program) {
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         process.step(PLENTY);
         return process;
@@ -75,12 +75,12 @@ public final class CannonSnapshotGameTests {
 
     /** Runs the program in slices, writing it to a tag and reading it back between every one. */
     private static Process throughTags(final Loaded program) {
-        Process process = new Process(program, ROOM, Host.still());
+        Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnTick");
         for (int i = 0; i < PATIENCE && process.state() == Process.State.RUNNING; i++) {
             process.step(SLICE);
             final CompoundTag tag = SnapshotTag.write(process.save());
-            process = Process.restore(program, SnapshotTag.read(tag), Host.still());
+            process = Process.restore(program, SnapshotTag.read(tag), IHost.still());
         }
         return process;
     }
@@ -135,28 +135,28 @@ public final class CannonSnapshotGameTests {
     @GameTest(template = ARENA)
     public static void snapshotTag_bringsBackEveryKindItWroteDown(final GameTestHelper helper) {
         final Snapshot written = new Snapshot(4096,
-                List.of(new Snapshot.Held.Text(0, 26, 3, false, "hello"),
-                        new Snapshot.Held.Object(1, 24, 4, false, "Tally",
-                                Map.of("count", new Snapshot.Value.I4(7))),
-                        new Snapshot.Held.Array(2, 32, 5, true, "int",
-                                List.of(new Snapshot.Value.I8(9), new Snapshot.Value.R4(1.5f))),
-                        new Snapshot.Held.Listing(3, 24, 6, false,
-                                List.of(new Snapshot.Value.Ref(0), new Snapshot.Value.Nothing())),
-                        new Snapshot.Held.Keyed(4, 32, 7, false,
-                                List.of(new Snapshot.Value.Ch('a')),
-                                List.of(new Snapshot.Value.R8(2.25))),
-                        new Snapshot.Held.Handler(5, 32, 8, false, "Note",
-                                List.of(new Snapshot.BoundShot(new Snapshot.Value.Ref(1), "Monitor",
+                List.of(new Snapshot.IHeld.Text(0, 26, 3, false, "hello"),
+                        new Snapshot.IHeld.Object(1, 24, 4, false, "Tally",
+                                Map.of("count", new Snapshot.IValue.I4(7))),
+                        new Snapshot.IHeld.Array(2, 32, 5, true, "int",
+                                List.of(new Snapshot.IValue.I8(9), new Snapshot.IValue.R4(1.5f))),
+                        new Snapshot.IHeld.Listing(3, 24, 6, false,
+                                List.of(new Snapshot.IValue.Ref(0), new Snapshot.IValue.Nothing())),
+                        new Snapshot.IHeld.Keyed(4, 32, 7, false,
+                                List.of(new Snapshot.IValue.Ch('a')),
+                                List.of(new Snapshot.IValue.R8(2.25))),
+                        new Snapshot.IHeld.Handler(5, 32, 8, false, "Note",
+                                List.of(new Snapshot.BoundShot(new Snapshot.IValue.Ref(1), "Monitor",
                                         "First", List.of("int"), "void")))),
                 List.of(new Snapshot.FrameShot("Monitor", "OnTick", List.of(), 12,
-                        new Snapshot.Value.Ref(1), List.of(new Snapshot.Value.Bool(true)),
-                        List.of(new Snapshot.Value.I4(3)), false)),
+                        new Snapshot.IValue.Ref(1), List.of(new Snapshot.IValue.Bool(true)),
+                        List.of(new Snapshot.IValue.I4(3)), false)),
                 List.of(new Snapshot.FrameShot("Counter", "Counter", List.of(), 0,
-                        new Snapshot.Value.Nothing(), List.of(), List.of(), true)),
-                Map.of("Counter", Map.of("seen", new Snapshot.Value.I4(2))),
-                new Snapshot.Value.Ref(1),
+                        new Snapshot.IValue.Nothing(), List.of(), List.of(), true)),
+                Map.of("Counter", Map.of("seen", new Snapshot.IValue.I4(2))),
+                new Snapshot.IValue.Ref(1),
                 List.of(new Snapshot.WatchShot(1, "minecraft:iron_ingot", "BELOW", 1000L,
-                        new Snapshot.Value.Ref(5), new Snapshot.Value.Ref(1), 640L, false, true)),
+                        new Snapshot.IValue.Ref(5), new Snapshot.IValue.Ref(1), 640L, false, true)),
                 List.of("first", "second"), 7, "RUNNING", "", 91);
         final Snapshot read = SnapshotTag.read(SnapshotTag.write(written));
         helper.assertTrue(read.equals(written), "what came back out of the tag is what went in; got " + read);

@@ -13,7 +13,7 @@ import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.crafting.CraftingPattern;
 import dev.jstech.computronics.crafting.NetworkRecipe;
 import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
@@ -180,7 +180,7 @@ public final class MekanismHardwareMatrixGameTests {
         // and strand its machines (the receiving buses stop pulling). The craft must survive the pull and finish.
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey infused = MekanismRig.itemKey(ALLOY_INFUSED);
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     prepare(helper, rig, 1);
@@ -222,7 +222,7 @@ public final class MekanismHardwareMatrixGameTests {
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
         final StorageKey infused = MekanismRig.itemKey(ALLOY_INFUSED);
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> prepare(helper, rig, 1))
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -265,7 +265,7 @@ public final class MekanismHardwareMatrixGameTests {
     public static void machineBrokenMidStep_craftFailsVisiblyAndTheMachineKeepsItsContents(final GameTestHelper helper) {
         final MekanismRig.Rig rig = MekanismRig.build(helper, INFUSER);
         final StorageKey frame = MekanismRig.itemKey(FRAME);
-        final NetworkOperation[] op = new NetworkOperation[1];
+        final INetworkOperation[] op = new INetworkOperation[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> prepare(helper, rig, 1))
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -308,7 +308,7 @@ public final class MekanismHardwareMatrixGameTests {
                     helper.assertTrue(rig.net().mainframe().submitNetworkCraft(frame, 4, false, "battery", null) == null,
                             "a Mainframe that is not running must refuse the request");
                     final var cli = new dev.jstech.computronics.program.ServerCliComputer(
-                            (dev.jstech.computronics.terminal.ComputerTerminalHost) rig.net().cc(), helper.getLevel());
+                            (dev.jstech.computronics.terminal.IComputerTerminalHost) rig.net().cc(), helper.getLevel());
                     final var response = dev.jstech.computronics.program.cli.CliCommands.newShell(50)
                             .run("operation craft 4 " + FRAME, cli);
                     final String text = String.join(" | ", response.lines().stream().map(l -> l.text()).toList());

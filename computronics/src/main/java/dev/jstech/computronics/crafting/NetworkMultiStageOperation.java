@@ -8,8 +8,8 @@
 package dev.jstech.computronics.crafting;
 
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.operation.NetworkOperation;
-import dev.jstech.computronics.operation.PersistentOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
+import dev.jstech.computronics.operation.IPersistentOperation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.operation.OperationPriority;
@@ -31,7 +31,7 @@ import java.util.UUID;
  * stage pulls it back, so the chain flows through shared network storage. If a stage fails, the whole craft
  * fails. The stages themselves are real network operations the Mainframe ticks; this just sequences them.
  */
-public final class NetworkMultiStageOperation implements PersistentOperation {
+public final class NetworkMultiStageOperation implements IPersistentOperation {
 
     public static final String KIND = "multi";
 
@@ -43,7 +43,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
     private final UUID operationId;
 
     private int stageIndex;
-    private NetworkOperation currentStage;
+    private INetworkOperation currentStage;
     // After a reload: the id of the stage this pipeline was waiting on, until the Mainframe hands it back.
     @Nullable
     private UUID pendingStageId;
@@ -92,7 +92,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
         tag.putString("Label", requesterLabel);
         tag.putByte(NetworkCraftOperation.PRIORITY_KEY, (byte) priority.ordinal());
         tag.putInt("StageIndex", stageIndex);
-        if (currentStage instanceof PersistentOperation stage && !currentStage.isDone()) {
+        if (currentStage instanceof IPersistentOperation stage && !currentStage.isDone()) {
             tag.putUUID("StageId", stage.operationId());
         } else if (pendingStageId != null) {
             tag.putUUID("StageId", pendingStageId);
@@ -143,7 +143,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
      * restored — the pipeline then simply starts the same stage again, which is safe because a stage only
      * moves items once it runs).
      */
-    public void adoptStage(@Nullable final NetworkOperation stage) {
+    public void adoptStage(@Nullable final INetworkOperation stage) {
         this.currentStage = stage;
         this.pendingStageId = null;
     }
@@ -190,7 +190,7 @@ public final class NetworkMultiStageOperation implements PersistentOperation {
     }
 
     @Nullable
-    private NetworkOperation startStage(final MultiStagePattern.Stage stage) {
+    private INetworkOperation startStage(final MultiStagePattern.Stage stage) {
         // Each stage is sized by what the stage after it consumes, never by the final quantity: nine nuggets
         // (one ingot makes nine) smelt one ingot; one iron block (nine ingots) smelts nine.
         final long demand = pattern.stageDemands(requested)[stageIndex];

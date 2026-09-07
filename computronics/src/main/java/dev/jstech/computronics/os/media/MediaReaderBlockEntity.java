@@ -11,9 +11,9 @@ import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.PeripheralLinks;
 import dev.jstech.computronics.storage.ServerStorageContents;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralEndpoint;
+import dev.jstech.core.peripheral.IPeripheralEndpoint;
 import dev.jstech.core.peripheral.PeripheralLinkValidator;
-import dev.jstech.core.peripheral.PeripheralOwner;
+import dev.jstech.core.peripheral.IPeripheralOwner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -48,7 +48,7 @@ import java.util.Optional;
  * to the nearest computer, mirroring the monitor pattern. The linked owner position is stored in
  * NBT and restored on world reload.
  */
-public class MediaReaderBlockEntity extends BlockEntity implements PeripheralEndpoint {
+public class MediaReaderBlockEntity extends BlockEntity implements IPeripheralEndpoint {
 
     private static final String NBT_SLOT = "MediaSlot";
     private static final String NBT_LINKED_OWNER = "LinkedOwner";
@@ -105,7 +105,7 @@ public class MediaReaderBlockEntity extends BlockEntity implements PeripheralEnd
                 ? media.format() : null;
     }
 
-    // ─── PeripheralEndpoint ──────────────────────────────────────────────────
+    // ─── IPeripheralEndpoint ──────────────────────────────────────────────────
 
     @Override
     public PeripheralCableType cableType() {
@@ -154,7 +154,7 @@ public class MediaReaderBlockEntity extends BlockEntity implements PeripheralEnd
         } else {
             // Drop the link if the computer is gone or the cable path is broken.
             final boolean ownerPresent =
-                    level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner;
+                    level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof IPeripheralOwner;
             if (!ownerPresent
                     || !validator.isLinkStillValid(linkedOwner, self, PeripheralCableType.COMPUTING)) {
                 unlink(level);
@@ -168,7 +168,7 @@ public class MediaReaderBlockEntity extends BlockEntity implements PeripheralEnd
      */
     public void unlink(final ServerLevel level) {
         if (linkedOwner != null
-                && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof PeripheralOwner owner) {
+                && level.getBlockEntity(BlockPos.of(linkedOwner)) instanceof IPeripheralOwner owner) {
             owner.onEndpointUnlinked(worldPosition.asLong());
         }
         onOwnerUnlinked();

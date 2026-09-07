@@ -254,7 +254,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
 
         syncSearchBoxVisibility();
 
-        tabs = new TerminalTab[]{
+        tabs = new ITerminalTab[]{
             new LocalTerminalTab(this, menu),
             new StorageTerminalTab(this, menu),
             new NetworkTerminalTab(this, menu),
@@ -359,7 +359,7 @@ public class ComputerTerminalScreen extends AbstractComputerScreen<ComputerTermi
     }
 
     // Per-tab rendering delegates; instantiated in init() once menu and screen geometry are ready.
-    private TerminalTab[] tabs;
+    private ITerminalTab[] tabs;
 
     // The rail now scrolls instead of shrinking, so every entry keeps its full height and its name.
     private int railScroll;

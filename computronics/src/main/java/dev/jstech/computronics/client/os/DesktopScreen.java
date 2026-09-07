@@ -49,7 +49,7 @@ import java.util.List;
  *
  * <p>First iteration: wallpaper, launcher icons, a taskbar with a start button and clock, a start
  * menu, and stackable program windows with a draggable title bar and a close box. Program content is
- * delegated to {@link DesktopApp} instances. Visual polish is tuned in-game.
+ * delegated to {@link IDesktopApp} instances. Visual polish is tuned in-game.
  */
 public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
@@ -89,11 +89,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     // The live app instances kept per computer while its Monitor is left, so re-entering restores each
     // program's in-progress session (terminal scrollback, an unsaved query) instead of a fresh window.
-    private static final java.util.Map<BlockPos, java.util.Map<String, DesktopApp>> SAVED_APPS =
+    private static final java.util.Map<BlockPos, java.util.Map<String, IDesktopApp>> SAVED_APPS =
             new java.util.LinkedHashMap<>(16, 0.75f, true) {
                 @Override
                 protected boolean removeEldestEntry(
-                        final java.util.Map.Entry<BlockPos, java.util.Map<String, DesktopApp>> eldest) {
+                        final java.util.Map.Entry<BlockPos, java.util.Map<String, IDesktopApp>> eldest) {
                     return size() > MAX_SAVED_DESKTOPS;
                 }
             };
@@ -118,7 +118,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     public static boolean hostNetworked(final net.minecraft.core.BlockPos pos) {
         final net.minecraft.world.level.Level level = Minecraft.getInstance().level;
         return level != null
-                && level.getBlockEntity(pos) instanceof dev.jstech.computronics.os.OsHost computer
+                && level.getBlockEntity(pos) instanceof dev.jstech.computronics.os.IOsHost computer
                 && computer.networkAttached();
     }
 
@@ -492,10 +492,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * happens when one is opened in the file explorer.
      */
     private record Launcher(String label, net.minecraft.resources.ResourceLocation programId,
-                            java.util.function.Supplier<DesktopApp> factory, String runs) {
+                            java.util.function.Supplier<IDesktopApp> factory, String runs) {
 
         Launcher(final String label, final net.minecraft.resources.ResourceLocation programId,
-                 final java.util.function.Supplier<DesktopApp> factory) {
+                 final java.util.function.Supplier<IDesktopApp> factory) {
             this(label, programId, factory, "");
         }
     }
@@ -552,7 +552,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     /** The megabytes a window opened under {@code key} holds: its program's weight under the running system. */
     private int windowRamMb(final String key) {
         final dev.jstech.computronics.os.OsDef os = dev.jstech.computronics.os.OsRegistry.getOs(osId);
-        return os == null ? 0 : dev.jstech.computronics.os.OsHost.windowRamMb(key, os, chrome);
+        return os == null ? 0 : dev.jstech.computronics.os.IOsHost.windowRamMb(key, os, chrome);
     }
 
     /** What the open windows hold together. */
@@ -720,7 +720,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     /** Whether {@code app} runs in the front (focused) window; what a recipe viewer's drop or transfer targets. */
-    public boolean isFront(final DesktopApp app) {
+    public boolean isFront(final IDesktopApp app) {
         final DesktopWindow front = frontWindow();
         return front != null && front.app() == app;
     }
@@ -789,7 +789,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private HardwareEra era() {
         final Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(host)
-                instanceof dev.jstech.computronics.os.OsHost be) {
+                instanceof dev.jstech.computronics.os.IOsHost be) {
             final HardwareEra era = be.displayEra();
             if (era != null) {
                 return era;
@@ -869,9 +869,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!screen.windows.isEmpty()) {
             return; // the player already opened something before the layout arrived; keep theirs
         }
-        final java.util.Map<String, DesktopApp> savedApps = SAVED_APPS.get(screen.host);
+        final java.util.Map<String, IDesktopApp> savedApps = SAVED_APPS.get(screen.host);
         for (final dev.jstech.computronics.os.OpenWindow ow : payload.toOpenWindows()) {
-            DesktopApp app = savedApps != null ? savedApps.get(ow.key()) : null;
+            IDesktopApp app = savedApps != null ? savedApps.get(ow.key()) : null;
             final boolean restored = app != null;
             if (app == null) {
                 app = screen.factoryFor(ow.key());
@@ -982,7 +982,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             } else if (!installedPrograms.contains(spec.id().getPath())) {
                 continue; // installed apps: the server already gated them into installedPrograms
             }
-            final ProgramClient.DesktopAppFactory factory = ProgramClient.factory(spec.id());
+            final ProgramClient.IDesktopAppFactory factory = ProgramClient.factory(spec.id());
             // Apps receive the desktop id (their skin/icon key); the Frames editions' id equals their OS id.
             launchers.add(new Launcher(launcherLabel(spec), spec.id(),
                     () -> factory.create(host, monitorPos, desktopId)));
@@ -1137,14 +1137,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     // The Files window asked for a program to be run. It gets this desktop's terminal,
                     // whatever this desktop calls it, and the command goes in as if it had been typed.
                     final String terminal = terminalLabel();
-                    final DesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
+                    final IDesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
                     if (shell != null && allowOpen(terminal)) {
                         openApp(terminal, shell);
                     }
                     ShellApp.runWhenReady(key.substring(RUN_AT_TERMINAL.length()));
                     continue;
                 }
-                final DesktopApp app = factoryFor(key);
+                final IDesktopApp app = factoryFor(key);
                 if (app != null && allowOpen(key)) {
                     openApp(key, app);
                 }
@@ -2393,7 +2393,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private boolean networkAttached() {
         final net.minecraft.world.level.Level level = Minecraft.getInstance().level;
         return level != null
-                && level.getBlockEntity(host) instanceof dev.jstech.computronics.os.OsHost computer
+                && level.getBlockEntity(host) instanceof dev.jstech.computronics.os.IOsHost computer
                 && computer.networkAttached();
     }
 
@@ -3810,7 +3810,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 bringToFront(i);
                 // A click landing on an active inventory slot (only the front inventory-band window has them) is
                 // a real container click: let the vanilla container drive the cursor, drag, and shift-click.
-                if (w.app() instanceof InventoryBandApp && !(w.app() instanceof NetworkInteractorApp)
+                if (w.app() instanceof IInventoryBandApp && !(w.app() instanceof NetworkInteractorApp)
                         && !w.app().modalActive() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
                     return super.mouseClicked(mouseXAbs, mouseYAbs, button);
                 }
@@ -3956,7 +3956,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // No window drag/resize in progress. While the front Network Interactor holds a stack on the cursor,
         // a drag is the vanilla "spread across slots" gesture — hand it to the container, not the app.
         final DesktopWindow w = frontWindow();
-        if (w != null && w.app() instanceof InventoryBandApp && !menu.getCarried().isEmpty()) {
+        if (w != null && w.app() instanceof IInventoryBandApp && !menu.getCarried().isEmpty()) {
             return super.mouseDragged(mouseXAbs, mouseYAbs, button, dx, dy);
         }
         if (w != null) {
@@ -4198,7 +4198,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     @org.jetbrains.annotations.Nullable
     private DesktopWindow frontNetworkInteractorWindow() {
         final DesktopWindow w = frontWindow();
-        return w != null && w.app() instanceof InventoryBandApp ? w : null;
+        return w != null && w.app() instanceof IInventoryBandApp ? w : null;
     }
 
     /**
@@ -4226,7 +4226,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private void syncInventorySlots() {
         final DesktopWindow w = frontNetworkInteractorWindow();
-        if (w == null || !(w.app() instanceof InventoryBandApp app)) {
+        if (w == null || !(w.app() instanceof IInventoryBandApp app)) {
             menu.setSlotsActive(false);
             return;
         }
@@ -4317,7 +4317,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
     }
 
-    private void openApp(final String key, final DesktopApp app) {
+    private void openApp(final String key, final IDesktopApp app) {
         // Open at the default size, clamped to the screen — but never below the app's minimum while the
         // screen still has room for it, so the content opens laid out (not collapsed) on a small monitor.
         final int top = workTop();
@@ -4333,7 +4333,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Recreates a program from its launcher key, for restoring persisted windows. */
     @org.jetbrains.annotations.Nullable
-    private DesktopApp factoryFor(final String key) {
+    private IDesktopApp factoryFor(final String key) {
         for (final Launcher l : launchers) {
             if (l.label().equals(key) && l.factory() != null) {
                 return l.factory().get();
@@ -4342,7 +4342,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         // A program the desktop shows no launcher for (the Task Manager) still opens, and still comes back
         // with the session, so it is looked up by the same label the panel calls it.
         final dev.jstech.computronics.os.ProgramSpec spec = chrome == null ? null : chrome.programFor(key);
-        final ProgramClient.DesktopAppFactory factory = spec == null ? null : ProgramClient.factory(spec.id());
+        final ProgramClient.IDesktopAppFactory factory = spec == null ? null : ProgramClient.factory(spec.id());
         return factory == null ? null : factory.create(host, monitorPos, desktopId);
     }
 
@@ -4364,7 +4364,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 return;
             }
         }
-        final DesktopApp app = factoryFor(key);
+        final IDesktopApp app = factoryFor(key);
         if (app != null && allowOpen(key)) {
             app.applySkin(skin);
             openApp(key, app);
@@ -4455,7 +4455,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // The programs' insides stay in this client as a convenience, keyed by the same launcher keys the
         // machine's layout uses, so a restored window picks its session back up when it is still here.
-        final java.util.Map<String, DesktopApp> apps = new java.util.LinkedHashMap<>();
+        final java.util.Map<String, IDesktopApp> apps = new java.util.LinkedHashMap<>();
         for (final DesktopWindow w : windows) {
             apps.put(w.appKey(), w.app());
         }

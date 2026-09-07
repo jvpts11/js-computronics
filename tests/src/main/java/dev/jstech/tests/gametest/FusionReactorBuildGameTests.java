@@ -11,7 +11,7 @@ import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.crafting.CraftingPattern;
 import dev.jstech.computronics.crafting.NetworkRecipe;
 import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
@@ -118,7 +118,7 @@ public final class FusionReactorBuildGameTests {
      * controller's and ports' surplus frames feed the next part, and the 51 frames of the shell itself are one
      * request of their own, so 17 frame crafts (68 frames) cover the 66 used and two frames are left over.
      */
-    private static void seedRawStock(final TestWorldBuilderSeed seed) {
+    private static void seedRawStock(final ITestWorldBuilderSeed seed) {
         seed.put(Items.COPPER_INGOT, 96);           // 76 atomic + 8 (elite) + 8 (advanced) + 4 (tank) infused alloys
         seed.put(Items.REDSTONE, 112);              // 96 infusions + 4 basic circuits x2 + 2 adapters x4
         seed.put(mek("dust_diamond"), 168);         // 84 reinforced x2
@@ -133,7 +133,7 @@ public final class FusionReactorBuildGameTests {
         seed.put(Items.GLASS_PANE, 1);
     }
 
-    private interface TestWorldBuilderSeed {
+    private interface ITestWorldBuilderSeed {
         void put(Item item, int count);
     }
 
@@ -216,7 +216,7 @@ public final class FusionReactorBuildGameTests {
         final int[] next = {0};
         final int[] planAttempts = {0};
         final String[] failure = new String[1];
-        final NetworkOperation[] current = new NetworkOperation[1];
+        final INetworkOperation[] current = new INetworkOperation[1];
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     MekanismRig.mountBuses(helper);

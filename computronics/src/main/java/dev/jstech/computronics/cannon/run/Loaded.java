@@ -13,7 +13,7 @@ import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmType;
 import dev.jstech.computronics.cannon.asm.Instruction;
 import dev.jstech.computronics.cannon.asm.Opcode;
-import dev.jstech.computronics.cannon.asm.Operand;
+import dev.jstech.computronics.cannon.asm.IOperand;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -225,7 +225,7 @@ public final class Loaded {
 
     /** Where a branch goes, or the end of the method when nothing carries that label. */
     public static int target(final Method method, final Instruction instruction) {
-        if (instruction.operand() instanceof Operand.Label label) {
+        if (instruction.operand() instanceof IOperand.Label label) {
             final Integer at = method.labels().get(label.name());
             if (at != null) {
                 return at;

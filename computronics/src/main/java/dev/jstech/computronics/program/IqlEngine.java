@@ -8,8 +8,8 @@
 package dev.jstech.computronics.program;
 
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.program.cli.CliComputer;
-import dev.jstech.computronics.program.iql.IqlCondition;
+import dev.jstech.computronics.program.cli.ICliComputer;
+import dev.jstech.computronics.program.iql.IIqlCondition;
 import dev.jstech.computronics.program.iql.IqlDefinition;
 import dev.jstech.computronics.program.iql.IqlDefinitionParser;
 import dev.jstech.computronics.program.iql.IqlOperation;
@@ -23,7 +23,7 @@ import java.util.Locale;
 
 /**
  * The IQL Engine's runtime: it takes a statement and either runs it as an immediate action/query (via the
- * {@link CliComputer}) or, for a Layer-2 statement, stores/runs a saved object against the Mainframe's
+ * {@link ICliComputer}) or, for a Layer-2 statement, stores/runs a saved object against the Mainframe's
  * catalog. CREATE/DROP touch the catalog; EXEC runs a procedure's statements in order, stopping at the
  * first error (the chosen default); a QUERY whose object is a view name runs the saved query. Touching the
  * catalog requires the Engine to be installed and running on the Mainframe; ad-hoc actions do not.
@@ -33,17 +33,17 @@ public final class IqlEngine {
     private static final int RECURSION_GUARD = 32;
 
     private final MainframeBlockEntity mainframe;
-    private final CliComputer computer;
+    private final ICliComputer computer;
     private final int queryRowLimit;
 
-    public IqlEngine(final MainframeBlockEntity mainframe, final CliComputer computer, final int queryRowLimit) {
+    public IqlEngine(final MainframeBlockEntity mainframe, final ICliComputer computer, final int queryRowLimit) {
         this.mainframe = mainframe;
         this.computer = computer;
         this.queryRowLimit = queryRowLimit;
     }
 
     /** The result of running a statement: a status, a message, and (for a read) the result rows. */
-    public record Outcome(boolean ok, String message, List<CliComputer.StoredItem> rows) {
+    public record Outcome(boolean ok, String message, List<ICliComputer.StoredItem> rows) {
 
         static Outcome ok(final String message) {
             return new Outcome(true, message, List.of());
@@ -53,7 +53,7 @@ public final class IqlEngine {
             return new Outcome(false, message, List.of());
         }
 
-        static Outcome rows(final List<CliComputer.StoredItem> rows) {
+        static Outcome rows(final List<ICliComputer.StoredItem> rows) {
             return new Outcome(true, rows.size() + (rows.size() == 1 ? " row" : " rows"), rows);
         }
     }
@@ -130,7 +130,7 @@ public final class IqlEngine {
             // Pass the whole WHERE so the read filters on every field (qty/name/damaged/...), not just name.
             return Outcome.rows(computer.queryObject(operation.item(), operation.where(), "", limit));
         }
-        final CliComputer.OpResult result = computer.execute(operation);
+        final ICliComputer.OpResult result = computer.execute(operation);
         return new Outcome(result.ok(), result.message(), List.of());
     }
 

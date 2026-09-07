@@ -33,7 +33,7 @@ import java.util.List;
  * (Keep Stock / Batch Craft / Periodic Move / IQL script) that the server compiles into jobs; no IQL is
  * typed here. Requires the Automation Engine (or the IQL Engine) on the Mainframe for jobs to actually run.
  */
-public final class AutomationManagerApp implements DesktopApp {
+public final class AutomationManagerApp implements IDesktopApp {
 
     private static final int REFRESH_FRAMES = 40;
     private static final int C_GOOD = 0xFF2EA043;

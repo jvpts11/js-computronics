@@ -42,13 +42,13 @@ public final class CannonCommands {
     }
 
     /** Every verb, for the shell to register. */
-    public static List<CliCommand> all() {
+    public static List<ICliCommand> all() {
         return List.of(new Compile(), new Run(), new Pack());
     }
 
     /** Whether that package is installed on the computer. */
-    public static boolean installed(final CliComputer computer, final String id) {
-        for (final CliComputer.ProgramInfo program : computer.programs()) {
+    public static boolean installed(final ICliComputer computer, final String id) {
+        for (final ICliComputer.ProgramInfo program : computer.programs()) {
             if (id.equalsIgnoreCase(program.id())) {
                 return true;
             }
@@ -57,7 +57,7 @@ public final class CannonCommands {
     }
 
     /** Compiles one or more source files into one assembly listing. */
-    static final class Compile implements CliCommand {
+    static final class Compile implements ICliCommand {
 
         @Override
         public String name() {
@@ -75,7 +75,7 @@ public final class CannonCommands {
         }
 
         @Override
-        public boolean available(final CliComputer computer) {
+        public boolean available(final ICliComputer computer) {
             return installed(computer, COMPILER);
         }
 
@@ -99,7 +99,7 @@ public final class CannonCommands {
 
             final List<SourceFile> sources = new ArrayList<>();
             for (final String path : paths) {
-                final CliComputer.FsResult read = ctx.computer().readFile(path);
+                final ICliComputer.FsResult read = ctx.computer().readFile(path);
                 if (!read.ok()) {
                     ctx.out().error("cannonc: " + read.message());
                     return;
@@ -122,7 +122,7 @@ public final class CannonCommands {
                 return;
             }
             final String target = out != null ? out : compiled(paths.getFirst());
-            final CliComputer.FsResult written = ctx.computer().writeFile(target, built.assembly());
+            final ICliComputer.FsResult written = ctx.computer().writeFile(target, built.assembly());
             if (!written.ok()) {
                 ctx.out().error("cannonc: " + written.message());
                 return;
@@ -145,7 +145,7 @@ public final class CannonCommands {
     }
 
     /** Starts, stops and lists the Cannon programs running on this computer. */
-    static final class Run implements CliCommand {
+    static final class Run implements ICliCommand {
 
         @Override
         public String name() {
@@ -163,7 +163,7 @@ public final class CannonCommands {
         }
 
         @Override
-        public boolean available(final CliComputer computer) {
+        public boolean available(final ICliComputer computer) {
             return installed(computer, RUNTIME);
         }
 
@@ -189,7 +189,7 @@ public final class CannonCommands {
                     heapMb = megabytes(ctx.args().get(i + 1));
                 }
             }
-            final CliComputer.OpResult started = ctx.computer().startCannon(path, heapMb);
+            final ICliComputer.OpResult started = ctx.computer().startCannon(path, heapMb);
             if (started.ok()) {
                 ctx.out().ok(started.message());
             } else {
@@ -203,7 +203,7 @@ public final class CannonCommands {
                 ctx.out().error("usage: cannon stop <id>   (as listed by 'cannon ps')");
                 return;
             }
-            final CliComputer.OpResult stopped = ctx.computer().stopCannon(id);
+            final ICliComputer.OpResult stopped = ctx.computer().stopCannon(id);
             if (stopped.ok()) {
                 ctx.out().ok(stopped.message());
             } else {
@@ -212,13 +212,13 @@ public final class CannonCommands {
         }
 
         private void list(final CliContext ctx) {
-            final List<CliComputer.CannonProcess> running = ctx.computer().cannonProcesses();
+            final List<ICliComputer.CannonProcess> running = ctx.computer().cannonProcesses();
             if (running.isEmpty()) {
                 ctx.out().dim("no Cannon programs are running");
                 return;
             }
             ctx.out().info("  id  name                 state      memory");
-            for (final CliComputer.CannonProcess process : running) {
+            for (final ICliComputer.CannonProcess process : running) {
                 ctx.out().line(String.format(Locale.ROOT, "  %-3d %-20s %-10s %s of %s",
                         process.id(), cut(process.name(), 20), cut(process.state(), 10),
                         kilobytes(process.heldBytes()), kilobytes(process.heapBytes())));
@@ -255,7 +255,7 @@ public final class CannonCommands {
      * Somebody about to install a stranger's program can open it and read the whole thing first, which
      * is not a thing you can say of most places software comes from.
      */
-    static final class Pack implements CliCommand {
+    static final class Pack implements ICliCommand {
 
         @Override
         public String name() {
@@ -273,7 +273,7 @@ public final class CannonCommands {
         }
 
         @Override
-        public boolean available(final CliComputer computer) {
+        public boolean available(final ICliComputer computer) {
             return installed(computer, RUNTIME);
         }
 
@@ -296,7 +296,7 @@ public final class CannonCommands {
 
         /** Writes a manifest for a project that has none, filled in as far as it can be guessed. */
         private void init(final CliContext ctx) {
-            final CliComputer computer = ctx.computer();
+            final ICliComputer computer = ctx.computer();
             if (computer.readFile(Manifest.FILE).ok()) {
                 ctx.out().error(Manifest.FILE + " is already here; edit it, or delete it to start over");
                 return;
@@ -309,7 +309,7 @@ public final class CannonCommands {
                 ctx.out().error("canpack: " + wrong.getFirst());
                 return;
             }
-            final CliComputer.FsResult written = computer.writeFile(Manifest.FILE, made.write());
+            final ICliComputer.FsResult written = computer.writeFile(Manifest.FILE, made.write());
             if (!written.ok()) {
                 ctx.out().error(written.message());
                 return;
@@ -320,8 +320,8 @@ public final class CannonCommands {
 
         /** Reads the manifest, gathers what it names, and writes the package out beside it. */
         private void build(final CliContext ctx) {
-            final CliComputer computer = ctx.computer();
-            final CliComputer.FsResult read = computer.readFile(Manifest.FILE);
+            final ICliComputer computer = ctx.computer();
+            final ICliComputer.FsResult read = computer.readFile(Manifest.FILE);
             if (!read.ok()) {
                 ctx.out().error("no " + Manifest.FILE + " here; run 'canpack init' first");
                 return;
@@ -329,7 +329,7 @@ public final class CannonCommands {
             final Manifest manifest = Manifest.read(read.message());
             final Map<String, String> files = new LinkedHashMap<>();
             for (final String named : manifest.files()) {
-                final CliComputer.FsResult file = computer.readFile(named);
+                final ICliComputer.FsResult file = computer.readFile(named);
                 if (!file.ok()) {
                     ctx.out().error("canpack: " + named + " is named in the manifest but not here");
                     return;
@@ -344,7 +344,7 @@ public final class CannonCommands {
                 }
                 return;
             }
-            final CliComputer.FsResult written =
+            final ICliComputer.FsResult written =
                     computer.writeFile(packed.fileName(), packed.write());
             if (!written.ok()) {
                 ctx.out().error(written.message());
@@ -363,7 +363,7 @@ public final class CannonCommands {
         private void publish(final CliContext ctx) {
             String file = ctx.argCount() > 1 ? ctx.arg(1) : "";
             if (file.isEmpty()) {
-                final CliComputer.FsResult read = ctx.computer().readFile(Manifest.FILE);
+                final ICliComputer.FsResult read = ctx.computer().readFile(Manifest.FILE);
                 if (!read.ok()) {
                     ctx.out().error("name the package to publish, or run this beside a " + Manifest.FILE);
                     return;
@@ -382,7 +382,7 @@ public final class CannonCommands {
             report(ctx, ctx.computer().unpublishPackage(ctx.arg(1)));
         }
 
-        private static void report(final CliContext ctx, final CliComputer.OpResult result) {
+        private static void report(final CliContext ctx, final ICliComputer.OpResult result) {
             if (result.ok()) {
                 ctx.out().ok(result.message());
             } else {

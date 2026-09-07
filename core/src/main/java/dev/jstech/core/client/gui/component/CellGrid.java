@@ -27,13 +27,13 @@ public final class CellGrid extends UiComponent {
 
     /** Draws the content of one cell in its rectangle. */
     @FunctionalInterface
-    public interface CellRenderer {
+    public interface ICellRenderer {
         void render(GuiGraphics g, UiContext ctx, int index, int x, int y, int w, int h, boolean hovered);
     }
 
     /** A click on a cell. */
     @FunctionalInterface
-    public interface CellClick {
+    public interface ICellClick {
         void click(int index, int button, boolean shift);
     }
 
@@ -49,8 +49,8 @@ public final class CellGrid extends UiComponent {
     private int inset;
     private int cellCount = Integer.MAX_VALUE;
     private boolean wells = true;
-    private CellRenderer renderer = (g, ctx, index, x, y, w, h, hovered) -> { };
-    private CellClick onClick = (index, button, shift) -> { };
+    private ICellRenderer renderer = (g, ctx, index, x, y, w, h, hovered) -> { };
+    private ICellClick onClick = (index, button, shift) -> { };
     private IntPredicate marked = index -> false;
     private IntPredicate selected = index -> false;
     private IntFunction<List<Component>> tooltips = index -> List.of();
@@ -121,12 +121,12 @@ public final class CellGrid extends UiComponent {
         return Math.max(0, totalRows - visibleRows);
     }
 
-    public CellGrid setRenderer(final CellRenderer value) {
+    public CellGrid setRenderer(final ICellRenderer value) {
         renderer = value;
         return this;
     }
 
-    public CellGrid setOnClick(final CellClick action) {
+    public CellGrid setOnClick(final ICellClick action) {
         onClick = action;
         return this;
     }

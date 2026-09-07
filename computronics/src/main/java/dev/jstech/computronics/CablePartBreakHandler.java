@@ -9,7 +9,7 @@ package dev.jstech.computronics;
 
 import dev.jstech.computronics.JsComputronics;
 import dev.jstech.computronics.block.DataCableBlock;
-import dev.jstech.computronics.block.part.CablePart;
+import dev.jstech.computronics.block.part.ICablePart;
 import dev.jstech.computronics.blockentity.DataCableBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -50,7 +50,7 @@ public final class CablePartBreakHandler {
             return; // aiming at the cable itself: let it break (its parts drop with it)
         }
         event.setCanceled(true);
-        final CablePart removed = cable.removePart(face);
+        final ICablePart removed = cable.removePart(face);
         if (removed == null) {
             return;
         }

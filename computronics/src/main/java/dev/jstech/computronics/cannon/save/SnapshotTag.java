@@ -78,14 +78,14 @@ public final class SnapshotTag {
         final CompoundTag tag = new CompoundTag();
         tag.putLong(BUDGET, shot.heapBudget());
         final ListTag held = new ListTag();
-        for (final Snapshot.Held one : shot.held()) {
+        for (final Snapshot.IHeld one : shot.held()) {
             held.add(write(one));
         }
         tag.put(HELD, held);
         tag.put(FRAMES, frames(shot.frames()));
         tag.put(WAITING, frames(shot.waiting()));
         final ListTag statics = new ListTag();
-        for (final Map.Entry<String, Map<String, Snapshot.Value>> entry : shot.statics().entrySet()) {
+        for (final Map.Entry<String, Map<String, Snapshot.IValue>> entry : shot.statics().entrySet()) {
             final CompoundTag owner = new CompoundTag();
             owner.putString(OWNER, entry.getKey());
             owner.put(FIELDS, fields(entry.getValue()));
@@ -122,12 +122,12 @@ public final class SnapshotTag {
 
     /** Reads one back. */
     public static Snapshot read(final CompoundTag tag) {
-        final List<Snapshot.Held> held = new ArrayList<>();
+        final List<Snapshot.IHeld> held = new ArrayList<>();
         final ListTag written = tag.getList(HELD, Tag.TAG_COMPOUND);
         for (int i = 0; i < written.size(); i++) {
             held.add(readHeld(written.getCompound(i)));
         }
-        final Map<String, Map<String, Snapshot.Value>> statics = new LinkedHashMap<>();
+        final Map<String, Map<String, Snapshot.IValue>> statics = new LinkedHashMap<>();
         final ListTag owners = tag.getList(STATICS, Tag.TAG_COMPOUND);
         for (int i = 0; i < owners.size(); i++) {
             final CompoundTag owner = owners.getCompound(i);
@@ -155,37 +155,37 @@ public final class SnapshotTag {
 
     // ---------------------------------------------------------------- what the program allocated
 
-    private static CompoundTag write(final Snapshot.Held one) {
+    private static CompoundTag write(final Snapshot.IHeld one) {
         final CompoundTag tag = new CompoundTag();
         tag.putInt(ID, one.id());
         tag.putLong(BYTES, one.bytes());
         tag.putInt(LINE, one.line());
         tag.putBoolean(FREED, one.freed());
         switch (one) {
-            case Snapshot.Held.Text text -> {
+            case Snapshot.IHeld.Text text -> {
                 tag.putString(KIND, "text");
                 tag.putString(VALUE, text.value());
             }
-            case Snapshot.Held.Object object -> {
+            case Snapshot.IHeld.Object object -> {
                 tag.putString(KIND, "object");
                 tag.putString(TYPE, object.type());
                 tag.put(FIELDS, fields(object.fields()));
             }
-            case Snapshot.Held.Array array -> {
+            case Snapshot.IHeld.Array array -> {
                 tag.putString(KIND, "array");
                 tag.putString(TYPE, array.element());
                 tag.put(VALUES, values(array.values()));
             }
-            case Snapshot.Held.Listing list -> {
+            case Snapshot.IHeld.Listing list -> {
                 tag.putString(KIND, "list");
                 tag.put(ITEMS, values(list.items()));
             }
-            case Snapshot.Held.Keyed keyed -> {
+            case Snapshot.IHeld.Keyed keyed -> {
                 tag.putString(KIND, "map");
                 tag.put(KEYS, values(keyed.keys()));
                 tag.put(VALUES, values(keyed.values()));
             }
-            case Snapshot.Held.Handler handler -> {
+            case Snapshot.IHeld.Handler handler -> {
                 tag.putString(KIND, "handler");
                 tag.putString(TYPE, handler.type());
                 final ListTag chain = new ListTag();
@@ -204,20 +204,20 @@ public final class SnapshotTag {
         return tag;
     }
 
-    private static Snapshot.Held readHeld(final CompoundTag tag) {
+    private static Snapshot.IHeld readHeld(final CompoundTag tag) {
         final int id = tag.getInt(ID);
         final long bytes = tag.getLong(BYTES);
         final int line = tag.getInt(LINE);
         final boolean freed = tag.getBoolean(FREED);
         return switch (tag.getString(KIND)) {
-            case "text" -> new Snapshot.Held.Text(id, bytes, line, freed, tag.getString(VALUE));
-            case "object" -> new Snapshot.Held.Object(id, bytes, line, freed, tag.getString(TYPE),
+            case "text" -> new Snapshot.IHeld.Text(id, bytes, line, freed, tag.getString(VALUE));
+            case "object" -> new Snapshot.IHeld.Object(id, bytes, line, freed, tag.getString(TYPE),
                     readFields(tag.getList(FIELDS, Tag.TAG_COMPOUND)));
-            case "array" -> new Snapshot.Held.Array(id, bytes, line, freed, tag.getString(TYPE),
+            case "array" -> new Snapshot.IHeld.Array(id, bytes, line, freed, tag.getString(TYPE),
                     readValues(tag.getList(VALUES, Tag.TAG_COMPOUND)));
-            case "list" -> new Snapshot.Held.Listing(id, bytes, line, freed,
+            case "list" -> new Snapshot.IHeld.Listing(id, bytes, line, freed,
                     readValues(tag.getList(ITEMS, Tag.TAG_COMPOUND)));
-            case "map" -> new Snapshot.Held.Keyed(id, bytes, line, freed,
+            case "map" -> new Snapshot.IHeld.Keyed(id, bytes, line, freed,
                     readValues(tag.getList(KEYS, Tag.TAG_COMPOUND)),
                     readValues(tag.getList(VALUES, Tag.TAG_COMPOUND)));
             default -> {
@@ -230,7 +230,7 @@ public final class SnapshotTag {
                             readNames(bound.getList(PARAMETERS, Tag.TAG_STRING)),
                             bound.getString(RETURNS)));
                 }
-                yield new Snapshot.Held.Handler(id, bytes, line, freed, tag.getString(TYPE), chain);
+                yield new Snapshot.IHeld.Handler(id, bytes, line, freed, tag.getString(TYPE), chain);
             }
         };
     }
@@ -268,35 +268,35 @@ public final class SnapshotTag {
 
     // ---------------------------------------------------------------- single values
 
-    private static CompoundTag write(final Snapshot.Value value) {
+    private static CompoundTag write(final Snapshot.IValue value) {
         final CompoundTag tag = new CompoundTag();
         switch (value) {
-            case Snapshot.Value.Nothing ignored -> tag.putString(KIND, "none");
-            case Snapshot.Value.I4 number -> {
+            case Snapshot.IValue.Nothing ignored -> tag.putString(KIND, "none");
+            case Snapshot.IValue.I4 number -> {
                 tag.putString(KIND, "i4");
                 tag.putInt(VALUE, number.value());
             }
-            case Snapshot.Value.I8 number -> {
+            case Snapshot.IValue.I8 number -> {
                 tag.putString(KIND, "i8");
                 tag.putLong(VALUE, number.value());
             }
-            case Snapshot.Value.R4 number -> {
+            case Snapshot.IValue.R4 number -> {
                 tag.putString(KIND, "r4");
                 tag.putFloat(VALUE, number.value());
             }
-            case Snapshot.Value.R8 number -> {
+            case Snapshot.IValue.R8 number -> {
                 tag.putString(KIND, "r8");
                 tag.putDouble(VALUE, number.value());
             }
-            case Snapshot.Value.Bool flag -> {
+            case Snapshot.IValue.Bool flag -> {
                 tag.putString(KIND, "bool");
                 tag.putBoolean(VALUE, flag.value());
             }
-            case Snapshot.Value.Ch letter -> {
+            case Snapshot.IValue.Ch letter -> {
                 tag.putString(KIND, "char");
                 tag.putInt(VALUE, letter.value());
             }
-            case Snapshot.Value.Ref reference -> {
+            case Snapshot.IValue.Ref reference -> {
                 tag.putString(KIND, "ref");
                 tag.putInt(VALUE, reference.id());
             }
@@ -304,38 +304,38 @@ public final class SnapshotTag {
         return tag;
     }
 
-    private static Snapshot.Value readValue(final CompoundTag tag) {
+    private static Snapshot.IValue readValue(final CompoundTag tag) {
         return switch (tag.getString(KIND)) {
-            case "i4" -> new Snapshot.Value.I4(tag.getInt(VALUE));
-            case "i8" -> new Snapshot.Value.I8(tag.getLong(VALUE));
-            case "r4" -> new Snapshot.Value.R4(tag.getFloat(VALUE));
-            case "r8" -> new Snapshot.Value.R8(tag.getDouble(VALUE));
-            case "bool" -> new Snapshot.Value.Bool(tag.getBoolean(VALUE));
-            case "char" -> new Snapshot.Value.Ch((char) tag.getInt(VALUE));
-            case "ref" -> new Snapshot.Value.Ref(tag.getInt(VALUE));
-            default -> new Snapshot.Value.Nothing();
+            case "i4" -> new Snapshot.IValue.I4(tag.getInt(VALUE));
+            case "i8" -> new Snapshot.IValue.I8(tag.getLong(VALUE));
+            case "r4" -> new Snapshot.IValue.R4(tag.getFloat(VALUE));
+            case "r8" -> new Snapshot.IValue.R8(tag.getDouble(VALUE));
+            case "bool" -> new Snapshot.IValue.Bool(tag.getBoolean(VALUE));
+            case "char" -> new Snapshot.IValue.Ch((char) tag.getInt(VALUE));
+            case "ref" -> new Snapshot.IValue.Ref(tag.getInt(VALUE));
+            default -> new Snapshot.IValue.Nothing();
         };
     }
 
-    private static ListTag values(final List<Snapshot.Value> values) {
+    private static ListTag values(final List<Snapshot.IValue> values) {
         final ListTag written = new ListTag();
-        for (final Snapshot.Value value : values) {
+        for (final Snapshot.IValue value : values) {
             written.add(write(value));
         }
         return written;
     }
 
-    private static List<Snapshot.Value> readValues(final ListTag written) {
-        final List<Snapshot.Value> values = new ArrayList<>();
+    private static List<Snapshot.IValue> readValues(final ListTag written) {
+        final List<Snapshot.IValue> values = new ArrayList<>();
         for (int i = 0; i < written.size(); i++) {
             values.add(readValue(written.getCompound(i)));
         }
         return values;
     }
 
-    private static ListTag fields(final Map<String, Snapshot.Value> fields) {
+    private static ListTag fields(final Map<String, Snapshot.IValue> fields) {
         final ListTag written = new ListTag();
-        for (final Map.Entry<String, Snapshot.Value> field : fields.entrySet()) {
+        for (final Map.Entry<String, Snapshot.IValue> field : fields.entrySet()) {
             final CompoundTag tag = write(field.getValue());
             tag.putString(NAME, field.getKey());
             written.add(tag);
@@ -343,8 +343,8 @@ public final class SnapshotTag {
         return written;
     }
 
-    private static Map<String, Snapshot.Value> readFields(final ListTag written) {
-        final Map<String, Snapshot.Value> fields = new LinkedHashMap<>();
+    private static Map<String, Snapshot.IValue> readFields(final ListTag written) {
+        final Map<String, Snapshot.IValue> fields = new LinkedHashMap<>();
         for (int i = 0; i < written.size(); i++) {
             final CompoundTag tag = written.getCompound(i);
             fields.put(tag.getString(NAME), readValue(tag));

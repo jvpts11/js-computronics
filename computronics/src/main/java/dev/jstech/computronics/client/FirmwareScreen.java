@@ -311,7 +311,7 @@ public class FirmwareScreen extends Screen {
     private HardwareEra era() {
         final Minecraft mc = Minecraft.getInstance();
         if (mc.level != null && mc.level.getBlockEntity(computerPos)
-                instanceof dev.jstech.computronics.os.OsHost host) {
+                instanceof dev.jstech.computronics.os.IOsHost host) {
             return host.displayEra();
         }
         return switch (kind) {

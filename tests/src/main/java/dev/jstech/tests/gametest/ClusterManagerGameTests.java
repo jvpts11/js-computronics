@@ -26,7 +26,7 @@ import dev.jstech.computronics.item.ServerHardwareHandler;
 import dev.jstech.computronics.item.ServerItem;
 import dev.jstech.computronics.operation.payload.ClusterManagerStatePayload;
 import dev.jstech.computronics.operation.payload.ComputingPayloads;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.media.MediaItem;
 import dev.jstech.computronics.os.media.MediaKind;
 import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
@@ -581,7 +581,7 @@ public final class ClusterManagerGameTests {
                 })
                 .thenWaitUntil(() -> helper.assertTrue(manager.job() == null, "the job finishes"))
                 .thenExecute(() -> {
-                    final OsHost first = rack.unitHost(0);
+                    final IOsHost first = rack.unitHost(0);
                     helper.assertTrue(first.console() != null && first.console().isInstalled(MINESWEEPER.toString()),
                             "the node with a system has the program");
                     helper.assertTrue(rack.unitHost(2).installedOsId() == null, "the bare node is untouched");

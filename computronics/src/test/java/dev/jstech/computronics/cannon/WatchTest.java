@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import java.util.List;
@@ -48,7 +48,7 @@ class WatchTest {
         assertFalse(bag.hasErrors(), () -> String.join("\n",
                 bag.sorted().stream().map(Diagnostic::format).toList()));
         final Loaded program = Loaded.of(written);
-        final Process process = new Process(program, ROOM, Host.still());
+        final Process process = new Process(program, ROOM, IHost.still());
         process.begin(process.create(program.entryPoint()), "OnInit");
         process.step(PLENTY);
         assertEquals(Process.State.FINISHED, process.state(),
@@ -138,7 +138,7 @@ class WatchTest {
         hold(before, 100);
         hold(before, 40);
         assertEquals(List.of("iron 100 -> 40"), before.console());
-        final Process after = Process.restore(before.program(), before.save(), Host.still());
+        final Process after = Process.restore(before.program(), before.save(), IHost.still());
         hold(after, 30);
         hold(after, 20);
         // It knew it was already below when the world came back, so it does not say so a second time.

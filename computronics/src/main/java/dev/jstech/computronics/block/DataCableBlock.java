@@ -12,7 +12,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.block.part.AbstractBusPart;
-import dev.jstech.computronics.block.part.CablePart;
+import dev.jstech.computronics.block.part.ICablePart;
 import dev.jstech.computronics.blockentity.DataCableBlockEntity;
 import dev.jstech.core.network.DataTier;
 import dev.jstech.core.network.NetworkSystem;
@@ -117,7 +117,7 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         }
         // The cable only shows a connection where the device actually accepts a cable on that face
         // (a computer accepts one on its rear only), so the rendered nub never lies about connectivity.
-        return neighbor instanceof dev.jstech.core.network.DataNetworkConnectable device
+        return neighbor instanceof dev.jstech.core.network.IDataNetworkConnectable device
                 && device.acceptedCableTiers().contains(this.tier)
                 && device.connectsOnFace(neighborState, direction.getOpposite(), this.tier);
     }
@@ -156,7 +156,7 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
         // A plain click opens the part's configuration menu (import / export buses); picking a part off
         // the cable is done with a left-click, handled separately so it never breaks the cable. Each bus
         // builds its own menu, and the open packet carries the bus name so the field shows it client-side.
-        final CablePart part = cable.getPart(face);
+        final ICablePart part = cable.getPart(face);
         if (part instanceof AbstractBusPart bus && player instanceof ServerPlayer serverPlayer) {
             serverPlayer.openMenu(new SimpleMenuProvider(
                             (id, inv, p) -> bus.createMenu(id, inv, cable, face),
@@ -179,7 +179,7 @@ public class DataCableBlock extends PipeBlock implements EntityBlock {
             final Vec3 start = player.getEyePosition();
             final Vec3 end = start.add(player.getViewVector(1.0F).scale(player.blockInteractionRange() + 1.0));
             final Direction face = aimedPart(level, pos, start, end);
-            final CablePart part = face == null ? null : cable.getPart(face);
+            final ICablePart part = face == null ? null : cable.getPart(face);
             if (part != null) {
                 return part.partItem();
             }

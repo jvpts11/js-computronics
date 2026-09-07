@@ -9,7 +9,7 @@ package dev.jstech.tests.gametest;
 
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.crafting.PendingCraftOperation;
-import dev.jstech.computronics.operation.NetworkOperation;
+import dev.jstech.computronics.operation.INetworkOperation;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.operation.OperationPriority;
@@ -50,7 +50,7 @@ public final class AsyncPlanningGameTests {
     public static void craftRequest_plansOffTheTickThenRunsOneCraft(final GameTestHelper helper) {
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-        final NetworkOperation[] request = new NetworkOperation[1];
+        final INetworkOperation[] request = new INetworkOperation[1];
         final int[] settled = {0};
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
@@ -125,7 +125,7 @@ public final class AsyncPlanningGameTests {
                     net.cc().loadPattern(CraftFiles.oakPlanks());
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final NetworkOperation request = net.mainframe().submitCraftRequest(PLANKS, 8, false, "test",
+                    final INetworkOperation request = net.mainframe().submitCraftRequest(PLANKS, 8, false, "test",
                             () -> settled[0]++);
                     helper.assertTrue(request != null, "the request is accepted");
                     helper.assertTrue(net.mainframe().cancelOperation(request.operationId()),

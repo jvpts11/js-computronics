@@ -44,7 +44,7 @@ import java.util.Set;
  * and how full each server is. Clicking a type opens a detail view: where it is stored, what it makes, and
  * which buses filter it. Data is computed server-side; the dashboard re-requests on a slow cadence.
  */
-public final class StorageInsightsApp implements DesktopApp {
+public final class StorageInsightsApp implements IDesktopApp {
 
     private static final int REFRESH_FRAMES = 60;
     private static final int C_CRIT = 0xFFD1495B;

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Values;
@@ -33,7 +33,7 @@ class HostOperationsTest {
     private static final int PLENTY = 1_000_000;
 
     /** A network that writes down what it was asked and by whom, and refuses one particular thing. */
-    private static final class Asked implements Host {
+    private static final class Asked implements IHost {
 
         private final List<String> log = new ArrayList<>();
 
@@ -176,7 +176,7 @@ class HostOperationsTest {
 
     @Test
     void operations_isNotThereAtAllOnAMachineOffTheNetwork() {
-        final Process process = new Process(compile(), ROOM, Host.still());
+        final Process process = new Process(compile(), ROOM, IHost.still());
         process.begin(process.create("Lonely"), "OnTick");
         process.step(PLENTY);
         assertEquals(Process.State.HALTED, process.state());

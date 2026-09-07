@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.item;
 
-import dev.jstech.computronics.rack.MountableRackUnit;
+import dev.jstech.computronics.rack.IMountableRackUnit;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -23,7 +23,7 @@ import java.util.List;
  * cooling that buys a dense rack its thermal headroom. Rack units spend the same rack-unit budget
  * the servers do, which is what makes filling a cabinet a set of real trade-offs.
  */
-public class RackUnitItem extends Item implements MountableRackUnit {
+public class RackUnitItem extends Item implements IMountableRackUnit {
 
     /** What a rack unit does for the cabinet. */
     public enum Kind {

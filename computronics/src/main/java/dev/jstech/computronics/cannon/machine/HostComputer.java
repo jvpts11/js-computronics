@@ -9,12 +9,12 @@ package dev.jstech.computronics.cannon.machine;
 
 import dev.jstech.computronics.blockentity.AbstractComputerBlockEntity;
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Values;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.CpuSpec;
 import dev.jstech.computronics.os.OsDef;
-import dev.jstech.computronics.program.cli.CliComputer;
+import dev.jstech.computronics.program.cli.ICliComputer;
 import dev.jstech.computronics.storage.StorageKey;
 import java.util.Locale;
 
@@ -40,18 +40,18 @@ public final class HostComputer {
     }
 
     /** Answers one of them. */
-    public static Host.Reply call(final AbstractComputerBlockEntity machine, final CliComputer shell,
+    public static IHost.Reply call(final AbstractComputerBlockEntity machine, final ICliComputer shell,
                                   final String member, final int line) {
         return switch (member) {
-            case "Name" -> Host.Reply.of(name(machine), GLANCE);
-            case "Cpu" -> Host.Reply.of(cpu(machine), GLANCE);
-            case "Os" -> Host.Reply.of(os(machine), GLANCE);
-            case "RamMb" -> Host.Reply.of(machine.ramTotalMb(), GLANCE);
-            case "FreeRamMb" -> Host.Reply.of(machine.ramLedger().freeMb(), GLANCE);
-            case "Online" -> Host.Reply.of(machine.isRunning(), GLANCE);
-            case "Disks" -> Host.Reply.of(disks(shell), GATHER);
-            case "Programs" -> Host.Reply.of(programs(machine), GATHER);
-            case "Processes" -> Host.Reply.of(processes(machine), GATHER);
+            case "Name" -> IHost.Reply.of(name(machine), GLANCE);
+            case "Cpu" -> IHost.Reply.of(cpu(machine), GLANCE);
+            case "Os" -> IHost.Reply.of(os(machine), GLANCE);
+            case "RamMb" -> IHost.Reply.of(machine.ramTotalMb(), GLANCE);
+            case "FreeRamMb" -> IHost.Reply.of(machine.ramLedger().freeMb(), GLANCE);
+            case "Online" -> IHost.Reply.of(machine.isRunning(), GLANCE);
+            case "Disks" -> IHost.Reply.of(disks(shell), GATHER);
+            case "Programs" -> IHost.Reply.of(programs(machine), GATHER);
+            case "Processes" -> IHost.Reply.of(processes(machine), GATHER);
             default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Computer has no " + member);
         };
     }
@@ -90,9 +90,9 @@ public final class HostComputer {
         return made;
     }
 
-    private static Values.ListValue disks(final CliComputer shell) {
+    private static Values.ListValue disks(final ICliComputer shell) {
         final Values.ListValue all = new Values.ListValue();
-        for (final CliComputer.MountInfo mount : shell.mounts()) {
+        for (final ICliComputer.MountInfo mount : shell.mounts()) {
             final Values.Obj made = new Values.Obj("DiskInfo");
             made.set("Mount", String.valueOf(mount.drive()));
             made.set("CapacityMb", mount.capacityMbEq() / StorageKey.MB_EQ_PER_ITEM);

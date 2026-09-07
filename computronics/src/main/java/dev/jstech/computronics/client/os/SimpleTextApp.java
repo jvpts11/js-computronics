@@ -16,7 +16,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * A minimal placeholder desktop app: a titled window showing a single line of body text. Used for
  * desktop programs whose full implementation lands later.
  */
-public final class SimpleTextApp implements DesktopApp {
+public final class SimpleTextApp implements IDesktopApp {
 
     private final String title;
     private final Label body;

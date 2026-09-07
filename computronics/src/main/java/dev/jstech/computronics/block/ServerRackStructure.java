@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.block;
 
-import dev.jstech.core.multiblock.BlockMatcher;
+import dev.jstech.core.multiblock.IBlockMatcher;
 import dev.jstech.core.multiblock.MultiblockPattern;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -44,7 +44,7 @@ public final class ServerRackStructure {
             .layer("#P", "PP")
             .layer("PP", "PP")
             .layer("PP", "PP")
-            .where('P', BlockMatcher.any())
+            .where('P', IBlockMatcher.any())
             .build();
 
     private ServerRackStructure() {

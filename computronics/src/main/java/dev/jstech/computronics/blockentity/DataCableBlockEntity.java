@@ -9,11 +9,11 @@ package dev.jstech.computronics.blockentity;
 
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.block.DataCableBlock;
-import dev.jstech.computronics.block.part.CablePart;
+import dev.jstech.computronics.block.part.ICablePart;
 import dev.jstech.computronics.block.part.CablePartType;
 import dev.jstech.core.network.ConnectivityIndex;
 import dev.jstech.core.network.DataTier;
-import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.INetworkBridge;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.uuid.NetworkUuid;
 import net.minecraft.core.BlockPos;
@@ -43,7 +43,7 @@ import java.util.Set;
  */
 public class DataCableBlockEntity extends BlockEntity {
 
-    private final CablePart[] parts = new CablePart[6];
+    private final ICablePart[] parts = new ICablePart[6];
     private final byte[] partTypes = {-1, -1, -1, -1, -1, -1};
     @Nullable
     private NetworkUuid loadedNetwork;
@@ -57,7 +57,7 @@ public class DataCableBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel)) {
             return;
         }
-        for (final CablePart part : cable.parts) {
+        for (final ICablePart part : cable.parts) {
             if (part != null) {
                 part.serverTick();
             }
@@ -122,11 +122,11 @@ public class DataCableBlockEntity extends BlockEntity {
     }
 
     @Nullable
-    public CablePart getPart(final Direction face) {
+    public ICablePart getPart(final Direction face) {
         return parts[face.get3DDataValue()];
     }
 
-    public void addPart(final Direction face, final CablePart part) {
+    public void addPart(final Direction face, final ICablePart part) {
         final int idx = face.get3DDataValue();
         part.attach(this, face);
         parts[idx] = part;
@@ -136,9 +136,9 @@ public class DataCableBlockEntity extends BlockEntity {
     }
 
     @Nullable
-    public CablePart removePart(final Direction face) {
+    public ICablePart removePart(final Direction face) {
         final int idx = face.get3DDataValue();
-        final CablePart removed = parts[idx];
+        final ICablePart removed = parts[idx];
         parts[idx] = null;
         partTypes[idx] = -1;
         if (removed != null) {
@@ -159,7 +159,7 @@ public class DataCableBlockEntity extends BlockEntity {
 
     public void dropAllParts(final ServerLevel serverLevel) {
         for (int i = 0; i < parts.length; i++) {
-            final CablePart part = parts[i];
+            final ICablePart part = parts[i];
             if (part == null) {
                 continue;
             }
@@ -172,7 +172,7 @@ public class DataCableBlockEntity extends BlockEntity {
     }
 
     public void dropAllBuffers(final ServerLevel serverLevel) {
-        for (final CablePart part : parts) {
+        for (final ICablePart part : parts) {
             if (part != null) {
                 part.dropContents(serverLevel);
             }
@@ -212,7 +212,7 @@ public class DataCableBlockEntity extends BlockEntity {
             final var block = serverLevel.getBlockState(neighborPos).getBlock();
             if (block instanceof DataCableBlock other && other.tier() == myTier) {
                 neighbors.add(neighborPos.asLong());
-            } else if (block instanceof NetworkBridge) {
+            } else if (block instanceof INetworkBridge) {
                 neighbors.add(neighborPos.asLong());
             }
         }
@@ -226,7 +226,7 @@ public class DataCableBlockEntity extends BlockEntity {
         super.saveAdditional(tag, registries);
         final ListTag list = new ListTag();
         for (int i = 0; i < parts.length; i++) {
-            final CablePart part = parts[i];
+            final ICablePart part = parts[i];
             if (part == null) {
                 continue;
             }
@@ -262,7 +262,7 @@ public class DataCableBlockEntity extends BlockEntity {
                 continue;
             }
             final Direction face = Direction.from3DDataValue(idx);
-            final CablePart part = type.create();
+            final ICablePart part = type.create();
             part.attach(this, face);
             part.load(entry.getCompound("Data"), registries);
             parts[idx] = part;

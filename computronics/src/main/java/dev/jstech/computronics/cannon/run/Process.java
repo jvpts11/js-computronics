@@ -11,7 +11,7 @@ import dev.jstech.computronics.cannon.Shape;
 import dev.jstech.computronics.cannon.asm.AsmType;
 import dev.jstech.computronics.cannon.asm.Instruction;
 import dev.jstech.computronics.cannon.asm.Opcode;
-import dev.jstech.computronics.cannon.asm.Operand;
+import dev.jstech.computronics.cannon.asm.IOperand;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -90,11 +90,11 @@ public final class Process {
     private String message;
     private int spent;
 
-    public Process(final Loaded program, final long heapBytes, final Host host) {
+    public Process(final Loaded program, final long heapBytes, final IHost host) {
         this(program, heapBytes, host, true);
     }
 
-    private Process(final Loaded program, final long heapBytes, final Host host, final boolean fresh) {
+    private Process(final Loaded program, final long heapBytes, final IHost host, final boolean fresh) {
         this.program = program;
         this.heap = new Heap(heapBytes);
         this.library = new Library(this.heap, host, program.entryPoint());
@@ -469,7 +469,7 @@ public final class Process {
         for (int i = 0; i < things.size(); i++) {
             numbers.put(things.get(i), i);
         }
-        final List<Snapshot.Held> held = new ArrayList<>();
+        final List<Snapshot.IHeld> held = new ArrayList<>();
         for (int i = 0; i < things.size(); i++) {
             held.add(this.freeze(things.get(i), i, numbers));
         }
@@ -485,7 +485,7 @@ public final class Process {
         for (final Frame frame : this.waiting) {
             queued.add(freeze(frame, numbers));
         }
-        final Map<String, Map<String, Snapshot.Value>> kept = new LinkedHashMap<>();
+        final Map<String, Map<String, Snapshot.IValue>> kept = new LinkedHashMap<>();
         for (final Map.Entry<String, Values.Obj> entry : this.statics.entrySet()) {
             kept.put(entry.getKey(), fields(entry.getValue(), numbers));
         }
@@ -501,16 +501,16 @@ public final class Process {
     }
 
     /** Reads a process back out of what {@link #save()} wrote, ready to carry on where it stopped. */
-    public static Process restore(final Loaded program, final Snapshot shot, final Host host) {
+    public static Process restore(final Loaded program, final Snapshot shot, final IHost host) {
         final Process process = new Process(program, shot.heapBudget(), host, false);
         final Map<Integer, Object> byNumber = new LinkedHashMap<>();
-        for (final Snapshot.Held written : shot.held()) {
+        for (final Snapshot.IHeld written : shot.held()) {
             byNumber.put(written.id(), shell(written));
         }
         // Handlers are settled before anything is filled in, because one cannot be changed after it is
         // made and whatever points at one has to point at the one that stays.
-        for (final Snapshot.Held written : shot.held()) {
-            if (written instanceof Snapshot.Held.Handler handler) {
+        for (final Snapshot.IHeld written : shot.held()) {
+            if (written instanceof Snapshot.IHeld.Handler handler) {
                 final List<Values.Bound> chain = new ArrayList<>();
                 for (final Snapshot.BoundShot bound : handler.chain()) {
                     chain.add(new Values.Bound(value(bound.target(), byNumber), bound.owner(),
@@ -519,7 +519,7 @@ public final class Process {
                 byNumber.put(handler.id(), new Values.DelegateValue(handler.type(), chain));
             }
         }
-        for (final Snapshot.Held written : shot.held()) {
+        for (final Snapshot.IHeld written : shot.held()) {
             fill(written, byNumber);
             process.heap.restore(byNumber.get(written.id()), written.bytes(), written.line(),
                     written.freed());
@@ -536,9 +536,9 @@ public final class Process {
                 process.waiting.add(frame);
             }
         }
-        for (final Map.Entry<String, Map<String, Snapshot.Value>> entry : shot.statics().entrySet()) {
+        for (final Map.Entry<String, Map<String, Snapshot.IValue>> entry : shot.statics().entrySet()) {
             final Values.Obj holder = process.statics(entry.getKey());
-            for (final Map.Entry<String, Snapshot.Value> field : entry.getValue().entrySet()) {
+            for (final Map.Entry<String, Snapshot.IValue> field : entry.getValue().entrySet()) {
                 holder.set(field.getKey(), value(field.getValue(), byNumber));
             }
         }
@@ -564,26 +564,26 @@ public final class Process {
         return process;
     }
 
-    private Snapshot.Held freeze(final Object thing, final int number, final Map<Object, Integer> numbers) {
+    private Snapshot.IHeld freeze(final Object thing, final int number, final Map<Object, Integer> numbers) {
         final long bytes = this.heap.bytesOf(thing);
         final int line = this.heap.lineOf(thing);
         final boolean freed = this.heap.isFreed(thing);
         if (thing instanceof String text) {
-            return new Snapshot.Held.Text(number, bytes, line, freed, text);
+            return new Snapshot.IHeld.Text(number, bytes, line, freed, text);
         }
         if (thing instanceof Values.Obj object) {
-            return new Snapshot.Held.Object(number, bytes, line, freed, object.type(),
+            return new Snapshot.IHeld.Object(number, bytes, line, freed, object.type(),
                     fields(object, numbers));
         }
         if (thing instanceof Values.Arr array) {
-            return new Snapshot.Held.Array(number, bytes, line, freed, array.element(),
+            return new Snapshot.IHeld.Array(number, bytes, line, freed, array.element(),
                     values(array.all(), numbers));
         }
         if (thing instanceof Values.ListValue list) {
-            return new Snapshot.Held.Listing(number, bytes, line, freed, values(list.items(), numbers));
+            return new Snapshot.IHeld.Listing(number, bytes, line, freed, values(list.items(), numbers));
         }
         if (thing instanceof Values.MapValue map) {
-            return new Snapshot.Held.Keyed(number, bytes, line, freed,
+            return new Snapshot.IHeld.Keyed(number, bytes, line, freed,
                     values(new ArrayList<>(map.entries().keySet()), numbers),
                     values(new ArrayList<>(map.entries().values()), numbers));
         }
@@ -593,41 +593,41 @@ public final class Process {
             chain.add(new Snapshot.BoundShot(value(bound.target(), numbers), bound.owner(),
                     bound.method(), bound.parameters(), bound.returns()));
         }
-        return new Snapshot.Held.Handler(number, bytes, line, freed, delegate.type(), chain);
+        return new Snapshot.IHeld.Handler(number, bytes, line, freed, delegate.type(), chain);
     }
 
-    private static Object shell(final Snapshot.Held written) {
+    private static Object shell(final Snapshot.IHeld written) {
         return switch (written) {
-            case Snapshot.Held.Text text -> new String(text.value().toCharArray());
-            case Snapshot.Held.Object object -> new Values.Obj(object.type());
-            case Snapshot.Held.Array array -> new Values.Arr(array.element(), array.values().size());
-            case Snapshot.Held.Listing ignored -> new Values.ListValue();
-            case Snapshot.Held.Keyed ignored -> new Values.MapValue();
-            case Snapshot.Held.Handler handler -> new Values.DelegateValue(handler.type(), List.of());
+            case Snapshot.IHeld.Text text -> new String(text.value().toCharArray());
+            case Snapshot.IHeld.Object object -> new Values.Obj(object.type());
+            case Snapshot.IHeld.Array array -> new Values.Arr(array.element(), array.values().size());
+            case Snapshot.IHeld.Listing ignored -> new Values.ListValue();
+            case Snapshot.IHeld.Keyed ignored -> new Values.MapValue();
+            case Snapshot.IHeld.Handler handler -> new Values.DelegateValue(handler.type(), List.of());
         };
     }
 
     // A later pass, because two things can point at each other and neither can be filled in until both
     // exist.
-    private static void fill(final Snapshot.Held written, final Map<Integer, Object> byNumber) {
+    private static void fill(final Snapshot.IHeld written, final Map<Integer, Object> byNumber) {
         final Object thing = byNumber.get(written.id());
         switch (written) {
-            case Snapshot.Held.Object object -> {
-                for (final Map.Entry<String, Snapshot.Value> field : object.fields().entrySet()) {
+            case Snapshot.IHeld.Object object -> {
+                for (final Map.Entry<String, Snapshot.IValue> field : object.fields().entrySet()) {
                     ((Values.Obj) thing).set(field.getKey(), value(field.getValue(), byNumber));
                 }
             }
-            case Snapshot.Held.Array array -> {
+            case Snapshot.IHeld.Array array -> {
                 for (int i = 0; i < array.values().size(); i++) {
                     ((Values.Arr) thing).set(i, value(array.values().get(i), byNumber), 0);
                 }
             }
-            case Snapshot.Held.Listing list -> {
-                for (final Snapshot.Value item : list.items()) {
+            case Snapshot.IHeld.Listing list -> {
+                for (final Snapshot.IValue item : list.items()) {
                     ((Values.ListValue) thing).items().add(value(item, byNumber));
                 }
             }
-            case Snapshot.Held.Keyed keyed -> {
+            case Snapshot.IHeld.Keyed keyed -> {
                 for (int i = 0; i < keyed.keys().size(); i++) {
                     ((Values.MapValue) thing).entries().put(value(keyed.keys().get(i), byNumber),
                             value(keyed.values().get(i), byNumber));
@@ -654,7 +654,7 @@ public final class Process {
         for (int i = 0; i < written.slots().size() && i < frame.slots.length; i++) {
             frame.slots[i] = value(written.slots().get(i), byNumber);
         }
-        for (final Snapshot.Value held : written.stack()) {
+        for (final Snapshot.IValue held : written.stack()) {
             frame.push(value(held, byNumber));
         }
         frame.at = written.at();
@@ -684,52 +684,52 @@ public final class Process {
                 ? setUp : null;
     }
 
-    private static Map<String, Snapshot.Value> fields(final Values.Obj object,
+    private static Map<String, Snapshot.IValue> fields(final Values.Obj object,
                                                       final Map<Object, Integer> numbers) {
-        final Map<String, Snapshot.Value> written = new LinkedHashMap<>();
+        final Map<String, Snapshot.IValue> written = new LinkedHashMap<>();
         for (final Map.Entry<String, Object> field : object.all().entrySet()) {
             written.put(field.getKey(), value(field.getValue(), numbers));
         }
         return written;
     }
 
-    private static List<Snapshot.Value> values(final List<Object> things,
+    private static List<Snapshot.IValue> values(final List<Object> things,
                                                final Map<Object, Integer> numbers) {
-        final List<Snapshot.Value> written = new ArrayList<>();
+        final List<Snapshot.IValue> written = new ArrayList<>();
         for (final Object thing : things) {
             written.add(value(thing, numbers));
         }
         return written;
     }
 
-    private static Snapshot.Value value(final Object thing,
+    private static Snapshot.IValue value(final Object thing,
                                         final Map<Object, Integer> numbers) {
         return switch (thing) {
-            case null -> new Snapshot.Value.Nothing();
-            case Integer number -> new Snapshot.Value.I4(number);
-            case Long number -> new Snapshot.Value.I8(number);
-            case Float number -> new Snapshot.Value.R4(number);
-            case Double number -> new Snapshot.Value.R8(number);
-            case Boolean flag -> new Snapshot.Value.Bool(flag);
-            case Character letter -> new Snapshot.Value.Ch(letter);
+            case null -> new Snapshot.IValue.Nothing();
+            case Integer number -> new Snapshot.IValue.I4(number);
+            case Long number -> new Snapshot.IValue.I8(number);
+            case Float number -> new Snapshot.IValue.R4(number);
+            case Double number -> new Snapshot.IValue.R8(number);
+            case Boolean flag -> new Snapshot.IValue.Bool(flag);
+            case Character letter -> new Snapshot.IValue.Ch(letter);
             default -> {
                 final Integer number = numbers.get(thing);
-                yield number == null ? new Snapshot.Value.Nothing() : new Snapshot.Value.Ref(number);
+                yield number == null ? new Snapshot.IValue.Nothing() : new Snapshot.IValue.Ref(number);
             }
         };
     }
 
-    private static Object value(final Snapshot.Value written,
+    private static Object value(final Snapshot.IValue written,
                                           final Map<Integer, Object> byNumber) {
         return switch (written) {
-            case Snapshot.Value.Nothing ignored -> null;
-            case Snapshot.Value.I4 number -> number.value();
-            case Snapshot.Value.I8 number -> number.value();
-            case Snapshot.Value.R4 number -> number.value();
-            case Snapshot.Value.R8 number -> number.value();
-            case Snapshot.Value.Bool flag -> flag.value();
-            case Snapshot.Value.Ch letter -> letter.value();
-            case Snapshot.Value.Ref reference -> byNumber.get(reference.id());
+            case Snapshot.IValue.Nothing ignored -> null;
+            case Snapshot.IValue.I4 number -> number.value();
+            case Snapshot.IValue.I8 number -> number.value();
+            case Snapshot.IValue.R4 number -> number.value();
+            case Snapshot.IValue.R8 number -> number.value();
+            case Snapshot.IValue.Bool flag -> flag.value();
+            case Snapshot.IValue.Ch letter -> letter.value();
+            case Snapshot.IValue.Ref reference -> byNumber.get(reference.id());
         };
     }
 
@@ -748,21 +748,21 @@ public final class Process {
 
     private void run(final Frame frame, final Instruction instruction, final int line) {
         switch (instruction.opcode()) {
-            case LDC_I4 -> frame.push(((Operand.I4) instruction.operand()).value());
-            case LDC_I8 -> frame.push(((Operand.I8) instruction.operand()).value());
-            case LDC_R4 -> frame.push(((Operand.R4) instruction.operand()).value());
-            case LDC_R8 -> frame.push(((Operand.R8) instruction.operand()).value());
+            case LDC_I4 -> frame.push(((IOperand.I4) instruction.operand()).value());
+            case LDC_I8 -> frame.push(((IOperand.I8) instruction.operand()).value());
+            case LDC_R4 -> frame.push(((IOperand.R4) instruction.operand()).value());
+            case LDC_R8 -> frame.push(((IOperand.R8) instruction.operand()).value());
             case LDNULL -> frame.push(null);
-            case LDSTR -> frame.push(this.text(((Operand.Text) instruction.operand()).value(), line));
+            case LDSTR -> frame.push(this.text(((IOperand.Text) instruction.operand()).value(), line));
             case LDTHIS -> frame.push(frame.self);
-            case LDLOC -> frame.push(frame.slots[((Operand.Slot) instruction.operand()).index()]);
-            case STLOC -> frame.slots[((Operand.Slot) instruction.operand()).index()] = frame.pop();
+            case LDLOC -> frame.push(frame.slots[((IOperand.Slot) instruction.operand()).index()]);
+            case STLOC -> frame.slots[((IOperand.Slot) instruction.operand()).index()] = frame.pop();
             case POP -> frame.pop();
             case DUP -> frame.push(frame.peek());
-            case LDFLD -> this.loadField(frame, (Operand.Field) instruction.operand(), line);
-            case STFLD -> this.storeField(frame, (Operand.Field) instruction.operand(), line);
-            case LDSFLD -> this.loadStatic(frame, (Operand.Field) instruction.operand(), line);
-            case STSFLD -> this.storeStatic(frame, (Operand.Field) instruction.operand());
+            case LDFLD -> this.loadField(frame, (IOperand.Field) instruction.operand(), line);
+            case STFLD -> this.storeField(frame, (IOperand.Field) instruction.operand(), line);
+            case LDSFLD -> this.loadStatic(frame, (IOperand.Field) instruction.operand(), line);
+            case STSFLD -> this.storeStatic(frame, (IOperand.Field) instruction.operand());
             case ADD, SUB, MUL, DIV, REM, AND, OR, XOR, SHL, SHR ->
                     this.arithmetic(frame, instruction.opcode(), line);
             case NEG -> frame.push(Numbers.negate(frame.pop()));
@@ -776,16 +776,16 @@ public final class Process {
             case BRTRUE -> this.jumpIf(frame, instruction, truth(frame.pop()));
             case BRFALSE -> this.jumpIf(frame, instruction, !truth(frame.pop()));
             case BEQ, BNE, BLT, BLE, BGT, BGE -> this.jumpCompare(frame, instruction);
-            case NEWOBJ -> this.newObject(frame, (Operand.Constructor) instruction.operand(), line);
-            case NEWARR -> this.newArray(frame, (Operand.Type) instruction.operand(), line);
+            case NEWOBJ -> this.newObject(frame, (IOperand.Constructor) instruction.operand(), line);
+            case NEWARR -> this.newArray(frame, (IOperand.Type) instruction.operand(), line);
             case LDELEM -> this.loadElement(frame, line);
             case STELEM -> this.storeElement(frame, line);
             case LDLEN -> frame.push(this.array(frame.pop(), line).length());
             case DISPOSE -> this.heap.dispose(frame.pop(), line);
-            case CASTCLASS -> this.cast(frame, ((Operand.Type) instruction.operand()).name(), line);
-            case ISINST -> this.isInstance(frame, ((Operand.Type) instruction.operand()).name());
-            case LDFN -> this.handler(frame, (Operand.Method) instruction.operand(), line);
-            case CALL, CALLVIRT -> this.call(frame, (Operand.Method) instruction.operand(),
+            case CASTCLASS -> this.cast(frame, ((IOperand.Type) instruction.operand()).name(), line);
+            case ISINST -> this.isInstance(frame, ((IOperand.Type) instruction.operand()).name());
+            case LDFN -> this.handler(frame, (IOperand.Method) instruction.operand(), line);
+            case CALL, CALLVIRT -> this.call(frame, (IOperand.Method) instruction.operand(),
                     instruction.opcode() == Opcode.CALLVIRT, line);
             case SYS -> throw new Halt(Halt.Reason.NO_NETWORK, line,
                     "this computer is not on a network");
@@ -832,7 +832,7 @@ public final class Process {
 
     // ---------------------------------------------------------------- fields
 
-    private void loadField(final Frame frame, final Operand.Field field, final int line) {
+    private void loadField(final Frame frame, final IOperand.Field field, final int line) {
         final Object target = this.alive(frame.pop(), line);
         if (target instanceof Values.Obj object) {
             frame.push(object.get(field.name()));
@@ -841,7 +841,7 @@ public final class Process {
         frame.push(this.library.read(target, field.name(), line));
     }
 
-    private void storeField(final Frame frame, final Operand.Field field, final int line) {
+    private void storeField(final Frame frame, final IOperand.Field field, final int line) {
         final Object value = frame.pop();
         final Object target = this.alive(frame.pop(), line);
         if (!(target instanceof Values.Obj object)) {
@@ -850,7 +850,7 @@ public final class Process {
         object.set(field.name(), value);
     }
 
-    private void loadStatic(final Frame frame, final Operand.Field field, final int line) {
+    private void loadStatic(final Frame frame, final IOperand.Field field, final int line) {
         final Loaded.Type type = this.program.type(field.owner());
         if (type == null) {
             frame.push(this.library.readStatic(field.owner(), field.name(), line));
@@ -863,7 +863,7 @@ public final class Process {
         frame.push(this.statics(field.owner()).get(field.name()));
     }
 
-    private void storeStatic(final Frame frame, final Operand.Field field) {
+    private void storeStatic(final Frame frame, final IOperand.Field field) {
         this.statics(field.owner()).set(field.name(), frame.pop());
     }
 
@@ -873,7 +873,7 @@ public final class Process {
 
     // ---------------------------------------------------------------- objects
 
-    private void newObject(final Frame frame, final Operand.Constructor made, final int line) {
+    private void newObject(final Frame frame, final IOperand.Constructor made, final int line) {
         frame.push(this.instance(made.owner(), this.take(frame, made.parameters()), line));
     }
 
@@ -914,7 +914,7 @@ public final class Process {
         return bytes;
     }
 
-    private void newArray(final Frame frame, final Operand.Type element, final int line) {
+    private void newArray(final Frame frame, final IOperand.Type element, final int line) {
         final int length = Numbers.toInt(frame.pop());
         if (length < 0) {
             throw new Halt(Halt.Reason.OUT_OF_RANGE, line, "an array cannot have " + length + " places");
@@ -972,7 +972,7 @@ public final class Process {
 
     // ---------------------------------------------------------------- calls
 
-    private void handler(final Frame frame, final Operand.Method method, final int line) {
+    private void handler(final Frame frame, final IOperand.Method method, final int line) {
         final Object target = frame.pop();
         final Values.Bound bound = new Values.Bound(target, method.owner(), method.name(),
                 method.parameters(), method.returns());
@@ -981,7 +981,7 @@ public final class Process {
         frame.push(made);
     }
 
-    private void call(final Frame frame, final Operand.Method named, final boolean through, final int line) {
+    private void call(final Frame frame, final IOperand.Method named, final boolean through, final int line) {
         final List<Object> arguments = this.take(frame, named.parameters());
         if (through) {
             this.invoke(frame, arguments, line);
@@ -1001,7 +1001,7 @@ public final class Process {
     // A call through an interface names the interface, but the object knows which class it is, and
     // that is the one whose lines should run.
     private Loaded.Method onItsOwnType(final Loaded.Method direct, final Object self,
-                                       final Operand.Method named) {
+                                       final IOperand.Method named) {
         if (!(self instanceof Values.Obj object) || object.type().equals(named.owner())) {
             return direct;
         }
@@ -1081,7 +1081,7 @@ public final class Process {
         }
     }
 
-    private void push(final Frame frame, final Operand.Method named, final Library.Answer answer) {
+    private void push(final Frame frame, final IOperand.Method named, final Library.Answer answer) {
         if (!"void".equals(named.returns())) {
             frame.push(answer.value());
         }

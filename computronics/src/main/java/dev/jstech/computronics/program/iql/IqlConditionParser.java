@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.program.iql;
 
-import dev.jstech.computronics.program.iql.IqlCondition.Op;
+import dev.jstech.computronics.program.iql.IIqlCondition.Op;
 import dev.jstech.computronics.program.iql.IqlLexer.Token;
 import dev.jstech.computronics.program.iql.IqlLexer.Type;
 import java.util.List;
@@ -41,61 +41,61 @@ public final class IqlConditionParser {
     }
 
     /** Lexes and parses a whole string as a single condition; errors if any token is left over. */
-    public static IqlCondition parse(final String text) {
+    public static IIqlCondition parse(final String text) {
         final List<Token> tokens = IqlLexer.lex(text);
         final IqlConditionParser parser = new IqlConditionParser(tokens, 0);
-        final IqlCondition condition = parser.parseCondition();
+        final IIqlCondition condition = parser.parseCondition();
         if (parser.pos != tokens.size()) {
             throw new IllegalArgumentException("unexpected token: " + tokens.get(parser.pos).text());
         }
         return condition;
     }
 
-    IqlCondition parseCondition() {
+    IIqlCondition parseCondition() {
         return parseOr();
     }
 
-    private IqlCondition parseOr() {
-        IqlCondition left = parseAnd();
+    private IIqlCondition parseOr() {
+        IIqlCondition left = parseAnd();
         while (peekKeyword("OR")) {
             pos++;
-            left = new IqlCondition.Or(left, parseAnd());
+            left = new IIqlCondition.Or(left, parseAnd());
         }
         return left;
     }
 
-    private IqlCondition parseAnd() {
-        IqlCondition left = parseNot();
+    private IIqlCondition parseAnd() {
+        IIqlCondition left = parseNot();
         while (peekKeyword("AND")) {
             pos++;
-            left = new IqlCondition.And(left, parseNot());
+            left = new IIqlCondition.And(left, parseNot());
         }
         return left;
     }
 
-    private IqlCondition parseNot() {
+    private IIqlCondition parseNot() {
         if (peekKeyword("NOT")) {
             pos++;
-            return new IqlCondition.Not(parseNot());
+            return new IIqlCondition.Not(parseNot());
         }
         return parsePrimary();
     }
 
-    private IqlCondition parsePrimary() {
+    private IIqlCondition parsePrimary() {
         if (peekType(Type.LPAREN)) {
             pos++;
-            final IqlCondition inner = parseCondition();
+            final IIqlCondition inner = parseCondition();
             expectType(Type.RPAREN, "')'");
             return inner;
         }
         return parseComparison();
     }
 
-    private IqlCondition parseComparison() {
+    private IIqlCondition parseComparison() {
         final String field = expectType(Type.WORD, "a field name").text();
         final Op op = parseOperator();
         final String value = parseValue();
-        return new IqlCondition.Comparison(field, op, value);
+        return new IIqlCondition.Comparison(field, op, value);
     }
 
     private Op parseOperator() {

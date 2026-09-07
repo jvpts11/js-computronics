@@ -10,11 +10,11 @@ package dev.jstech.computronics.program.iql;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.jstech.computronics.program.iql.IqlCondition.And;
-import dev.jstech.computronics.program.iql.IqlCondition.Comparison;
-import dev.jstech.computronics.program.iql.IqlCondition.Not;
-import dev.jstech.computronics.program.iql.IqlCondition.Op;
-import dev.jstech.computronics.program.iql.IqlCondition.Or;
+import dev.jstech.computronics.program.iql.IIqlCondition.And;
+import dev.jstech.computronics.program.iql.IIqlCondition.Comparison;
+import dev.jstech.computronics.program.iql.IIqlCondition.Not;
+import dev.jstech.computronics.program.iql.IIqlCondition.Op;
+import dev.jstech.computronics.program.iql.IIqlCondition.Or;
 import java.util.Map;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;

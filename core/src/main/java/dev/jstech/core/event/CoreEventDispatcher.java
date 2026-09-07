@@ -19,10 +19,10 @@ import java.util.function.Consumer;
  */
 public class CoreEventDispatcher {
 
-    private final Map<Class<? extends CoreEvent>, List<Consumer<? extends CoreEvent>>>
+    private final Map<Class<? extends ICoreEvent>, List<Consumer<? extends ICoreEvent>>>
             listenersByClass = new HashMap<>();
 
-    public <E extends CoreEvent> void subscribe(
+    public <E extends ICoreEvent> void subscribe(
             final Class<E> eventClass,
             final Consumer<E> listener) {
         Objects.requireNonNull(eventClass, "eventClass must not be null");
@@ -36,12 +36,12 @@ public class CoreEventDispatcher {
      * Removes one subscription, matched by identity on the listener; a listener that was never subscribed
      * for that class is ignored. A class left with no listeners is dropped from the count.
      */
-    public <E extends CoreEvent> void unsubscribe(
+    public <E extends ICoreEvent> void unsubscribe(
             final Class<E> eventClass,
             final Consumer<E> listener) {
         Objects.requireNonNull(eventClass, "eventClass must not be null");
         Objects.requireNonNull(listener, "listener must not be null");
-        final List<Consumer<? extends CoreEvent>> listeners = listenersByClass.get(eventClass);
+        final List<Consumer<? extends ICoreEvent>> listeners = listenersByClass.get(eventClass);
         if (listeners == null) {
             return;
         }
@@ -52,24 +52,24 @@ public class CoreEventDispatcher {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public <E extends CoreEvent> E post(final E event) {
+    public <E extends ICoreEvent> E post(final E event) {
         Objects.requireNonNull(event, "event must not be null");
 
-        // Every CoreEvent type this event is assignable to: its whole class chain AND its whole interface
+        // Every ICoreEvent type this event is assignable to: its whole class chain AND its whole interface
         // graph (superinterfaces included), de-duplicated and most-specific first. Collecting the full
         // graph — not just the direct interfaces — is what lets a listener on an ancestor interface
-        // (e.g. CoreEvent itself) be reached.
+        // (e.g. ICoreEvent itself) be reached.
         final java.util.Set<Class<?>> types = new java.util.LinkedHashSet<>();
         collectEventTypes(event.getClass(), types);
 
         for (final Class<?> type : types) {
-            final List<Consumer<? extends CoreEvent>> listeners = listenersByClass.get(type);
+            final List<Consumer<? extends ICoreEvent>> listeners = listenersByClass.get(type);
             if (listeners == null) {
                 continue;
             }
             // Iterate a snapshot so a listener may subscribe or clear during dispatch without a CME.
             for (final Consumer listener : new ArrayList<>(listeners)) {
-                if (event instanceof CoreEvent.Cancellable cancellable && cancellable.isCancelled()) {
+                if (event instanceof ICoreEvent.ICancellable cancellable && cancellable.isCancelled()) {
                     return event;
                 }
                 listener.accept(event);
@@ -79,7 +79,7 @@ public class CoreEventDispatcher {
     }
 
     private static void collectEventTypes(final Class<?> type, final java.util.Set<Class<?>> out) {
-        if (type == null || !CoreEvent.class.isAssignableFrom(type) || !out.add(type)) {
+        if (type == null || !ICoreEvent.class.isAssignableFrom(type) || !out.add(type)) {
             return;
         }
         collectEventTypes(type.getSuperclass(), out);

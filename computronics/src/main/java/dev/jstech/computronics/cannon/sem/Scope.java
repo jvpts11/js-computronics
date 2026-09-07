@@ -20,16 +20,16 @@ import java.util.Map;
 public final class Scope {
 
     private final Scope parent;
-    private final Map<String, Binding.Variable> variables = new LinkedHashMap<>();
+    private final Map<String, IBinding.Variable> variables = new LinkedHashMap<>();
 
     public Scope(final Scope parent) {
         this.parent = parent;
     }
 
     /** The variable of that name, from here outwards, or null. */
-    public Binding.Variable lookup(final String name) {
+    public IBinding.Variable lookup(final String name) {
         for (Scope scope = this; scope != null; scope = scope.parent) {
-            final Binding.Variable found = scope.variables.get(name);
+            final IBinding.Variable found = scope.variables.get(name);
             if (found != null) {
                 return found;
             }
@@ -38,7 +38,7 @@ public final class Scope {
     }
 
     /** Declares a variable here. Returns false when the name is already visible. */
-    public boolean declare(final Binding.Variable variable) {
+    public boolean declare(final IBinding.Variable variable) {
         if (this.lookup(variable.name()) != null) {
             return false;
         }

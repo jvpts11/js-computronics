@@ -12,7 +12,7 @@ import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
 import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
 import dev.jstech.computronics.item.ServerItem;
 import dev.jstech.computronics.os.OsDef;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.OsRegistry;
 import dev.jstech.computronics.rack.RackChassis;
 import net.minecraft.core.BlockPos;
@@ -26,7 +26,7 @@ import java.util.Locale;
  * The shell's way into the clusters, for players who prefer a prompt or run a system with no desktop:
  * the same actions as the Cluster Manager, on the same machine only.
  */
-public final class ClusterCommand implements CliCommand {
+public final class ClusterCommand implements ICliCommand {
 
     @Override
     public String name() {
@@ -44,7 +44,7 @@ public final class ClusterCommand implements CliCommand {
     }
 
     @Override
-    public boolean available(final CliComputer computer) {
+    public boolean available(final ICliComputer computer) {
         return computer.hostBlock() instanceof ClusterManagementComputerBlockEntity;
     }
 
@@ -135,7 +135,7 @@ public final class ClusterCommand implements CliCommand {
             if (!(cmc.getLevel().getBlockEntity(node.rack()) instanceof ServerRackBlockEntity rack)) {
                 continue;
             }
-            final OsHost host = rack.unitHost(node.row());
+            final IOsHost host = rack.unitHost(node.row());
             final ResourceLocation osId = host.installedOsId();
             final OsDef os = osId == null ? null : OsRegistry.getOs(osId);
             ctx.out().line(String.format(Locale.ROOT, "R%-2d U%-4d %-18s %-14s %s", rackIndex, node.row() + 1,

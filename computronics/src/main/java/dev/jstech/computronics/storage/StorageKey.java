@@ -27,7 +27,7 @@ import java.util.Objects;
  * The identity of one stored DATA type — an item, a fluid, or a chemical — preserving an item's or fluid's
  * data components. The network makes no distinction between the three: they are stored, indexed, moved and
  * displayed as data. A chemical is known only by its registry id; whatever mod owns it is reached through a
- * {@link ChemicalBridge}.
+ * {@link IChemicalBridge}.
  */
 public final class StorageKey {
 

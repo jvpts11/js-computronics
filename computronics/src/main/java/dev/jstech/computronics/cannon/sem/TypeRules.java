@@ -18,19 +18,19 @@ import java.util.List;
  * reference fits its base and nothing else, and there is no conversion an addon or a clever operator
  * can add. A player who reads the chain once knows the whole of it.
  *
- * <p>{@link TypeSymbol.Special#ERROR} converts to and from everything on purpose: it is what a type
+ * <p>{@link ITypeSymbol.Special#ERROR} converts to and from everything on purpose: it is what a type
  * that could not be resolved becomes, and letting it pass silently keeps one unknown name from
  * producing a complaint about every line that used it.
  */
 public final class TypeRules {
 
     /** The widening chain, in order. A type converts to any type further along it and to none before. */
-    private static final List<TypeSymbol.Primitive> WIDENING = List.of(
-            TypeSymbol.Primitive.CHAR,
-            TypeSymbol.Primitive.INT,
-            TypeSymbol.Primitive.LONG,
-            TypeSymbol.Primitive.FLOAT,
-            TypeSymbol.Primitive.DOUBLE);
+    private static final List<ITypeSymbol.Primitive> WIDENING = List.of(
+            ITypeSymbol.Primitive.CHAR,
+            ITypeSymbol.Primitive.INT,
+            ITypeSymbol.Primitive.LONG,
+            ITypeSymbol.Primitive.FLOAT,
+            ITypeSymbol.Primitive.DOUBLE);
 
     private final BuiltIns builtIns;
 
@@ -39,59 +39,59 @@ public final class TypeRules {
     }
 
     /** Whether this is the stand-in for a type that could not be resolved. */
-    public boolean isError(final TypeSymbol type) {
-        return type == null || type == TypeSymbol.Special.ERROR;
+    public boolean isError(final ITypeSymbol type) {
+        return type == null || type == ITypeSymbol.Special.ERROR;
     }
 
     /** Whether arithmetic applies. */
-    public boolean isNumeric(final TypeSymbol type) {
-        return type instanceof TypeSymbol.Primitive primitive && primitive.isNumeric();
+    public boolean isNumeric(final ITypeSymbol type) {
+        return type instanceof ITypeSymbol.Primitive primitive && primitive.isNumeric();
     }
 
     /** Whether the bitwise operators and the shifts apply. */
-    public boolean isIntegral(final TypeSymbol type) {
-        return type == TypeSymbol.Primitive.CHAR || type == TypeSymbol.Primitive.INT
-                || type == TypeSymbol.Primitive.LONG;
+    public boolean isIntegral(final ITypeSymbol type) {
+        return type == ITypeSymbol.Primitive.CHAR || type == ITypeSymbol.Primitive.INT
+                || type == ITypeSymbol.Primitive.LONG;
     }
 
     /** Whether values of this type are references, so null fits and the object can be disposed. */
-    public boolean isReference(final TypeSymbol type) {
-        if (type instanceof TypeSymbol.ArrayType || type instanceof TypeSymbol.GenericType) {
+    public boolean isReference(final ITypeSymbol type) {
+        if (type instanceof ITypeSymbol.ArrayType || type instanceof ITypeSymbol.GenericType) {
             return true;
         }
         return type instanceof NamedType named && named.kind() != NamedType.Kind.ENUM;
     }
 
     /** The named type behind a symbol, following a filled-in collection to its definition. */
-    public NamedType named(final TypeSymbol type) {
+    public NamedType named(final ITypeSymbol type) {
         if (type instanceof NamedType named) {
             return named;
         }
-        if (type instanceof TypeSymbol.GenericType generic) {
+        if (type instanceof ITypeSymbol.GenericType generic) {
             return generic.definition();
         }
         return null;
     }
 
     /** The arguments a filled-in collection was given, empty for anything else. */
-    public List<TypeSymbol> arguments(final TypeSymbol type) {
-        return type instanceof TypeSymbol.GenericType generic ? generic.arguments() : List.of();
+    public List<ITypeSymbol> arguments(final ITypeSymbol type) {
+        return type instanceof ITypeSymbol.GenericType generic ? generic.arguments() : List.of();
     }
 
     /** Whether a value of {@code from} can be used where {@code to} is wanted. */
-    public boolean isAssignable(final TypeSymbol from, final TypeSymbol to) {
+    public boolean isAssignable(final ITypeSymbol from, final ITypeSymbol to) {
         if (this.isError(from) || this.isError(to)) {
             return true;
         }
         if (from.equals(to)) {
             return true;
         }
-        if (from == TypeSymbol.Special.NULL) {
+        if (from == ITypeSymbol.Special.NULL) {
             return this.isReference(to);
         }
         if (this.isNumeric(from) && this.isNumeric(to)) {
-            final int start = WIDENING.indexOf((TypeSymbol.Primitive) from);
-            final int end = WIDENING.indexOf((TypeSymbol.Primitive) to);
+            final int start = WIDENING.indexOf((ITypeSymbol.Primitive) from);
+            final int end = WIDENING.indexOf((ITypeSymbol.Primitive) to);
             return start >= 0 && end >= 0 && start <= end;
         }
         if (to == this.builtIns.objectType() && this.isReference(from)) {
@@ -104,41 +104,41 @@ public final class TypeRules {
     }
 
     /** Replaces a collection's stand-in arguments with what a use site filled them in with. */
-    public TypeSymbol substitute(final TypeSymbol type, final List<TypeSymbol> arguments) {
-        if (type instanceof TypeSymbol.TypeParameter parameter) {
+    public ITypeSymbol substitute(final ITypeSymbol type, final List<ITypeSymbol> arguments) {
+        if (type instanceof ITypeSymbol.TypeParameter parameter) {
             return parameter.index() < arguments.size()
-                    ? arguments.get(parameter.index()) : TypeSymbol.Special.ERROR;
+                    ? arguments.get(parameter.index()) : ITypeSymbol.Special.ERROR;
         }
-        if (type instanceof TypeSymbol.ArrayType array) {
-            return new TypeSymbol.ArrayType(this.substitute(array.element(), arguments));
+        if (type instanceof ITypeSymbol.ArrayType array) {
+            return new ITypeSymbol.ArrayType(this.substitute(array.element(), arguments));
         }
-        if (type instanceof TypeSymbol.GenericType generic) {
-            final List<TypeSymbol> filled = new ArrayList<>();
-            for (final TypeSymbol argument : generic.arguments()) {
+        if (type instanceof ITypeSymbol.GenericType generic) {
+            final List<ITypeSymbol> filled = new ArrayList<>();
+            for (final ITypeSymbol argument : generic.arguments()) {
                 filled.add(this.substitute(argument, arguments));
             }
-            return new TypeSymbol.GenericType(generic.definition(), filled);
+            return new ITypeSymbol.GenericType(generic.definition(), filled);
         }
         return type;
     }
 
     /** What a two-operand expression produces, or null when the operator does not apply to them. */
-    public TypeSymbol binaryResult(final Operator operator, final TypeSymbol left, final TypeSymbol right) {
+    public ITypeSymbol binaryResult(final Operator operator, final ITypeSymbol left, final ITypeSymbol right) {
         if (this.isError(left) || this.isError(right)) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return switch (operator) {
             case ADD -> left == this.builtIns.stringType() || right == this.builtIns.stringType()
                     ? this.builtIns.stringType() : this.promote(left, right);
             case SUBTRACT, MULTIPLY, DIVIDE, REMAINDER -> this.promote(left, right);
             case LESS, LESS_EQUAL, GREATER, GREATER_EQUAL ->
-                    this.promote(left, right) == null ? null : TypeSymbol.Primitive.BOOL;
-            case EQUAL, NOT_EQUAL -> this.comparable(left, right) ? TypeSymbol.Primitive.BOOL : null;
-            case AND, OR -> left == TypeSymbol.Primitive.BOOL && right == TypeSymbol.Primitive.BOOL
-                    ? TypeSymbol.Primitive.BOOL : null;
+                    this.promote(left, right) == null ? null : ITypeSymbol.Primitive.BOOL;
+            case EQUAL, NOT_EQUAL -> this.comparable(left, right) ? ITypeSymbol.Primitive.BOOL : null;
+            case AND, OR -> left == ITypeSymbol.Primitive.BOOL && right == ITypeSymbol.Primitive.BOOL
+                    ? ITypeSymbol.Primitive.BOOL : null;
             case BIT_AND, BIT_OR, BIT_XOR -> {
-                if (left == TypeSymbol.Primitive.BOOL && right == TypeSymbol.Primitive.BOOL) {
-                    yield TypeSymbol.Primitive.BOOL;
+                if (left == ITypeSymbol.Primitive.BOOL && right == ITypeSymbol.Primitive.BOOL) {
+                    yield ITypeSymbol.Primitive.BOOL;
                 }
                 yield this.isIntegral(left) && this.isIntegral(right) ? this.promote(left, right) : null;
             }
@@ -149,12 +149,12 @@ public final class TypeRules {
     }
 
     /** What a one-operand expression produces, or null when the operator does not apply. */
-    public TypeSymbol unaryResult(final Operator operator, final TypeSymbol operand) {
+    public ITypeSymbol unaryResult(final Operator operator, final ITypeSymbol operand) {
         if (this.isError(operand)) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
         return switch (operator) {
-            case NOT -> operand == TypeSymbol.Primitive.BOOL ? TypeSymbol.Primitive.BOOL : null;
+            case NOT -> operand == ITypeSymbol.Primitive.BOOL ? ITypeSymbol.Primitive.BOOL : null;
             case NEGATE, PLUS -> this.isNumeric(operand) ? this.widen(operand) : null;
             case COMPLEMENT -> this.isIntegral(operand) ? this.widen(operand) : null;
             case INCREMENT, DECREMENT -> this.isNumeric(operand) ? operand : null;
@@ -163,14 +163,14 @@ public final class TypeRules {
     }
 
     /** What a foreach walks over gives it, or null when the value cannot be walked. */
-    public TypeSymbol elementOf(final TypeSymbol collection) {
+    public ITypeSymbol elementOf(final ITypeSymbol collection) {
         if (this.isError(collection)) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        if (collection instanceof TypeSymbol.ArrayType array) {
+        if (collection instanceof ITypeSymbol.ArrayType array) {
             return array.element();
         }
-        if (collection instanceof TypeSymbol.GenericType generic
+        if (collection instanceof ITypeSymbol.GenericType generic
                 && generic.definition() == this.builtIns.listType()) {
             return generic.arguments().getFirst();
         }
@@ -178,16 +178,16 @@ public final class TypeRules {
     }
 
     /** What indexing gives, or null when the value cannot be indexed by that key. */
-    public TypeSymbol indexResult(final TypeSymbol target, final TypeSymbol index) {
+    public ITypeSymbol indexResult(final ITypeSymbol target, final ITypeSymbol index) {
         if (this.isError(target) || this.isError(index)) {
-            return TypeSymbol.Special.ERROR;
+            return ITypeSymbol.Special.ERROR;
         }
-        if (target instanceof TypeSymbol.ArrayType array) {
-            return this.isAssignable(index, TypeSymbol.Primitive.INT) ? array.element() : null;
+        if (target instanceof ITypeSymbol.ArrayType array) {
+            return this.isAssignable(index, ITypeSymbol.Primitive.INT) ? array.element() : null;
         }
-        if (target instanceof TypeSymbol.GenericType generic) {
+        if (target instanceof ITypeSymbol.GenericType generic) {
             if (generic.definition() == this.builtIns.listType()) {
-                return this.isAssignable(index, TypeSymbol.Primitive.INT)
+                return this.isAssignable(index, ITypeSymbol.Primitive.INT)
                         ? generic.arguments().getFirst() : null;
             }
             if (generic.definition() == this.builtIns.mapType()) {
@@ -200,7 +200,7 @@ public final class TypeRules {
 
     // Two values can be compared when one fits the other: numbers against numbers, a reference
     // against a reference it could be, and null against anything a reference.
-    private boolean comparable(final TypeSymbol left, final TypeSymbol right) {
+    private boolean comparable(final ITypeSymbol left, final ITypeSymbol right) {
         if (this.isNumeric(left) && this.isNumeric(right)) {
             return true;
         }
@@ -217,18 +217,18 @@ public final class TypeRules {
      * the type its two sides were compared as cannot be read off the result and has to be worked out
      * the same way it was here.
      */
-    public TypeSymbol promote(final TypeSymbol left, final TypeSymbol right) {
+    public ITypeSymbol promote(final ITypeSymbol left, final ITypeSymbol right) {
         if (!this.isNumeric(left) || !this.isNumeric(right)) {
             return null;
         }
-        final TypeSymbol wideLeft = this.widen(left);
-        final TypeSymbol wideRight = this.widen(right);
-        return WIDENING.indexOf((TypeSymbol.Primitive) wideLeft) >= WIDENING.indexOf((TypeSymbol.Primitive) wideRight)
+        final ITypeSymbol wideLeft = this.widen(left);
+        final ITypeSymbol wideRight = this.widen(right);
+        return WIDENING.indexOf((ITypeSymbol.Primitive) wideLeft) >= WIDENING.indexOf((ITypeSymbol.Primitive) wideRight)
                 ? wideLeft : wideRight;
     }
 
     // Arithmetic on a char is arithmetic on its number, as it is in the language this one borrows from.
-    private TypeSymbol widen(final TypeSymbol type) {
-        return type == TypeSymbol.Primitive.CHAR ? TypeSymbol.Primitive.INT : type;
+    private ITypeSymbol widen(final ITypeSymbol type) {
+        return type == ITypeSymbol.Primitive.CHAR ? ITypeSymbol.Primitive.INT : type;
     }
 }

@@ -13,7 +13,7 @@ import dev.jstech.computronics.block.DataCableBlock;
 import dev.jstech.computronics.datacenter.DatacenterSection;
 import dev.jstech.computronics.datacenter.LoadBalanceMode;
 import dev.jstech.core.network.ConnectivityIndex;
-import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.INetworkBridge;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.network.ServerNode;
 import dev.jstech.core.network.ServerRouterElement;
@@ -102,7 +102,7 @@ public class ServerRouterBlockEntity extends BlockEntity {
         for (final Direction direction : Direction.values()) {
             final BlockPos neighborPos = worldPosition.relative(direction);
             final var block = serverLevel.getBlockState(neighborPos).getBlock();
-            if (block instanceof DataCableBlock || block instanceof NetworkBridge) {
+            if (block instanceof DataCableBlock || block instanceof INetworkBridge) {
                 neighbors.add(neighborPos.asLong());
             }
         }

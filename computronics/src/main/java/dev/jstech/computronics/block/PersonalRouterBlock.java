@@ -9,8 +9,8 @@ package dev.jstech.computronics.block;
 
 import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.blockentity.PersonalRouterBlockEntity;
-import dev.jstech.core.network.DataNetworkConnectable;
-import dev.jstech.core.network.NetworkBridge;
+import dev.jstech.core.network.IDataNetworkConnectable;
+import dev.jstech.core.network.INetworkBridge;
 import dev.jstech.core.network.NetworkSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
  * The Personal Router: a simple, tier-less block that converts between Ethernet and HBW so a Personal Computer (Ethernet) can reach the HBW backbone.
  */
 public class PersonalRouterBlock extends net.minecraft.world.level.block.HorizontalDirectionalBlock
-        implements EntityBlock, DataNetworkConnectable, NetworkBridge {
+        implements EntityBlock, IDataNetworkConnectable, INetworkBridge {
 
     public static final MapCodec<PersonalRouterBlock> CODEC = simpleCodec(PersonalRouterBlock::new);
 

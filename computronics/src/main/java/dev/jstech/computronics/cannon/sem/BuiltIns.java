@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.cannon.sem;
 
-import dev.jstech.computronics.cannon.ast.Decl;
+import dev.jstech.computronics.cannon.ast.IDecl;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,8 +24,8 @@ import java.util.Set;
  */
 public final class BuiltIns {
 
-    private static final Set<Decl.Modifier> PUBLIC = Set.of(Decl.Modifier.PUBLIC);
-    private static final Set<Decl.Modifier> PUBLIC_STATIC = Set.of(Decl.Modifier.PUBLIC, Decl.Modifier.STATIC);
+    private static final Set<IDecl.Modifier> PUBLIC = Set.of(IDecl.Modifier.PUBLIC);
+    private static final Set<IDecl.Modifier> PUBLIC_STATIC = Set.of(IDecl.Modifier.PUBLIC, IDecl.Modifier.STATIC);
 
     private final Map<String, NamedType> types = new LinkedHashMap<>();
 
@@ -128,24 +128,24 @@ public final class BuiltIns {
         return type;
     }
 
-    private void method(final NamedType owner, final String name, final TypeSymbol returns,
-                        final Set<Decl.Modifier> modifiers, final TypeSymbol... takes) {
-        final List<MemberSymbol.ParameterSymbol> parameters = new ArrayList<>();
+    private void method(final NamedType owner, final String name, final ITypeSymbol returns,
+                        final Set<IDecl.Modifier> modifiers, final ITypeSymbol... takes) {
+        final List<IMemberSymbol.ParameterSymbol> parameters = new ArrayList<>();
         for (int i = 0; i < takes.length; i++) {
-            parameters.add(MemberSymbol.ParameterSymbol.of("a" + i, takes[i]));
+            parameters.add(IMemberSymbol.ParameterSymbol.of("a" + i, takes[i]));
         }
-        owner.addMember(new MemberSymbol.MethodSymbol(owner, name, returns, parameters, modifiers));
+        owner.addMember(new IMemberSymbol.MethodSymbol(owner, name, returns, parameters, modifiers));
     }
 
-    private void property(final NamedType owner, final String name, final TypeSymbol type,
-                          final Set<Decl.Modifier> modifiers) {
-        owner.addMember(new MemberSymbol.PropertySymbol(owner, name, type, true, false, modifiers, Set.of()));
+    private void property(final NamedType owner, final String name, final ITypeSymbol type,
+                          final Set<IDecl.Modifier> modifiers) {
+        owner.addMember(new IMemberSymbol.PropertySymbol(owner, name, type, true, false, modifiers, Set.of()));
     }
 
     private void fillString() {
-        final TypeSymbol text = this.stringType;
-        final TypeSymbol integer = TypeSymbol.Primitive.INT;
-        final TypeSymbol flag = TypeSymbol.Primitive.BOOL;
+        final ITypeSymbol text = this.stringType;
+        final ITypeSymbol integer = ITypeSymbol.Primitive.INT;
+        final ITypeSymbol flag = ITypeSymbol.Primitive.BOOL;
         this.property(this.stringType, "Length", integer, PUBLIC);
         this.method(this.stringType, "Substring", text, PUBLIC, integer);
         this.method(this.stringType, "Substring", text, PUBLIC, integer, integer);
@@ -157,17 +157,17 @@ public final class BuiltIns {
         this.method(this.stringType, "ToLower", text, PUBLIC);
         this.method(this.stringType, "Trim", text, PUBLIC);
         this.method(this.stringType, "Replace", text, PUBLIC, text, text);
-        this.method(this.stringType, "Split", new TypeSymbol.GenericType(this.listType, List.of(text)),
-                PUBLIC, TypeSymbol.Primitive.CHAR);
+        this.method(this.stringType, "Split", new ITypeSymbol.GenericType(this.listType, List.of(text)),
+                PUBLIC, ITypeSymbol.Primitive.CHAR);
         this.method(this.stringType, "Format", text, PUBLIC_STATIC, text, this.objectType);
         this.method(this.stringType, "Format", text, PUBLIC_STATIC, text, this.objectType, this.objectType);
     }
 
     private void fillList() {
-        final TypeSymbol item = new TypeSymbol.TypeParameter("T", 0);
-        final TypeSymbol integer = TypeSymbol.Primitive.INT;
-        final TypeSymbol flag = TypeSymbol.Primitive.BOOL;
-        final TypeSymbol nothing = TypeSymbol.Primitive.VOID;
+        final ITypeSymbol item = new ITypeSymbol.TypeParameter("T", 0);
+        final ITypeSymbol integer = ITypeSymbol.Primitive.INT;
+        final ITypeSymbol flag = ITypeSymbol.Primitive.BOOL;
+        final ITypeSymbol nothing = ITypeSymbol.Primitive.VOID;
         this.property(this.listType, "Count", integer, PUBLIC);
         this.method(this.listType, "Add", nothing, PUBLIC, item);
         this.method(this.listType, "Insert", nothing, PUBLIC, integer, item);
@@ -182,45 +182,45 @@ public final class BuiltIns {
     }
 
     private void fillMap() {
-        final TypeSymbol key = new TypeSymbol.TypeParameter("K", 0);
-        final TypeSymbol value = new TypeSymbol.TypeParameter("V", 1);
-        final TypeSymbol nothing = TypeSymbol.Primitive.VOID;
-        this.property(this.mapType, "Count", TypeSymbol.Primitive.INT, PUBLIC);
+        final ITypeSymbol key = new ITypeSymbol.TypeParameter("K", 0);
+        final ITypeSymbol value = new ITypeSymbol.TypeParameter("V", 1);
+        final ITypeSymbol nothing = ITypeSymbol.Primitive.VOID;
+        this.property(this.mapType, "Count", ITypeSymbol.Primitive.INT, PUBLIC);
         this.method(this.mapType, "Put", nothing, PUBLIC, key, value);
         this.method(this.mapType, "Get", value, PUBLIC, key);
-        this.method(this.mapType, "ContainsKey", TypeSymbol.Primitive.BOOL, PUBLIC, key);
+        this.method(this.mapType, "ContainsKey", ITypeSymbol.Primitive.BOOL, PUBLIC, key);
         // The one lookup that answers both questions at once: whether the key was there, and what it
         // held. It is why the language has an outward parameter at all.
-        this.mapType.addMember(new MemberSymbol.MethodSymbol(this.mapType, "TryGet",
-                TypeSymbol.Primitive.BOOL,
-                List.of(MemberSymbol.ParameterSymbol.of("key", key),
-                        new MemberSymbol.ParameterSymbol("value", value, true)), PUBLIC));
-        this.method(this.mapType, "Remove", TypeSymbol.Primitive.BOOL, PUBLIC, key);
-        this.method(this.mapType, "Keys", new TypeSymbol.GenericType(this.listType, List.of(key)), PUBLIC);
-        this.method(this.mapType, "Values", new TypeSymbol.GenericType(this.listType, List.of(value)), PUBLIC);
+        this.mapType.addMember(new IMemberSymbol.MethodSymbol(this.mapType, "TryGet",
+                ITypeSymbol.Primitive.BOOL,
+                List.of(IMemberSymbol.ParameterSymbol.of("key", key),
+                        new IMemberSymbol.ParameterSymbol("value", value, true)), PUBLIC));
+        this.method(this.mapType, "Remove", ITypeSymbol.Primitive.BOOL, PUBLIC, key);
+        this.method(this.mapType, "Keys", new ITypeSymbol.GenericType(this.listType, List.of(key)), PUBLIC);
+        this.method(this.mapType, "Values", new ITypeSymbol.GenericType(this.listType, List.of(value)), PUBLIC);
     }
 
     private void fillDelegates() {
-        this.actionType.setInvoke(new MemberSymbol.MethodSymbol(this.actionType, "Invoke",
-                TypeSymbol.Primitive.VOID, List.of(), PUBLIC));
-        this.actionOfType.setInvoke(new MemberSymbol.MethodSymbol(this.actionOfType, "Invoke",
-                TypeSymbol.Primitive.VOID,
-                List.of(MemberSymbol.ParameterSymbol.of("value", new TypeSymbol.TypeParameter("T", 0))), PUBLIC));
-        this.funcType.setInvoke(new MemberSymbol.MethodSymbol(this.funcType, "Invoke",
-                new TypeSymbol.TypeParameter("R", 1),
-                List.of(MemberSymbol.ParameterSymbol.of("value", new TypeSymbol.TypeParameter("T", 0))), PUBLIC));
+        this.actionType.setInvoke(new IMemberSymbol.MethodSymbol(this.actionType, "Invoke",
+                ITypeSymbol.Primitive.VOID, List.of(), PUBLIC));
+        this.actionOfType.setInvoke(new IMemberSymbol.MethodSymbol(this.actionOfType, "Invoke",
+                ITypeSymbol.Primitive.VOID,
+                List.of(IMemberSymbol.ParameterSymbol.of("value", new ITypeSymbol.TypeParameter("T", 0))), PUBLIC));
+        this.funcType.setInvoke(new IMemberSymbol.MethodSymbol(this.funcType, "Invoke",
+                new ITypeSymbol.TypeParameter("R", 1),
+                List.of(IMemberSymbol.ParameterSymbol.of("value", new ITypeSymbol.TypeParameter("T", 0))), PUBLIC));
     }
 
     private void fillScript() {
-        this.method(this.scriptType, "OnInit", TypeSymbol.Primitive.VOID, PUBLIC);
-        this.method(this.scriptType, "OnTick", TypeSymbol.Primitive.VOID, PUBLIC);
-        this.method(this.scriptType, "OnDestroy", TypeSymbol.Primitive.VOID, PUBLIC);
+        this.method(this.scriptType, "OnInit", ITypeSymbol.Primitive.VOID, PUBLIC);
+        this.method(this.scriptType, "OnTick", ITypeSymbol.Primitive.VOID, PUBLIC);
+        this.method(this.scriptType, "OnDestroy", ITypeSymbol.Primitive.VOID, PUBLIC);
     }
 
     private void fillMath() {
         final NamedType math = this.declare("Math", NamedType.Kind.CLASS);
-        final TypeSymbol integer = TypeSymbol.Primitive.INT;
-        final TypeSymbol real = TypeSymbol.Primitive.DOUBLE;
+        final ITypeSymbol integer = ITypeSymbol.Primitive.INT;
+        final ITypeSymbol real = ITypeSymbol.Primitive.DOUBLE;
         this.method(math, "Abs", integer, PUBLIC_STATIC, integer);
         this.method(math, "Abs", real, PUBLIC_STATIC, real);
         this.method(math, "Min", integer, PUBLIC_STATIC, integer, integer);
@@ -238,30 +238,30 @@ public final class BuiltIns {
 
     private void fillConsole() {
         final NamedType console = this.declare("Console", NamedType.Kind.CLASS);
-        this.method(console, "Print", TypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
-        this.method(console, "PrintLine", TypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
-        this.method(console, "Clear", TypeSymbol.Primitive.VOID, PUBLIC_STATIC);
+        this.method(console, "Print", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
+        this.method(console, "PrintLine", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
+        this.method(console, "Clear", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC);
     }
 
     private void fillConvert() {
         final NamedType convert = this.declare("Convert", NamedType.Kind.CLASS);
-        this.method(convert, "ToInt", TypeSymbol.Primitive.INT, PUBLIC_STATIC, this.stringType);
-        this.method(convert, "ToLong", TypeSymbol.Primitive.LONG, PUBLIC_STATIC, this.stringType);
-        this.method(convert, "ToDouble", TypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC, this.stringType);
+        this.method(convert, "ToInt", ITypeSymbol.Primitive.INT, PUBLIC_STATIC, this.stringType);
+        this.method(convert, "ToLong", ITypeSymbol.Primitive.LONG, PUBLIC_STATIC, this.stringType);
+        this.method(convert, "ToDouble", ITypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC, this.stringType);
         this.method(convert, "ToString", this.stringType, PUBLIC_STATIC, this.objectType);
-        convert.addMember(new MemberSymbol.MethodSymbol(convert, "TryInt", TypeSymbol.Primitive.BOOL,
-                List.of(MemberSymbol.ParameterSymbol.of("text", this.stringType),
-                        new MemberSymbol.ParameterSymbol("value", TypeSymbol.Primitive.INT, true)),
+        convert.addMember(new IMemberSymbol.MethodSymbol(convert, "TryInt", ITypeSymbol.Primitive.BOOL,
+                List.of(IMemberSymbol.ParameterSymbol.of("text", this.stringType),
+                        new IMemberSymbol.ParameterSymbol("value", ITypeSymbol.Primitive.INT, true)),
                 PUBLIC_STATIC));
     }
 
     private void fillTime() {
         final NamedType time = this.declare("Time", NamedType.Kind.CLASS);
-        final TypeSymbol ticks = TypeSymbol.Primitive.LONG;
+        final ITypeSymbol ticks = ITypeSymbol.Primitive.LONG;
         this.property(time, "Tick", ticks, PUBLIC_STATIC);
         this.property(time, "DayTime", ticks, PUBLIC_STATIC);
         this.property(time, "Day", ticks, PUBLIC_STATIC);
-        this.method(time, "Ticks", ticks, PUBLIC_STATIC, TypeSymbol.Primitive.INT);
+        this.method(time, "Ticks", ticks, PUBLIC_STATIC, ITypeSymbol.Primitive.INT);
     }
 
     /**
@@ -273,17 +273,17 @@ public final class BuiltIns {
      */
     private void fillFile() {
         final NamedType file = this.declare("File", NamedType.Kind.CLASS);
-        this.method(file, "Exists", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
+        this.method(file, "Exists", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
         this.method(file, "Read", this.stringType, PUBLIC_STATIC, this.stringType);
-        file.addMember(new MemberSymbol.MethodSymbol(file, "TryRead", TypeSymbol.Primitive.BOOL,
-                List.of(MemberSymbol.ParameterSymbol.of("path", this.stringType),
-                        new MemberSymbol.ParameterSymbol("text", this.stringType, true)),
+        file.addMember(new IMemberSymbol.MethodSymbol(file, "TryRead", ITypeSymbol.Primitive.BOOL,
+                List.of(IMemberSymbol.ParameterSymbol.of("path", this.stringType),
+                        new IMemberSymbol.ParameterSymbol("text", this.stringType, true)),
                 PUBLIC_STATIC));
-        this.method(file, "Write", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType, this.stringType);
-        this.method(file, "Append", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType, this.stringType);
-        this.method(file, "Delete", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
-        this.method(file, "MkDir", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
-        this.method(file, "List", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
+        this.method(file, "Write", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType, this.stringType);
+        this.method(file, "Append", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType, this.stringType);
+        this.method(file, "Delete", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
+        this.method(file, "MkDir", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
+        this.method(file, "List", new ITypeSymbol.GenericType(this.listType, List.of(this.stringType)),
                 PUBLIC_STATIC, this.stringType);
     }
 
@@ -294,8 +294,8 @@ public final class BuiltIns {
      * what it was told, and asks again when it wants to know again.
      */
     private void fillComputer() {
-        final TypeSymbol integer = TypeSymbol.Primitive.INT;
-        final TypeSymbol whole = TypeSymbol.Primitive.LONG;
+        final ITypeSymbol integer = ITypeSymbol.Primitive.INT;
+        final ITypeSymbol whole = ITypeSymbol.Primitive.LONG;
 
         final NamedType cpu = this.declare("CpuInfo", NamedType.Kind.CLASS);
         this.property(cpu, "Mhz", integer, PUBLIC);
@@ -323,11 +323,11 @@ public final class BuiltIns {
         this.property(computer, "Os", os, PUBLIC_STATIC);
         this.property(computer, "RamMb", integer, PUBLIC_STATIC);
         this.property(computer, "FreeRamMb", integer, PUBLIC_STATIC);
-        this.property(computer, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
-        this.method(computer, "Disks", new TypeSymbol.GenericType(this.listType, List.of(disk)), PUBLIC_STATIC);
-        this.method(computer, "Programs", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
+        this.property(computer, "Online", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        this.method(computer, "Disks", new ITypeSymbol.GenericType(this.listType, List.of(disk)), PUBLIC_STATIC);
+        this.method(computer, "Programs", new ITypeSymbol.GenericType(this.listType, List.of(this.stringType)),
                 PUBLIC_STATIC);
-        this.method(computer, "Processes", new TypeSymbol.GenericType(this.listType, List.of(process)),
+        this.method(computer, "Processes", new ITypeSymbol.GenericType(this.listType, List.of(process)),
                 PUBLIC_STATIC);
     }
 
@@ -338,7 +338,7 @@ public final class BuiltIns {
      * a fair question anywhere. Everything else needs one, and says so if there is none.
      */
     private void fillNetwork() {
-        final TypeSymbol whole = TypeSymbol.Primitive.LONG;
+        final ITypeSymbol whole = ITypeSymbol.Primitive.LONG;
 
         final NamedType holding = this.declare("HoldingInfo", NamedType.Kind.CLASS);
         this.property(holding, "Server", this.stringType, PUBLIC);
@@ -350,16 +350,16 @@ public final class BuiltIns {
         this.property(server, "Capacity", whole, PUBLIC);
 
         final NamedType network = this.declare("Network", NamedType.Kind.CLASS);
-        this.property(network, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        this.property(network, "Online", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
         this.property(network, "Current", this.stringType, PUBLIC_STATIC);
         this.property(network, "Capacity", whole, PUBLIC_STATIC);
         this.property(network, "Used", whole, PUBLIC_STATIC);
         this.method(network, "Total", whole, PUBLIC_STATIC, this.stringType);
-        this.method(network, "Types", new TypeSymbol.GenericType(this.listType, List.of(this.stringType)),
+        this.method(network, "Types", new ITypeSymbol.GenericType(this.listType, List.of(this.stringType)),
                 PUBLIC_STATIC);
-        this.method(network, "Find", new TypeSymbol.GenericType(this.listType, List.of(holding)),
+        this.method(network, "Find", new ITypeSymbol.GenericType(this.listType, List.of(holding)),
                 PUBLIC_STATIC, this.stringType);
-        this.method(network, "Servers", new TypeSymbol.GenericType(this.listType, List.of(server)),
+        this.method(network, "Servers", new ITypeSymbol.GenericType(this.listType, List.of(server)),
                 PUBLIC_STATIC);
 
         // Being told beats asking. A program that wants to know when the iron runs low says so once and
@@ -370,10 +370,10 @@ public final class BuiltIns {
         this.property(event, "Previous", whole, PUBLIC);
 
         final NamedType subscription = this.declare("Subscription", NamedType.Kind.CLASS);
-        this.property(subscription, "Id", TypeSymbol.Primitive.INT, PUBLIC);
+        this.property(subscription, "Id", ITypeSymbol.Primitive.INT, PUBLIC);
         this.property(subscription, "Item", this.stringType, PUBLIC);
 
-        final TypeSymbol told = new TypeSymbol.GenericType(this.actionOfType, List.of(event));
+        final ITypeSymbol told = new ITypeSymbol.GenericType(this.actionOfType, List.of(event));
         this.method(network, "Watch", subscription, PUBLIC_STATIC, this.stringType, told);
         this.method(network, "WatchBelow", subscription, PUBLIC_STATIC, this.stringType, whole, told);
         this.method(network, "WatchAbove", subscription, PUBLIC_STATIC, this.stringType, whole, told);
@@ -386,7 +386,7 @@ public final class BuiltIns {
      * without first asking whether there is anything to add up.
      */
     private void fillMainframe() {
-        final TypeSymbol integer = TypeSymbol.Primitive.INT;
+        final ITypeSymbol integer = ITypeSymbol.Primitive.INT;
 
         final NamedType stat = this.declare("WorkStat", NamedType.Kind.CLASS);
         this.property(stat, "Type", this.stringType, PUBLIC);
@@ -394,13 +394,13 @@ public final class BuiltIns {
         this.property(stat, "AverageWait", integer, PUBLIC);
         this.property(stat, "AverageRun", integer, PUBLIC);
         this.property(stat, "ShortfallPercent", integer, PUBLIC);
-        this.property(stat, "Moved", TypeSymbol.Primitive.LONG, PUBLIC);
+        this.property(stat, "Moved", ITypeSymbol.Primitive.LONG, PUBLIC);
 
         final NamedType mainframe = this.declare("Mainframe", NamedType.Kind.CLASS);
-        this.property(mainframe, "Online", TypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        this.property(mainframe, "Online", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
         this.property(mainframe, "PeakToday", integer, PUBLIC_STATIC);
         this.method(mainframe, "Stats", stat, PUBLIC_STATIC, this.stringType);
-        this.method(mainframe, "Work", new TypeSymbol.GenericType(this.listType, List.of(stat)),
+        this.method(mainframe, "Work", new ITypeSymbol.GenericType(this.listType, List.of(stat)),
                 PUBLIC_STATIC);
     }
 
@@ -412,10 +412,10 @@ public final class BuiltIns {
      * and tries something else rather than stopping.
      */
     private void fillOperations() {
-        final TypeSymbol whole = TypeSymbol.Primitive.LONG;
+        final ITypeSymbol whole = ITypeSymbol.Primitive.LONG;
 
         final NamedType asked = this.declare("AskResult", NamedType.Kind.CLASS);
-        this.property(asked, "Ok", TypeSymbol.Primitive.BOOL, PUBLIC);
+        this.property(asked, "Ok", ITypeSymbol.Primitive.BOOL, PUBLIC);
         this.property(asked, "Message", this.stringType, PUBLIC);
 
         final NamedType operation = this.declare("OperationInfo", NamedType.Kind.CLASS);
@@ -436,14 +436,14 @@ public final class BuiltIns {
         // it holds is a picture of how things were, and painting over a picture changes nothing.
         this.method(operations, "Reprioritise", asked, PUBLIC_STATIC, this.stringType, this.stringType);
         this.method(operations, "Get", operation, PUBLIC_STATIC, this.stringType);
-        this.method(operations, "List", new TypeSymbol.GenericType(this.listType, List.of(operation)),
+        this.method(operations, "List", new ITypeSymbol.GenericType(this.listType, List.of(operation)),
                 PUBLIC_STATIC);
     }
 
     private void fillRandom() {
         final NamedType random = this.declare("Random", NamedType.Kind.CLASS);
-        this.method(random, "Next", TypeSymbol.Primitive.INT, PUBLIC_STATIC, TypeSymbol.Primitive.INT);
-        this.method(random, "NextDouble", TypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC);
-        this.method(random, "Seed", TypeSymbol.Primitive.VOID, PUBLIC_STATIC, TypeSymbol.Primitive.LONG);
+        this.method(random, "Next", ITypeSymbol.Primitive.INT, PUBLIC_STATIC, ITypeSymbol.Primitive.INT);
+        this.method(random, "NextDouble", ITypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC);
+        this.method(random, "Seed", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC, ITypeSymbol.Primitive.LONG);
     }
 }

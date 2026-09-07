@@ -11,9 +11,9 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity;
 import dev.jstech.core.network.DataTier;
-import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.IRearFacingDataPort;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.core.util.BlockDrops;
 import dev.jstech.core.util.BlockEntityTickers;
@@ -48,7 +48,7 @@ import java.util.Set;
  * works without one; the computer makes it one machine to run.
  */
 public class ClusterManagementComputerBlock extends HorizontalDirectionalBlock
-        implements EntityBlock, RearFacingDataPort, PeripheralConnectable, EraChassisBlock {
+        implements EntityBlock, IRearFacingDataPort, IPeripheralConnectable, IEraChassisBlock {
 
     public static final MapCodec<ClusterManagementComputerBlock> CODEC = simpleCodec(ClusterManagementComputerBlock::new);
 

@@ -12,7 +12,7 @@ import dev.jstech.computronics.operation.ComputingOperations;
 import dev.jstech.computronics.operation.NetworkSelectOperation;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.JsCore;
-import dev.jstech.core.event.OperationLifecycleEvent;
+import dev.jstech.core.event.IOperationLifecycleEvent;
 import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.core.operation.OperationStatus;
 import dev.jstech.core.operation.OperationType;
@@ -62,16 +62,16 @@ public final class OperationLifecycleGameTests {
     public static void events_followASelectFromCreatedToCompleted(final GameTestHelper helper) {
         final MainframeBlockEntity mainframe = OperationSchedulingGameTests.storageNetwork(helper);
         final ItemStackHandler dest = new ItemStackHandler(9);
-        final List<OperationLifecycleEvent> seen = new ArrayList<>();
+        final List<IOperationLifecycleEvent> seen = new ArrayList<>();
         final NetworkSelectOperation[] op = new NetworkSelectOperation[1];
         // The bus is shared by every test on the server: listen for this network's events only, and let
         // go of the listener when done so it does not outlive the test.
-        final Consumer<OperationLifecycleEvent> listener = event -> {
+        final Consumer<IOperationLifecycleEvent> listener = event -> {
             if (event.networkUuid().equals(mainframe.networkUuid())) {
                 seen.add(event);
             }
         };
-        JsCore.events().subscribe(OperationLifecycleEvent.class, listener);
+        JsCore.events().subscribe(IOperationLifecycleEvent.class, listener);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> OperationSchedulingGameTests.rack(helper)
                         .getServerStorage(0).insert(Items.COBBLESTONE, 100))
@@ -79,20 +79,20 @@ public final class OperationLifecycleGameTests {
                     op[0] = mainframe.submitNetworkSelect(Items.COBBLESTONE, 30,
                             OperationSchedulingGameTests.port(dest), "events");
                     helper.assertTrue(op[0] != null, "the pull is accepted");
-                    helper.assertTrue(seen.size() == 1 && seen.get(0) instanceof OperationLifecycleEvent.Created c
+                    helper.assertTrue(seen.size() == 1 && seen.get(0) instanceof IOperationLifecycleEvent.Created c
                             && c.operationId().equals(op[0].operationId())
                             && c.typeId().equals(ComputingOperations.SELECT),
                             "Created is posted on submission; seen=" + seen);
                 })
                 .thenExecuteAfter(2, () -> helper.assertTrue(seen.size() == 2
-                                && seen.get(1) instanceof OperationLifecycleEvent.Started s
+                                && seen.get(1) instanceof IOperationLifecycleEvent.Started s
                                 && s.operationId().equals(op[0].operationId()),
                         "Started is posted the first tick it runs; seen=" + seen))
                 .thenExecuteAfter(40, () -> {
-                    JsCore.events().unsubscribe(OperationLifecycleEvent.class, listener);
+                    JsCore.events().unsubscribe(IOperationLifecycleEvent.class, listener);
                     helper.assertTrue(OperationSchedulingGameTests.count(dest) == 30, "the pull delivered");
                     helper.assertTrue(seen.size() == 3
-                                    && seen.get(2) instanceof OperationLifecycleEvent.Completed done
+                                    && seen.get(2) instanceof IOperationLifecycleEvent.Completed done
                                     && done.operationId().equals(op[0].operationId())
                                     && done.durationTicks() >= 10,
                             "Completed closes the life with its duration; seen=" + seen);
@@ -104,14 +104,14 @@ public final class OperationLifecycleGameTests {
     public static void events_aCancelledOperationIsDiscarded(final GameTestHelper helper) {
         final MainframeBlockEntity mainframe = OperationSchedulingGameTests.storageNetwork(helper);
         final ItemStackHandler dest = new ItemStackHandler(9);
-        final List<OperationLifecycleEvent> seen = new ArrayList<>();
+        final List<IOperationLifecycleEvent> seen = new ArrayList<>();
         final NetworkSelectOperation[] op = new NetworkSelectOperation[1];
-        final Consumer<OperationLifecycleEvent> listener = event -> {
+        final Consumer<IOperationLifecycleEvent> listener = event -> {
             if (event.networkUuid().equals(mainframe.networkUuid())) {
                 seen.add(event);
             }
         };
-        JsCore.events().subscribe(OperationLifecycleEvent.class, listener);
+        JsCore.events().subscribe(IOperationLifecycleEvent.class, listener);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> OperationSchedulingGameTests.rack(helper)
                         .getServerStorage(0).insert(Items.COBBLESTONE, 100))
@@ -123,9 +123,9 @@ public final class OperationLifecycleGameTests {
                 .thenExecuteAfter(3, () -> helper.assertTrue(mainframe.cancelOperation(op[0].operationId()),
                         "the pull is cancelled mid-seek"))
                 .thenExecuteAfter(3, () -> {
-                    JsCore.events().unsubscribe(OperationLifecycleEvent.class, listener);
-                    final OperationLifecycleEvent last = seen.isEmpty() ? null : seen.get(seen.size() - 1);
-                    helper.assertTrue(last instanceof OperationLifecycleEvent.Discarded d
+                    JsCore.events().unsubscribe(IOperationLifecycleEvent.class, listener);
+                    final IOperationLifecycleEvent last = seen.isEmpty() ? null : seen.get(seen.size() - 1);
+                    helper.assertTrue(last instanceof IOperationLifecycleEvent.Discarded d
                             && d.operationId().equals(op[0].operationId()), "Discarded closes a cancelled life; seen=" + seen);
                 })
                 .thenSucceed();

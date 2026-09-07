@@ -24,34 +24,34 @@ public final class ListView<T> extends UiComponent {
 
     /** Draws one row in its rectangle. */
     @FunctionalInterface
-    public interface RowRenderer<T> {
+    public interface IRowRenderer<T> {
         void render(GuiGraphics g, UiContext ctx, T item, int index, int x, int y, int w, int h, boolean hovered,
                     boolean selected);
     }
 
     /** A click on a row, or on the empty space under the rows (index -1), with where it landed. */
     @FunctionalInterface
-    public interface RowClick {
+    public interface IRowClick {
         void click(int index, int button, double mx, double my);
     }
 
     private final Supplier<List<T>> items;
     private final int rowHeight;
-    private final RowRenderer<T> renderer;
-    private RowClick onClick = (index, button, mx, my) -> { };
+    private final IRowRenderer<T> renderer;
+    private IRowClick onClick = (index, button, mx, my) -> { };
     private boolean selectable;
     private int selected = -1;
     private int scroll;
     private int paddingX;
     private int paddingY;
 
-    public ListView(final Supplier<List<T>> items, final int rowHeight, final RowRenderer<T> renderer) {
+    public ListView(final Supplier<List<T>> items, final int rowHeight, final IRowRenderer<T> renderer) {
         this.items = items;
         this.rowHeight = Math.max(1, rowHeight);
         this.renderer = renderer;
     }
 
-    public ListView<T> setOnClick(final RowClick action) {
+    public ListView<T> setOnClick(final IRowClick action) {
         onClick = action;
         return this;
     }

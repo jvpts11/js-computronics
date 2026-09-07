@@ -27,7 +27,7 @@ import java.util.List;
  * session (POST, firmware, terminal or full desktop) on this monitor. The shell route is {@code ssh}; this
  * is the same reach for players who would rather point and click.
  */
-public final class RemoteControlApp implements DesktopApp {
+public final class RemoteControlApp implements IDesktopApp {
 
     private static final int ROW_H = 22;
     private static final int REFRESH_FRAMES = 60;

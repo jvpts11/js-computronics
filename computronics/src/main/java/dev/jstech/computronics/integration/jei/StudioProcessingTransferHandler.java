@@ -11,7 +11,7 @@ import dev.jstech.computronics.client.os.PatternStudioApp;
 import dev.jstech.computronics.crafting.PatternWorkbench;
 import dev.jstech.computronics.integration.jei.payload.SetProcessingPatternPayload;
 import dev.jstech.computronics.menu.DesktopMenu;
-import dev.jstech.computronics.storage.ChemicalBridge;
+import dev.jstech.computronics.storage.IChemicalBridge;
 import dev.jstech.computronics.storage.ChemicalBridges;
 import dev.jstech.computronics.storage.StorageKey;
 import mezz.jei.api.gui.ingredient.IRecipeSlotView;
@@ -119,7 +119,7 @@ public final class StudioProcessingTransferHandler implements IUniversalRecipeTr
             return new PatternWorkbench.DataCell(StorageKey.of(fluid.get()), fluid.get().getAmount(), false);
         }
         for (final ITypedIngredient<?> typed : slot.getAllIngredients().toList()) {
-            final Optional<ChemicalBridge.ChemicalAmount> chemical = ChemicalBridges.chemicalIngredient(typed.getIngredient());
+            final Optional<IChemicalBridge.ChemicalAmount> chemical = ChemicalBridges.chemicalIngredient(typed.getIngredient());
             if (chemical.isPresent()) {
                 final long amount = perTick ? chemical.get().amount() * PER_TICK_BASE_TICKS : chemical.get().amount();
                 return new PatternWorkbench.DataCell(StorageKey.chemical(chemical.get().chemical()), amount, perTick);

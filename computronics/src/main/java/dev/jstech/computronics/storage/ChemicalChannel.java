@@ -13,8 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** A block face's chemical port (from a {@link ChemicalBridge}), as a data channel; amounts are millibuckets. */
-public record ChemicalChannel(ChemicalPort chemicals) implements DataChannel {
+/** A block face's chemical port (from an {@link IChemicalBridge}), as a data channel; amounts are millibuckets. */
+public record ChemicalChannel(IChemicalPort chemicals) implements IDataChannel {
 
     @Override
     public StorageKey.Kind kind() {

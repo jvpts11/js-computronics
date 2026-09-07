@@ -12,7 +12,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -49,7 +49,7 @@ import org.jetbrains.annotations.Nullable;
  * computer can then query all linked readers to locate OS installation media without requiring the
  * reader to be physically adjacent.
  */
-public class MediaReaderBlock extends HorizontalDirectionalBlock implements EntityBlock, PeripheralConnectable {
+public class MediaReaderBlock extends HorizontalDirectionalBlock implements EntityBlock, IPeripheralConnectable {
 
     public static final MapCodec<MediaReaderBlock> CODEC = RecordCodecBuilder.mapCodec(instance ->
             instance.group(

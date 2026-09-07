@@ -47,18 +47,18 @@ class CoreConfigKeysTest {
 
     @Test
     void validate_clampsAnOutOfRangeLatency() {
-        final ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
-        final ConfigValidationResult<Integer> result = validator.validate(CoreConfigKeys.HDD_LATENCY_TICKS, 5000);
-        assertInstanceOf(ConfigValidationResult.Clamped.class, result);
+        final ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
+        final IConfigValidationResult<Integer> result = validator.validate(CoreConfigKeys.HDD_LATENCY_TICKS, 5000);
+        assertInstanceOf(IConfigValidationResult.Clamped.class, result);
         assertEquals(200, result.value());
     }
 
     @Test
     void validate_rejectsAWrongTypeToTheDefault() {
-        final ConfigValidator validator = new ConfigValidator(ConfigLogger.NOOP);
-        final ConfigValidationResult<Double> result =
+        final ConfigValidator validator = new ConfigValidator(IConfigLogger.NOOP);
+        final IConfigValidationResult<Double> result =
                 validator.validate(CoreConfigKeys.SUBFRAME_EFFICIENCY_FACTOR, "fast");
-        assertInstanceOf(ConfigValidationResult.Rejected.class, result);
+        assertInstanceOf(IConfigValidationResult.Rejected.class, result);
         assertEquals(0.6, result.value());
     }
 

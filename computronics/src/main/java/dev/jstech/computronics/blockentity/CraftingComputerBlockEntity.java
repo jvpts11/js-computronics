@@ -12,7 +12,7 @@ import dev.jstech.computronics.JsComputronics;
 import dev.jstech.computronics.hardware.ComputerBuild;
 import dev.jstech.computronics.hardware.CraftingCardSpec;
 import dev.jstech.computronics.hardware.ExpansionCardKind;
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import dev.jstech.computronics.hardware.FormFactor;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.uuid.NetworkUuid;
@@ -27,7 +27,7 @@ import java.util.Set;
  * The Crafting Computer: a Category-C computer that executes crafting recipes for the network.
  */
 public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
-        implements dev.jstech.computronics.terminal.ComputerTerminalHost {
+        implements dev.jstech.computronics.terminal.IComputerTerminalHost {
 
     // Slot layout — an ATX board: one CPU, four RAM, four PCIe (GPU and/or Crafting Card), one PSU,
     // two disks. Kept public so the assembly Menu and Screen address slots by name.
@@ -107,7 +107,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
             return 0.0;
         }
         double factor = 0.0;
-        for (final ExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CRAFTING)) {
+        for (final IExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CRAFTING)) {
             if (card instanceof CraftingCardSpec craftingCard) {
                 factor += craftingCard.cpuFactor();
             }
@@ -131,7 +131,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
             return 0;
         }
         int threads = 0;
-        for (final ExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CRAFTING)) {
+        for (final IExpansionCardSpec card : build.cardsOfKind(ExpansionCardKind.CRAFTING)) {
             if (card instanceof CraftingCardSpec craftingCard) {
                 threads += craftingCard.threads();
             }
@@ -429,7 +429,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
         return dataAccess;
     }
 
-    // ComputerTerminalHost — read-only monitoring so the Network Interactor works on a Crafting Computer
+    // IComputerTerminalHost — read-only monitoring so the Network Interactor works on a Crafting Computer
     // (the storage/hardware getters are inherited from the base; only these computer-semantic ones differ).
 
     @Override
@@ -507,7 +507,7 @@ public class CraftingComputerBlockEntity extends AbstractComputerBlockEntity
     }
 
     @Override
-    public dev.jstech.computronics.storage.DataSink localStorage() {
+    public dev.jstech.computronics.storage.IDataSink localStorage() {
         return new dev.jstech.computronics.storage.StoreSink(localStore());
     }
 }

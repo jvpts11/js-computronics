@@ -12,7 +12,7 @@ import dev.jstech.computronics.crafting.ProcessingPattern;
 import dev.jstech.computronics.operation.NetworkStorage;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.ChemicalBridges;
-import dev.jstech.computronics.storage.ChemicalPort;
+import dev.jstech.computronics.storage.IChemicalPort;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
@@ -87,7 +87,7 @@ public final class MekanismProcessingGameTests {
                     // With a bus on the hydrogen face too, the by-product is data as well - nothing stays behind.
                     helper.assertTrue(storage.count(hydrogen) == 400,
                             "the hydrogen must reach the network through its own bus; got " + storage.count(hydrogen));
-                    final Optional<ChemicalPort> left = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(MACHINE), Direction.EAST);
+                    final Optional<IChemicalPort> left = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(MACHINE), Direction.EAST);
                     helper.assertTrue(left.isPresent() && left.get().count(HYDROGEN) == 0,
                             "the separator must be drained of hydrogen; holds " + left.map(p -> p.count(HYDROGEN)).orElse(-1L));
                 })
@@ -139,7 +139,7 @@ public final class MekanismProcessingGameTests {
                             "two lots (400 mB) of water must have been fed, no more; left " + storage.count(water()));
                     // Hydrogen leaves through the other output face, which carries no bus: it stays in the machine.
                     helper.assertTrue(storage.count(hydrogen) == 0, "no hydrogen must reach the network without a bus on its face");
-                    final Optional<ChemicalPort> left = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(MACHINE), Direction.EAST);
+                    final Optional<IChemicalPort> left = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(MACHINE), Direction.EAST);
                     helper.assertTrue(left.isPresent() && left.get().count(HYDROGEN) == 400,
                             "the separator must hold the 400 mB of hydrogen it made; got "
                                     + left.map(p -> p.count(HYDROGEN)).orElse(-1L));
@@ -173,7 +173,7 @@ public final class MekanismProcessingGameTests {
                     MekanismRig.power(helper);
                     helper.assertTrue(!op[0].isWaiting() && !op[0].isDone(), "the operation must have resolved the chamber; waiting="
                             + op[0].isWaiting() + " done=" + op[0].isDone() + " status=" + op[0].toRecord().status());
-                    final Optional<ChemicalPort> top = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(MACHINE), Direction.UP);
+                    final Optional<IChemicalPort> top = ChemicalBridges.portFor(helper.getLevel(), helper.absolutePos(MACHINE), Direction.UP);
                     final var items = helper.getLevel().getCapability(Capabilities.ItemHandler.BLOCK,
                             helper.absolutePos(MACHINE), Direction.UP);
                     helper.assertTrue(top.isPresent() && top.get().count(OXYGEN) > 0,

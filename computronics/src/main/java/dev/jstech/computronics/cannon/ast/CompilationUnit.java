@@ -16,7 +16,7 @@ import java.util.Objects;
  * <p>A file holds nothing but type declarations, which is the language's first rule: there is no
  * such thing as a loose statement at the top of a file.
  */
-public record CompilationUnit(String file, List<Decl.TypeDecl> types) {
+public record CompilationUnit(String file, List<IDecl.ITypeDecl> types) {
 
     public CompilationUnit {
         Objects.requireNonNull(file, "file");
@@ -24,8 +24,8 @@ public record CompilationUnit(String file, List<Decl.TypeDecl> types) {
     }
 
     /** The declaration named {@code name}, or null if the file does not declare one. */
-    public Decl.TypeDecl type(final String name) {
-        for (final Decl.TypeDecl type : this.types) {
+    public IDecl.ITypeDecl type(final String name) {
+        for (final IDecl.ITypeDecl type : this.types) {
             if (type.name().equals(name)) {
                 return type;
             }

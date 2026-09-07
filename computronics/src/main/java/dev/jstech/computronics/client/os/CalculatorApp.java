@@ -23,7 +23,7 @@ import java.math.MathContext;
  * the {@link CalcEngine} evaluator. Buttons build an infix expression string; {@code =} evaluates it and
  * shows the formatted result. The {@code DEG}/{@code RAD} key toggles how trig functions read their angle.
  */
-public final class CalculatorApp implements DesktopApp {
+public final class CalculatorApp implements IDesktopApp {
 
     private static final String[][] KEYS = {
             {"DEG", "C", "<-", "(", ")"},

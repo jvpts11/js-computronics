@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class SelfTestOperationTaskTest {
 
     /** Runs every marshaled action inline on the calling thread; for testing pure-CPU tasks without a dispatcher. */
-    private static final class ImmediateContext implements OperationContext {
+    private static final class ImmediateContext implements IOperationContext {
         @Override
         public void onMainThread(final Runnable action) {
             action.run();
@@ -43,16 +43,16 @@ class SelfTestOperationTaskTest {
         }
     }
 
-    private static final OperationContext NO_OP = new ImmediateContext();
+    private static final IOperationContext NO_OP = new ImmediateContext();
 
     @Test
     void run_succeeds() {
-        assertInstanceOf(OperationResult.Success.class, new SelfTestOperationTask(10_000).run(NO_OP));
+        assertInstanceOf(IOperationResult.Success.class, new SelfTestOperationTask(10_000).run(NO_OP));
     }
 
     @Test
     void run_zeroWork_stillSucceeds() {
-        assertInstanceOf(OperationResult.Success.class, new SelfTestOperationTask(0).run(NO_OP));
+        assertInstanceOf(IOperationResult.Success.class, new SelfTestOperationTask(0).run(NO_OP));
     }
 
     @Test

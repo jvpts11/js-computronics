@@ -22,7 +22,7 @@ import dev.jstech.computronics.crafting.ProcessingPattern;
 import dev.jstech.computronics.crafting.RecipeBook;
 import dev.jstech.computronics.crafting.RecipeMachines;
 import dev.jstech.computronics.os.FilesystemKind;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import dev.jstech.computronics.os.VolumeLabel;
 import dev.jstech.computronics.os.fs.CraftFile;
 import dev.jstech.computronics.os.fs.DiskFilesystem;
@@ -83,10 +83,10 @@ public final class PatternStudioPayloads {
 
     /** The host at {@code hostPos} as an OS host with a workbench, if the player is at one of its monitors. */
     @Nullable
-    public static OsHost studioHost(final ServerPlayer player, final ServerLevel level, final BlockPos hostPos,
+    public static IOsHost studioHost(final ServerPlayer player, final ServerLevel level, final BlockPos hostPos,
                                     final BlockPos monitorPos) {
         final var terminal = ComputingPayloads.niHost(player, level, hostPos, monitorPos);
-        return terminal instanceof OsHost host && host.studio() != null ? host : null;
+        return terminal instanceof IOsHost host && host.studio() != null ? host : null;
     }
 
     private static void handleRequest(final RequestPatternStudioPayload payload, final IPayloadContext context) {
@@ -94,7 +94,7 @@ public final class PatternStudioPayloads {
             if (!(context.player() instanceof ServerPlayer player) || !(player.level() instanceof ServerLevel level)) {
                 return;
             }
-            final OsHost host = studioHost(player, level, payload.host(), payload.monitorPos());
+            final IOsHost host = studioHost(player, level, payload.host(), payload.monitorPos());
             if (host == null) {
                 return;
             }
@@ -110,7 +110,7 @@ public final class PatternStudioPayloads {
             if (!(context.player() instanceof ServerPlayer player) || !(player.level() instanceof ServerLevel level)) {
                 return;
             }
-            final OsHost host = studioHost(player, level, payload.host(), payload.monitorPos());
+            final IOsHost host = studioHost(player, level, payload.host(), payload.monitorPos());
             if (host == null) {
                 return;
             }
@@ -211,7 +211,7 @@ public final class PatternStudioPayloads {
     }
 
     /** Fills the bench from a recipe viewer's transfer: the nine cells, tags cleared. */
-    public static void applyBenchGrid(final OsHost host, final ServerLevel level, final List<ItemStack> grid,
+    public static void applyBenchGrid(final IOsHost host, final ServerLevel level, final List<ItemStack> grid,
                                       final String recipeId) {
         final PatternWorkbench studio = host.studio();
         if (studio == null) {
@@ -236,7 +236,7 @@ public final class PatternStudioPayloads {
      * Fills the machine draft from a recipe viewer's transfer, paired with the machine the data maps the
      * recipe type to (and the network declares), when there is one.
      */
-    public static void applyProcessingCells(final OsHost host, final ServerLevel level,
+    public static void applyProcessingCells(final IOsHost host, final ServerLevel level,
                                             final List<PatternWorkbench.DataCell> inputs,
                                             final List<PatternWorkbench.DataCell> outputs, final String recipeType) {
         final PatternWorkbench studio = host.studio();
@@ -252,7 +252,7 @@ public final class PatternStudioPayloads {
     // ---- files ----
 
     /** The medium behind a drive key: a linked reader's disc, or the system disk. Empty when there is none. */
-    private static ItemStack volumeFor(final ServerLevel level, final OsHost host, final String key) {
+    private static ItemStack volumeFor(final ServerLevel level, final IOsHost host, final String key) {
         if (DISK_KEY.equals(key)) {
             return host.systemDisk();
         }
@@ -260,14 +260,14 @@ public final class PatternStudioPayloads {
     }
 
     /** The path a craft file name has on {@code key}: under the crafts folder on a hierarchical system disk. */
-    private static String pathOn(final OsHost host, final String key, final String fileName) {
+    private static String pathOn(final IOsHost host, final String key, final String fileName) {
         if (DISK_KEY.equals(key) && ComputingPayloads.filesystemKindOf(host) == FilesystemKind.HIERARCHICAL) {
             return CRAFTS_DIR + "/" + fileName;
         }
         return fileName;
     }
 
-    private static Optional<String> readCraft(final ServerLevel level, final OsHost host, final String key,
+    private static Optional<String> readCraft(final ServerLevel level, final IOsHost host, final String key,
                                               final String fileName) {
         final ItemStack volume = volumeFor(level, host, key);
         if (volume.isEmpty() || fileName.isBlank() || fileName.contains("..")) {
@@ -276,7 +276,7 @@ public final class PatternStudioPayloads {
         return DiskFilesystem.read(volume, pathOn(host, key, fileName));
     }
 
-    private static String openFile(final ServerLevel level, final OsHost host, final String key,
+    private static String openFile(final ServerLevel level, final IOsHost host, final String key,
                                    final String fileName, final int[] tab) {
         final Optional<String> content = readCraft(level, host, key, fileName);
         if (content.isEmpty()) {
@@ -313,7 +313,7 @@ public final class PatternStudioPayloads {
         return "Opened " + fileName;
     }
 
-    private static String addStageFromFile(final ServerLevel level, final OsHost host, final String key,
+    private static String addStageFromFile(final ServerLevel level, final IOsHost host, final String key,
                                            final String fileName) {
         final Optional<String> content = readCraft(level, host, key, fileName);
         if (content.isEmpty()) {
@@ -347,7 +347,7 @@ public final class PatternStudioPayloads {
         };
     }
 
-    private static String saveToDisk(final ServerLevel level, final OsHost host, final PatternWorkbench.Kind kind) {
+    private static String saveToDisk(final ServerLevel level, final IOsHost host, final PatternWorkbench.Kind kind) {
         final PatternWorkbench studio = host.studio();
         if (kind == PatternWorkbench.Kind.BENCH) {
             studio.refreshPreview(level);
@@ -380,7 +380,7 @@ public final class PatternStudioPayloads {
         return "Saved " + fileName;
     }
 
-    private static String loadIntoRom(final ServerLevel level, final OsHost host, final PatternWorkbench.Kind kind) {
+    private static String loadIntoRom(final ServerLevel level, final IOsHost host, final PatternWorkbench.Kind kind) {
         if (!(host instanceof CraftingComputerBlockEntity cc)) {
             return "Only a Crafting Computer holds a Recipe ROM";
         }
@@ -424,7 +424,7 @@ public final class PatternStudioPayloads {
         return "Loaded into the ROM: " + name;
     }
 
-    private static String burn(final ServerLevel level, final OsHost host, final PatternWorkbench.Kind kind) {
+    private static String burn(final ServerLevel level, final IOsHost host, final PatternWorkbench.Kind kind) {
         final PatternEncoderBlockEntity encoder = encoderOf(level, host);
         if (encoder == null) {
             return "No Pattern Encoder is linked to this computer";
@@ -452,7 +452,7 @@ public final class PatternStudioPayloads {
      * network actually declares, else the first mapped machine, else the recipe type's generic category; empty
      * when the type is unknown, leaving the choice to the picker.
      */
-    static String defaultMachine(final ServerLevel level, final OsHost host, final String typeId) {
+    static String defaultMachine(final ServerLevel level, final IOsHost host, final String typeId) {
         if (typeId == null || typeId.isEmpty()) {
             return "";
         }
@@ -472,7 +472,7 @@ public final class PatternStudioPayloads {
     // ---- state ----
 
     @Nullable
-    static PatternEncoderBlockEntity encoderOf(final ServerLevel level, final OsHost host) {
+    static PatternEncoderBlockEntity encoderOf(final ServerLevel level, final IOsHost host) {
         for (final long endpoint : host.linkedEndpoints()) {
             if (level.getBlockEntity(BlockPos.of(endpoint)) instanceof PatternEncoderBlockEntity encoder) {
                 return encoder;
@@ -482,7 +482,7 @@ public final class PatternStudioPayloads {
     }
 
     /** The machine types the network's switches declare, keyed by type with a readable label. */
-    private static Map<String, String> declaredMachines(final ServerLevel level, final OsHost host) {
+    private static Map<String, String> declaredMachines(final ServerLevel level, final IOsHost host) {
         final Map<String, String> out = new LinkedHashMap<>();
         final List<CraftingComputerBlockEntity> computers = new ArrayList<>();
         if (host instanceof CraftingComputerBlockEntity cc) {
@@ -510,7 +510,7 @@ public final class PatternStudioPayloads {
         return out;
     }
 
-    public static PatternStudioStatePayload buildState(final ServerLevel level, final OsHost host,
+    public static PatternStudioStatePayload buildState(final ServerLevel level, final IOsHost host,
                                                        final String status, final int tabHint) {
         final PatternWorkbench studio = host.studio();
         final MainframeBlockEntity mf = host.networkUuid() == null ? null

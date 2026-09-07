@@ -8,7 +8,7 @@
 package dev.jstech.computronics.item;
 
 import dev.jstech.computronics.hardware.ClusterInterfaceCardSpec;
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -20,14 +20,14 @@ import java.util.List;
  * The Cluster Interface Card family: exclusive to the Cluster Management Computer, one per machine.
  * The card decides which cabinets the machine can drive and how many nodes it installs at once.
  */
-public class ClusterInterfaceCardItem extends SpecItem<ClusterInterfaceCardSpec> implements ExpansionCardItem {
+public class ClusterInterfaceCardItem extends SpecItem<ClusterInterfaceCardSpec> implements IExpansionCardItem {
 
     public ClusterInterfaceCardItem(final Properties properties, final ClusterInterfaceCardSpec spec) {
         super(properties.stacksTo(16), spec);
     }
 
     @Override
-    public ExpansionCardSpec cardSpec() {
+    public IExpansionCardSpec cardSpec() {
         return spec();
     }
 

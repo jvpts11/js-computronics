@@ -13,7 +13,7 @@ import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * One open program window on the {@link DesktopScreen}: a draggable, resizable frame hosting a
- * {@link DesktopApp}. The title bar carries minimize, maximize/restore, and close boxes; the bottom-right
+ * {@link IDesktopApp}. The title bar carries minimize, maximize/restore, and close boxes; the bottom-right
  * corner is a resize grip. A maximized window fills the desktop above the taskbar; a minimized window is
  * hidden and reachable from its taskbar button.
  */
@@ -34,7 +34,7 @@ public final class DesktopWindow {
     public static final int RESIZE_TOP = 4;
     public static final int RESIZE_BOTTOM = 8;
 
-    private final DesktopApp app;
+    private final IDesktopApp app;
     private final String appKey;
     private int x;
     private int y;
@@ -66,7 +66,7 @@ public final class DesktopWindow {
     private int resizeStartMx;
     private int resizeStartMy;
 
-    public DesktopWindow(final DesktopApp app, final String appKey, final int x, final int y,
+    public DesktopWindow(final IDesktopApp app, final String appKey, final int x, final int y,
                          final int w, final int h) {
         this.app = app;
         this.appKey = appKey;
@@ -82,7 +82,7 @@ public final class DesktopWindow {
         this.curH = h;
     }
 
-    public DesktopApp app() {
+    public IDesktopApp app() {
         return app;
     }
 

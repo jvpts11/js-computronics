@@ -12,7 +12,7 @@ import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
 import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.IDataSink;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
@@ -173,7 +173,7 @@ public final class PerformanceGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos absM = helper.absolutePos(m);
         final BlockState stateM = level.getBlockState(absM);
-        final DataSink sink = (key, amount, simulate) -> amount; // accepts everything, keeps nothing
+        final IDataSink sink = (key, amount, simulate) -> amount; // accepts everything, keeps nothing
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 8, () -> rackBe.getServerStorage(0).insert(Items.COBBLESTONE, 1_000_000_000L))

@@ -127,7 +127,7 @@ class CliShellTest {
     @Test
     void run_operationQueryReadsStorageInsteadOfExecuting() {
         computer.onNetwork = true;
-        computer.stock.add(new CliComputer.StoredItem("cobblestone", 100));
+        computer.stock.add(new ICliComputer.StoredItem("cobblestone", 100));
         final String out = joined("operation query items");
         assertTrue(out.contains("cobblestone"));
     }
@@ -156,8 +156,8 @@ class CliShellTest {
         assertTrue(response.lines().stream().anyMatch(l -> l.style() == CliStyle.ERROR));
     }
 
-    /** An in-memory CliComputer that records the last effecting call so tests can assert on it. */
-    private static final class FakeComputer implements CliComputer {
+    /** An in-memory ICliComputer that records the last effecting call so tests can assert on it. */
+    private static final class FakeComputer implements ICliComputer {
         boolean running;
         boolean onNetwork = true;
         boolean explode;
@@ -208,9 +208,9 @@ class CliShellTest {
         }
 
         @Override public List<StoredItem> query(
-                final dev.jstech.computronics.program.iql.IqlCondition where,
+                final dev.jstech.computronics.program.iql.IIqlCondition where,
                 final String server, final int limit) {
-            final String filter = dev.jstech.computronics.program.iql.IqlCondition
+            final String filter = dev.jstech.computronics.program.iql.IIqlCondition
                     .itemNameFilter(where).toLowerCase();
             final List<StoredItem> out = new ArrayList<>();
             for (final StoredItem item : stock) {
@@ -222,7 +222,7 @@ class CliShellTest {
         }
 
         @Override public List<StoredItem> queryObject(final String object,
-                final dev.jstech.computronics.program.iql.IqlCondition where,
+                final dev.jstech.computronics.program.iql.IIqlCondition where,
                 final String server, final int limit) {
             return object.equalsIgnoreCase("items") ? query(where, server, limit) : List.of();
         }

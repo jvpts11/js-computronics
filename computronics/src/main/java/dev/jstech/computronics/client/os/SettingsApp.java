@@ -44,7 +44,7 @@ import java.util.function.BooleanSupplier;
  * {@link SettingsSnapshotPayload}, and every change sends a {@link SetSettingPayload} and rebuilds the
  * page from the refreshed snapshot the server replies with.
  */
-public final class SettingsApp implements DesktopApp {
+public final class SettingsApp implements IDesktopApp {
 
     private static final List<String> NAV = List.of(
             "Personalize", "System", "Network", "Storage", "Display", "Programs", "Sound", "Users");

@@ -8,7 +8,7 @@
 package dev.jstech.computronics.client;
 
 import dev.jstech.computronics.blockentity.AbstractComputerBlockEntity;
-import dev.jstech.computronics.client.os.DesktopApp;
+import dev.jstech.computronics.client.os.IDesktopApp;
 import dev.jstech.computronics.client.os.DesktopWindow;
 import dev.jstech.computronics.client.theme.NmsThemes;
 import dev.jstech.computronics.gui.layout.NmsLayout;
@@ -36,7 +36,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The Network Management Studio as a desktop window (a {@link DesktopApp}): an in-world clone of SQL
+ * The Network Management Studio as a desktop window (an {@link IDesktopApp}): an in-world clone of SQL
  * Server Management Studio with an Object Explorer, a query editor, a results/messages grid and a status
  * bar. It opens from the Frames desktop NMS icon and closes back to the desktop like any other window.
  *
@@ -46,7 +46,7 @@ import java.util.Locale;
  * no real inventory slots, so it needs no container menu: the payload handlers authenticate by the player's
  * proximity to the host or one of its linked monitors.
  */
-public final class NmsApp implements DesktopApp {
+public final class NmsApp implements IDesktopApp {
 
     private static final int DB = 0;
     private static final int FOLDER = 1;

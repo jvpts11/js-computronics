@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.jstech.computronics.cannon.asm.AsmProgram;
 import dev.jstech.computronics.cannon.asm.AsmReader;
 import dev.jstech.computronics.cannon.run.Halt;
-import dev.jstech.computronics.cannon.run.Host;
+import dev.jstech.computronics.cannon.run.IHost;
 import dev.jstech.computronics.cannon.run.Loaded;
 import dev.jstech.computronics.cannon.run.Process;
 import dev.jstech.computronics.cannon.run.Values;
@@ -32,7 +32,7 @@ class HostComputerTest {
     private static final int PLENTY = 1_000_000;
 
     /** A machine that says the same things every time, so the program's side is what is under test. */
-    private static final class Machine implements Host {
+    private static final class Machine implements IHost {
 
         @Override
         public long tick() {

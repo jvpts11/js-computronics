@@ -22,8 +22,8 @@ import java.util.Map;
  * whole truth. References between allocated things become numbers, because two objects can point at
  * each other and a tree cannot say that.
  */
-public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames, List<FrameShot> waiting,
-                       Map<String, Map<String, Value>> statics, Value script, List<WatchShot> watches,
+public record Snapshot(long heapBudget, List<IHeld> held, List<FrameShot> frames, List<FrameShot> waiting,
+                       Map<String, Map<String, IValue>> statics, IValue script, List<WatchShot> watches,
                        List<String> console, int written, String state, String message, int spent) {
 
     public Snapshot {
@@ -42,7 +42,7 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
      * remember which side of the number it was on. Without them, a world that came back would tell a
      * program the iron had just run low when it had been low for a week.
      */
-    public record WatchShot(int id, String item, String kind, long threshold, Value handler, Value token,
+    public record WatchShot(int id, String item, String kind, long threshold, IValue handler, IValue token,
                             long last, boolean armed, boolean seen) {
     }
 
@@ -52,43 +52,43 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
      * <p>A number is written as itself; anything allocated is written as the number of the thing it
      * points at, so two names for one object come back as two names for one object.
      */
-    public sealed interface Value {
+    public sealed interface IValue {
 
         /** Nothing at all. */
-        record Nothing() implements Value {
+        record Nothing() implements IValue {
         }
 
         /** A whole number of four bytes, which is also how a bool and a character travel. */
-        record I4(int value) implements Value {
+        record I4(int value) implements IValue {
         }
 
         /** A whole number of eight bytes. */
-        record I8(long value) implements Value {
+        record I8(long value) implements IValue {
         }
 
         /** A real of four bytes. */
-        record R4(float value) implements Value {
+        record R4(float value) implements IValue {
         }
 
         /** A real of eight bytes. */
-        record R8(double value) implements Value {
+        record R8(double value) implements IValue {
         }
 
         /** True or false. */
-        record Bool(boolean value) implements Value {
+        record Bool(boolean value) implements IValue {
         }
 
         /** One character. */
-        record Ch(char value) implements Value {
+        record Ch(char value) implements IValue {
         }
 
         /** Something on the heap, by the number it was written down under. */
-        record Ref(int id) implements Value {
+        record Ref(int id) implements IValue {
         }
     }
 
     /** One method bound to what it belongs to, as a delegate holds it. */
-    public record BoundShot(Value target, String owner, String method, List<String> parameters,
+    public record BoundShot(IValue target, String owner, String method, List<String> parameters,
                             String returns) {
 
         public BoundShot {
@@ -97,7 +97,7 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
     }
 
     /** One thing the program had allocated, with what it costs and where it was made. */
-    public sealed interface Held {
+    public sealed interface IHeld {
 
         /** The number this thing is written down under. */
         int id();
@@ -112,12 +112,12 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
         boolean freed();
 
         /** A piece of text. */
-        record Text(int id, long bytes, int line, boolean freed, String value) implements Held {
+        record Text(int id, long bytes, int line, boolean freed, String value) implements IHeld {
         }
 
         /** An instance of a class, with what each of its fields holds. */
         record Object(int id, long bytes, int line, boolean freed, String type,
-                      Map<String, Value> fields) implements Held {
+                      Map<String, IValue> fields) implements IHeld {
 
             public Object {
                 fields = Map.copyOf(fields);
@@ -125,8 +125,8 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
         }
 
         /** A fixed run of values. */
-        record Array(int id, long bytes, int line, boolean freed, String element, List<Value> values)
-                implements Held {
+        record Array(int id, long bytes, int line, boolean freed, String element, List<IValue> values)
+                implements IHeld {
 
             public Array {
                 values = List.copyOf(values);
@@ -134,7 +134,7 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
         }
 
         /** A run of values that grows. */
-        record Listing(int id, long bytes, int line, boolean freed, List<Value> items) implements Held {
+        record Listing(int id, long bytes, int line, boolean freed, List<IValue> items) implements IHeld {
 
             public Listing {
                 items = List.copyOf(items);
@@ -142,8 +142,8 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
         }
 
         /** Values reached by a key, written as two runs that line up. */
-        record Keyed(int id, long bytes, int line, boolean freed, List<Value> keys, List<Value> values)
-                implements Held {
+        record Keyed(int id, long bytes, int line, boolean freed, List<IValue> keys, List<IValue> values)
+                implements IHeld {
 
             public Keyed {
                 keys = List.copyOf(keys);
@@ -153,7 +153,7 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
 
         /** A handler, or a run of them. */
         record Handler(int id, long bytes, int line, boolean freed, String type, List<BoundShot> chain)
-                implements Held {
+                implements IHeld {
 
             public Handler {
                 chain = List.copyOf(chain);
@@ -162,8 +162,8 @@ public record Snapshot(long heapBudget, List<Held> held, List<FrameShot> frames,
     }
 
     /** One call in progress: which method, how far into it, and everything it was holding. */
-    public record FrameShot(String owner, String name, List<String> parameters, int at, Value self,
-                            List<Value> slots, List<Value> stack, boolean discard) {
+    public record FrameShot(String owner, String name, List<String> parameters, int at, IValue self,
+                            List<IValue> slots, List<IValue> stack, boolean discard) {
 
         public FrameShot {
             parameters = List.copyOf(parameters);

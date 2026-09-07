@@ -11,13 +11,13 @@ import com.mojang.serialization.MapCodec;
 import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
 import dev.jstech.computronics.item.ServerItem;
-import dev.jstech.computronics.rack.MountableRackUnit;
+import dev.jstech.computronics.rack.IMountableRackUnit;
 import dev.jstech.computronics.rack.RackChassis;
 import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
-import dev.jstech.core.multiblock.MultiblockGeometry;
+import dev.jstech.core.multiblock.IMultiblockGeometry;
 import dev.jstech.core.multiblock.MultiblockPatternGeometry;
 import dev.jstech.core.network.DataTier;
-import dev.jstech.core.network.RearFacingDataPort;
+import dev.jstech.core.network.IRearFacingDataPort;
 import dev.jstech.core.util.BlockDrops;
 import dev.jstech.core.util.BlockEntityTickers;
 import net.minecraft.core.BlockPos;
@@ -53,7 +53,7 @@ import java.util.List;
  * The Server Rack: a 2-wide, 3-tall, 2-deep multiblock cabinet that is logically a single rack.
  */
 public class ServerRackBlock extends AbstractMultiblockControllerBlock
-        implements RearFacingDataPort {
+        implements IRearFacingDataPort {
 
     public static final MapCodec<ServerRackBlock> CODEC = simpleCodec(ServerRackBlock::new);
 
@@ -117,7 +117,7 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
     }
 
     @Override
-    protected MultiblockGeometry geometry() {
+    protected IMultiblockGeometry geometry() {
         return new MultiblockPatternGeometry(ServerRackStructure.PATTERN);
     }
 
@@ -203,7 +203,7 @@ public class ServerRackBlock extends AbstractMultiblockControllerBlock
     static ItemInteractionResult mountFromHand(final ServerRackBlockEntity rack, final BlockPos controllerPos,
                                                final BlockPos hitPos, final ItemStack stack, final Player player,
                                                final BlockHitResult hit) {
-        if (MountableRackUnit.of(stack) == null) {
+        if (IMountableRackUnit.of(stack) == null) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         // A chassis that belongs in another cabinet is refused with the reason, not ignored.

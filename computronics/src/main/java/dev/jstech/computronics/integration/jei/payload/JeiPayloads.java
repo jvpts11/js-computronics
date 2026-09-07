@@ -9,7 +9,7 @@ package dev.jstech.computronics.integration.jei.payload;
 
 import dev.jstech.computronics.JsComputronics;
 import dev.jstech.computronics.operation.payload.PatternStudioPayloads;
-import dev.jstech.computronics.os.OsHost;
+import dev.jstech.computronics.os.IOsHost;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -43,7 +43,7 @@ public final class JeiPayloads {
                 return;
             }
             // The host is resolved through the monitor the player is at, never from the position alone.
-            final OsHost host = PatternStudioPayloads.studioHost(player, level, payload.host(), payload.monitorPos());
+            final IOsHost host = PatternStudioPayloads.studioHost(player, level, payload.host(), payload.monitorPos());
             if (host == null) {
                 return;
             }
@@ -58,7 +58,7 @@ public final class JeiPayloads {
             if (!(context.player() instanceof ServerPlayer player) || !(player.level() instanceof ServerLevel level)) {
                 return;
             }
-            final OsHost host = PatternStudioPayloads.studioHost(player, level, payload.host(), payload.monitorPos());
+            final IOsHost host = PatternStudioPayloads.studioHost(player, level, payload.host(), payload.monitorPos());
             if (host == null) {
                 return;
             }

@@ -10,7 +10,7 @@ package dev.jstech.computronics.operation;
 import dev.jstech.computronics.blockentity.MainframeBlockEntity;
 import dev.jstech.computronics.operation.index.ItemLocation;
 import dev.jstech.computronics.storage.DataContainers;
-import dev.jstech.computronics.storage.DataSink;
+import dev.jstech.computronics.storage.IDataSink;
 import dev.jstech.computronics.storage.LocalStore;
 import dev.jstech.computronics.storage.StorageKey;
 import dev.jstech.core.uuid.NetworkUuid;
@@ -34,7 +34,7 @@ import java.util.Optional;
 public final class DataHandoff {
 
     /** Where a handoff draws its stack from, and how it writes back what is left of it. */
-    public interface Source {
+    public interface ISource {
         ItemStack get();
 
         void set(ItemStack remaining);
@@ -61,9 +61,9 @@ public final class DataHandoff {
     }
 
     /** The stack on the player's cursor, in whichever menu is open now. */
-    public static Source cursor(final Player player) {
+    public static ISource cursor(final Player player) {
         final AbstractContainerMenu menu = player.containerMenu;
-        return new Source() {
+        return new ISource() {
             @Override
             public ItemStack get() {
                 return menu.getCarried();
@@ -83,9 +83,9 @@ public final class DataHandoff {
     }
 
     /** A slot of the menu the player has open now. */
-    public static Source slot(final Slot slot, final Player player) {
+    public static ISource slot(final Slot slot, final Player player) {
         final AbstractContainerMenu menu = player.containerMenu;
-        return new Source() {
+        return new ISource() {
             @Override
             public ItemStack get() {
                 return slot.getItem();
@@ -105,8 +105,8 @@ public final class DataHandoff {
     }
 
     /** A slot of the player's own inventory, by index. */
-    public static Source inventory(final Player player, final int index) {
-        return new Source() {
+    public static ISource inventory(final Player player, final int index) {
+        return new ISource() {
             @Override
             public ItemStack get() {
                 return player.getInventory().getItem(index);
@@ -132,7 +132,7 @@ public final class DataHandoff {
      * INSERT has settled and any leftover is back with the player, so a caller can refresh the player's view.
      */
     public static Outcome intoNetwork(final MainframeBlockEntity mainframe, final ServerLevel level,
-                                      final NetworkUuid network, final Player player, final Source source,
+                                      final NetworkUuid network, final Player player, final ISource source,
                                       final int amount, final boolean contents, final String label,
                                       final Runnable afterSettle) {
         final ItemStack stack = source.get();
@@ -187,7 +187,7 @@ public final class DataHandoff {
      * source. With {@code contents} set, a held container hands over what the store has room for and comes
      * back straight away.
      */
-    public static Outcome intoLocalStore(final LocalStore store, final Player player, final Source source,
+    public static Outcome intoLocalStore(final LocalStore store, final Player player, final ISource source,
                                          final int amount, final boolean contents) {
         final ItemStack stack = source.get();
         if (stack.isEmpty() || amount <= 0) {
@@ -224,7 +224,7 @@ public final class DataHandoff {
      * put back into the network.
      */
     public static Outcome fillFromNetwork(final MainframeBlockEntity mainframe, final ServerLevel level,
-                                          final NetworkUuid network, final Player player, final Source source,
+                                          final NetworkUuid network, final Player player, final ISource source,
                                           final StorageKey key, final String label, final Runnable afterSettle) {
         final ItemStack stack = source.get();
         if (stack.isEmpty() || !(key.isFluid() || key.isChemical())) {
@@ -255,7 +255,7 @@ public final class DataHandoff {
     }
 
     /** Fills ONE held container with {@code key} from a computer's own disks, at once. */
-    public static Outcome fillFromLocalStore(final LocalStore store, final Player player, final Source source,
+    public static Outcome fillFromLocalStore(final LocalStore store, final Player player, final ISource source,
                                              final StorageKey key) {
         final ItemStack stack = source.get();
         if (stack.isEmpty() || !(key.isFluid() || key.isChemical())) {
@@ -293,7 +293,7 @@ public final class DataHandoff {
     }
 
     /** A container going back where it came from when that place is still free, else to the inventory. */
-    private static void handBack(final Player player, final Source source, final ItemStack container) {
+    private static void handBack(final Player player, final ISource source, final ItemStack container) {
         if (container.isEmpty()) {
             return;
         }
@@ -305,7 +305,7 @@ public final class DataHandoff {
     }
 
     /** Receives what a SELECT pulls out of the servers and only counts it; the container is filled at the end. */
-    private static final class CollectingSink implements DataSink {
+    private static final class CollectingSink implements IDataSink {
 
         private long total;
 

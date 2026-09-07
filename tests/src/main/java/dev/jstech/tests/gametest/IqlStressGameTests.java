@@ -15,7 +15,7 @@ import dev.jstech.computronics.program.ServerCliComputer;
 import dev.jstech.computronics.program.iql.IqlParseResult;
 import dev.jstech.computronics.program.iql.IqlParser;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -60,7 +60,7 @@ public final class IqlStressGameTests {
         world.setBlock(new BlockPos(3, 2, 2), ComputingModule.PERSONAL_ROUTER.get());
         world.setBlock(new BlockPos(4, 2, 2), ComputingModule.ETHERNET_CABLE.get());
         final PersonalComputerBlockEntity pc = world.placeRunningPersonalComputer(new BlockPos(5, 2, 2));
-        final ComputerTerminalHost host = pc;
+        final IComputerTerminalHost host = pc;
         final StorageKey cobble = StorageKey.of(Items.COBBLESTONE);
         final StorageKey dirt = StorageKey.of(Items.DIRT);
 

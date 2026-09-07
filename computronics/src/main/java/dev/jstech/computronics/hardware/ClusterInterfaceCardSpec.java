@@ -28,7 +28,7 @@ import java.util.Objects;
  * @param tdpWatts      the card's power draw
  */
 public record ClusterInterfaceCardSpec(HardwareEra era, IndustrialTier tier, PcieGeneration bus, Reach reach,
-                                       int parallelNodes, int tdpWatts) implements ExpansionCardSpec {
+                                       int parallelNodes, int tdpWatts) implements IExpansionCardSpec {
 
     /** How far a card reaches, in cabinet kinds. Each level includes the ones before it. */
     public enum Reach {

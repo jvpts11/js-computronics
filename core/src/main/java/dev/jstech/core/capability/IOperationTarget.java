@@ -14,5 +14,5 @@ import dev.jstech.core.network.NetworkCategory;
  */
 public interface IOperationTarget extends INetworkNodeCapability{
     // Phase 1+: boolean canAccept(OperationType<?> type);
-    // Phase 1+: void accept(Operation op, OperationContext ctx, OperationCallback cb);
+    // Phase 1+: void accept(Operation op, IOperationContext ctx, OperationCallback cb);
 }

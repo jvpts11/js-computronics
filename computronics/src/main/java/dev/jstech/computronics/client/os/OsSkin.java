@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
-import dev.jstech.core.client.gui.skin.Skin;
+import dev.jstech.core.client.gui.skin.ISkin;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation;
  * rather than carrying its own hardcoded chrome. A skin is resolved from the installed OS id ({@code frames_95
  * / frames_xp / frames_11}). Each skin is a <em>distinct design</em>, not a recolour of one layout: every skin
  * holds its own palette and its own {@link Form} shape language, faithful to the approved style guide. It is
- * the core's {@link Skin}, so the core's components paint through it as well.
+ * the core's {@link ISkin}, so the core's components paint through it as well.
  *
  * <ul>
  *   <li>{@link Form#BEVEL} (Frames 95) — raised/sunken 3D bevels, solid navy title, grey chrome, square.</li>
@@ -27,7 +27,7 @@ import net.minecraft.resources.ResourceLocation;
  *       all four window corners gently rounded.</li>
  * </ul>
  */
-public final class OsSkin implements Skin {
+public final class OsSkin implements ISkin {
 
     /**
      * The shape language a skin draws its primitives in. A period Unix desktop is not the Frames 95

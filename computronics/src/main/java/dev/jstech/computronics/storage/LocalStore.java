@@ -21,7 +21,7 @@ import java.util.Map;
  * literally the union of its disks. A write touches one volume in place and refreshes that disk's usage
  * summary, whatever the disk holds.
  */
-public final class LocalStore implements WeightedStore {
+public final class LocalStore implements IWeightedStore {
 
     private final List<ItemStack> disks;
     private final Runnable onChanged;

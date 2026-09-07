@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Bridges a declarative {@link MultiblockPattern} to the {@link MultiblockGeometry} contract consumed by
+ * Bridges a declarative {@link MultiblockPattern} to the {@link IMultiblockGeometry} contract consumed by
  * {@link AbstractMultiblockControllerBlock}. Cells marked {@link MultiblockPattern#IGNORE_CHAR} are excluded from
  * all position lists and the block count, so they behave as "no block required" without occupying a footprint cell.
  *
@@ -24,7 +24,7 @@ import java.util.Objects;
  * facing a direction other than NORTH, each local (dx, dz) offset is rotated via {@link Rotation#transform} before
  * being applied to the controller world position, producing the same footprint in all four horizontal orientations.
  */
-public final class MultiblockPatternGeometry implements MultiblockGeometry {
+public final class MultiblockPatternGeometry implements IMultiblockGeometry {
 
     private final MultiblockPattern pattern;
     private final int cachedBlockCount;

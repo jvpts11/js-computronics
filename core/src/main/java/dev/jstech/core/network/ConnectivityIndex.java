@@ -116,7 +116,7 @@ public final class ConnectivityIndex {
 
     // Mutations
 
-    public PlacementResult onCablePlaced(long encodedPos, Set<Long> neighbors) {
+    public IPlacementResult onCablePlaced(long encodedPos, Set<Long> neighbors) {
         if (posToId.containsKey(encodedPos)) {
             throw new IllegalStateException(
                     "Position already registered: " + encodedPos);
@@ -167,7 +167,7 @@ public final class ConnectivityIndex {
             // Multiple distinct UUIDs were merged. Keep the first one as
             cleanupOrphanedUuids(newRoot);
             rootToUuid.put(newRoot, firstSeenUuid);
-            return new PlacementResult.Conflict(firstSeenUuid, conflictingUuid);
+            return new IPlacementResult.Conflict(firstSeenUuid, conflictingUuid);
         }
 
         if (firstSeenUuid != null) {
@@ -175,17 +175,17 @@ public final class ConnectivityIndex {
             // merged component now carries that UUID.
             cleanupOrphanedUuids(newRoot);
             rootToUuid.put(newRoot, firstSeenUuid);
-            return new PlacementResult.Inherited(firstSeenUuid);
+            return new IPlacementResult.Inherited(firstSeenUuid);
         }
 
         if (unionedWithAny) {
             // We merged with at least one neighbor, but none of them had
             // a UUID. The merged component is still UUID-less.
-            return PlacementResult.MERGED_WITHOUT_UUID;
+            return IPlacementResult.MERGED_WITHOUT_UUID;
         }
 
         // No relevant neighbors at all — isolated cable.
-        return PlacementResult.ISOLATED;
+        return IPlacementResult.ISOLATED;
     }
 
     private void cleanupOrphanedUuids(int currentRoot) {
@@ -371,36 +371,36 @@ public final class ConnectivityIndex {
     public record RemovalResult(Optional<NetworkUuid> previousUuid, int resultingComponents) {
     }
 
-    // PlacementResult
+    // IPlacementResult
 
     /**
      * Outcome of a single {@link #onCablePlaced} invocation.
      */
-    public sealed interface PlacementResult
-            permits PlacementResult.Isolated,
-            PlacementResult.MergedWithoutUuid,
-            PlacementResult.Inherited,
-            PlacementResult.Conflict {
+    public sealed interface IPlacementResult
+            permits IPlacementResult.Isolated,
+            IPlacementResult.MergedWithoutUuid,
+            IPlacementResult.Inherited,
+            IPlacementResult.Conflict {
 
         /**
          * No registered neighbors — cable is alone in its own new component.
          */
-        record Isolated() implements PlacementResult {}
+        record Isolated() implements IPlacementResult {}
 
         /**
          * Unioned with neighbors, but none of them had a UUID.
          */
-        record MergedWithoutUuid() implements PlacementResult {}
+        record MergedWithoutUuid() implements IPlacementResult {}
 
         /**
          * Unioned with neighbors that all agreed on a single UUID; component now carries it.
          */
-        record Inherited(NetworkUuid uuid) implements PlacementResult {}
+        record Inherited(NetworkUuid uuid) implements IPlacementResult {}
 
         /**
          * Two or more neighbors carried distinct UUIDs.
          */
-        record Conflict(NetworkUuid first, NetworkUuid second) implements PlacementResult {}
+        record Conflict(NetworkUuid first, NetworkUuid second) implements IPlacementResult {}
 
         // Stateless singletons for the cases without payload.
         Isolated ISOLATED = new Isolated();

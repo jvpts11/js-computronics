@@ -13,7 +13,7 @@ import dev.jstech.computronics.ComputingModule;
 import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
 import dev.jstech.computronics.os.media.MediaItem;
 import dev.jstech.core.peripheral.PeripheralCableType;
-import dev.jstech.core.peripheral.PeripheralConnectable;
+import dev.jstech.core.peripheral.IPeripheralConnectable;
 import dev.jstech.core.tier.HardwareEra;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -45,8 +45,8 @@ import org.jetbrains.annotations.Nullable;
  * per hardware era, each writing the media of its day. A click with a disc the era accepts puts it in the bay,
  * a sneak-click takes it out (unless a job holds it), and a plain click opens the bay's small panel.
  */
-public class PatternEncoderBlock extends HorizontalDirectionalBlock implements EntityBlock, PeripheralConnectable,
-        EraChassisBlock {
+public class PatternEncoderBlock extends HorizontalDirectionalBlock implements EntityBlock, IPeripheralConnectable,
+        IEraChassisBlock {
 
     public static final MapCodec<PatternEncoderBlock> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
             propertiesCodec(),

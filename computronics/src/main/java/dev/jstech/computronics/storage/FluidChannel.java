@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Set;
 
 /** The fluid tanks of a block face, as a data channel; amounts are millibuckets. */
-public record FluidChannel(IFluidHandler fluids) implements DataChannel {
+public record FluidChannel(IFluidHandler fluids) implements IDataChannel {
 
     private static IFluidHandler.FluidAction action(final boolean simulate) {
         return simulate ? IFluidHandler.FluidAction.SIMULATE : IFluidHandler.FluidAction.EXECUTE;

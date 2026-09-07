@@ -15,7 +15,7 @@ import java.util.List;
  */
 public final class CliCommands {
 
-    private static final List<CliCommand> EXTRA = new ArrayList<>();
+    private static final List<ICliCommand> EXTRA = new ArrayList<>();
 
     private CliCommands() {
     }
@@ -25,13 +25,13 @@ public final class CliCommands {
      * appear after the built-ins. A name or alias that collides with an existing command shadows it
      * only on lookup ties by registration order, so add-ons should namespace unusual verbs.
      */
-    public static synchronized void register(final CliCommand command) {
+    public static synchronized void register(final ICliCommand command) {
         EXTRA.add(command);
     }
 
     /** Every command the prompt knows: the built-ins first, then anything add-ons registered. */
-    public static synchronized List<CliCommand> all() {
-        final List<CliCommand> commands = new ArrayList<>(BuiltinCommands.all());
+    public static synchronized List<ICliCommand> all() {
+        final List<ICliCommand> commands = new ArrayList<>(BuiltinCommands.all());
         commands.addAll(EXTRA);
         return commands;
     }
@@ -40,10 +40,10 @@ public final class CliCommands {
      * The command set for a shell family: the DOS verbs (plus registered extras) for {@code DOS}, or the
      * shared network/program verbs plus the POSIX file verbs (plus extras) for {@code POSIX}.
      */
-    public static synchronized List<CliCommand> commandsFor(
+    public static synchronized List<ICliCommand> commandsFor(
             final dev.jstech.computronics.os.ShellFamily family) {
         if (family == dev.jstech.computronics.os.ShellFamily.POSIX) {
-            final List<CliCommand> commands = new ArrayList<>(BuiltinCommands.shared());
+            final List<ICliCommand> commands = new ArrayList<>(BuiltinCommands.shared());
             commands.addAll(PosixCommands.all());
             commands.addAll(EXTRA);
             return commands;
@@ -58,7 +58,7 @@ public final class CliCommands {
     }
 
     /** The shell for a computer: the live installer's verbs while a live medium is booted, else its OS family's. */
-    public static CliShell shellFor(final CliComputer computer, final int width) {
+    public static CliShell shellFor(final ICliComputer computer, final int width) {
         if (computer.liveInstall() != null) {
             return new CliShell(LiveInstallCommands.all(), width);
         }
@@ -66,7 +66,7 @@ public final class CliCommands {
     }
 
     /** The command list a computer's terminal offers for completion: live verbs, or its family's set. */
-    public static List<CliCommand> commandsFor(final dev.jstech.computronics.os.ShellFamily family,
+    public static List<ICliCommand> commandsFor(final dev.jstech.computronics.os.ShellFamily family,
                                                final boolean live) {
         return live ? LiveInstallCommands.all() : commandsFor(family);
     }

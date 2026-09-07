@@ -31,12 +31,12 @@ public final class DataChannels {
 
     /** Finds a kind's channel on a block face, or null when the block offers none of that kind there. */
     @FunctionalInterface
-    public interface Resolver {
+    public interface IResolver {
         @Nullable
-        DataChannel resolve(Level level, BlockPos pos, @Nullable Direction side);
+        IDataChannel resolve(Level level, BlockPos pos, @Nullable Direction side);
     }
 
-    private static final Map<StorageKey.Kind, Resolver> RESOLVERS = new EnumMap<>(StorageKey.Kind.class);
+    private static final Map<StorageKey.Kind, IResolver> RESOLVERS = new EnumMap<>(StorageKey.Kind.class);
 
     static {
         RESOLVERS.put(StorageKey.Kind.ITEM, (level, pos, side) -> {
@@ -48,7 +48,7 @@ public final class DataChannels {
             return fluids == null ? null : new FluidChannel(fluids);
         });
         RESOLVERS.put(StorageKey.Kind.CHEMICAL, (level, pos, side) ->
-                ChemicalBridges.portFor(level, pos, side).<DataChannel>map(ChemicalChannel::new).orElse(null));
+                ChemicalBridges.portFor(level, pos, side).<IDataChannel>map(ChemicalChannel::new).orElse(null));
         for (final StorageKey.Kind kind : StorageKey.Kind.values()) {
             if (!RESOLVERS.containsKey(kind)) {
                 throw new IllegalStateException("no data channel resolver for " + kind + ": every kind of data must be transferable");
@@ -57,10 +57,10 @@ public final class DataChannels {
     }
 
     /** Every channel the block at {@code pos} offers on {@code side}, keyed by kind; absent kinds are omitted. */
-    public static Map<StorageKey.Kind, DataChannel> resolve(final Level level, final BlockPos pos, @Nullable final Direction side) {
-        final Map<StorageKey.Kind, DataChannel> channels = new EnumMap<>(StorageKey.Kind.class);
-        for (final Map.Entry<StorageKey.Kind, Resolver> entry : RESOLVERS.entrySet()) {
-            final DataChannel channel = entry.getValue().resolve(level, pos, side);
+    public static Map<StorageKey.Kind, IDataChannel> resolve(final Level level, final BlockPos pos, @Nullable final Direction side) {
+        final Map<StorageKey.Kind, IDataChannel> channels = new EnumMap<>(StorageKey.Kind.class);
+        for (final Map.Entry<StorageKey.Kind, IResolver> entry : RESOLVERS.entrySet()) {
+            final IDataChannel channel = entry.getValue().resolve(level, pos, side);
             if (channel != null) {
                 channels.put(entry.getKey(), channel);
             }

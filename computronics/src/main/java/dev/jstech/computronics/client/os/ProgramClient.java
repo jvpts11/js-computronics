@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * The client-side half of a program: how its id maps to the desktop window it opens. The
  * platform-independent descriptor ({@code os.ProgramSpec}) lives in common; this registry supplies the
- * one thing that cannot — a factory that builds the {@link DesktopApp} on the client. Together they are
+ * one thing that cannot — a factory that builds the {@link IDesktopApp} on the client. Together they are
  * the whole per-program wiring, so a new program is a common {@code ProgramSpec} plus one entry here,
  * and the launcher rail, taskbar and This PC all resolve the window through this one lookup instead of a
  * hardcoded {@code switch}.
@@ -28,11 +28,11 @@ public final class ProgramClient {
 
     /** Builds a program's window from the desktop context (the host computer, its monitor, and the OS id). */
     @FunctionalInterface
-    public interface DesktopAppFactory {
-        DesktopApp create(BlockPos host, BlockPos monitorPos, ResourceLocation osId);
+    public interface IDesktopAppFactory {
+        IDesktopApp create(BlockPos host, BlockPos monitorPos, ResourceLocation osId);
     }
 
-    private static final Map<ResourceLocation, DesktopAppFactory> FACTORIES = new LinkedHashMap<>();
+    private static final Map<ResourceLocation, IDesktopAppFactory> FACTORIES = new LinkedHashMap<>();
 
     static {
         registerBuiltins();
@@ -42,12 +42,12 @@ public final class ProgramClient {
     }
 
     /** Registers the window factory for {@code id}. Safe to call from any mod's client setup. */
-    public static void register(final ResourceLocation id, final DesktopAppFactory factory) {
+    public static void register(final ResourceLocation id, final IDesktopAppFactory factory) {
         FACTORIES.put(id, factory);
     }
 
     /** The window factory for {@code id}, or {@code null} when the program opens no desktop window. */
-    public static DesktopAppFactory factory(final ResourceLocation id) {
+    public static IDesktopAppFactory factory(final ResourceLocation id) {
         return FACTORIES.get(id);
     }
 

@@ -13,7 +13,7 @@ import dev.jstech.core.tier.IndustrialTier;
  * A crafting co-processor for the Supercomputer's six dedicated slots.
  */
 public record PhiCoprocessorSpec(IndustrialTier tier, int maxSlot, int cores, int mhz, int tdpWatts)
-        implements ExpansionCardSpec {
+        implements IExpansionCardSpec {
 
     public static final int SLOT_COUNT = 6;
 

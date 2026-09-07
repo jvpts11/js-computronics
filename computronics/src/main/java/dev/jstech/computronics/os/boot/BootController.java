@@ -92,7 +92,7 @@ public final class BootController {
      * @return the appropriate {@link BootTarget}
      */
     public static BootTarget targetForComputer(@Nullable final BlockEntity be) {
-        if (!(be instanceof dev.jstech.computronics.os.OsHost computer)) {
+        if (!(be instanceof dev.jstech.computronics.os.IOsHost computer)) {
             return BootTarget.FIRMWARE;
         }
         // A booted live installation medium (the manual Arch / Gentoo install) runs its own shell in the

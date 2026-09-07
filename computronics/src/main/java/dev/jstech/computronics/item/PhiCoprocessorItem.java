@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.item;
 
-import dev.jstech.computronics.hardware.ExpansionCardSpec;
+import dev.jstech.computronics.hardware.IExpansionCardSpec;
 import dev.jstech.computronics.hardware.PhiCoprocessorSpec;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -19,14 +19,14 @@ import java.util.List;
 /**
  * A crafting co-processor item for the Supercomputer.
  */
-public class PhiCoprocessorItem extends SpecItem<PhiCoprocessorSpec> implements ExpansionCardItem {
+public class PhiCoprocessorItem extends SpecItem<PhiCoprocessorSpec> implements IExpansionCardItem {
 
     public PhiCoprocessorItem(final Properties properties, final PhiCoprocessorSpec spec) {
         super(properties.stacksTo(16), spec);
     }
 
     @Override
-    public ExpansionCardSpec cardSpec() {
+    public IExpansionCardSpec cardSpec() {
         return spec();
     }
 

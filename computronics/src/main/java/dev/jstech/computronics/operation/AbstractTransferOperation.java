@@ -10,7 +10,7 @@ package dev.jstech.computronics.operation;
 import dev.jstech.computronics.hardware.StorageTier;
 import dev.jstech.computronics.operation.payload.OperationRecord;
 import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.core.operation.LatencyScheduler;
+import dev.jstech.core.operation.ILatencyScheduler;
 import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.core.operation.exec.EqualShare;
 import dev.jstech.core.operation.exec.OperationProgress;
@@ -32,7 +32,7 @@ import java.util.Objects;
  *
  * <p>Subclasses supply only how a single server is moved ({@link #moveFromSource}) and how the provenance record reads ({@link #toRecord()}/{@link #liveRecord()}); the latency build, the per-tick share-and-stall loop, the SubOperation rows and the settle bookkeeping live here so the two operations cannot drift apart.
  */
-public abstract class AbstractTransferOperation implements NetworkOperation {
+public abstract class AbstractTransferOperation implements INetworkOperation {
 
     protected static final int STALL_LIMIT = 40;
 
@@ -95,7 +95,7 @@ public abstract class AbstractTransferOperation implements NetworkOperation {
      */
     protected final void addSource(final NodeUuid server, final long quantity, final StorageTier tier,
                                    final int ramLatencyTicks,
-                                   @Nullable final LatencyScheduler scheduler) {
+                                   @Nullable final ILatencyScheduler scheduler) {
         final int diskLatency = tier.latencyTicks();
         final long cap = NetworkIndex.serverThroughputCap(level, server);
         final Source source;

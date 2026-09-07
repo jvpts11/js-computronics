@@ -12,7 +12,7 @@ import dev.jstech.computronics.blockentity.MonitorBlockEntity;
 import dev.jstech.computronics.gui.layout.ComputerTerminalLayout;
 import dev.jstech.computronics.operation.payload.ComputingPayloads;
 import dev.jstech.computronics.operation.payload.NetworkItemEntry;
-import dev.jstech.computronics.terminal.ComputerTerminalHost;
+import dev.jstech.computronics.terminal.IComputerTerminalHost;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
@@ -68,7 +68,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
 
     private final Level level;
     @Nullable
-    private final ComputerTerminalHost host;
+    private final IComputerTerminalHost host;
     @Nullable
     private final ServerPlayer serverPlayer;
     private final BlockPos hostPos;
@@ -122,7 +122,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
     };
 
     public ComputerTerminalMenu(final int containerId, final Inventory playerInventory,
-                                @Nullable final ComputerTerminalHost host,
+                                @Nullable final IComputerTerminalHost host,
                                 final BlockPos hostPos, final BlockPos monitorPos, final int initialTab) {
         super(ComputingModule.COMPUTER_TERMINAL_MENU.get(), containerId);
         this.level = playerInventory.player.level();
@@ -168,7 +168,7 @@ public class ComputerTerminalMenu extends AbstractComputerMenu {
         final BlockPos hostPos = buf.readBlockPos();
         final int initialTab = buf.readVarInt();
         final var be = playerInventory.player.level().getBlockEntity(hostPos);
-        if (be instanceof ComputerTerminalHost terminalHost) {
+        if (be instanceof IComputerTerminalHost terminalHost) {
             return new ComputerTerminalMenu(containerId, playerInventory, terminalHost, hostPos, monitorPos, initialTab);
         }
         return null;

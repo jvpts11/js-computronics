@@ -18,7 +18,7 @@ import java.util.Objects;
  * and {@code cpuFactor} — the crafting throughput it delivers, as a multiple of the host CPU's capacity.
  */
 public record CraftingCardSpec(IndustrialTier tier, PcieGeneration bus, double cpuFactor, int threads, int tdpWatts)
-        implements ExpansionCardSpec {
+        implements IExpansionCardSpec {
 
     public CraftingCardSpec {
         Objects.requireNonNull(tier, "tier must not be null");
