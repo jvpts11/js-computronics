@@ -23,9 +23,9 @@ import java.util.List;
 public final class HostFiles {
 
     /** What each of these is worth in instructions. Reading is dear; writing is dearer. */
-    private static final int LOOK = 10;
-    private static final int READ = 50;
-    private static final int WRITE = 100;
+    private static final int LOOK = dev.jstech.computronics.cannon.CannonCosts.GLANCE_NETWORK;
+    private static final int READ = dev.jstech.computronics.cannon.CannonCosts.READ;
+    private static final int WRITE = dev.jstech.computronics.cannon.CannonCosts.WRITE;
 
     private HostFiles() {
     }

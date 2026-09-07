@@ -32,10 +32,10 @@ import java.util.Locale;
 public final class HostOperations {
 
     /** Reading what is in flight. */
-    private static final int READ = 50;
+    private static final int READ = dev.jstech.computronics.cannon.CannonCosts.READ;
 
     /** Asking for work. Far dearer than reading, because it is the network's time being spent. */
-    private static final int SUBMIT = 200;
+    private static final int SUBMIT = dev.jstech.computronics.cannon.CannonCosts.SUBMIT;
 
     private HostOperations() {
     }

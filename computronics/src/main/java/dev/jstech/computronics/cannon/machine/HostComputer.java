@@ -28,8 +28,8 @@ import java.util.Locale;
 public final class HostComputer {
 
     /** Reading a single number off the machine barely costs anything; gathering a list costs more. */
-    private static final int GLANCE = 5;
-    private static final int GATHER = 30;
+    private static final int GLANCE = dev.jstech.computronics.cannon.CannonCosts.GLANCE;
+    private static final int GATHER = dev.jstech.computronics.cannon.CannonCosts.GATHER;
 
     private HostComputer() {
     }

@@ -28,8 +28,8 @@ import java.util.List;
 public final class HostNetwork {
 
     /** Reading the index. The network is not the program's own memory, and the price says so. */
-    private static final int GLANCE = 10;
-    private static final int READ = 50;
+    private static final int GLANCE = dev.jstech.computronics.cannon.CannonCosts.GLANCE_NETWORK;
+    private static final int READ = dev.jstech.computronics.cannon.CannonCosts.READ;
 
     /**
      * How many rows one call may gather.
