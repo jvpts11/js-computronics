@@ -315,6 +315,13 @@ public final class OsBootstrap {
             ProgramSpec.of(rl("cannonrt"), "cannon", "Cannon Runtime", false, ALL_PLATFORMS, 12, ProgramKind.SERVICE, 2, HostScope.ANY)
                     .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.CANNON_FOUNDATION).withRam(24),
             /*
+             * Aural Studio Code: the light editor for Cannon, with the machine's programs down the side
+             * and its console welded into the bottom of the window, so a program is written, compiled and
+             * run without leaving it. Frames XP or newer, and any Linux desktop.
+             */
+            ProgramSpec.of(rl("aural_studio_code"), "auralcode", "Aural Studio Code", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.ANY)
+                    .withMinEra(LEGACY).withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT).withRam(48),
+            /*
              * The Linux desktop environments: packages that turn a TTY distribution into a graphical desktop.
              * Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest), and so is
              * the RAM each holds once it is up, on top of the distribution's own share.

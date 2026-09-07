@@ -209,6 +209,7 @@
   "os.jsc.mc_dos": "MC-DOS",
   "os.jsc.mc_net": "MC-NET",
   "os.jsc.ubuntu": "Ubuntu",
+  "program.jsc.aural_studio_code": "Aural Studio Code",
   "program.jsc.automation_engine": "Automation Engine",
   "program.jsc.automation_engine.desc": "The service that runs standing automation rules on the Mainframe.",
   "program.jsc.automation_manager": "Automation Manager",

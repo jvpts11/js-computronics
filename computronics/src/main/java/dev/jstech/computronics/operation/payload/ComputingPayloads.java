@@ -1733,10 +1733,11 @@ public final class ComputingPayloads {
                                                  final IPayloadContext context) {
         context.enqueueWork(() -> {
             /*
-             * The console reply routes to whichever desktop window owns a console (the Shell or the
-             * Network Interactor's embedded command line); both ignore it when not open.
+             * A computer has one console and this is what it said, so it goes to every window looking at
+             * it: the terminal window, an editor's terminal panel, and the Network Interactor's own
+             * embedded command line. Each ignores it when it is not open.
              */
-            dev.jstech.computronics.client.os.ShellApp.accept(payload);
+            dev.jstech.computronics.client.os.ShellViews.accept(payload);
             dev.jstech.computronics.client.os.NetworkInteractorApp.acceptConsole(payload);
         });
     }

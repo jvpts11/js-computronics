@@ -79,6 +79,7 @@ public final class ProgramClient {
         register(rl("craft_planner"), (host, mon, os) -> new CraftPlannerApp(host, mon));
         register(rl("automation_manager"), (host, mon, os) -> new AutomationManagerApp(host, mon));
         register(rl("remote_control"), (host, mon, os) -> new RemoteControlApp(host, mon));
+        register(rl("aural_studio_code"), (host, mon, os) -> new AuralStudioCodeApp(host));
         // Linux's disk utility: the same volumes This PC lists, under the name that platform uses.
         register(rl("disks"), (host, mon, os) -> new ThisPcApp(host, "Disks"));
     }
