@@ -3,23 +3,23 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.DiskSpec;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.os.FilesystemKind;
-import dev.jstech.computronics.os.OsDef;
-import dev.jstech.computronics.os.OsDisks;
-import dev.jstech.computronics.os.OsRegistry;
-import dev.jstech.computronics.os.fs.DiskFilesystem;
-import dev.jstech.computronics.os.fs.FileType;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.DiskSpec;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.os.FilesystemKind;
+import dev.jstech.computers.os.OsDef;
+import dev.jstech.computers.os.OsDisks;
+import dev.jstech.computers.os.OsRegistry;
+import dev.jstech.computers.os.fs.DiskFilesystem;
+import dev.jstech.computers.os.fs.FileType;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
@@ -44,7 +44,7 @@ public final class DiskEraGameTests {
     private static final String ARENA = "empty";
 
     private static OsDef os(final String path) {
-        final OsDef def = OsRegistry.getOs(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path));
+        final OsDef def = OsRegistry.getOs(ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, path));
         if (def == null) {
             throw new IllegalStateException("no such OS: " + path);
         }

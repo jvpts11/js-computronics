@@ -3,19 +3,19 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
-import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.program.ServerCliComputer;
-import dev.jstech.computronics.program.iql.IqlParseResult;
-import dev.jstech.computronics.program.iql.IqlParser;
-import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.terminal.IComputerTerminalHost;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computers.operation.NetworkStorage;
+import dev.jstech.computers.program.ServerCliComputer;
+import dev.jstech.computers.program.iql.IqlParseResult;
+import dev.jstech.computers.program.iql.IqlParser;
+import dev.jstech.computers.storage.StorageKey;
+import dev.jstech.computers.terminal.IComputerTerminalHost;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;

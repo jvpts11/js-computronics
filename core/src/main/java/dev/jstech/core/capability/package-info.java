@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 /**
  * NeoForge {@code BlockCapability} declarations and the supporting interfaces that BlockEntities implement to expose them.

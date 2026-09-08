@@ -7,16 +7,16 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.client.os.DesktopScreen;
-import dev.jstech.computronics.client.os.DesktopWindow;
-import dev.jstech.computronics.client.os.EditorApp;
-import dev.jstech.computronics.client.os.FilesApp;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
-import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.client.os.DesktopScreen;
+import dev.jstech.computers.client.os.DesktopWindow;
+import dev.jstech.computers.client.os.EditorApp;
+import dev.jstech.computers.client.os.FilesApp;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
+import dev.jstech.computers.os.media.MediaReaderBlockEntity;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -50,7 +50,7 @@ public final class InstallMediaClientTests {
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
 
     private static ResourceLocation jsc(final String path) {
-        return ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, path);
     }
 
     /** A disc in a drive: what it is, what it installs, and what its files are called in its dialect. */

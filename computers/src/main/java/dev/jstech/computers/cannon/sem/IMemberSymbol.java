@@ -1,0 +1,100 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computers.
+ */
+package dev.jstech.computers.cannon.sem;
+
+import dev.jstech.computers.cannon.ast.IDecl;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Something declared inside a type: a field, a method, a constructor, a property or an event.
+ *
+ * <p>Each one knows the type it belongs to, so a lookup that walked up through the base classes can
+ * still say where what it found was written.
+ */
+public sealed interface IMemberSymbol {
+
+    /** What the member is called; a constructor is called by its type's name. */
+    String name();
+
+    /** The type that declares it. */
+    NamedType owner();
+
+    /** The words it was declared with. */
+    Set<IDecl.Modifier> modifiers();
+
+    /** Whether it belongs to the type rather than to an instance of it. */
+    default boolean isStatic() {
+        return this.modifiers().contains(IDecl.Modifier.STATIC);
+    }
+
+    /**
+     * One parameter of a method or a constructor. An outward one is filled in by the method rather
+     * than read by it.
+     */
+    record ParameterSymbol(String name, ITypeSymbol type, boolean outward) {
+
+        /** A parameter the method reads. */
+        public static ParameterSymbol of(final String name, final ITypeSymbol type) {
+            return new ParameterSymbol(name, type, false);
+        }
+    }
+
+    /** A field. */
+    record FieldSymbol(NamedType owner, String name, ITypeSymbol type, Set<IDecl.Modifier> modifiers)
+            implements IMemberSymbol {
+
+        /** Whether it may only be written where it is declared or in a constructor. */
+        public boolean isReadOnly() {
+            return this.modifiers.contains(IDecl.Modifier.READONLY);
+        }
+    }
+
+    /** A method, including a delegate's invoke shape. */
+    record MethodSymbol(NamedType owner, String name, ITypeSymbol returnType, List<ParameterSymbol> parameters,
+                        Set<IDecl.Modifier> modifiers) implements IMemberSymbol {
+
+        public MethodSymbol {
+            parameters = List.copyOf(parameters);
+        }
+
+        /** How a diagnostic writes the method, with the types it takes. */
+        public String describe() {
+            final StringBuilder text = new StringBuilder(this.name).append('(');
+            for (int i = 0; i < this.parameters.size(); i++) {
+                text.append(i > 0 ? ", " : "").append(this.parameters.get(i).type().describe());
+            }
+            return text.append(')').toString();
+        }
+    }
+
+    /** A constructor. */
+    record ConstructorSymbol(NamedType owner, List<ParameterSymbol> parameters, Set<IDecl.Modifier> modifiers)
+            implements IMemberSymbol {
+
+        public ConstructorSymbol {
+            parameters = List.copyOf(parameters);
+        }
+
+        @Override
+        public String name() {
+            return this.owner.name();
+        }
+    }
+
+    /** A property in the short form, with whichever halves it was given. */
+    record PropertySymbol(NamedType owner, String name, ITypeSymbol type, boolean readable, boolean writable,
+                          Set<IDecl.Modifier> modifiers, Set<IDecl.Modifier> setterModifiers)
+            implements IMemberSymbol {
+    }
+
+    /** An event, whose type is always a delegate. */
+    record EventSymbol(NamedType owner, String name, NamedType delegateType, Set<IDecl.Modifier> modifiers)
+            implements IMemberSymbol {
+    }
+}

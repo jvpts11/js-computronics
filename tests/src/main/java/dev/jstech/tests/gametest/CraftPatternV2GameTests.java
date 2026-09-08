@@ -3,16 +3,16 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.crafting.AnyTagResolver;
-import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.crafting.MultiStagePattern;
-import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.os.fs.CraftFile;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.crafting.AnyTagResolver;
+import dev.jstech.computers.crafting.CraftingPattern;
+import dev.jstech.computers.crafting.MultiStagePattern;
+import dev.jstech.computers.crafting.ProcessingPattern;
+import dev.jstech.computers.os.fs.CraftFile;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.gametest.framework.GameTest;

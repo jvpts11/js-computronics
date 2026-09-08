@@ -3,20 +3,20 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.operation.payload.NetworkItemEntry;
-import dev.jstech.computronics.operation.payload.NetworkSnapshotPayload;
-import dev.jstech.computronics.storage.DriveVolumes;
-import dev.jstech.computronics.storage.ServerStorageContents;
-import dev.jstech.computronics.storage.ServerStore;
-import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.storage.StorageVolume;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.ServerRackBlockEntity;
+import dev.jstech.computers.operation.NetworkStorage;
+import dev.jstech.computers.operation.payload.NetworkItemEntry;
+import dev.jstech.computers.operation.payload.NetworkSnapshotPayload;
+import dev.jstech.computers.storage.DriveVolumes;
+import dev.jstech.computers.storage.ServerStorageContents;
+import dev.jstech.computers.storage.ServerStore;
+import dev.jstech.computers.storage.StorageKey;
+import dev.jstech.computers.storage.StorageVolume;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.uuid.NetworkUuid;
 import dev.jstech.tests.JsTests;

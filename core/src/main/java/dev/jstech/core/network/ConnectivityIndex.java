@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.core.network;
 
@@ -22,7 +22,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Spatial connectivity index for the J's Computronics computation network.
+ * Spatial connectivity index for the J's Computers computation network.
  */
 public final class ConnectivityIndex {
 

@@ -3,23 +3,23 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.testkit;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
-import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.storage.ServerStore;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computers.blockentity.ServerRackBlockEntity;
+import dev.jstech.computers.crafting.CraftingPattern;
+import dev.jstech.computers.crafting.ProcessingPattern;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.storage.ServerStore;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.core.multiblock.AbstractMultiblockControllerBlock;
 import dev.jstech.industrial.IndustrialModule;
 import dev.jstech.industrial.blockentity.AbstractMachineBlockEntity;
@@ -432,7 +432,7 @@ public final class BigBaseScenario {
          * an empty test arena) the ground has to come out first, because otherwise every cabinet stays a lone
          * controller block, no rack forms, and the base has nothing on its network at all.
          */
-        world.clearFor(dev.jstech.computronics.block.ServerRackStructure.allPositions(pos, facing));
+        world.clearFor(dev.jstech.computers.block.ServerRackStructure.allPositions(pos, facing));
         world.setBlock(pos, state);
         ((AbstractMultiblockControllerBlock) rackBlock).setPlacedBy(world.level(), world.absolute(pos), state,
                 null, ItemStack.EMPTY);

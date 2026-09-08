@@ -7,11 +7,11 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.client.os.VirtualStudioCodeApp;
-import dev.jstech.computronics.client.os.DesktopScreen;
-import dev.jstech.computronics.client.os.IDesktopApp;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.client.os.VirtualStudioCodeApp;
+import dev.jstech.computers.client.os.DesktopScreen;
+import dev.jstech.computers.client.os.IDesktopApp;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -41,7 +41,7 @@ public final class CannonEditorClientTests {
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
 
     private static final ResourceLocation FRAMES_XP =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp");
     private static final String EDITOR_LAUNCHER = "Virtual Studio Code";
 
     /** The program the player writes: short enough to type, and it says something when it runs. */
@@ -49,7 +49,7 @@ public final class CannonEditorClientTests {
             "class Hello { static void Main() { Console.PrintLine(\"it runs\"); } }";
 
     private static ResourceLocation program(final String path) {
-        return ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, path);
     }
 
     /** The window of a launched program, or null. */
@@ -106,7 +106,7 @@ public final class CannonEditorClientTests {
                         "the compiler is happy with what was typed")
                 // Ctrl+S, the way anybody saves.
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_S, GLFW.GLFW_MOD_CONTROL))
-                .thenWaitUntilServer(level -> !dev.jstech.computronics.os.fs.DiskFilesystem.read(
+                .thenWaitUntilServer(level -> !dev.jstech.computers.os.fs.DiskFilesystem.read(
                                 TestWorldBuilder.at(level, ctx.origin())
                                         .blockEntity(COMPUTER, CraftingComputerBlockEntity.class).systemDisk(),
                                 "progs/hello.can").orElse("").isEmpty(),

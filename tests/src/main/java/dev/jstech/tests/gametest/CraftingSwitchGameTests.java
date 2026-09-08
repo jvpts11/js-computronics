@@ -3,12 +3,12 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.CraftingSwitchBlockEntity;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.CraftingSwitchBlockEntity;
 import dev.jstech.industrial.IndustrialModule;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;

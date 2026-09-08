@@ -7,15 +7,15 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.cannon.CannonCompiler;
-import dev.jstech.computronics.cannon.SourceFile;
-import dev.jstech.computronics.cannon.machine.MachinePrograms;
-import dev.jstech.computronics.cannon.run.Library;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.cannon.CannonCompiler;
+import dev.jstech.computers.cannon.SourceFile;
+import dev.jstech.computers.cannon.machine.MachinePrograms;
+import dev.jstech.computers.cannon.run.Library;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
 import dev.jstech.core.language.ILanguageProcess;
 import dev.jstech.tests.JsTests;
 import java.util.List;
@@ -92,7 +92,7 @@ public final class CannonProcessGameTests {
                 new ItemStack(ComputingModule.PSU_650G.get()));
         hw.setStackInSlot(CraftingComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
-        computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp"));
+        computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp"));
         return computer;
     }
 

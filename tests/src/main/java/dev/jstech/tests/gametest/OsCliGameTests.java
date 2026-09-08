@@ -3,25 +3,25 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.operation.payload.ConsoleInitPayload;
-import dev.jstech.computronics.os.FilesystemKind;
-import dev.jstech.computronics.os.ShellFamily;
-import dev.jstech.computronics.os.fs.DiskFilesystem;
-import dev.jstech.computronics.os.fs.FileType;
-import dev.jstech.computronics.program.ServerCliComputer;
-import dev.jstech.computronics.program.cli.ICliCommand;
-import dev.jstech.computronics.program.cli.CliCommands;
-import dev.jstech.computronics.program.cli.ICliComputer;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.operation.payload.ConsoleInitPayload;
+import dev.jstech.computers.os.FilesystemKind;
+import dev.jstech.computers.os.ShellFamily;
+import dev.jstech.computers.os.fs.DiskFilesystem;
+import dev.jstech.computers.os.fs.FileType;
+import dev.jstech.computers.program.ServerCliComputer;
+import dev.jstech.computers.program.cli.ICliCommand;
+import dev.jstech.computers.program.cli.CliCommands;
+import dev.jstech.computers.program.cli.ICliComputer;
 import dev.jstech.tests.JsTests;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
@@ -61,7 +61,7 @@ public final class OsCliGameTests {
      * and is available from the Vintage era onward, so it can be installed on any Mainframe.
      */
     private static final ResourceLocation MC_DOS =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_dos");
 
     // the console-open payload
 
@@ -585,7 +585,7 @@ public final class OsCliGameTests {
                             "brightness must clamp to 100");
                     // Netshare routes to the system disk's public-share component.
                     helper.assertTrue(cli.setConfig("netshare", "600").ok(), "config netshare must succeed");
-                    helper.assertTrue(dev.jstech.computronics.item.DiskItem
+                    helper.assertTrue(dev.jstech.computers.item.DiskItem
                                     .publicPermille(mainframe.systemDisk()) == 600,
                             "netshare must set the disk public permille");
                     helper.assertFalse(cli.setConfig("frobnicate", "1").ok(), "an unknown key must fail");
@@ -609,8 +609,8 @@ public final class OsCliGameTests {
                     cli.setConfig("accent", "3A6AE0");
                     final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
                     mainframe.console().save(tag);
-                    final dev.jstech.computronics.program.ComputerConsoleState reloaded =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState reloaded =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     reloaded.load(tag);
                     helper.assertTrue(reloaded.settings().clock12h(), "clock must survive a reload");
                     helper.assertTrue(reloaded.settings().accent() == 0xFF3A6AE0,
@@ -627,8 +627,8 @@ public final class OsCliGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final dev.jstech.computronics.program.cli.CliShell shell =
-                            dev.jstech.computronics.program.cli.CliCommands.newShell(52);
+                    final dev.jstech.computers.program.cli.CliShell shell =
+                            dev.jstech.computers.program.cli.CliCommands.newShell(52);
                     final var listed = shell.run("config", cli);
                     helper.assertTrue(listed.lines().stream().anyMatch(l -> l.text().contains("clock")),
                             "'config' must list the clock setting");
@@ -735,15 +735,15 @@ public final class OsCliGameTests {
     public static void linux_ubuntuBootsToBashTty(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.TERMINAL_ONLY,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.TERMINAL_ONLY,
                             "a Linux distribution without a desktop environment must boot to the terminal");
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    helper.assertTrue(cli.shellFamily() == dev.jstech.computronics.os.ShellFamily.POSIX,
+                    helper.assertTrue(cli.shellFamily() == dev.jstech.computers.os.ShellFamily.POSIX,
                             "the Linux kernel must give the shell the POSIX family");
                     helper.assertTrue("player@ubuntu:~$".equals(cli.prompt()),
                             "the bash prompt must start in the home directory; got " + cli.prompt());
@@ -751,8 +751,8 @@ public final class OsCliGameTests {
                     helper.assertTrue(fs != null && fs.hasDir("home/player") && fs.hasDir("etc"),
                             "the install must lay down the Unix tree (/home/player, /etc)");
 
-                    final dev.jstech.computronics.program.cli.CliShell shell =
-                            dev.jstech.computronics.program.cli.CliCommands.newShell(
+                    final dev.jstech.computers.program.cli.CliShell shell =
+                            dev.jstech.computers.program.cli.CliCommands.newShell(
                                     cli.shellFamily(), 52);
                     helper.assertTrue(text(shell.run("pwd", cli)).contains("/home/player"),
                             "'pwd' must print the home directory");
@@ -782,13 +782,13 @@ public final class OsCliGameTests {
     public static void linux_archUsesZshPromptOnTheSameKernel(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "arch"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "arch"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
                     helper.assertTrue("player@arch ~ %".equals(cli.prompt()),
                             "Arch must show the zsh prompt; got " + cli.prompt());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.newShell(
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.newShell(
                             cli.shellFamily(), 52);
                     helper.assertTrue(text(shell.run("uname -a", cli)).contains("Linux arch"),
                             "'uname -a' must name the Linux kernel and the host");
@@ -806,7 +806,7 @@ public final class OsCliGameTests {
     public static void firmware_bootOrderPicksTheSystemDisk(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos, MC_DOS);
-        final ResourceLocation ubuntu = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu");
+        final ResourceLocation ubuntu = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu");
         mainframe.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START + 1,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
         helper.startSequence()
@@ -849,11 +849,11 @@ public final class OsCliGameTests {
     public static void linux_packageManagerInstallsFromTheMirror(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.newShell(
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.newShell(
                             cli.shellFamily(), 52);
                     helper.assertTrue(text(shell.run("apt install iqlengine", cli)).contains("could not resolve mirror"),
                             "without a Mirror, apt must fail to resolve the mirror");
@@ -879,8 +879,8 @@ public final class OsCliGameTests {
     public static void linux_sourceBuildSettlesWhenDone(final GameTestHelper helper) {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final dev.jstech.computronics.program.ComputerConsoleState console =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState console =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     console.startBuild("jsc:example", 100L);
                     helper.assertTrue(console.settleBuilds(50L).isEmpty(), "a build must not settle early");
                     helper.assertFalse(console.isInstalled("jsc:example"), "a building package is not installed yet");
@@ -891,8 +891,8 @@ public final class OsCliGameTests {
                     console.startBuild("jsc:other", 900L);
                     final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
                     console.save(tag);
-                    final dev.jstech.computronics.program.ComputerConsoleState loaded =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState loaded =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     loaded.load(tag);
                     helper.assertTrue(loaded.pendingBuilds().containsKey("jsc:other"),
                             "a pending build must persist across a reload");
@@ -908,22 +908,22 @@ public final class OsCliGameTests {
     public static void linux_desktopEnvironmentPackageBootsTheDesktop(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(mainframe.installedDesktopId() == null,
                             "a fresh Linux install has no desktop environment");
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.TERMINAL_ONLY,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.TERMINAL_ONLY,
                             "without a desktop environment the distribution boots to the TTY");
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.newShell(
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.newShell(
                             cli.shellFamily(), 52);
                     shell.run("mirror install", cli);
                     helper.assertTrue(text(shell.run("apt install gnome", cli)).contains("done"),
                             "apt must install the GNOME package from the mirror");
-                    final ResourceLocation gnome = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "gnome");
+                    final ResourceLocation gnome = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "gnome");
                     helper.assertTrue(gnome.equals(mainframe.installedDesktopId()),
                             "the installed desktop package must become the computer's desktop; got "
                                     + mainframe.installedDesktopId());
@@ -931,33 +931,33 @@ public final class OsCliGameTests {
                      * Installing the package does not put the running machine into a desktop: a system
                      * that is already up keeps the session it booted until it is restarted.
                      */
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.TERMINAL_ONLY,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.TERMINAL_ONLY,
                             "a running TTY session must not grow a desktop without a restart");
 
                     // The restart is what applies it: POST fixes the session from what is now on disk.
                     mainframe.setBootedDesktopId(mainframe.installedDesktopId());
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.FULL_DESKTOP,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.FULL_DESKTOP,
                             "after a restart the distribution boots the installed desktop");
 
                     // And removing it takes effect the same way: on the next boot, not immediately.
                     shell.run("apt remove gnome", cli);
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.FULL_DESKTOP,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.FULL_DESKTOP,
                             "the running desktop session survives its package being removed");
                     mainframe.setBootedDesktopId(mainframe.installedDesktopId());
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.TERMINAL_ONLY,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.TERMINAL_ONLY,
                             "after the restart the machine is back at the TTY");
 
-                    helper.assertTrue(dev.jstech.computronics.os.OsRegistry.getDesktop(gnome) != null
-                                    && dev.jstech.computronics.os.OsRegistry.getDesktop(gnome).panelStyle()
-                                    == dev.jstech.computronics.os.PanelStyle.GNOME,
+                    helper.assertTrue(dev.jstech.computers.os.OsRegistry.getDesktop(gnome) != null
+                                    && dev.jstech.computers.os.OsRegistry.getDesktop(gnome).panelStyle()
+                                    == dev.jstech.computers.os.PanelStyle.GNOME,
                             "the GNOME desktop environment must be registered with the GNOME chrome");
                 })
                 .thenSucceed();
@@ -972,18 +972,18 @@ public final class OsCliGameTests {
     public static void linux_archLiveInstallByHandBootsTheSystem(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     mainframe.console().startLiveInstall(
-                            dev.jstech.computronics.program.install.LiveInstallState.Distro.ARCH);
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                            dev.jstech.computers.program.install.LiveInstallState.Distro.ARCH);
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.TERMINAL_ONLY,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.TERMINAL_ONLY,
                             "a booted live medium runs in the terminal");
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     helper.assertTrue("root@archiso ~ #".equals(cli.prompt()),
                             "the live shell must be a root prompt on the ISO; got " + cli.prompt());
                     helper.assertTrue(text(shell.run("ls", cli)).contains("command not found"),
@@ -1002,7 +1002,7 @@ public final class OsCliGameTests {
                     shell.run("exit", cli);
                     helper.assertTrue(text(shell.run("reboot", cli)).contains("Installation complete"),
                             "reboot after a full sequence must complete the install");
-                    final ResourceLocation arch = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "arch");
+                    final ResourceLocation arch = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "arch");
                     helper.assertTrue(mainframe.console().liveInstall() == null, "the live session must end");
                     helper.assertTrue(arch.equals(mainframe.installedOsId()),
                             "the computer must boot the hand-installed Arch; got " + mainframe.installedOsId());
@@ -1022,16 +1022,16 @@ public final class OsCliGameTests {
     public static void linux_gentooLiveInstallCompilesTheKernelBeforeBooting(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         // The test CPU runs at 2000 MHz, which the live installer turns into a 32 s (640 tick) kernel build.
         final int kernelTicks = 640;
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     mainframe.console().startLiveInstall(
-                            dev.jstech.computronics.program.install.LiveInstallState.Distro.GENTOO);
+                            dev.jstech.computers.program.install.LiveInstallState.Distro.GENTOO);
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     helper.assertTrue("livecd ~ #".equals(cli.prompt()),
                             "the Gentoo live CD is a root prompt; got " + cli.prompt());
                     helper.assertTrue(text(shell.run("tar xpf stage3-amd64.tar.xz -C /mnt", cli)).contains("Not a mountpoint"),
@@ -1052,7 +1052,7 @@ public final class OsCliGameTests {
                 })
                 .thenExecuteAfter(kernelTicks + 10, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     helper.assertTrue(text(shell.run("genkernel all", cli)).contains("Kernel compiled successfully"),
                             "once the sources are compiled genkernel builds the kernel");
                     shell.run("grub-install /dev/sda", cli);
@@ -1060,7 +1060,7 @@ public final class OsCliGameTests {
                     shell.run("exit", cli);
                     helper.assertTrue(text(shell.run("reboot", cli)).contains("Installation complete"),
                             "reboot after the full sequence must complete the install");
-                    final ResourceLocation gentoo = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "gentoo");
+                    final ResourceLocation gentoo = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "gentoo");
                     helper.assertTrue(mainframe.console().liveInstall() == null, "the live session must end");
                     helper.assertTrue(gentoo.equals(mainframe.installedOsId()),
                             "the computer must boot the hand-installed Gentoo; got " + mainframe.installedOsId());
@@ -1080,14 +1080,14 @@ public final class OsCliGameTests {
     public static void linux_emergeAnnouncesAFinishedBuild(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "gentoo"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "gentoo"));
         // Minesweeper's 16 MB footprint on the 2000 MHz test CPU is an 8 s (160 tick) build.
         final int buildTicks = 160;
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     helper.assertTrue(text(shell.run("emerge mines", cli)).contains("compiling (about " + (buildTicks / 20) + "s)"),
                             "emerge starts a CPU-scaled source build");
                     helper.assertTrue(text(shell.run("emerge mines", cli)).contains("already compiling"),
@@ -1100,7 +1100,7 @@ public final class OsCliGameTests {
                 })
                 .thenExecuteAfter(buildTicks + 10, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     final var response = shell.run("pwd", cli);
                     helper.assertTrue(!response.lines().isEmpty()
                                     && response.lines().get(0).text().contains("mines: build finished, package installed"),
@@ -1120,7 +1120,7 @@ public final class OsCliGameTests {
     public static void firmware_formatDiskErasesTheSystem(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(mainframe.installedOsId() != null, "the fixture installs an OS");
@@ -1143,14 +1143,14 @@ public final class OsCliGameTests {
     public static void shell_formatAndUninstallManageTheComputer(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp"));
         // A second disk becomes drive D:.
         mainframe.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START + 1,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     shell.run("mirror install", cli);
                     helper.assertTrue(mainframe.isMirrorInstalled(), "the mirror verb installs the service");
                     helper.assertTrue(text(shell.run("uninstall mirror", cli)).contains("Removing mirror"),
@@ -1171,12 +1171,12 @@ public final class OsCliGameTests {
     public static void linux_packageRemoveDropsTheDesktopEnvironment(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     shell.run("apt install cinnamon", cli);
                     helper.assertTrue(mainframe.installedDesktopId() != null,
                             "installing a desktop environment registers it");
@@ -1198,12 +1198,12 @@ public final class OsCliGameTests {
     public static void packageManagers_removeWithTheirOwnFlagsAndAdvertiseIt(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "arch"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "arch"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     shell.run("pacman -S cinnamon", cli);
                     helper.assertTrue(mainframe.installedDesktopId() != null,
                             "pacman -S installs a package");
@@ -1226,7 +1226,7 @@ public final class OsCliGameTests {
     public static void desktopEnvironments_installOnlyOnHardwareOfTheirOwnEraOrNewer(final GameTestHelper helper) {
         final BlockPos legacyPos = new BlockPos(2, 2, 2);
         final BlockPos vintagePos = new BlockPos(6, 2, 2);
-        final ResourceLocation ubuntu = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu");
+        final ResourceLocation ubuntu = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu");
         /*
          * A machine of an era is its era chassis carrying a board of that same era: the chassis accepts
          * no other, so the two can never disagree.
@@ -1245,7 +1245,7 @@ public final class OsCliGameTests {
                     vintage.installMirror();
                     final ServerCliComputer legacyCli = cliFor(legacy, helper.getLevel());
                     final var legacyShell =
-                            dev.jstech.computronics.program.cli.CliCommands.shellFor(legacyCli, 52);
+                            dev.jstech.computers.program.cli.CliCommands.shellFor(legacyCli, 52);
 
                     helper.assertTrue(text(legacyShell.run("apt install kde-plasma", legacyCli))
                                     .contains("Setting up"),
@@ -1256,7 +1256,7 @@ public final class OsCliGameTests {
 
                     final ServerCliComputer vintageCli = cliFor(vintage, helper.getLevel());
                     final var vintageShell =
-                            dev.jstech.computronics.program.cli.CliCommands.shellFor(vintageCli, 52);
+                            dev.jstech.computers.program.cli.CliCommands.shellFor(vintageCli, 52);
                     helper.assertTrue(text(vintageShell.run("apt install gnome", vintageCli))
                                     .contains("Legacy hardware"),
                             "a Vintage machine gets no desktop environment at all");
@@ -1275,12 +1275,12 @@ public final class OsCliGameTests {
     public static void installedSoftware_ridesOnTheDiskAndNotOnTheComputer(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands
+                    final var shell = dev.jstech.computers.program.cli.CliCommands
                             .shellFor(cli, 52);
                     shell.run("apt install cinnamon", cli);
                     helper.assertTrue(mainframe.installedDesktopId() != null,
@@ -1313,10 +1313,10 @@ public final class OsCliGameTests {
     public static void openWindows_persistWithTheMachineAndCloseOnRestartOrShutdown(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
-        final java.util.List<dev.jstech.computronics.os.OpenWindow> layout = java.util.List.of(
-                new dev.jstech.computronics.os.OpenWindow("Files", 40, 30, 200, 140, false, false),
-                new dev.jstech.computronics.os.OpenWindow("Editor", 60, 50, 180, 120, true, false));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
+        final java.util.List<dev.jstech.computers.os.OpenWindow> layout = java.util.List.of(
+                new dev.jstech.computers.os.OpenWindow("Files", 40, 30, 200, 140, false, false),
+                new dev.jstech.computers.os.OpenWindow("Editor", 60, 50, 180, 120, true, false));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.setNeedsPost(false);
@@ -1352,16 +1352,16 @@ public final class OsCliGameTests {
     public static void firmware_pullingTheSystemDiskDropsTheSession(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     helper.assertTrue(mainframe.validateOsSession(), "an installed system is a valid session");
                     mainframe.getInventory().setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START, ItemStack.EMPTY);
                     helper.assertTrue(mainframe.installedOsId() == null, "the system left with its disk");
                     helper.assertFalse(mainframe.validateOsSession(), "no disk means no bootable session");
-                    helper.assertTrue(dev.jstech.computronics.os.boot.BootController
+                    helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
-                                    == dev.jstech.computronics.os.boot.BootController.BootTarget.FIRMWARE,
+                                    == dev.jstech.computers.os.boot.BootController.BootTarget.FIRMWARE,
                             "with the system disk gone the machine boots to the firmware");
                 })
                 .thenSucceed();
@@ -1373,28 +1373,28 @@ public final class OsCliGameTests {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final BlockPos readerPos = pos.east();
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         // A GPU gives the Mainframe peripheral ports so the adjacent reader can link to it.
         mainframe.getInventory().setStackInSlot(MainframeBlockEntity.GPU_SLOTS_START,
                 new ItemStack(ComputingModule.GPU_HD_7970.get()));
         helper.setBlock(readerPos, ComputingModule.CD_DRIVE.get());
         if (!(helper.getBlockEntity(readerPos)
-                instanceof dev.jstech.computronics.os.media.MediaReaderBlockEntity reader)) {
+                instanceof dev.jstech.computers.os.media.MediaReaderBlockEntity reader)) {
             helper.fail("no media reader at " + readerPos);
             return;
         }
         final ItemStack media = new ItemStack(ComputingModule.CD_ROM.get());
-        dev.jstech.computronics.os.media.MediaItem.setKind(
-                media, dev.jstech.computronics.os.media.MediaKind.OS_INSTALL);
-        dev.jstech.computronics.os.media.MediaItem.setPayload(
-                media, ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "arch"));
+        dev.jstech.computers.os.media.MediaItem.setKind(
+                media, dev.jstech.computers.os.media.MediaKind.OS_INSTALL);
+        dev.jstech.computers.os.media.MediaItem.setPayload(
+                media, ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "arch"));
         reader.mediaSlot().setStackInSlot(0, media);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> {
                     helper.assertTrue(mainframe.linkedEndpoints().contains(helper.absolutePos(readerPos).asLong()),
                             "the reader must link to the Mainframe");
                     mainframe.console().startLiveInstall(
-                            dev.jstech.computronics.program.install.LiveInstallState.Distro.ARCH);
+                            dev.jstech.computers.program.install.LiveInstallState.Distro.ARCH);
                     helper.assertTrue(mainframe.validateOsSession(),
                             "a live session with its medium in the drive is valid");
                     helper.assertTrue("root@archiso ~ #".equals(cliFor(mainframe, helper.getLevel()).prompt()),
@@ -1415,7 +1415,7 @@ public final class OsCliGameTests {
     public static void console_formatWipesTheSoftwareState(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
@@ -1437,11 +1437,11 @@ public final class OsCliGameTests {
     public static void linux_screenfetchShowsTheSystem(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     // A package the Mirror serves, not a built-in: a fresh system does not have it.
                     helper.assertTrue(text(shell.run("screenfetch", cli)).contains("command not found"),
                             "screenfetch is a package, absent on a fresh install");
@@ -1466,13 +1466,13 @@ public final class OsCliGameTests {
     public static void linux_buildSettlesByTickingWithoutACommand(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = placeMainframeWithOs(helper, pos,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "gentoo"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "gentoo"));
         // Minesweeper's 16 MB footprint on the 2000 MHz test CPU is an 8 s (160 tick) build.
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     mainframe.installMirror();
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     shell.run("emerge mines", cli);
                     helper.assertTrue(mainframe.console().buildTotal("jsc:minesweeper") > 0,
                             "a running build knows its full duration (for the progress lines)");
@@ -1482,7 +1482,7 @@ public final class OsCliGameTests {
                     helper.assertTrue(mainframe.console().isInstalled("jsc:minesweeper"),
                             "the tick settles a finished build without a command");
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.shellFor(cli, 52);
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     helper.assertTrue(text(shell.run("pwd", cli)).contains("build finished"),
                             "with no console open the finished notice waits for the next command");
                 })
@@ -1495,9 +1495,9 @@ public final class OsCliGameTests {
         final BlockPos posA = new BlockPos(1, 2, 2);
         final BlockPos posB = new BlockPos(4, 2, 2);
         final MainframeBlockEntity a = placeMainframeWithOs(helper, posA,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "ubuntu"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "ubuntu"));
         final MainframeBlockEntity b = placeMainframeWithOs(helper, posB,
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "debian"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "debian"));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     a.console().pushHistory("echo typed-on-a");
@@ -1572,7 +1572,7 @@ public final class OsCliGameTests {
     }
 
     /** All of a shell response's lines joined with newlines. */
-    private static String text(final dev.jstech.computronics.program.cli.CliShell.Response response) {
+    private static String text(final dev.jstech.computers.program.cli.CliShell.Response response) {
         final StringBuilder sb = new StringBuilder();
         for (final var line : response.lines()) {
             sb.append(line.text()).append('\n');
@@ -1595,15 +1595,15 @@ public final class OsCliGameTests {
                 new ItemStack(ComputingModule.GPU_HD_7970.get()));
         helper.setBlock(readerPos, ComputingModule.CD_DRIVE.get());
         if (!(helper.getBlockEntity(readerPos)
-                instanceof dev.jstech.computronics.os.media.MediaReaderBlockEntity reader)) {
+                instanceof dev.jstech.computers.os.media.MediaReaderBlockEntity reader)) {
             helper.fail("no media reader at " + readerPos);
             return;
         }
         final ItemStack disc = new ItemStack(ComputingModule.CD_ROM.get());
-        dev.jstech.computronics.os.media.MediaItem.setKind(
-                disc, dev.jstech.computronics.os.media.MediaKind.PROGRAM_INSTALL);
-        dev.jstech.computronics.os.media.MediaItem.setPayload(
-                disc, ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "crafting_manager"));
+        dev.jstech.computers.os.media.MediaItem.setKind(
+                disc, dev.jstech.computers.os.media.MediaKind.PROGRAM_INSTALL);
+        dev.jstech.computers.os.media.MediaItem.setPayload(
+                disc, ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "crafting_manager"));
         reader.mediaSlot().setStackInSlot(0, disc);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> {

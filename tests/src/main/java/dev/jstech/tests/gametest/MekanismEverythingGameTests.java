@@ -3,21 +3,21 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
 import com.mojang.logging.LogUtils;
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
-import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.crafting.MultiStagePattern;
-import dev.jstech.computronics.crafting.NetworkRecipe;
-import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.program.ServerCliComputer;
-import dev.jstech.computronics.program.iql.IqlParseResult;
-import dev.jstech.computronics.program.iql.IqlParser;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computers.crafting.CraftingPattern;
+import dev.jstech.computers.crafting.MultiStagePattern;
+import dev.jstech.computers.crafting.NetworkRecipe;
+import dev.jstech.computers.operation.NetworkStorage;
+import dev.jstech.computers.program.ServerCliComputer;
+import dev.jstech.computers.program.iql.IqlParseResult;
+import dev.jstech.computers.program.iql.IqlParser;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -90,7 +90,7 @@ public final class MekanismEverythingGameTests {
             final BlockPos rackPos = cable.above(); // the row in front belongs to the rig's machines
             helper.setBlock(rackPos, ComputingModule.SUPERCOMPUTER_RACK.get());
             if (helper.getBlockEntity(rackPos)
-                    instanceof dev.jstech.computronics.blockentity.ServerRackBlockEntity rack) {
+                    instanceof dev.jstech.computers.blockentity.ServerRackBlockEntity rack) {
                 rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
             }
         }

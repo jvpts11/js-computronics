@@ -7,16 +7,16 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.client.os.DesktopScreen;
-import dev.jstech.computronics.client.os.DesktopWindow;
-import dev.jstech.computronics.client.os.FilesApp;
-import dev.jstech.computronics.client.os.FilesApps;
-import dev.jstech.computronics.operation.payload.RenameFilePayload;
-import dev.jstech.computronics.os.FilesystemKind;
-import dev.jstech.computronics.os.fs.DiskFilesystem;
-import dev.jstech.computronics.os.fs.FileType;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.client.os.DesktopScreen;
+import dev.jstech.computers.client.os.DesktopWindow;
+import dev.jstech.computers.client.os.FilesApp;
+import dev.jstech.computers.client.os.FilesApps;
+import dev.jstech.computers.operation.payload.RenameFilePayload;
+import dev.jstech.computers.os.FilesystemKind;
+import dev.jstech.computers.os.fs.DiskFilesystem;
+import dev.jstech.computers.os.fs.FileType;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -46,7 +46,7 @@ public final class FilesSyncClientTests {
     private static final String FOLDER = "progs";
 
     private static final ResourceLocation FRAMES_XP =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp");
 
     /** The explorers open on the desktop, in the order they were opened. */
     private static List<FilesApp> explorers(final ClientTestContext ctx) {

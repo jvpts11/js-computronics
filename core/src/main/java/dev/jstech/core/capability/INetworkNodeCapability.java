@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.core.capability;
 
@@ -14,7 +14,7 @@ import dev.jstech.core.uuid.NodeUuid;
 import java.util.Optional;
 
 /**
- * Contract for any block that participates in a J's Computronics computation network as a {@link NetworkCategory#B Category B} or {@link NetworkCategory#C Category C} node.
+ * Contract for any block that participates in a J's Computers computation network as a {@link NetworkCategory#B Category B} or {@link NetworkCategory#C Category C} node.
  */
 public interface INetworkNodeCapability {
 

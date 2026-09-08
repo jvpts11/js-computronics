@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 /**
  * Cross-cutting utilities (math helpers, formatters, time/tick conversions) used by multiple modules.

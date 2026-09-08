@@ -3,25 +3,25 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.os.FilesystemKind;
-import dev.jstech.computronics.os.OsRegistry;
-import dev.jstech.computronics.os.VolumeLabel;
-import dev.jstech.computronics.os.boot.BootController;
-import dev.jstech.computronics.os.fs.DiskFilesystem;
-import dev.jstech.computronics.os.fs.FileType;
-import dev.jstech.computronics.os.fs.FilesystemContents;
-import dev.jstech.computronics.os.fs.StoredFile;
-import dev.jstech.computronics.storage.DriveVolumes;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.os.FilesystemKind;
+import dev.jstech.computers.os.OsRegistry;
+import dev.jstech.computers.os.VolumeLabel;
+import dev.jstech.computers.os.boot.BootController;
+import dev.jstech.computers.os.fs.DiskFilesystem;
+import dev.jstech.computers.os.fs.FileType;
+import dev.jstech.computers.os.fs.FilesystemContents;
+import dev.jstech.computers.os.fs.StoredFile;
+import dev.jstech.computers.storage.DriveVolumes;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -64,7 +64,7 @@ public final class OsFilesystemGameTests {
 
         // Stamp it with a SYSTEM_OS identifying mc_net.
         final ResourceLocation osId =
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_net");
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_net");
         stack.set(ComputingModule.SYSTEM_OS.get(), osId);
 
         /*
@@ -153,7 +153,7 @@ public final class OsFilesystemGameTests {
         mainframe.togglePower();
 
         final ResourceLocation soRede =
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_net");
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_net");
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
@@ -530,13 +530,13 @@ public final class OsFilesystemGameTests {
      */
     @GameTest(template = ARENA)
     public static void os_programGatingHonorsCapability(final GameTestHelper helper) {
-        final ResourceLocation nms = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");
-        final ResourceLocation iql = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "iqlengine");
-        final ResourceLocation frames95 = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_95");
-        final ResourceLocation framesXp = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
-        final ResourceLocation mcDos = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
+        final ResourceLocation nms = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "nms");
+        final ResourceLocation iql = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "iqlengine");
+        final ResourceLocation frames95 = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_95");
+        final ResourceLocation framesXp = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp");
+        final ResourceLocation mcDos = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_dos");
         final ResourceLocation unknown =
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "no_such_program");
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "no_such_program");
 
         // Ample hardware, so only the platform and OS-version gates decide the outcome here.
         final int cpu = 9999;
@@ -554,9 +554,9 @@ public final class OsFilesystemGameTests {
         helper.assertTrue(OsRegistry.canRunProgram(mcDos, unknown, cpu, vram),
                 "an unregistered program declares no requirement and must pass");
         // The 11-only Automation Manager: refused on Frames XP, allowed on Frames 11.
-        final ResourceLocation frames11 = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_11");
+        final ResourceLocation frames11 = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_11");
         final ResourceLocation autoMgr =
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "automation_manager");
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "automation_manager");
         helper.assertFalse(OsRegistry.canRunProgram(framesXp, autoMgr, cpu, vram),
                 "the Automation Manager needs Frames 11, so Frames XP must refuse it");
         helper.assertTrue(OsRegistry.canRunProgram(frames11, autoMgr, cpu, vram),
@@ -571,7 +571,7 @@ public final class OsFilesystemGameTests {
      */
     @GameTest(template = ARENA)
     public static void programs_registryIsWellFormed(final GameTestHelper helper) {
-        final var builtins = dev.jstech.computronics.os.OsBootstrap.builtinPrograms();
+        final var builtins = dev.jstech.computers.os.OsBootstrap.builtinPrograms();
         helper.assertTrue(!builtins.isEmpty(), "the built-in program list must not be empty");
         for (final var spec : builtins) {
             helper.assertTrue(OsRegistry.getProgram(spec.id()) == spec,
@@ -581,7 +581,7 @@ public final class OsFilesystemGameTests {
             helper.assertTrue(!spec.platforms().isEmpty(), "program " + spec.id() + " needs a platform");
         }
         // A known program resolves, and its title key follows the vanilla convention.
-        final ResourceLocation nms = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "nms");
+        final ResourceLocation nms = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "nms");
         helper.assertTrue(OsRegistry.getProgram(nms) != null, "the NMS must be registered");
         helper.assertTrue(OsRegistry.getProgram(nms).titleKey().equals("program.jsc.nms"),
                 "the title key must be program.jsc.nms");
@@ -590,7 +590,7 @@ public final class OsFilesystemGameTests {
          * The OS registry is well-formed too: every built-in OS is registered with a display name and a
          * kernel that itself exists, so its lang key and install disc derive cleanly.
          */
-        final var oses = dev.jstech.computronics.os.OsBootstrap.builtinOses();
+        final var oses = dev.jstech.computers.os.OsBootstrap.builtinOses();
         helper.assertTrue(!oses.isEmpty(), "the built-in OS list must not be empty");
         for (final var os : oses) {
             helper.assertTrue(OsRegistry.getOs(os.id()) == os, "OS " + os.id() + " must be registered");
@@ -649,7 +649,7 @@ public final class OsFilesystemGameTests {
         mainframe.togglePower();
 
         final ResourceLocation framesXp =
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp");
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
@@ -674,16 +674,16 @@ public final class OsFilesystemGameTests {
     public static void console_prefsAndInstallPersistNbt(final GameTestHelper helper) {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final dev.jstech.computronics.program.ComputerConsoleState state =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState state =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     state.install("jsc:nms");
                     state.setWallpaper("winxp");
                     state.setComputerName("HAL");
                     final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
                     state.save(tag);
 
-                    final dev.jstech.computronics.program.ComputerConsoleState loaded =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState loaded =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     loaded.load(tag);
                     helper.assertTrue(loaded.isInstalled("jsc:nms"),
                             "an installed program must persist across a reload");
@@ -703,28 +703,28 @@ public final class OsFilesystemGameTests {
     public static void console_iconPositionPersistsNbt(final GameTestHelper helper) {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final dev.jstech.computronics.program.ComputerConsoleState state =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState state =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     final int cell =
-                            dev.jstech.computronics.program.ComputerConsoleState.packCell(2, 3);
+                            dev.jstech.computers.program.ComputerConsoleState.packCell(2, 3);
                     state.setIconCell("file:Notes.txt", cell);
                     state.setIconCell("app:Network",
-                            dev.jstech.computronics.program.ComputerConsoleState.packCell(1, 0));
+                            dev.jstech.computers.program.ComputerConsoleState.packCell(1, 0));
                     final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
                     state.save(tag);
 
-                    final dev.jstech.computronics.program.ComputerConsoleState loaded =
-                            new dev.jstech.computronics.program.ComputerConsoleState();
+                    final dev.jstech.computers.program.ComputerConsoleState loaded =
+                            new dev.jstech.computers.program.ComputerConsoleState();
                     loaded.load(tag);
                     final Integer back = loaded.iconCells().get("file:Notes.txt");
                     helper.assertTrue(back != null && back == cell,
                             "a pinned icon's cell must persist; got " + back);
                     helper.assertTrue(
-                            dev.jstech.computronics.program.ComputerConsoleState
+                            dev.jstech.computers.program.ComputerConsoleState
                                     .cellColumn(back) == 2,
                             "the persisted column must be 2");
                     helper.assertTrue(
-                            dev.jstech.computronics.program.ComputerConsoleState
+                            dev.jstech.computers.program.ComputerConsoleState
                                     .cellRow(back) == 3,
                             "the persisted row must be 3");
                     helper.assertTrue(loaded.iconCells().containsKey("app:Network"),
@@ -741,7 +741,7 @@ public final class OsFilesystemGameTests {
     @GameTest(template = ARENA)
     public static void fs_moveBetweenDesktopAndFolderConservesFile(final GameTestHelper helper) {
         final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
-        final String desktop = dev.jstech.computronics.os.fs.SystemLayout.DESKTOP_DIR;
+        final String desktop = dev.jstech.computers.os.fs.SystemLayout.DESKTOP_DIR;
 
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {

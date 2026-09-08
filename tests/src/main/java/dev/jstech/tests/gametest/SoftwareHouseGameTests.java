@@ -3,18 +3,18 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.os.Branding;
-import dev.jstech.computronics.os.OsRegistry;
-import dev.jstech.computronics.os.SoftwareHouse;
-import dev.jstech.computronics.os.media.InstallerProjection;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.os.Branding;
+import dev.jstech.computers.os.OsRegistry;
+import dev.jstech.computers.os.SoftwareHouse;
+import dev.jstech.computers.os.media.InstallerProjection;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
@@ -42,7 +42,7 @@ public final class SoftwareHouseGameTests {
     private static final String ARENA = "empty";
 
     private static ResourceLocation rl(final String path) {
-        return ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, path);
     }
 
     @GameTest(template = ARENA)

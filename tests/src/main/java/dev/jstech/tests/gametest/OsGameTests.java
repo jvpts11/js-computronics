@@ -3,21 +3,21 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.operation.payload.ComputingPayloads;
-import dev.jstech.computronics.os.OsRegistry;
-import dev.jstech.computronics.os.boot.BootController;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
-import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.operation.payload.ComputingPayloads;
+import dev.jstech.computers.os.OsRegistry;
+import dev.jstech.computers.os.boot.BootController;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
+import dev.jstech.computers.os.media.MediaReaderBlockEntity;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
@@ -47,10 +47,10 @@ public final class OsGameTests {
     private static final int SETTLE = 4;
 
     private static final ResourceLocation SO_REDE =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_net");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_net");
 
     private static final ResourceLocation MC_DOS =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_dos");
 
     @GameTest(template = ARENA)
     public static void os_installPersistsAndConsumesDisk(final GameTestHelper helper) {
@@ -159,7 +159,7 @@ public final class OsGameTests {
 
                     // Era gating: a LEGACY-minimum OS must NOT install on a Vintage-era hardware.
                     helper.assertTrue(
-                            !dev.jstech.computronics.os.OsGating.canInstall(
+                            !dev.jstech.computers.os.OsGating.canInstall(
                                     HardwareEra.LEGACY, HardwareEra.VINTAGE),
                             "canInstall(LEGACY, VINTAGE) must be false (era gate rejects newer OS on older hardware)");
                 })
@@ -247,16 +247,16 @@ public final class OsGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final var routerBe = helper.getBlockEntity(routerPos);
-                    helper.assertTrue(routerBe instanceof dev.jstech.computronics.blockentity
+                    helper.assertTrue(routerBe instanceof dev.jstech.computers.blockentity
                                     .ServerRouterBlockEntity,
                             "the Server Router must create a ServerRouterBlockEntity");
                     helper.assertFalse(
-                            routerBe instanceof dev.jstech.computronics.blockentity
+                            routerBe instanceof dev.jstech.computers.blockentity
                                     .AbstractComputerBlockEntity,
                             "the Server Router must NOT extend AbstractComputerBlockEntity");
                     final var managerBe = helper.getBlockEntity(managerPos);
                     helper.assertTrue(
-                            managerBe instanceof dev.jstech.computronics.blockentity
+                            managerBe instanceof dev.jstech.computers.blockentity
                                     .AbstractComputerBlockEntity,
                             "the Cluster Management Computer is a computer: it extends AbstractComputerBlockEntity");
 

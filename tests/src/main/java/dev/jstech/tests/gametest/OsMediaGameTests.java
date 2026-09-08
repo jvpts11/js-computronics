@@ -3,17 +3,17 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
-import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
-import dev.jstech.computronics.storage.ServerStorageContents;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
+import dev.jstech.computers.os.media.MediaReaderBlockEntity;
+import dev.jstech.computers.storage.ServerStorageContents;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -78,7 +78,7 @@ public final class OsMediaGameTests {
                     final ItemStack installer = new ItemStack(ComputingModule.DVD_ROM.get());
                     MediaItem.setKind(installer, MediaKind.PROGRAM_INSTALL);
                     MediaItem.setPayload(installer,
-                            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "kde_plasma"));
+                            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "kde_plasma"));
                     helper.assertTrue(dvd.acceptsMedia(installer),
                             "a DVD drive must accept a program installer pressed on a DVD");
 
@@ -130,7 +130,7 @@ public final class OsMediaGameTests {
         }
 
         // Build a MediaItem stack of kind OS_INSTALL stamped with jsc:mc_dos.
-        final ResourceLocation mcDos = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
+        final ResourceLocation mcDos = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_dos");
         final ItemStack media = new ItemStack(ComputingModule.CD_ROM.get());
         MediaItem.setKind(media, MediaKind.OS_INSTALL);
         MediaItem.setPayload(media, mcDos);

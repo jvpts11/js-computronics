@@ -7,8 +7,8 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.operation.payload.FolderContentPayload;
-import dev.jstech.computronics.operation.payload.RequestFolderContentPayload;
+import dev.jstech.computers.operation.payload.FolderContentPayload;
+import dev.jstech.computers.operation.payload.RequestFolderContentPayload;
 import dev.jstech.tests.JsTests;
 import io.netty.buffer.Unpooled;
 import java.util.ArrayList;

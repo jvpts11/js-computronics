@@ -3,17 +3,17 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.block.MainframeBlock;
-import dev.jstech.computronics.block.MainframePartBlock;
-import dev.jstech.computronics.block.MainframeStructure;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.block.MainframeBlock;
+import dev.jstech.computers.block.MainframePartBlock;
+import dev.jstech.computers.block.MainframeStructure;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
@@ -72,7 +72,7 @@ public final class EraMachineGameTests {
         final Player player = helper.makeMockPlayer(GameType.CREATIVE);
         final BlockPos absolute = helper.absolutePos(pos);
         player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
-        final var menu = new dev.jstech.computronics.menu.CraftingComputerMenu(
+        final var menu = new dev.jstech.computers.menu.CraftingComputerMenu(
                 1, player.getInventory(), be);
         helper.assertFalse(menu.slots.isEmpty(), "the Crafting Computer menu must build its slots for " + block);
         helper.assertTrue(menu.stillValid(player),
@@ -108,7 +108,7 @@ public final class EraMachineGameTests {
         final Player player = helper.makeMockPlayer(GameType.CREATIVE);
         final BlockPos absolute = helper.absolutePos(pos);
         player.setPos(absolute.getX() + 0.5, absolute.getY(), absolute.getZ() + 0.5);
-        final var menu = new dev.jstech.computronics.menu.MainframeMenu(
+        final var menu = new dev.jstech.computers.menu.MainframeMenu(
                 1, player.getInventory(), be);
         helper.assertFalse(menu.slots.isEmpty(), "the Mainframe menu must build its slots for " + block);
         helper.assertTrue(menu.stillValid(player),

@@ -15,14 +15,14 @@ Every `.java` file starts with this block comment, above the `package` line:
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
-package dev.jstech.computronics...;
+package dev.jstech.computers...;
 ```
 
 The SPDX tag identifies the licence; the full text lives in `LICENSE`. Do not use the line-comment form and
 do not paste the long licence preamble. The last line names the mod the file belongs to: J's Core, J's
-Computronics or J's Industrial.
+Computers or J's Industrial.
 
 ## Modelling
 

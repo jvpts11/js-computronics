@@ -7,15 +7,15 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.cannon.CannonCompiler;
-import dev.jstech.computronics.cannon.SourceFile;
-import dev.jstech.computronics.cannon.machine.MachinePrograms;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.os.fs.DiskFilesystem;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.cannon.CannonCompiler;
+import dev.jstech.computers.cannon.SourceFile;
+import dev.jstech.computers.cannon.machine.MachinePrograms;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.os.fs.DiskFilesystem;
 import dev.jstech.tests.JsTests;
 import java.util.List;
 import java.util.Optional;
@@ -77,7 +77,7 @@ public final class CannonApiGameTests {
          * Frames XP, because that is the oldest system the language is allowed on and the oldest one
          * with drives a program can write to at all.
          */
-        computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp"));
+        computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp"));
         return computer;
     }
 
@@ -91,7 +91,7 @@ public final class CannonApiGameTests {
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
                     // The same write the shell would do, so a refusal here is the drive's, not the bridge's.
-                    final var direct = new dev.jstech.computronics.program.ServerCliComputer(
+                    final var direct = new dev.jstech.computers.program.ServerCliComputer(
                             computer, helper.getLevel()).writeFile("direct.txt", "by the shell");
                     helper.assertTrue(direct.ok(), "the shell itself can write here: " + direct.message());
                     final MachinePrograms.Started started = computer.cannon().start("writer.asm", listing("""
@@ -114,7 +114,7 @@ public final class CannonApiGameTests {
                             DiskFilesystem.read(computer.systemDisk(), "stock.txt");
                     helper.assertTrue(read.isPresent(), "the file is on the disk; it holds "
                             + DiskFilesystem.list(computer.systemDisk(), "",
-                                    dev.jstech.computronics.os.FilesystemKind.FLAT).stream()
+                                    dev.jstech.computers.os.FilesystemKind.FLAT).stream()
                                     .map(DiskFilesystem.FileEntry::path).toList());
                     helper.assertTrue("iron 64".equals(read.orElse("")),
                             "with what it wrote in it; got " + read.orElse(""));
@@ -133,8 +133,8 @@ public final class CannonApiGameTests {
                 .thenExecuteAfter(SETTLE, () -> {
                     // Put the file there the way anything else on the machine would.
                     DiskFilesystem.write(computer.systemDisk(), "note.txt",
-                            dev.jstech.computronics.os.fs.FileType.TXT, "written by hand", Long.MAX_VALUE,
-                            dev.jstech.computronics.os.FilesystemKind.FLAT);
+                            dev.jstech.computers.os.fs.FileType.TXT, "written by hand", Long.MAX_VALUE,
+                            dev.jstech.computers.os.FilesystemKind.FLAT);
                     final MachinePrograms.Started started = computer.cannon().start("reader.asm", listing("""
                             class Reader {
                                 static void Main() {
@@ -164,7 +164,7 @@ public final class CannonApiGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final var shell = new dev.jstech.computronics.program.ServerCliComputer(
+                    final var shell = new dev.jstech.computers.program.ServerCliComputer(
                             computer, helper.getLevel());
                     shell.writeFile("notes.txt", "one");
                     /*
@@ -322,7 +322,7 @@ public final class CannonApiGameTests {
         wired.rack().getServerStorage(0).insert(net.minecraft.world.item.Items.OAK_LOG, 640);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final long capacity = dev.jstech.computronics.operation.NetworkStorage.of(
+                    final long capacity = dev.jstech.computers.operation.NetworkStorage.of(
                             helper.getLevel(), wired.mainframe().networkUuid()).capacity();
                     helper.assertTrue(capacity > 0, "the network has drives to fill; got " + capacity);
                     final MachinePrograms.Started started = computer.cannon().start("room.asm", listing("""
@@ -402,7 +402,7 @@ public final class CannonApiGameTests {
                      * The row the network wrote down has to name the script, not just say a program did
                      * it: a base runs many at once and the player has to know which one to go and fix.
                      */
-                    final List<dev.jstech.computronics.operation.payload.OperationRecord> log =
+                    final List<dev.jstech.computers.operation.payload.OperationRecord> log =
                             wired.mainframe().recentOperations();
                     helper.assertFalse(log.isEmpty(), "the network wrote the work down");
                     boolean named = false;
@@ -448,7 +448,7 @@ public final class CannonApiGameTests {
                 .thenExecuteAfter(2, () -> {
                     // The logs are taken away by something else on the network, as they would be.
                     wired.rack().getServerStorage(0).extract(
-                            dev.jstech.computronics.storage.StorageKey.of(
+                            dev.jstech.computers.storage.StorageKey.of(
                                     new net.minecraft.world.item.ItemStack(
                                             net.minecraft.world.item.Items.OAK_LOG)), 600);
                     for (int i = 0; i < 4; i++) {
@@ -469,13 +469,13 @@ public final class CannonApiGameTests {
         wired.mainframe().installMirror();
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final var shell = new dev.jstech.computronics.program.ServerCliComputer(
+                    final var shell = new dev.jstech.computers.program.ServerCliComputer(
                             computer, helper.getLevel());
                     // A package as it would come off 'canpack build'.
-                    final var manifest = new dev.jstech.computronics.cannon.pack.Manifest(
+                    final var manifest = new dev.jstech.computers.cannon.pack.Manifest(
                             "stockwatch", "1.0.0", "jvpts11", "stockwatch.asm", "bell", 1,
                             List.of("stockwatch.asm"), "Tells you when the iron runs low");
-                    final var packed = new dev.jstech.computronics.cannon.pack.Packed(manifest,
+                    final var packed = new dev.jstech.computers.cannon.pack.Packed(manifest,
                             java.util.Map.of("stockwatch.asm", listing("""
                                     class Watcher : IScript {
                                         public void OnInit() { }
@@ -501,7 +501,7 @@ public final class CannonApiGameTests {
                     helper.assertTrue(offered, "the network offers it, marked as the community's");
 
                     // What comes back off the shelf is what went on it, line for line.
-                    final var back = dev.jstech.computronics.cannon.pack.Packed.read(
+                    final var back = dev.jstech.computers.cannon.pack.Packed.read(
                             wired.mainframe().shelvedPackage("stockwatch"));
                     helper.assertTrue(back != null && back.files().equals(packed.files()),
                             "and it comes back unchanged");
@@ -511,7 +511,7 @@ public final class CannonApiGameTests {
                      * and the machine knows it has a program a player wrote.
                      */
                     computer.console().install(
-                            dev.jstech.computronics.program.cli.CannonCommands.RUNTIME);
+                            dev.jstech.computers.program.cli.CannonCommands.RUNTIME);
                     final var installed = shell.packageInstall("stockwatch");
                     helper.assertTrue(installed.ok(), "it installs: " + installed.message());
                     final var known = computer.console().communityProgram("stockwatch");

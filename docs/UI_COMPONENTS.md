@@ -37,7 +37,7 @@ is how a program knows a click landed on empty space.
 
 Every drawing call goes through the `Skin` interface: the colours (text, dim, accent, edge, backgrounds) and
 the primitives (panel, button, field, tab, list row, scroll thumb, status bar, window frame). J's
-Computronics implements it once per operating system, so a button on Frames 95 has a bevel and the same
+Computers implements it once per operating system, so a button on Frames 95 has a bevel and the same
 button on Frames 11 is flat, with no change to the program.
 
 ## The components

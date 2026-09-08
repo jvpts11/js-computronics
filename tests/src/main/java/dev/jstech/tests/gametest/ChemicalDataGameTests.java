@@ -3,15 +3,15 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.storage.ChemicalBridges;
-import dev.jstech.computronics.storage.IChemicalPort;
-import dev.jstech.computronics.storage.ExternalDataPort;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.operation.NetworkStorage;
+import dev.jstech.computers.storage.ChemicalBridges;
+import dev.jstech.computers.storage.IChemicalPort;
+import dev.jstech.computers.storage.ExternalDataPort;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import io.netty.buffer.Unpooled;
@@ -173,15 +173,15 @@ public final class ChemicalDataGameTests {
     public static void importBus_pullsAGasOutOfATankIntoTheNetwork(final GameTestHelper helper) {
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-        world.setBlock(BUS_CABLE, dev.jstech.computronics.ComputingModule.ETHERNET_CABLE.get());
+        world.setBlock(BUS_CABLE, dev.jstech.computers.ComputingModule.ETHERNET_CABLE.get());
         world.placeFromItem(TANK_A, BuiltInRegistries.BLOCK.get(TANK));
         final StorageKey oxygen = StorageKey.chemical(OXYGEN);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
                     final Optional<IChemicalPort> tank = ChemicalBridges.portFor(helper.getLevel(), world.absolute(TANK_A), Direction.UP);
                     helper.assertTrue(tank.isPresent() && tank.get().fill(OXYGEN, 500, false) == 500, "the tank must take 500 mB of oxygen");
-                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computronics.blockentity.DataCableBlockEntity cable) {
-                        cable.addPart(Direction.SOUTH, new dev.jstech.computronics.block.part.ImportBusPart());
+                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computers.blockentity.DataCableBlockEntity cable) {
+                        cable.addPart(Direction.SOUTH, new dev.jstech.computers.block.part.ImportBusPart());
                     }
                 })
                 .thenWaitUntil(() -> helper.assertTrue(net.storage(helper.getLevel()).count(oxygen) >= 500,
@@ -204,7 +204,7 @@ public final class ChemicalDataGameTests {
          */
         final TestWorldBuilder world = TestWorldBuilder.forGameTest(helper);
         final TestWorldBuilder.CraftingNetwork net = world.buildCraftingNetwork();
-        world.setBlock(BUS_CABLE, dev.jstech.computronics.ComputingModule.ETHERNET_CABLE.get());
+        world.setBlock(BUS_CABLE, dev.jstech.computers.ComputingModule.ETHERNET_CABLE.get());
         world.placeFromItem(TANK_A, BuiltInRegistries.BLOCK.get(TANK));
         world.placeFromItem(TANK_B, BuiltInRegistries.BLOCK.get(TANK));
         final StorageKey oxygen = StorageKey.chemical(OXYGEN);
@@ -229,8 +229,8 @@ public final class ChemicalDataGameTests {
                     helper.assertTrue(!filterItem[0].isEmpty(), "picking the tank up must drop its item");
                     helper.assertTrue(ChemicalBridges.chemicalOf(filterItem[0]).filter(OXYGEN::equals).isPresent(),
                             "the tank item must carry the oxygen; got " + ChemicalBridges.chemicalOf(filterItem[0]));
-                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computronics.blockentity.DataCableBlockEntity cable) {
-                        final var bus = new dev.jstech.computronics.block.part.ExportBusPart();
+                    if (world.getBlockEntity(BUS_CABLE) instanceof dev.jstech.computers.blockentity.DataCableBlockEntity cable) {
+                        final var bus = new dev.jstech.computers.block.part.ExportBusPart();
                         cable.addPart(Direction.WEST, bus);
                         bus.setFilter(filterItem[0]);
                         bus.getDataAccess().set(1, 300); // max: keep the faced block at 300 mB

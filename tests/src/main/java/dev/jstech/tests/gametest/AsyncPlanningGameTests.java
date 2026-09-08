@@ -7,11 +7,11 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.crafting.PendingCraftOperation;
-import dev.jstech.computronics.operation.INetworkOperation;
-import dev.jstech.computronics.operation.payload.OperationRecord;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.crafting.PendingCraftOperation;
+import dev.jstech.computers.operation.INetworkOperation;
+import dev.jstech.computers.operation.payload.OperationRecord;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.core.operation.OperationPriority;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.CraftFiles;

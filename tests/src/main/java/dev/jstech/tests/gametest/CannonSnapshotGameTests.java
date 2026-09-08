@@ -7,16 +7,16 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.cannon.CannonCompiler;
-import dev.jstech.computronics.cannon.DiagnosticBag;
-import dev.jstech.computronics.cannon.SourceFile;
-import dev.jstech.computronics.cannon.asm.AsmProgram;
-import dev.jstech.computronics.cannon.asm.AsmReader;
-import dev.jstech.computronics.cannon.run.IHost;
-import dev.jstech.computronics.cannon.run.Loaded;
-import dev.jstech.computronics.cannon.run.Process;
-import dev.jstech.computronics.cannon.run.Snapshot;
-import dev.jstech.computronics.cannon.save.SnapshotTag;
+import dev.jstech.computers.cannon.CannonCompiler;
+import dev.jstech.computers.cannon.DiagnosticBag;
+import dev.jstech.computers.cannon.SourceFile;
+import dev.jstech.computers.cannon.asm.AsmProgram;
+import dev.jstech.computers.cannon.asm.AsmReader;
+import dev.jstech.computers.cannon.run.IHost;
+import dev.jstech.computers.cannon.run.Loaded;
+import dev.jstech.computers.cannon.run.Process;
+import dev.jstech.computers.cannon.run.Snapshot;
+import dev.jstech.computers.cannon.save.SnapshotTag;
 import dev.jstech.tests.JsTests;
 import java.util.List;
 import java.util.Map;

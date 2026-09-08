@@ -18,7 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Central facade for spatial connectivity, UUID lookup, and orchestration capacity queries on a J's Computronics network.
+ * Central facade for spatial connectivity, UUID lookup, and orchestration capacity queries on a J's Computers network.
  */
 public final class NetworkSystem {
 

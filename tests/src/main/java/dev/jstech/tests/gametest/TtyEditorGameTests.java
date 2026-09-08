@@ -7,11 +7,11 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.operation.payload.CommandOutputPayload;
-import dev.jstech.computronics.operation.payload.DesktopShellOutputPayload;
-import dev.jstech.computronics.program.cli.CliCommands;
-import dev.jstech.computronics.program.cli.ICliCommand;
-import dev.jstech.computronics.os.ShellFamily;
+import dev.jstech.computers.operation.payload.CommandOutputPayload;
+import dev.jstech.computers.operation.payload.DesktopShellOutputPayload;
+import dev.jstech.computers.program.cli.CliCommands;
+import dev.jstech.computers.program.cli.ICliCommand;
+import dev.jstech.computers.os.ShellFamily;
 import dev.jstech.tests.JsTests;
 import io.netty.buffer.Unpooled;
 import java.util.List;

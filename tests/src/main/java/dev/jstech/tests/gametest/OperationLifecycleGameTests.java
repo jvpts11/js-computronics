@@ -7,10 +7,10 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.operation.ComputingOperations;
-import dev.jstech.computronics.operation.NetworkSelectOperation;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.operation.ComputingOperations;
+import dev.jstech.computers.operation.NetworkSelectOperation;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.core.JsCore;
 import dev.jstech.core.event.IOperationLifecycleEvent;
 import dev.jstech.core.operation.OperationPriority;

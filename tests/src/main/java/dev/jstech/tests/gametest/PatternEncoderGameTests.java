@@ -3,15 +3,15 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.PatternEncoderBlockEntity;
-import dev.jstech.computronics.os.fs.CraftFile;
-import dev.jstech.computronics.os.fs.DiskFilesystem;
-import dev.jstech.computronics.os.media.MediaFormat;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.PatternEncoderBlockEntity;
+import dev.jstech.computers.os.fs.CraftFile;
+import dev.jstech.computers.os.fs.DiskFilesystem;
+import dev.jstech.computers.os.media.MediaFormat;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.CraftFiles;

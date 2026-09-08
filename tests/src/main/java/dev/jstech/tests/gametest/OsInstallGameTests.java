@@ -3,24 +3,24 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.block.MonitorBlock;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.blockentity.PersonalComputerBlockEntity;
-import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.operation.payload.ComputingPayloads;
-import dev.jstech.computronics.os.IOsHost;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
-import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.block.MonitorBlock;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.blockentity.PersonalComputerBlockEntity;
+import dev.jstech.computers.blockentity.ServerRackBlockEntity;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.operation.payload.ComputingPayloads;
+import dev.jstech.computers.os.IOsHost;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
+import dev.jstech.computers.os.media.MediaReaderBlockEntity;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -45,8 +45,8 @@ public final class OsInstallGameTests {
 
     private static final String ARENA = "empty";
     private static final int SETTLE = 4;
-    private static final ResourceLocation DEBIAN = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "debian");
-    private static final ResourceLocation FRAMES_95 = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_95");
+    private static final ResourceLocation DEBIAN = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "debian");
+    private static final ResourceLocation FRAMES_95 = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_95");
 
     private OsInstallGameTests() {
     }

@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 /**
  * The Tier system (T0 through T9) and Hardware Era (Vintage..Singularity) classifications.

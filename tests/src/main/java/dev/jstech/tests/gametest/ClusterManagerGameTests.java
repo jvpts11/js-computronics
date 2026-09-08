@@ -3,38 +3,38 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity.ClusterRef;
-import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity.InstallJob;
-import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity.JobKind;
-import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity.NodeRef;
-import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity.SectionRef;
-import dev.jstech.computronics.blockentity.ClusterManagementComputerBlockEntity;
-import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.blockentity.ServerRouterBlockEntity;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.item.ServerHardwareHandler;
-import dev.jstech.computronics.item.ServerItem;
-import dev.jstech.computronics.operation.payload.ClusterManagerStatePayload;
-import dev.jstech.computronics.operation.payload.ComputingPayloads;
-import dev.jstech.computronics.os.IOsHost;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
-import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
-import dev.jstech.computronics.program.ServerCliComputer;
-import dev.jstech.computronics.program.cli.CliCommands;
-import dev.jstech.computronics.program.cli.CliLine;
-import dev.jstech.computronics.program.cli.CliShell;
-import dev.jstech.computronics.rack.RackChassis;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.ClusterManagementComputerBlockEntity.ClusterRef;
+import dev.jstech.computers.blockentity.ClusterManagementComputerBlockEntity.InstallJob;
+import dev.jstech.computers.blockentity.ClusterManagementComputerBlockEntity.JobKind;
+import dev.jstech.computers.blockentity.ClusterManagementComputerBlockEntity.NodeRef;
+import dev.jstech.computers.blockentity.ClusterManagementComputerBlockEntity.SectionRef;
+import dev.jstech.computers.blockentity.ClusterManagementComputerBlockEntity;
+import dev.jstech.computers.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.blockentity.ServerRackBlockEntity;
+import dev.jstech.computers.blockentity.ServerRouterBlockEntity;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.item.ServerHardwareHandler;
+import dev.jstech.computers.item.ServerItem;
+import dev.jstech.computers.operation.payload.ClusterManagerStatePayload;
+import dev.jstech.computers.operation.payload.ComputingPayloads;
+import dev.jstech.computers.os.IOsHost;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
+import dev.jstech.computers.os.media.MediaReaderBlockEntity;
+import dev.jstech.computers.program.ServerCliComputer;
+import dev.jstech.computers.program.cli.CliCommands;
+import dev.jstech.computers.program.cli.CliLine;
+import dev.jstech.computers.program.cli.CliShell;
+import dev.jstech.computers.rack.RackChassis;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
@@ -88,10 +88,10 @@ public final class ClusterManagerGameTests {
     private static final BlockPos SECTION_CABLE = new BlockPos(5, 2, 3);
     private static final BlockPos SERVER_RACK = new BlockPos(6, 2, 3);
 
-    private static final ResourceLocation DEBIAN = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "debian");
+    private static final ResourceLocation DEBIAN = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "debian");
     private static final ResourceLocation MINESWEEPER =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "minesweeper");
-    private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "mc_dos");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "minesweeper");
+    private static final ResourceLocation MC_DOS = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "mc_dos");
 
     private ClusterManagerGameTests() {
     }

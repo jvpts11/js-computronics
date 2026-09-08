@@ -7,7 +7,7 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.crafting.RecipeMachines;
+import dev.jstech.computers.crafting.RecipeMachines;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;

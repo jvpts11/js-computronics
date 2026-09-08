@@ -30,7 +30,7 @@ them; this mod adds their recipes and tags them the common way (`c:dusts/iron`, 
 on), so machines from other mods accept them and their ingots work here.
 
 Every machine exposes its inventory and its energy buffer as capabilities: hoppers and pipes move items in
-and out, and any FE generator can power it. When J's Computronics is installed, the Pattern Studio knows
+and out, and any FE generator can power it. When J's Computers is installed, the Pattern Studio knows
 which machine runs which recipe type, so a macerating or compressing recipe transfers straight onto the
 right machine.
 
@@ -45,5 +45,5 @@ playable (see [docs/RELEASING.md](../docs/RELEASING.md)).
 - Minecraft 1.21.1 and NeoForge 21.1.248 or newer.
 - [J's Core](../core/README.md) at the same version (required).
 
-It does not need [J's Computronics](../computronics/README.md), and never will: the machines work on their
+It does not need [J's Computers](../computers/README.md), and never will: the machines work on their
 own, with any FE source, and the computing mod only adds ways to drive them.

@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.clienttest;
 
@@ -49,7 +49,7 @@ public final class ClientTestReport {
     /** Writes the report; a write failure is logged, never thrown, so the client still shuts down cleanly. */
     public void write(final Path file, final int shard, final int shards) {
         final List<String> lines = new ArrayList<>();
-        lines.add("J's Computronics client tests - shard " + shard + "/" + shards);
+        lines.add("J's Computers client tests - shard " + shard + "/" + shards);
         for (final Result r : results) {
             lines.add((r.passed() ? "PASS " : "FAIL ") + r.name()
                     + (r.passed() ? "" : ": " + r.message()) + " [" + r.ticks() + " ticks]");

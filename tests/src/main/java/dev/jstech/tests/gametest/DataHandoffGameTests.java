@@ -3,16 +3,16 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.operation.DataHandoff;
-import dev.jstech.computronics.storage.ChemicalBridges;
-import dev.jstech.computronics.storage.IChemicalPort;
-import dev.jstech.computronics.storage.DataContainers;
-import dev.jstech.computronics.storage.LocalStore;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.operation.DataHandoff;
+import dev.jstech.computers.storage.ChemicalBridges;
+import dev.jstech.computers.storage.IChemicalPort;
+import dev.jstech.computers.storage.DataContainers;
+import dev.jstech.computers.storage.LocalStore;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;

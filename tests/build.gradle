@@ -7,7 +7,7 @@ plugins {
 
 // The runs below reach into the other subprojects' source sets, so those must be configured first.
 evaluationDependsOn(':core')
-evaluationDependsOn(':computronics')
+evaluationDependsOn(':computers')
 evaluationDependsOn(':industrial')
 
 base {
@@ -107,7 +107,7 @@ neoForge {
             sourceSet(rootProject.project(':core').sourceSets.main)
         }
         jsc {
-            sourceSet(rootProject.project(':computronics').sourceSets.main)
+            sourceSet(rootProject.project(':computers').sourceSets.main)
         }
         jsindustrial {
             sourceSet(rootProject.project(':industrial').sourceSets.main)
@@ -117,7 +117,7 @@ neoForge {
 
 dependencies {
     implementation project(':core')
-    implementation project(':computronics')
+    implementation project(':computers')
     implementation project(':industrial')
 
     // The computing mod's dependencies, present so the runs load them as well.

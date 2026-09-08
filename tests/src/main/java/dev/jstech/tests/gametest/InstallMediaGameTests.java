@@ -3,22 +3,22 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.os.OsRegistry;
-import dev.jstech.computronics.os.ProgramSpec;
-import dev.jstech.computronics.os.fs.InstallerLayout;
-import dev.jstech.computronics.os.media.InstallMedia;
-import dev.jstech.computronics.os.media.InstallerProjection;
-import dev.jstech.computronics.os.media.MediaFormat;
-import dev.jstech.computronics.os.media.MediaItem;
-import dev.jstech.computronics.os.media.MediaKind;
-import dev.jstech.computronics.os.media.MediaReaderBlock;
-import dev.jstech.computronics.os.media.MediaReaderBlockEntity;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.os.OsRegistry;
+import dev.jstech.computers.os.ProgramSpec;
+import dev.jstech.computers.os.fs.InstallerLayout;
+import dev.jstech.computers.os.media.InstallMedia;
+import dev.jstech.computers.os.media.InstallerProjection;
+import dev.jstech.computers.os.media.MediaFormat;
+import dev.jstech.computers.os.media.MediaItem;
+import dev.jstech.computers.os.media.MediaKind;
+import dev.jstech.computers.os.media.MediaReaderBlock;
+import dev.jstech.computers.os.media.MediaReaderBlockEntity;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
@@ -52,7 +52,7 @@ public final class InstallMediaGameTests {
     }
 
     private static ResourceLocation rl(final String path) {
-        return ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, path);
     }
 
     private static ItemStack installer(final Item medium, final MediaKind kind, final String payload) {

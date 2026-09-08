@@ -3,14 +3,14 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.operation.payload.CraftManagerStatePayload;
-import dev.jstech.computronics.operation.payload.PatternStudioEditPayload;
-import dev.jstech.computronics.operation.payload.PatternStudioStatePayload;
-import dev.jstech.computronics.operation.payload.SetMachineConfigPayload;
+import dev.jstech.computers.operation.payload.CraftManagerStatePayload;
+import dev.jstech.computers.operation.payload.PatternStudioEditPayload;
+import dev.jstech.computers.operation.payload.PatternStudioStatePayload;
+import dev.jstech.computers.operation.payload.SetMachineConfigPayload;
 import dev.jstech.tests.JsTests;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
@@ -121,8 +121,8 @@ public final class MachinePayloadGameTests {
                     i == 0 ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BIRCH_PLANKS)
                             : net.minecraft.world.item.ItemStack.EMPTY, 12L * i));
         }
-        final var cell = new dev.jstech.computronics.crafting.PatternWorkbench.DataCell(
-                dev.jstech.computronics.storage.StorageKey.of(net.minecraft.world.item.Items.RAW_IRON), 2, true);
+        final var cell = new dev.jstech.computers.crafting.PatternWorkbench.DataCell(
+                dev.jstech.computers.storage.StorageKey.of(net.minecraft.world.item.Items.RAW_IRON), 2, true);
         final PatternStudioStatePayload state = new PatternStudioStatePayload(bench,
                 new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.CHEST), "Chest of any planks",
                 "note", "chest.craft",

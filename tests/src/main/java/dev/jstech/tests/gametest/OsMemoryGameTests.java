@@ -7,20 +7,20 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
-import dev.jstech.computronics.os.HostScope;
-import dev.jstech.computronics.os.OpenWindow;
-import dev.jstech.computronics.os.OsDef;
-import dev.jstech.computronics.os.OsRegistry;
-import dev.jstech.computronics.os.Platform;
-import dev.jstech.computronics.os.ProgramKind;
-import dev.jstech.computronics.os.ProgramSpec;
-import dev.jstech.computronics.os.RamLedger;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
+import dev.jstech.computers.os.HostScope;
+import dev.jstech.computers.os.OpenWindow;
+import dev.jstech.computers.os.OsDef;
+import dev.jstech.computers.os.OsRegistry;
+import dev.jstech.computers.os.Platform;
+import dev.jstech.computers.os.ProgramKind;
+import dev.jstech.computers.os.ProgramSpec;
+import dev.jstech.computers.os.RamLedger;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
@@ -149,7 +149,7 @@ public final class OsMemoryGameTests {
     }
 
     private static ResourceLocation id(final String path) {
-        return ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, path);
     }
 
     /** A Legacy Mainframe with one 2 GB DDR2 module, powered on with {@code osId} installed. */

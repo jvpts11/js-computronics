@@ -58,6 +58,8 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   the memory bar; resting the cursor on it reads out the link and the figures.
 
 ### Changed
+- The computing mod is J's Computers. It was J's Computronics, and Computronics is the name of a mod
+  that already exists. The mod id stays `jsc`, so nothing a world holds changes name.
 - The Task Manager ends a program you wrote, as it ends a window. What the machine itself is made of still
   cannot be ended, because that is the machine and not something you started.
 - The network knows how much it could hold, not only how much it does: a server offers its drives, a
@@ -77,7 +79,7 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 ## [0.2.0a] - 2026-09-06
 
 The mod became a series. The code every module shares now lives in a library mod of its own, J's Core,
-and the industrial machines in their own mod, J's Industrial; J's Computronics keeps the computers, the
+and the industrial machines in their own mod, J's Industrial; J's Computers keeps the computers, the
 network and the programs. The three ship together at one version. Worlds from 0.1.0a do not carry over:
 the industrial blocks and the material items changed their ids.
 

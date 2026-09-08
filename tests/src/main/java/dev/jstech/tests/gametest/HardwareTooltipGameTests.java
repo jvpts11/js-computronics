@@ -3,13 +3,13 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.HardwareItems;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.os.MinSpecTooltip;
+import dev.jstech.computers.HardwareItems;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.os.MinSpecTooltip;
 import dev.jstech.core.tier.HardwareEra;
 import dev.jstech.tests.JsTests;
 import net.minecraft.gametest.framework.GameTest;
@@ -55,7 +55,7 @@ public final class HardwareTooltipGameTests {
     @GameTest(template = ARENA)
     public static void installDiscNeedsLine_coloursTheEraTheSameWay(final GameTestHelper helper) {
         final List<Component> lines = MinSpecTooltip.osMinSpec(
-                ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "fedora"));
+                ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "fedora"));
         helper.assertTrue(!lines.isEmpty() && lines.get(0).getString().equals("Needs Legacy hardware or later"),
                 "the needs line reads as before; got " + (lines.isEmpty() ? "nothing" : lines.get(0).getString()));
         final TextColor colour = lines.get(0).getSiblings().get(0).getStyle().getColor();

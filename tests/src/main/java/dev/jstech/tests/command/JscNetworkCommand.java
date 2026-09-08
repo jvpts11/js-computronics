@@ -3,14 +3,14 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.command;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import dev.jstech.computronics.block.DataCableBlock;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.block.DataCableBlock;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
 import dev.jstech.core.network.ConnectivityIndex;
 import dev.jstech.core.network.DataTier;
 import dev.jstech.core.network.NetworkSystem;

@@ -3,21 +3,21 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.crafting.MultiStagePattern;
-import dev.jstech.computronics.crafting.NetworkProcessingOperation;
-import dev.jstech.computronics.crafting.NetworkRecipe;
-import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.INetworkOperation;
-import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.operation.payload.OperationRecord;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.crafting.CraftingPattern;
+import dev.jstech.computers.crafting.MultiStagePattern;
+import dev.jstech.computers.crafting.NetworkProcessingOperation;
+import dev.jstech.computers.crafting.NetworkRecipe;
+import dev.jstech.computers.crafting.ProcessingPattern;
+import dev.jstech.computers.operation.INetworkOperation;
+import dev.jstech.computers.operation.NetworkStorage;
+import dev.jstech.computers.operation.payload.OperationRecord;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -351,9 +351,9 @@ public final class MekanismMachineParkGameTests {
                     }
                 })
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var cli = new dev.jstech.computronics.program.ServerCliComputer(
-                            (dev.jstech.computronics.terminal.IComputerTerminalHost) rig.net().cc(), helper.getLevel());
-                    final var shell = dev.jstech.computronics.program.cli.CliCommands.newShell(50);
+                    final var cli = new dev.jstech.computers.program.ServerCliComputer(
+                            (dev.jstech.computers.terminal.IComputerTerminalHost) rig.net().cc(), helper.getLevel());
+                    final var shell = dev.jstech.computers.program.cli.CliCommands.newShell(50);
                     final var response = shell.run("operation craft 4 " + FRAME, cli);
                     final boolean queued = response.lines().stream().anyMatch(l -> l.text().contains("CRAFT queued"));
                     helper.assertTrue(queued, "the shell must queue the craft; got " + response.lines().stream().map(l -> l.text()).toList());
@@ -421,14 +421,14 @@ public final class MekanismMachineParkGameTests {
                 })
                 .thenExecuteAfter(SETTLE, () -> {
                     rig.world().setBlock(mainframePos, ComputingModule.MAINFRAME.get());
-                    rig.world().blockEntity(mainframePos, dev.jstech.computronics.blockentity.MainframeBlockEntity.class)
+                    rig.world().blockEntity(mainframePos, dev.jstech.computers.blockentity.MainframeBlockEntity.class)
                             .loadWithComponents(snapshot[0], helper.getLevel().registryAccess());
                 })
                 .thenWaitUntil(() -> {
                     MekanismRig.power(helper);
                     final NetworkStorage storage = rig.net().storage(helper.getLevel());
                     helper.assertTrue(storage.count(frame) >= 4, "waiting for the frames after the reload: "
-                            + rig.world().blockEntity(mainframePos, dev.jstech.computronics.blockentity.MainframeBlockEntity.class)
+                            + rig.world().blockEntity(mainframePos, dev.jstech.computers.blockentity.MainframeBlockEntity.class)
                                     .activeOperationRecords());
                 })
                 .thenExecute(() -> {

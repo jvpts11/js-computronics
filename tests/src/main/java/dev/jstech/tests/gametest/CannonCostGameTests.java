@@ -7,15 +7,15 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.cannon.CannonCosts;
-import dev.jstech.computronics.cannon.machine.MachineHost;
-import dev.jstech.computronics.cannon.run.IHost;
-import dev.jstech.computronics.cannon.run.Values;
-import dev.jstech.computronics.hardware.DiskSize;
-import dev.jstech.computronics.hardware.StorageTier;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.cannon.CannonCosts;
+import dev.jstech.computers.cannon.machine.MachineHost;
+import dev.jstech.computers.cannon.run.IHost;
+import dev.jstech.computers.cannon.run.Values;
+import dev.jstech.computers.hardware.DiskSize;
+import dev.jstech.computers.hardware.StorageTier;
 import dev.jstech.tests.JsTests;
 import java.util.List;
 import net.minecraft.core.BlockPos;
@@ -62,7 +62,7 @@ public final class CannonCostGameTests {
                 new ItemStack(ComputingModule.PSU_650G.get()));
         hw.setStackInSlot(CraftingComputerBlockEntity.DISK_SLOTS_START,
                 new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
-        computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp"));
+        computer.installOs(ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_xp"));
         return computer;
     }
 

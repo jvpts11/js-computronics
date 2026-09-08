@@ -3,13 +3,13 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.storage.ServerStorageContents;
-import dev.jstech.computronics.storage.StorageKey;
-import dev.jstech.computronics.storage.StorageVolumes;
+import dev.jstech.computers.storage.ServerStorageContents;
+import dev.jstech.computers.storage.StorageKey;
+import dev.jstech.computers.storage.StorageVolumes;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.gametest.framework.GameTest;

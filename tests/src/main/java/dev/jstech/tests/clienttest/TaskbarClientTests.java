@@ -7,9 +7,9 @@
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jstech.computronics.JsComputronics;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.client.os.DesktopScreen;
+import dev.jstech.computers.JsComputers;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.client.os.DesktopScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -35,7 +35,7 @@ public final class TaskbarClientTests {
     private static final BlockPos MONITOR = new BlockPos(6, 2, 2);
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
     private static final ResourceLocation FRAMES_11 =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_11");
+            ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_11");
     private static final String CALCULATOR = "Calculator";
 
     @ClientTest(timeoutTicks = 2400)

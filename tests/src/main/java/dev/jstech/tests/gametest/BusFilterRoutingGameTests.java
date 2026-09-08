@@ -3,18 +3,18 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.block.part.ImportBusPart;
-import dev.jstech.computronics.blockentity.DataCableBlockEntity;
-import dev.jstech.computronics.storage.CompositeDataPort;
-import dev.jstech.computronics.storage.IDataPort;
-import dev.jstech.computronics.storage.ExternalDataPort;
-import dev.jstech.computronics.storage.FilteredDataPort;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.block.part.ImportBusPart;
+import dev.jstech.computers.blockentity.DataCableBlockEntity;
+import dev.jstech.computers.storage.CompositeDataPort;
+import dev.jstech.computers.storage.IDataPort;
+import dev.jstech.computers.storage.ExternalDataPort;
+import dev.jstech.computers.storage.FilteredDataPort;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;

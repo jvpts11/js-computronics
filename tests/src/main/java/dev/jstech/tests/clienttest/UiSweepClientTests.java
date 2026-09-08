@@ -3,16 +3,16 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.clienttest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.client.ClusterManagementComputerScreen;
-import dev.jstech.computronics.client.CraftingSwitchScreen;
-import dev.jstech.computronics.client.ServerRackScreen;
-import dev.jstech.computronics.client.os.DesktopScreen;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.ServerRackBlockEntity;
+import dev.jstech.computers.client.ClusterManagementComputerScreen;
+import dev.jstech.computers.client.CraftingSwitchScreen;
+import dev.jstech.computers.client.ServerRackScreen;
+import dev.jstech.computers.client.os.DesktopScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

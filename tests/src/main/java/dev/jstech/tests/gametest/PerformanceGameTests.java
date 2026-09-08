@@ -3,17 +3,17 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.blockentity.ServerRackBlockEntity;
-import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.storage.IDataSink;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.blockentity.ServerRackBlockEntity;
+import dev.jstech.computers.crafting.CraftingPattern;
+import dev.jstech.computers.storage.IDataSink;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -144,10 +144,10 @@ public final class PerformanceGameTests {
         final int load = 5000;
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 2, () -> {
-                    final var pattern = new dev.jstech.computronics.crafting.ProcessingPattern(
-                            java.util.List.of(new dev.jstech.computronics.crafting
+                    final var pattern = new dev.jstech.computers.crafting.ProcessingPattern(
+                            java.util.List.of(new dev.jstech.computers.crafting
                                     .ProcessingPattern.ProcessingInput(StorageKey.of(Items.IRON_INGOT), 1L)),
-                            java.util.List.of(new dev.jstech.computronics.crafting
+                            java.util.List.of(new dev.jstech.computers.crafting
                                     .ProcessingPattern.ProcessingOutput(StorageKey.of(Items.COPPER_INGOT), 1L, 100)),
                             "jsc:nonexistent_machine", 100_000);
                     for (int i = 0; i < load; i++) {

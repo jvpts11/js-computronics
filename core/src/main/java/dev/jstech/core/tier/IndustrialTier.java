@@ -3,12 +3,12 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.core.tier;
 
 /**
- * Industrial Tier (T0-T9): the central cross-module progression axis of J's Computronics.
+ * Industrial Tier (T0-T9): the central cross-module progression axis of J's Computers.
  */
 
 public enum IndustrialTier {

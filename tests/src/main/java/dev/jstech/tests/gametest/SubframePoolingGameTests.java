@@ -7,8 +7,8 @@
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.operation.payload.OperationRecord;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.operation.payload.OperationRecord;
 import dev.jstech.core.network.NetworkSystem;
 import dev.jstech.core.network.SubframeNode;
 import dev.jstech.core.uuid.NodeUuid;

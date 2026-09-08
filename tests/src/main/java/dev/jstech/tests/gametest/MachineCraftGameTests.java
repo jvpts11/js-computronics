@@ -3,19 +3,19 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.crafting.MultiStagePattern;
-import dev.jstech.computronics.crafting.NetworkRecipe;
-import dev.jstech.computronics.crafting.ProcessingPattern.ProcessingInput;
-import dev.jstech.computronics.crafting.ProcessingPattern.ProcessingOutput;
-import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.os.fs.CraftFile;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.crafting.MultiStagePattern;
+import dev.jstech.computers.crafting.NetworkRecipe;
+import dev.jstech.computers.crafting.ProcessingPattern.ProcessingInput;
+import dev.jstech.computers.crafting.ProcessingPattern.ProcessingOutput;
+import dev.jstech.computers.crafting.ProcessingPattern;
+import dev.jstech.computers.os.fs.CraftFile;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;

@@ -3,24 +3,24 @@
  *
  * Copyright (C) 2026 jvpts11
  *
- * This file is part of J's Computronics.
+ * This file is part of J's Computers.
  */
 package dev.jstech.tests.gametest;
 
-import dev.jstech.computronics.ComputingModule;
-import dev.jstech.computronics.block.part.InputBusPart;
-import dev.jstech.computronics.block.part.ReceivingBusPart;
-import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.blockentity.DataCableBlockEntity;
-import dev.jstech.computronics.blockentity.HbwInterfaceBlockEntity;
-import dev.jstech.computronics.blockentity.MainframeBlockEntity;
-import dev.jstech.computronics.crafting.CraftingPattern;
-import dev.jstech.computronics.crafting.NetworkRecipe;
-import dev.jstech.computronics.crafting.ProcessingPattern;
-import dev.jstech.computronics.operation.INetworkOperation;
-import dev.jstech.computronics.operation.NetworkStorage;
-import dev.jstech.computronics.operation.payload.OperationRecord;
-import dev.jstech.computronics.storage.StorageKey;
+import dev.jstech.computers.ComputingModule;
+import dev.jstech.computers.block.part.InputBusPart;
+import dev.jstech.computers.block.part.ReceivingBusPart;
+import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.blockentity.DataCableBlockEntity;
+import dev.jstech.computers.blockentity.HbwInterfaceBlockEntity;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
+import dev.jstech.computers.crafting.CraftingPattern;
+import dev.jstech.computers.crafting.NetworkRecipe;
+import dev.jstech.computers.crafting.ProcessingPattern;
+import dev.jstech.computers.operation.INetworkOperation;
+import dev.jstech.computers.operation.NetworkStorage;
+import dev.jstech.computers.operation.payload.OperationRecord;
+import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.tests.JsTests;
 import dev.jstech.tests.testkit.TestWorldBuilder;
 import net.minecraft.core.BlockPos;
@@ -100,14 +100,14 @@ public final class MekanismParallelLoadGameTests {
         world.setBlock(CABLE, ComputingModule.HPC_CABLE.get());
         world.setBlock(NODE_RACK, ComputingModule.SUPERCOMPUTER_RACK.get());
         final var rack = world.blockEntity(NODE_RACK,
-                dev.jstech.computronics.blockentity.ServerRackBlockEntity.class);
+                dev.jstech.computers.blockentity.ServerRackBlockEntity.class);
         rack.getServers().setStackInSlot(0, ComputingModule.defaultSupercomputerNode());
         rack.toggleBayPower(0); // bays start on; the offline fixture wants the node dark
     }
 
     private static void powerCluster(final TestWorldBuilder world) {
         world.blockEntity(NODE_RACK,
-                dev.jstech.computronics.blockentity.ServerRackBlockEntity.class).toggleBayPower(0);
+                dev.jstech.computers.blockentity.ServerRackBlockEntity.class).toggleBayPower(0);
     }
 
     private static void placeCluster(final TestWorldBuilder world) {
