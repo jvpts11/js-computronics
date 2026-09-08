@@ -1579,4 +1579,59 @@ public final class OsCliGameTests {
         }
         return sb.toString();
     }
+
+    /**
+     * An install disc in a drive shows its setup, readme and licence at the prompt, the way the explorer
+     * has always shown them, and {@code type} reads them. The disc stores nothing; the prompt used to
+     * take that literally and show an empty disc.
+     */
+    @GameTest(template = ARENA, timeoutTicks = 60)
+    public static void cliDir_listsAnInstallDiscAndTypeReadsItsReadme(final GameTestHelper helper) {
+        final BlockPos pos = new BlockPos(2, 2, 2);
+        final BlockPos readerPos = pos.east();
+        final MainframeBlockEntity mainframe = placeMainframeWithMcDos(helper, pos);
+        // A GPU gives the Mainframe peripheral ports so the adjacent reader can link to it.
+        mainframe.getInventory().setStackInSlot(MainframeBlockEntity.GPU_SLOTS_START,
+                new ItemStack(ComputingModule.GPU_HD_7970.get()));
+        helper.setBlock(readerPos, ComputingModule.CD_DRIVE.get());
+        if (!(helper.getBlockEntity(readerPos)
+                instanceof dev.jstech.computronics.os.media.MediaReaderBlockEntity reader)) {
+            helper.fail("no media reader at " + readerPos);
+            return;
+        }
+        final ItemStack disc = new ItemStack(ComputingModule.CD_ROM.get());
+        dev.jstech.computronics.os.media.MediaItem.setKind(
+                disc, dev.jstech.computronics.os.media.MediaKind.PROGRAM_INSTALL);
+        dev.jstech.computronics.os.media.MediaItem.setPayload(
+                disc, ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "crafting_manager"));
+        reader.mediaSlot().setStackInSlot(0, disc);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
+                    helper.assertTrue(cli.changeDrive('D').ok(), "the disc's drive is D:");
+                    final ICliComputer.FsResult listing = cli.listDisk("");
+                    helper.assertTrue(listing.ok(), "dir on the disc must succeed");
+                    final java.util.List<String> names = new java.util.ArrayList<>();
+                    boolean supportIsDir = false;
+                    for (final ICliComputer.FsEntry entry : listing.entries()) {
+                        names.add(entry.name());
+                        if (entry.name().equals("SUPPORT")) {
+                            supportIsDir = entry.isDir();
+                        }
+                    }
+                    helper.assertTrue(names.contains("SETUP.EXE") && names.contains("README.TXT")
+                                    && names.contains("LICENSE.TXT") && names.contains("SUPPORT"),
+                            "dir lists the projected disc: " + names);
+                    helper.assertTrue(supportIsDir, "the disc's folder lists as a folder");
+                    final ICliComputer.FsResult readme = cli.readFile("README.TXT");
+                    helper.assertTrue(readme.ok() && readme.message().contains("Crafting Manager"),
+                            "type reads the readme's generated text: " + readme.message());
+                    final ICliComputer.FsResult licence = cli.readFile("LICENSE.TXT");
+                    helper.assertTrue(licence.ok() && licence.message().contains("licensed"),
+                            "type reads the licence's generated text: " + licence.message());
+                    helper.assertTrue(cli.changeDir("SUPPORT").ok(), "a projected folder can be entered");
+                    helper.assertTrue(cli.changeDir("\\").ok(), "and left again");
+                })
+                .thenSucceed();
+    }
 }

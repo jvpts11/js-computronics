@@ -24,6 +24,7 @@ public final class ClientTestSuite {
             CraftingChainClientTests.class,
             FilesSyncClientTests.class,
             FullJourneyClientTests.class,
+            InstallMediaClientTests.class,
             MekanismClientTests.class,
             UiSweepClientTests.class);
 

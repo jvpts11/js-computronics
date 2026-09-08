@@ -113,6 +113,16 @@ public final class EditorApp implements IDesktopApp {
         return "Editor";
     }
 
+    /** The text in the buffer, which is what the player is reading or writing. */
+    public String text() {
+        return body.text();
+    }
+
+    /** The file the buffer holds, or empty for one not saved yet. */
+    public String openFile() {
+        return lockedPath;
+    }
+
     @Override
     public int defaultWidth() {
         return 284;

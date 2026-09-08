@@ -2182,6 +2182,16 @@ public final class ServerCliComputer implements ICliComputer {
             entries.add(new FsEntry(FsPaths.fileName(e.path()), e.type().extension(),
                     e.weight(), e.readOnly(), false, e.modified()));
         }
+        /*
+         * An install disc stores nothing: its setup, readme and licence are generated from what it
+         * installs, and the explorer has always shown them. The prompt showed an empty disc instead,
+         * so the same projection is listed here, dirs with the dirs and files with the files.
+         */
+        for (final dev.jstech.computronics.os.fs.InstallerLayout.Entry e
+                : dev.jstech.computronics.os.media.InstallerProjection.list(ctx.disk(), target)) {
+            entries.add(new FsEntry(FsPaths.fileName(e.path()),
+                    e.directory() ? "" : e.type().extension(), 0L, true, e.directory(), 0L));
+        }
         return FsResult.listing(entries);
     }
 
@@ -2196,6 +2206,12 @@ public final class ServerCliComputer implements ICliComputer {
         }
         final DiskCtx ctx = r.ctx();
         final String real = r.path();
+        // A file on an install disc has no stored bytes: its text is generated from the disc's stamp.
+        final java.util.Optional<String> projected =
+                dev.jstech.computronics.os.media.InstallerProjection.text(ctx.disk(), real);
+        if (projected.isPresent()) {
+            return FsResult.content(projected.get());
+        }
         final java.util.Optional<String> content = DiskFilesystem.read(ctx.disk(), real);
         if (content.isEmpty()) {
             // Distinguish a .dat rejection from a plain missing file for a cleaner error.
@@ -2634,7 +2650,17 @@ public final class ServerCliComputer implements ICliComputer {
             return false;
         }
         final String parent = FsPaths.parentDir(storagePath);
-        return DiskFilesystem.listDirs(ctx.disk(), parent, ctx.kind()).contains(storagePath);
+        if (DiskFilesystem.listDirs(ctx.disk(), parent, ctx.kind()).contains(storagePath)) {
+            return true;
+        }
+        // A folder on an install disc is projected, not stored, and can still be entered.
+        for (final dev.jstech.computronics.os.fs.InstallerLayout.Entry e
+                : dev.jstech.computronics.os.media.InstallerProjection.list(ctx.disk(), parent)) {
+            if (e.directory() && e.path().equals(storagePath)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Returns the lowercase extension of a file path (after the last dot), or {@code ""} if none. */
