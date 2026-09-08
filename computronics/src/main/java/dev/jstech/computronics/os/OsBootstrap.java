@@ -344,6 +344,13 @@ public final class OsBootstrap {
             ProgramSpec.of(rl("vim"), "vim", "Vim", false, ALL_PLATFORMS, 8, ProgramKind.APP, 0, HostScope.ANY)
                     .withMinEra(VINTAGE).withEra(VINTAGE).withHouse(SoftwareHouse.BUNDLED).withRam(4),
             /*
+             * Emacs is also a terminal editor and also the answer to a different question: it splits the
+             * glass, so the source and what the compiler said about it are readable at once. Three times
+             * the memory of Vim, which is the trade.
+             */
+            ProgramSpec.of(rl("emacs"), "emacs", "Emacs", false, ALL_PLATFORMS, 24, ProgramKind.APP, 0, HostScope.ANY)
+                    .withMinEra(VINTAGE).withEra(VINTAGE).withHouse(SoftwareHouse.BUNDLED).withRam(12),
+            /*
              * The Linux desktop environments: packages that turn a TTY distribution into a graphical desktop.
              * Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest), and so is
              * the RAM each holds once it is up, on top of the distribution's own share.

@@ -234,6 +234,7 @@
   "program.jsc.disks.desc": "The volumes attached to this machine, and what occupies each one.",
   "program.jsc.editor": "Editor",
   "program.jsc.editor.desc": "Write and edit text files.",
+  "program.jsc.emacs": "Emacs",
   "program.jsc.exposure": "Exposure",
   "program.jsc.files": "Files",
   "program.jsc.files.desc": "Browse, open and organise the files on this computer's disks.",

@@ -67,6 +67,33 @@ public final class TtyEditor {
     /** Whatever the flavour of editor wants to remember between keys, such as a pending command. */
     private String pending = "";
 
+    /**
+     * A second buffer under the first, with its own name.
+     *
+     * <p>Splitting the glass is what one of these editors does and the other does not, so it lives
+     * here as something a flavour may fill rather than as a thing every editor has. Empty means the
+     * file has the whole screen.
+     */
+    private List<String> lower = List.of();
+    private String lowerName = "";
+
+    /** Puts a second buffer under the file, named the way a mode line names one. */
+    public void showLower(final String name, final List<String> lines) {
+        this.lowerName = name == null ? "" : name;
+        this.lower = lines == null ? List.of() : List.copyOf(lines);
+    }
+
+    /** Takes the second buffer away, giving the file the whole glass again. */
+    public void hideLower() {
+        this.lower = List.of();
+        this.lowerName = "";
+    }
+
+    /** Whether a second buffer is showing. */
+    public boolean split() {
+        return !this.lower.isEmpty();
+    }
+
     /** The colouring of the open file, read again only when the text changes. */
     private List<List<CodeRuns.Run>> cached = List.of();
     private String colouredText;
@@ -156,7 +183,18 @@ public final class TtyEditor {
     public void render(final GuiGraphics g, final Font font, final int x, final int y,
                        final int width, final int height, final InkPalette palette) {
         g.fill(x, y, x + width, y + height, palette.ground());
-        final int rows = Math.max(1, (height - PAD - LINE_H) / LINE_H);
+        /*
+         * With a second buffer showing, the file gets the upper half and keeps its own mode line, and
+         * what is under it gets the rest. The status line at the very bottom belongs to the editor
+         * either way, which is where the echo area is on a real one.
+         */
+        final int lowerH = this.lower.isEmpty() ? 0
+                : Math.min(height / 2, (this.lower.size() + 1) * LINE_H + PAD);
+        final int upperH = height - lowerH;
+        if (lowerH > 0) {
+            drawLower(g, font, x, y + upperH, width, lowerH, palette);
+        }
+        final int rows = Math.max(1, (upperH - PAD - LINE_H) / LINE_H);
         followCaret(rows);
 
         final List<List<CodeRuns.Run>> runs = runs();
@@ -182,6 +220,29 @@ public final class TtyEditor {
         }
         Draw.popScissor(g);
         drawStatus(g, font, x, y + height - LINE_H, width, palette);
+    }
+
+    /**
+     * The second buffer: its own mode line naming it, then its lines.
+     *
+     * <p>What is in it is text somebody else produced, so it is drawn plainly rather than coloured as
+     * source: it is a compiler talking, not a program.
+     */
+    private void drawLower(final GuiGraphics g, final Font font, final int x, final int y,
+                           final int width, final int height, final InkPalette palette) {
+        g.fill(x, y, x + width, y + LINE_H, palette.gutter());
+        g.drawString(font, font.plainSubstrByWidth("-UUU:%%--F1  " + this.lowerName, width - 6),
+                x + PAD, y, palette.plain(), false);
+        Draw.pushScissor(g, x, y + LINE_H, x + width, y + height);
+        int ry = y + LINE_H + 1;
+        for (final String line : this.lower) {
+            if (ry + LINE_H > y + height) {
+                break;
+            }
+            g.drawString(font, line, x + PAD, ry, palette.plain(), false);
+            ry += LINE_H;
+        }
+        Draw.popScissor(g);
     }
 
     private void drawStatus(final GuiGraphics g, final Font font, final int x, final int y,
