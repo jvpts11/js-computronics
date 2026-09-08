@@ -25,6 +25,7 @@ public final class ClientTestSuite {
             FilesSyncClientTests.class,
             FullJourneyClientTests.class,
             InstallMediaClientTests.class,
+            TaskbarClientTests.class,
             MekanismClientTests.class,
             UiSweepClientTests.class);
 

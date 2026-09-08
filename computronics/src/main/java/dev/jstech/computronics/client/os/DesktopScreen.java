@@ -720,6 +720,23 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return panelCtxOpen;
     }
 
+    /** Whether a window's menu, the one its taskbar button opens, is open. */
+    public boolean isTaskMenuOpen() {
+        return taskMenuIndex >= 0;
+    }
+
+    /**
+     * Screen position of the centre of the taskbar button of the {@code index}-th open window, wherever
+     * this panel keeps its buttons: centred on Frames 11, from the left on every other panel.
+     */
+    public int[] taskButtonPoint(final int index) {
+        final int y = oy() + (topPanel() ? TASKBAR_H / 2 : sh() - TASKBAR_H / 2);
+        if (is(dev.jstech.computronics.os.PanelStyle.FRAMES_11)) {
+            return new int[] {ox() + win11AppsX(sw()) + index * WIN11_SLOT + WIN11_SLOT / 2, y};
+        }
+        return new int[] {ox() + taskButtonX(index, sw()) + taskButtonW(sw()) / 2, y};
+    }
+
     /** Screen position of the centre of the panel menu's {@code label} entry, or null when it is not there. */
     @org.jetbrains.annotations.Nullable
     public int[] panelMenuPoint(final String label) {
@@ -4058,6 +4075,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int appsX = win11AppsX(sw());
             final int idx = (int) ((mouseX - appsX) / WIN11_SLOT);
             if (mouseX >= appsX && idx >= 0 && idx < windows.size()) {
+                // The right button asks about the window; its menu opens over the icon it belongs to.
+                if (button == 1) {
+                    taskMenuIndex = idx;
+                    taskMenuX = appsX + idx * WIN11_SLOT;
+                    taskMenuY = tbY + 3;
+                    return true;
+                }
                 final DesktopWindow w = windows.get(idx);
                 if (w.minimized()) {
                     w.setMinimized(false);
@@ -4069,6 +4093,15 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 }
                 return true;
             }
+            /*
+             * The rest of the bar is the bar. It used to fall through to the classic layout's hit test,
+             * which still believed a button sat at the left where Frames 95 keeps its first one, so a
+             * right-click on empty bar there opened a window's menu, drawn where no window's icon was.
+             */
+            if (button == 1) {
+                openPanelMenu((int) mouseX, tbY);
+            }
+            return true;
         }
 
         if (startButtonHit(mouseX, mouseY, tbY)) {
