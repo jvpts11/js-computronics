@@ -183,5 +183,6 @@ public final class EditorApp implements IDesktopApp {
         }
         status = "Saving...";
         PacketDistributor.sendToServer(new SaveFilePayload(host, target, body.text()));
+        FilesApps.diskChanged();
     }
 }

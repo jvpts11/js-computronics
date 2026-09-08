@@ -53,8 +53,13 @@ public final class ShellViews {
         }
         /*
          * Any command may have installed or removed a program (apt install, uninstall, ...), so the
-         * desktop's launcher state is refreshed once for all of them rather than once per view.
+         * desktop's launcher state is refreshed once for all of them rather than once per view. And any
+         * command may have changed the disk (del, mkdir, a program writing a file), so the explorers ask
+         * again too, once the command is done rather than on every line a running program prints.
          */
+        if (!payload.busy()) {
+            FilesApps.refreshAll();
+        }
         DesktopScreen.refreshActive();
     }
 }

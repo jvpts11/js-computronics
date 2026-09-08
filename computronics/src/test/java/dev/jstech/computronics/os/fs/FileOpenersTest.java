@@ -27,6 +27,13 @@ class FileOpenersTest {
     }
 
     @Test
+    void defaultFor_runsACompiledProgramWhenTheRuntimeIsThere() {
+        // Opening a compiled program means running it; reading its listing is what "Open with" is for.
+        assertEquals(FileOpeners.RUNTIME, FileOpeners.defaultFor("progs/a.asm", List.of("cannonrt", "exposure")));
+        assertEquals("exposure", FileOpeners.defaultFor("progs/a.asm", List.of("exposure")));
+    }
+
+    @Test
     void defaultFor_fallsBackToThePlainEditorOnAMachineWithNoCodeEditor() {
         assertEquals(FileOpeners.EDITOR, FileOpeners.defaultFor("progs/a.can", NOTHING));
     }

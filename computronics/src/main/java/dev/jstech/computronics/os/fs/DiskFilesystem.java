@@ -483,6 +483,23 @@ public final class DiskFilesystem {
     }
 
     /**
+     * The kind a path's extension names, or {@code fallback} when it names none.
+     *
+     * <p>A name with no extension, or one nobody claims, keeps the kind it had: a text file renamed to
+     * {@code notes} is still text, which is what lets it still be opened.
+     */
+    private static FileType typeOfPath(final String path, final FileType fallback) {
+        final int slash = path.lastIndexOf('/');
+        final String name = slash >= 0 ? path.substring(slash + 1) : path;
+        final int dot = name.lastIndexOf('.');
+        if (dot <= 0 || dot == name.length() - 1) {
+            return fallback;
+        }
+        return FileType.fromExtension(name.substring(dot + 1).toLowerCase(java.util.Locale.ROOT))
+                .orElse(fallback);
+    }
+
+    /**
      * Re-keys a file or directory from {@code src} to the full path {@code dest}.
      *
      * <p>Returns {@code false}, without mutation, when the kind is not hierarchical, the
@@ -507,8 +524,18 @@ public final class DiskFilesystem {
             if (file.type().virtualProjection() || fs.files().containsKey(dest)) {
                 return false;
             }
+            /*
+             * The kind follows the new name. A file's kind is read off its extension everywhere else,
+             * so one renamed from .txt to .can has to become a program rather than a text file wearing
+             * a program's name. A name whose kind is one the machine writes by itself is refused, the
+             * way writing such a file by hand is: renaming into it would make a file nothing can edit.
+             */
+            final FileType newType = typeOfPath(dest, file.type());
+            if (newType.virtualProjection()) {
+                return false;
+            }
             disk.set(ComputingModule.FILESYSTEM.get(),
-                    fs.without(src).with(new StoredFile(dest, file.type(), file.content(), file.modified())));
+                    fs.without(src).with(new StoredFile(dest, newType, file.content(), file.modified())));
             return true;
         }
 

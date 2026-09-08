@@ -173,6 +173,7 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
         this.status = "Saving...";
         CodeFileReplies.expectSaved(this);
         PacketDistributor.sendToServer(new SaveFilePayload(this.host, doc.path, doc.area.text()));
+        FilesApps.diskChanged();
     }
 
     @Override

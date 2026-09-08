@@ -643,6 +643,7 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                             new dev.jstech.computronics.operation.payload.SaveFilePayload(
                                     menu.hostPos(), path, text));
+                    dev.jstech.computronics.client.os.FilesApps.diskChanged();
                 }
 
                 @Override

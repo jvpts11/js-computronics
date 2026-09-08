@@ -436,6 +436,67 @@ public final class OsFilesystemGameTests {
     }
 
     /**
+     * A file's kind follows its name: renamed from .txt to .can it is a program, since its kind is read
+     * off the extension everywhere else and a text file wearing a program's name would open in nothing.
+     */
+    @GameTest(template = ARENA)
+    public static void fs_renameChangesTheKindWithTheExtension(final GameTestHelper helper) {
+        final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    DiskFilesystem.write(disk, "progs/hello.txt", FileType.TXT, "class A {}", 1000L,
+                            FilesystemKind.HIERARCHICAL);
+                    helper.assertTrue(DiskFilesystem.rename(disk, "progs/hello.txt", "progs/hello.can",
+                                    FilesystemKind.HIERARCHICAL), "renaming across kinds must succeed");
+                    FileType kind = null;
+                    for (final DiskFilesystem.FileEntry entry
+                            : DiskFilesystem.list(disk, "progs", FilesystemKind.HIERARCHICAL)) {
+                        if (entry.path().equals("progs/hello.can")) {
+                            kind = entry.type();
+                        }
+                    }
+                    helper.assertTrue(kind == FileType.CAN, "the renamed file must be a program, was " + kind);
+                    final Optional<String> content = DiskFilesystem.read(disk, "progs/hello.can");
+                    helper.assertTrue(content.isPresent() && "class A {}".equals(content.get()),
+                            "the content must survive the change of kind");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Renaming into a kind the machine writes by itself is refused, the way writing one by hand is: a
+     * .dat is a view of what a drive holds, and a real file under that name would be one nothing can edit.
+     */
+    @GameTest(template = ARENA)
+    public static void fs_renameRefusesAKindTheMachineOwns(final GameTestHelper helper) {
+        final ItemStack disk = new ItemStack(ComputingModule.disk(StorageTier.NVME, DiskSize.TB_1));
+
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    DiskFilesystem.write(disk, "notes.txt", FileType.TXT, "keep", 1000L,
+                            FilesystemKind.HIERARCHICAL);
+                    helper.assertFalse(DiskFilesystem.rename(disk, "notes.txt", "notes.dat",
+                            FilesystemKind.HIERARCHICAL), "renaming into .dat must be refused");
+                    helper.assertFalse(DiskFilesystem.rename(disk, "notes.txt", "setup.exe",
+                            FilesystemKind.HIERARCHICAL), "renaming into .exe must be refused");
+                    helper.assertTrue(DiskFilesystem.exists(disk, "notes.txt"),
+                            "the file must still be where it was after a refused rename");
+                    // A name with no extension keeps the kind it had, so the file can still be opened.
+                    helper.assertTrue(DiskFilesystem.rename(disk, "notes.txt", "notes",
+                            FilesystemKind.HIERARCHICAL), "dropping the extension is allowed");
+                    for (final DiskFilesystem.FileEntry entry
+                            : DiskFilesystem.list(disk, "", FilesystemKind.HIERARCHICAL)) {
+                        if (entry.path().equals("notes")) {
+                            helper.assertTrue(entry.type() == FileType.TXT,
+                                    "a file with no extension keeps its kind, was " + entry.type());
+                        }
+                    }
+                })
+                .thenSucceed();
+    }
+
+    /**
      * Renaming a directory onto an already-occupied destination is rejected, so colliding files in the
      * destination are never silently overwritten (no data loss).
      */

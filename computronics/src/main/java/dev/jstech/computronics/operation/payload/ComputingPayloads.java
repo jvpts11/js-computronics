@@ -1082,7 +1082,7 @@ public final class ComputingPayloads {
     private static void handleDiskFiles(final DiskFilesPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!dev.jstech.computronics.client.os.CodeFileReplies.listing(payload)) {
-                dev.jstech.computronics.client.os.FilesApp.accept(payload);
+                dev.jstech.computronics.client.os.FilesApps.accept(payload);
             }
         });
     }

@@ -143,6 +143,7 @@ public final class ShellView extends Panel {
             PacketDistributor.sendToServer(
                     new dev.jstech.computronics.operation.payload.SaveFilePayload(
                             ShellView.this.host, path, text));
+            FilesApps.diskChanged();
         }
 
         @Override

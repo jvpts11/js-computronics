@@ -151,6 +151,39 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         PENDING_OPEN.add(OPEN_FILES_AT + dir);
     }
 
+    /** A queued request to open a file: the program to use (empty for the default), then the path. */
+    private static final String OPEN_FILE = "File\0";
+
+    /**
+     * Lets a running app open a file in whatever program opens that kind by default.
+     *
+     * <p>Which program that is has one answer for the whole desktop, so the explorer asks here rather
+     * than deciding for itself and disagreeing with a double-click on the desktop.
+     */
+    public static void requestOpenFile(final String path) {
+        PENDING_OPEN.add(OPEN_FILE + "\0" + path);
+    }
+
+    /** Lets a running app open a file in a program the player picked. */
+    public static void requestOpenFileWith(final String programId, final String path) {
+        PENDING_OPEN.add(OPEN_FILE + programId + "\0" + path);
+    }
+
+    /** The ids of the programs the open desktop's machine has, for a window offering what can open a file. */
+    public static java.util.List<String> installedProgramIds() {
+        return active == null ? java.util.List.of() : java.util.List.copyOf(active.installedPrograms);
+    }
+
+    /** What a program is called, for a menu that offers it by id. */
+    public static String openerName(final String programId) {
+        if (programId.equals(dev.jstech.computronics.os.fs.FileOpeners.EDITOR)) {
+            return "Editor";
+        }
+        final dev.jstech.computronics.os.ProgramSpec spec = dev.jstech.computronics.program.Programs.get(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", programId));
+        return spec == null ? programId : spec.displayName();
+    }
+
     /**
      * Forgets every per-machine client cache: the programs' insides kept for the machines of the world the
      * player is leaving, and any open request that never found a desktop. Called on logout, so nothing of
@@ -361,7 +394,6 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     // Inline rename of a desktop icon.
     private int deskRenaming = -1; // index into desktopItems, or -1
     private final StringBuilder deskRenameBuf = new StringBuilder();
-    private String deskRenameExt = "";
     @org.jetbrains.annotations.Nullable
     private String deskPendingRename; // enter rename on this name once the next listing arrives
 
@@ -746,6 +778,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** The open window hosting the program launched under {@code label}, or null. */
     @org.jetbrains.annotations.Nullable
+    /** Every window of a program, front-most last, since a program may be open more than once. */
+    public List<DesktopWindow> windowsFor(final String label) {
+        final List<DesktopWindow> out = new ArrayList<>();
+        for (final DesktopWindow w : windows) {
+            if (w.appKey().equals(label)) {
+                out.add(w);
+            }
+        }
+        return out;
+    }
+
     public DesktopWindow windowFor(final String label) {
         for (final DesktopWindow w : windows) {
             if (w.appKey().equals(label)) {
@@ -1170,16 +1213,18 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     continue;
                 }
                 if (key.startsWith(RUN_AT_TERMINAL)) {
-                    /*
-                     * The Files window asked for a program to be run. It gets this desktop's terminal,
-                     * whatever this desktop calls it, and the command goes in as if it had been typed.
-                     */
-                    final String terminal = terminalLabel();
-                    final IDesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
-                    if (shell != null && allowOpen(terminal)) {
-                        openApp(terminal, shell);
-                    }
-                    ShellApp.runWhenReady(key.substring(RUN_AT_TERMINAL.length()));
+                    runAtTerminal(key.substring(RUN_AT_TERMINAL.length()));
+                    continue;
+                }
+                if (key.startsWith(OPEN_FILE)) {
+                    // A window asked for a file to be opened, in a program it named or in the default one.
+                    final String rest = key.substring(OPEN_FILE.length());
+                    final int split = rest.indexOf('\0');
+                    final String programId = rest.substring(0, split);
+                    final String path = rest.substring(split + 1);
+                    openIn(programId.isEmpty()
+                            ? dev.jstech.computronics.os.fs.FileOpeners.defaultFor(path, installedPrograms)
+                            : programId, path);
                     continue;
                 }
                 final IDesktopApp app = factoryFor(key);
@@ -1305,7 +1350,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 final int di = i - launchers.size();
                 final DiskFilesPayload.WireFile f = desktopItems.get(di);
                 drawDesktopIcon(g, ix, iy, f);
-                label = di == deskRenaming ? deskRenameBuf + "_" + deskRenameExt : baseName(f.path());
+                label = di == deskRenaming ? deskRenameBuf + "_" : baseName(f.path());
             }
             if (i == selectedIcon) {
                 // Defer the full label to a pass after every icon so nothing overdraws it.
@@ -1840,12 +1885,27 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private void openIn(final String programId, final String path) {
         if (programId.isEmpty()) {
+            /*
+             * Nothing here claims the kind, but a language an addon brought may: its compiled programs
+             * have an extension of their own, and opening one of those means running it.
+             */
+            final int dot = path.lastIndexOf('.');
+            final String extension = dot >= 0 ? path.substring(dot + 1).toLowerCase(java.util.Locale.ROOT) : "";
+            if (!extension.isEmpty() && dev.jstech.core.JsCore.languages().runnerOf(extension) != null) {
+                runAtTerminal(path);
+                return;
+            }
             showBalloon("Cannot open", "No program on this computer opens " + FsPaths.fileName(path));
             return;
         }
         if (programId.equals(dev.jstech.computronics.os.fs.FileOpeners.EDITOR)) {
             openApp("Editor", new EditorApp(host));
             PacketDistributor.sendToServer(new RequestFileContentPayload(host, path));
+            return;
+        }
+        if (programId.equals(dev.jstech.computronics.os.fs.FileOpeners.RUNTIME)) {
+            // A compiled program is run, not read: it gets this desktop's terminal and prints into it.
+            runAtTerminal(path);
             return;
         }
         final dev.jstech.computronics.os.ProgramSpec spec = dev.jstech.computronics.program.Programs.get(
@@ -1864,6 +1924,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (opened != null) {
             opened.app().openFile(path);
         }
+    }
+
+    /**
+     * Runs a program at this desktop's terminal, whatever this desktop calls it, as if the command had
+     * been typed there.
+     */
+    private void runAtTerminal(final String path) {
+        final String terminal = terminalLabel();
+        final IDesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
+        if (shell != null && allowOpen(terminal)) {
+            openApp(terminal, shell);
+        }
+        ShellApp.runWhenReady(path);
     }
 
     /** The launcher of a program by id, or null when this desktop does not offer it. */
@@ -2110,31 +2183,23 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         deskRenaming = idx;
         selectedIcon = launchers.size() + idx;
         deskRenameBuf.setLength(0);
-        final String name = baseName(f.path());
-        if (!f.directory()) {
-            final int dot = name.lastIndexOf('.');
-            if (dot > 0) {
-                deskRenameBuf.append(name, 0, dot);
-                deskRenameExt = name.substring(dot);
-            } else {
-                deskRenameBuf.append(name);
-                deskRenameExt = "";
-            }
-        } else {
-            deskRenameBuf.append(name);
-            deskRenameExt = "";
-        }
+        /*
+         * The whole name is edited, extension included: the extension decides which program opens the
+         * file, so keeping it out of reach left a text file that should have been a program with no
+         * way to become one.
+         */
+        deskRenameBuf.append(baseName(f.path()));
     }
 
     private void commitDeskRename() {
         if (deskRenaming >= 0 && deskRenaming < desktopItems.size()) {
             final DiskFilesPayload.WireFile f = desktopItems.get(deskRenaming);
             final String oldPath = f.path();
-            final String newName = deskRenameBuf.toString().trim() + deskRenameExt;
+            final String newName = deskRenameBuf.toString().trim();
             final String newPath = desktopDir + "/" + newName;
-            if (!deskRenameBuf.toString().trim().isEmpty() && !newPath.equals(oldPath)) {
+            if (!newName.isEmpty() && !newPath.equals(oldPath)) {
                 PacketDistributor.sendToServer(new RenameFilePayload(host, oldPath, newPath));
-                requestDesktop();
+                FilesApps.diskChanged();
             }
         }
         deskRenaming = -1;
@@ -2150,7 +2215,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return;
         }
         PacketDistributor.sendToServer(new DeleteFilePayload(host, f.path()));
-        requestDesktop();
+        FilesApps.diskChanged();
     }
 
     /**
@@ -2164,14 +2229,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final String name = uniqueDeskName("New File", "." + type.extension());
         deskPendingRename = name;
         PacketDistributor.sendToServer(new SaveFilePayload(host, desktopDir + "/" + name, ""));
-        requestDesktop();
+        FilesApps.diskChanged();
     }
 
     private void newDeskFolder() {
         final String name = uniqueDeskName("New Folder", "");
         deskPendingRename = name;
         PacketDistributor.sendToServer(new MkdirPayload(host, desktopDir + "/" + name));
-        requestDesktop();
+        FilesApps.diskChanged();
     }
 
     private String uniqueDeskName(final String base, final String ext) {
@@ -4773,6 +4838,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     @Override
     public void removed() {
+        /*
+         * The explorers of this desktop stop listening: another machine's desktop may open next, and a
+         * listing of its disk must not land in a window that was showing this one. They say they are
+         * back when this desktop is restored.
+         */
+        FilesApps.forgetAll();
         /*
          * The layout goes to the machine: the windows the player leaves behind are what the machine
          * has open, for whoever looks next and after the game is closed. Not when the desktop is closing

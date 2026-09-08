@@ -19,7 +19,6 @@ import dev.jstech.computronics.operation.payload.MoveFilePayload;
 import dev.jstech.computronics.operation.payload.RenameFilePayload;
 import dev.jstech.computronics.operation.payload.RenameVolumePayload;
 import dev.jstech.computronics.operation.payload.RequestDiskFilesPayload;
-import dev.jstech.computronics.operation.payload.RequestFileContentPayload;
 import dev.jstech.computronics.operation.payload.SaveFilePayload;
 import dev.jstech.computronics.os.fs.InstallerLayout;
 import dev.jstech.computronics.os.fs.SystemLayout;
@@ -116,7 +115,6 @@ public final class FilesApp implements IDesktopApp {
     private int renaming = -1;
     @Nullable
     private String renamePath;
-    private String renameExt = "";
     private int volRenaming = -1;
 
     /*
@@ -154,8 +152,6 @@ public final class FilesApp implements IDesktopApp {
     private int ctxRow = -1;
     // The lines the properties dialog shows for the row it was opened on.
     private List<String[]> propertyLines = List.of();
-
-    private static FilesApp active;
 
     // components
     private final Panel root = new Panel();
@@ -272,7 +268,7 @@ public final class FilesApp implements IDesktopApp {
                 .setOnClick((index, button, shift) -> rowClicked(index, button, clickX, clickY)));
 
         renameField = root.add(new NameField(NAME_MAX));
-        renameField.setSuffix(() -> renameExt).setOnCommit(this::commitRename).setOnBlur(this::endRename);
+        renameField.setOnCommit(this::commitRename).setOnBlur(this::endRename);
         renameField.setVisible(false);
         volumeField = root.add(new NameField(VOLUME_LABEL_MAX));
         volumeField.setOnCommit(this::commitVolumeRename).setOnBlur(this::endVolumeRename);
@@ -291,7 +287,7 @@ public final class FilesApp implements IDesktopApp {
         }
         propertiesClose = properties.add(new Button("Close", properties::close).setPrimary(true));
 
-        active = this;
+        FilesApps.register(this);
         request(initialDir);
     }
 
@@ -301,13 +297,26 @@ public final class FilesApp implements IDesktopApp {
         this.os = osSkin.osPath();
     }
 
-    /** Routes a server listing reply to the open Files window. */
-    public static void accept(final DiskFilesPayload payload) {
-        if (active != null) {
-            active.dir = payload.dir();
-            active.volumes = payload.volumes();
-            active.rebuild(payload.files());
+    /** Takes a listing of the folder this explorer is on. */
+    void accept(final DiskFilesPayload payload) {
+        this.volumes = payload.volumes();
+        rebuild(payload.files());
+    }
+
+    @Override
+    public void onClosed() {
+        FilesApps.forget(this);
+    }
+
+    /** The names listed right now, top to bottom, which is what a player sees in the window. */
+    public List<String> names() {
+        final List<String> out = new ArrayList<>(rows.size());
+        for (final Row row : rows) {
+            if (row.file() != null) {
+                out.add(row.name());
+            }
         }
+        return out;
     }
 
     /** Re-requests this explorer's current listing, so a file moved in from outside shows up at once. */
@@ -371,7 +380,7 @@ public final class FilesApp implements IDesktopApp {
 
     @Override
     public void onRestored() {
-        active = this;
+        FilesApps.register(this);
         request(dir); // the folder may have gained or lost files while the window was away
     }
 
@@ -717,11 +726,6 @@ public final class FilesApp implements IDesktopApp {
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
-        /*
-         * The front (last-rendered) explorer window owns the DiskFilesPayload routing, so two open
-         * Files windows don't leave the back one as a stale target and a closed one stops receiving.
-         */
-        active = this;
         lastX = x;
         lastY = y;
         contentW = width;
@@ -1082,10 +1086,18 @@ public final class FilesApp implements IDesktopApp {
             final boolean dat = target.file().projectsItem();
             final boolean setup = isSetup(target);
             final boolean program = target.kind() == Kind.FILE && isProgram(target.file());
-            final boolean editable = target.kind() == Kind.FILE && !dat && !setup && isText(target.file());
             items.add(new ContextMenu.Item(setup || program ? "Run" : "Open", true, () -> open(target)));
-            if (target.kind() == Kind.FILE) {
-                items.add(new ContextMenu.Item("Open with Editor", editable, () -> openInEditor(target)));
+            if (target.kind() == Kind.FILE && !dat && !setup) {
+                /*
+                 * One entry per program on this machine that can open the kind, so a player picks the
+                 * one they want rather than getting whichever the desktop would have chosen.
+                 */
+                final String path = target.file().path();
+                for (final String programId : dev.jstech.computronics.os.fs.FileOpeners.available(
+                        path, DesktopScreen.installedProgramIds())) {
+                    items.add(new ContextMenu.Item("Open with " + DesktopScreen.openerName(programId), true,
+                            () -> DesktopScreen.requestOpenFileWith(programId, path)));
+                }
             }
             items.add(ContextMenu.Item.separator());
             items.add(new ContextMenu.Item("Cut", !ro && !target.file().readOnly(), () -> cut(target)));
@@ -1101,7 +1113,10 @@ public final class FilesApp implements IDesktopApp {
             items.add(ContextMenu.Item.separator());
         } else {
             items.add(new ContextMenu.Item("Paste", !clipboard.isEmpty() && !ro, this::paste));
-            items.add(new ContextMenu.Item("New File", !ro, this::newFile));
+            for (final dev.jstech.computronics.os.fs.FileType type
+                    : dev.jstech.computronics.os.fs.FileOpeners.creatable()) {
+                items.add(new ContextMenu.Item("New ." + type.extension(), !ro, () -> newFile(type)));
+            }
             items.add(new ContextMenu.Item("New Folder", !ro, this::newFolder));
             items.add(ContextMenu.Item.separator());
             if (onMedia()) {
@@ -1110,13 +1125,6 @@ public final class FilesApp implements IDesktopApp {
         }
         items.add(new ContextMenu.Item("Refresh", true, () -> request(dir)));
         return items;
-    }
-
-    private static boolean isText(final DiskFilesPayload.WireFile f) {
-        return switch (f.ext().toLowerCase(Locale.ROOT)) {
-            case "bin", "exe", "sh", "dat" -> false;
-            default -> true;
-        };
     }
 
     /**
@@ -1218,7 +1226,7 @@ public final class FilesApp implements IDesktopApp {
                      */
                     if (monitorPos != null) {
                         PacketDistributor.sendToServer(new MediumTransferPayload(host, monitorPos, src.file().path(), mediaDest));
-                        request(dir);
+                        FilesApps.diskChanged();
                     }
                 } else if (destDir != null) {
                     // Reorganising a .dat into a normal folder by hand is forbidden; surface the error dialog.
@@ -1230,7 +1238,7 @@ public final class FilesApp implements IDesktopApp {
             } else if (destDir != null && src.file() != null) {
                 // A real, non-projection entry moves into a real folder as before.
                 PacketDistributor.sendToServer(new MoveFilePayload(host, src.file().path(), destDir));
-                request(dir);
+                FilesApps.diskChanged();
             }
         }
         dragging = false;
@@ -1357,25 +1365,16 @@ public final class FilesApp implements IDesktopApp {
                 }
                 if (isSetup(r)) {
                     runSetup(r.file().path());
-                } else if (isProgram(r.file())) {
+                } else if (!r.file().projectsItem()) {
                     /*
-                     * A compiled program is run, not read: it gets a terminal, the way one does anywhere
-                     * else, and prints into it.
+                     * Which program opens a kind of file is the desktop's one answer, so the explorer
+                     * asks it rather than keeping a second opinion that would disagree with a
+                     * double-click on the desktop.
                      */
-                    DesktopScreen.requestRunAtTerminal(r.file().path());
-                } else if (!r.file().projectsItem() && isText(r.file())) {
-                    openInEditor(r);
+                    DesktopScreen.requestOpenFile(r.file().path());
                 }
             }
         }
-    }
-
-    private void openInEditor(final Row r) {
-        if (r.file() == null) {
-            return;
-        }
-        DesktopScreen.requestOpen("Editor");
-        PacketDistributor.sendToServer(new RequestFileContentPayload(host, r.file().path()));
     }
 
     /** Runs the setup program on an installer medium: the same install This PC's button does. */
@@ -1448,7 +1447,7 @@ public final class FilesApp implements IDesktopApp {
         if (clipboardCut) {
             clipboard.clear();
         }
-        request(dir);
+        FilesApps.diskChanged();
     }
 
     private void startRenameAt(final int index) {
@@ -1465,32 +1464,27 @@ public final class FilesApp implements IDesktopApp {
         }
         renaming = index;
         renamePath = r.file().path();
-        String stem = r.name();
-        renameExt = "";
-        if (r.kind() == Kind.FILE) {
-            // Edit only the name, keeping the extension fixed (Windows-style rename).
-            final int dot = stem.lastIndexOf('.');
-            if (dot > 0) {
-                renameExt = stem.substring(dot);
-                stem = stem.substring(0, dot);
-            }
-        }
-        renameField.set(stem);
+        /*
+         * The whole name is edited, extension included. The extension is what decides which program
+         * opens a file, so keeping it out of reach made a text file that should have been a program
+         * into one that could only be deleted and made again.
+         */
+        renameField.set(r.name());
         root.focus(renameField);
     }
 
-    /** The rename field committing: the new name, without the extension it kept. */
-    private void commitRename(final String stem) {
+    /** The rename field committing: the new name, whole. */
+    private void commitRename(final String name) {
         final String oldPath = renamePath;
-        if (oldPath == null || stem.trim().isEmpty()) {
+        if (oldPath == null || name.trim().isEmpty()) {
             return;
         }
         final int slash = oldPath.lastIndexOf('/');
         final String prefix = slash >= 0 ? oldPath.substring(0, slash + 1) : "";
-        final String newPath = prefix + stem.trim() + renameExt;
+        final String newPath = prefix + name.trim();
         if (!newPath.equals(oldPath)) {
             PacketDistributor.sendToServer(new RenameFilePayload(host, oldPath, newPath));
-            request(dir);
+            FilesApps.diskChanged();
         }
     }
 
@@ -1525,7 +1519,7 @@ public final class FilesApp implements IDesktopApp {
                 DesktopScreen.showDatLockedError();
             }
             bandRows.clear();
-            request(dir);
+            FilesApps.diskChanged();
             return;
         }
         if (ctxRow < 0 || ctxRow >= rows.size()) {
@@ -1540,7 +1534,7 @@ public final class FilesApp implements IDesktopApp {
             return;
         }
         PacketDistributor.sendToServer(new DeleteFilePayload(host, r.file().path()));
-        request(dir);
+        FilesApps.diskChanged();
     }
 
     /** The right refusal for a projected entry: a stored item points at the Network Interactor, an installer's file at setup. */
@@ -1552,18 +1546,24 @@ public final class FilesApp implements IDesktopApp {
         }
     }
 
-    private void newFile() {
-        final String name = uniqueName("New File", ".txt");
+    /**
+     * Makes an empty file of that kind, and puts the cursor in its name.
+     *
+     * <p>The kind is chosen before the file exists, because the extension decides which program opens
+     * it, and a file made as text and renamed afterwards is a rename the player should not have had to do.
+     */
+    public void newFile(final dev.jstech.computronics.os.fs.FileType type) {
+        final String name = uniqueName("New File", "." + type.extension());
         pendingRename = name;
         PacketDistributor.sendToServer(new SaveFilePayload(host, join(dir, name), ""));
-        request(dir);
+        FilesApps.diskChanged();
     }
 
     private void newFolder() {
         final String name = uniqueName("New Folder", "");
         pendingRename = name;
         PacketDistributor.sendToServer(new MkdirPayload(host, join(dir, name)));
-        request(dir);
+        FilesApps.diskChanged();
     }
 
     private void startVolumeRename(final int index) {
@@ -1578,7 +1578,7 @@ public final class FilesApp implements IDesktopApp {
     private void commitVolumeRename(final String label) {
         if (volRenaming >= 0 && volRenaming < volumes.size()) {
             PacketDistributor.sendToServer(new RenameVolumePayload(host, volumes.get(volRenaming).key(), label.trim()));
-            request(dir);
+            FilesApps.diskChanged();
         }
     }
 

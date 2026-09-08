@@ -30,6 +30,14 @@ public final class FileOpeners {
     public static final String EDITOR = "editor";
 
     /**
+     * The program runtime, which opens a compiled program by running it.
+     *
+     * <p>Running is what opening a compiled program means, so it comes first for one; the editors
+     * that can read the listing follow, for a player who wants to look inside.
+     */
+    public static final String RUNTIME = "cannonrt";
+
+    /**
      * The programs that can open each kind of file, best first.
      *
      * <p>Best means the one a player most likely wants: a source file opens in the editor written for
@@ -40,7 +48,7 @@ public final class FileOpeners {
     static {
         final List<String> code = List.of("aural_studio_code", "aural_studio", "exposure", EDITOR);
         BY_TYPE.put(FileType.CAN, code);
-        BY_TYPE.put(FileType.ASM, code);
+        BY_TYPE.put(FileType.ASM, List.of(RUNTIME, "aural_studio_code", "aural_studio", "exposure", EDITOR));
         BY_TYPE.put(FileType.IQL, List.of("nms", EDITOR));
         BY_TYPE.put(FileType.CRAFT, List.of("crafting_manager"));
         BY_TYPE.put(FileType.TXT, List.of(EDITOR));
