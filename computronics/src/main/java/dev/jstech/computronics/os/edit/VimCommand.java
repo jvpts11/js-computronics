@@ -1,0 +1,59 @@
+/*
+ * SPDX-License-Identifier: LGPL-3.0-only
+ *
+ * Copyright (C) 2026 jvpts11
+ *
+ * This file is part of J's Computronics.
+ */
+package dev.jstech.computronics.os.edit;
+
+/**
+ * What a line typed after a colon in Vim asks for.
+ *
+ * <p>Reading it is arithmetic over a short string and it is where the mistakes hide: {@code :wq} is two
+ * things, {@code :q!} means one thing and {@code :q} another, and a line that means nothing has to say
+ * so rather than quietly doing half of it. So it is read here, on its own, where every one of those can
+ * be written down as a case.
+ */
+public record VimCommand(boolean write, boolean quit, boolean force, String error) {
+
+    /** A line that asked for nothing anybody knows. */
+    public static VimCommand unknown(final String typed) {
+        return new VimCommand(false, false, false, "E492: not an editor command: " + typed);
+    }
+
+    /** Whether it could be read at all. */
+    public boolean ok() {
+        return this.error.isEmpty();
+    }
+
+    /**
+     * Reads the line, without the colon.
+     *
+     * <p>The forms that exist are the ones a person actually types: write, quit, both, and either of
+     * the last two insisted on with a bang. Anything else is refused by name, the way the real thing
+     * refuses it, instead of being guessed at.
+     */
+    public static VimCommand of(final String typed) {
+        final String line = typed == null ? "" : typed.trim();
+        return switch (line) {
+            case "w" -> new VimCommand(true, false, false, "");
+            case "q" -> new VimCommand(false, true, false, "");
+            case "q!" -> new VimCommand(false, true, true, "");
+            case "wq", "x" -> new VimCommand(true, true, false, "");
+            case "wq!", "x!" -> new VimCommand(true, true, true, "");
+            case "" -> new VimCommand(false, false, false, "");
+            default -> unknown(line);
+        };
+    }
+
+    /**
+     * What to say when a quit was asked for with changes still unwritten and no bang.
+     *
+     * <p>Vim's own words, because a player who has met Vim knows what they mean and one who has not is
+     * told exactly what to do about it.
+     */
+    public static String unwritten() {
+        return "E37: no write since last change (add ! to override)";
+    }
+}

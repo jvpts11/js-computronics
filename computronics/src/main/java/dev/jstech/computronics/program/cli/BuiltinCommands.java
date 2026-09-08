@@ -103,7 +103,14 @@ public final class BuiltinCommands {
                 new Rmdir(),
                 new Copy(),
                 new Move(),
-                new Ren());
+                new Ren(),
+                /*
+                 * The editors that take the terminal rather than opening a window. They are verbs like
+                 * any other, so they are listed by help and gated by whether the machine has them,
+                 * which is what lets a headless server be programmed at all.
+                 */
+                new TtyEditorCommand("vim", "edit a file in the terminal", "vim"),
+                new TtyEditorCommand("emacs", "edit a file in the terminal", "emacs"));
     }
 
     private static String group(final long n) {

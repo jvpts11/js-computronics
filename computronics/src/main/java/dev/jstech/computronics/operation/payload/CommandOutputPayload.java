@@ -18,9 +18,20 @@ import java.util.List;
 /**
  * Server to client: the styled output of one Command Prompt line, plus whether the console should be cleared before printing it (the {@code clear} command). Each line carries its text and a style ordinal the client maps to a colour.
  */
-public record CommandOutputPayload(boolean clear, String prompt, List<WireLine> lines) implements CustomPacketPayload {
+public record CommandOutputPayload(boolean clear, String prompt, List<WireLine> lines,
+                                   String editor, String editorPath) implements CustomPacketPayload {
 
     public static final int MAX_LINES = 256;
+
+    /** A reply that only printed, which is what nearly every command does. */
+    public CommandOutputPayload(final boolean clear, final String prompt, final List<WireLine> lines) {
+        this(clear, prompt, lines, "", "");
+    }
+
+    /** Whether the machine gave the terminal to an editor. */
+    public boolean handsOver() {
+        return !this.editor.isEmpty() && !this.editorPath.isEmpty();
+    }
 
     public static final CustomPacketPayload.Type<CommandOutputPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("jsc", "command_output"));
@@ -30,6 +41,8 @@ public record CommandOutputPayload(boolean clear, String prompt, List<WireLine> 
                     ByteBufCodecs.BOOL, CommandOutputPayload::clear,
                     ByteBufCodecs.stringUtf8(256), CommandOutputPayload::prompt,
                     WireLine.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_LINES)), CommandOutputPayload::lines,
+                    ByteBufCodecs.stringUtf8(32), CommandOutputPayload::editor,
+                    ByteBufCodecs.stringUtf8(160), CommandOutputPayload::editorPath,
                     CommandOutputPayload::new);
 
     @Override

@@ -1098,6 +1098,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
     }
 
+
     /** Routes a desktop-folder listing reply to the active desktop. */
     public static void acceptDesktop(final DesktopFilesPayload payload) {
         if (active == null) {

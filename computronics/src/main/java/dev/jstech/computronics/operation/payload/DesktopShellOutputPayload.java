@@ -23,10 +23,21 @@ import java.util.List;
  * <p>{@code busy} says a program has the terminal: nothing can be typed until it returns, what it
  * prints keeps arriving, and the shell asks again until it is told otherwise.
  */
-public record DesktopShellOutputPayload(boolean clear, boolean busy, String prompt, List<WireLine> lines)
-        implements CustomPacketPayload {
+public record DesktopShellOutputPayload(boolean clear, boolean busy, String prompt, List<WireLine> lines,
+                                        String editor, String editorPath) implements CustomPacketPayload {
 
     public static final int MAX_LINES = 256;
+
+    /** A reply that only printed, which is what nearly every command does. */
+    public DesktopShellOutputPayload(final boolean clear, final boolean busy, final String prompt,
+                                     final List<WireLine> lines) {
+        this(clear, busy, prompt, lines, "", "");
+    }
+
+    /** Whether the machine gave the terminal to an editor. */
+    public boolean handsOver() {
+        return !this.editor.isEmpty() && !this.editorPath.isEmpty();
+    }
 
     public static final CustomPacketPayload.Type<DesktopShellOutputPayload> TYPE =
             new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("jsc", "desktop_shell_output"));
@@ -37,6 +48,8 @@ public record DesktopShellOutputPayload(boolean clear, boolean busy, String prom
                     ByteBufCodecs.BOOL, DesktopShellOutputPayload::busy,
                     ByteBufCodecs.stringUtf8(256), DesktopShellOutputPayload::prompt,
                     WireLine.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_LINES)), DesktopShellOutputPayload::lines,
+                    ByteBufCodecs.stringUtf8(32), DesktopShellOutputPayload::editor,
+                    ByteBufCodecs.stringUtf8(160), DesktopShellOutputPayload::editorPath,
                     DesktopShellOutputPayload::new);
 
     @Override

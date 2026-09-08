@@ -337,6 +337,13 @@ public final class OsBootstrap {
             ProgramSpec.of(rl("exposure"), "exposure", "Exposure", false, DESKTOPS, 192, ProgramKind.APP, 2, HostScope.ANY)
                     .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.DAYLIGHT_FOUNDATION).withRam(64),
             /*
+             * Vim takes over the terminal it was started from instead of opening a window of its own,
+             * which is the only reason a rack server with no graphics can be programmed at all, and why
+             * it runs on every platform there is a prompt on. Four megabytes, and it shows.
+             */
+            ProgramSpec.of(rl("vim"), "vim", "Vim", false, ALL_PLATFORMS, 8, ProgramKind.APP, 0, HostScope.ANY)
+                    .withMinEra(VINTAGE).withEra(VINTAGE).withHouse(SoftwareHouse.BUNDLED).withRam(4),
+            /*
              * The Linux desktop environments: packages that turn a TTY distribution into a graphical desktop.
              * Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest), and so is
              * the RAM each holds once it is up, on top of the distribution's own share.

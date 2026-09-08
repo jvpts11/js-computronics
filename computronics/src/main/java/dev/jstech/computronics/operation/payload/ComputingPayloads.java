@@ -470,7 +470,10 @@ public final class ComputingPayloads {
                 wire.add(new CommandOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
             }
             final String prompt = computer.prompt();
-            PacketDistributor.sendToPlayer(player, new CommandOutputPayload(response.clearScreen(), prompt, wire));
+            final var handOver = response.handOver();
+            PacketDistributor.sendToPlayer(player, new CommandOutputPayload(response.clearScreen(), prompt, wire,
+                    handOver == null ? "" : handOver.editor(),
+                    handOver == null ? "" : handOver.path()));
             if (computer.firmwareRebootRequested()) {
                 // "reboot --firmware": leave the terminal and enter the boot manager on the same monitor.
                 player.closeContainer();
@@ -1647,6 +1650,8 @@ public final class ComputingPayloads {
             boolean clear = false;
             boolean busy = false;
             String prompt = "C:\\>";
+            /* Set when the command was one that gives the terminal to an editor. */
+            dev.jstech.computronics.program.cli.CliShell.HandOver handOver = null;
             if (context.player() instanceof ServerPlayer player
                     && player.level() instanceof ServerLevel level
                     && level.getBlockEntity(payload.hostPos())
@@ -1667,6 +1672,7 @@ public final class ComputingPayloads {
                         computer, CLI_WIDTH);
                 final var response = shell.run(payload.line(), computer);
                 clear = response.clearScreen();
+                handOver = response.handOver();
                 for (final var cliLine : response.lines()) {
                     wire.add(new DesktopShellOutputPayload.WireLine(cliLine.text(), cliLine.style().ordinal()));
                 }
@@ -1699,7 +1705,9 @@ public final class ComputingPayloads {
                     return;
                 }
             }
-            context.reply(new DesktopShellOutputPayload(clear, busy, prompt, wire));
+            context.reply(new DesktopShellOutputPayload(clear, busy, prompt, wire,
+                    handOver == null ? "" : handOver.editor(),
+                    handOver == null ? "" : handOver.path()));
         });
     }
 

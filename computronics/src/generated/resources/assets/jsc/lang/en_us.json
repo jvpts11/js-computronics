@@ -274,5 +274,6 @@
   "program.jsc.task_manager": "Task Manager",
   "program.jsc.task_manager.desc": "What this machine is running, what it is spending, and how to end it.",
   "program.jsc.this_pc": "This PC",
-  "program.jsc.this_pc.desc": "The machine itself: its hardware, its disks and what fills them."
+  "program.jsc.this_pc.desc": "The machine itself: its hardware, its disks and what fills them.",
+  "program.jsc.vim": "Vim"
 }

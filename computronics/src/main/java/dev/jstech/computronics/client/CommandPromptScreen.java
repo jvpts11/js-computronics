@@ -221,6 +221,17 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
             reflowInput();
         }
         scrollOffset = 0;
+        /*
+         * The machine decided a command gives the terminal away, having checked the editor is there.
+         * A terminal that has never heard of the one it named carries on with its prompt.
+         */
+        if (payload.handsOver()) {
+            final var flavourAsked =
+                    dev.jstech.computronics.client.os.TtyEditors.flavourOf(payload.editor());
+            if (flavourAsked != null) {
+                openEditor(payload.editorPath(), flavourAsked);
+            }
+        }
     }
 
     /** Repositions the input box after the DOS prompt width changes (e.g. after a {@code cd}). */
@@ -427,6 +438,11 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     @Override
     public boolean keyPressed(final int key, final int scan, final int mods) {
+        // While an editor has the terminal every key is its, including the ones that would leave.
+        if (this.editor != null) {
+            this.editor.keyPressed(key, mods);
+            return true;
+        }
         if (key == 257 || key == 335) { // Enter / numpad Enter
             submit();
             return true;
@@ -460,6 +476,9 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     @Override
     public boolean charTyped(final char c, final int mods) {
+        if (this.editor != null) {
+            return this.editor.charTyped(c);
+        }
         return input != null && input.charTyped(c, mods);
     }
 
@@ -543,6 +562,9 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
 
     @Override
     public boolean mouseScrolled(final double mouseX, final double mouseY, final double dx, final double dy) {
+        if (this.editor != null) {
+            return this.editor.scrolled(dy);
+        }
         final int top = 27;
         final int bottom = imageHeight - 23;
         final int visible = (bottom - top) / LINE_H;
@@ -577,6 +599,65 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     @Override
     public void render(final GuiGraphics g, final int mouseX, final int mouseY, final float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
+        if (this.editor != null) {
+            /*
+             * The editor has the glass: over everything, because it is what the terminal is showing
+             * now, not something drawn on top of a console that is still there.
+             */
+            this.editor.render(g, font, leftPos + 8, topPos + 8, imageWidth - 16, imageHeight - 16,
+                    dev.jstech.computronics.os.edit.InkPalette.DARK);
+        }
+    }
+
+    /**
+     * The editor that has this terminal, or null when the prompt has it.
+     *
+     * <p>This screen is the terminal of a machine that may have no desktop at all, which is exactly
+     * where an editor that needs none earns its place.
+     */
+    private dev.jstech.computronics.client.os.TtyEditor editor;
+
+    /** Whoever is waiting for the file the machine said to open. */
+    private final dev.jstech.computronics.client.os.CodeFileReplies.IReader opening =
+            new dev.jstech.computronics.client.os.CodeFileReplies.IReader() {
+                @Override
+                public void onContent(final String path, final String content, final boolean exists) {
+                    CommandPromptScreen.this.editor = new dev.jstech.computronics.client.os.TtyEditor(
+                            path, content, CommandPromptScreen.this.flavour,
+                            CommandPromptScreen.this.terminalHost);
+                    if (!exists) {
+                        CommandPromptScreen.this.editor.say(
+                                "\"" + CommandPromptScreen.this.editor.name() + "\" [New]");
+                    }
+                }
+            };
+
+    /** How the editor being opened reads a keyboard, set just before the file is asked for. */
+    private dev.jstech.computronics.client.os.TtyEditor.IKeys flavour;
+
+    /** What an editor running here can ask this terminal to do for it. */
+    private final dev.jstech.computronics.client.os.TtyEditor.IHost terminalHost =
+            new dev.jstech.computronics.client.os.TtyEditor.IHost() {
+                @Override
+                public void save(final String path, final String text) {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                            new dev.jstech.computronics.operation.payload.SaveFilePayload(
+                                    menu.hostPos(), path, text));
+                }
+
+                @Override
+                public void quit() {
+                    CommandPromptScreen.this.editor = null;
+                }
+            };
+
+    /** Hands this terminal to an editor on {@code path}, which the machine is asked for. */
+    private void openEditor(final String path,
+                            final dev.jstech.computronics.client.os.TtyEditor.IKeys keys) {
+        this.flavour = keys;
+        dev.jstech.computronics.client.os.CodeFileReplies.expectContent(this.opening, path);
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.jstech.computronics.operation.payload.RequestFileContentPayload(menu.hostPos(), path));
     }
 
 

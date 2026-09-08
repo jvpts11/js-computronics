@@ -110,6 +110,63 @@ public final class ShellView extends Panel {
     /** Stops the machine's console being drawn into a view nobody is looking at. */
     public void release() {
         ShellViews.forget(this);
+        CodeFileReplies.forget(this.opening);
+    }
+
+    /**
+     * The editor that has taken this terminal, or null when the prompt has it.
+     *
+     * <p>A terminal editor is not a window: it is handed the glass the terminal was using, which is the
+     * whole reason a machine with no desktop can still be programmed.
+     */
+    private TtyEditor editor;
+
+    /** Whoever is waiting for the file an editor was asked to open. */
+    private final CodeFileReplies.IReader opening = new CodeFileReplies.IReader() {
+        @Override
+        public void onContent(final String path, final String content, final boolean exists) {
+            ShellView.this.editor = new TtyEditor(path, content,
+                    ShellView.this.flavour, ShellView.this.terminalHost);
+            if (!exists) {
+                ShellView.this.editor.say("\"" + ShellView.this.editor.name() + "\" [New]");
+            }
+        }
+    };
+
+    /** How the editor being opened reads a keyboard, set just before the file is asked for. */
+    private TtyEditor.IKeys flavour;
+
+    /** What an editor running here can ask the terminal to do for it. */
+    private final TtyEditor.IHost terminalHost = new TtyEditor.IHost() {
+        @Override
+        public void save(final String path, final String text) {
+            PacketDistributor.sendToServer(
+                    new dev.jstech.computronics.operation.payload.SaveFilePayload(
+                            ShellView.this.host, path, text));
+        }
+
+        @Override
+        public void quit() {
+            ShellView.this.editor = null;
+            /*
+             * The prompt comes back where it was, so the machine is asked for it rather than guessed:
+             * a program may have left the terminal somewhere else while the editor had it.
+             */
+            PacketDistributor.sendToServer(new DesktopShellRunPayload(ShellView.this.host, ""));
+        }
+    };
+
+    /** Hands the terminal to an editor on {@code path}, which the machine is asked for. */
+    public void openEditor(final String path, final TtyEditor.IKeys keys) {
+        this.flavour = keys;
+        CodeFileReplies.expectContent(this.opening, path);
+        PacketDistributor.sendToServer(
+                new dev.jstech.computronics.operation.payload.RequestFileContentPayload(this.host, path));
+    }
+
+    /** Whether an editor has this terminal. */
+    public boolean editing() {
+        return this.editor != null;
     }
 
     /** The system this view is running under, which decides the console's ground. */
@@ -147,6 +204,16 @@ public final class ShellView extends Panel {
             this.prompt = payload.prompt();
         }
         this.busy = payload.busy();
+        /*
+         * The machine decided a command gives the terminal away, having checked that the editor is
+         * installed. A terminal that has never heard of the one it named carries on with its prompt.
+         */
+        if (payload.handsOver()) {
+            final TtyEditor.IKeys flavourAsked = TtyEditors.flavourOf(payload.editor());
+            if (flavourAsked != null) {
+                openEditor(payload.editorPath(), flavourAsked);
+            }
+        }
     }
 
     private void push(final String text, final int color) {
@@ -217,6 +284,12 @@ public final class ShellView extends Panel {
 
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
+        if (this.editor != null) {
+            // The editor has the glass: no scrollback, no prompt, exactly as at a real terminal.
+            this.editor.render(g, ctx.font(), x(), y(), width(), height(),
+                    dev.jstech.computronics.os.edit.InkPalette.DARK);
+            return;
+        }
         final int ground = groundOf(this.osSkin);
         g.fill(x(), y(), right(), bottom(), ground);
         // Lines wrap to the view's current width, so nothing leaks past the frame however it is resized.
@@ -250,12 +323,18 @@ public final class ShellView extends Panel {
 
     @Override
     public boolean charTyped(final char c) {
+        if (this.editor != null) {
+            return this.editor.charTyped(c);
+        }
         // While a program has the terminal the keyboard is its, and it listens for one thing only.
         return this.busy || super.charTyped(c);
     }
 
     @Override
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
+        if (this.editor != null) {
+            return this.editor.keyPressed(key, modifiers);
+        }
         if (this.busy) {
             if (key == GLFW.GLFW_KEY_C && net.minecraft.client.gui.screens.Screen.hasControlDown()) {
                 PacketDistributor.sendToServer(new DesktopShellRunPayload(this.host, ComputingPayloads.INTERRUPT));
@@ -267,6 +346,9 @@ public final class ShellView extends Panel {
 
     @Override
     public boolean mouseScrolled(final double mx, final double my, final double delta) {
+        if (this.editor != null) {
+            return this.editor.scrolled(delta);
+        }
         this.scrollOffset = Math.max(0, this.scrollOffset + (delta > 0 ? 1 : -1));
         return true;
     }
@@ -274,9 +356,9 @@ public final class ShellView extends Panel {
     private void submit(final String line) {
         this.scrollOffset = 0;
         push(this.prompt + " " + line, colorOf(CliStyle.PROMPT.ordinal()));
-        // "run/start/open <program>" launches a desktop window client-side (the server shell has no windows).
         final String[] parts = line.split("\\s+", 2);
         final String verb = parts[0].toLowerCase(Locale.ROOT);
+        // "run/start/open <program>" launches a desktop window client-side (the server shell has no windows).
         if (verb.equals("run") || verb.equals("start") || verb.equals("open")) {
             handleRun(parts.length > 1 ? parts[1].trim() : "");
             return;

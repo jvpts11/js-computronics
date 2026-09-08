@@ -93,7 +93,14 @@ public final class CliShell {
             out.error("error running '" + word + "': " + unexpected.getMessage());
         }
         final boolean clear = command instanceof IClearMarker;
-        return new Response(out.lines(), clear);
+        /*
+         * A command that gives the terminal away says so by being one; which file is the argument it
+         * was just run with, which the shell already has, so nothing has to be remembered anywhere.
+         */
+        final CliShell.HandOver handOver = command instanceof IHandOver && !args.isEmpty()
+                ? new HandOver(command.name(), args.getFirst())
+                : null;
+        return new Response(out.lines(), clear, handOver);
     }
 
     /**
@@ -103,7 +110,31 @@ public final class CliShell {
     public interface IClearMarker {
     }
 
-    /** The result of one line: the output to print, and whether to clear the console before printing it. */
-    public record Response(List<CliLine> lines, boolean clearScreen) {
+    /**
+     * Implemented by a command that gives the terminal away rather than printing to it.
+     *
+     * <p>Which editor and which file is decided by the machine; drawing it is the screen's half. A
+     * terminal that has never heard of the editor named simply carries on with its prompt.
+     *
+     * <p>The command says nothing about the file: the shell already has the arguments it just handed
+     * over, so nothing here has to remember anything between one line and the next.
+     */
+    public interface IHandOver {
+    }
+
+    /** The terminal was given to {@code editor}, on {@code path}. */
+    public record HandOver(String editor, String path) {
+    }
+
+    /**
+     * The result of one line: the output to print, whether to clear the console before printing it, and
+     * the editor the terminal was given to, if it was.
+     */
+    public record Response(List<CliLine> lines, boolean clearScreen, HandOver handOver) {
+
+        /** A reply that only printed. */
+        public Response(final List<CliLine> lines, final boolean clearScreen) {
+            this(lines, clearScreen, null);
+        }
     }
 }
