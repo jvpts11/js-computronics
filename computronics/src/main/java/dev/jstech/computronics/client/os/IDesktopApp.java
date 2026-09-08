@@ -45,6 +45,15 @@ public interface IDesktopApp {
     }
 
     /**
+     * Asks the app to open a file, which is what happens when one is double-clicked or picked with
+     * "Open with". An app that opens no files ignores it, which is why it does nothing by default.
+     *
+     * <p>Called once the window exists, so an app can act on it straight away.
+     */
+    default void openFile(String path) {
+    }
+
+    /**
      * Called as this app's window is closed, before it leaves the desktop.
      *
      * <p>An app that told something it was waiting for an answer says here that it is not, so a reply

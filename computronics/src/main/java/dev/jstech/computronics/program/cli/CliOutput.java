@@ -87,6 +87,29 @@ public final class CliOutput {
         line(sb.toString());
     }
 
+    /**
+     * A name and what it does, in two columns: the dots run from the name up to {@code column}, so every
+     * description begins in the same place however long the names are.
+     *
+     * <p>This is not {@link #row}, and the difference matters. A row pushes its value to the right edge,
+     * which is right for a figure being read off a listing and wrong for a list of commands: a long
+     * description leaves no room for dots at all, so some lines get them and some do not, and each
+     * description starts somewhere different. Lining the descriptions up is the whole job here.
+     */
+    public void entry(final String name, final String description, final int column) {
+        final StringBuilder text = new StringBuilder(name);
+        if (name.length() + 2 <= column) {
+            text.append(' ');
+            text.append(".".repeat(column - name.length() - 2));
+            text.append(' ');
+        } else {
+            // A name past the column keeps a single space, so it reads as one entry rather than two words.
+            text.append(' ');
+        }
+        text.append(description);
+        line(text.toString());
+    }
+
     public List<CliLine> lines() {
         return List.copyOf(lines);
     }

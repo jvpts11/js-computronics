@@ -237,6 +237,12 @@ public final class AuralStudioApp implements IDesktopApp {
         return 120;
     }
 
+    /** Opens a file, as picking this program with "Open with" does. */
+    @Override
+    public void openFile(final String path) {
+        this.workspace.open(path);
+    }
+
     @Override
     public void onRestored() {
         this.workspace.refresh();

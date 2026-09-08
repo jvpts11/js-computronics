@@ -169,6 +169,15 @@ public final class ShellView extends Panel {
         return this.editor != null;
     }
 
+    /** Everything the console has printed here, as one piece of text. */
+    public String scrollbackText() {
+        final StringBuilder text = new StringBuilder();
+        for (final Line line : this.scrollback) {
+            text.append(line.text()).append('\n');
+        }
+        return text.toString();
+    }
+
     /** The system this view is running under, which decides the console's ground. */
     public ShellView setSkin(final OsSkin value) {
         this.osSkin = value == null ? OsSkin.fallback() : value;

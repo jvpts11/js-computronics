@@ -241,6 +241,12 @@ public final class ExposureApp implements IDesktopApp {
         return 118;
     }
 
+    /** Opens a file, as picking this program with "Open with" does. */
+    @Override
+    public void openFile(final String path) {
+        this.workspace.open(path);
+    }
+
     @Override
     public void onRestored() {
         this.workspace.refresh();

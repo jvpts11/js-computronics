@@ -20,6 +20,7 @@ import java.util.List;
 public final class ClientTestSuite {
 
     private static final List<Class<?>> CLASSES = List.of(
+            CannonEditorClientTests.class,
             CraftingChainClientTests.class,
             FullJourneyClientTests.class,
             MekanismClientTests.class,

@@ -151,9 +151,20 @@ public final class BuiltinCommands {
                 return;
             }
             ctx.out().header("commands");
+            /*
+             * The dots stop at one column for the whole list, worked out from the longest name there is,
+             * so every summary starts in the same place however long the names happen to be.
+             */
+            int column = 0;
             for (final ICliCommand command : ctx.shell().commands()) {
                 if (command.available(ctx.computer())) {
-                    ctx.out().row("  " + command.name(), command.summary());
+                    column = Math.max(column, command.name().length());
+                }
+            }
+            column += 6;
+            for (final ICliCommand command : ctx.shell().commands()) {
+                if (command.available(ctx.computer())) {
+                    ctx.out().entry("  " + command.name(), command.summary(), column);
                 }
             }
             ctx.out().blank();

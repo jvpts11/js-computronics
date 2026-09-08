@@ -32,6 +32,16 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   double-click.
 - Mods may add a programming language of their own, and remove this one. A language that registers itself
   gets the prompt, the terminal, the task manager, saving and the tick budget without writing any of them.
+- Five editors to write a program in, each a different bargain between what it shows you and what it costs
+  the machine to keep open. Aural Studio is the whole workshop in one window, and the only one that tells you
+  what a line will cost the program before you write it. Aural Studio Code offers the same suggestions in a
+  fifth of the memory, with the machine's own console welded into the bottom of the window. Exposure suggests
+  nothing and instead compiles every program on the disk, so changing something shared shows which of the
+  others stopped building. Vim and Emacs open no window at all: they take over the terminal they were started
+  from, which is what lets a rack server with no screen be programmed, or one reached from another machine.
+  Emacs splits that terminal, so a program and what the compiler said about it are readable at once.
+- Whatever language a file is written in colours it, marks in the margin where the compiler stopped, and
+  suggests what can follow a name, in every one of the editors. A language a mod adds gets all of it.
 
 - Every system, desktop, service and program holds a share of the computer's RAM, in megabytes, and a program
   opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one

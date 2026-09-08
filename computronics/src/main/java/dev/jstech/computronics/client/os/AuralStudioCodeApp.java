@@ -85,6 +85,41 @@ public final class AuralStudioCodeApp implements IDesktopApp {
         return doc == null ? List.of() : doc.complaints();
     }
 
+    /* What the window is showing, for a test that drives it the way a player does */
+
+    /** The file being edited, or empty when none is. */
+    public String openFile() {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        return doc == null ? "" : doc.path();
+    }
+
+    /** The text of the file being edited. */
+    public String text() {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        return doc == null ? "" : doc.area().text();
+    }
+
+    /** How many things the compiler has to say about it. */
+    public int complaintCount() {
+        return complaints().size();
+    }
+
+    /** Everything the terminal panel has printed, as one piece of text. */
+    public String terminalText() {
+        return this.terminal.scrollbackText();
+    }
+
+    /** Opens a file, as clicking it in the explorer or picking this program with "Open with" does. */
+    @Override
+    public void openFile(final String path) {
+        this.workspace.open(path);
+    }
+
+    /** Runs a line at the terminal panel, as typing it and pressing return does. */
+    public void runInTerminal(final String line) {
+        this.terminal.run(line);
+    }
+
     /** One row of the explorer: the file's name, in the colour a selected row asks for. */
     private void drawFileRow(final GuiGraphics g, final UiContext ctx, final DiskFilesPayload.WireFile file,
                              final int index, final int x, final int y, final int width, final int height,

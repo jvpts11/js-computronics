@@ -24,6 +24,7 @@ import dev.jstech.computronics.operation.payload.RequestFileContentPayload;
 import dev.jstech.computronics.operation.payload.SaveFilePayload;
 import dev.jstech.computronics.operation.payload.SetDesktopPrefsPayload;
 import dev.jstech.computronics.operation.payload.SetIconPositionPayload;
+import dev.jstech.computronics.os.fs.FsPaths;
 import dev.jstech.computronics.os.fs.SystemLayout;
 import dev.jstech.core.gui.layout.DesktopZ;
 import dev.jstech.core.tier.HardwareEra;
@@ -483,8 +484,6 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int LABEL_W = CELL_W - 2;
     private static final int LABEL_LINES = 2;
     private static final int LABEL_LINE_H = 8;
-    private static final String[] DESK_CTX_ICON = {"Open", "Rename", "Delete"};
-    private static final String[] DESK_CTX_BG = {"New File", "New Folder", "Personalize", "Refresh"};
     private static final int DESK_CTX_W = 88;
     private static final int DESK_CTX_ITEM_H = 11;
     /**
@@ -1828,14 +1827,96 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final DiskFilesPayload.WireFile f = desktopItems.get(di);
         if (f.directory()) {
             openApp("Files", new FilesApp(host, desktopId.getPath(), f.path(), monitorPos));
-        } else if (!f.readOnly()) {
+            return;
+        }
+        openIn(dev.jstech.computronics.os.fs.FileOpeners.defaultFor(f.path(), installedPrograms), f.path());
+    }
+
+    /**
+     * Opens a file in a named program, or says why it cannot be opened at all.
+     *
+     * <p>Which program a kind of file belongs to is one answer, kept in one place, so a double-click, a
+     * pick from "Open with" and a run from the explorer all reach the same one.
+     */
+    private void openIn(final String programId, final String path) {
+        if (programId.isEmpty()) {
+            showBalloon("Cannot open", "No program on this computer opens " + FsPaths.fileName(path));
+            return;
+        }
+        if (programId.equals(dev.jstech.computronics.os.fs.FileOpeners.EDITOR)) {
             openApp("Editor", new EditorApp(host));
-            PacketDistributor.sendToServer(new RequestFileContentPayload(host, f.path()));
+            PacketDistributor.sendToServer(new RequestFileContentPayload(host, path));
+            return;
+        }
+        final dev.jstech.computronics.os.ProgramSpec spec = dev.jstech.computronics.program.Programs.get(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", programId));
+        final Launcher launcher = spec == null ? null : launcherFor(spec.id());
+        if (launcher == null) {
+            showBalloon("Cannot open", "No program on this computer opens " + FsPaths.fileName(path));
+            return;
+        }
+        runLauncher(launcher);
+        /*
+         * The window exists once the launcher has run, so the file goes to it straight away. An app that
+         * opens no files ignores this, which is what lets any program be picked without a special case.
+         */
+        final DesktopWindow opened = windowFor(launcher.label());
+        if (opened != null) {
+            opened.app().openFile(path);
         }
     }
 
+    /** The launcher of a program by id, or null when this desktop does not offer it. */
+    private Launcher launcherFor(final net.minecraft.resources.ResourceLocation id) {
+        for (final Launcher launcher : launchers) {
+            if (id.equals(launcher.programId())) {
+                return launcher;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Offers the programs on this machine that can open the file, so the player picks one.
+     *
+     * <p>A menu rather than a dialog: it is the same question as the one that was just asked with the
+     * right button, and the answer is one of a handful of names.
+     */
+    private void openWith(final String path) {
+        final java.util.List<DeskEntry> entries = new java.util.ArrayList<>();
+        for (final String programId
+                : dev.jstech.computronics.os.fs.FileOpeners.available(path, installedPrograms)) {
+            final dev.jstech.computronics.os.ProgramSpec spec = dev.jstech.computronics.program.Programs.get(
+                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", programId));
+            final String label = spec == null ? programId : spec.displayName();
+            entries.add(new DeskEntry(label, () -> openIn(programId, path)));
+        }
+        if (entries.isEmpty()) {
+            showBalloon("Cannot open", "No program on this computer opens " + FsPaths.fileName(path));
+            return;
+        }
+        deskCtxEntries = java.util.List.copyOf(entries);
+        deskCtxOpen = true;
+    }
+
+    /**
+     * One line of a desktop menu: what it says, and what it does.
+     *
+     * <p>The labels and the actions used to be two lists kept in step by an index, which is how a
+     * program icon came to offer the wallpaper's menu. An entry carries its own action, so a menu is
+     * built for whatever was actually right-clicked and there is nothing left to keep in step.
+     */
+    private record DeskEntry(String label, Runnable action) {
+    }
+
+    /** The menu currently open on the desktop, built when it was opened. */
+    private java.util.List<DeskEntry> deskCtxEntries = java.util.List.of();
+
     private void renderDeskContext(final GuiGraphics g, final int hoverMx, final int hoverMy) {
-        final String[] items = deskCtxItem >= 0 ? DESK_CTX_ICON : DESK_CTX_BG;
+        final String[] items = deskCtxEntries.stream().map(DeskEntry::label).toArray(String[]::new);
+        if (items.length == 0) {
+            return;
+        }
         final int mx = deskCtxX;
         final int my = deskCtxY;
         final int mh = items.length * DESK_CTX_ITEM_H + 2;
@@ -1934,34 +2015,74 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     }
 
     private int deskCtxItemAt(final double mx, final double my) {
-        final String[] items = deskCtxItem >= 0 ? DESK_CTX_ICON : DESK_CTX_BG;
         if (mx < deskCtxX || mx > deskCtxX + DESK_CTX_W) {
             return -1;
         }
         final int rel = (int) Math.floor((my - (deskCtxY + 1)) / (double) DESK_CTX_ITEM_H);
-        return rel >= 0 && rel < items.length ? rel : -1;
+        return rel >= 0 && rel < deskCtxEntries.size() ? rel : -1;
     }
 
     private void runDeskContext(final int item) {
-        if (deskCtxItem >= 0) {
-            if (deskCtxItem >= desktopItems.size()) {
-                return;
+        if (item >= 0 && item < deskCtxEntries.size()) {
+            deskCtxEntries.get(item).action().run();
+        }
+    }
+
+    /**
+     * Opens the menu for whatever the cursor is on: a program, a file or folder, or the wallpaper.
+     *
+     * <p>Each gets the entries that mean something for it, which is why a program no longer offers to
+     * be renamed and the wallpaper no longer offers to be opened.
+     */
+    private void openDeskContext(final int slot, final int x, final int y) {
+        final java.util.List<DeskEntry> entries = new java.util.ArrayList<>();
+        if (slot >= 0 && slot < launchers.size()) {
+            final Launcher launcher = launchers.get(slot);
+            entries.add(new DeskEntry("Open", () -> runLauncher(launcher)));
+            /*
+             * Only what the machine could actually take off: the programs that ship with a system are
+             * part of it, so offering to remove one would be offering something that then fails.
+             */
+            final dev.jstech.computronics.os.ProgramSpec spec =
+                    dev.jstech.computronics.program.Programs.get(launcher.programId());
+            if (spec != null && spec.installable()) {
+                entries.add(new DeskEntry("Uninstall", () -> uninstallLauncher(spec)));
             }
-            switch (item) {
-                case 0 -> openSlot(launchers.size() + deskCtxItem);
-                case 1 -> startDeskRename(deskCtxItem);
-                case 2 -> deleteDeskItem(deskCtxItem);
-                default -> { }
+        } else if (slot >= launchers.size() && slot - launchers.size() < desktopItems.size()) {
+            final int di = slot - launchers.size();
+            final DiskFilesPayload.WireFile file = desktopItems.get(di);
+            entries.add(new DeskEntry("Open", () -> openSlot(launchers.size() + di)));
+            if (!file.directory()) {
+                entries.add(new DeskEntry("Open with...", () -> openWith(file.path())));
+            }
+            /*
+             * A projection of what a drive holds is not a file anybody wrote, so it cannot be renamed or
+             * deleted by hand; the filesystem refuses both, and a menu that offered them would be lying.
+             */
+            if (!file.readOnly()) {
+                entries.add(new DeskEntry("Rename", () -> startDeskRename(di)));
+                entries.add(new DeskEntry("Delete", () -> deleteDeskItem(di)));
             }
         } else {
-            switch (item) {
-                case 0 -> newDeskFile();
-                case 1 -> newDeskFolder();
-                case 2 -> cycleWallpaper();
-                case 3 -> requestDesktop();
-                default -> { }
+            for (final dev.jstech.computronics.os.fs.FileType type
+                    : dev.jstech.computronics.os.fs.FileOpeners.creatable()) {
+                entries.add(new DeskEntry("New ." + type.extension(), () -> newDeskFile(type)));
             }
+            entries.add(new DeskEntry("New Folder", this::newDeskFolder));
+            entries.add(new DeskEntry("Personalize", this::cycleWallpaper));
+            entries.add(new DeskEntry("Refresh", this::requestDesktop));
         }
+        deskCtxEntries = java.util.List.copyOf(entries);
+        deskCtxItem = slot >= launchers.size() ? slot - launchers.size() : -1;
+        deskCtxX = x;
+        deskCtxY = y;
+        deskCtxOpen = !entries.isEmpty();
+    }
+
+    /** Takes a program off this computer, the way {@code uninstall} at the prompt does. */
+    private void uninstallLauncher(final dev.jstech.computronics.os.ProgramSpec spec) {
+        PacketDistributor.sendToServer(new dev.jstech.computronics.operation.payload
+                .DesktopShellRunPayload(host, "uninstall " + spec.commandName()));
     }
 
     /** Cycles to the next wallpaper style and persists the choice on the computer. */
@@ -2032,8 +2153,15 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         requestDesktop();
     }
 
-    private void newDeskFile() {
-        final String name = uniqueDeskName("New File", ".txt");
+    /**
+     * Makes an empty file of that kind, and puts the cursor in its name.
+     *
+     * <p>The kind is chosen before the file exists, because the extension is what decides which program
+     * opens it and a file created as text and renamed afterwards is a rename the player should not have
+     * had to do.
+     */
+    private void newDeskFile(final dev.jstech.computronics.os.fs.FileType type) {
+        final String name = uniqueDeskName("New File", "." + type.extension());
         deskPendingRename = name;
         PacketDistributor.sendToServer(new SaveFilePayload(host, desktopDir + "/" + name, ""));
         requestDesktop();
@@ -2941,7 +3069,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (my >= bodyTop && mx >= x + KDE_SIDE_W + 4) {
             final int row = (my - (bodyTop + 4)) / KDE_ROW_H;
             if (row >= 0 && row < launchers.size()) {
-                runLauncher(launchers.get(row));
+                startChoose(row);
                 closeStart();
             }
         }
@@ -3042,7 +3170,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             int ry = fieldY + 22 + 12;
             for (final Launcher l : filtered) {
                 if (my >= ry && my < ry + 16 && mx >= fieldX && mx < fieldX + fieldW) {
-                    runLauncher(l);
+                    startChoose(l);
                     closeStart();
                     return true;
                 }
@@ -3061,7 +3189,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int row = (my - gridTop) / GN_TILE_H;
             final int idx = row * GN_COLS + col;
             if (idx >= 0 && idx < filtered.size() && gridTop + (row + 1) * GN_TILE_H <= sh - 26) {
-                runLauncher(filtered.get(idx));
+                startChoose(filtered.get(idx));
                 closeStart();
                 return true;
             }
@@ -3073,7 +3201,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (my >= dashY && my < dashY + 20 && mx >= dashX && mx < dashX + dashW) {
             final int idx = (mx - dashX - 4) / 22;
             if (idx >= 0 && idx < dashN) {
-                runLauncher(launchers.get(idx));
+                startChoose(idx);
                 closeStart();
             }
             return true;
@@ -3147,7 +3275,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             for (int i = 0; i < favN; i++) {
                 final int fy = y + 8 + i * 22;
                 if (my >= fy - 3 && my < fy + 19) {
-                    runLauncher(launchers.get(i));
+                    startChoose(i);
                     closeStart();
                     return true;
                 }
@@ -3158,7 +3286,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (mx >= listX && my >= y + CIN_HEADER_H) {
             final int row = (my - (y + CIN_HEADER_H)) / CIN_ROW_H;
             if (row >= 0 && row < launchers.size()) {
-                runLauncher(launchers.get(row));
+                startChoose(row);
                 closeStart();
             }
         }
@@ -3594,6 +3722,38 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * Resolves a click inside the (version-specific) Start menu. Returns true when the click landed on the
      * panel (and was acted on or absorbed); false when it fell outside, so the caller closes the menu.
      */
+    /*
+     * Which button opened the Start menu entry, and where the cursor was. Every panel style lays its
+     * entries out differently and each handler already does that arithmetic, so rather than a second
+     * hit test that would have to match all of them, the handlers say which entry was hit and this
+     * decides what to do with it.
+     */
+    private boolean startWithRightButton;
+    private int startClickX;
+    private int startClickY;
+
+    /**
+     * Starts a program from the Start menu, or opens its own menu when the right button asked.
+     *
+     * <p>Every panel style calls this instead of running the launcher itself, so a program listed
+     * anywhere answers the right button the same way.
+     */
+    private void startChoose(final int index) {
+        if (index >= 0 && index < launchers.size()) {
+            startChoose(launchers.get(index));
+        }
+    }
+
+    /** The same, for the panels that lay their entries out from a list of their own. */
+    private void startChoose(final Launcher launcher) {
+        if (this.startWithRightButton) {
+            closeStart();
+            openDeskContext(launchers.indexOf(launcher), this.startClickX, this.startClickY);
+            return;
+        }
+        runLauncher(launcher);
+    }
+
     private boolean handleStartMenuClick(final int mx, final int my, final int tbY) {
         if (periodPanel()) {
             return handleStartClickPeriod(mx, my, tbY);
@@ -3622,7 +3782,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         final int idx = (int) Math.floor((my - (y + 4)) / (double) MENU_ITEM_H);
         if (idx >= 0 && idx < launchers.size()) {
-            runLauncher(launchers.get(idx));
+            startChoose(idx);
         }
         closeStart();
         return true;
@@ -3637,7 +3797,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int itemsTop = y + 4;
         final int idx = (int) Math.floor((my - itemsTop) / (double) MENU_ITEM_H);
         if (idx >= 0 && idx < launchers.size()) {
-            runLauncher(launchers.get(idx));
+            startChoose(idx);
         } else {
             final int shutY = itemsTop + launchers.size() * MENU_ITEM_H + 6;
             if (my >= shutY && my <= shutY + MENU_ITEM_H) {
@@ -3667,7 +3827,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 for (int i = 0; i < col.size(); i++) {
                     final int ry = xpLeftRowY(i);
                     if (dy >= ry && dy < ry + XP_ROW_H) {
-                        runLauncher(col.get(i));
+                        startChoose(col.get(i));
                         closeStart();
                         return true;
                     }
@@ -3680,7 +3840,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 final List<Launcher> col = xpRightLaunchers();
                 final int row = dy / XP_ROW_H;
                 if (row >= 0 && row < col.size()) {
-                    runLauncher(col.get(row));
+                    startChoose(col.get(row));
                 }
             }
         } else if (my >= bodyBot) {
@@ -3731,7 +3891,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             int ry = contentTop + 11;
             for (final Launcher l : filtered) {
                 if (my >= ry && my < ry + 15) {
-                    runLauncher(l);
+                    startChoose(l);
                     closeStart();
                     return true;
                 }
@@ -3748,7 +3908,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             if (col >= 0 && col < W11_COLS) {
                 final int idx = row * W11_COLS + col;
                 if (idx >= 0 && idx < filtered.size()) {
-                    runLauncher(filtered.get(idx));
+                    startChoose(filtered.get(idx));
                     closeStart();
                     return true;
                 }
@@ -3851,7 +4011,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
         if (startOpen) {
-            if (handleStartMenuClick((int) mouseX, (int) mouseY, tbY)) {
+            /*
+             * The right button asks about a program rather than starting it, the way it does on the
+             * desktop itself. Before this, both buttons ran it, so there was no way to reach a
+             * program's own menu from the one place every program is listed.
+             */
+            startWithRightButton = button == 1;
+            startClickX = (int) mouseX;
+            startClickY = (int) mouseY;
+            final boolean handled = handleStartMenuClick((int) mouseX, (int) mouseY, tbY);
+            startWithRightButton = false;
+            if (handled) {
                 return true;
             }
             startOpen = false;
@@ -3998,12 +4168,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int slot = iconSlotAt(mouseX, mouseY, perCol);
 
         if (button == 1) {
-            // Right-click: open the desktop context menu on an icon, or on the empty background.
+            // Right-click: the menu of whatever is under the cursor, or the wallpaper's own.
             selectedIcon = slot;
-            deskCtxItem = slot >= launchers.size() ? slot - launchers.size() : -1;
-            deskCtxX = (int) mouseX;
-            deskCtxY = (int) mouseY;
-            deskCtxOpen = true;
+            openDeskContext(slot, (int) mouseX, (int) mouseY);
             return true;
         }
 

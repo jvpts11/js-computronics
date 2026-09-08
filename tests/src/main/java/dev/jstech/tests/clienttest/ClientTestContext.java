@@ -475,9 +475,19 @@ public final class ClientTestContext {
 
     /** Presses and releases a GLFW key on the open screen. */
     public void key(final int keyCode) {
+        key(keyCode, 0);
+    }
+
+    /**
+     * The same, with modifiers held: {@code GLFW_MOD_CONTROL} and friends, combined with {@code |}.
+     *
+     * <p>The shortcuts a program has are keys held with something, so a test that never holds anything
+     * cannot reach them at all.
+     */
+    public void key(final int keyCode, final int modifiers) {
         final Screen screen = screen(Screen.class);
-        screen.keyPressed(keyCode, 0, 0);
-        screen.keyReleased(keyCode, 0, 0);
+        screen.keyPressed(keyCode, 0, modifiers);
+        screen.keyReleased(keyCode, 0, modifiers);
     }
 
     /** Types {@code text} into the open screen, character by character. */
