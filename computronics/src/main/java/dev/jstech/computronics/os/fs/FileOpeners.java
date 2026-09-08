@@ -46,9 +46,9 @@ public final class FileOpeners {
     private static final Map<FileType, List<String>> BY_TYPE = new LinkedHashMap<>();
 
     static {
-        final List<String> code = List.of("aural_studio_code", "aural_studio", "exposure", EDITOR);
+        final List<String> code = List.of("virtual_studio_code", "virtual_studio", "exposure", EDITOR);
         BY_TYPE.put(FileType.CAN, code);
-        BY_TYPE.put(FileType.ASM, List.of(RUNTIME, "aural_studio_code", "aural_studio", "exposure", EDITOR));
+        BY_TYPE.put(FileType.ASM, List.of(RUNTIME, "virtual_studio_code", "virtual_studio", "exposure", EDITOR));
         BY_TYPE.put(FileType.IQL, List.of("nms", EDITOR));
         BY_TYPE.put(FileType.CRAFT, List.of("crafting_manager"));
         BY_TYPE.put(FileType.TXT, List.of(EDITOR));

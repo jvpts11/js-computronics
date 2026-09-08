@@ -24,14 +24,14 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Aural Studio Code: the light editor, with the machine's programs down the side and the compiler
+ * Virtual Studio Code: the light editor, with the machine's programs down the side and the compiler
  * reading over the player's shoulder.
  *
  * <p>All it owns is the arrangement. What the files are, which are open and what is wrong with them is
  * the workspace's; the explorer, the tabs and the text are the toolkit's own components. That is what
  * lets the other two editors be a different arrangement of the same parts rather than a second copy.
  */
-public final class AuralStudioCodeApp implements IDesktopApp {
+public final class VirtualStudioCodeApp implements IDesktopApp {
 
     private static final int RAIL_W = 14;
     private static final int SIDE_W = 76;
@@ -61,7 +61,7 @@ public final class AuralStudioCodeApp implements IDesktopApp {
     private final ShellView terminal;
     private final CodeCompletions completions = new CodeCompletions();
 
-    public AuralStudioCodeApp(final BlockPos host) {
+    public VirtualStudioCodeApp(final BlockPos host) {
         this.workspace = new CodeWorkspace(host);
         this.explorer = this.root.add(new ListView<>(this.workspace::files, ROW_H, this::drawFileRow))
                 .setOnClick(this::onFilePicked);
@@ -173,8 +173,8 @@ public final class AuralStudioCodeApp implements IDesktopApp {
     @Override
     public String title() {
         final CodeWorkspace.Doc doc = this.workspace.current();
-        return doc == null ? "Aural Studio Code"
-                : doc.name() + (doc.dirty() ? " *" : "") + " - Aural Studio Code";
+        return doc == null ? "Virtual Studio Code"
+                : doc.name() + (doc.dirty() ? " *" : "") + " - Virtual Studio Code";
     }
 
     @Override

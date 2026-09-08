@@ -9,7 +9,7 @@ package dev.jstech.tests.clienttest;
 
 import dev.jstech.computronics.JsComputronics;
 import dev.jstech.computronics.blockentity.CraftingComputerBlockEntity;
-import dev.jstech.computronics.client.os.AuralStudioCodeApp;
+import dev.jstech.computronics.client.os.VirtualStudioCodeApp;
 import dev.jstech.computronics.client.os.DesktopScreen;
 import dev.jstech.computronics.client.os.IDesktopApp;
 import dev.jstech.tests.testkit.TestWorldBuilder;
@@ -42,7 +42,7 @@ public final class CannonEditorClientTests {
 
     private static final ResourceLocation FRAMES_XP =
             ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "frames_xp");
-    private static final String EDITOR_LAUNCHER = "Aural Studio Code";
+    private static final String EDITOR_LAUNCHER = "Virtual Studio Code";
 
     /** The program the player writes: short enough to type, and it says something when it runs. */
     private static final String SOURCE =
@@ -60,8 +60,8 @@ public final class CannonEditorClientTests {
         return window != null && type.isInstance(window.app()) ? type.cast(window.app()) : null;
     }
 
-    private static AuralStudioCodeApp editor(final ClientTestContext ctx) {
-        return app(ctx, EDITOR_LAUNCHER, AuralStudioCodeApp.class);
+    private static VirtualStudioCodeApp editor(final ClientTestContext ctx) {
+        return app(ctx, EDITOR_LAUNCHER, VirtualStudioCodeApp.class);
     }
 
     /** Opens a program from the Start menu, the way a player reaches one. */
@@ -74,11 +74,11 @@ public final class CannonEditorClientTests {
 
     /** A program written at the keyboard, saved, compiled and run, all on one machine. */
     @ClientTest(timeoutTicks = 3000)
-    public static void auralStudioCode_writesAProgramTheMachineThenRuns(final ClientTestContext ctx) {
+    public static void virtualStudioCode_writesAProgramTheMachineThenRuns(final ClientTestContext ctx) {
         ctx.thenBuild(0, world -> {
                     final CraftingComputerBlockEntity computer = world.placeRunningCraftingComputer(COMPUTER);
                     computer.installOs(FRAMES_XP);
-                    for (final String id : new String[] {"aural_studio_code", "cannonc", "cannonrt"}) {
+                    for (final String id : new String[] {"virtual_studio_code", "cannonc", "cannonrt"}) {
                         computer.console().install(program(id).toString());
                     }
                     world.placeMonitor(MONITOR, Direction.EAST);

@@ -315,19 +315,19 @@ public final class OsBootstrap {
             ProgramSpec.of(rl("cannonrt"), "cannon", "Cannon Runtime", false, ALL_PLATFORMS, 12, ProgramKind.SERVICE, 2, HostScope.ANY)
                     .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.CANNON_FOUNDATION).withRam(24),
             /*
-             * Aural Studio: the whole workshop in one window, and the only editor that says what a call
+             * Virtual Studio: the whole workshop in one window, and the only editor that says what a call
              * will cost the program before the line is written. Frames only, and it asks the machine to
              * prove it: a quarter of a gigabyte held while it is open, which is what a program of the
              * generation after this one weighs.
              */
-            ProgramSpec.of(rl("aural_studio"), "auralstudio", "Aural Studio", false, FRAMES_ONLY, 512, ProgramKind.APP, 2, HostScope.ANY)
+            ProgramSpec.of(rl("virtual_studio"), "virtualstudio", "Virtual Studio", false, FRAMES_ONLY, 512, ProgramKind.APP, 2, HostScope.ANY)
                     .withMinEra(LEGACY).withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT).withRam(256),
             /*
-             * Aural Studio Code: the light editor for Cannon, with the machine's programs down the side
+             * Virtual Studio Code: the light editor for Cannon, with the machine's programs down the side
              * and its console welded into the bottom of the window, so a program is written, compiled and
              * run without leaving it. Frames XP or newer, and any Linux desktop.
              */
-            ProgramSpec.of(rl("aural_studio_code"), "auralcode", "Aural Studio Code", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.ANY)
+            ProgramSpec.of(rl("virtual_studio_code"), "virtualcode", "Virtual Studio Code", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.ANY)
                     .withMinEra(LEGACY).withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT).withRam(48),
             /*
              * Exposure: the editor that compiles every program on the disk instead of the one in front

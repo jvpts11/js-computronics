@@ -62,8 +62,8 @@ public final class InstallMediaClientTests {
             ComputingModule.FLOPPY_DISK.get(), "minesweeper", "README.TXT", "LICENSE.TXT", "Minesweeper");
 
     /** A Standard-era program on a DVD: lowercase names and a sources folder, the disc reported empty. */
-    private static final Disc AURAL_STUDIO_DVD = new Disc(ComputingModule.DVD_DRIVE.get(),
-            ComputingModule.DVD_ROM.get(), "aural_studio", "readme.txt", "license.txt", "Aural Studio");
+    private static final Disc VIRTUAL_STUDIO_DVD = new Disc(ComputingModule.DVD_DRIVE.get(),
+            ComputingModule.DVD_ROM.get(), "virtual_studio", "readme.txt", "license.txt", "Virtual Studio");
 
     private static MediaReaderBlockEntity drive(final ClientTestContext ctx, final ServerLevel level) {
         if (level.getBlockEntity(ctx.abs(DRIVE)) instanceof MediaReaderBlockEntity be) {
@@ -106,7 +106,7 @@ public final class InstallMediaClientTests {
     /** The exact disc and desktop the readme was reported empty on. */
     @ClientTest(timeoutTicks = 2400)
     public static void readme_ofAStandardDvdOnFrames11OpensWithItsText(final ClientTestContext ctx) {
-        readme(ctx, "frames_11", AURAL_STUDIO_DVD);
+        readme(ctx, "frames_11", VIRTUAL_STUDIO_DVD);
     }
 
     /** The readme on a program's disc opens in the Editor with its text, not as an empty page. */

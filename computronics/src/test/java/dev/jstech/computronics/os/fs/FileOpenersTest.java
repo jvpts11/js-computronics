@@ -18,12 +18,12 @@ class FileOpenersTest {
 
     private static final List<String> NOTHING = List.of();
     private static final List<String> EVERYTHING =
-            List.of("aural_studio_code", "aural_studio", "exposure", "nms", "crafting_manager");
+            List.of("virtual_studio_code", "virtual_studio", "exposure", "nms", "crafting_manager");
 
     @Test
     void defaultFor_opensASourceFileInACodeEditorWhenThereIsOne() {
-        assertEquals("aural_studio_code", FileOpeners.defaultFor("progs/a.can", EVERYTHING));
-        assertEquals("aural_studio_code", FileOpeners.defaultFor("progs/a.asm", EVERYTHING));
+        assertEquals("virtual_studio_code", FileOpeners.defaultFor("progs/a.can", EVERYTHING));
+        assertEquals("virtual_studio_code", FileOpeners.defaultFor("progs/a.asm", EVERYTHING));
     }
 
     @Test
@@ -75,7 +75,7 @@ class FileOpenersTest {
 
     @Test
     void available_ordersTheCodeEditorsBestFirst() {
-        assertEquals(List.of("aural_studio_code", "aural_studio", "exposure", FileOpeners.EDITOR),
+        assertEquals(List.of("virtual_studio_code", "virtual_studio", "exposure", FileOpeners.EDITOR),
                 FileOpeners.available("a.can", EVERYTHING));
     }
 

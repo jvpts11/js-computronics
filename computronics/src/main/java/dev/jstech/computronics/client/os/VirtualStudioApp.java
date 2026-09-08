@@ -26,7 +26,7 @@ import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Aural Studio: the whole workshop in one window.
+ * Virtual Studio: the whole workshop in one window.
  *
  * <p>It is the same workspace the lighter editor uses, arranged for somebody who wants everything on
  * the glass at once: the project down the left with what the compiler produced from it, the source and
@@ -34,7 +34,7 @@ import org.lwjgl.glfw.GLFW;
  * else does is the price: the list of what can follow a name says what each call will cost the program,
  * before the line is written.
  */
-public final class AuralStudioApp implements IDesktopApp {
+public final class VirtualStudioApp implements IDesktopApp {
 
     private static final int MENU_H = 10;
     private static final int TOOLBAR_H = 13;
@@ -69,7 +69,7 @@ public final class AuralStudioApp implements IDesktopApp {
     /** What the last build said, which is what the Build Output pane shows. */
     private final List<String> built = new ArrayList<>();
 
-    public AuralStudioApp(final BlockPos host) {
+    public VirtualStudioApp(final BlockPos host) {
         this.workspace = new CodeWorkspace(host);
         this.solution = this.root.add(new ListView<>(this::rows, ROW_H, this::drawTreeRow))
                 .setOnClick(this::onTreePicked);
@@ -214,7 +214,7 @@ public final class AuralStudioApp implements IDesktopApp {
     @Override
     public String title() {
         final CodeWorkspace.Doc doc = this.workspace.current();
-        return doc == null ? "Aural Studio" : doc.name() + (doc.dirty() ? " *" : "") + " - Aural Studio";
+        return doc == null ? "Virtual Studio" : doc.name() + (doc.dirty() ? " *" : "") + " - Virtual Studio";
     }
 
     @Override
@@ -410,7 +410,7 @@ public final class AuralStudioApp implements IDesktopApp {
                     new ContextMenu.Item("Build", this.workspace.current() != null, this::build));
             default -> List.of(
                     new ContextMenu.Item("Cannon 1.0", false, () -> { }),
-                    new ContextMenu.Item("Aural Studio", false, () -> { }));
+                    new ContextMenu.Item("Virtual Studio", false, () -> { }));
         };
         this.menu.open(entries, x, y, boundX, boundY, boundW, boundH);
     }

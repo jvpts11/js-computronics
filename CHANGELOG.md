@@ -33,8 +33,8 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 - Mods may add a programming language of their own, and remove this one. A language that registers itself
   gets the prompt, the terminal, the task manager, saving and the tick budget without writing any of them.
 - Five editors to write a program in, each a different bargain between what it shows you and what it costs
-  the machine to keep open. Aural Studio is the whole workshop in one window, and the only one that tells you
-  what a line will cost the program before you write it. Aural Studio Code offers the same suggestions in a
+  the machine to keep open. Virtual Studio is the whole workshop in one window, and the only one that tells you
+  what a line will cost the program before you write it. Virtual Studio Code offers the same suggestions in a
   fifth of the memory, with the machine's own console welded into the bottom of the window. Exposure suggests
   nothing and instead compiles every program on the disk, so changing something shared shows which of the
   others stopped building. Vim and Emacs open no window at all: they take over the terminal they were started

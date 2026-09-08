@@ -209,8 +209,6 @@
   "os.jsc.mc_dos": "MC-DOS",
   "os.jsc.mc_net": "MC-NET",
   "os.jsc.ubuntu": "Ubuntu",
-  "program.jsc.aural_studio": "Aural Studio",
-  "program.jsc.aural_studio_code": "Aural Studio Code",
   "program.jsc.automation_engine": "Automation Engine",
   "program.jsc.automation_engine.desc": "The service that runs standing automation rules on the Mainframe.",
   "program.jsc.automation_manager": "Automation Manager",
@@ -276,5 +274,7 @@
   "program.jsc.task_manager.desc": "What this machine is running, what it is spending, and how to end it.",
   "program.jsc.this_pc": "This PC",
   "program.jsc.this_pc.desc": "The machine itself: its hardware, its disks and what fills them.",
-  "program.jsc.vim": "Vim"
+  "program.jsc.vim": "Vim",
+  "program.jsc.virtual_studio": "Virtual Studio",
+  "program.jsc.virtual_studio_code": "Virtual Studio Code"
 }
