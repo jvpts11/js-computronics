@@ -330,6 +330,13 @@ public final class OsBootstrap {
             ProgramSpec.of(rl("aural_studio_code"), "auralcode", "Aural Studio Code", false, DESKTOPS, 128, ProgramKind.APP, 2, HostScope.ANY)
                     .withMinEra(LEGACY).withEra(STANDARD).withHouse(SoftwareHouse.MIDSOFT).withRam(48),
             /*
+             * Exposure: the editor that compiles every program on the disk instead of the one in front
+             * of you, so changing something shared shows which of the others stopped building. It offers
+             * nothing as you type, which is the trade.
+             */
+            ProgramSpec.of(rl("exposure"), "exposure", "Exposure", false, DESKTOPS, 192, ProgramKind.APP, 2, HostScope.ANY)
+                    .withMinEra(LEGACY).withEra(LEGACY).withHouse(SoftwareHouse.DAYLIGHT_FOUNDATION).withRam(64),
+            /*
              * The Linux desktop environments: packages that turn a TTY distribution into a graphical desktop.
              * Footprints are balancing estimates (Plasma is the heaviest, Cinnamon the lightest), and so is
              * the RAM each holds once it is up, on top of the distribution's own share.

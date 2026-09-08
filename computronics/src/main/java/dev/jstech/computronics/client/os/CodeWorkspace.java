@@ -13,6 +13,7 @@ import dev.jstech.computronics.operation.payload.RequestFileContentPayload;
 import dev.jstech.computronics.operation.payload.SaveFilePayload;
 import dev.jstech.computronics.os.edit.CodeRuns;
 import dev.jstech.computronics.os.edit.InkPalette;
+import dev.jstech.computronics.os.edit.ProblemReport;
 import dev.jstech.core.JsCore;
 import dev.jstech.core.language.IProgrammingLanguage;
 import java.util.ArrayList;
@@ -89,7 +90,7 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
 
     /** Asks the machine which programs it holds. */
     public void refresh() {
-        CodeFileReplies.expectListing(this);
+        CodeFileReplies.expectListing(this, HOME);
         PacketDistributor.sendToServer(new RequestDiskFilesPayload(this.host, HOME));
     }
 
@@ -147,7 +148,7 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
                 return;
             }
         }
-        CodeFileReplies.expectContent(this);
+        CodeFileReplies.expectContent(this, path);
         PacketDistributor.sendToServer(new RequestFileContentPayload(this.host, path));
     }
 
@@ -277,6 +278,45 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
             marks.add(new CodeArea.Mark(complaint.line(), true, complaint.code() + ": " + complaint.message()));
         }
         doc.area.setMarks(marks);
+    }
+
+    /* What is wrong with the whole folder, not just with what is open */
+
+    /** What the compiler said about every program on the disk, the last time they were all read. */
+    private final java.util.Map<String, List<IProgrammingLanguage.Complaint>> folderComplaints =
+            new java.util.LinkedHashMap<>();
+
+    /** Asks the machine for every program at once, to compile the lot. */
+    public void surveyFolder() {
+        CodeFileReplies.expectFolder(this, HOME);
+        PacketDistributor.sendToServer(
+                new dev.jstech.computronics.operation.payload.RequestFolderContentPayload(
+                        this.host, HOME, ".can"));
+    }
+
+    @Override
+    public void onFolder(final dev.jstech.computronics.operation.payload.FolderContentPayload folder) {
+        this.folderComplaints.clear();
+        for (final var file : folder.files()) {
+            final IProgrammingLanguage language = languageOf(file.path());
+            if (language == null) {
+                continue;
+            }
+            /*
+             * The text on the disk, not what is open: a file the player is halfway through editing is
+             * reported as the machine would find it, and the open copy has its own margin for that.
+             */
+            this.folderComplaints.put(file.path(), language.compile(
+                    List.of(new IProgrammingLanguage.SourceText(
+                            ProblemReport.nameOf(file.path()), file.text()))).complaints());
+        }
+        this.status = ProblemReport.brokenFiles(this.folderComplaints) + " of "
+                + folder.files().size() + " program(s) with problems";
+    }
+
+    /** Every complaint from every program on the disk, worst file first. */
+    public List<ProblemReport.Row> folderProblems() {
+        return ProblemReport.of(this.folderComplaints);
     }
 
     /** Notes that the player changed the open file, and reads it again. */

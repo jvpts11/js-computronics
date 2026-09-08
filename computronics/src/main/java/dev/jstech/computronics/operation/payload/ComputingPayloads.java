@@ -222,6 +222,10 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleDeleteFile);
         registrar.playToServer(RequestFileContentPayload.TYPE, RequestFileContentPayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestFileContent);
+        registrar.playToServer(RequestFolderContentPayload.TYPE, RequestFolderContentPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestFolderContent);
+        registrar.playToClient(FolderContentPayload.TYPE, FolderContentPayload.STREAM_CODEC,
+                ComputingPayloads::handleFolderContent);
         registrar.playToClient(FileContentPayload.TYPE, FileContentPayload.STREAM_CODEC,
                 ComputingPayloads::handleFileContent);
         registrar.playToServer(RenameFilePayload.TYPE, RenameFilePayload.STREAM_CODEC,
@@ -2215,6 +2219,54 @@ public final class ComputingPayloads {
                 computer.setChanged();
             }
         });
+    }
+
+    /**
+     * Reads a whole folder of one kind of file at once.
+     *
+     * <p>An editor that reports on a program's neighbours has to read them all, and twenty files one at
+     * a time is twenty round trips for what is really one question. Only the machine's own disk is read,
+     * because a removable medium is browsed rather than compiled against.
+     */
+    private static void handleRequestFolderContent(final RequestFolderContentPayload payload,
+                                                   final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            final java.util.List<FolderContentPayload.WireFile> files = new java.util.ArrayList<>();
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos())
+                            instanceof dev.jstech.computronics.os.IOsHost computer) {
+                final net.minecraft.world.item.ItemStack disk = computer.systemDisk();
+                final dev.jstech.computronics.os.FilesystemKind kind = filesystemKindOf(computer);
+                if (!disk.isEmpty() && kind != dev.jstech.computronics.os.FilesystemKind.NONE) {
+                    final String suffix = payload.extension().toLowerCase(java.util.Locale.ROOT);
+                    for (final dev.jstech.computronics.os.fs.DiskFilesystem.FileEntry entry
+                            : dev.jstech.computronics.os.fs.DiskFilesystem.list(disk, payload.dir(), kind)) {
+                        if (files.size() >= FolderContentPayload.MAX_FILES) {
+                            break;
+                        }
+                        if (!entry.path().toLowerCase(java.util.Locale.ROOT).endsWith(suffix)) {
+                            continue;
+                        }
+                        final String text = dev.jstech.computronics.os.fs.DiskFilesystem
+                                .read(disk, entry.path()).orElse("");
+                        /*
+                         * A file too long for one reply is left out rather than cut: half a program
+                         * would compile to complaints that are the payload's fault, not the player's.
+                         */
+                        if (text.length() <= FolderContentPayload.MAX_TEXT) {
+                            files.add(new FolderContentPayload.WireFile(entry.path(), text));
+                        }
+                    }
+                }
+            }
+            context.reply(new FolderContentPayload(payload.dir(), files));
+        });
+    }
+
+    private static void handleFolderContent(final FolderContentPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() ->
+                dev.jstech.computronics.client.os.CodeFileReplies.folder(payload));
     }
 
     private static void handleRequestFileContent(final RequestFileContentPayload payload,
