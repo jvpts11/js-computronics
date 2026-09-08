@@ -7,6 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
+import dev.jstech.computronics.cannon.CannonCosts;
 import dev.jstech.computronics.cannon.CannonSemantics;
 import dev.jstech.computronics.cannon.SourceFile;
 import dev.jstech.computronics.cannon.edit.CannonCompletions;
@@ -40,6 +41,22 @@ public final class CodeCompletions {
 
     private final ContextMenu menu = new ContextMenu(WIDTH, ROW_H);
     private final BuiltIns builtIns = new BuiltIns();
+    /** Whether the strip under the list says what the call on it will cost the program. */
+    private boolean showCosts;
+    /** What each offered call is, kept beside the list so the strip can price the one being looked at. */
+    private final List<String> offered = new ArrayList<>();
+
+    /**
+     * Says what each call costs, under the list.
+     *
+     * <p>Only one editor does this, and it is what that editor is for: a player deciding whether a line
+     * belongs in something that runs every tick wants the price before they write it, not after the
+     * program has eaten its budget.
+     */
+    public CodeCompletions withCosts(final boolean value) {
+        this.showCosts = value;
+        return this;
+    }
 
     /** Whether a list is being offered. */
     public boolean isOpen() {
@@ -76,9 +93,11 @@ public final class CodeCompletions {
             return;
         }
         final List<ContextMenu.Item> entries = new ArrayList<>(Math.min(found.size(), MAX_ITEMS));
+        this.offered.clear();
         for (final CannonCompletions.Item item : found.subList(0, Math.min(found.size(), MAX_ITEMS))) {
             entries.add(new ContextMenu.Item(item.signature(), true,
                     () -> take(doc, where, item.label())));
+            this.offered.add(item.owner() + "." + item.label());
         }
         this.menu.open(entries, caret[0], caret[1] + CodeArea.lineHeight(),
                 bounds[0], bounds[1], bounds[2], bounds[3]);
@@ -116,6 +135,32 @@ public final class CodeCompletions {
     /** Draws the list, which belongs over everything else the editor drew. */
     public void render(final GuiGraphics g, final UiContext ctx) {
         this.menu.render(g, ctx);
+        if (this.showCosts && this.menu.isOpen()) {
+            drawCost(g, ctx);
+        }
+    }
+
+    /**
+     * The strip under the list: what the call the keyboard is on will cost the program.
+     *
+     * <p>A call that never reaches the machine says so, because "free" is the useful thing to know
+     * about the calls that are free on purpose.
+     */
+    private void drawCost(final GuiGraphics g, final UiContext ctx) {
+        final int at = this.menu.selected();
+        if (at < 0 || at >= this.offered.size()) {
+            return;
+        }
+        final String[] call = this.offered.get(at).split("\\.", 2);
+        if (call.length < 2 || !CannonCosts.known(call[0], call[1])) {
+            return;
+        }
+        final String text = "costs " + CannonCosts.of(call[0], call[1]).describe();
+        final int y = this.menu.bottom();
+        g.fill(this.menu.x() - 1, y, this.menu.right() + 1, y + ROW_H + 1, 0xFF000000);
+        g.fill(this.menu.x(), y, this.menu.right(), y + ROW_H, ctx.skin().fieldBg());
+        g.drawString(ctx.font(), ctx.font().plainSubstrByWidth(text, this.menu.width() - 6),
+                this.menu.x() + 3, y + 1, ctx.skin().dim(), false);
     }
 
     /** Gives the keys to the list while it is up; false when it wants none of them. */
