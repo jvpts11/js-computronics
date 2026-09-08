@@ -1816,9 +1816,8 @@ public final class ComputingPayloads {
 
     private static void handleFileSaved(final FileSavedPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
-            if (!dev.jstech.computronics.client.os.CodeFileReplies.saved(payload.ok(), payload.message())) {
-                dev.jstech.computronics.client.os.EditorApp.accept(payload);
-            }
+            // Whoever asked for the save said so first; a result nobody is waiting for has no window left.
+            dev.jstech.computronics.client.os.CodeFileReplies.saved(payload.ok(), payload.message());
         });
     }
 
@@ -2371,14 +2370,11 @@ public final class ComputingPayloads {
     private static void handleFileContent(final FileContentPayload payload, final IPayloadContext context) {
         context.enqueueWork(() -> {
             /*
-             * A code editor says it is waiting before it asks, so an answer meant for it never lands in
-             * the Editor's buffer. With nobody waiting this is the Editor's, exactly as before.
+             * Every window that opens a file says it is waiting for that file, by name, before it asks.
+             * An answer nobody is waiting for belongs to a window that has since closed, and is dropped.
              */
-            if (!dev.jstech.computronics.client.os.CodeFileReplies.content(
-                    payload.path(), payload.content(), payload.exists())) {
-                dev.jstech.computronics.client.os.EditorApp.acceptContent(
-                        payload.path(), payload.content(), payload.exists());
-            }
+            dev.jstech.computronics.client.os.CodeFileReplies.content(
+                    payload.path(), payload.content(), payload.exists());
         });
     }
 

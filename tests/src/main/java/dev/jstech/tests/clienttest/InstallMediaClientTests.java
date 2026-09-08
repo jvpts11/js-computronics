@@ -22,7 +22,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 
 /**
  * An install disc, read the way a player reads one: in the explorer, then in the Editor.
@@ -30,7 +32,8 @@ import net.minecraft.world.item.ItemStack;
  * <p>The disc's readme and licence are not stored anywhere; they are generated from what the disc
  * installs, the moment they are asked for. That the machine generates them is proved elsewhere. This is
  * about whether the text reaches the window the player opened it in, on each of the desktops that
- * draw that window differently.
+ * draw that window differently and for each kind of disc, since a floppy and a DVD speak different
+ * dialects.
  */
 public final class InstallMediaClientTests {
 
@@ -46,18 +49,27 @@ public final class InstallMediaClientTests {
     private static final BlockPos MONITOR = new BlockPos(6, 2, 2);
     private static final BlockPos PLAYER_AT_MONITOR = new BlockPos(8, 2, 2);
 
-    private static final ResourceLocation MINESWEEPER =
-            ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, "minesweeper");
-
-    private static ResourceLocation os(final String path) {
+    private static ResourceLocation jsc(final String path) {
         return ResourceLocation.fromNamespaceAndPath(JsComputronics.MODID, path);
     }
+
+    /** A disc in a drive: what it is, what it installs, and what its files are called in its dialect. */
+    private record Disc(Block drive, Item medium, String program, String readme, String licence, String marker) {
+    }
+
+    /** A Vintage-era program on a floppy: uppercase 8.3 names. */
+    private static final Disc MINESWEEPER_FLOPPY = new Disc(ComputingModule.FLOPPY_DRIVE.get(),
+            ComputingModule.FLOPPY_DISK.get(), "minesweeper", "README.TXT", "LICENSE.TXT", "Minesweeper");
+
+    /** A Standard-era program on a DVD: lowercase names and a sources folder, the disc reported empty. */
+    private static final Disc AURAL_STUDIO_DVD = new Disc(ComputingModule.DVD_DRIVE.get(),
+            ComputingModule.DVD_ROM.get(), "aural_studio", "readme.txt", "license.txt", "Aural Studio");
 
     private static MediaReaderBlockEntity drive(final ClientTestContext ctx, final ServerLevel level) {
         if (level.getBlockEntity(ctx.abs(DRIVE)) instanceof MediaReaderBlockEntity be) {
             return be;
         }
-        throw new ClientTestFailure("no floppy drive at " + ctx.abs(DRIVE));
+        throw new ClientTestFailure("no media drive at " + ctx.abs(DRIVE));
     }
 
     /** The explorer's own name for the disc in that drive, and for a file on it. */
@@ -78,34 +90,40 @@ public final class InstallMediaClientTests {
 
     @ClientTest(timeoutTicks = 2400)
     public static void readme_onFrames95OpensWithItsText(final ClientTestContext ctx) {
-        readme(ctx, "frames_95");
+        readme(ctx, "frames_95", MINESWEEPER_FLOPPY);
     }
 
     @ClientTest(timeoutTicks = 2400)
     public static void readme_onFramesXpOpensWithItsText(final ClientTestContext ctx) {
-        readme(ctx, "frames_xp");
+        readme(ctx, "frames_xp", MINESWEEPER_FLOPPY);
     }
 
     @ClientTest(timeoutTicks = 2400)
     public static void readme_onFrames11OpensWithItsText(final ClientTestContext ctx) {
-        readme(ctx, "frames_11");
+        readme(ctx, "frames_11", MINESWEEPER_FLOPPY);
     }
 
-    /** The readme on a program's floppy opens in the Editor with its text, not as an empty page. */
-    private static void readme(final ClientTestContext ctx, final String desktop) {
+    /** The exact disc and desktop the readme was reported empty on. */
+    @ClientTest(timeoutTicks = 2400)
+    public static void readme_ofAStandardDvdOnFrames11OpensWithItsText(final ClientTestContext ctx) {
+        readme(ctx, "frames_11", AURAL_STUDIO_DVD);
+    }
+
+    /** The readme on a program's disc opens in the Editor with its text, not as an empty page. */
+    private static void readme(final ClientTestContext ctx, final String desktop, final Disc disc) {
         ctx.thenBuild(0, world -> {
                     final CraftingComputerBlockEntity computer = world.placeRunningCraftingComputer(COMPUTER);
-                    computer.installOs(os(desktop));
-                    world.setBlock(DRIVE, ComputingModule.FLOPPY_DRIVE.get());
+                    computer.installOs(jsc(desktop));
+                    world.setBlock(DRIVE, disc.drive());
                     world.placeMonitor(MONITOR, Direction.EAST);
                 })
-                // A program's install floppy, seated in the drive beside the computer.
+                // The program's install disc, seated in the drive beside the computer.
                 .thenServer(SETTLE * 3, level -> {
-                    final ItemStack floppy = new ItemStack(ComputingModule.FLOPPY_DISK.get());
-                    MediaItem.setKind(floppy, MediaKind.PROGRAM_INSTALL);
-                    MediaItem.setPayload(floppy, MINESWEEPER);
+                    final ItemStack medium = new ItemStack(disc.medium());
+                    MediaItem.setKind(medium, MediaKind.PROGRAM_INSTALL);
+                    MediaItem.setPayload(medium, jsc(disc.program()));
                     final MediaReaderBlockEntity reader = drive(ctx, level);
-                    ctx.assertTrue(reader.insertMedia(floppy).isEmpty(), "the drive takes the floppy");
+                    ctx.assertTrue(reader.insertMedia(medium).isEmpty(), "the drive takes the disc");
                     ctx.assertEquals(ctx.abs(COMPUTER), reader.ownerPos(),
                             "the drive is linked to the computer beside it");
                 })
@@ -115,23 +133,23 @@ public final class InstallMediaClientTests {
                 .then(SETTLE, () -> DesktopScreen.requestOpenFiles(mediaDir(ctx)))
                 .thenWaitUntil(() -> {
                             final FilesApp files = app(ctx, "Files", FilesApp.class);
-                            return files != null && files.names().contains("README.TXT");
-                        }, SCREEN_WAIT, "the explorer to list the floppy's readme")
-                .thenScreenshot(2, "floppy-listed")
+                            return files != null && files.names().contains(disc.readme());
+                        }, SCREEN_WAIT, "the explorer to list the disc's readme")
+                .thenScreenshot(2, "disc-listed")
                 // Opened the way a double-click opens it.
-                .then(SETTLE, () -> DesktopScreen.requestOpenFile(mediaDir(ctx) + "/README.TXT"))
+                .then(SETTLE, () -> DesktopScreen.requestOpenFile(mediaDir(ctx) + "/" + disc.readme()))
                 .thenWaitUntil(() -> {
                             final EditorApp editor = app(ctx, "Editor", EditorApp.class);
-                            return editor != null && editor.openFile().endsWith("README.TXT");
+                            return editor != null && editor.openFile().endsWith(disc.readme());
                         }, SCREEN_WAIT, "the Editor to open the readme")
-                .thenWaitUntil(() -> app(ctx, "Editor", EditorApp.class).text().contains("Minesweeper"),
+                .thenWaitUntil(() -> app(ctx, "Editor", EditorApp.class).text().contains(disc.marker()),
                         SCREEN_WAIT, "the readme's text to reach the Editor")
                 .thenScreenshot(2, "readme-open")
                 // The licence too, since it is the other file a player opens to see what they are getting.
-                .then(SETTLE, () -> DesktopScreen.requestOpenFile(mediaDir(ctx) + "/LICENSE.TXT"))
+                .then(SETTLE, () -> DesktopScreen.requestOpenFile(mediaDir(ctx) + "/" + disc.licence()))
                 .thenWaitUntil(() -> {
                             final EditorApp editor = app(ctx, "Editor", EditorApp.class);
-                            return editor != null && editor.openFile().endsWith("LICENSE.TXT")
+                            return editor != null && editor.openFile().endsWith(disc.licence())
                                     && editor.text().contains("licensed");
                         }, SCREEN_WAIT, "the licence's text to reach the Editor")
                 .thenScreenshot(2, "license-open");

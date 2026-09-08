@@ -20,7 +20,6 @@ import dev.jstech.computronics.operation.payload.MkdirPayload;
 import dev.jstech.computronics.operation.payload.MoveFilePayload;
 import dev.jstech.computronics.operation.payload.RenameFilePayload;
 import dev.jstech.computronics.operation.payload.RequestDesktopFilesPayload;
-import dev.jstech.computronics.operation.payload.RequestFileContentPayload;
 import dev.jstech.computronics.operation.payload.SaveFilePayload;
 import dev.jstech.computronics.operation.payload.SetDesktopPrefsPayload;
 import dev.jstech.computronics.operation.payload.SetIconPositionPayload;
@@ -1899,8 +1898,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return;
         }
         if (programId.equals(dev.jstech.computronics.os.fs.FileOpeners.EDITOR)) {
-            openApp("Editor", new EditorApp(host));
-            PacketDistributor.sendToServer(new RequestFileContentPayload(host, path));
+            final EditorApp editor = new EditorApp(host);
+            openApp("Editor", editor);
+            editor.openFile(path);
             return;
         }
         if (programId.equals(dev.jstech.computronics.os.fs.FileOpeners.RUNTIME)) {

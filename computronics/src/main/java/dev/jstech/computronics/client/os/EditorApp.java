@@ -7,7 +7,7 @@
  */
 package dev.jstech.computronics.client.os;
 
-import dev.jstech.computronics.operation.payload.FileSavedPayload;
+import dev.jstech.computronics.operation.payload.RequestFileContentPayload;
 import dev.jstech.computronics.operation.payload.SaveFilePayload;
 import dev.jstech.core.client.gui.component.Label;
 import dev.jstech.core.client.gui.component.Panel;
@@ -28,7 +28,7 @@ import java.util.Locale;
  * goes through the filesystem on the server and the status line reports the result. Tab moves between
  * the name and the text; a file opened from the explorer keeps its name (rename it there).
  */
-public final class EditorApp implements IDesktopApp {
+public final class EditorApp implements IDesktopApp, CodeFileReplies.IReader {
 
     private static final int NAME_H = 13;
     private static final int STATUS_H = 10;
@@ -41,8 +41,6 @@ public final class EditorApp implements IDesktopApp {
     /** The full path of an opened file, whose name the field shows short and cannot change. */
     private String lockedPath = "";
     private String status = "Ctrl+S to save";
-
-    private static EditorApp active;
 
     private final Panel root = new Panel();
     private final Label nameCaption;
@@ -71,21 +69,36 @@ public final class EditorApp implements IDesktopApp {
         body = root.add(new TextArea());
         statusLabel = root.add(new Label(() -> status, Label.Tone.DIM));
         root.focus(nameField);
-        active = this;
     }
 
-    /** Routes a save result to the open Editor window. */
-    public static void accept(final FileSavedPayload payload) {
-        if (active != null) {
-            active.status = payload.message();
-        }
+    /**
+     * Opens a file: this window says it is waiting for that file, by name, and then asks for it.
+     *
+     * <p>The Editor used to be opened and the file asked for in the same breath by whoever wanted it
+     * open, and the answer went to whichever Editor existed when it arrived. Opening a window is queued
+     * for the next frame while the machine can answer within the same one, so the answer could arrive
+     * before the window did, and the page came up empty. Waiting by name, the way the code editors do,
+     * makes the order of the two irrelevant.
+     */
+    @Override
+    public void openFile(final String path) {
+        CodeFileReplies.expectContent(this, path);
+        PacketDistributor.sendToServer(new RequestFileContentPayload(host, path));
     }
 
-    /** Routes file content (from the Files explorer's Open) into the open Editor window. */
-    public static void acceptContent(final String path, final String content, final boolean exists) {
-        if (active != null) {
-            active.load(path, content, exists);
-        }
+    @Override
+    public void onContent(final String path, final String content, final boolean exists) {
+        load(path, content, exists);
+    }
+
+    @Override
+    public void onSaved(final boolean ok, final String message) {
+        status = message;
+    }
+
+    @Override
+    public void onClosed() {
+        CodeFileReplies.forget(this);
     }
 
     private void load(final String path, final String content, final boolean exists) {
@@ -192,6 +205,7 @@ public final class EditorApp implements IDesktopApp {
             return;
         }
         status = "Saving...";
+        CodeFileReplies.expectSaved(this);
         PacketDistributor.sendToServer(new SaveFilePayload(host, target, body.text()));
         FilesApps.diskChanged();
     }
