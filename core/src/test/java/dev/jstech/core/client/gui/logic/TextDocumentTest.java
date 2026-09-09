@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TextDocumentTest {
 
@@ -107,5 +109,60 @@ class TextDocumentTest {
         doc.setCursor(-1, -1);
         assertEquals(0, doc.cursorLine());
         assertEquals(0, doc.cursorCol());
+    }
+
+    @Test
+    void insertText_typesEveryCharacterAndSplitsOnNewlines() {
+        doc.setText("ab");
+        doc.setCursor(0, 1);
+        doc.insertText("X\nY");
+        assertEquals("aX\nYb", doc.text());
+        assertEquals(1, doc.cursorLine());
+        assertEquals(1, doc.cursorCol());
+    }
+
+    @Test
+    void find_movesToTheNextMatchAfterTheCaretAndGoesRound() {
+        doc.setText("one two\nthree two\ntwo");
+        assertTrue(doc.find("two"));
+        assertEquals(0, doc.cursorLine());
+        assertEquals(4, doc.cursorCol());
+        assertTrue(doc.find("two"));
+        assertEquals(1, doc.cursorLine());
+        assertEquals(6, doc.cursorCol());
+        assertTrue(doc.find("two"));
+        assertEquals(2, doc.cursorLine());
+        assertTrue(doc.find("two"), "the search goes round to the top");
+        assertEquals(0, doc.cursorLine());
+        assertEquals(4, doc.cursorCol());
+    }
+
+    @Test
+    void find_saysNoForNothingAndForWhatIsNotThere() {
+        doc.setText("abc");
+        assertFalse(doc.find(""));
+        assertFalse(doc.find(null));
+        assertFalse(doc.find("zzz"));
+        assertEquals(0, doc.cursorCol(), "a miss leaves the caret alone");
+    }
+
+    @Test
+    void find_findsTheOnlyMatchWhenItSitsUnderTheCaret() {
+        doc.setText("  needle");
+        doc.setCursor(0, 2);
+        assertTrue(doc.find("needle"), "the one match, at the caret, is still found by going round");
+        assertEquals(2, doc.cursorCol());
+    }
+
+    @Test
+    void toggleLinePrefix_commentsALineOutAndBackIn() {
+        doc.setText("    x = 1;");
+        doc.setCursor(0, 8);
+        doc.toggleLinePrefix("// ");
+        assertEquals("    // x = 1;", doc.text());
+        assertEquals(11, doc.cursorCol(), "the caret keeps its place in the text");
+        doc.toggleLinePrefix("// ");
+        assertEquals("    x = 1;", doc.text());
+        assertEquals(8, doc.cursorCol());
     }
 }

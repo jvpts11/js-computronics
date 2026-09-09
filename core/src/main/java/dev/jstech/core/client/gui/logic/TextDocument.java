@@ -77,6 +77,61 @@ public final class TextDocument {
         col++;
     }
 
+    /** Types a whole string at the caret, a newline in it splitting the line the way Enter does. */
+    public void insertText(final String text) {
+        for (final char c : text.toCharArray()) {
+            if (c == '\n') {
+                newline();
+            } else if (c != '\r') {
+                insert(c);
+            }
+        }
+    }
+
+    /**
+     * Moves the caret to the next place {@code needle} occurs after it, going round to the top when
+     * nothing follows, and says whether it was found anywhere. The caret lands at the match's start,
+     * which is where an editor scrolls to show it.
+     */
+    public boolean find(final String needle) {
+        if (needle == null || needle.isEmpty()) {
+            return false;
+        }
+        final int count = lines.size();
+        for (int step = 0; step <= count; step++) {
+            final int at = (line + step) % count;
+            final String text = lines.get(at).toString();
+            // On the caret's own line the search starts after the caret, so repeating moves on.
+            final int from = step == 0 ? col + 1 : 0;
+            final int hit = from <= text.length() ? text.indexOf(needle, from) : -1;
+            // Back on the caret's line after going round, only what sits at or before the caret is new.
+            if (hit >= 0 && !(step == count && hit > col)) {
+                line = at;
+                col = hit;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Puts {@code marker} at the start of the caret's line, or takes it off when it is already there,
+     * which is what commenting a line out and back in means to an editor.
+     */
+    public void toggleLinePrefix(final String marker) {
+        final StringBuilder cur = lines.get(line);
+        final String text = cur.toString();
+        final int indent = text.length() - text.stripLeading().length();
+        if (text.startsWith(marker, indent)) {
+            cur.delete(indent, indent + marker.length());
+            col = Math.max(0, col - marker.length());
+        } else {
+            cur.insert(indent, marker);
+            col += marker.length();
+        }
+        col = Math.min(col, cur.length());
+    }
+
     /** Splits the current line at the caret; the caret starts the new line. */
     public void newline() {
         final StringBuilder cur = lines.get(line);

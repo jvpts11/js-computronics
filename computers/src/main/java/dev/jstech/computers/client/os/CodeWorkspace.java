@@ -82,31 +82,123 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
     private String status = "";
     private InkPalette palette = InkPalette.LIGHT;
 
+    /*
+     * The folder the workspace is on. It starts on the machine's own, and an editor that works in
+     * folders the way one of them does points it wherever the player opened.
+     */
+    private String folder = HOME;
+
+    /** What every folder the workspace has looked into holds, by folder, files and subfolders alike. */
+    private final java.util.Map<String, List<DiskFilesPayload.WireFile>> listings = new java.util.LinkedHashMap<>();
+
+    /** The subfolders the player has opened up in a tree, by path. */
+    private final java.util.Set<String> expanded = new java.util.LinkedHashSet<>();
+
+    /** Folders still to be asked for, one at a time, since one listing is waited for at once. */
+    private final java.util.ArrayDeque<String> toList = new java.util.ArrayDeque<>();
+
     public CodeWorkspace(final BlockPos host) {
         this.host = host;
     }
 
     /* What is on the disk */
 
-    /** Asks the machine which programs it holds. */
-    public void refresh() {
-        CodeFileReplies.expectListing(this, HOME);
-        PacketDistributor.sendToServer(new RequestDiskFilesPayload(this.host, HOME));
+    /** The folder the workspace is on. */
+    public String folder() {
+        return this.folder;
     }
 
-    /** The programs on the disk: the files some language in the registry claims. */
+    /** Points the workspace at another folder and reads it. */
+    public void setFolder(final String dir) {
+        this.folder = dir == null ? "" : dir;
+        this.expanded.clear();
+        this.listings.clear();
+        refresh();
+    }
+
+    /** Asks the machine what the folder holds, and what every opened subfolder holds. */
+    public void refresh() {
+        this.toList.clear();
+        this.toList.add(this.folder);
+        this.toList.addAll(this.expanded);
+        askNext();
+    }
+
+    private void askNext() {
+        final String dir = this.toList.poll();
+        if (dir == null) {
+            return;
+        }
+        CodeFileReplies.expectListing(this, dir);
+        PacketDistributor.sendToServer(new RequestDiskFilesPayload(this.host, dir));
+    }
+
+    /** Opens a subfolder up in the tree, or closes it again. */
+    public void toggleFolder(final String dir) {
+        if (!this.expanded.remove(dir)) {
+            this.expanded.add(dir);
+            if (!this.listings.containsKey(dir)) {
+                this.toList.add(dir);
+                if (this.toList.size() == 1) {
+                    askNext();
+                }
+            }
+        }
+    }
+
+    /** Whether a subfolder is opened up in the tree. */
+    public boolean isExpanded(final String dir) {
+        return this.expanded.contains(dir);
+    }
+
+    /** One row of the tree: how deep it sits, and what it is. */
+    public record TreeRow(int depth, DiskFilesPayload.WireFile file) {
+    }
+
+    /**
+     * The folder as a tree: its entries, subfolders first, each opened subfolder's entries indented
+     * under it. Every file is listed, not only the programs, since a folder is what the player sees.
+     */
+    public List<TreeRow> tree() {
+        final List<TreeRow> out = new ArrayList<>();
+        addRows(out, this.folder, 0);
+        return out;
+    }
+
+    private void addRows(final List<TreeRow> out, final String dir, final int depth) {
+        final List<DiskFilesPayload.WireFile> here = this.listings.getOrDefault(dir, List.of());
+        for (final DiskFilesPayload.WireFile file : here) {
+            if (file.directory()) {
+                out.add(new TreeRow(depth, file));
+                if (this.expanded.contains(file.path())) {
+                    addRows(out, file.path(), depth + 1);
+                }
+            }
+        }
+        for (final DiskFilesPayload.WireFile file : here) {
+            if (!file.directory()) {
+                out.add(new TreeRow(depth, file));
+            }
+        }
+    }
+
+    /** The programs in the folder: the files some language in the registry claims. */
     public List<DiskFilesPayload.WireFile> files() {
         return this.files;
     }
 
     @Override
     public void onListing(final DiskFilesPayload listing) {
-        this.files.clear();
-        for (final DiskFilesPayload.WireFile file : listing.files()) {
-            if (!file.directory() && languageOf(file.path()) != null) {
-                this.files.add(file);
+        this.listings.put(listing.dir(), List.copyOf(listing.files()));
+        if (listing.dir().equals(this.folder)) {
+            this.files.clear();
+            for (final DiskFilesPayload.WireFile file : listing.files()) {
+                if (!file.directory() && languageOf(file.path()) != null) {
+                    this.files.add(file);
+                }
             }
         }
+        askNext();
     }
 
     /* What is open */
@@ -289,10 +381,64 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
 
     /** Asks the machine for every program at once, to compile the lot. */
     public void surveyFolder() {
-        CodeFileReplies.expectFolder(this, HOME);
+        CodeFileReplies.expectFolder(this, this.folder);
         PacketDistributor.sendToServer(
                 new dev.jstech.computers.operation.payload.RequestFolderContentPayload(
-                        this.host, HOME, ".can"));
+                        this.host, this.folder, ".can"));
+    }
+
+    /** Saves the file being edited under another name, which then becomes the one being edited. */
+    public void saveAs(final String path) {
+        final Doc doc = current();
+        if (doc == null || path == null || path.isBlank()) {
+            return;
+        }
+        final Doc copy = new Doc(path);
+        copy.area.setText(doc.area.text()).setPalette(this.palette).setColouring(lines -> colour(path, lines));
+        copy.area.setTabSize(doc.area.tabSize());
+        this.docs.add(copy);
+        this.current = this.docs.size() - 1;
+        recompile(copy);
+        save();
+    }
+
+    /** Puts every open file that changed back on the disk, one after the other. */
+    public void saveAll() {
+        final int was = this.current;
+        for (int i = 0; i < this.docs.size(); i++) {
+            if (this.docs.get(i).dirty) {
+                this.current = i;
+                save();
+            }
+        }
+        this.current = was;
+    }
+
+    /** Opens a new, empty file under {@code path} without asking the disk, as New File does. */
+    public void newFile(final String path) {
+        final Doc doc = new Doc(path);
+        doc.area.setText("").setPalette(this.palette).setColouring(lines -> colour(path, lines));
+        this.docs.add(doc);
+        this.current = this.docs.size() - 1;
+        doc.dirty = true;
+        recompile(doc);
+        this.status = "New file " + doc.name();
+    }
+
+    /** Whether any open file has changes not yet on the disk. */
+    public boolean anyDirty() {
+        for (final Doc doc : this.docs) {
+            if (doc.dirty) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Closes every open file. */
+    public void closeAll() {
+        this.docs.clear();
+        this.current = -1;
     }
 
     @Override

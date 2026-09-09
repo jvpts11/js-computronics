@@ -104,6 +104,19 @@ public final class CodeArea extends UiComponent {
     }
 
     /** Runs after every change the player makes, for an owner that recompiles as it is typed. */
+    /** How many spaces the Tab key puts down; four unless an editor's settings say otherwise. */
+    private int tabSize = 4;
+
+    /** Sets how many spaces the Tab key puts down, between two and eight. */
+    public CodeArea setTabSize(final int value) {
+        this.tabSize = Math.max(2, Math.min(8, value));
+        return this;
+    }
+
+    public int tabSize() {
+        return this.tabSize;
+    }
+
     public CodeArea setOnEdit(final Runnable action) {
         this.onEdit = action == null ? () -> { } : action;
         return this;
@@ -299,10 +312,10 @@ public final class CodeArea extends UiComponent {
             }
             case GLFW.GLFW_KEY_TAB -> {
                 /*
-                 * Four spaces, not a tab character: the file is read back by a compiler that counts
+                 * Spaces, not a tab character: the file is read back by a compiler that counts
                  * columns, and a column has to mean the same thing to it as it does on the screen.
                  */
-                for (int i = 0; i < 4; i++) {
+                for (int i = 0; i < this.tabSize; i++) {
                     this.doc.insert(' ');
                 }
                 this.onEdit.run();
