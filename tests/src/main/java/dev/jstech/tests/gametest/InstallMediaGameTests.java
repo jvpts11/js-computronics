@@ -149,8 +149,15 @@ public final class InstallMediaGameTests {
                     helper.assertTrue(root.contains("SETUP.EXE") && root.contains("README.TXT")
                                     && root.contains("CRAFTMGR.PKG") && root.contains("SUPPORT"),
                             "a CD lists setup, readme, manifest and its folders: " + root);
-                    helper.assertTrue(InstallerProjection.list(disc, "SUPPORT").isEmpty(),
-                            "a folder on the disc lists what is inside it, which here is nothing");
+                    final List<String> support = new ArrayList<>();
+                    for (final InstallerLayout.Entry e : InstallerProjection.list(disc, "SUPPORT")) {
+                        support.add(e.path());
+                    }
+                    helper.assertTrue(support.contains("SUPPORT/README.TXT") && support.contains("SUPPORT/CHECKSUM.TXT"),
+                            "a folder on the disc lists what is inside it: the support notes and the checksums; got "
+                                    + support);
+                    helper.assertTrue(InstallerProjection.text(disc, "SUPPORT/CHECKSUM.TXT").orElse("")
+                                    .contains("SETUP.EXE"), "the checksum list names every file on the disc");
                     final String readme = InstallerProjection.text(disc, "README.TXT").orElse("");
                     helper.assertTrue(readme.contains("Package id: craftmgr") && readme.contains("Crafting Manager"),
                             "the readme is generated from the stamp: " + readme);

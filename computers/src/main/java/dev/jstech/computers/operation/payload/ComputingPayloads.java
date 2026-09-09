@@ -935,19 +935,28 @@ public final class ComputingPayloads {
                                         disk, reqDir, kind)) {
                             wire.add(wireFile(disk, e, ""));
                         }
-                    }
-                    // At the root, removable media in linked drives appear as drives to open.
-                    if (reqDir.isEmpty()) {
-                        for (final long endpoint : computer.linkedEndpoints()) {
-                            if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
-                                    instanceof dev.jstech.computers.os.media
-                                            .MediaReaderBlockEntity reader
-                                    && !reader.mediaSlot().getStackInSlot(0).isEmpty()) {
-                                wire.add(new DiskFilesPayload.WireFile(
-                                        "media:" + endpoint, "", 0L, false, true));
+                        /*
+                         * The system's own files and the installed programs' folders are generated, not
+                         * stored, and take their place among the real entries; a real one with the same
+                         * name (a folder the player made) wins.
+                         */
+                        final java.util.Set<String> seen = new java.util.HashSet<>();
+                        for (final DiskFilesPayload.WireFile f : wire) {
+                            seen.add(f.path());
+                        }
+                        for (final dev.jstech.computers.os.fs.InstallerLayout.Entry e
+                                : dev.jstech.computers.os.fs.ProgramFilesProjection.list(computer, reqDir)) {
+                            if (seen.add(e.path())) {
+                                wire.add(new DiskFilesPayload.WireFile(e.path(),
+                                        e.directory() ? "" : e.type().extension(), 0L, true, e.directory()));
                             }
                         }
                     }
+                    /*
+                     * A disc in a drive is a volume of its own, listed beside the disk under This PC and
+                     * in the explorer's tree; it is not a folder inside the disk, so the disk's root does
+                     * not list it.
+                     */
                 }
             }
             context.reply(new DiskFilesPayload(payload.dir(), wire, volumes));
@@ -1612,7 +1621,7 @@ public final class ComputingPayloads {
              * when the program was already there, which is what made the disc's setup look inert.
              */
             dev.jstech.computers.os.install.SetupRunner.begin(computer, level, payload.hostPos(), spec,
-                    reader.insertedFormat(), false);
+                    reader.insertedFormat(), false, dev.jstech.computers.os.install.SetupJob.VIA_SETUP);
         });
     }
 
@@ -1631,6 +1640,8 @@ public final class ComputingPayloads {
                             instanceof dev.jstech.computers.terminal.IComputerTerminalHost host) {
                 final var computer =
                         new dev.jstech.computers.program.ServerCliComputer(host, level);
+                // The window's own shell: its directory is its own, and so is the reply.
+                computer.useSession(payload.session());
                 /*
                  * A program has the terminal: everything typed goes to it, not to the shell, and what it
                  * printed since the last time keeps coming until it returns.
@@ -1638,7 +1649,8 @@ public final class ComputingPayloads {
                 final var running = computer.foreground();
                 if (running != null) {
                     busy = drainForeground(running, payload.line(), wire);
-                    context.reply(new DesktopShellOutputPayload(false, busy, computer.prompt(), wire));
+                    context.reply(new DesktopShellOutputPayload(false, busy, computer.prompt(), wire,
+                            payload.session()));
                     return;
                 }
                 /*
@@ -1650,14 +1662,16 @@ public final class ComputingPayloads {
                 if (setup != null && host instanceof dev.jstech.computers.os.IOsHost machine) {
                     if (INTERRUPT.equals(payload.line())) {
                         dev.jstech.computers.os.install.SetupRunner.cancel(machine, level, payload.hostPos());
-                        context.reply(new DesktopShellOutputPayload(false, false, computer.prompt(), wire));
+                        context.reply(new DesktopShellOutputPayload(false, false, computer.prompt(), wire,
+                                payload.session()));
                         return;
                     }
                     wire.add(new DesktopShellOutputPayload.WireLine(
                             (setup.removing() ? "Removing " : "Setting up ") + setup.name() + "  "
                                     + (setup.permille() / 10) + "%  (Ctrl+C to cancel)",
                             dev.jstech.computers.program.cli.CliStyle.DIM.ordinal()));
-                    context.reply(new DesktopShellOutputPayload(false, true, computer.prompt(), wire));
+                    context.reply(new DesktopShellOutputPayload(false, true, computer.prompt(), wire,
+                            payload.session()));
                     return;
                 }
                 final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(
@@ -1699,7 +1713,7 @@ public final class ComputingPayloads {
             }
             context.reply(new DesktopShellOutputPayload(clear, busy, prompt, wire,
                     handOver == null ? "" : handOver.editor(),
-                    handOver == null ? "" : handOver.path()));
+                    handOver == null ? "" : handOver.path(), payload.session()));
         });
     }
 
@@ -2322,7 +2336,7 @@ public final class ComputingPayloads {
          */
         final java.util.Optional<String> projected = media
                 ? dev.jstech.computers.os.media.InstallerProjection.text(vol, mediaSubPath(path))
-                : java.util.Optional.empty();
+                : dev.jstech.computers.os.fs.ProgramFilesProjection.text(computer, path);
         return projected.isPresent() ? projected
                 : dev.jstech.computers.os.fs.DiskFilesystem.read(vol, media ? mediaSubPath(path) : path);
     }
@@ -2342,7 +2356,7 @@ public final class ComputingPayloads {
                 wire.add(new DesktopShellOutputPayload.WireLine(name + ": file not found",
                         dev.jstech.computers.program.cli.CliStyle.ERROR.ordinal()));
                 PacketDistributor.sendToPlayer(player,
-                        new DesktopShellOutputPayload(false, false, "", wire));
+                        new DesktopShellOutputPayload(false, false, "", wire, payload.session()));
                 return;
             }
             final int room = dev.jstech.computers.cannon.machine.MachinePrograms.DEFAULT_HEAP_MB;
@@ -2350,7 +2364,7 @@ public final class ComputingPayloads {
                 wire.add(new DesktopShellOutputPayload.WireLine(name + ": not enough memory to run it",
                         dev.jstech.computers.program.cli.CliStyle.ERROR.ordinal()));
                 PacketDistributor.sendToPlayer(player,
-                        new DesktopShellOutputPayload(false, false, "", wire));
+                        new DesktopShellOutputPayload(false, false, "", wire, payload.session()));
                 return;
             }
             final var started = computer.cannon().start(name, listing.get(), room, computer);
@@ -2358,7 +2372,7 @@ public final class ComputingPayloads {
                 wire.add(new DesktopShellOutputPayload.WireLine(started.message(),
                         dev.jstech.computers.program.cli.CliStyle.ERROR.ordinal()));
                 PacketDistributor.sendToPlayer(player,
-                        new DesktopShellOutputPayload(false, false, "", wire));
+                        new DesktopShellOutputPayload(false, false, "", wire, payload.session()));
                 return;
             }
             computer.setChanged();
@@ -2371,7 +2385,7 @@ public final class ComputingPayloads {
                         dev.jstech.computers.program.cli.CliStyle.OK.ordinal()));
             }
             PacketDistributor.sendToPlayer(player,
-                    new DesktopShellOutputPayload(false, console, "", wire));
+                    new DesktopShellOutputPayload(false, console, "", wire, payload.session()));
         });
     }
 

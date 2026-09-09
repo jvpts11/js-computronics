@@ -77,7 +77,7 @@ public final class ShellApp implements IDesktopApp {
      */
     public void runProgram(final String path) {
         this.view.say(path, CliStyle.PROMPT);
-        PacketDistributor.sendToServer(new RunProgramPayload(this.host, path));
+        PacketDistributor.sendToServer(new RunProgramPayload(this.host, path, this.view.session()));
     }
 
     /**

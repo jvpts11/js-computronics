@@ -96,6 +96,13 @@ public final class InstallerLayout {
                 out.add(file("LICENSE.TXT", FileType.TXT));
                 out.add(file(dosName(facts.packageId()) + ".PKG", FileType.PKG));
                 out.add(file("DATA1.CAB", FileType.BIN));
+                // What a disc of the day kept beside the setup: notes for support and a checksum list.
+                out.add(file("SUPPORT/README.TXT", FileType.TXT));
+                out.add(file("SUPPORT/CHECKSUM.TXT", FileType.TXT));
+                if (facts.system()) {
+                    out.add(file("I386/SETUP.SYS", FileType.SYS));
+                    out.add(file("I386/DRIVERS.CAB", FileType.BIN));
+                }
             }
             default -> {
                 out.add(dir("sources"));
@@ -106,6 +113,9 @@ public final class InstallerLayout {
                 out.add(file("license.txt", FileType.TXT));
                 out.add(file(facts.idPath() + ".pkg", FileType.PKG));
                 out.add(file(facts.system() ? "sources/install.wim" : "sources/data1.cab", FileType.BIN));
+                out.add(file("sources/setup.inf", FileType.INF));
+                out.add(file("support/readme.txt", FileType.TXT));
+                out.add(file("support/checksums.txt", FileType.TXT));
             }
         }
         return out;
@@ -120,6 +130,13 @@ public final class InstallerLayout {
     /** The text of a projected file, or empty for one that is not text (a cabinet, a kernel). */
     public static Optional<String> textOf(final MediaFormat format, final Facts facts, final String path) {
         final String base = baseName(path).toLowerCase(Locale.ROOT);
+        final String lower = path.toLowerCase(Locale.ROOT).replace('\\', '/');
+        if (lower.startsWith("support/")) {
+            return Optional.of(base.startsWith("checksum") ? checksums(format, facts) : supportNote(facts));
+        }
+        if (base.equals("setup.inf")) {
+            return Optional.of(setupInf(facts));
+        }
         if (base.equals("readme.txt")) {
             return Optional.of(readme(format, facts));
         }
@@ -189,6 +206,40 @@ public final class InstallerLayout {
 
     private static String autorun(final MediaFormat format, final Facts facts) {
         return "[autorun]\nopen=" + setupName(format, facts) + "\nlabel=" + facts.name() + "\n";
+    }
+
+    /** The note in the support folder: who to turn to, and what the disc needs to install. */
+    private static String supportNote(final Facts facts) {
+        final StringBuilder out = new StringBuilder();
+        out.append(facts.name()).append(" support notes\n\n");
+        out.append("If setup stops part way, make sure the computer has:\n");
+        for (final String need : facts.needs()) {
+            out.append("  ").append(need).append('\n');
+        }
+        out.append("\nThe disc is read-only. Nothing on it can be changed or lost.\n");
+        out.append("Questions go to ").append(facts.house()).append(".\n");
+        return out.toString();
+    }
+
+    /** A checksum list, one per file the disc carries, of the kind every disc shipped with. */
+    private static String checksums(final MediaFormat format, final Facts facts) {
+        final StringBuilder out = new StringBuilder();
+        for (final Entry entry : entries(format, facts)) {
+            if (!entry.directory()) {
+                final String name = entry.path();
+                out.append(String.format(Locale.ROOT, "%08x", (name + facts.idPath()).hashCode()))
+                        .append("  ").append(name).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
+    /** What the setup program reads before it starts: where things go and what the package is. */
+    private static String setupInf(final Facts facts) {
+        return "[Setup]\nProduct=" + facts.name() + "\nPackage=" + facts.packageId() + "\nPublisher=" + facts.house()
+                + "\nYear=" + facts.year() + "\n\n[Install]\nSource=sources\\"
+                + (facts.system() ? "install.wim" : "data1.cab") + "\nTarget="
+                + (facts.system() ? "\\Frames" : "\\Program Files\\" + facts.name()) + "\n";
     }
 
     private static String license(final Facts facts) {

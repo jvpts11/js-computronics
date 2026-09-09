@@ -107,7 +107,8 @@ public final class SetupGameTests {
     public static void setup_installsWhenItsTimeIsUpAndNotBefore(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = machineWithFloppy(helper, pos, MINESWEEPER);
-        final int ticks = SetupTiming.ticks(spec(MINESWEEPER).minDiskMb(), MediaFormat.FLOPPY, false);
+        final int ticks = SetupTiming.ticks(spec(MINESWEEPER).minDiskMb(), MediaFormat.FLOPPY, false,
+                SetupTiming.eraFactor(mainframe.displayEra()));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> {
                     final Optional<String> refusal = SetupRunner.begin(mainframe, helper.getLevel(),
@@ -134,7 +135,8 @@ public final class SetupGameTests {
     public static void setup_cancelLeavesNothingInstalled(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = machineWithFloppy(helper, pos, MINESWEEPER);
-        final int ticks = SetupTiming.ticks(spec(MINESWEEPER).minDiskMb(), MediaFormat.FLOPPY, false);
+        final int ticks = SetupTiming.ticks(spec(MINESWEEPER).minDiskMb(), MediaFormat.FLOPPY, false,
+                SetupTiming.eraFactor(mainframe.displayEra()));
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> SetupRunner.begin(mainframe, helper.getLevel(),
                         helper.absolutePos(pos), spec(MINESWEEPER), MediaFormat.FLOPPY, false))
@@ -203,8 +205,9 @@ public final class SetupGameTests {
     public static void setup_removingTakesAFifthAndUninstalls(final GameTestHelper helper) {
         final BlockPos pos = new BlockPos(2, 2, 2);
         final MainframeBlockEntity mainframe = machineWithFloppy(helper, pos, MINESWEEPER);
-        final int install = SetupTiming.networkTicks(spec(MINESWEEPER).minDiskMb(), false);
-        final int remove = SetupTiming.networkTicks(spec(MINESWEEPER).minDiskMb(), true);
+        final int factor = SetupTiming.eraFactor(mainframe.displayEra());
+        final int install = SetupTiming.networkTicks(spec(MINESWEEPER).minDiskMb(), false, factor);
+        final int remove = SetupTiming.networkTicks(spec(MINESWEEPER).minDiskMb(), true, factor);
         helper.startSequence()
                 .thenExecuteAfter(SETTLE + 4, () -> {
                     mainframe.console().install(MINESWEEPER.toString());

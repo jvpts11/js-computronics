@@ -197,4 +197,36 @@ public final class InstallMediaClientTests {
                         }, SCREEN_WAIT, "the licence's text to reach the Editor")
                 .thenScreenshot(2, "license-open");
     }
+
+    /** The disc's setup program, double-clicked in the explorer, is how a player without This PC installs. */
+    @ClientTest(timeoutTicks = 2400)
+    public static void setup_doubleClickedInTheExplorerOpensTheWindow(final ClientTestContext ctx) {
+        final Disc disc = MINESWEEPER_FLOPPY;
+        final String setup = "SETUP.EXE";
+        ctx.thenBuild(0, world -> {
+                    final CraftingComputerBlockEntity computer = world.placeRunningCraftingComputer(COMPUTER);
+                    computer.installOs(jsc("frames_11"));
+                    world.setBlock(DRIVE, disc.drive());
+                    world.placeMonitor(MONITOR, Direction.EAST);
+                })
+                .thenServer(SETTLE * 3, level -> {
+                    final ItemStack medium = new ItemStack(disc.medium());
+                    MediaItem.setKind(medium, MediaKind.PROGRAM_INSTALL);
+                    MediaItem.setPayload(medium, jsc(disc.program()));
+                    ctx.assertTrue(drive(ctx, level).insertMedia(medium).isEmpty(), "the drive takes the floppy");
+                })
+                .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .then(SETTLE, () -> DesktopScreen.requestOpenFiles(mediaDir(ctx)))
+                .thenWaitUntil(() -> {
+                            final FilesApp files = app(ctx, "Files", FilesApp.class);
+                            return files != null && files.names().contains(setup);
+                        }, SCREEN_WAIT, "the explorer to list the disc's setup program")
+                .then(SETTLE, () -> ctx.assertTrue(app(ctx, "Files", FilesApp.class).open(setup),
+                        "the explorer opens the setup program the way a double click does"))
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).windowFor("Setup") != null,
+                        SCREEN_WAIT, "the Setup window to open from the explorer")
+                .thenScreenshot(2, "setup-from-explorer");
+    }
 }

@@ -40,7 +40,15 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     private static final float TEXT_SCALE = 0.85f;
     private static final int LINE_H = 9;
 
-    private final Deque<Line> scrollback = new ArrayDeque<>();
+    /**
+     * What each machine's prompt has printed, kept while the game runs.
+     *
+     * <p>A terminal's screen belongs to the machine, not to the window that happens to be showing it:
+     * walking away from a TTY and coming back finds what was there, the way a real one does. The lines
+     * are kept here by machine, so opening the prompt again picks up where it was.
+     */
+    private static final Map<net.minecraft.core.BlockPos, Deque<Line>> KEPT = new java.util.HashMap<>();
+    private final Deque<Line> scrollback;
     /** Whether the machine's identity line has been added, so a late init reply adds it only once. */
     private boolean identityShown;
     private final List<String> history = new ArrayList<>();
@@ -67,6 +75,9 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
         this.imageHeight = 178;
         this.titleLabelX = -10000;
         this.inventoryLabelY = -10000;
+        this.scrollback = KEPT.computeIfAbsent(menu.hostPos(), pos -> new ArrayDeque<>());
+        // A screen that still has its lines has already said whose it is.
+        this.identityShown = !this.scrollback.isEmpty();
     }
 
     /** Whether this terminal wears the MC-DOS identity (the dedicated DOS screen overrides). */
@@ -211,6 +222,10 @@ public class CommandPromptScreen<M extends CommandPromptMenu> extends AbstractCo
     private void apply(final CommandOutputPayload payload) {
         if (payload.clear()) {
             scrollback.clear();
+        }
+        // A bar growing on one line: what was printed last is drawn over rather than followed.
+        if (payload.replaceLast() && !scrollback.isEmpty() && !payload.lines().isEmpty()) {
+            scrollback.removeLast();
         }
         for (final CommandOutputPayload.WireLine line : payload.lines()) {
             push(line.text(), styleOf(line.style()));

@@ -864,7 +864,8 @@ public final class ServerCliComputer implements ICliComputer {
             return OpResult.fail("this computer cannot store installed programs");
         }
         final java.util.Optional<String> refusal = dev.jstech.computers.os.install.SetupRunner.begin(
-                machine, level, hostBlock.getBlockPos(), program, medium, false);
+                machine, level, hostBlock.getBlockPos(), program, medium, false,
+                dev.jstech.computers.os.install.SetupJob.VIA_INSTALL);
         return refusal.map(OpResult::fail)
                 .orElseGet(() -> OpResult.ok("Setting up " + program.commandName() + " from "
                         + mediumDriveName(medium) + " ..."));
@@ -1814,10 +1815,68 @@ public final class ServerCliComputer implements ICliComputer {
         }
         final dev.jstech.computers.os.ProgramSpec fetched = spec;
         final java.util.Optional<String> refusal = dev.jstech.computers.os.install.SetupRunner.begin(
-                machine, level, hostBlock.getBlockPos(), fetched, null, false);
-        return refusal.map(OpResult::fail)
-                .orElseGet(() -> OpResult.ok("Get:1 mirror://" + mirrorHostname() + " " + fetched.commandName()
-                        + " " + modVersion() + " [" + fetched.minDiskMb() + " MB]"));
+                machine, level, hostBlock.getBlockPos(), fetched, null, false, manager.command());
+        return refusal.map(OpResult::fail).orElseGet(() -> OpResult.ok(fetchLines(manager, fetched)));
+    }
+
+    /**
+     * What a package manager prints before the download starts, in its own words.
+     *
+     * <p>Each of them has a voice a player who has used the real one knows on sight, and the lines are
+     * that voice: what was resolved, what will be installed, how big it is, and where it comes from.
+     * They are one message, line by line, and the bar the machine draws afterwards follows them.
+     */
+    private String fetchLines(final dev.jstech.computers.os.PackageManagerKind manager,
+                              final dev.jstech.computers.os.ProgramSpec spec) {
+        final String pkg = spec.commandName();
+        final String ver = dev.jstech.computers.os.ProgramVersions.of(spec.id());
+        final int mb = spec.minDiskMb();
+        return switch (manager) {
+            case APT -> String.join("\n",
+                    "Reading package lists... Done",
+                    "Building dependency tree... Done",
+                    "The following NEW packages will be installed:",
+                    "  " + pkg,
+                    "Need to get " + mb + " MB of archives.",
+                    "Get:1 mirror://" + mirrorHostname() + " stable/main " + pkg + " " + ver + " [" + mb + " MB]");
+            case DNF -> String.join("\n",
+                    "Last metadata expiration check: 0:00:01 ago.",
+                    "Dependencies resolved.",
+                    "Installing:  " + pkg + "  x86_64  " + ver + "  mirror  " + mb + " MB",
+                    "Downloading Packages:");
+            case PACMAN -> String.join("\n",
+                    "resolving dependencies...",
+                    "looking for conflicting packages...",
+                    "Packages (1) " + pkg + "-" + ver,
+                    "Total Download Size: " + mb + ".00 MiB",
+                    ":: Retrieving packages...");
+            default -> "Fetching " + pkg + " " + ver + " from mirror://" + mirrorHostname() + " [" + mb + " MB]";
+        };
+    }
+
+    /** The same, for a removal: what the manager says before it takes the package off. */
+    private static String removeLines(final dev.jstech.computers.os.PackageManagerKind manager,
+                                      final dev.jstech.computers.os.ProgramSpec spec) {
+        final String pkg = spec.commandName();
+        final String ver = dev.jstech.computers.os.ProgramVersions.of(spec.id());
+        return switch (manager) {
+            case APT -> String.join("\n",
+                    "Reading package lists... Done",
+                    "Building dependency tree... Done",
+                    "The following packages will be REMOVED:",
+                    "  " + pkg,
+                    "After this operation, " + spec.minDiskMb() + " MB disk space will be freed.",
+                    "Removing " + pkg + " (" + ver + ") ...");
+            case DNF -> String.join("\n",
+                    "Dependencies resolved.",
+                    "Removing:  " + pkg + "  x86_64  " + ver,
+                    "Running transaction");
+            case PACMAN -> String.join("\n",
+                    "checking dependencies...",
+                    "Packages (1) " + pkg + "-" + ver,
+                    ":: Removing " + pkg + " ...");
+            default -> "Removing " + pkg + " ...";
+        };
     }
 
     /** The name the Mirror's Mainframe goes by in a package line, or the plain word when it has none. */
@@ -1850,21 +1909,29 @@ public final class ServerCliComputer implements ICliComputer {
             return OpResult.fail("could not resolve mirror:// - connect this computer to a network whose Mainframe"
                     + " runs the Mirror service");
         }
-        final String current = modVersion();
-        final java.util.List<String> outdated = console.outdatedPackages(current);
-        if (outdated.isEmpty()) {
-            return OpResult.ok("All packages are up to date (" + current + ").");
-        }
         /*
-         * Bringing a package to the current build is a re-stamp: the program itself always runs the
-         * code this mod version ships, so an update reconciles the record rather than moving files.
+         * Each package has a version of its own, and one installed at an older one is what an update
+         * brings up. The program itself always runs the code this build ships, so an update reconciles
+         * the record rather than moving files.
          */
+        final java.util.List<String> outdated = new java.util.ArrayList<>();
+        for (final String id : console.installed()) {
+            if (!dev.jstech.computers.os.ProgramVersions.of(id).equals(console.installedVersion(id))) {
+                outdated.add(id);
+            }
+        }
+        if (outdated.isEmpty()) {
+            return OpResult.ok("All packages are up to date.");
+        }
+        final StringBuilder lines = new StringBuilder();
         for (final String id : outdated) {
-            console.setInstalledVersion(id, current);
+            final String version = dev.jstech.computers.os.ProgramVersions.of(id);
+            console.setInstalledVersion(id, version);
+            final String path = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
+            lines.append("Setting up ").append(path).append(" (").append(version).append(") ...\n");
         }
         hostBlock.setChanged();
-        return OpResult.ok("Updated " + outdated.size() + " package"
-                + (outdated.size() == 1 ? "" : "s") + " to " + current + ".");
+        return OpResult.ok(lines + "Updated " + outdated.size() + " package" + (outdated.size() == 1 ? "" : "s") + ".");
     }
 
     /**
@@ -1920,10 +1987,11 @@ public final class ServerCliComputer implements ICliComputer {
             return OpResult.fail("this computer cannot store installed programs");
         }
         final dev.jstech.computers.os.ProgramSpec removing = spec;
+        final dev.jstech.computers.os.PackageManagerKind manager = packageManager();
+        final String via = manager == dev.jstech.computers.os.PackageManagerKind.NONE ? "uninstall" : manager.command();
         final java.util.Optional<String> refusal = dev.jstech.computers.os.install.SetupRunner.begin(
-                machine, level, hostBlock.getBlockPos(), removing, null, true);
-        return refusal.map(OpResult::fail)
-                .orElseGet(() -> OpResult.ok("Removing " + removing.commandName() + " ..."));
+                machine, level, hostBlock.getBlockPos(), removing, null, true, via);
+        return refusal.map(OpResult::fail).orElseGet(() -> OpResult.ok(removeLines(manager, removing)));
     }
 
     @Override
@@ -2126,11 +2194,31 @@ public final class ServerCliComputer implements ICliComputer {
         return out;
     }
 
+    /** The terminal window's shell session this prompt speaks for, or 0 for the machine's own prompt. */
+    private int session;
+
+    /**
+     * Says which terminal window's shell this is.
+     *
+     * <p>A window that has moved with {@code cd} is where it went, whatever the other windows and the
+     * full-screen prompt are doing; one that has not is wherever the machine's prompt is.
+     */
+    public void useSession(final int session) {
+        this.session = session;
+    }
+
     @Override
     public dev.jstech.computers.program.cli.DosPath.Location currentLocation() {
         final dev.jstech.computers.program.ComputerConsoleState console = host.console();
         if (console == null) {
             return dev.jstech.computers.program.cli.DosPath.Location.root('C');
+        }
+        final dev.jstech.computers.program.ComputerConsoleState.ShellSpot spot =
+                session == 0 ? null : console.sessionLocation(session);
+        if (spot != null) {
+            final java.util.List<String> parts = spot.dir().isEmpty()
+                    ? java.util.List.of() : java.util.List.of(spot.dir().split("/"));
+            return new dev.jstech.computers.program.cli.DosPath.Location(spot.drive(), parts);
         }
         /*
          * A fresh POSIX session starts in the home directory (a DOS one at the drive root); once the player
@@ -2149,7 +2237,12 @@ public final class ServerCliComputer implements ICliComputer {
     @Override
     public void setCurrentLocation(final dev.jstech.computers.program.cli.DosPath.Location location) {
         final dev.jstech.computers.program.ComputerConsoleState console = host.console();
-        if (console != null) {
+        if (console == null) {
+            return;
+        }
+        if (session != 0) {
+            console.setSessionLocation(session, location.drive(), location.storagePath());
+        } else {
             console.setTerminalLocation(location.drive(), location.storagePath());
         }
     }
@@ -2184,6 +2277,21 @@ public final class ServerCliComputer implements ICliComputer {
             entries.add(new FsEntry(FsPaths.fileName(e.path()),
                     e.directory() ? "" : e.type().extension(), 0L, true, e.directory(), 0L));
         }
+        // The system's files and the installed programs' folders, generated the same way, on the system disk.
+        final dev.jstech.computers.os.IOsHost machine = osHost();
+        if (machine != null && ctx.drive() == 'C') {
+            final java.util.Set<String> seen = new java.util.HashSet<>();
+            for (final FsEntry entry : entries) {
+                seen.add(entry.name());
+            }
+            for (final dev.jstech.computers.os.fs.InstallerLayout.Entry e
+                    : dev.jstech.computers.os.fs.ProgramFilesProjection.list(machine, target)) {
+                if (seen.add(FsPaths.fileName(e.path()))) {
+                    entries.add(new FsEntry(FsPaths.fileName(e.path()),
+                            e.directory() ? "" : e.type().extension(), 0L, true, e.directory(), 0L));
+                }
+            }
+        }
         return FsResult.listing(entries);
     }
 
@@ -2203,6 +2311,15 @@ public final class ServerCliComputer implements ICliComputer {
                 dev.jstech.computers.os.media.InstallerProjection.text(ctx.disk(), real);
         if (projected.isPresent()) {
             return FsResult.content(projected.get());
+        }
+        // So is a file of the system's own, or of an installed program's folder, on the system disk.
+        final dev.jstech.computers.os.IOsHost machine = osHost();
+        if (machine != null && ctx.drive() == 'C') {
+            final java.util.Optional<String> system =
+                    dev.jstech.computers.os.fs.ProgramFilesProjection.text(machine, real);
+            if (system.isPresent()) {
+                return FsResult.content(system.get());
+            }
         }
         final java.util.Optional<String> content = DiskFilesystem.read(ctx.disk(), real);
         if (content.isEmpty()) {
@@ -2652,7 +2769,10 @@ public final class ServerCliComputer implements ICliComputer {
                 return true;
             }
         }
-        return false;
+        // And so is the system's own folder, and an installed program's.
+        final dev.jstech.computers.os.IOsHost machine = osHost();
+        return machine != null && ctx.drive() == 'C'
+                && dev.jstech.computers.os.fs.ProgramFilesProjection.isDir(machine, storagePath);
     }
 
     /** Returns the lowercase extension of a file path (after the last dot), or {@code ""} if none. */

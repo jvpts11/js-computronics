@@ -26,7 +26,8 @@ final class SystemLayoutTest {
         final List<String> dirs = SystemLayout.directoriesFor(OsCapability.FULL_DESKTOP);
         assertTrue(dirs.contains("Program Files"), "must include Program Files");
         assertTrue(dirs.contains("Program Files (x86)"), "must include Program Files (x86)");
-        assertTrue(dirs.contains("Windows"), "must include Windows");
+        assertTrue(dirs.contains(SystemLayout.SYSTEM_DIR), "must include the system directory");
+        assertEquals("Frames", SystemLayout.SYSTEM_DIR, "the system folder carries the desktop line's name");
         assertTrue(dirs.contains("Users"), "must include Users");
         assertTrue(dirs.contains(SystemLayout.DESKTOP_DIR), "must include the desktop directory");
     }

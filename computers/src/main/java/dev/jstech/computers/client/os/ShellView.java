@@ -48,6 +48,14 @@ public final class ShellView extends Panel {
     }
 
     private final BlockPos host;
+
+    /**
+     * This window's shell session on the machine.
+     *
+     * <p>Two terminals on one desktop are two shells: each keeps its own directory on the machine and
+     * only hears the replies to what was typed in it. What the machine prints on its own reaches both.
+     */
+    private final int session = ShellViews.newSession();
     /*
      * The console's ground follows the system it runs on, and which system that is is a question only
      * this mod's skin answers; the toolkit's own context knows the shared look and not the form.
@@ -104,7 +112,20 @@ public final class ShellView extends Panel {
         focus(this.console);
         ShellViews.register(this);
         // Sync the real prompt (and any pending build notices) before the player types anything.
-        PacketDistributor.sendToServer(new DesktopShellRunPayload(host, ""));
+        PacketDistributor.sendToServer(new DesktopShellRunPayload(host, "", this.session));
+    }
+
+    /** The shell session this window is on the machine. */
+    public int session() {
+        return this.session;
+    }
+
+    /** Asks the program in front to stop, the way Ctrl+C at the terminal does. */
+    public void interrupt() {
+        if (this.busy) {
+            PacketDistributor.sendToServer(new DesktopShellRunPayload(this.host, ComputingPayloads.INTERRUPT,
+                    this.session));
+        }
     }
 
     /** Stops the machine's console being drawn into a view nobody is looking at. */
@@ -214,8 +235,17 @@ public final class ShellView extends Panel {
             this.scrollback.clear();
             this.generation++;
         }
+        // A bar growing on one line: what was printed last is drawn over rather than followed.
+        if (payload.replaceLast() && !this.scrollback.isEmpty() && !payload.lines().isEmpty()) {
+            this.scrollback.removeLast();
+            this.generation++;
+        }
         for (final DesktopShellOutputPayload.WireLine line : payload.lines()) {
             push(line.text(), colorOf(line.style()));
+        }
+        // Lines the machine printed on its own say nothing about who has the prompt.
+        if (payload.informational()) {
+            return;
         }
         // An empty prompt means "unchanged"; otherwise track the new current directory.
         if (!payload.prompt().isEmpty()) {
@@ -359,7 +389,7 @@ public final class ShellView extends Panel {
         }
         if (this.busy) {
             if (key == GLFW.GLFW_KEY_C && net.minecraft.client.gui.screens.Screen.hasControlDown()) {
-                PacketDistributor.sendToServer(new DesktopShellRunPayload(this.host, ComputingPayloads.INTERRUPT));
+                interrupt();
             }
             return true;
         }
@@ -385,7 +415,7 @@ public final class ShellView extends Panel {
             handleRun(parts.length > 1 ? parts[1].trim() : "");
             return;
         }
-        PacketDistributor.sendToServer(new DesktopShellRunPayload(this.host, line));
+        PacketDistributor.sendToServer(new DesktopShellRunPayload(this.host, line, this.session));
     }
 
     /** Opens an installed program's window by name, or lists what can be opened. */

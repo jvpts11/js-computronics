@@ -16,16 +16,28 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * Server to client: the styled output of one Command Prompt line, plus whether the console should be cleared before printing it (the {@code clear} command). Each line carries its text and a style ordinal the client maps to a colour.
+ * Server to client: the styled output of one Command Prompt line, plus whether the console should be
+ * cleared before printing it (the {@code clear} command). Each line carries its text and a style
+ * ordinal the client maps to a colour.
+ *
+ * <p>{@code replaceLast} says the lines redraw over the last one printed rather than follow it, the way
+ * a progress bar at a real terminal grows on the same line instead of filling the screen with copies.
  */
 public record CommandOutputPayload(boolean clear, String prompt, List<WireLine> lines,
-                                   String editor, String editorPath) implements CustomPacketPayload {
+                                   String editor, String editorPath, boolean replaceLast)
+        implements CustomPacketPayload {
 
     public static final int MAX_LINES = 256;
 
     /** A reply that only printed, which is what nearly every command does. */
     public CommandOutputPayload(final boolean clear, final String prompt, final List<WireLine> lines) {
-        this(clear, prompt, lines, "", "");
+        this(clear, prompt, lines, "", "", false);
+    }
+
+    /** A reply that hands the terminal to an editor. */
+    public CommandOutputPayload(final boolean clear, final String prompt, final List<WireLine> lines,
+                                final String editor, final String editorPath) {
+        this(clear, prompt, lines, editor, editorPath, false);
     }
 
     /** Whether the machine gave the terminal to an editor. */
@@ -43,6 +55,7 @@ public record CommandOutputPayload(boolean clear, String prompt, List<WireLine> 
                     WireLine.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_LINES)), CommandOutputPayload::lines,
                     ByteBufCodecs.stringUtf8(32), CommandOutputPayload::editor,
                     ByteBufCodecs.stringUtf8(160), CommandOutputPayload::editorPath,
+                    ByteBufCodecs.BOOL, CommandOutputPayload::replaceLast,
                     CommandOutputPayload::new);
 
     @Override

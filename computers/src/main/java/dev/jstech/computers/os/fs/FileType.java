@@ -62,6 +62,17 @@ public enum FileType {
     INF("inf", false, true),
     /** Opaque installer payload (a cabinet, an image, a kernel): listed, never opened. */
     BIN("bin", false, true),
+    /*
+     * What the system folder and Program Files show: generated from the system and the programs
+     * installed on it, never stored, never a player's to edit. A system has files in it, and a
+     * computer whose system folder is empty is not a computer anybody has used.
+     */
+    /** A settings file the system keeps for itself. */
+    INI("ini", false, true),
+    /** A piece of the system: the kernel, a driver. */
+    SYS("sys", false, true),
+    /** A font the system draws with. */
+    FON("fon", false, true),
 
     /** Cannon source, user-editable, and what the compiler reads. */
     CAN("can", true, false),

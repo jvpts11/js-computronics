@@ -140,7 +140,7 @@ public final class PosixCommands {
             ctx.out().dim("Resolving mirror://mainframe ...");
             final ICliComputer.OpResult result = ctx.computer().packageInstall(name);
             if (result.ok()) {
-                ctx.out().ok(result.message());
+                lines(ctx, result.message());
             } else {
                 ctx.out().error("E: " + result.message());
             }
@@ -154,9 +154,21 @@ public final class PosixCommands {
             final String name = pkg.trim().split("\\s+")[0];
             final ICliComputer.OpResult result = ctx.computer().packageRemove(name);
             if (result.ok()) {
-                ctx.out().ok(result.message());
+                lines(ctx, result.message());
             } else {
                 ctx.out().error("E: " + result.message());
+            }
+        }
+
+        /** A manager speaks in several lines; the last of them is the one that says it went well. */
+        private static void lines(final CliContext ctx, final String message) {
+            final String[] parts = message.split("\n");
+            for (int i = 0; i < parts.length; i++) {
+                if (i == parts.length - 1) {
+                    ctx.out().ok(parts[i]);
+                } else {
+                    ctx.out().line(parts[i]);
+                }
             }
         }
 

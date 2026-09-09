@@ -303,6 +303,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         if (active == null) {
             return;
         }
+        // A reply to another window's line is not this box's to show.
+        if (payload.session() != 0 && payload.session() != active.session) {
+            return;
+        }
         if (payload.clear()) {
             active.output.clear();
         }
@@ -1027,9 +1031,12 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return output.isEmpty() ? 0xFF40C060 : output.peekLast().color();
     }
 
+    /** This box's own shell session on the machine, so its replies are its own. */
+    private final int session = ShellViews.newSession();
+
     private void runCommand(final String line) {
         pushOutput("> " + line, 0xFF40C060);
-        PacketDistributor.sendToServer(new DesktopShellRunPayload(host, line));
+        PacketDistributor.sendToServer(new DesktopShellRunPayload(host, line, this.session));
     }
 
     //  Input

@@ -60,6 +60,19 @@ class SetupTimingTest {
     }
 
     @Test
+    void eraFactor_doublesWithEveryGenerationAndCutsTheTimeToMatch() {
+        assertEquals(1, SetupTiming.eraFactor(dev.jstech.core.tier.HardwareEra.VINTAGE));
+        assertEquals(2, SetupTiming.eraFactor(dev.jstech.core.tier.HardwareEra.LEGACY));
+        assertEquals(4, SetupTiming.eraFactor(dev.jstech.core.tier.HardwareEra.STANDARD));
+        assertEquals(1, SetupTiming.eraFactor(null));
+        // A 128 MB program on a CD: 32 s on a Vintage machine, 8 s on a Standard one, never under the floor.
+        assertEquals(32, seconds(SetupTiming.ticks(128, MediaFormat.CD, false, 1)));
+        assertEquals(8, seconds(SetupTiming.ticks(128, MediaFormat.CD, false, 4)));
+        assertEquals(SetupTiming.MIN_SECONDS, seconds(SetupTiming.ticks(16, MediaFormat.FLOPPY, false, 32)));
+        assertEquals(4, seconds(SetupTiming.networkTicks(128, false, 4)));
+    }
+
+    @Test
     void rateOf_ordersTheMediaByAge() {
         assertTrue(SetupTiming.rateOf(MediaFormat.FLOPPY) < SetupTiming.rateOf(MediaFormat.CD));
         assertTrue(SetupTiming.rateOf(MediaFormat.CD) < SetupTiming.rateOf(MediaFormat.DVD));

@@ -304,6 +304,7 @@ public final class ComputerConsoleState {
     public void wipeSoftware() {
         history.clear();
         terminalDirs.clear();
+        sessions.clear();
         terminalDrive = 'C';
         installed.clear();
         pendingBuilds.clear();
@@ -315,6 +316,28 @@ public final class ComputerConsoleState {
     public void setTerminalLocation(final char drive, final String dir) {
         this.terminalDrive = Character.toUpperCase(drive);
         this.terminalDirs.put(this.terminalDrive, dir == null ? "" : dir);
+    }
+
+    /** Where one terminal window's shell is: its drive and directory. */
+    public record ShellSpot(char drive, String dir) {
+    }
+
+    /**
+     * Where each terminal window's shell is, by session number.
+     *
+     * <p>Every terminal window is a shell of its own, so a {@code cd} in one leaves the others where
+     * they were. The spots are not saved: a session lives as long as its window, and a machine that is
+     * loaded again starts them all fresh from the terminal's own location above.
+     */
+    private final Map<Integer, ShellSpot> sessions = new LinkedHashMap<>();
+
+    /** Where session {@code session}'s shell is, or null when it has not moved from the machine's spot. */
+    public ShellSpot sessionLocation(final int session) {
+        return sessions.get(session);
+    }
+
+    public void setSessionLocation(final int session, final char drive, final String dir) {
+        sessions.put(session, new ShellSpot(Character.toUpperCase(drive), dir == null ? "" : dir));
     }
 
     /** Packs a desktop grid column and row into a single value for {@link #iconCells}. */
@@ -400,6 +423,8 @@ public final class ComputerConsoleState {
             job.putBoolean("Removing", setup.removing());
             job.putInt("Total", setup.ticksTotal());
             job.putInt("Left", setup.ticksLeft());
+            job.putString("Via", setup.via());
+            job.putString("Package", setup.packageName());
             tag.put("Setup", job);
         }
         final ListTag installedTag = new ListTag();
@@ -507,7 +532,8 @@ public final class ComputerConsoleState {
             final CompoundTag job = tag.getCompound("Setup");
             setup = new dev.jstech.computers.os.install.SetupJob(job.getString("Program"), job.getString("Name"),
                     job.getString("House"), job.getInt("SizeMb"), job.getString("Source"),
-                    job.getBoolean("Removing"), job.getInt("Total"), job.getInt("Left"));
+                    job.getBoolean("Removing"), job.getInt("Total"), job.getInt("Left"),
+                    job.getString("Via"), job.getString("Package"));
         }
         community.clear();
         for (final Tag entry : tag.getList("Community", Tag.TAG_COMPOUND)) {

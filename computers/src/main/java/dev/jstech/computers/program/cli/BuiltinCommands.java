@@ -385,10 +385,18 @@ public final class BuiltinCommands {
         }
 
         private static void report(final CliContext ctx, final ICliComputer.OpResult result) {
-            if (result.ok()) {
-                ctx.out().ok(result.message());
-            } else {
+            if (!result.ok()) {
                 ctx.out().error(result.message());
+                return;
+            }
+            // A manager speaks in several lines; the last of them is the one that says it went well.
+            final String[] parts = result.message().split("\n");
+            for (int i = 0; i < parts.length; i++) {
+                if (i == parts.length - 1) {
+                    ctx.out().ok(parts[i]);
+                } else {
+                    ctx.out().line(parts[i]);
+                }
             }
         }
 

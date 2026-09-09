@@ -29,10 +29,13 @@ public final class SystemLayout {
     public static final String DESKTOP_DIR = "Users/Public/Desktop";
 
     /** The ordered system directories a full desktop OS provides (parents before children). */
+    /** The folder the system itself lives in, named after the system line rather than after somebody else's. */
+    public static final String SYSTEM_DIR = "Frames";
+
     private static final List<String> DESKTOP_DIRECTORIES = List.of(
             "Program Files",
             "Program Files (x86)",
-            "Windows",
+            SYSTEM_DIR,
             "Users",
             "Users/Public",
             "Users/Public/Desktop",

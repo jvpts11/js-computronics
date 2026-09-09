@@ -23,6 +23,14 @@ public final class ShellViews {
 
     private static final List<ShellView> OPEN = new ArrayList<>();
 
+    /** Where session numbers come from; a number is never handed out twice while the game runs. */
+    private static int nextSession = 1;
+
+    /** A fresh shell session number for a window that is about to talk to a machine. */
+    public static int newSession() {
+        return nextSession++;
+    }
+
     private ShellViews() {
     }
 
@@ -48,8 +56,14 @@ public final class ShellViews {
         if (OPEN.isEmpty()) {
             return;
         }
+        /*
+         * A reply belongs to the window that asked; only what the machine says on its own, with no
+         * session on it, is for every window looking at the console.
+         */
         for (final ShellView view : List.copyOf(OPEN)) {
-            view.accept(payload);
+            if (payload.session() == 0 || payload.session() == view.session()) {
+                view.accept(payload);
+            }
         }
         /*
          * Any command may have installed or removed a program (apt install, uninstall, ...), so the

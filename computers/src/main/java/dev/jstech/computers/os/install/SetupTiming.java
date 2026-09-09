@@ -72,4 +72,25 @@ public final class SetupTiming {
     public static int networkTicks(final int sizeMb, final boolean removing) {
         return ticks(sizeMb, NETWORK_MB_PER_SECOND, removing);
     }
+
+    /**
+     * How much faster a machine of that generation sets a program up than a Vintage one.
+     *
+     * <p>A floppy is a floppy, but what unpacks and writes what it carries is the computer, and each
+     * generation does that twice as fast as the one before: Vintage 1, Legacy 2, Standard 4, and so on.
+     * A machine with no generation to speak of counts as Vintage.
+     */
+    public static int eraFactor(final dev.jstech.core.tier.HardwareEra era) {
+        return era == null ? 1 : 1 << era.ordinal();
+    }
+
+    /** A disc's time on a machine that works {@code factor} times as fast as a Vintage one. */
+    public static int ticks(final int sizeMb, final MediaFormat format, final boolean removing, final int factor) {
+        return ticks(sizeMb, rateOf(format) * Math.max(1, factor), removing);
+    }
+
+    /** The Mirror's time on a machine that works {@code factor} times as fast as a Vintage one. */
+    public static int networkTicks(final int sizeMb, final boolean removing, final int factor) {
+        return ticks(sizeMb, NETWORK_MB_PER_SECOND * Math.max(1, factor), removing);
+    }
 }
