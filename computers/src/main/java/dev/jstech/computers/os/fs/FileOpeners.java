@@ -49,6 +49,8 @@ public final class FileOpeners {
         final List<String> code = List.of("virtual_studio_code", "virtual_studio", "exposure", EDITOR);
         BY_TYPE.put(FileType.CAN, code);
         BY_TYPE.put(FileType.ASM, List.of(RUNTIME, "virtual_studio_code", "virtual_studio", "exposure", EDITOR));
+        BY_TYPE.put(FileType.SLN, List.of("virtual_studio", EDITOR));
+        BY_TYPE.put(FileType.CANPROJ, List.of("virtual_studio", EDITOR));
         BY_TYPE.put(FileType.IQL, List.of("nms", EDITOR));
         BY_TYPE.put(FileType.CRAFT, List.of("crafting_manager"));
         BY_TYPE.put(FileType.TXT, List.of(EDITOR));

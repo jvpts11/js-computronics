@@ -42,6 +42,21 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   Emacs splits that terminal, so a program and what the compiler said about it are readable at once.
 - Whatever language a file is written in colours it, marks in the margin where the compiler stopped, and
   suggests what can follow a name, in every one of the editors. A language a mod adds gets all of it.
+- Virtual Studio works in solutions. It opens on a Start Window: what you opened lately, or a project or
+  folder or file to open, or a new project to create. Creating one picks a template first, filtered by
+  language, platform and kind, then names the project and its solution, and writes a solution file, a
+  project file and a first source that already builds. The Solution Explorer shows every project with its
+  dependencies, properties, sources and what it built; Build compiles a project with the libraries it
+  references and writes the listing where the project file says; Start builds the startup project and
+  runs it at the terminal; Package hands the project to `canpack`.
+- Virtual Studio Code works the way its namesake does: a Welcome page, a folder opened as a tree beside
+  the editor, a command palette on Ctrl+Shift+P, F5 to build and run the open file at the terminal welded
+  into the window, and an Extensions page listing every language the machine knows.
+- Installing takes time. Setup runs as a job on the machine: a window with a progress bar on a desktop,
+  lines at the prompt, cancellable from either, and how long it takes depends on where the program comes
+  from (a floppy is slow, a DVD faster, the network faster still) and how big the program is. A machine
+  that goes away mid-setup picks it up where it was.
+- `setup.exe` on an installation disc, double-clicked in the explorer, starts that setup.
 
 - Every system, desktop, service and program holds a share of the computer's RAM, in megabytes, and a program
   opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one

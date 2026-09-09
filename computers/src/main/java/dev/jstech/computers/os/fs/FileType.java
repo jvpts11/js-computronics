@@ -82,7 +82,11 @@ public enum FileType {
      * which already means the manifest projected off an installation disc: one extension meaning two
      * things depending on where the file sits is how a player learns not to trust what they open.
      */
-    CPK("cpk", true, false);
+    CPK("cpk", true, false),
+    /** A solution: the projects a studio works on together, and which starts. */
+    SLN("sln", true, false),
+    /** A project: what it is made of and what it builds. */
+    CANPROJ("canproj", true, false);
 
     private final String extension;
     private final boolean userEditable;
