@@ -1156,6 +1156,33 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
     }
 
+    /**
+     * A machine saying how the program it is setting up is going.
+     *
+     * <p>The desktop opens its Setup window on the first word and hands it every one after, so the
+     * window is a view of the machine's job: two players at two monitors of one machine see the same
+     * bar, and a desktop opened halfway through picks it up where it is.
+     */
+    public static void acceptSetup(final dev.jstech.computers.operation.payload.SetupProgressPayload payload) {
+        if (active == null || !active.host.equals(payload.hostPos())) {
+            return;
+        }
+        final DesktopWindow open = active.windowFor(SetupApp.KEY);
+        final SetupApp app;
+        if (open != null && open.app() instanceof SetupApp existing) {
+            app = existing;
+        } else {
+            app = new SetupApp(active.host, active.desktopId.getPath());
+            active.openApp(SetupApp.KEY, app);
+        }
+        app.accept(payload);
+        if (payload.state() == dev.jstech.computers.operation.payload.SetupProgressPayload.STATE_DONE) {
+            // The launcher appears, or goes, the moment the job is done.
+            active.requestDesktop();
+            FilesApps.refreshAll();
+        }
+    }
+
 
     /** Routes a desktop-folder listing reply to the active desktop. */
     public static void acceptDesktop(final DesktopFilesPayload payload) {
@@ -1230,6 +1257,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 }
                 if (key.startsWith(RUN_AT_TERMINAL)) {
                     runAtTerminal(key.substring(RUN_AT_TERMINAL.length()));
+                    continue;
+                }
+                if (key.startsWith(TYPE_AT_TERMINAL)) {
+                    typeAtTerminal(List.of(key.substring(TYPE_AT_TERMINAL.length()).split("\n")));
                     continue;
                 }
                 if (key.startsWith(OPEN_FILE)) {
@@ -1948,12 +1979,50 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * been typed there.
      */
     private void runAtTerminal(final String path) {
-        final String terminal = terminalLabel();
-        final IDesktopApp shell = terminal.isEmpty() ? null : factoryFor(terminal);
-        if (shell != null && allowOpen(terminal)) {
-            openApp(terminal, shell);
+        final ShellApp shell = terminalApp();
+        if (shell != null) {
+            shell.runProgram(path);
         }
-        ShellApp.runWhenReady(path);
+    }
+
+    /** Types lines at this desktop's terminal, one after the other. */
+    private void typeAtTerminal(final List<String> lines) {
+        final ShellApp shell = terminalApp();
+        if (shell != null) {
+            shell.typeLines(lines);
+        }
+    }
+
+    /**
+     * This desktop's terminal window, brought forward, or opened when there is none: a program that
+     * needs the prompt gets the one that is up rather than a second one beside it.
+     */
+    @org.jetbrains.annotations.Nullable
+    private ShellApp terminalApp() {
+        final String terminal = terminalLabel();
+        if (terminal.isEmpty()) {
+            return null;
+        }
+        final DesktopWindow open = windowFor(terminal);
+        if (open != null && open.app() instanceof ShellApp shell) {
+            open.setMinimized(false);
+            bringToFront(windows.indexOf(open));
+            return shell;
+        }
+        final IDesktopApp made = factoryFor(terminal);
+        if (made instanceof ShellApp shell && allowOpen(terminal)) {
+            openApp(terminal, shell);
+            return shell;
+        }
+        return null;
+    }
+
+    /** A queued request to type lines at the terminal, the lines joined by newlines. */
+    private static final String TYPE_AT_TERMINAL = "Type\0";
+
+    /** Lets a running app hand the shell a job: lines typed at the terminal, one after the other. */
+    public static void requestTypeAtTerminal(final List<String> lines) {
+        PENDING_OPEN.add(TYPE_AT_TERMINAL + String.join("\n", lines));
     }
 
     /** The launcher of a program by id, or null when this desktop does not offer it. */

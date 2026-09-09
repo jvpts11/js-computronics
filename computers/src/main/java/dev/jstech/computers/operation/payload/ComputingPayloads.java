@@ -226,6 +226,10 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleRequestFolderContent);
         registrar.playToClient(FolderContentPayload.TYPE, FolderContentPayload.STREAM_CODEC,
                 ComputingPayloads::handleFolderContent);
+        registrar.playToClient(SetupProgressPayload.TYPE, SetupProgressPayload.STREAM_CODEC,
+                ComputingPayloads::handleSetupProgress);
+        registrar.playToServer(CancelSetupPayload.TYPE, CancelSetupPayload.STREAM_CODEC,
+                ComputingPayloads::handleCancelSetup);
         registrar.playToClient(FileContentPayload.TYPE, FileContentPayload.STREAM_CODEC,
                 ComputingPayloads::handleFileContent);
         registrar.playToServer(RenameFilePayload.TYPE, RenameFilePayload.STREAM_CODEC,
@@ -1597,49 +1601,18 @@ public final class ComputingPayloads {
                 return;
             }
             final net.minecraft.resources.ResourceLocation pl = reader.insertedPayload();
-            // A program needs an installed OS to host it.
-            if (pl == null || computer.installedOs() == null) {
-                return;
-            }
-            /*
-             * Program install gate: the OS platform must be supported and the hardware must meet the
-             * program's CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
-             */
-            if (!dev.jstech.computers.os.OsRegistry.canInstallProgram(
-                    computer.installedOsId(), pl,
-                    computer.maxCpuMhz(), computer.totalVramMb(), computer.systemDiskFreeMb())) {
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                        "This program's platform or hardware requirements are not met by this computer."),
-                        false);
-                return;
-            }
-            /*
-             * Host gate: a program bound to a specific computer (the Crafting Manager to a Crafting Computer,
-             * the Mainframe services to a Mainframe) installs only there. Driven by the descriptor's host
-             * scope, not a per-program check.
-             */
             final dev.jstech.computers.os.ProgramSpec spec =
-                    dev.jstech.computers.os.OsRegistry.getProgram(pl);
-            if (!hostScopeAllows(spec, computer)) {
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal(
-                        hostScopeMessage(spec)), false);
+                    pl == null ? null : dev.jstech.computers.os.OsRegistry.getProgram(pl);
+            if (spec == null) {
                 return;
             }
             /*
-             * The Automation Engine is a Mainframe service: installing its floppy on the Mainframe turns the
-             * job agent on.
+             * Whether the machine can take the program, and why not, is the machine's answer, given in
+             * the Setup window that opens for it. It used to be a line in the chat, or nothing at all
+             * when the program was already there, which is what made the disc's setup look inert.
              */
-            if (pl.equals(Programs.AUTOMATION_ENGINE) && computer instanceof MainframeBlockEntity mainframe) {
-                mainframe.installAutomationEngine();
-            }
-            // The Mirror is a Mainframe service too: its floppy turns the package repository on.
-            if (pl.equals(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", "mirror"))
-                    && computer instanceof MainframeBlockEntity mainframe) {
-                mainframe.installMirror();
-            }
-            if (computer.console().install(pl.toString())) {
-                computer.setChanged();
-            }
+            dev.jstech.computers.os.install.SetupRunner.begin(computer, level, payload.hostPos(), spec,
+                    reader.insertedFormat(), false);
         });
     }
 
@@ -1666,6 +1639,25 @@ public final class ComputingPayloads {
                 if (running != null) {
                     busy = drainForeground(running, payload.line(), wire);
                     context.reply(new DesktopShellOutputPayload(false, busy, computer.prompt(), wire));
+                    return;
+                }
+                /*
+                 * A setup holds the prompt the way a running program does: the bar redraws until it is
+                 * done, and the one thing typed that means anything is the interrupt, which cancels it.
+                 */
+                final var console = host.console();
+                final var setup = console == null ? null : console.setup();
+                if (setup != null && host instanceof dev.jstech.computers.os.IOsHost machine) {
+                    if (INTERRUPT.equals(payload.line())) {
+                        dev.jstech.computers.os.install.SetupRunner.cancel(machine, level, payload.hostPos());
+                        context.reply(new DesktopShellOutputPayload(false, false, computer.prompt(), wire));
+                        return;
+                    }
+                    wire.add(new DesktopShellOutputPayload.WireLine(
+                            (setup.removing() ? "Removing " : "Setting up ") + setup.name() + "  "
+                                    + (setup.permille() / 10) + "%  (Ctrl+C to cancel)",
+                            dev.jstech.computers.program.cli.CliStyle.DIM.ordinal()));
+                    context.reply(new DesktopShellOutputPayload(false, true, computer.prompt(), wire));
                     return;
                 }
                 final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(
@@ -2268,6 +2260,22 @@ public final class ComputingPayloads {
                 }
             }
             context.reply(new FolderContentPayload(payload.dir(), files));
+        });
+    }
+
+    /** A machine telling a desktop how its setup is going: the desktop's Setup window is a view of it. */
+    private static void handleSetupProgress(final SetupProgressPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> dev.jstech.computers.client.os.DesktopScreen.acceptSetup(payload));
+    }
+
+    /** A player at the Setup window's Cancel: the machine stops and nothing is installed. */
+    private static void handleCancelSetup(final CancelSetupPayload payload, final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (context.player() instanceof ServerPlayer player
+                    && player.level() instanceof ServerLevel level
+                    && level.getBlockEntity(payload.hostPos()) instanceof dev.jstech.computers.os.IOsHost host) {
+                dev.jstech.computers.os.install.SetupRunner.cancel(host, level, payload.hostPos());
+            }
         });
     }
 
@@ -4283,19 +4291,6 @@ public final class ComputingPayloads {
     }
 
     /** The player-facing reason a program's host scope rejected this computer. */
-    private static String hostScopeMessage(final dev.jstech.computers.os.ProgramSpec spec) {
-        if (spec == null) {
-            return "This program cannot install on this computer.";
-        }
-        return switch (spec.hostScope()) {
-            case MAINFRAME -> "The " + spec.displayName() + " only installs on a Mainframe.";
-            case CRAFTING_COMPUTER -> "The " + spec.displayName() + " only installs on a Crafting Computer.";
-            case SERVER -> "The " + spec.displayName() + " only installs on a server in a rack.";
-            case CLUSTER_MANAGEMENT_COMPUTER -> "The " + spec.displayName()
-                    + " only installs on a Cluster Management Computer.";
-            default -> "This program cannot install on this computer.";
-        };
-    }
 
     private static void handleRequestItemDetail(final RequestItemDetailPayload payload,
                                                 final IPayloadContext context) {

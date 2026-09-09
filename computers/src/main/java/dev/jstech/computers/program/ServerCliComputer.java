@@ -851,60 +851,59 @@ public final class ServerCliComputer implements ICliComputer {
             return engineControl("install");
         }
         /*
-         * The other Mainframe services flip their agent flag, exactly like the mirror-based package path:
-         * marking only the console entry would leave the service itself off (the bug that made a Mirror
-         * installed from its disc unable to serve packages).
+         * Installing is something the machine does over time, from the disc in a linked drive. Whether
+         * it can, and why not, is decided in one place for every way of asking, so the prompt says
+         * exactly what the Setup window on a desktop would.
          */
-        if (hostBlock instanceof MainframeBlockEntity mainframe
-                && program.kind() == dev.jstech.computers.os.ProgramKind.SERVICE) {
-            if (!hasInstallMediumFor(program.id())) {
-                return OpResult.fail(program.commandName() + " needs its install disc in a linked drive");
-            }
-            final boolean done = switch (program.id().getPath()) {
-                case "automation_engine" -> mainframe.installAutomationEngine();
-                case "mirror" -> mainframe.installMirror();
-                default -> host.console() != null && host.console().install(program.id().toString());
-            };
-            if (host.console() != null) {
-                host.console().install(program.id().toString());
-            }
-            hostBlock.setChanged();
-            return done ? OpResult.ok("Setting up " + program.commandName() + " ... done")
-                    : OpResult.fail(program.commandName() + " is already installed");
-        }
-        if (program.preinstalled()) {
-            return OpResult.fail(program.commandName() + " is pre-installed on every computer");
-        }
-        final OpResult tooOld = eraGate(program);
-        if (tooOld != null) {
-            return tooOld;
-        }
-        /*
-         * Install economy: an app needs its physical install medium in a linked drive, and you cannot conjure
-         * a program out of thin air.
-         */
-        if (!hasInstallMediumFor(program.id())) {
+        final dev.jstech.computers.os.media.MediaFormat medium = installMediumFormatFor(program.id());
+        if (medium == null) {
             return OpResult.fail(program.commandName() + " needs its install disc in a linked drive");
         }
-        /*
-         * Program install gate: the OS platform must be supported and the hardware must meet the program's
-         * CPU/VRAM/disk minimums (e.g. the NMS installs only on the Frames platform).
-         */
-        if (host instanceof dev.jstech.computers.os.IOsHost oc
-                && !dev.jstech.computers.os.OsRegistry.canInstallProgram(
-                        oc.installedOsId(), program.id(),
-                        oc.maxCpuMhz(), oc.totalVramMb(), oc.systemDiskFreeMb())) {
-            return OpResult.fail(program.commandName() + " cannot install on this computer's OS or hardware");
-        }
-        final ComputerConsoleState console = host.console();
-        if (console == null) {
+        final dev.jstech.computers.os.IOsHost machine = osHost();
+        if (machine == null) {
             return OpResult.fail("this computer cannot store installed programs");
         }
-        if (!console.install(program.id().toString())) {
-            return OpResult.fail(program.commandName() + " is already installed");
+        final java.util.Optional<String> refusal = dev.jstech.computers.os.install.SetupRunner.begin(
+                machine, level, hostBlock.getBlockPos(), program, medium, false);
+        return refusal.map(OpResult::fail)
+                .orElseGet(() -> OpResult.ok("Setting up " + program.commandName() + " from "
+                        + mediumDriveName(medium) + " ..."));
+    }
+
+    /** The machine as the thing that installs programs, whichever of the two handles this prompt holds. */
+    @org.jetbrains.annotations.Nullable
+    private dev.jstech.computers.os.IOsHost osHost() {
+        if (host instanceof dev.jstech.computers.os.IOsHost fromHost) {
+            return fromHost;
         }
-        hostBlock.setChanged();
-        return OpResult.ok("installed " + program.commandName());
+        return hostBlock instanceof dev.jstech.computers.os.IOsHost fromBlock ? fromBlock : null;
+    }
+
+    /** What the disc a program comes from is called at a prompt. */
+    private static String mediumDriveName(final dev.jstech.computers.os.media.MediaFormat medium) {
+        return switch (medium) {
+            case FLOPPY -> "the floppy";
+            case CD -> "the CD";
+            case DVD -> "the DVD";
+            case USB -> "the USB drive";
+        };
+    }
+
+    /** The format of the disc a program's installer sits on in a linked drive, or null when none does. */
+    @org.jetbrains.annotations.Nullable
+    private dev.jstech.computers.os.media.MediaFormat installMediumFormatFor(final ResourceLocation programId) {
+        if (!(host instanceof dev.jstech.computers.os.IOsHost computer)) {
+            return null;
+        }
+        for (final long endpoint : computer.linkedEndpoints()) {
+            if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
+                    instanceof dev.jstech.computers.os.media.MediaReaderBlockEntity reader
+                    && reader.insertedKind() == dev.jstech.computers.os.media.MediaKind.PROGRAM_INSTALL
+                    && programId.equals(reader.insertedPayload())) {
+                return reader.insertedFormat();
+            }
+        }
+        return null;
     }
 
     /**
@@ -931,24 +930,6 @@ public final class ServerCliComputer implements ICliComputer {
         return OpResult.fail(spec.commandName() + " needs "
                 + (needed.charAt(0) + needed.substring(1).toLowerCase(java.util.Locale.ROOT))
                 + " hardware or later");
-    }
-
-    /** Whether a media reader linked to this computer holds a PROGRAM_INSTALL medium for {@code programId}. */
-    private boolean hasInstallMediumFor(final ResourceLocation programId) {
-        if (!(host instanceof dev.jstech.computers.os
-                .IOsHost computer)) {
-            return false;
-        }
-        for (final long endpoint : computer.linkedEndpoints()) {
-            if (level.getBlockEntity(net.minecraft.core.BlockPos.of(endpoint))
-                    instanceof dev.jstech.computers.os.media.MediaReaderBlockEntity reader
-                    && reader.insertedKind()
-                            == dev.jstech.computers.os.media.MediaKind.PROGRAM_INSTALL
-                    && programId.equals(reader.insertedPayload())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @Override
@@ -1823,10 +1804,27 @@ public final class ServerCliComputer implements ICliComputer {
             hostBlock.setChanged();
             return OpResult.ok(">>> Emerging " + spec.commandName() + " ... compiling (about " + (ticks / 20) + "s)");
         }
-        console.install(spec.id().toString());
-        console.setInstalledVersion(spec.id().toString(), modVersion());
-        hostBlock.setChanged();
-        return OpResult.ok("Setting up " + spec.commandName() + " ... done");
+        /*
+         * A package from the Mirror is fetched over the network and set up over time, the way the same
+         * program from a disc is; the manager's own gates above have already said it may.
+         */
+        final dev.jstech.computers.os.IOsHost machine = osHost();
+        if (machine == null) {
+            return OpResult.fail("this computer cannot store installed programs");
+        }
+        final dev.jstech.computers.os.ProgramSpec fetched = spec;
+        final java.util.Optional<String> refusal = dev.jstech.computers.os.install.SetupRunner.begin(
+                machine, level, hostBlock.getBlockPos(), fetched, null, false);
+        return refusal.map(OpResult::fail)
+                .orElseGet(() -> OpResult.ok("Get:1 mirror://" + mirrorHostname() + " " + fetched.commandName()
+                        + " " + modVersion() + " [" + fetched.minDiskMb() + " MB]"));
+    }
+
+    /** The name the Mirror's Mainframe goes by in a package line, or the plain word when it has none. */
+    private String mirrorHostname() {
+        final MainframeBlockEntity mirror = mirrorMainframe();
+        final String name = mirror == null ? "" : mirror.console() == null ? "" : mirror.console().computerName();
+        return name == null || name.isBlank() ? "mainframe" : name;
     }
 
     /** The build every package the Mirror serves is currently at: the mod's own version. */
@@ -1913,25 +1911,19 @@ public final class ServerCliComputer implements ICliComputer {
             hostBlock.setChanged();
             return OpResult.ok(">>> " + spec.commandName() + ": build cancelled");
         }
-        boolean removed = console != null && console.uninstall(spec.id().toString());
         /*
-         * A Mainframe service also turns its agent off (removing only the console entry would leave the
-         * service running headless).
+         * Removing is the same job as installing, run backwards and quicker; a Mainframe service also
+         * turns its agent off when the job ends, so nothing is left running headless.
          */
-        if (hostBlock instanceof MainframeBlockEntity mainframe
-                && spec.kind() == dev.jstech.computers.os.ProgramKind.SERVICE) {
-            removed = switch (spec.id().getPath()) {
-                case "iqlengine" -> mainframe.uninstallIqlEngine() || removed;
-                case "automation_engine" -> mainframe.uninstallAutomationEngine() || removed;
-                case "mirror" -> mainframe.uninstallMirror() || removed;
-                default -> removed;
-            };
+        final dev.jstech.computers.os.IOsHost machine = osHost();
+        if (machine == null) {
+            return OpResult.fail("this computer cannot store installed programs");
         }
-        if (!removed) {
-            return OpResult.fail(spec.commandName() + " is not installed, so not removed");
-        }
-        hostBlock.setChanged();
-        return OpResult.ok("Removing " + spec.commandName() + " ... done");
+        final dev.jstech.computers.os.ProgramSpec removing = spec;
+        final java.util.Optional<String> refusal = dev.jstech.computers.os.install.SetupRunner.begin(
+                machine, level, hostBlock.getBlockPos(), removing, null, true);
+        return refusal.map(OpResult::fail)
+                .orElseGet(() -> OpResult.ok("Removing " + removing.commandName() + " ..."));
     }
 
     @Override

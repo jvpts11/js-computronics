@@ -14,6 +14,7 @@ import dev.jstech.computers.client.os.DesktopScreen;
 import dev.jstech.computers.client.os.DesktopWindow;
 import dev.jstech.computers.client.os.EditorApp;
 import dev.jstech.computers.client.os.FilesApp;
+import dev.jstech.computers.operation.payload.InstallFromMediaPayload;
 import dev.jstech.computers.os.media.MediaItem;
 import dev.jstech.computers.os.media.MediaKind;
 import dev.jstech.computers.os.media.MediaReaderBlockEntity;
@@ -25,6 +26,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * An install disc, read the way a player reads one: in the explorer, then in the Editor.
@@ -107,6 +109,47 @@ public final class InstallMediaClientTests {
     @ClientTest(timeoutTicks = 2400)
     public static void readme_ofAStandardDvdOnFrames11OpensWithItsText(final ClientTestContext ctx) {
         readme(ctx, "frames_11", VIRTUAL_STUDIO_DVD);
+    }
+
+    /**
+     * Running the disc's setup opens a Setup window that copies for a while and then the program is
+     * there: on the desktop as a launcher, and the window gone. Installing used to be a flag that
+     * flipped the instant it was asked, with nothing on the screen either way.
+     */
+    @ClientTest(timeoutTicks = 2400)
+    public static void setup_fromAFloppyOpensTheWindowAndInstallsInTime(final ClientTestContext ctx) {
+        final Disc disc = MINESWEEPER_FLOPPY;
+        ctx.thenBuild(0, world -> {
+                    final CraftingComputerBlockEntity computer = world.placeRunningCraftingComputer(COMPUTER);
+                    computer.installOs(jsc("frames_xp"));
+                    world.setBlock(DRIVE, disc.drive());
+                    world.placeMonitor(MONITOR, Direction.EAST);
+                })
+                .thenServer(SETTLE * 3, level -> {
+                    final ItemStack medium = new ItemStack(disc.medium());
+                    MediaItem.setKind(medium, MediaKind.PROGRAM_INSTALL);
+                    MediaItem.setPayload(medium, jsc(disc.program()));
+                    ctx.assertTrue(drive(ctx, level).insertMedia(medium).isEmpty(), "the drive takes the floppy");
+                })
+                .thenTeleport(SETTLE, PLAYER_AT_MONITOR, Direction.WEST)
+                .thenRightClick(SETTLE, MONITOR)
+                .thenAwaitScreen(DesktopScreen.class, BOOT_WAIT)
+                .thenAssert(SETTLE, () -> !ctx.screen(DesktopScreen.class).launcherLabels().contains("Minesweeper"),
+                        "the program is not there before setup")
+                // What the disc's setup.exe and This PC's Install button both send.
+                .then(SETTLE, () -> PacketDistributor.sendToServer(new InstallFromMediaPayload(
+                        ctx.abs(COMPUTER), ctx.abs(DRIVE).asLong())))
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).windowFor("Setup") != null,
+                        SCREEN_WAIT, "the Setup window to open")
+                .thenScreenshot(2, "setup-copying")
+                .thenAssert(SETTLE, () -> !ctx.screen(DesktopScreen.class).launcherLabels().contains("Minesweeper"),
+                        "the program is not installed while Setup is still copying")
+                // A 16 MB floppy takes its sixteen seconds; the window goes by itself once it is done.
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).launcherLabels().contains("Minesweeper"),
+                        20 * 25, "the program to be installed when Setup finishes")
+                .thenScreenshot(2, "setup-done")
+                .thenWaitUntil(() -> ctx.screen(DesktopScreen.class).windowFor("Setup") == null,
+                        20 * 5, "the Setup window to close on its own");
     }
 
     /** The readme on a program's disc opens in the Editor with its text, not as an empty page. */

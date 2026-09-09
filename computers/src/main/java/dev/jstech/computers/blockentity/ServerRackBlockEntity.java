@@ -949,6 +949,8 @@ public class ServerRackBlockEntity extends BlockEntity
             }
             final UUID node = ensureNodeUuid(stack);
             present.add(node);
+            // A server setting a program up keeps copying while it is a powered node.
+            dev.jstech.computers.os.install.SetupRunner.tick(unitHost(i), level, worldPosition);
 
             final NetworkUuid previous = registered.get(node);
             if (network == null) {

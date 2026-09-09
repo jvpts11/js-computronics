@@ -113,6 +113,29 @@ public final class ComputerConsoleState {
     }
 
     /*
+     * The program being set up right now, if any. One at a time: a machine installs one thing and
+     * then the next, and a second request while one runs is told the machine is busy.
+     */
+    @org.jetbrains.annotations.Nullable
+    private dev.jstech.computers.os.install.SetupJob setup;
+
+    /** What the machine is setting up, or null when nothing. */
+    @org.jetbrains.annotations.Nullable
+    public dev.jstech.computers.os.install.SetupJob setup() {
+        return setup;
+    }
+
+    /** Starts a setup; the caller has already checked the machine can take the program. */
+    public void beginSetup(final dev.jstech.computers.os.install.SetupJob job) {
+        this.setup = job;
+    }
+
+    /** Forgets the setup, done or cancelled. */
+    public void clearSetup() {
+        this.setup = null;
+    }
+
+    /*
      * A live installation medium booted on this computer (the manual Arch / Gentoo install), until it reboots
      * into the installed system. Persisted so a half-done install survives a reload.
      */
@@ -366,6 +389,19 @@ public final class ComputerConsoleState {
             historyTag.add(StringTag.valueOf(line));
         }
         tag.put("History", historyTag);
+        if (setup != null) {
+            // A setup half done goes with the machine, so the world coming back finds it still copying.
+            final CompoundTag job = new CompoundTag();
+            job.putString("Program", setup.programId());
+            job.putString("Name", setup.name());
+            job.putString("House", setup.house());
+            job.putInt("SizeMb", setup.sizeMb());
+            job.putString("Source", setup.source());
+            job.putBoolean("Removing", setup.removing());
+            job.putInt("Total", setup.ticksTotal());
+            job.putInt("Left", setup.ticksLeft());
+            tag.put("Setup", job);
+        }
         final ListTag installedTag = new ListTag();
         for (final String id : installed) {
             installedTag.add(StringTag.valueOf(id));
@@ -465,6 +501,13 @@ public final class ComputerConsoleState {
         installed.clear();
         for (final Tag entry : tag.getList("Installed", Tag.TAG_STRING)) {
             installed.add(entry.getAsString());
+        }
+        setup = null;
+        if (tag.contains("Setup")) {
+            final CompoundTag job = tag.getCompound("Setup");
+            setup = new dev.jstech.computers.os.install.SetupJob(job.getString("Program"), job.getString("Name"),
+                    job.getString("House"), job.getInt("SizeMb"), job.getString("Source"),
+                    job.getBoolean("Removing"), job.getInt("Total"), job.getInt("Left"));
         }
         community.clear();
         for (final Tag entry : tag.getList("Community", Tag.TAG_COMPOUND)) {

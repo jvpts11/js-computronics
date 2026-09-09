@@ -62,6 +62,12 @@ public final class FullJourneyClientTests {
 
     private static final int SETTLE = 4;
     private static final int SCREEN_WAIT = 60;
+
+    /** How long a CD takes to set up {@code program}, since installing is a job now, plus the usual slack. */
+    private static int setupWait(final net.minecraft.resources.ResourceLocation program) {
+        return dev.jstech.computers.os.install.SetupTiming.ticks(Programs.get(program).minDiskMb(),
+                dev.jstech.computers.os.media.MediaFormat.CD, false) + SCREEN_WAIT;
+    }
     /** Long enough for a cold start's POST to play out on the monitor before the desktop shows. */
     private static final int BOOT_WAIT = 400;
 
@@ -368,7 +374,7 @@ public final class FullJourneyClientTests {
                     ctx.clickDesktop(appPoint(ctx, "This PC", app.installButtonCenter(firstInstallable(app))));
                 })
                 .thenWaitUntilServer(level -> cc(ctx, level).console().isInstalled(Programs.CRAFTING_MANAGER.toString()),
-                        SCREEN_WAIT, "This PC to install the Crafting Manager from the disc",
+                        setupWait(Programs.CRAFTING_MANAGER), "This PC to install the Crafting Manager from the disc",
                         level -> "installed=" + cc(ctx, level).console().installed())
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);
@@ -404,7 +410,7 @@ public final class FullJourneyClientTests {
                     ctx.clickDesktop(appPoint(ctx, "This PC", app.installButtonCenter(firstInstallable(app))));
                 })
                 .thenWaitUntilServer(level -> cc(ctx, level).console().isInstalled(Programs.PATTERN_STUDIO.toString()),
-                        SCREEN_WAIT, "This PC to install the Pattern Studio from the disc",
+                        setupWait(Programs.PATTERN_STUDIO), "This PC to install the Pattern Studio from the disc",
                         level -> "installed=" + cc(ctx, level).console().installed())
                 .then(0, () -> ctx.key(GLFW.GLFW_KEY_ESCAPE))
                 .thenAwaitNoScreen(SCREEN_WAIT);

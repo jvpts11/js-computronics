@@ -163,6 +163,21 @@ public final class TestWorldBuilder {
      * OS footprint, and the Network OS itself so Operations get dispatched. A valid build never powers on by
      * itself; callers toggle power when they want the machine running.
      */
+    /**
+     * Runs whatever {@code host} is setting up to its end, tick by tick, the way waiting would.
+     *
+     * <p>A setup takes seconds of game time so a player sees it; a test that only cares what the
+     * machine looks like afterwards ticks the job itself rather than sleeping through the bar.
+     */
+    public static void finishSetup(final dev.jstech.computers.os.IOsHost host, final ServerLevel level,
+                                   final BlockPos pos) {
+        final int most = dev.jstech.computers.os.install.SetupTiming.MAX_SECONDS
+                * dev.jstech.computers.os.install.SetupTiming.TICKS_PER_SECOND + 1;
+        for (int i = 0; i < most && host.console() != null && host.console().setup() != null; i++) {
+            dev.jstech.computers.os.install.SetupRunner.tick(host, level, pos);
+        }
+    }
+
     public static void installMainframeBuild(final MainframeBlockEntity be) {
         final ItemStackHandler inv = be.getInventory();
         inv.setStackInSlot(MainframeBlockEntity.MOTHERBOARD_SLOT,

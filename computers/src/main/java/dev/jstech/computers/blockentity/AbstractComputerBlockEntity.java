@@ -1031,6 +1031,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
     protected void tickNode(final ServerLevel level) {
         tickBuildProgress(level);
         tickCannon();
+        dev.jstech.computers.os.install.SetupRunner.tick(this, level, worldPosition);
         final NetworkSystem system = NetworkSystem.get(level);
         NetworkUuid resolved = null;
         if (isRunning()) {
@@ -1193,7 +1194,7 @@ public abstract class AbstractComputerBlockEntity extends BlockEntity
      * <p>A computer that has been switched off is not running programs, so they are told so and given
      * their chance to say goodbye rather than being left frozen for whenever it comes back on.
      */
-    private void tickCannon() {
+    protected void tickCannon() {
         if (cannon.isEmpty()) {
             return;
         }

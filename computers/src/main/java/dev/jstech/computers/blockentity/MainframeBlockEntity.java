@@ -410,11 +410,18 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
 
     private void tick(final ServerLevel level) {
         nativeNetworkUuid(); // the mainframe owns a network identity from placement on
+        /*
+         * The Mainframe runs its own tick rather than the base's node tick, so the programs a player
+         * wrote are ticked here as well, and told to stop when the cabinet is switched off.
+         */
+        tickCannon();
         if (!isRunning()) {
             leaveNetwork(level);
             closeDispatch();
             return;
         }
+        // Whatever the machine is setting up copies on while it is up, network or no network.
+        dev.jstech.computers.os.install.SetupRunner.tick(this, level, worldPosition);
         updateNetwork(level);
         if (networkConflict) {
             // A contested network collapses: discard every in-flight Operation (its progress is

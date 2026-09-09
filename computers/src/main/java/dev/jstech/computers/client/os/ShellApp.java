@@ -39,8 +39,10 @@ public final class ShellApp implements IDesktopApp {
     /** The window title: the desktop environment's own terminal name (Konsole, Terminal, Megashell...). */
     private final String title;
 
-    /** A program the next terminal window runs as it opens, or empty. */
-    private static String pendingProgram = "";
+    private final BlockPos host;
+
+    /** Lines still to be typed here, one after the other as each finishes. */
+    private final java.util.ArrayDeque<String> lines = new java.util.ArrayDeque<>();
 
     public ShellApp(final BlockPos host) {
         this(host, null);
@@ -62,23 +64,43 @@ public final class ShellApp implements IDesktopApp {
         } else {
             this.title = chrome != null && promptSpec != null ? chrome.nameOf(promptSpec) : "Command Prompt";
         }
+        this.host = host;
         this.view = new ShellView(host, posix, true);
-        if (!pendingProgram.isEmpty()) {
-            final String path = pendingProgram;
-            pendingProgram = "";
-            this.view.say(path, CliStyle.PROMPT);
-            PacketDistributor.sendToServer(new RunProgramPayload(host, path));
-        }
+        this.view.setOnIdle(this::typeNext);
     }
 
     /**
-     * Has the next terminal window to open run that program.
+     * Runs a compiled program here, as the explorer's double click on one does.
      *
-     * <p>It is how opening one in the file explorer reaches a terminal: the window has to exist before
-     * anything the program prints can land in it, so the run waits for the window rather than racing it.
+     * <p>The window exists before anything the program prints can land in it, which is why the
+     * desktop opens or raises the terminal first and only then hands it the program.
      */
-    public static void runWhenReady(final String path) {
-        pendingProgram = path;
+    public void runProgram(final String path) {
+        this.view.say(path, CliStyle.PROMPT);
+        PacketDistributor.sendToServer(new RunProgramPayload(this.host, path));
+    }
+
+    /**
+     * Types lines here one after the other, the next only once the machine has answered the one
+     * before, the way a studio hands the shell a job it cannot do itself.
+     */
+    public void typeLines(final java.util.List<String> typed) {
+        this.lines.addAll(typed);
+        if (!this.view.busy()) {
+            typeNext();
+        }
+    }
+
+    /** Everything the terminal has printed so far, one line after another. */
+    public String scrollbackText() {
+        return this.view.scrollbackText();
+    }
+
+    private void typeNext() {
+        final String next = this.lines.poll();
+        if (next != null) {
+            this.view.run(next);
+        }
     }
 
     @Override

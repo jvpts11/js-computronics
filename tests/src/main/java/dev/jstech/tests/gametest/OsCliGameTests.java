@@ -921,8 +921,10 @@ public final class OsCliGameTests {
                     final var shell = dev.jstech.computers.program.cli.CliCommands.newShell(
                             cli.shellFamily(), 52);
                     shell.run("mirror install", cli);
-                    helper.assertTrue(text(shell.run("apt install gnome", cli)).contains("done"),
-                            "apt must install the GNOME package from the mirror");
+                    helper.assertTrue(text(shell.run("apt install gnome", cli)).contains("Get:1"),
+                            "apt must fetch the GNOME package from the mirror");
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     final ResourceLocation gnome = ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "gnome");
                     helper.assertTrue(gnome.equals(mainframe.installedDesktopId()),
                             "the installed desktop package must become the computer's desktop; got "
@@ -945,6 +947,8 @@ public final class OsCliGameTests {
 
                     // And removing it takes effect the same way: on the next boot, not immediately.
                     shell.run("apt remove gnome", cli);
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(dev.jstech.computers.os.boot.BootController
                                     .targetForComputer(mainframe)
                                     == dev.jstech.computers.os.boot.BootController.BootTarget.FULL_DESKTOP,
@@ -1155,6 +1159,8 @@ public final class OsCliGameTests {
                     helper.assertTrue(mainframe.isMirrorInstalled(), "the mirror verb installs the service");
                     helper.assertTrue(text(shell.run("uninstall mirror", cli)).contains("Removing mirror"),
                             "uninstall removes an installed service by name");
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertFalse(mainframe.isMirrorInstalled(), "the service flag turns off with it");
                     helper.assertTrue(text(shell.run("format D:", cli)).contains("WILL BE LOST"),
                             "format without /y only warns");
@@ -1178,10 +1184,14 @@ public final class OsCliGameTests {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
                     final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     shell.run("apt install cinnamon", cli);
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(mainframe.installedDesktopId() != null,
                             "installing a desktop environment registers it");
                     helper.assertTrue(text(shell.run("apt remove cinnamon", cli)).contains("Removing cinnamon"),
                             "the package manager removes an installed package");
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(mainframe.installedDesktopId() == null,
                             "without the package the computer boots back to the TTY");
                     helper.assertTrue(text(shell.run("apt remove cinnamon", cli)).contains("not installed"),
@@ -1205,12 +1215,16 @@ public final class OsCliGameTests {
                     final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
                     final var shell = dev.jstech.computers.program.cli.CliCommands.shellFor(cli, 52);
                     shell.run("pacman -S cinnamon", cli);
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(mainframe.installedDesktopId() != null,
                             "pacman -S installs a package");
                     helper.assertTrue(text(shell.run("pacman", cli)).contains("-R <package>"),
                             "the usage line names the removal flag");
                     helper.assertTrue(text(shell.run("pacman -R cinnamon", cli)).contains("Removing cinnamon"),
                             "pacman -R removes an installed package");
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(mainframe.installedDesktopId() == null,
                             "the desktop environment is gone with its package");
                 })
@@ -1248,8 +1262,10 @@ public final class OsCliGameTests {
                             dev.jstech.computers.program.cli.CliCommands.shellFor(legacyCli, 52);
 
                     helper.assertTrue(text(legacyShell.run("apt install kde-plasma", legacyCli))
-                                    .contains("Setting up"),
+                                    .contains("Get:1"),
                             "KDE is old enough for a Legacy machine");
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(legacy, helper.getLevel(),
+                            helper.absolutePos(legacyPos));
                     helper.assertTrue(text(legacyShell.run("apt install cinnamon", legacyCli))
                                     .contains("Standard hardware"),
                             "Cinnamon must refuse a Legacy machine and say which era it needs");
@@ -1283,6 +1299,8 @@ public final class OsCliGameTests {
                     final var shell = dev.jstech.computers.program.cli.CliCommands
                             .shellFor(cli, 52);
                     shell.run("apt install cinnamon", cli);
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(mainframe.installedDesktopId() != null,
                             "the desktop environment installs on the original disk");
 
@@ -1447,6 +1465,8 @@ public final class OsCliGameTests {
                             "screenfetch is a package, absent on a fresh install");
                     mainframe.installMirror();
                     shell.run("apt install screenfetch", cli);
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     final String out = text(shell.run("screenfetch", cli));
                     helper.assertTrue(out.contains("player@ubuntu"), "the header is user@host; got " + out);
                     helper.assertTrue(out.contains("OS: Ubuntu"), "the OS line names the distribution");
@@ -1455,6 +1475,8 @@ public final class OsCliGameTests {
                     helper.assertTrue(out.contains("DE: none (tty1)"), "without a DE the machine is a TTY");
                     helper.assertTrue(out.contains("CPU: 2000 MHz"), "the CPU line shows the clock");
                     shell.run("apt install cinnamon", cli);
+                    dev.jstech.tests.testkit.TestWorldBuilder.finishSetup(mainframe, helper.getLevel(),
+                            helper.absolutePos(pos));
                     helper.assertTrue(text(shell.run("neofetch", cli)).contains("DE: Cinnamon"),
                             "with a desktop environment installed the DE line names it (alias included)");
                 })

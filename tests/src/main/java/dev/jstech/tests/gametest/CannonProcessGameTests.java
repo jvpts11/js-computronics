@@ -10,6 +10,7 @@ package dev.jstech.tests.gametest;
 import dev.jstech.computers.ComputingModule;
 import dev.jstech.computers.JsComputers;
 import dev.jstech.computers.blockentity.CraftingComputerBlockEntity;
+import dev.jstech.computers.blockentity.MainframeBlockEntity;
 import dev.jstech.computers.cannon.CannonCompiler;
 import dev.jstech.computers.cannon.SourceFile;
 import dev.jstech.computers.cannon.machine.MachinePrograms;
@@ -98,6 +99,62 @@ public final class CannonProcessGameTests {
 
     private static ILanguageProcess only(final MachinePrograms programs) {
         return programs.all().getFirst().process();
+    }
+
+    /** A Mainframe up and running Frames 95, since it ticks itself rather than the way other computers do. */
+    private static MainframeBlockEntity mainframe(final GameTestHelper helper, final BlockPos at) {
+        helper.setBlock(at, ComputingModule.MAINFRAME.get());
+        if (!(helper.getBlockEntity(at) instanceof MainframeBlockEntity mainframe)) {
+            helper.fail("no Mainframe at " + at);
+            return null;
+        }
+        final ItemStackHandler inv = mainframe.getInventory();
+        inv.setStackInSlot(MainframeBlockEntity.MOTHERBOARD_SLOT, new ItemStack(ComputingModule.MOTHERBOARD_MTX_P.get()));
+        inv.setStackInSlot(MainframeBlockEntity.CPU_SLOTS_START, new ItemStack(ComputingModule.CPU_SERVO_2620.get()));
+        inv.setStackInSlot(MainframeBlockEntity.RAM_SLOTS_START, new ItemStack(ComputingModule.RAM_DDR3_8192.get()));
+        inv.setStackInSlot(MainframeBlockEntity.PSU_SLOT, new ItemStack(ComputingModule.PSU_650G.get()));
+        inv.setStackInSlot(MainframeBlockEntity.DISK_SLOTS_START,
+                new ItemStack(ComputingModule.disk(StorageTier.HDD, DiskSize.GB_500)));
+        mainframe.togglePower();
+        if (!mainframe.installOs(ResourceLocation.fromNamespaceAndPath(JsComputers.MODID, "frames_95"))) {
+            helper.fail("could not install Frames 95 on the Mainframe");
+            return null;
+        }
+        return mainframe;
+    }
+
+    /**
+     * The world's own ticks reach a script on a Mainframe.
+     *
+     * <p>The other tests tick the programs by hand; this one leaves it to the machine, on the one
+     * computer that runs its own tick instead of the shared one, which is where a script could sit
+     * started and never be called.
+     */
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void programs_areTickedByAMainframeOnItsOwn(final GameTestHelper helper) {
+        final MainframeBlockEntity mainframe = mainframe(helper, new BlockPos(2, 2, 2));
+        if (mainframe == null) {
+            return;
+        }
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 4, () -> {
+                    final MachinePrograms.Started started =
+                            mainframe.cannon().start("counter.asm", listing(COUNTER), 1, mainframe);
+                    helper.assertTrue(started.ok(), "it starts on the Mainframe: " + started.message());
+                })
+                .thenExecuteAfter(6, () -> {
+                    final List<String> said = only(mainframe.cannon()).console();
+                    helper.assertTrue(said.size() >= 4 && said.get(0).equals("up") && said.get(1).equals("tick 1"),
+                            "the world ticks the script without anybody asking; got " + said);
+                })
+                .thenExecuteAfter(1, () -> {
+                    mainframe.togglePower();
+                })
+                .thenExecuteAfter(4, () -> {
+                    helper.assertTrue(mainframe.cannon().isEmpty(),
+                            "switching the cabinet off stops what it was running");
+                })
+                .thenSucceed();
     }
 
     @GameTest(template = ARENA)

@@ -170,6 +170,14 @@ public final class ShellView extends Panel {
         return this.editor != null;
     }
 
+    /** Told each time a command finishes and the prompt is back, so a window can run lines in turn. */
+    private Runnable onIdle;
+
+    public ShellView setOnIdle(final Runnable action) {
+        this.onIdle = action;
+        return this;
+    }
+
     /** Everything the console has printed here, as one piece of text. */
     public String scrollbackText() {
         final StringBuilder text = new StringBuilder();
@@ -214,6 +222,10 @@ public final class ShellView extends Panel {
             this.prompt = payload.prompt();
         }
         this.busy = payload.busy();
+        if (!this.busy && this.onIdle != null) {
+            // A command finished: whoever queued the next line behind it may send it now.
+            this.onIdle.run();
+        }
         /*
          * The machine decided a command gives the terminal away, having checked that the editor is
          * installed. A terminal that has never heard of the one it named carries on with its prompt.
