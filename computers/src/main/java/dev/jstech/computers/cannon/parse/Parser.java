@@ -998,8 +998,68 @@ public final class Parser {
         return new IExpr.OutArgument(type, name, start.line(), start.column());
     }
 
+    /** Reads one expression standing on its own, as a hole in an interpolated string holds one. */
+    public IExpr parseLoneExpression() {
+        final IExpr expression = this.parseExpression();
+        if (!this.atEnd()) {
+            final Token extra = this.peek();
+            this.diagnostics.error(extra.line(), extra.column(), CannonError.EXPECTED_TOKEN, "the end of the hole",
+                    extra.describe());
+        }
+        return expression;
+    }
+
+    /**
+     * An interpolated string as the sum of its parts: each stretch of text is a string and each hole
+     * is the expression it holds, joined with {@code +} from left to right, starting from the text so
+     * the sum is a string whatever the first hole is.
+     */
+    private IExpr parseInterpolated(final Token token) {
+        @SuppressWarnings("unchecked")
+        final List<Object> parts = (List<Object>) token.value();
+        IExpr sum = null;
+        for (final Object part : parts) {
+            final IExpr piece;
+            if (part instanceof dev.jstech.computers.cannon.lex.Lexer.Hole hole) {
+                piece = this.parseHole(token, hole);
+            } else {
+                piece = new IExpr.Literal(TokenKind.STRING_LITERAL, part, token.line(), token.column());
+            }
+            if (sum == null) {
+                sum = part instanceof String ? piece
+                        : new IExpr.Binary(Operator.ADD, new IExpr.Literal(TokenKind.STRING_LITERAL, "",
+                        token.line(), token.column()), piece, token.line(), token.column());
+            } else {
+                sum = new IExpr.Binary(Operator.ADD, sum, piece, token.line(), token.column());
+            }
+        }
+        return sum == null ? new IExpr.Literal(TokenKind.STRING_LITERAL, "", token.line(), token.column()) : sum;
+    }
+
+    /**
+     * The expression in one hole, read by a lexer and parser of its own.
+     *
+     * <p>The code is padded with the lines and columns before it, so anything wrong inside the hole is
+     * reported where it sits in the file rather than at the start of a string nobody can find.
+     */
+    private IExpr parseHole(final Token token, final dev.jstech.computers.cannon.lex.Lexer.Hole hole) {
+        if (hole.code().isBlank()) {
+            this.diagnostics.error(hole.line(), hole.column(), CannonError.EXPECTED_EXPRESSION, "'}'");
+            return new IExpr.Literal(TokenKind.STRING_LITERAL, "", token.line(), token.column());
+        }
+        final String padded = "\n".repeat(Math.max(0, hole.line() - 1)) + " ".repeat(Math.max(0, hole.column() - 1))
+                + hole.code();
+        final dev.jstech.computers.cannon.lex.Lexer lexer = new dev.jstech.computers.cannon.lex.Lexer(
+                new dev.jstech.computers.cannon.SourceFile("", padded), this.diagnostics);
+        return new Parser(lexer.tokenize(), this.diagnostics).parseLoneExpression();
+    }
+
     private IExpr parsePrimary() {
         final Token start = this.peek();
+        if (start.kind() == TokenKind.INTERPOLATED_STRING) {
+            this.advance();
+            return this.parseInterpolated(start);
+        }
         if (LITERALS.contains(start.kind())) {
             this.advance();
             return new IExpr.Literal(start.kind(), start.value(), start.line(), start.column());

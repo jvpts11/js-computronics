@@ -386,4 +386,18 @@ class ProcessTest {
         assertFinished(process);
         assertEquals(List.of("round 0", "round 1", "round 2"), process.console());
     }
+
+    @Test
+    void run_fillsTheHolesOfAnInterpolatedString() {
+        final Process process = run("""
+                        int a = 4;
+                        int b = 6;
+                        string who = "sum";
+                        Console.PrintLine($"Test {who}: {a + b} ({Twice(a)})");
+                        Console.PrintLine($"{a}{b}");
+                        Console.PrintLine($"plain");
+                """);
+        assertFinished(process);
+        assertEquals(List.of("Test sum: 10 (8)", "46", "plain"), process.console());
+    }
 }

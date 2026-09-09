@@ -104,10 +104,91 @@ public final class Lexer {
         if (c == '"') {
             return this.scanString(startLine, startColumn);
         }
+        if (c == '$' && this.peek(1) == '"') {
+            return this.scanInterpolated(startLine, startColumn);
+        }
         if (c == '\'') {
             return this.scanChar(startLine, startColumn);
         }
         return this.scanOperator(startIndex, startLine, startColumn);
+    }
+
+    /** A piece of code inside an interpolated string, with where it starts so its own mistakes point home. */
+    public record Hole(String code, int line, int column) {
+    }
+
+    /**
+     * A string with holes in it: {@code $"Total: {count} items"}.
+     *
+     * <p>The token's value is the list of its parts in order, each a String of plain text (escapes
+     * already read) or a {@link Hole} holding the code between one pair of braces, untouched, for the
+     * parser to read as an expression. Two braces in a row are one brace of text.
+     */
+    private Token scanInterpolated(final int startLine, final int startColumn) {
+        final int startIndex = this.index;
+        this.advance();
+        this.advance();
+        final List<Object> parts = new ArrayList<>();
+        final StringBuilder text = new StringBuilder();
+        while (true) {
+            if (this.index >= this.source.length() || this.peek() == '\n') {
+                this.diagnostics.error(startLine, startColumn, CannonError.UNTERMINATED_STRING);
+                break;
+            }
+            final char c = this.peek();
+            if (c == '"') {
+                this.advance();
+                break;
+            }
+            if (c == '{' && this.peek(1) == '{') {
+                this.advance();
+                this.advance();
+                text.append('{');
+                continue;
+            }
+            if (c == '}' && this.peek(1) == '}') {
+                this.advance();
+                this.advance();
+                text.append('}');
+                continue;
+            }
+            if (c == '{') {
+                if (!text.isEmpty()) {
+                    parts.add(text.toString());
+                    text.setLength(0);
+                }
+                this.advance();
+                final int holeLine = this.line;
+                final int holeColumn = this.column;
+                final StringBuilder code = new StringBuilder();
+                int depth = 1;
+                while (this.index < this.source.length() && this.peek() != '\n') {
+                    final char inner = this.peek();
+                    if (inner == '{') {
+                        depth++;
+                    } else if (inner == '}') {
+                        depth--;
+                        if (depth == 0) {
+                            break;
+                        }
+                    }
+                    code.append(this.advance());
+                }
+                if (this.index < this.source.length() && this.peek() == '}') {
+                    this.advance();
+                } else {
+                    this.diagnostics.error(holeLine, holeColumn, CannonError.UNTERMINATED_STRING);
+                }
+                parts.add(new Hole(code.toString(), holeLine, holeColumn));
+                continue;
+            }
+            text.append(c == '\\' ? this.scanEscape() : this.advance());
+        }
+        if (!text.isEmpty() || parts.isEmpty()) {
+            parts.add(text.toString());
+        }
+        return new Token(TokenKind.INTERPOLATED_STRING, this.source.text().substring(startIndex, this.index),
+                List.copyOf(parts), startLine, startColumn);
     }
 
     private Token scanWord(final int startIndex, final int startLine, final int startColumn) {

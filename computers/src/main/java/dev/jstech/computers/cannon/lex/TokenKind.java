@@ -25,6 +25,7 @@ public enum TokenKind {
     FLOAT_LITERAL("a float"),
     DOUBLE_LITERAL("a double"),
     STRING_LITERAL("a string"),
+    INTERPOLATED_STRING("an interpolated string"),
     CHAR_LITERAL("a character"),
     IDENTIFIER("a name"),
 

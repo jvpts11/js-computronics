@@ -155,4 +155,35 @@ class LexerTest {
         assertEquals(List.of(TokenKind.INT, TokenKind.IDENTIFIER, TokenKind.SEMICOLON,
                 TokenKind.END_OF_FILE), kinds(tokens));
     }
+
+    @Test
+    void tokenize_readsAnInterpolatedStringIntoTextAndHoles() {
+        final List<Token> tokens = this.scan("$\"Total: {count} of {a + b}!\"");
+        assertEquals(TokenKind.INTERPOLATED_STRING, tokens.getFirst().kind());
+        @SuppressWarnings("unchecked")
+        final List<Object> parts = (List<Object>) tokens.getFirst().value();
+        assertEquals(5, parts.size());
+        assertEquals("Total: ", parts.get(0));
+        assertEquals(new Lexer.Hole("count", 1, 11), parts.get(1));
+        assertEquals(" of ", parts.get(2));
+        assertEquals(new Lexer.Hole("a + b", 1, 22), parts.get(3));
+        assertEquals("!", parts.get(4));
+        assertEquals(List.of(new Lexer.Hole("x", 1, 4)), this.scan("$\"{x}\"").getFirst().value());
+        assertEquals(List.of(""), this.scan("$\"\"").getFirst().value());
+        assertEquals(List.of(), this.bag.sorted());
+    }
+
+    @Test
+    void tokenize_treatsDoubledBracesInAnInterpolatedStringAsText() {
+        final List<Token> tokens = this.scan("$\"{{x}} = {x}\"");
+        @SuppressWarnings("unchecked")
+        final List<Object> parts = (List<Object>) tokens.getFirst().value();
+        assertEquals(List.of("{x} = ", new Lexer.Hole("x", 1, 12)), parts);
+    }
+
+    @Test
+    void tokenize_complainsOfAnInterpolatedStringThatNeverCloses() {
+        this.scan("$\"open {x");
+        assertEquals("C1001", this.bag.sorted().getFirst().code());
+    }
 }

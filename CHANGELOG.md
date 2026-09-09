@@ -57,6 +57,33 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   from (a floppy is slow, a DVD faster, the network faster still) and how big the program is. A machine
   that goes away mid-setup picks it up where it was.
 - `setup.exe` on an installation disc, double-clicked in the explorer, starts that setup.
+- An installed program is on the disk. Its folder under Program Files (or Program Files (x86), for one
+  older than the system) holds the program, its settings file, its libraries, a font when it brought one
+  and what came on its disc, and the system's own folder is called Frames, with the same kind of contents.
+  The explorer, the prompt and the studios read them like any other file.
+- An installation disc reads as a disc: its sources folder holds the setup, the packed program and its
+  checksums, its support folder the read-me and the checksum list.
+- Every terminal on a machine is its own session, with its own place on the disk: two Command Prompts
+  can be in two folders, and what one prints is only in that one. Closing a Fedora terminal and opening
+  it again shows what it printed before.
+- Cannon strings can carry values: `$"Total {a + b}"` fills the braces with what the expression comes to.
+  Two braces in a row are one brace of text.
+- The code editors in both studios grew up: text can be selected with the mouse or with Shift and the
+  arrows, cut, copied and pasted; Ctrl+Z and Ctrl+Y undo and redo; the font zooms with Ctrl and the
+  wheel; a new line keeps the indentation of the one before; a bracket or quote closes itself; Tab and
+  Shift+Tab indent the selected lines; and the marks in the margin say what the compiler said when the
+  cursor rests on them.
+- Files close. Ctrl+W, the cross on the tab or File > Close closes the open file, asking first when it
+  has changes. Ctrl+W in Virtual Studio Code does the same.
+- The explorers of both studios show the same icons the file explorer shows, and the file explorer's
+  columns can be dragged wider or narrower.
+- Implement Interface: with the cursor on a class that says it implements one, Edit > Implement Interface
+  (or Ctrl+.) writes the methods the interface asks for that the class does not have yet.
+- Virtual Studio's dock splits into Error List, Output and Terminal; the Error List is a table of code,
+  description, file and line, and the panels and the Solution Explorer resize by dragging their edges.
+  Starting a console program runs it in the dock's terminal.
+- The Create a new project page shows the templates used lately beside the list, filters by language,
+  platform and project type, and the Configure page asks where the project goes, with a "..." to browse.
 
 - Every system, desktop, service and program holds a share of the computer's RAM, in megabytes, and a program
   opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one
@@ -90,6 +117,25 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   stay visible however many there are.
 - An Operation's provenance rows name the computer that asked and the program it asked through, as in
   "lab-pc (Interactor)"; a bus reads as its kind and its name.
+- Installing scales with the machine: the same program takes twice as long on each older generation of
+  hardware, so a Vintage machine reading a floppy really waits and a modern one reading the network
+  hardly does.
+- `apt`, `dnf`, `pacman` and `pckmgr` speak as they do: a package is fetched, unpacked and set up with
+  its own version, and the progress bar grows in place on one line instead of printing a new line each
+  time. Removing goes the same way.
+- Setup on a Linux machine happens at the prompt only; the Setup window is a Frames thing.
+- A file whose extension belongs to no language is opened as text, not compiled: an assembly listing is
+  read, not built.
+
+### Fixed
+- The installation disc's setup no longer sits in the local disk's root, and the installed program's
+  files are where the shortcut says they are.
+- Two open terminals no longer mirror each other's output and folder.
+- Virtual Studio's menus open and close on the click; the File menu no longer stays open with the others
+  dead beside it.
+- The name of a new file starts with the cursor before the extension, and the arrow keys move it.
+- The "Open with Virtual Studio" entry of the explorer's menu is one entry, not a row of them.
+- Errors are listed in a table with room for the description instead of running into each other.
 
 ## [0.2.0a] - 2026-09-06
 
