@@ -69,7 +69,11 @@ technical reasoning out.
 - A plain imperative title, no trailing period, followed by an optional body that explains what changed
   and why: `Add the energy network distribution`, `Fix the peripheral cable length clamp`. No type
   prefixes such as `feat:` or `fix:`.
-- Branch names in English: `feature/energy-network`, `fix/payload-streamcodec`.
+- Branch names in English, in three parts: the mods the branch touches, the kind of work, and its name:
+  `<mod>,<mod>/<kind>/<name>`. The mods are the subproject names separated by commas, with no spaces
+  (git does not allow them in a ref); the kind is `feature`, `fix` or whatever the work is. Examples:
+  `core/fix/payload-streamcodec`, `computers,core/feature/user-software`. The first part says at a
+  glance which jars a branch changes.
 - Commits carry the author's own authorship and nothing else.
 
 ## NeoForge 1.21.1
