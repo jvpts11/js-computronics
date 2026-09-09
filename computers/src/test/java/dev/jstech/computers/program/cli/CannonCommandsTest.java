@@ -154,6 +154,14 @@ class CannonCommandsTest {
     }
 
     @Test
+    void compile_saysHowToRunWhatItWrote() {
+        this.computer.add(CannonCommands.COMPILER);
+        this.computer.files.put("Monitor.can", SCRIPT);
+        assertTrue(this.run("cannonc Monitor.can").contains("run it with: cannon run Monitor.asm"));
+        assertFalse(this.run("cannonc Missing.can").contains("run it with"));
+    }
+
+    @Test
     void compile_writesWhereItWasToldTo() {
         this.computer.add(CannonCommands.COMPILER);
         this.computer.files.put("Monitor.can", SCRIPT);

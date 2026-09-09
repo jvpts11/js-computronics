@@ -128,6 +128,8 @@ public final class CannonCommands {
                 return;
             }
             ctx.out().ok("cannonc: wrote " + target);
+            // Compiling is not running, and the prompt is the place to say how the second is done.
+            ctx.out().dim("run it with: cannon run " + target);
         }
 
         /** The name a source file compiles to: the same name, with the assembly's extension. */

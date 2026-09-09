@@ -126,6 +126,8 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 - Setup on a Linux machine happens at the prompt only; the Setup window is a Frames thing.
 - A file whose extension belongs to no language is opened as text, not compiled: an assembly listing is
   read, not built.
+- `cannonc` says how to run what it wrote. Compiling and running are two commands, and the prompt now
+  names the second one after the first has finished.
 
 ### Fixed
 - The installation disc's setup no longer sits in the local disk's root, and the installed program's
