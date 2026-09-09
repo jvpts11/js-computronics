@@ -361,6 +361,22 @@ public final class ExposureApp implements IDesktopApp {
     }
 
     @Override
+    public void mouseDragged(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null) {
+            doc.area().mouseDragged(mouseX, mouseY, button);
+        }
+    }
+
+    @Override
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null) {
+            doc.area().mouseReleased(mouseX, mouseY, button);
+        }
+    }
+
+    @Override
     public boolean charTyped(final char c) {
         final CodeWorkspace.Doc doc = this.workspace.current();
         if (doc != null && doc.area().charTyped(c)) {

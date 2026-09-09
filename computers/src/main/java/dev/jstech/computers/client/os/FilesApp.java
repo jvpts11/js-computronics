@@ -163,6 +163,22 @@ public final class FilesApp implements IDesktopApp {
     private final SearchField search;
     private final ListView<TreeItem> treeList;
     private final ColumnHeader columns;
+    /* How wide the type and size columns are; the name column takes what is left. Dragged by the headings' edges. */
+    private int typeColW = FilesLayout.TYPE_COL_W;
+    private int sizeColW = FilesLayout.SIZE_COL_W;
+
+    /** A column's left edge dragged to {@code edgeX}: the type column's, or the size column's. */
+    private void resizeColumn(final int column, final int edgeX) {
+        final int rel = edgeX - lastX;
+        if (column == 1) {
+            final int least = FilesLayout.listX() + 4 + FilesLayout.ICON_W + 3 + FilesLayout.MIN_COL_W;
+            typeColW = Math.max(FilesLayout.MIN_COL_W, contentW - sizeColW - Math.max(least, rel));
+        } else if (column == 2) {
+            final int most = contentW - FilesLayout.MIN_COL_W;
+            sizeColW = Math.max(FilesLayout.MIN_COL_W, contentW - Math.min(most, rel));
+            typeColW = Math.max(FilesLayout.MIN_COL_W, Math.min(typeColW, contentW - sizeColW - FilesLayout.MIN_COL_W));
+        }
+    }
     private final ListView<Row> fileList;
     private final CellGrid iconGrid;
     private final TextField renameField;
@@ -193,10 +209,8 @@ public final class FilesApp implements IDesktopApp {
 
     private enum SortBy { NAME, TYPE, SIZE }
 
-    private enum IconType { UP, FOLDER, HOME, IQL, DOC, DAT, EXE, PKG, INF, BIN, CFG, LOG, CRAFT,
-        SOURCE, PROGRAM, BUNDLE }
 
-    private record Row(Kind kind, String name, String type, String size, IconType icon,
+    private record Row(Kind kind, String name, String type, String size, FileIcons.Kind icon,
                        @Nullable DiskFilesPayload.WireFile file, @Nullable ItemStack item) {
     }
 
@@ -256,7 +270,8 @@ public final class FilesApp implements IDesktopApp {
         treeList = root.add(new ListView<TreeItem>(this::tree, FilesLayout.ROW_H, this::renderTreeRow)
                 .setPadding(1, 2)
                 .setOnClick(this::treeClicked));
-        columns = root.add(new ColumnHeader(List.of("Name", "Type", "Size")).setOnSort(column -> applyFilterAndSort()));
+        columns = root.add(new ColumnHeader(List.of("Name", "Type", "Size")).setOnSort(column -> applyFilterAndSort())
+                .setOnResize(this::resizeColumn));
         fileList = root.add(new ListView<Row>(() -> rows, FilesLayout.ROW_H, this::renderFileRow)
                 .setPadding(1, 1)
                 .setOnClick(this::rowClicked));
@@ -489,21 +504,21 @@ public final class FilesApp implements IDesktopApp {
     private void rebuild(final List<DiskFilesPayload.WireFile> files) {
         final List<Row> built = new ArrayList<>();
         if (dir.isEmpty()) {
-            built.add(new Row(Kind.STORAGE, "Storage", "Stored items", "", IconType.FOLDER, null, null));
+            built.add(new Row(Kind.STORAGE, "Storage", "Stored items", "", FileIcons.Kind.FOLDER, null, null));
         } else {
-            built.add(new Row(Kind.UP, "..", "Up one level", "", IconType.UP, null, null));
+            built.add(new Row(Kind.UP, "..", "Up one level", "", FileIcons.Kind.UP, null, null));
         }
         for (final DiskFilesPayload.WireFile f : files) {
             if (f.directory()) {
                 final boolean drive = f.path().startsWith("media:") && f.path().indexOf('/') < 0;
                 built.add(new Row(Kind.DIR, drive ? volumeLabel(f.path()) : baseName(f.path()),
-                        drive ? "Removable drive" : "Folder", "", IconType.FOLDER, f, null));
+                        drive ? "Removable drive" : "Folder", "", FileIcons.Kind.FOLDER, f, null));
             } else if (f.projectsItem()) {
                 final ItemStack stack = stackOf(f.itemId());
                 built.add(new Row(Kind.FILE, stack.isEmpty() ? baseName(f.path()) : stack.getHoverName().getString(),
-                        "Stored item", f.count() + " it", IconType.DAT, f, stack.isEmpty() ? null : stack));
+                        "Stored item", f.count() + " it", FileIcons.Kind.DAT, f, stack.isEmpty() ? null : stack));
             } else {
-                built.add(new Row(Kind.FILE, baseName(f.path()), typeLabel(f), sizeLabel(f), iconFor(f.ext()), f, null));
+                built.add(new Row(Kind.FILE, baseName(f.path()), typeLabel(f), sizeLabel(f), FileIcons.kindOf(f.ext()), f, null));
             }
         }
         this.allRows = built;
@@ -786,7 +801,8 @@ public final class FilesApp implements IDesktopApp {
         final int lx = x + FilesLayout.listX();
         final int lw = FilesLayout.listW(width);
         columns.setBounds(lx, y + FilesLayout.colsY(), lw, FilesLayout.COLS_H);
-        columns.setColumnX(lx + 4 + FilesLayout.ICON_W + 3, x + FilesLayout.typeColX(width), x + FilesLayout.sizeColX(width));
+        columns.setColumnX(lx + 4 + FilesLayout.ICON_W + 3, x + FilesLayout.typeColX(width, typeColW, sizeColW),
+                x + FilesLayout.sizeColX(width, sizeColW));
 
         final int listY = y + FilesLayout.listY();
         final int listH = FilesLayout.listH(height);
@@ -818,7 +834,8 @@ public final class FilesApp implements IDesktopApp {
             } else if (renaming >= fileList.scroll() && renaming < fileList.scroll() + fileList.visibleRows()) {
                 final int[] r = fileList.rowRect(renaming);
                 final int nameX = r[0] + 3 + FilesLayout.ICON_W + 3;
-                renameField.setBounds(nameX - 3, r[1], FilesLayout.nameMaxW(width) + 6, FilesLayout.ROW_H);
+                renameField.setBounds(nameX - 3, r[1], FilesLayout.nameMaxW(width, typeColW, sizeColW) + 6,
+                        FilesLayout.ROW_H);
                 renameField.setVisible(true);
             }
         }
@@ -845,8 +862,8 @@ public final class FilesApp implements IDesktopApp {
         final boolean cur = item.target().isEmpty() ? (dir.isEmpty() && isVolumeItem(item))
                 : isVolumeItem(item) ? isCurrentVolume(item.target()) : dir.equals(item.target());
         ctx.skin().listRow(g, x, y, w, h, hovered, cur);
-        drawIcon(g, x + 2, y + 1, item.target().equals("Storage") ? IconType.DAT
-                : (isVolumeItem(item) ? (item.removable() ? IconType.BIN : IconType.HOME) : IconType.FOLDER));
+        FileIcons.draw(g, x + 2, y + 1, item.target().equals("Storage") ? FileIcons.Kind.DAT
+                : (isVolumeItem(item) ? (item.removable() ? FileIcons.Kind.BIN : FileIcons.Kind.HOME) : FileIcons.Kind.FOLDER));
         if (!(isVolumeItem(item) && item.volumeIndex() == volRenaming)) {
             final int maxW = w + 2 - (FilesLayout.ICON_W + 8) - (item.removable() ? 8 : 0);
             g.drawString(ctx.font(), Texts.clip(ctx.font(), item.label(), maxW), x + 3 + FilesLayout.ICON_W, y + 2,
@@ -881,17 +898,17 @@ public final class FilesApp implements IDesktopApp {
         if (r.item() != null) {
             DesktopItems.item(g, r.item(), x + 1, y - 3);
         } else {
-            drawIcon(g, x + 2, y + 1, r.icon());
+            FileIcons.draw(g, x + 2, y + 1, r.icon());
         }
         final boolean ro = r.file() != null && r.file().readOnly();
         final int nameColor = sel ? ctx.skin().listRowText(true) : (ro ? ctx.skin().dim() : ctx.skin().text());
         final int subColor = sel ? ctx.skin().listRowText(true) : ctx.skin().dim();
         if (index != renaming) {
-            g.drawString(ctx.font(), Texts.clip(ctx.font(), r.name(), FilesLayout.nameMaxW(contentW)),
+            g.drawString(ctx.font(), Texts.clip(ctx.font(), r.name(), FilesLayout.nameMaxW(contentW, typeColW, sizeColW)),
                     x + 3 + FilesLayout.ICON_W + 3, y + 2, nameColor, false);
         }
-        g.drawString(ctx.font(), Texts.clip(ctx.font(), r.type(), FilesLayout.TYPE_COL_W - 4),
-                lastX + FilesLayout.typeColX(contentW), y + 2, subColor, false);
+        g.drawString(ctx.font(), Texts.clip(ctx.font(), r.type(), typeColW - 4),
+                lastX + FilesLayout.typeColX(contentW, typeColW, sizeColW), y + 2, subColor, false);
         g.drawString(ctx.font(), r.size(), lastX + contentW - 4 - ctx.font().width(r.size()), y + 2, subColor, false);
     }
 
@@ -904,7 +921,7 @@ public final class FilesApp implements IDesktopApp {
         if (r.item() != null) {
             DesktopItems.item(g, r.item(), cx + w / 2 - 8, cy + 2);
         } else {
-            drawIcon(g, cx + w / 2 - FilesLayout.ICON_W / 2, cy + 4, r.icon());
+            FileIcons.draw(g, cx + w / 2 - FilesLayout.ICON_W / 2, cy + 4, r.icon());
         }
         if (index != renaming) {
             final String label = Texts.clip(ctx.font(), r.name(), w - 4);
@@ -1151,6 +1168,11 @@ public final class FilesApp implements IDesktopApp {
             properties.mouseDragged(mouseX, mouseY, button);
             return;
         }
+        // A column edge being dragged keeps the mouse even once it has left the headings' row.
+        if (columns.dragging()) {
+            columns.mouseDragged(mouseX, mouseY, button);
+            return;
+        }
         if (root.mouseDragged(mouseX, mouseY, button)) {
             return;
         }
@@ -1350,6 +1372,17 @@ public final class FilesApp implements IDesktopApp {
     // actions
 
     /** Opens a row: a folder navigates; an installer's setup runs; a text file opens in the Editor. */
+    /** Opens the entry called {@code name} the way a double click on it does; false when it is not listed. */
+    public boolean open(final String name) {
+        for (final Row r : rows) {
+            if (r.name().equals(name)) {
+                open(r);
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void open(final Row r) {
         switch (r.kind()) {
             case STORAGE -> go("Storage");
@@ -1470,6 +1503,9 @@ public final class FilesApp implements IDesktopApp {
          * into one that could only be deleted and made again.
          */
         renameField.set(r.name());
+        // The caret opens before the extension, on the part of the name that usually changes.
+        final int dot = r.name().lastIndexOf('.');
+        renameField.setCaret(dot > 0 ? dot : r.name().length());
         root.focus(renameField);
     }
 
@@ -1721,97 +1757,6 @@ public final class FilesApp implements IDesktopApp {
         return lower.isEmpty() ? "File" : lower.toUpperCase(Locale.ROOT) + " file";
     }
 
-    private static IconType iconFor(final String ext) {
-        final String lower = ext.toLowerCase(Locale.ROOT);
-        final var language = dev.jstech.core.JsCore.languages().byExtension(lower);
-        if (language != null) {
-            return language.sourceExtensions().contains(lower) ? IconType.SOURCE : IconType.PROGRAM;
-        }
-        return switch (lower) {
-            case "iql" -> IconType.IQL;
-            case "dat" -> IconType.DAT;
-            case "exe", "sh" -> IconType.EXE;
-            case "pkg" -> IconType.PKG;
-            case "inf" -> IconType.INF;
-            case "bin" -> IconType.BIN;
-            case "cfg" -> IconType.CFG;
-            case "log" -> IconType.LOG;
-            case "craft" -> IconType.CRAFT;
-            case "cpk" -> IconType.BUNDLE;
-            default -> IconType.DOC;
-        };
-    }
-
-    /** Draws a small per-type icon (a folder with a tab, or a document with a folded corner). */
-    private static void drawIcon(final GuiGraphics g, final int x, final int y, final IconType type) {
-        final int w = FilesLayout.ICON_W;
-        switch (type) {
-            case UP -> {
-                g.fill(x, y + 1, x + w, y + 9, 0xFFA8A8A8);
-                g.fill(x, y + 1, x + w, y + 2, 0xFFD8D8D8);
-                Draw.outline(g, x, y + 1, w, 8, 0xFF707070);
-                g.fill(x + 5, y + 3, x + 7, y + 8, 0xFF303030);
-                g.fill(x + 3, y + 4, x + 9, y + 5, 0xFF303030);
-            }
-            case FOLDER -> {
-                g.fill(x, y + 2, x + 5, y, 0xFFFFE9A8);
-                g.fill(x, y + 2, x + w, y + 9, 0xFFF4C842);
-                g.fill(x, y + 2, x + w, y + 3, 0xFFFFF3C4);
-                Draw.outline(g, x, y, w, 9, 0xFF9A7B16);
-            }
-            case HOME -> {
-                // A disk drive: a slab with an activity lamp.
-                g.fill(x, y + 1, x + w, y + 9, 0xFF8B93A4);
-                g.fill(x + 1, y + 2, x + w - 1, y + 8, 0xFFC7CDDA);
-                g.fill(x + 2, y + 3, x + w - 2, y + 4, 0xFFEDF0F6);
-                g.fill(x + w - 4, y + 6, x + w - 2, y + 8, 0xFF49E07A);
-            }
-            case BIN -> {
-                // A removable medium or an opaque installer file: a dark cartridge.
-                g.fill(x + 1, y, x + w - 1, y + 9, 0xFF2E3238);
-                g.fill(x + 3, y + 2, x + w - 3, y + 4, 0xFFB8BEC8);
-                Draw.outline(g, x + 1, y, w - 2, 9, 0xFF1C1F24);
-            }
-            case IQL -> doc(g, x, y, 0xFFA9D4FF, 0xFF3A72B0);
-            case DAT -> doc(g, x, y, 0xFFBDEEC0, 0xFF4F9B53);
-            case EXE -> {
-                doc(g, x, y, 0xFFDDE2EC, 0xFF3A4256);
-                g.fill(x + 4, y + 3, x + 6, y + 7, 0xFF3A4256);   // a play glyph
-                g.fill(x + 6, y + 4, x + 8, y + 6, 0xFF3A4256);
-            }
-            case PKG -> doc(g, x, y, 0xFFE8DDB5, 0xFF9C7A2B);
-            case INF -> doc(g, x, y, 0xFFEDEDED, 0xFF8A93A6);
-            case CFG -> doc(g, x, y, 0xFFE3E0F5, 0xFF6C5FB0);
-            case LOG -> doc(g, x, y, 0xFFF0E6D6, 0xFFA0865A);
-            case CRAFT -> doc(g, x, y, 0xFFFFD9B0, 0xFFC26A1A);
-            // Something a person writes: a page with two lines of writing on it.
-            case SOURCE -> {
-                doc(g, x, y, 0xFFCFE6D8, 0xFF2E7D5B);
-                g.fill(x + 3, y + 4, x + 8, y + 5, 0xFF2E7D5B);
-                g.fill(x + 3, y + 6, x + 7, y + 7, 0xFF2E7D5B);
-            }
-            // Something a machine runs: the same page with the play mark an installer wears.
-            case PROGRAM -> {
-                doc(g, x, y, 0xFFD8E6CF, 0xFF4C7D2E);
-                g.fill(x + 4, y + 3, x + 6, y + 8, 0xFF4C7D2E);
-                g.fill(x + 6, y + 4, x + 8, y + 7, 0xFF4C7D2E);
-            }
-            // Something with other things inside it: a page with a band across it, like a parcel.
-            case BUNDLE -> {
-                doc(g, x, y, 0xFFE6DCCF, 0xFF7D5B2E);
-                g.fill(x + 1, y + 5, x + 10, y + 6, 0xFF7D5B2E);
-                g.fill(x + 5, y + 2, x + 6, y + 9, 0xFF7D5B2E);
-            }
-            case DOC -> doc(g, x, y, 0xFFDFE3EA, 0xFF8A93A6);
-        }
-    }
-
-    private static void doc(final GuiGraphics g, final int x, final int y, final int fill, final int edge) {
-        final int w = FilesLayout.ICON_W;
-        g.fill(x + 1, y, x + w, y + 9, fill);
-        g.fill(x + w - 3, y, x + w, y + 3, 0xFFFFFFFF);
-        Draw.outline(g, x + 1, y, w - 1, 9, edge);
-    }
 
     /** A Windows-style address for the path: {@code C:\dir\} on the disk, the drive's label on media. */
     private String displayPath(final String dir) {

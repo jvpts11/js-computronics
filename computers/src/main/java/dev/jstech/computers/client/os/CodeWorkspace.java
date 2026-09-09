@@ -15,6 +15,7 @@ import dev.jstech.computers.os.edit.CodeRuns;
 import dev.jstech.computers.os.edit.InkPalette;
 import dev.jstech.computers.os.edit.ProblemReport;
 import dev.jstech.core.JsCore;
+import dev.jstech.core.client.gui.logic.TextDocument;
 import dev.jstech.core.language.IProgrammingLanguage;
 import java.util.ArrayList;
 import java.util.List;
@@ -326,15 +327,76 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
         return JsCore.languages().byExtension(path.substring(dot + 1).toLowerCase(Locale.ROOT));
     }
 
+    /** The language that compiles {@code path}: the one claiming it as a source, not as its output. */
+    public static IProgrammingLanguage sourceLanguageOf(final String path) {
+        final int dot = path.lastIndexOf('.');
+        if (dot < 0 || dot == path.length() - 1) {
+            return null;
+        }
+        final String ext = path.substring(dot + 1).toLowerCase(Locale.ROOT);
+        final IProgrammingLanguage language = JsCore.languages().byExtension(ext);
+        return language != null && language.sourceExtensions().contains(ext) ? language : null;
+    }
+
     /** The rows of a file, coloured by whichever language owns it. */
     private static List<List<CodeRuns.Run>> colour(final String path, final List<String> lines) {
         final IProgrammingLanguage language = languageOf(path);
         if (language == null) {
             return List.of();
         }
+        if (sourceLanguageOf(path) == null) {
+            return colourListing(lines);
+        }
         final List<CodeRuns.Span> spans = new ArrayList<>();
         for (final IProgrammingLanguage.Token token : language.tokenize(String.join("\n", lines))) {
             spans.add(new CodeRuns.Span(token.line(), token.column(), token.length(), inkOf(token.kind())));
+        }
+        return CodeRuns.byLine(lines, spans);
+    }
+
+    /**
+     * The colouring of a listing the compiler wrote: directives, labels, numbers and quoted text.
+     *
+     * <p>A listing is read, not compiled, so it is coloured by its shape rather than by a language's
+     * lexer: a word starting with a dot is a directive, a word ending in a colon is a label, and the
+     * rest is left as it is. It is what lets a player follow their program a line at a time.
+     */
+    private static List<List<CodeRuns.Run>> colourListing(final List<String> lines) {
+        final List<CodeRuns.Span> spans = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            final String text = lines.get(i);
+            int at = 0;
+            while (at < text.length()) {
+                final char c = text.charAt(at);
+                if (Character.isWhitespace(c)) {
+                    at++;
+                    continue;
+                }
+                int end = at + 1;
+                if (c == '"') {
+                    while (end < text.length() && text.charAt(end) != '"') {
+                        end++;
+                    }
+                    end = Math.min(text.length(), end + 1);
+                    spans.add(new CodeRuns.Span(i + 1, at + 1, end - at, CodeRuns.Ink.TEXT));
+                } else if (c == ';') {
+                    spans.add(new CodeRuns.Span(i + 1, at + 1, text.length() - at, CodeRuns.Ink.COMMENT));
+                    end = text.length();
+                } else {
+                    while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+                        end++;
+                    }
+                    final String word = text.substring(at, end);
+                    final CodeRuns.Ink ink = word.startsWith(".") ? CodeRuns.Ink.KEYWORD
+                            : word.endsWith(":") ? CodeRuns.Ink.NAME
+                            : word.chars().allMatch(ch -> Character.isDigit(ch) || ch == '-' || ch == '.')
+                            ? CodeRuns.Ink.NUMBER : null;
+                    if (ink != null) {
+                        spans.add(new CodeRuns.Span(i + 1, at + 1, end - at, ink));
+                    }
+                }
+                at = end;
+            }
         }
         return CodeRuns.byLine(lines, spans);
     }
@@ -358,7 +420,8 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
      * computer in the world.
      */
     public void recompile(final Doc doc) {
-        final IProgrammingLanguage language = languageOf(doc.path);
+        // Only a source is compiled; what the compiler wrote is read, coloured, and left alone.
+        final IProgrammingLanguage language = sourceLanguageOf(doc.path);
         if (language == null) {
             doc.complaints = List.of();
             doc.area.setMarks(List.of());
@@ -368,9 +431,167 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
                 List.of(new IProgrammingLanguage.SourceText(doc.name(), doc.area.text()))).complaints();
         final List<CodeArea.Mark> marks = new ArrayList<>(doc.complaints.size());
         for (final IProgrammingLanguage.Complaint complaint : doc.complaints) {
-            marks.add(new CodeArea.Mark(complaint.line(), true, complaint.code() + ": " + complaint.message()));
+            marks.add(markOf(doc, complaint));
         }
         doc.area.setMarks(marks);
+    }
+
+    /** What the compiler says when a class leaves an interface's method out, with the three names in it. */
+    private static final java.util.regex.Pattern MISSING_MEMBER =
+            java.util.regex.Pattern.compile("'([^']+)' says it is a '([^']+)' but does not have '([^']+)'");
+
+    /**
+     * Writes into {@code doc} every method its classes promised an interface and left out, the way
+     * a studio's "Implement interface" does; false when there was nothing to write.
+     *
+     * <p>The compiler already names each missing method; the interface's own declaration, in this
+     * file or one of the others open, says what it returns and takes. The stubs go in before the
+     * class's closing brace, at the class's own depth.
+     */
+    public boolean implementInterface(final Doc doc) {
+        final java.util.Map<Integer, List<String>> stubsByClassLine = new java.util.LinkedHashMap<>();
+        final java.util.Map<Integer, String> indentByClassLine = new java.util.HashMap<>();
+        final TextDocument text = doc.area.document();
+        for (final IProgrammingLanguage.Complaint complaint : doc.complaints) {
+            if (!"C3018".equals(complaint.code())) {
+                continue;
+            }
+            final java.util.regex.Matcher m = MISSING_MEMBER.matcher(complaint.message());
+            if (!m.find()) {
+                continue;
+            }
+            final int classLine = complaint.line() - 1;
+            if (classLine < 0 || classLine >= text.lineCount()) {
+                continue;
+            }
+            final String classText = text.line(classLine);
+            final String indent = " ".repeat(classText.length() - classText.stripLeading().length());
+            indentByClassLine.put(classLine, indent);
+            stubsByClassLine.computeIfAbsent(classLine, k -> new ArrayList<>())
+                    .add(stubFor(m.group(2), m.group(3), indent + " ".repeat(doc.area.tabSize())));
+        }
+        if (stubsByClassLine.isEmpty()) {
+            return false;
+        }
+        // Later classes first, so writing into one does not move the lines of the ones above it.
+        final List<Integer> lines = new ArrayList<>(stubsByClassLine.keySet());
+        lines.sort(java.util.Collections.reverseOrder());
+        for (final int classLine : lines) {
+            final int closing = closingBraceLine(text, classLine);
+            if (closing < 0) {
+                continue;
+            }
+            final StringBuilder block = new StringBuilder();
+            for (final String stub : stubsByClassLine.get(classLine)) {
+                block.append('\n').append(stub);
+            }
+            block.append('\n');
+            final String before = text.line(closing);
+            final int brace = before.indexOf('}');
+            text.setCursor(closing, Math.max(0, brace));
+            text.insertText(block.toString());
+        }
+        doc.dirty = true;
+        recompile(doc);
+        return true;
+    }
+
+    /** The line holding the brace that closes the class declared on {@code classLine}, or -1. */
+    private static int closingBraceLine(final TextDocument text, final int classLine) {
+        int depth = 0;
+        boolean opened = false;
+        for (int i = classLine; i < text.lineCount(); i++) {
+            final String line = text.line(i);
+            for (int c = 0; c < line.length(); c++) {
+                final char ch = line.charAt(c);
+                if (ch == '{') {
+                    depth++;
+                    opened = true;
+                } else if (ch == '}') {
+                    depth--;
+                    if (opened && depth == 0) {
+                        return i;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * The method a class has to write for {@code member} of {@code face}: the built-in script
+     * interface is known here, and any other interface is read from the open files.
+     */
+    private String stubFor(final String face, final String member, final String indent) {
+        final int paren = member.indexOf('(');
+        final String name = paren < 0 ? member : member.substring(0, paren);
+        String returnType = "void";
+        String parameters = "";
+        if (!face.equals("IScript")) {
+            final dev.jstech.computers.cannon.ast.IDecl.MethodDecl declared = declaredMethod(face, member);
+            if (declared != null) {
+                returnType = declared.returnType().describe();
+                final StringBuilder params = new StringBuilder();
+                for (final dev.jstech.computers.cannon.ast.IDecl.Parameter p : declared.parameters()) {
+                    params.append(params.isEmpty() ? "" : ", ").append(p.outward() ? "out " : "")
+                            .append(p.type().describe()).append(' ').append(p.name());
+                }
+                parameters = params.toString();
+            }
+        }
+        final String body = switch (returnType) {
+            case "void" -> "";
+            case "int", "long", "float", "double" -> "return 0;";
+            case "bool" -> "return false;";
+            case "string" -> "return \"\";";
+            default -> "return null;";
+        };
+        return indent + "public " + returnType + " " + name + "(" + parameters + ") {\n"
+                + (body.isEmpty() ? "" : indent + "    " + body + "\n") + indent + "}";
+    }
+
+    /** The declaration of {@code face}'s method described as {@code member}, in any open file, or null. */
+    private dev.jstech.computers.cannon.ast.IDecl.MethodDecl declaredMethod(final String face, final String member) {
+        for (final Doc open : this.docs) {
+            final dev.jstech.computers.cannon.CannonFrontEnd.Result parsed = dev.jstech.computers.cannon.CannonFrontEnd
+                    .parse(new dev.jstech.computers.cannon.SourceFile(open.name(), open.area.text()));
+            for (final dev.jstech.computers.cannon.ast.IDecl.ITypeDecl type : parsed.unit().types()) {
+                if (type instanceof dev.jstech.computers.cannon.ast.IDecl.InterfaceDecl declared
+                        && declared.name().equals(face)) {
+                    for (final dev.jstech.computers.cannon.ast.IDecl.MethodDecl method : declared.methods()) {
+                        final StringBuilder described = new StringBuilder(method.name()).append('(');
+                        for (int i = 0; i < method.parameters().size(); i++) {
+                            described.append(i > 0 ? ", " : "").append(method.parameters().get(i).type().describe());
+                        }
+                        if (described.append(')').toString().equals(member)) {
+                            return method;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * A complaint as a mark: on its row, under the word at its column.
+     *
+     * <p>The compiler says where it stopped; how much to underline is the word that starts there, so
+     * a wrong name is underlined whole rather than as one letter.
+     */
+    private static CodeArea.Mark markOf(final Doc doc, final IProgrammingLanguage.Complaint complaint) {
+        final String text = complaint.code() + ": " + complaint.message();
+        final int row = complaint.line() - 1;
+        if (complaint.column() <= 0 || row < 0 || row >= doc.area.document().lineCount()) {
+            return new CodeArea.Mark(complaint.line(), true, text);
+        }
+        final String line = doc.area.document().line(row);
+        final int from = Math.min(complaint.column() - 1, line.length());
+        int to = from;
+        while (to < line.length() && (Character.isLetterOrDigit(line.charAt(to)) || line.charAt(to) == '_')) {
+            to++;
+        }
+        return new CodeArea.Mark(complaint.line(), complaint.column(), Math.max(1, to - from), true, text);
     }
 
     /* What is wrong with the whole folder, not just with what is open */

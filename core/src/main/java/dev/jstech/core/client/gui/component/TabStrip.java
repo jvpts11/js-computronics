@@ -63,6 +63,21 @@ public final class TabStrip extends UiComponent {
         return this;
     }
 
+    /** Room for the close mark at the right of a tab that can be closed. */
+    private static final int CLOSE_W = 9;
+    private IntConsumer onClose;
+
+    /**
+     * Gives every tab a close mark at its right, and says what closing one does.
+     *
+     * <p>The mark takes the click that lands on it, and so does the middle button anywhere on the tab,
+     * the way an editor's tabs close; neither selects the tab first.
+     */
+    public TabStrip setCloseable(final IntConsumer action) {
+        onClose = action;
+        return this;
+    }
+
     public int selected() {
         return selected;
     }
@@ -102,15 +117,24 @@ public final class TabStrip extends UiComponent {
     @Override
     public void render(final GuiGraphics g, final UiContext ctx) {
         final List<String> current = labels();
+        final int close = onClose == null ? 0 : CLOSE_W;
         if (labelPadding >= 0) {
             final int[] measured = new int[current.size()];
             for (int i = 0; i < current.size(); i++) {
-                measured[i] = ctx.font().width(current.get(i)) + labelPadding;
+                measured[i] = ctx.font().width(current.get(i)) + labelPadding + close;
             }
             widths = measured;
         }
         for (int i = 0; i < current.size(); i++) {
-            ctx.skin().tab(g, ctx.font(), tabX(i), y(), tabWidth(i), height(), current.get(i), i == selected);
+            final int tx = tabX(i);
+            final int tw = tabWidth(i);
+            ctx.skin().tab(g, ctx.font(), tx, y(), tw - close, height(), current.get(i), i == selected);
+            if (close > 0) {
+                // The mark is part of the tab, drawn on the same ground, lit when the mouse is over it.
+                final boolean over = ctx.over(tx + tw - close, y(), close, height());
+                g.drawString(ctx.font(), "x", tx + tw - close + 2, y() + (height() - 7) / 2,
+                        over ? ctx.skin().text() : ctx.skin().dim(), false);
+            }
         }
         if (underline) {
             g.fill(x(), y() + height() - 1, x() + width(), y() + height(), ctx.skin().edge());
@@ -129,6 +153,13 @@ public final class TabStrip extends UiComponent {
             if (mx < tabX(i) + tabWidth(i)) {
                 index = i;
                 break;
+            }
+        }
+        if (onClose != null) {
+            final boolean onMark = mx >= tabX(index) + tabWidth(index) - CLOSE_W;
+            if (button == 2 || (button == 0 && onMark)) {
+                onClose.accept(index);
+                return true;
             }
         }
         if (index != selected) {

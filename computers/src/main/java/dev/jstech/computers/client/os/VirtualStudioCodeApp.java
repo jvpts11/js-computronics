@@ -96,6 +96,24 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     private java.util.function.Consumer<String> askAction = value -> { };
     private final Popup settings = new Popup("Settings", 170, 50).setLayouter(this::layoutSettings);
     private final AmountStepper tabStepper = new AmountStepper();
+    /** The question a closing tab with changes asks. */
+    private final Popup askClose = new Popup(() -> "Save changes to " + closingName() + "?", 176, 40)
+            .setLayouter(this::layoutAskClose);
+    /** The tab being closed while the question is up. */
+    private int closing = -1;
+
+    /** How close to a divider a click has to land to take hold of it. */
+    private static final int GRIP = 3;
+    /* The two dividers the player can drag: how wide the side bar is, how tall the panel is. */
+    private int sideW = SIDE_W;
+    private int panelH = PANEL_H;
+    /** Where the dividers were drawn last, so a click can find them. */
+    private int dividerX;
+    private int dividerY;
+    private int bodyTop;
+    private int bodyBottom;
+    /** Which divider the mouse is holding: 0 none, 1 the side bar's, 2 the panel's. */
+    private int holding;
 
     /** Lines to run at the terminal, one after the other as each finishes. */
     private final Deque<String> queue = new ArrayDeque<>();
@@ -118,6 +136,18 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                 .setOnClick(this::onSideRow);
         this.extensions = this.root.add(new ListView<>(() -> JsCore.languages().all(), ROW_H + 2, this::drawLanguage));
         this.tabs = this.root.add(new TabStrip(this.workspace::tabLabels).fitToLabels(10).setUnderline(false));
+        this.tabs.setCloseable(this::closeTab);
+        this.askClose.add(new Button("Save", () -> {
+            this.askClose.close();
+            this.workspace.setCurrent(this.closing);
+            this.workspace.save();
+            this.workspace.close(this.closing);
+        }).setPrimary(true));
+        this.askClose.add(new Button("Don't Save", () -> {
+            this.askClose.close();
+            this.workspace.close(this.closing);
+        }));
+        this.askClose.add(new Button("Cancel", this.askClose::close));
         this.tabs.setOnSelect(this.workspace::setCurrent);
         this.panelTabs = this.root.add(new TabStrip(PANEL_TABS).fitToLabels(12).setUnderline(true));
         this.panelTabs.setSelected(PANEL_TERMINAL);
@@ -256,8 +286,17 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                              final int x, final int y, final int width, final int height,
                              final boolean hovered, final boolean selected) {
         final int color = row.header() ? ctx.skin().dim() : ctx.skin().listRowText(selected);
-        g.drawString(ctx.font(), ctx.font().plainSubstrByWidth(row.label(), width - 2 - row.depth() * 5),
-                x + 2 + row.depth() * 5, y + 1, color, false);
+        ctx.skin().listRow(g, x, y, width, height, hovered && !row.header(), selected && !row.header());
+        int textX = x + 2 + row.depth() * 5;
+        if (!row.header()) {
+            // The icon the explorer would give the same file, so a tree reads the way the explorer does.
+            final boolean folder = row.file() != null && row.file().directory();
+            final String path = row.file() != null ? row.file().path() : row.label();
+            FileIcons.draw(g, textX, y, FileIcons.kindOfPath(path, folder));
+            textX += 12;
+        }
+        g.drawString(ctx.font(), ctx.font().plainSubstrByWidth(row.label(), x + width - 2 - textX), textX, y + 1,
+                color, false);
     }
 
     private void onSideRow(final int index, final int button, final double mx, final double my) {
@@ -335,7 +374,7 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         items.add(item("Save As...", hasDoc(), this::saveAs));
         items.add(item("Save All", this.workspace.anyDirty(), this.workspace::saveAll));
         items.add(ContextMenu.Item.separator());
-        items.add(item("Close Editor", hasDoc(), () -> this.workspace.close(this.workspace.currentIndex())));
+        items.add(item("Close Editor", hasDoc(), () -> closeTab(this.workspace.currentIndex())));
         items.add(item("Close Folder", this.folderOpen, this::closeFolder));
         items.add(item("Exit", true, () -> DesktopScreen.requestClose("Virtual Studio Code")));
         return items;
@@ -344,7 +383,8 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     private List<ContextMenu.Item> editMenu() {
         return List.of(
                 item("Find...", hasDoc(), this::find),
-                item("Toggle Line Comment", hasDoc(), this::toggleComment));
+                item("Toggle Line Comment", hasDoc(), this::toggleComment),
+                item("Implement Interface", hasDoc(), this::implementInterface));
     }
 
     private List<ContextMenu.Item> viewMenu() {
@@ -403,6 +443,7 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                 new CommandPalette.Entry("File: Close Folder", "", this::closeFolder),
                 new CommandPalette.Entry("Edit: Find...", "Ctrl+F", this::find),
                 new CommandPalette.Entry("Edit: Toggle Line Comment", "", this::toggleComment),
+                new CommandPalette.Entry("Edit: Implement Interface", "Ctrl+.", this::implementInterface),
                 new CommandPalette.Entry("View: Toggle Problems", "Ctrl+Shift+M", () -> this.panelTabs.setSelected(
                         this.panelTabs.selected() == PANEL_PROBLEMS ? PANEL_TERMINAL : PANEL_PROBLEMS)),
                 new CommandPalette.Entry("View: Explorer", "", () -> this.side = Side.EXPLORER),
@@ -475,6 +516,15 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                 this.workspace.say("No results for '" + needle + "'");
             }
         });
+    }
+
+    /** Writes the methods the class under the caret promised its interface and left out. */
+    private void implementInterface() {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null) {
+            this.workspace.say(this.workspace.implementInterface(doc) ? "Interface implemented"
+                    : "Nothing to implement here");
+        }
     }
 
     private void toggleComment() {
@@ -591,6 +641,9 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         this.askTitle = title;
         this.askAction = action;
         this.askField.set(initial);
+        // A file name opens with the caret before its extension, which is the part that gets typed over.
+        final int dot = initial.lastIndexOf('.');
+        this.askField.setCaret(dot > 0 ? dot : initial.length());
         this.ask.open();
         this.ask.focus(this.askField);
     }
@@ -598,6 +651,33 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     private void layoutAsk(final Popup p) {
         this.askField.setBounds(p.x() + 4, p.contentTop() + 3, p.width() - 8, 11);
         this.askOk.setBounds(p.right() - 38, p.bottom() - 15, 34, 11);
+    }
+
+    private String closingName() {
+        final List<CodeWorkspace.Doc> docs = this.workspace.docs();
+        return this.closing >= 0 && this.closing < docs.size() ? docs.get(this.closing).name() : "";
+    }
+
+    private void layoutAskClose(final Popup p) {
+        final List<dev.jstech.core.client.gui.component.UiComponent> c = p.children();
+        final int y = p.bottom() - 15;
+        c.get(0).setBounds(p.x() + 4, y, 40, 11);
+        c.get(1).setBounds(p.x() + 48, y, 60, 11);
+        c.get(2).setBounds(p.right() - 44, y, 40, 11);
+    }
+
+    /** Closes a tab, asking first when it has changes the disk does not. */
+    private void closeTab(final int index) {
+        final List<CodeWorkspace.Doc> docs = this.workspace.docs();
+        if (index < 0 || index >= docs.size()) {
+            return;
+        }
+        if (docs.get(index).dirty()) {
+            this.closing = index;
+            this.askClose.open();
+            return;
+        }
+        this.workspace.close(index);
     }
 
     private void layoutSettings(final Popup p) {
@@ -675,17 +755,22 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
 
         drawRail(g, x, top, bodyTotal);
         final boolean sideShown = this.folderOpen || this.side == Side.EXTENSIONS;
-        final int sideW = sideShown ? SIDE_W : 0;
+        // The dividers hold their places between frames, within what the window can afford.
+        this.sideW = Math.max(50, Math.min(width - RAIL_W - 100, this.sideW));
+        final int sideW = sideShown ? this.sideW : 0;
         if (sideShown) {
-            this.skin.panel(g, x + RAIL_W, top, SIDE_W, bodyTotal);
+            this.skin.panel(g, x + RAIL_W, top, sideW, bodyTotal);
             g.drawString(font, this.side == Side.EXTENSIONS ? "EXTENSIONS" : "EXPLORER", x + RAIL_W + 4, top + 1,
                     this.skin.dim(), false);
         }
         // A list that is not on show is hidden outright: one with no room still has rows to draw.
         this.explorer.setVisible(sideShown && this.side != Side.EXTENSIONS);
         this.extensions.setVisible(sideShown && this.side == Side.EXTENSIONS);
-        this.explorer.setBounds(x + RAIL_W, top + CAPTION_H, SIDE_W, bodyTotal - CAPTION_H);
-        this.extensions.setBounds(x + RAIL_W, top + CAPTION_H, SIDE_W, bodyTotal - CAPTION_H);
+        this.explorer.setBounds(x + RAIL_W, top + CAPTION_H, sideW, bodyTotal - CAPTION_H);
+        this.extensions.setBounds(x + RAIL_W, top + CAPTION_H, sideW, bodyTotal - CAPTION_H);
+        this.dividerX = sideShown ? x + RAIL_W + sideW : -1000;
+        this.bodyTop = top;
+        this.bodyBottom = top + bodyTotal;
 
         final int codeX = x + RAIL_W + sideW;
         final int codeW = width - RAIL_W - sideW;
@@ -703,16 +788,14 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
             this.tabs.setSelected(this.workspace.currentIndex());
             final int bodyY = top + TAB_H;
             final int bodyH = bodyTotal - TAB_H;
-            final boolean panelShown = bodyH - PANEL_H >= MIN_CODE_H;
-            final int codeH = panelShown ? bodyH - PANEL_H : bodyH;
+            this.panelH = Math.max(TAB_H + 18, Math.min(bodyH - MIN_CODE_H, this.panelH));
+            final boolean panelShown = bodyH - this.panelH >= MIN_CODE_H;
+            final int codeH = panelShown ? bodyH - this.panelH : bodyH;
             if (doc != null) {
                 doc.area().setBounds(codeX, bodyY, codeW, codeH);
             }
-            if (panelShown) {
-                layoutPanel(codeX, bodyY + codeH, codeW, PANEL_H);
-            } else {
-                layoutPanel(codeX, bodyY + codeH, codeW, 0);
-            }
+            layoutPanel(codeX, bodyY + codeH, codeW, panelShown ? this.panelH : 0);
+            this.dividerY = panelShown ? bodyY + codeH : -1000;
             if (doc == null) {
                 drawEmpty(g, font, codeX, bodyY, codeW, codeH);
             }
@@ -731,6 +814,9 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         }
         if (this.settings.isOpen()) {
             this.settings.renderIn(g, ctx, x, y, width, height);
+        }
+        if (this.askClose.isOpen()) {
+            this.askClose.renderIn(g, ctx, x, y, width, height);
         }
         this.menuBar.render(g, ctx);
     }
@@ -877,7 +963,7 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     /* Input */
 
     private boolean popupOpen() {
-        return this.picker.isOpen() || this.ask.isOpen() || this.settings.isOpen();
+        return this.picker.isOpen() || this.ask.isOpen() || this.settings.isOpen() || this.askClose.isOpen();
     }
 
     @Override
@@ -894,15 +980,16 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
             this.settings.mouseClicked(mouseX, mouseY, button);
             return;
         }
+        if (this.askClose.isOpen()) {
+            this.askClose.mouseClicked(mouseX, mouseY, button);
+            return;
+        }
         if (this.palette.isOpen()) {
             this.palette.mouseClicked(mouseX, mouseY, button);
             return;
         }
-        if (this.menuBar.isOpen() || this.menuBar.mouseClicked(mouseX, mouseY, button)) {
-            if (!this.menuBar.isOpen()) {
-                // A menu that just closed took the click; a title that just opened one took it too.
-                return;
-            }
+        // An open menu gets the click first: on one of its items, on another title, or outside to close.
+        if (this.menuBar.mouseClicked(mouseX, mouseY, button)) {
             return;
         }
         if (this.completions.mouseClicked(mouseX, mouseY, button)) {
@@ -929,6 +1016,15 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                 return;
             }
         }
+        // A click on a divider takes hold of it; the drag that follows moves it.
+        if (Math.abs(mouseX - this.dividerX) <= GRIP && mouseY >= this.bodyTop && mouseY < this.bodyBottom) {
+            this.holding = 1;
+            return;
+        }
+        if (Math.abs(mouseY - this.dividerY) <= GRIP && mouseX > this.dividerX) {
+            this.holding = 2;
+            return;
+        }
         if (this.terminal.contains(mouseX, mouseY)) {
             this.typingInTerminal = true;
         }
@@ -942,6 +1038,31 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     }
 
     @Override
+    public void mouseDragged(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        if (this.holding == 1) {
+            this.sideW = (int) (mouseX - (this.dividerX - this.sideW));
+            return;
+        }
+        if (this.holding == 2) {
+            this.panelH = (int) (this.dividerY + this.panelH - mouseY);
+            return;
+        }
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null && !modalActive()) {
+            doc.area().mouseDragged(mouseX, mouseY, button);
+        }
+    }
+
+    @Override
+    public void mouseReleased(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
+        this.holding = 0;
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null) {
+            doc.area().mouseReleased(mouseX, mouseY, button);
+        }
+    }
+
+    @Override
     public boolean charTyped(final char c) {
         if (this.picker.isOpen()) {
             return this.picker.charTyped(c);
@@ -951,6 +1072,9 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         }
         if (this.settings.isOpen()) {
             return this.settings.charTyped(c);
+        }
+        if (this.askClose.isOpen()) {
+            return this.askClose.charTyped(c);
         }
         if (this.palette.isOpen()) {
             return this.palette.charTyped(c);
@@ -981,6 +1105,9 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         }
         if (this.settings.isOpen()) {
             return this.settings.keyPressed(key, scanCode, modifiers);
+        }
+        if (this.askClose.isOpen()) {
+            return this.askClose.keyPressed(key, scanCode, modifiers);
         }
         if (this.palette.isOpen()) {
             return this.palette.keyPressed(key, scanCode, modifiers);
@@ -1022,6 +1149,14 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         }
         if (ctrl && key == GLFW.GLFW_KEY_COMMA) {
             openSettings();
+            return true;
+        }
+        if (ctrl && key == GLFW.GLFW_KEY_W) {
+            closeTab(this.workspace.currentIndex());
+            return true;
+        }
+        if (ctrl && key == GLFW.GLFW_KEY_PERIOD) {
+            implementInterface();
             return true;
         }
         if (ctrl && key == GLFW.GLFW_KEY_GRAVE_ACCENT) {

@@ -50,7 +50,10 @@ public final class Breadcrumbs extends UiComponent {
             final String label = trail.get(i).label();
             final int w = ctx.font().width(label);
             if (px + w > maxX) {
-                g.drawString(ctx.font(), "..", px, cy, ctx.skin().dim(), false);
+                // As much of the crumb as fits, so a long volume name still reads, then the dots.
+                final int room = maxX - px - ctx.font().width("..");
+                final String head = room > 0 ? ctx.font().plainSubstrByWidth(label, room) : "";
+                g.drawString(ctx.font(), head + "..", px, cy, ctx.skin().dim(), false);
                 break;
             }
             final boolean last = i == trail.size() - 1;

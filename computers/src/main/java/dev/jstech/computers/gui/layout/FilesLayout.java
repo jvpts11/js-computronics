@@ -117,12 +117,28 @@ public final class FilesLayout {
 
     /** The x where the Type column begins, measured from the window's left edge. */
     public static int typeColX(final int width) {
-        return width - SIZE_COL_W - TYPE_COL_W;
+        return typeColX(width, TYPE_COL_W, SIZE_COL_W);
     }
 
     public static int sizeColX(final int width) {
-        return width - SIZE_COL_W;
+        return sizeColX(width, SIZE_COL_W);
     }
+
+    /** The same, with the widths the player dragged the columns to. */
+    public static int typeColX(final int width, final int typeW, final int sizeW) {
+        return width - sizeW - typeW;
+    }
+
+    public static int sizeColX(final int width, final int sizeW) {
+        return width - sizeW;
+    }
+
+    public static int nameMaxW(final int width, final int typeW, final int sizeW) {
+        return typeColX(width, typeW, sizeW) - (listX() + 4 + ICON_W + 3) - 3;
+    }
+
+    /** The least a column may be dragged down to, so its heading still reads. */
+    public static final int MIN_COL_W = 26;
 
     /** The widest a name may be drawn before it runs into the Type column. */
     public static int nameMaxW(final int width) {

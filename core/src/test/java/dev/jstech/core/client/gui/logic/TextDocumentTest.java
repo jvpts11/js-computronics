@@ -165,4 +165,117 @@ class TextDocumentTest {
         assertEquals("    x = 1;", doc.text());
         assertEquals(8, doc.cursorCol());
     }
+
+    @Test
+    void selection_growsWithExtendedMovesAndReadsBackInOrder() {
+        doc.setText("one\ntwo\nthree");
+        doc.setCursor(0, 1);
+        doc.right(true);
+        doc.down(true);
+        assertTrue(doc.hasSelection());
+        assertEquals("ne\ntw", doc.selectedText());
+        assertEquals(new TextDocument.Spot(0, 1), doc.selectionStart());
+        assertEquals(new TextDocument.Spot(1, 2), doc.selectionEnd());
+        // Selecting backwards reads the same stretch forwards.
+        doc.setCursor(1, 2);
+        doc.setCursor(0, 1, true);
+        assertEquals("ne\ntw", doc.selectedText());
+        doc.left();
+        assertTrue(!doc.hasSelection(), "a plain move drops the selection");
+        doc.selectAll();
+        assertEquals("one\ntwo\nthree", doc.selectedText());
+    }
+
+    @Test
+    void typing_replacesTheSelectionAndDeleteRemovesIt() {
+        doc.setText("hello world");
+        doc.select(0, 0, 0, 5);
+        doc.insert('H');
+        assertEquals("H world", doc.text());
+        assertEquals(1, doc.cursorCol());
+        doc.select(0, 1, 0, 7);
+        doc.delete();
+        assertEquals("H", doc.text());
+        doc.setText("a\nb\nc");
+        doc.select(0, 1, 2, 0);
+        doc.backspace();
+        assertEquals("ac", doc.text());
+        assertEquals(0, doc.cursorLine());
+        assertEquals(1, doc.cursorCol());
+    }
+
+    @Test
+    void undo_takesBackARunOfTypingAndRedoPutsItBack() {
+        doc.setText("");
+        doc.insert('a');
+        doc.insert('b');
+        doc.insert('c');
+        doc.newline();
+        doc.insert('d');
+        assertEquals("abc\nd", doc.text());
+        assertTrue(doc.undo());
+        assertEquals("abc\n", doc.text(), "the letter typed after the newline is one step");
+        assertTrue(doc.undo());
+        assertEquals("abc", doc.text(), "the newline is the next");
+        assertTrue(doc.undo());
+        assertEquals("", doc.text(), "and the run of typing before it is one step, not three");
+        assertTrue(!doc.undo(), "nothing left to take back");
+        assertTrue(doc.redo());
+        assertEquals("abc", doc.text());
+        doc.insert('x');
+        assertTrue(!doc.redo(), "a new change forgets what could be put back");
+        assertEquals("abcx", doc.text());
+    }
+
+    @Test
+    void newlineIndented_keepsTheDepthAndOpensABlock() {
+        doc.setText("    if (x) {");
+        doc.setCursor(0, 12);
+        doc.newlineIndented(4);
+        assertEquals("    if (x) {\n        ", doc.text());
+        assertEquals(8, doc.cursorCol());
+        doc.setText("    foo();");
+        doc.setCursor(0, 10);
+        doc.newlineIndented(4);
+        assertEquals("    foo();\n    ", doc.text());
+        // A closing brace under the caret moves to its own line at the block's depth.
+        doc.setText("    if (x) {}");
+        doc.setCursor(0, 12);
+        doc.newlineIndented(4);
+        assertEquals("    if (x) {\n        \n    }", doc.text());
+        assertEquals(1, doc.cursorLine());
+        assertEquals(8, doc.cursorCol());
+    }
+
+    @Test
+    void indent_andOutdentMoveEverySelectedLine() {
+        doc.setText("a\nb\nc");
+        doc.select(0, 0, 1, 1);
+        doc.indent(4);
+        assertEquals("    a\n    b\nc", doc.text());
+        assertEquals(5, doc.cursorCol());
+        doc.outdent(4);
+        assertEquals("a\nb\nc", doc.text());
+        doc.clearSelection();
+        doc.setCursor(2, 0);
+        doc.indent(2);
+        assertEquals("a\nb\n  c", doc.text());
+        doc.select(0, 0, 2, 3);
+        doc.toggleLinePrefix("// ");
+        assertEquals("// a\n// b\n  // c", doc.text());
+        doc.toggleLinePrefix("// ");
+        assertEquals("a\nb\n  c", doc.text());
+    }
+
+    @Test
+    void home_goesToTheTextThenToTheLineStart() {
+        doc.setText("    x = 1;");
+        doc.setCursor(0, 9);
+        doc.home(false);
+        assertEquals(4, doc.cursorCol());
+        doc.home(false);
+        assertEquals(0, doc.cursorCol());
+        doc.end(true);
+        assertEquals("    x = 1;", doc.selectedText());
+    }
 }

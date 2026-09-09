@@ -68,4 +68,58 @@ public class TextEditStateTest {
         state.sync(null);
         assertEquals("", state.value());
     }
+
+    @Test
+    public void caret_startsAfterTheTextAndMovesWithinIt() {
+        final TextEditState state = new TextEditState(16);
+        state.sync("file.can");
+        assertEquals(8, state.caret());
+        state.left();
+        state.left();
+        assertEquals(6, state.caret());
+        state.home();
+        assertEquals(0, state.caret());
+        state.left();
+        assertEquals(0, state.caret(), "the caret never leaves the text on the left");
+        state.end();
+        state.right();
+        assertEquals(8, state.caret(), "nor on the right");
+        state.setCaret(4);
+        assertEquals(4, state.caret());
+        state.setCaret(99);
+        assertEquals(8, state.caret(), "a place past the end is the end");
+    }
+
+    @Test
+    public void type_insertsAtTheCaretAndBackspaceDeleteWorkAroundIt() {
+        final TextEditState state = new TextEditState(16);
+        state.sync("file.can");
+        state.setCaret(4);
+        state.type('s');
+        assertEquals("files.can", state.edit());
+        assertEquals(5, state.caret());
+        state.backspace();
+        assertEquals("file.can", state.edit());
+        assertEquals(4, state.caret());
+        state.delete();
+        assertEquals("filecan", state.edit());
+        assertEquals(4, state.caret(), "delete takes what is after the caret and leaves it where it was");
+        state.home();
+        state.backspace();
+        assertEquals("filecan", state.edit(), "nothing before the caret, nothing removed");
+        state.end();
+        state.delete();
+        assertEquals("filecan", state.edit(), "nothing after the caret, nothing removed");
+    }
+
+    @Test
+    public void revert_putsTheCaretBackAfterTheValue() {
+        final TextEditState state = new TextEditState(16);
+        state.sync("abc");
+        state.home();
+        state.type('x');
+        state.revert();
+        assertEquals("abc", state.edit());
+        assertEquals(3, state.caret());
+    }
 }

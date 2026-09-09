@@ -60,12 +60,34 @@ public final class ContextMenu extends UiComponent {
     public void open(final List<Item> entries, final int x, final int y, final int boundX, final int boundY,
                      final int boundW, final int boundH) {
         items = List.copyOf(entries);
-        final int h = items.size() * itemHeight + 2;
-        final int mx = Math.max(boundX, Math.min(x, boundX + boundW - itemWidth - 1));
-        final int my = Math.max(boundY, Math.min(y, boundY + boundH - h - 1));
-        setBounds(mx, my, itemWidth, h);
+        this.anchorX = x;
+        this.anchorY = y;
+        this.boundX = boundX;
+        this.boundY = boundY;
+        this.boundW = boundW;
+        this.boundH = boundH;
+        place(itemWidth);
+        measured = false;
         open = true;
         selected = next(-1, 1);
+    }
+
+    /* Where the menu was asked to open, kept so it can be placed again once its labels are measured. */
+    private int anchorX;
+    private int anchorY;
+    private int boundX;
+    private int boundY;
+    private int boundW;
+    private int boundH;
+    /** Whether the labels have been measured with a font; a menu is drawn before it can be clicked. */
+    private boolean measured = true;
+
+    /** Puts the menu at its anchor, {@code w} wide, moved as needed to stay inside its bounds. */
+    private void place(final int w) {
+        final int h = items.size() * itemHeight + 2;
+        final int mx = Math.max(boundX, Math.min(anchorX, boundX + boundW - w - 1));
+        final int my = Math.max(boundY, Math.min(anchorY, boundY + boundH - h - 1));
+        setBounds(mx, my, w, h);
     }
 
     public void close() {
@@ -123,6 +145,20 @@ public final class ContextMenu extends UiComponent {
     public void render(final GuiGraphics g, final UiContext ctx) {
         if (!open) {
             return;
+        }
+        /*
+         * The menu is as wide as its widest label: a label that does not fit is a menu the player
+         * cannot read. The font is only known here, so the measuring waits for the first drawing.
+         */
+        if (!measured) {
+            int widest = itemWidth;
+            for (final Item item : items) {
+                if (!item.isSeparator()) {
+                    widest = Math.max(widest, ctx.font().width(item.label()) + 10);
+                }
+            }
+            place(widest);
+            measured = true;
         }
         g.fill(x() - 1, y() - 1, right() + 1, bottom() + 1, 0xFF000000);
         g.fill(x(), y(), right(), bottom(), ctx.skin().panelBg());

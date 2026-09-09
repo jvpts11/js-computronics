@@ -125,18 +125,46 @@ public class TextField extends UiComponent {
         final boolean focused = isFocused();
         ctx.skin().field(g, x(), y(), width(), height(), focused);
         final String shown = focused ? state.edit() : state.value();
-        final String text;
-        int color = ctx.skin().text();
+        final int textY = y() + (height() - 7) / 2;
         if (focused) {
+            /*
+             * The caret has to stay in view: when the text is wider than the field, what is shown is
+             * the stretch that ends at the caret, or the whole text when it fits.
+             */
             final String tail = suffix.get();
-            text = Texts.tail(ctx.font(), shown, width() - 8 - ctx.font().width(tail)) + "_" + tail;
-        } else if (shown.isEmpty()) {
-            text = Texts.clip(ctx.font(), placeholder.get(), width() - 6);
-            color = ctx.skin().dim();
-        } else {
-            text = Texts.clip(ctx.font(), shown, width() - 6);
+            final int avail = width() - 8 - ctx.font().width(tail);
+            final int caret = state.caret();
+            int offset = 0;
+            while (offset < caret && ctx.font().width(shown.substring(offset, caret)) > avail) {
+                offset++;
+            }
+            final String visible = Texts.clip(ctx.font(), shown.substring(offset), avail);
+            g.drawString(ctx.font(), visible, x() + 3, textY, ctx.skin().text(), false);
+            final int caretX = x() + 3 + ctx.font().width(shown.substring(offset, caret));
+            g.fill(caretX, textY - 1, caretX + 1, textY + 8, ctx.skin().text());
+            if (!tail.isEmpty()) {
+                g.drawString(ctx.font(), tail, x() + 3 + ctx.font().width(visible) + 1, textY, ctx.skin().dim(), false);
+            }
+            return;
         }
-        g.drawString(ctx.font(), text, x() + 3, y() + (height() - 7) / 2, color, false);
+        if (shown.isEmpty()) {
+            g.drawString(ctx.font(), Texts.clip(ctx.font(), placeholder.get(), width() - 6), x() + 3, textY,
+                    ctx.skin().dim(), false);
+        } else {
+            g.drawString(ctx.font(), Texts.clip(ctx.font(), shown, width() - 6), x() + 3, textY,
+                    ctx.skin().text(), false);
+        }
+    }
+
+    /** Puts the caret at {@code index}: before the extension of a file name, say. */
+    public TextField setCaret(final int index) {
+        state.setCaret(index);
+        return this;
+    }
+
+    /** Where the caret is: how many characters of the edit sit before it. */
+    public int caret() {
+        return state.caret();
     }
 
     @Override
@@ -166,6 +194,14 @@ public class TextField extends UiComponent {
                 state.backspace();
                 edited();
             }
+            case GLFW.GLFW_KEY_DELETE -> {
+                state.delete();
+                edited();
+            }
+            case GLFW.GLFW_KEY_LEFT -> state.left();
+            case GLFW.GLFW_KEY_RIGHT -> state.right();
+            case GLFW.GLFW_KEY_HOME -> state.home();
+            case GLFW.GLFW_KEY_END -> state.end();
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_TAB -> blur();
             case GLFW.GLFW_KEY_ESCAPE -> {
                 if (revertOnEscape) {

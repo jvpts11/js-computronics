@@ -235,8 +235,11 @@ public final class CannonEditorClientTests {
                         SCREEN_WAIT, "the listing to be where the project file says", level -> "")
                 .thenScreenshot(2, "built")
                 .then(SETTLE, () -> studio(ctx).startProgram())
-                .thenWaitUntil(() -> terminalText(ctx).contains("Hello from Hello"),
-                        SCREEN_WAIT * 3, "the started program to print its line at the terminal")
+                // Start runs at the studio's own terminal, in its dock, not in a window of its own.
+                .thenWaitUntil(() -> studio(ctx).terminalText().contains("Hello from Hello"),
+                        SCREEN_WAIT * 3, "the started program to print its line at the studio's terminal")
+                .thenAssert(0, () -> app(ctx, TERMINAL, ShellApp.class) == null,
+                        "no terminal window opened for it")
                 .thenScreenshot(2, "started");
     }
 }
