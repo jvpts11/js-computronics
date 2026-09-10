@@ -14,8 +14,6 @@ import dev.jstech.computers.operation.payload.CraftCatalogPayload;
 import dev.jstech.computers.operation.payload.CraftPlanPayload;
 import dev.jstech.computers.operation.payload.CraftPlanRequestPayload;
 import dev.jstech.computers.operation.payload.CraftSubmitPayload;
-import dev.jstech.computers.operation.payload.DesktopShellOutputPayload;
-import dev.jstech.computers.operation.payload.DesktopShellRunPayload;
 import dev.jstech.computers.operation.payload.ItemRecipesPayload;
 import dev.jstech.computers.operation.payload.NetworkInteractorPayload;
 import dev.jstech.computers.operation.payload.NetworkItemEntry;
@@ -31,12 +29,10 @@ import dev.jstech.computers.operation.payload.RequestNiOperationsPayload;
 import dev.jstech.computers.operation.payload.RequestNiServersPayload;
 import dev.jstech.computers.operation.payload.SetSettingPayload;
 import dev.jstech.computers.program.OperationPalette;
-import dev.jstech.computers.program.cli.CliStyle;
 import dev.jstech.computers.storage.StorageKey;
 import dev.jstech.core.client.gui.component.Button;
 import dev.jstech.core.client.gui.component.CellGrid;
 import dev.jstech.core.client.gui.component.Checkbox;
-import dev.jstech.core.client.gui.component.CommandLine;
 import dev.jstech.core.client.gui.component.ContextMenu;
 import dev.jstech.core.client.gui.component.Draw;
 import dev.jstech.core.client.gui.component.Label;
@@ -49,6 +45,7 @@ import dev.jstech.core.client.gui.component.TabStrip;
 import dev.jstech.core.client.gui.component.Texts;
 import dev.jstech.core.client.gui.component.UiComponent;
 import dev.jstech.core.client.gui.component.UiContext;
+import dev.jstech.core.gui.layout.DesktopZ;
 import dev.jstech.core.operation.OperationPriority;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.Font;
@@ -64,10 +61,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -86,8 +81,12 @@ import java.util.TreeSet;
  * container slots inside a fixed, framed band pinned just above the footer: the desktop menu owns the 36
  * slots and the desktop screen positions them over that band, so the vanilla container drives the cursor,
  * drag, and shift-click. This app paints the inventory frame and slot backgrounds; the screen renders the
- * items and cursor on top. The item grid above the band scrolls its items when there are more than fit. An
- * embedded console still runs ad-hoc operations through the same path as the Shell.
+ * items and cursor on top. The item grid above the band scrolls its items when there are more than fit.
+ *
+ * <p>Every zone has a boundary of its own, drawn by the desktop's skin: the toolbar on its band, the grid in
+ * a sunken well of drawn cells under its caption, the inventory in a second well, the details in a framed
+ * panel with a header strip (and the network's own card when nothing is chosen), and a status bar with a
+ * storage gauge.
  *
  * <p>The grid is also driven from the keyboard (a dotted cell marks where it is), filtered by the mod that
  * made the item and by its category, and starred into a Favourites tab the machine keeps. Two grips reshape
@@ -173,9 +172,6 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
 
     private static NetworkInteractorApp active;
 
-    private record Line(String text, int color) {
-    }
-
     private final BlockPos host;
     private final BlockPos monitorPos;
     private OsSkin skin = OsSkin.fallback();
@@ -188,7 +184,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private final Set<String> favourites = new LinkedHashSet<>();
     private boolean online;
     private long usedItems;
+    private long capacityItems;
     private int serverCount;
+    /** Whether the last frame showed the network's card, which wants the live operations too. */
+    private boolean cardShown;
 
     /** How the grid is ordered: 0 by name, 1 most stored first, 2 least stored first. */
     private int sortMode = lastSort;
@@ -242,7 +241,6 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private final Map<StorageKey, ItemRecipesPayload> recipes = new HashMap<>();
     private final Set<StorageKey> recipesAsked = new HashSet<>();
 
-    private final Deque<Line> output = new ArrayDeque<>();
     private int contentW = 280;
     private int contentH = 188;
     // Geometry of the last frame: where the content sits on the desktop and where the cursor was.
@@ -299,10 +297,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     private final CellGrid grid;
     private final ScrollBar gridBar;
     private final ListView<OperationRecord> opList;
-    private final Label usageLabel;
-    private final Label statusLabel;
     private final Label hintLabel;
-    private final CommandLine console;
     private final Button detailRequest;
     private final Button detailCraft;
     private final Button detailStar;
@@ -322,17 +317,19 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         modButton = root.add(new Button(this::modLabel, this::openModFilter).setLabelScale(Texts.SMALL));
         categoryButton = root.add(new Button(this::categoryLabel, this::openCategoryFilter).setLabelScale(Texts.SMALL));
         sortButton = root.add(new Button(this::sortLabel, this::cycleSort).setLabelScale(Texts.SMALL));
+        /*
+         * The cells are drawn by the renderer over the skin's row backgrounds (hover and selection in the
+         * era's colours), not as wells: the well is the whole field the grid sits in.
+         */
         grid = root.add(new CellGrid(INV_COLS, 1, 1, CELL)
-                .setInset(2)
+                .setInset(0)
+                .setWells(false)
+                .setSelected(this::isSelectedIndex)
                 .setRenderer(this::renderGridCell)
                 .setOnClick(this::gridCellClicked));
         gridBar = root.add(new ScrollBar(grid::maxScroll, grid::scroll, v -> grid.setScroll(v)));
         opList = root.add(new ListView<OperationRecord>(this::allOps, OP_ROW_H, this::renderOpRow).setOnClick(this::opClicked));
-        usageLabel = root.add(new Label(this::usageText, Label.Tone.DIM).setAlign(Label.Align.RIGHT));
-        statusLabel = root.add(new Label(this::statusText).setColor(this::statusColor));
         hintLabel = root.add(new Label(this::hintText, Label.Tone.DIM).setScale(Texts.SMALL));
-        console = root.add(new CommandLine(DesktopShellRunPayload.MAX_LEN - 1, this::runCommand)
-                .setIdle(this::lastOutputText, this::lastOutputColor));
         detailRequest = root.add(new Button("Request", this::detailRequestPressed).setLabelScale(Texts.SMALL));
         detailCraft = root.add(new Button("Craft", this::detailCraftPressed).setLabelScale(Texts.SMALL));
         detailStar = root.add(new Button(STAR, this::detailStarPressed).setLabelScale(Texts.SMALL));
@@ -359,7 +356,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
 
     private void request() {
         PacketDistributor.sendToServer(new RequestNetworkInteractorPayload(host, monitorPos));
-        if (tab == TAB_OPS) {
+        if (tab == TAB_OPS || cardShown) {
             requestOps();
         }
     }
@@ -439,25 +436,8 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         active.recipesAsked.clear();
         active.online = payload.mainframeOnline();
         active.usedItems = payload.usedItems();
+        active.capacityItems = payload.capacityItems();
         active.serverCount = payload.serverCount();
-    }
-
-    /** Routes an embedded-console output reply to the open Network Interactor window. */
-    public static void acceptConsole(final DesktopShellOutputPayload payload) {
-        if (active == null) {
-            return;
-        }
-        // A reply to another window's line is not this box's to show.
-        if (payload.session() != 0 && payload.session() != active.session) {
-            return;
-        }
-        if (payload.clear()) {
-            active.output.clear();
-        }
-        for (final DesktopShellOutputPayload.WireLine line : payload.lines()) {
-            active.pushOutput(line.text(), colorOf(line.style()));
-        }
-        active.request(); // an operation may have changed the network; refresh the grid
     }
 
     /** Delivers a craft plan (need/have rows, and the recipes to choose from) to the open NI's craft popup. */
@@ -506,13 +486,6 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             active.activeOps.addAll(ops);
             active.scSlotsUsed = scSlotsUsed;
             active.scSlotsTotal = scSlotsTotal;
-        }
-    }
-
-    private void pushOutput(final String text, final int color) {
-        output.addLast(new Line(text, color));
-        while (output.size() > 64) {
-            output.removeFirst();
         }
     }
 
@@ -647,8 +620,10 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         tabs.setBounds(x, y, width, TAB_H);
         tabs.setSelected(tab);
 
-        // Search + filters + sort (fixed header, grid tabs only).
+        // The toolbar band under the tabs: search + filters + sort sit on it (grid tabs only).
         final boolean onGrid = gridTab();
+        g.fill(x, y + TAB_H, x + width, y + NetworkInteractorLayout.HEADER_H, skin.panelBg());
+        g.fill(x, y + NetworkInteractorLayout.HEADER_H - 1, x + width, y + NetworkInteractorLayout.HEADER_H, skin.edge());
         search.setBounds(x + z.searchX(), y + z.searchY(), z.searchW(), SEARCH_H);
         search.setVisible(onGrid);
         modButton.setBounds(x + z.modX(), y + z.searchY(), z.modW(), SEARCH_H);
@@ -661,83 +636,70 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         sortButton.setVisible(onGrid);
 
         /*
-         * The grid zone: the tab body between the fixed header and the grip strip. The grid scrolls its
-         * ITEMS, not its pixels: the rows shown change.
+         * The grid zone: a captioned, sunken well between the toolbar and the grip strip. Every cell that fits
+         * is drawn, empty ones too, so the field reads as a storage grid; the grid scrolls its ITEMS, not its
+         * pixels: the rows shown change.
          */
         final int gridTop = y + z.gridY();
         final int gridRows = Math.max(1, z.gridRows());
-        grid.setColumns(z.gridCols()).setVisibleRows(gridRows).setTotalRows(totalItemRows(z)).setCellCount(gridCount());
+        final int shownCells = z.gridRows() * z.gridCols();
+        grid.setColumns(z.gridCols()).setVisibleRows(gridRows).setTotalRows(totalItemRows(z))
+                .setCellCount(Math.max(gridCount(), (grid.scroll() + z.gridRows()) * z.gridCols()));
         grid.place(x + z.gridX(), gridTop);
         grid.setVisible(onGrid && z.gridH() > 0);
-        gridBar.setBounds(x + width - SCROLLBAR_W, gridTop, SCROLLBAR_W, z.gridH());
+        gridBar.setBounds(x + z.wellX() + z.wellW() - NetworkInteractorLayout.INV_PAD + 1, gridTop, SCROLLBAR_W, z.gridH());
         gridBar.setVisible(onGrid && z.gridH() > 0 && grid.maxScroll() > 0);
         // The list stops short of the vertical grip, so a press on the grip drags it instead of picking a row.
-        opList.setBounds(x + z.gridX(), gridTop, z.gripX() - 1 - z.gridX(), Math.max(OP_ROW_H, z.gridH()));
+        opList.setBounds(x + z.gridX(), gridTop, z.gridW(), Math.max(OP_ROW_H, z.gridH()));
         opList.setVisible(tab == TAB_OPS && z.gridH() > 0 && !allOps().isEmpty());
         clampKeyCell();
 
-        // What the body says when there are no cells or rows to show, clipped to the zone.
-        if (z.gridH() > 0) {
-            Draw.pushScissor(g, x, gridTop, x + width, gridTop + z.gridH());
-            switch (tab) {
-                case TAB_STATUS -> renderStatus(g, font, x + 4, gridTop + 2);
-                case TAB_CRAFTING -> {
-                    if (filteredCrafts().isEmpty()) {
-                        // Two lines, each wrapped to the grid width so the hint never truncates mid-word.
-                        final String msg = !search.query().isEmpty() || filtering()
-                                ? "No crafts match the search and filters."
-                                : "No patterns on the network. Load .craft files on a Crafting Computer.";
-                        drawWrapped(g, font, msg, x + 6, gridTop + 2, z.gridW() - 4, skin.dim());
-                    }
+        if (tab == TAB_STATUS) {
+            // The Status tab is the network's card at full width, the same card the details show when idle.
+            renderStatusTab(g, font, x, y, z);
+        } else {
+            renderCaption(g, font, x, y, z);
+            skin.field(g, x + z.wellX(), y + z.wellY(), z.wellW(), z.wellH(), false);
+            // What the well says when there are no cells or rows to show, clipped to it.
+            if (z.gridH() > 0) {
+                Draw.pushScissor(g, x + z.gridX(), gridTop, x + z.gridX() + z.gridW(), gridTop + z.gridH());
+                final String msg = emptyMessage();
+                if (msg != null && shownCells > 0) {
+                    drawWrapped(g, font, msg, x + z.gridX() + 2, gridTop + 2, z.gridW() - 4, skin.dim());
                 }
-                case TAB_FAV -> {
-                    if (gridEntries().isEmpty()) {
-                        final String msg = favourites.isEmpty()
-                                ? "Nothing starred yet. Press F on an item, or its star in the details."
-                                : "No favourites match the search and filters.";
-                        drawWrapped(g, font, msg, x + 6, gridTop + 2, z.gridW() - 4, skin.dim());
-                    }
+                if (tab == TAB_OPS) {
+                    renderOpsHeader(g, font, x + z.gridX(), gridTop);
                 }
-                case TAB_OPS -> renderOpsHeader(g, font, x + z.gridX(), gridTop);
-                default -> {
-                    if (gridEntries().isEmpty()) {
-                        g.drawString(font, "(empty)", x + 6, gridTop + 2, skin.dim(), false);
-                    }
-                }
+                Draw.popScissor(g);
             }
-            Draw.popScissor(g);
         }
 
         /*
-         * The framed inventory band: a pinned panel with the shown slot backgrounds; the desktop screen draws
+         * The inventory well: a pinned, sunken field with the shown slot backgrounds; the desktop screen draws
          * the real container items and the cursor over it. Always fully visible, never clipped.
          */
         renderGrips(g, font, x, y, z);
         renderInventoryBand(g, font, x, y, z);
 
-        // Item details panel (right column): the item in view, or the selected Operation on the Ops tab.
+        // The details panel (right column): the item in view, the selection, the network's card, or the
+        // selected Operation on the Ops tab.
         final boolean detailButtons = tab != TAB_OPS && tab != TAB_STATUS;
         detailRequest.setVisible(false);
         detailCraft.setVisible(false);
         detailStar.setVisible(false);
+        cardShown = false;
         if (tab == TAB_OPS) {
             renderOpDetails(g, font, x, y, z);
-        } else {
+        } else if (tab != TAB_STATUS) {
             renderDetails(g, font, x, y, z, mouseX, mouseY, detailButtons);
         }
 
-        // Status line (fixed footer): usage right-aligned, the left label clipped so it never overruns.
-        final int statusY = y + z.statusY();
-        final int usageW = font.width(usageText());
-        usageLabel.setBounds(x + width - 3 - usageW, statusY + 1, usageW, 8);
-        statusLabel.setBounds(x + 3, statusY + 1, width - 3 - usageW - 4 - 3, 8);
+        // The status bar (fixed footer), then the hint line under it.
+        renderStatusBar(g, font, x, y + z.statusY(), width);
         hintLabel.setBounds(x + 3, y + z.hintY(), width - 6, NetworkInteractorLayout.HINT_H);
 
-        // Embedded console (fixed footer).
-        final int cy = y + z.consoleY();
-        console.setBounds(x, cy - 1, width, y + height - (cy - 1));
-
         root.render(g, ctx);
+        renderToolbarMarks(g);
         if (marquee) {
             // The rubber band, over the grid: a faint fill with the accent around it.
             final int x0 = Math.min(pressX, bandX);
@@ -747,6 +709,135 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             g.fill(x0, y0, x1, y1, 0x334A90E2);
             Draw.outline(g, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0), skin.accent());
         }
+    }
+
+    /** What the well says when the active tab has nothing to list, or null when it has. */
+    @Nullable
+    private String emptyMessage() {
+        return switch (tab) {
+            case TAB_CRAFTING -> filteredCrafts().isEmpty()
+                    ? (!search.query().isEmpty() || filtering()
+                            ? "No crafts match the search and filters."
+                            : "No patterns on the network. Load .craft files on a Crafting Computer.")
+                    : null;
+            case TAB_FAV -> gridEntries().isEmpty()
+                    ? (favourites.isEmpty()
+                            ? "Nothing starred yet. Press F on an item, or its star in the details."
+                            : "No favourites match the search and filters.")
+                    : null;
+            case TAB_NETWORK, TAB_LOCAL -> gridEntries().isEmpty()
+                    ? (!search.query().isEmpty() || filtering() ? "Nothing matches the search and filters."
+                            : (tab == TAB_LOCAL ? "Nothing on this computer's disks." : "Nothing on the network."))
+                    : null;
+            default -> null;
+        };
+    }
+
+    /** The caption strip over the well: what the tab lists and how much of it. */
+    private void renderCaption(final GuiGraphics g, final Font font, final int x, final int y,
+                               final NetworkInteractorLayout.Zones z) {
+        final int cx = x + z.wellX();
+        final int cy = y + z.capY();
+        Texts.small(g, font, gridCaption(), cx + 1, cy, skin.dim());
+        final String right = captionCount();
+        Texts.small(g, font, right, cx + z.wellW() - 1 - Texts.smallWidth(font, right), cy, skin.dim());
+    }
+
+    /** The caption's left side: the tab's name for what it lists. */
+    private String gridCaptionText() {
+        return switch (tab) {
+            case TAB_LOCAL -> "LOCAL STORAGE";
+            case TAB_CRAFTING -> "CRAFTABLE";
+            case TAB_FAV -> "FAVOURITES";
+            case TAB_OPS -> "OPERATIONS";
+            default -> "NETWORK STORAGE";
+        };
+    }
+
+    /** The caption's right side: the count of what the tab lists. */
+    private String captionCount() {
+        return switch (tab) {
+            case TAB_LOCAL -> localItems.size() + " types";
+            case TAB_CRAFTING -> crafts.size() + (crafts.size() == 1 ? " recipe" : " recipes");
+            case TAB_FAV -> favourites.size() + " starred";
+            case TAB_OPS -> activeOps.size() + " live · " + recentOps.size() + " recent";
+            default -> networkItems.size() + " types · " + dataLabel(usedItems);
+        };
+    }
+
+    /** The status bar: the Mainframe, the counts, and the storage gauge, in segments. */
+    private void renderStatusBar(final GuiGraphics g, final Font font, final int x, final int y, final int width) {
+        final int h = NetworkInteractorLayout.STATUS_H;
+        skin.statusBar(g, x, y, width, h);
+        final int ty = y + 2;
+        int sx = x + 3;
+        sx = statusSegment(g, font, sx, ty, online ? "● Mainframe online" : "○ Mainframe offline",
+                online ? ONLINE_GREEN : OFFLINE_RED, y, h);
+        sx = statusSegment(g, font, sx, ty, networkItems.size() + " types", skin.text(), y, h);
+        statusSegment(g, font, sx, ty, serverCount + (serverCount == 1 ? " server" : " servers"), skin.text(), y, h);
+        // The storage gauge, right: a small bar and the figures.
+        final String figures = capacityItems > 0 ? dataLabel(usedItems) + " / " + dataLabel(capacityItems)
+                : dataLabel(usedItems) + " stored";
+        final int fw = Texts.smallWidth(font, figures);
+        final int fx = x + width - 3 - fw;
+        Texts.small(g, font, figures, fx, ty, skin.dim());
+        if (capacityItems > 0) {
+            final int bw = 30;
+            final int bx = fx - 4 - bw;
+            g.fill(bx, ty + 1, bx + bw, ty + 6, skin.fieldBg());
+            Draw.outline(g, bx, ty + 1, bw, 5, skin.edge());
+            final int fill = (int) Math.min(bw - 2, Math.round((bw - 2) * (double) usedItems / capacityItems));
+            g.fill(bx + 1, ty + 2, bx + 1 + fill, ty + 5, gaugeColor());
+        }
+    }
+
+    /** Draws one status segment and returns where the next begins; a thin rule closes it. */
+    private int statusSegment(final GuiGraphics g, final Font font, final int sx, final int ty, final String text,
+                              final int color, final int barY, final int barH) {
+        Texts.small(g, font, text, sx, ty, color);
+        final int end = sx + Texts.smallWidth(font, text) + 5;
+        g.fill(end, barY + 2, end + 1, barY + barH - 1, halfEdge());
+        return end + 5;
+    }
+
+    /** The gauge's colour: green with room, amber past three quarters, red when nearly full. */
+    private int gaugeColor() {
+        if (capacityItems <= 0) {
+            return ONLINE_GREEN;
+        }
+        final double share = (double) usedItems / capacityItems;
+        return share >= 0.95 ? SHORT_RED : share >= 0.75 ? AMBER : ONLINE_GREEN;
+    }
+
+    /** The skin's edge at half strength: the rules inside a panel, the cell separators. */
+    private int halfEdge() {
+        return (skin.edge() & 0x00FFFFFF) | 0x60000000;
+    }
+
+    /** The toolbar's small marks, drawn after the tree: the search's magnifier and the drop-downs' carets. */
+    private void renderToolbarMarks(final GuiGraphics g) {
+        if (!gridTab()) {
+            return;
+        }
+        if (!search.isFocused() && search.edit().isEmpty()) {
+            // A magnifier at the field's right end: a ring and a handle, in the placeholder's tone.
+            final int mx = search.right() - 10;
+            final int my = search.y() + 3;
+            Draw.outline(g, mx, my, 5, 5, skin.dim());
+            g.fill(mx + 4, my + 4, mx + 5, my + 5, skin.dim());
+            g.fill(mx + 5, my + 5, mx + 7, my + 7, skin.dim());
+        }
+        caret(g, modButton);
+        caret(g, categoryButton);
+    }
+
+    /** A small downward caret at a drop-down button's right end. */
+    private void caret(final GuiGraphics g, final Button button) {
+        final int cx = button.right() - 7;
+        final int cy = button.y() + button.height() / 2 - 1;
+        g.fill(cx, cy, cx + 5, cy + 1, skin.dim());
+        g.fill(cx + 1, cy + 1, cx + 4, cy + 2, skin.dim());
+        g.fill(cx + 2, cy + 2, cx + 3, cy + 3, skin.dim());
     }
 
     private void selectTab(final int index) {
@@ -944,14 +1035,23 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return (gridCount() + cols - 1) / cols;
     }
 
+    /** Whether the cell at {@code index} holds a selected key, for the grid's row backgrounds. */
+    private boolean isSelectedIndex(final int index) {
+        final StorageKey key = keyAt(index);
+        return key != null && selected.contains(key);
+    }
+
+    /**
+     * One cell of the well: a light separator around it (drawn for empty cells too, so the field reads as a
+     * grid), then the item with its count in the corner, the star, the craftable's availability mark, and
+     * the keyboard's dotted frame.
+     */
     private void renderGridCell(final GuiGraphics g, final UiContext ctx, final int index, final int cx, final int cy,
                                 final int size, final int cellHeight, final boolean hovered) {
-        final StorageKey selectedKey = keyAt(index);
-        if (selectedKey != null && selected.contains(selectedKey)) {
-            // A selected cell is tinted under its item, the way a selected row in a list is.
-            g.fill(cx + 1, cy + 1, cx + size - 1, cy + cellHeight - 1, 0x663A72B0);
-        }
+        Draw.outline(g, cx, cy, size, cellHeight, halfEdge());
         final StorageKey key;
+        String count = null;
+        int mark = 0;
         if (tab == TAB_CRAFTING) {
             final List<CraftCatalogPayload.Entry> list = filteredCrafts();
             if (index >= list.size()) {
@@ -959,13 +1059,11 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             }
             final CraftCatalogPayload.Entry e = list.get(index);
             DesktopItems.item(g, e.result(), cx + 1, cy + 1);
-            // Availability dot (green/amber/red), top-right.
-            final int dot = switch (e.availability()) {
+            mark = switch (e.availability()) {
                 case CraftCatalogPayload.DOT_GREEN -> 0xFF3CC75A;
                 case CraftCatalogPayload.DOT_AMBER -> AMBER;
                 default -> 0xFFD05050;
             };
-            g.fill(cx + size - 4, cy + 1, cx + size, cy + 5, dot);
             key = StorageKey.of(e.result());
         } else {
             final List<NetworkItemEntry> items = gridEntries();
@@ -973,16 +1071,32 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
                 return;
             }
             final NetworkItemEntry e = items.get(index);
-            // The count rides just in front of the model, both inside this window's depth band.
-            DesktopItems.data(g, ctx.font(), e.key(), cx + 1, cy + 1, e.total() > 0 ? formatCount(e.total()) : null);
+            DesktopItems.data(g, ctx.font(), e.key(), cx + 1, cy + 1, null);
+            count = e.total() > 0 ? formatCount(e.total()) : null;
             key = e.key();
+        }
+        final boolean chosen = selected.contains(key);
+        // What sits in front of the model rides at the count's depth, like the vanilla count does.
+        g.pose().pushPose();
+        g.pose().translate(0.0F, 0.0F, DesktopZ.countOffset());
+        if (count != null) {
+            final int w = Texts.smallWidth(ctx.font(), count);
+            final int tx = cx + size - w - 1;
+            final int ty = cy + cellHeight - 8;
+            g.fill(tx - 1, ty - 1, tx + w + 1, ty + 7, chosen ? 0x00000000 : (skin.fieldBg() & 0x00FFFFFF) | 0xC0000000);
+            Texts.small(g, ctx.font(), count, tx, ty, skin.listRowText(chosen));
+        }
+        if (mark != 0) {
+            // The availability mark: a small colour tab in the count's corner.
+            g.fill(cx + size - 6, cy + cellHeight - 4, cx + size - 1, cy + cellHeight - 1, mark);
         }
         if (favourites.contains(key.id())) {
             Texts.small(g, ctx.font(), STAR, cx + 1, cy, STAR_GOLD);
         }
         if (index == keyCell) {
-            dottedOutline(g, cx, cy, size, cellHeight, STAR_GOLD);
+            dottedOutline(g, cx + 1, cy + 1, size - 2, cellHeight - 2, STAR_GOLD);
         }
+        g.pose().popPose();
     }
 
     /** A dotted rectangle: the keyboard's cell, told from the mouse's lit one. */
@@ -1002,6 +1116,11 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
      * the anchor join); a second click on the same cell within the double-click time opens it.
      */
     private void gridCellClicked(final int index, final int button, final boolean shift) {
+        if (keyAt(index) == null) {
+            // A drawn but empty cell: the press is on the well's empty part, and is treated as such.
+            cellHit = false;
+            return;
+        }
         final boolean control = Screen.hasControlDown();
         final long now = System.currentTimeMillis();
         final boolean second = button == 0 && !shift && !control && index == lastClickCell
@@ -1179,9 +1298,9 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
 
     private void renderGrips(final GuiGraphics g, final Font font, final int x, final int y,
                              final NetworkInteractorLayout.Zones z) {
-        // The horizontal grip strip: the band's label at the left, the grip mark in the middle.
+        // The horizontal grip strip: the well's caption at the left, the grip mark in the middle.
         final int sy = y + z.gripY();
-        g.drawString(font, "Inventory", x + z.invBandX() + 3, sy, skin.dim(), false);
+        Texts.small(g, font, "INVENTORY", x + z.invBandX() + 1, sy + 1, skin.dim());
         final int hx = x + z.invBandX() + z.invBandW() / 2 - 10;
         final int hover = dragGrip == 2 || NetworkInteractorLayout.onHorizontalGrip(lastMouseX - x, lastMouseY - y, z)
                 ? skin.accent() : skin.edge();
@@ -1189,7 +1308,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         g.fill(hx, sy + 5, hx + 20, sy + 6, hover);
         // The vertical grip: between the left column and the details panel, its mark half way down.
         final int vx = x + z.gripX() + NetworkInteractorLayout.GAP / 2 - 1;
-        final int vy = y + z.gridY() + (z.invBandY() + z.invBandH() - z.gridY()) / 2 - 10;
+        final int vy = y + z.capY() + (z.invBandY() + z.invBandH() - z.capY()) / 2 - 10;
         final int vHover = dragGrip == 1 || NetworkInteractorLayout.onVerticalGrip(lastMouseX - x, lastMouseY - y, z)
                 ? skin.accent() : skin.edge();
         g.fill(vx, vy, vx + 1, vy + 20, vHover);
@@ -1198,12 +1317,12 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
 
     private void renderInventoryBand(final GuiGraphics g, final Font font, final int x, final int y,
                                      final NetworkInteractorLayout.Zones z) {
-        // The band panel: a raised surface with a bevel, so the inventory reads as a distinct, bounded area.
+        // The band is a sunken well of the era, so the inventory reads as a distinct, bounded area.
         final int bx = x + z.invBandX();
         final int by = y + z.invBandY();
         final int bw = z.invBandW();
         final int bh = z.invBandH();
-        raisedPanel(g, bx, by, bw, bh);
+        skin.field(g, bx, by, bw, bh, false);
 
         /*
          * Slot backgrounds inside the frame (the desktop screen draws the real items and cursor over these),
@@ -1213,19 +1332,106 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             for (int c = 0; c < INV_COLS; c++) {
                 final int cx = x + z.invX() + c * CELL;
                 final int cy = y + NetworkInteractorLayout.slotRowY(z, r);
-                g.fill(cx, cy, cx + CELL - 2, cy + CELL - 2, skin.fieldBg());
-                Draw.outline(g, cx, cy, CELL - 2, CELL - 2, skin.edge());
+                g.fill(cx, cy, cx + CELL - 2, cy + CELL - 2, skin.panelBg());
+                Draw.outline(g, cx, cy, CELL - 2, CELL - 2, halfEdge());
             }
         }
     }
 
-    /** A raised surface: the panel fill with a light top-left and a dark bottom-right edge. */
-    private void raisedPanel(final GuiGraphics g, final int x, final int y, final int w, final int h) {
-        g.fill(x, y, x + w, y + h, skin.panelBg());
-        g.fill(x, y, x + w, y + 1, 0xFFFFFFFF);
-        g.fill(x, y, x + 1, y + h, 0xFFFFFFFF);
-        g.fill(x, y + h - 1, x + w, y + h, skin.edge());
-        g.fill(x + w - 1, y, x + w, y + h, skin.edge());
+    /** The framed panel every detail view sits in: the era's group panel. */
+    private void framedPanel(final GuiGraphics g, final int x, final int y, final int w, final int h) {
+        skin.panel(g, x, y, w, h);
+    }
+
+    /**
+     * The panel's header strip: an icon, a name and a line under it, on a band of its own with a rule
+     * beneath. Returns the y where the panel's body begins.
+     */
+    private int panelHeader(final GuiGraphics g, final Font font, final int dx, final int dy, final int dw,
+                            @Nullable final StorageKey icon, final String name, final String sub, final int subColor,
+                            final boolean starred) {
+        final int hh = 22;
+        g.fill(dx + 1, dy + 1, dx + dw - 1, dy + hh, skin.panelBg());
+        g.fill(dx + 1, dy + hh, dx + dw - 1, dy + hh + 1, halfEdge());
+        final int px = dx + 5;
+        int tx = px;
+        if (icon != null) {
+            DesktopItems.data(g, font, icon, px, dy + 3, null);
+            tx = px + 20;
+        }
+        final int starW = starred ? Texts.smallWidth(font, STAR) + 2 : 0;
+        final String shown = Texts.clip(font, name, Texts.smallFits(dw - (tx - dx) - 6 - starW));
+        Texts.small(g, font, shown, tx, dy + 4, skin.text());
+        if (starred) {
+            Texts.small(g, font, STAR, tx + Texts.smallWidth(font, shown) + 2, dy + 4, STAR_GOLD);
+        }
+        Texts.small(g, font, Texts.clip(font, sub, Texts.smallFits(dw - (tx - dx) - 6)), tx, dy + 13, subColor);
+        return dy + hh + 5;
+    }
+
+    /**
+     * The network's card: the Mainframe, the storage gauge, what is on the network and what is running. The
+     * details panel shows it when nothing is chosen, and the Status tab shows it at full width.
+     */
+    private void renderNetworkCard(final GuiGraphics g, final Font font, final int dx, final int dy, final int dw,
+                                   final int dh) {
+        cardShown = true;
+        final int px = dx + 5;
+        int py = panelHeader(g, font, dx, dy, dw, null, "This network",
+                online ? "● Mainframe online" : "○ Mainframe offline", online ? ONLINE_GREEN : OFFLINE_RED, false);
+        py = sectionRule(g, font, px, py, dw, "STORAGE");
+        final int gw = dw - 12;
+        g.fill(px, py, px + gw, py + 5, skin.fieldBg());
+        Draw.outline(g, px, py, gw, 5, skin.edge());
+        if (capacityItems > 0) {
+            final int fill = (int) Math.min(gw - 2, Math.round((gw - 2) * (double) usedItems / capacityItems));
+            g.fill(px + 1, py + 1, px + 1 + fill, py + 4, gaugeColor());
+        }
+        py += 8;
+        py = cardRow(g, font, px, py, dw, "used", capacityItems > 0
+                ? dataLabel(usedItems) + " of " + dataLabel(capacityItems) : dataLabel(usedItems));
+        py = sectionRule(g, font, px, py + 2, dw, "ON THE NETWORK");
+        py = cardRow(g, font, px, py, dw, "Item types", Integer.toString(networkItems.size()));
+        py = cardRow(g, font, px, py, dw, "Servers", Integer.toString(serverCount));
+        py = cardRow(g, font, px, py, dw, "Craftable", Integer.toString(crafts.size()));
+        py = cardRow(g, font, px, py, dw, "Favourites", Integer.toString(favourites.size()));
+        py = sectionRule(g, font, px, py + 2, dw, "RUNNING");
+        py = cardRow(g, font, px, py, dw, "Operations", activeOps.size() + " live");
+        if (py + 10 < dy + dh) {
+            Texts.small(g, font, "Select an item to see its details.", px, py + 4, skin.dim());
+        }
+    }
+
+    /** A caption with a thin rule under it; returns the y of the first line below. */
+    private int sectionRule(final GuiGraphics g, final Font font, final int px, final int py, final int dw,
+                            final String caption) {
+        Texts.small(g, font, caption, px, py, skin.dim());
+        g.fill(px, py + 8, px + dw - 12, py + 9, halfEdge());
+        return py + 11;
+    }
+
+    /** A "label ... value" row of the card. */
+    private int cardRow(final GuiGraphics g, final Font font, final int px, final int py, final int dw,
+                        final String label, final String value) {
+        Texts.small(g, font, label, px, py, skin.dim());
+        Texts.small(g, font, value, px + dw - 12 - Texts.smallWidth(font, value), py, skin.text());
+        return py + 8;
+    }
+
+    /** The Status tab: the network's card across the whole body, in its own framed panel. */
+    private void renderStatusTab(final GuiGraphics g, final Font font, final int x, final int y,
+                                 final NetworkInteractorLayout.Zones z) {
+        final int px = x + z.wellX();
+        final int py = y + z.capY();
+        final int pw = contentW - 2 * NetworkInteractorLayout.INSET;
+        final int ph = z.statusY() - z.capY() - 2;
+        if (pw <= 6 || ph <= 6) {
+            return;
+        }
+        framedPanel(g, px, py, pw, ph);
+        Draw.pushScissor(g, px + 1, py + 1, px + pw - 1, py + ph - 1);
+        renderNetworkCard(g, font, px, py, Math.min(pw, 180), ph);
+        Draw.popScissor(g);
     }
 
     // details panel
@@ -1245,19 +1451,17 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         if (dw <= 6 || dh <= 6) {
             return;
         }
-        raisedPanel(g, dx, dy, dw, dh);
+        framedPanel(g, dx, dy, dw, dh);
         Draw.pushScissor(g, dx + 1, dy + 1, dx + dw - 1, dy + dh - 1);
         final int px = dx + 5;
-        int py = dy + 5;
         if (hoveredGridEntry(mouseX, mouseY) == null && selected.size() > 1) {
-            renderSelectionDetails(g, font, px, py, dw, withButtons);
+            renderSelectionDetails(g, font, dx, dy, dw, withButtons);
             Draw.popScissor(g);
             return;
         }
         final NetworkItemEntry e = detailEntry(mouseX, mouseY);
         if (e == null) {
-            Texts.small(g, font, "Hover an item to", px, py, skin.dim());
-            Texts.small(g, font, "see its details.", px, py + 9, skin.dim());
+            renderNetworkCard(g, font, dx, dy, dw, dh);
             Draw.popScissor(g);
             return;
         }
@@ -1265,17 +1469,9 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         final ItemStack stack = e.icon(); // empty for a fluid or a chemical
         final ResourceLocation id = key.registryId();
         final boolean starred = favourites.contains(key.id());
-        DesktopItems.data(g, font, key, px, py, null);
-        final int starW = starred ? Texts.smallWidth(font, STAR) + 2 : 0;
-        Texts.small(g, font, Texts.trim(font, e.name().getString(), Texts.smallFits(dw - 28 - starW)), px + 20, py, skin.text());
-        if (starred) {
-            Texts.small(g, font, STAR, px + 20 + Texts.smallWidth(font, Texts.trim(font, e.name().getString(),
-                    Texts.smallFits(dw - 28 - starW))) + 2, py, STAR_GOLD);
-        }
-        Texts.small(g, font, Texts.trim(font, modName(id.getNamespace()), Texts.smallFits(dw - 28)), px + 20, py + 9, LINK_BLUE);
-        py += 22;
+        int py = panelHeader(g, font, dx, dy, dw, key, e.name().getString(), modName(id.getNamespace()), LINK_BLUE, starred);
         // Where it is: the network total and the servers that hold it, on one line.
-        Texts.small(g, font, Texts.trim(font, storedLine(e), Texts.smallFits(dw - 10)), px, py, skin.dim());
+        Texts.small(g, font, Texts.clip(font, storedLine(e), Texts.smallFits(dw - 10)), px, py, skin.dim());
         py += 10;
         final ItemRecipesPayload known = recipesFor(key);
         py = detailList(g, font, px, py, dw, "MADE BY", known == null ? List.of("...") : known.madeBy());
@@ -1311,32 +1507,36 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
      * The details panel for a selection of several items: how many, each by name and amount, what they
      * weigh together, and the actions that take them all: Request and the star.
      */
-    private void renderSelectionDetails(final GuiGraphics g, final Font font, final int px, final int top, final int dw,
+    private void renderSelectionDetails(final GuiGraphics g, final Font font, final int dx, final int dy, final int dw,
                                         final boolean withButtons) {
-        int py = top;
+        final int px = dx + 5;
         final List<NetworkItemEntry> entries = selectedEntries();
         final int count = tab == TAB_CRAFTING ? selected.size() : entries.size();
-        Texts.small(g, font, count + " items selected", px, py, skin.text());
-        py += 10;
         long weight = 0L;
+        long items = 0L;
         int stocked = 0;
         final List<String> lines = new ArrayList<>();
+        final StringBuilder names = new StringBuilder();
         for (final NetworkItemEntry e : entries) {
             weight += e.key().weight(e.total());
+            items += e.total();
             if (e.total() > 0) {
                 stocked++;
             }
             lines.add(e.name().getString() + " · " + amount(e.key(), e.total()));
+            names.append(names.length() > 0 ? ", " : "").append(e.name().getString());
         }
         if (tab == TAB_CRAFTING) {
             for (final StorageKey key : selected) {
                 lines.add(key.displayName().getString());
+                names.append(names.length() > 0 ? ", " : "").append(key.displayName().getString());
             }
-        } else {
-            Texts.small(g, font, dataLabel(weight) + " together", px, py, skin.dim());
-            py += 10;
         }
+        int py = panelHeader(g, font, dx, dy, dw, null, count + " items selected", names.toString(), skin.dim(), false);
         py = detailList(g, font, px, py, dw, "SELECTED", lines.size() > 12 ? lines.subList(0, 12) : lines);
+        if (tab != TAB_CRAFTING) {
+            py = detail(g, font, px, py, dw, "TOGETHER", formatCount(items) + " items · " + dataLabel(weight));
+        }
         if (lines.size() > 12) {
             Texts.small(g, font, "+" + (lines.size() - 12) + " more", px + 2, py - 2, skin.dim());
             py += 8;
@@ -1426,17 +1626,16 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         PacketDistributor.sendToServer(new SetSettingPayload(host, starred ? "unfavourite" : "favourite", id));
     }
 
-    /** Draws a labelled list section (a dim caption, then each entry on its own line; "(none)" if empty). */
+    /** Draws a labelled list section (a ruled caption, then each entry on its own line; "(none)" if empty). */
     private int detailList(final GuiGraphics g, final Font font, final int px, final int py, final int dw,
                            final String label, final List<String> values) {
-        Texts.small(g, font, label, px, py, skin.dim());
-        int vy = py + 8;
+        int vy = sectionRule(g, font, px, py, dw, label);
         if (values.isEmpty()) {
             Texts.small(g, font, "(none)", px + 2, vy, skin.dim());
             return vy + 10;
         }
         for (final String v : values) {
-            Texts.small(g, font, Texts.trim(font, v, Texts.smallFits(dw - 8)), px + 2, vy, skin.text());
+            Texts.small(g, font, Texts.clip(font, v, Texts.smallFits(dw - 14)), px + 2, vy, skin.text());
             vy += 8;
         }
         return vy + 2;
@@ -1463,12 +1662,11 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return out;
     }
 
-    /** Draws a labelled detail line (a dim caption, then the value wrapped to the panel width). Returns new y. */
+    /** Draws a labelled detail line (a ruled caption, then the value wrapped to the panel width). Returns new y. */
     private int detail(final GuiGraphics g, final Font font, final int px, final int py, final int dw,
                        final String label, final String value) {
-        Texts.small(g, font, label, px, py, skin.dim());
-        int vy = py + 8;
-        for (final String line : wrap(font, value, Texts.smallFits(dw - 12))) {
+        int vy = sectionRule(g, font, px, py, dw, label);
+        for (final String line : wrap(font, value, Texts.smallFits(dw - 14))) {
             Texts.small(g, font, line, px + 2, vy, skin.text());
             vy += 8;
         }
@@ -1572,23 +1770,6 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         return entryAt(grid.cellAt(mx, my));
     }
 
-    private void renderStatus(final GuiGraphics g, final Font font, final int x, final int y) {
-        int ry = y + 2;
-        Texts.small(g, font, online ? "Mainframe: online" : "Mainframe: offline", x, ry, online ? ONLINE_GREEN : OFFLINE_RED);
-        ry += 10;
-        Texts.small(g, font, "Item types on network: " + networkItems.size(), x, ry, skin.text());
-        ry += 10;
-        Texts.small(g, font, "Local item types: " + localItems.size(), x, ry, skin.text());
-        ry += 10;
-        Texts.small(g, font, "Network stored: " + dataLabel(usedItems), x, ry, skin.text());
-        ry += 10;
-        Texts.small(g, font, "Servers: " + serverCount, x, ry, skin.text());
-        ry += 10;
-        Texts.small(g, font, "Craftable: " + crafts.size(), x, ry, skin.text());
-        ry += 10;
-        Texts.small(g, font, "Favourites: " + favourites.size(), x, ry, skin.text());
-    }
-
     /** The crafts shown after the search and the filters (by result); the full list when none apply. */
     private List<CraftCatalogPayload.Entry> filteredCrafts() {
         final String q = search.query();
@@ -1649,7 +1830,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
     }
 
-    /** Whether typing goes to the grid: no text field or console holds the keyboard, no dialog is up. */
+    /** Whether typing goes to the grid: no text field holds the keyboard, no dialog is up. */
     private boolean keyboardOnGrid() {
         return gridTab() && root.focusedChild() == null && !hasPopup() && !filterMenu.isOpen();
     }
@@ -1768,29 +1949,24 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         if (dw <= 6 || dh <= 6) {
             return;
         }
-        raisedPanel(g, dx, dy, dw, dh);
+        framedPanel(g, dx, dy, dw, dh);
         Draw.pushScissor(g, dx + 1, dy + 1, dx + dw - 1, dy + dh - 1);
         final List<OperationRecord> all = allOps();
         final int px = dx + 5;
-        int py = dy + 5;
         if (opSelected < 0 || opSelected >= all.size()) {
-            Texts.small(g, font, "Select an operation", px, py, skin.dim());
-            Texts.small(g, font, "to see its details.", px, py + 9, skin.dim());
+            renderNetworkCard(g, font, dx, dy, dw, dh);
             Draw.popScissor(g);
             return;
         }
         final OperationRecord op = all.get(opSelected);
-        DesktopItems.data(g, font, op.key(), px, py, null);
-        Texts.small(g, font, Texts.trim(font, op.name().getString(), Texts.smallFits(dw - 28)), px + 20, py + 1, skin.text());
-        Texts.small(g, font, OperationPalette.labelFor(op.type()), px + 20, py + 10, OperationPalette.colorFor(op.type()));
-        py += 22;
+        int py = panelHeader(g, font, dx, dy, dw, op.key(), op.name().getString(), OperationPalette.labelFor(op.type()),
+                OperationPalette.colorFor(op.type()), false);
         Texts.small(g, font, "moved " + formatCount(op.moved()) + " / " + formatCount(op.requested()), px, py, skin.text());
         py += 10;
         Texts.small(g, font, opStatusLong(op.status()), px, py, opStatusColor(op.status()));
         py += 12;
         if (!op.subs().isEmpty()) {
-            Texts.small(g, font, "SUBOPERATIONS", px, py, skin.dim());
-            py += 10;
+            py = sectionRule(g, font, px, py, dw, "SUBOPERATIONS");
             for (final var sub : op.subs()) {
                 if (py > dy + dh - 9) {
                     break;
@@ -1800,8 +1976,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
                 py += 9;
             }
         } else if (!op.moves().isEmpty()) {
-            Texts.small(g, font, "SOURCES", px, py, skin.dim());
-            py += 10;
+            py = sectionRule(g, font, px, py, dw, "SOURCES");
             for (final var mv : op.moves()) {
                 if (py > dy + dh - 9) {
                     break;
@@ -1858,37 +2033,6 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         };
     }
 
-    // footer
-
-    private String usageText() {
-        return dataLabel(usedItems) + " stored";
-    }
-
-    private String statusText() {
-        return (online ? "● Mainframe online" : "○ Mainframe offline")
-                + "  ·  " + networkItems.size() + " types  ·  " + serverCount + " servers";
-    }
-
-    private int statusColor() {
-        return online ? ONLINE_GREEN : OFFLINE_RED;
-    }
-
-    private String lastOutputText() {
-        return output.isEmpty() ? "" : output.peekLast().text();
-    }
-
-    private int lastOutputColor() {
-        return output.isEmpty() ? 0xFF40C060 : output.peekLast().color();
-    }
-
-    /** This box's own shell session on the machine, so its replies are its own. */
-    private final int session = ShellViews.newSession();
-
-    private void runCommand(final String line) {
-        pushOutput("> " + line, 0xFF40C060);
-        PacketDistributor.sendToServer(new DesktopShellRunPayload(host, line, this.session));
-    }
-
     //  Input
 
     private Panel inputTarget() {
@@ -1928,7 +2072,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
         /*
          * Inventory band: real container slots handled by the desktop screen (cursor, drag, shift-click);
-         * the app simply ignores clicks that land there so it never misreads them as grid/console input.
+         * the app simply ignores clicks that land there so it never misreads them as grid input.
          */
         if (inInventoryZone(lx, ly)) {
             return;
@@ -1947,7 +2091,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             }
             gridPressed = true;
         }
-        // A click that no field took leaves the keyboard on the grid; the console gets it only when clicked.
+        // A click that no field took leaves the keyboard on the grid.
     }
 
     @Override
@@ -2138,7 +2282,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             return true;
         }
         if (keyboardOnGrid()) {
-            // The grid's letters arrive as keys; a stray character is not the console's to take.
+            // The grid's letters arrive as keys; a stray character has nowhere else to go.
             return true;
         }
         return inputTarget().charTyped(c);
@@ -2150,7 +2294,7 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
             return filterMenu.keyPressed(key, scanCode, modifiers);
         }
         if (!hasPopup() && key == GLFW.GLFW_KEY_ESCAPE && root.focusedChild() != null) {
-            // Escape puts the keyboard down from the search or the console, back on the grid.
+            // Escape puts the keyboard down from the search, back on the grid.
             root.focus(null);
             return true;
         }
@@ -2932,26 +3076,6 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
         }
     }
 
-    private static int colorOf(final int ordinal) {
-        final CliStyle[] values = CliStyle.values();
-        final CliStyle style = ordinal >= 0 && ordinal < values.length ? values[ordinal] : CliStyle.PLAIN;
-        return switch (style) {
-            case ACCENT, HEADER -> 0xFF39D6C4;
-            case OK -> 0xFF5FE07A;
-            case ERROR -> 0xFFEF6A5A;
-            case WARN -> 0xFFF0B23A;
-            case INFO -> 0xFF2AA7E0;
-            case DIM -> 0xFF7D8A9C;
-            // The extended palette: brand-tinted terminal colors (screenfetch logos and the like).
-            case ORANGE -> 0xFFE95420;
-            case MAGENTA -> 0xFFE0447C;
-            case BLUE -> 0xFF5A8FD6;
-            case CYAN -> 0xFF2FA6E8;
-            case PURPLE -> 0xFF9E8FD6;
-            default -> 0xFFCDD6E2;
-        };
-    }
-
     //  Inspection (client tests): content-local points of the controls, from the last frame's layout
 
     private int[] local(final int[] c) {
@@ -3250,5 +3374,20 @@ public final class NetworkInteractorApp implements IInventoryBandApp {
     /** The keyboard hint under the status line. */
     public String keyboardHint() {
         return hintText();
+    }
+
+    /** The caption over the grid's well: what the active tab lists. */
+    public String gridCaption() {
+        return gridCaptionText();
+    }
+
+    /** The network's storage capacity in item-equivalents, as the last snapshot said; zero when unknown. */
+    public long storageCapacity() {
+        return capacityItems;
+    }
+
+    /** The network's used storage in item-equivalents, as the last snapshot said. */
+    public long storageUsed() {
+        return usedItems;
     }
 }

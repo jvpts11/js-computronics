@@ -1761,11 +1761,9 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             /*
              * A computer has one console and this is what it said, so it goes to every window looking at
-             * it: the terminal window, an editor's terminal panel, and the Network Interactor's own
-             * embedded command line. Each ignores it when it is not open.
+             * it: the terminal window and an editor's terminal panel. Each ignores it when it is not open.
              */
             dev.jstech.computers.client.os.ShellViews.accept(payload);
-            dev.jstech.computers.client.os.NetworkInteractorApp.acceptConsole(payload);
         });
     }
 
@@ -4688,8 +4686,10 @@ public final class ComputingPayloads {
         final List<CraftCatalogPayload.Entry> crafts = buildCraftCatalog(level, network);
         final List<String> favourites = computer.console() == null ? List.of()
                 : computer.console().settings().favourites();
+        final long capacity = network == null ? 0L
+                : dev.jstech.computers.operation.NetworkStorage.of(level, network).capacity();
         PacketDistributor.sendToPlayer(player, new NetworkInteractorPayload(
-                networkItems, localItems, online, usedItems, serverCount, crafts, favourites));
+                networkItems, localItems, online, usedItems, serverCount, crafts, favourites, capacity));
     }
 
     /** Answers the details panel: what makes the item on this network, and what uses it. */

@@ -18,12 +18,13 @@ import dev.jstech.core.gui.layout.GuiLayout;
  * <p>All coordinates are content-local (origin at the window's content top-left, past the border and title
  * bar). The window has a LEFT column and a flexible-width DETAILS column to its right:
  * <ul>
- *   <li>the left column holds the search/filter/sort header, the GRID (which fills the height between the
- *       header and the inventory band and SCROLLS its items when there are more than fit), a grip strip, and a
- *       framed INVENTORY band pinned just above the footer (a {@value #INV_PAD}px border around the slots);</li>
- *   <li>the details column fills the space to the right of the left column, from the header down to the footer,
- *       showing the hovered item's details;</li>
- *   <li>the status bar, a keyboard hint line and the console line are pinned full-width at the bottom.</li>
+ *   <li>the left column holds the toolbar band (search, the two filters and the sort), a caption strip, the
+ *       GRID in a sunken well (it fills the height between the caption and the inventory band and SCROLLS its
+ *       items when there are more than fit), a grip strip, and a framed INVENTORY well pinned just above the
+ *       footer (a {@value #INV_PAD}px border around the slots);</li>
+ *   <li>the details column fills the space to the right of the left column, from the caption strip down to
+ *       the footer, showing the hovered item's details;</li>
+ *   <li>the status bar and a keyboard hint line are pinned full-width at the bottom.</li>
  * </ul>
  *
  * <p>Two grips let the player reshape the window's insides, and the places they set are kept with the window:
@@ -38,9 +39,10 @@ public final class NetworkInteractorLayout {
     public static final int TAB_H = 13;
     public static final int SEARCH_H = 13;
     public static final int STATUS_H = 11;
-    /** The keyboard hint line between the status bar and the console. */
+    /** The keyboard hint line under the status bar. */
     public static final int HINT_H = 8;
-    public static final int CONSOLE_H = 10;
+    /** The caption strip over the grid's well ("NETWORK STORAGE · 9 types"). */
+    public static final int CAP_H = 8;
     public static final int CELL = 18;
     public static final int INV_COLS = 9;
     public static final int INV_ROWS = 4;          // 3 main rows + the hotbar, like the vanilla layout
@@ -64,10 +66,10 @@ public final class NetworkInteractorLayout {
     /** The first content row below the tab strip (where the search/sort header sits). */
     public static final int BODY_TOP = TAB_H + 2;
 
-    /** Fixed header height: tab strip + search/sort row. The grid zone starts here. */
+    /** Fixed header height: tab strip + the toolbar band. The caption strip and the details panel start here. */
     public static final int HEADER_H = BODY_TOP + SEARCH_H + 3;
-    /** Fixed footer height: the status bar, the hint line and the console line, pinned to the bottom. */
-    public static final int FOOTER_H = STATUS_H + HINT_H + CONSOLE_H;
+    /** Fixed footer height: the status bar and the hint line, pinned to the bottom. */
+    public static final int FOOTER_H = STATUS_H + HINT_H;
     /** Gap between the 3 main inventory rows and the hotbar row, like the vanilla inventory. */
     public static final int HOTBAR_GAP = 4;
     /** Fixed inventory-band height with every row shown: the frame on each side, the 4 slot rows, and the gap. */
@@ -136,7 +138,7 @@ public final class NetworkInteractorLayout {
 
     /** Whether a content-local point is on the vertical grip (the gap between the left column and the details). */
     public static boolean onVerticalGrip(final int lx, final int ly, final Zones z) {
-        return lx >= z.gripX() && lx < z.gripX() + GAP && ly >= z.gridY() && ly < z.invBandY() + z.invBandH();
+        return lx >= z.gripX() && lx < z.gripX() + GAP && ly >= z.capY() && ly < z.invBandY() + z.invBandH();
     }
 
     /** Whether a content-local point is on the horizontal grip strip above the inventory band. */
@@ -174,12 +176,14 @@ public final class NetworkInteractorLayout {
     public record Zones(int searchX, int searchY, int searchW,
                         int modX, int modW, int catX, int catW,
                         int sortX, int sortY, int sortW,
+                        int capY,
+                        int wellX, int wellY, int wellW, int wellH,
                         int gridX, int gridY, int gridW, int gridH, int gridCols, int gridRows,
                         int gripX, int gripY,
                         int invBandX, int invBandY, int invBandW, int invBandH,
                         int invX, int invY, int invFirstRow,
                         int detailsX, int detailsY, int detailsW, int detailsH,
-                        int statusY, int hintY, int consoleY) {
+                        int statusY, int hintY) {
     }
 
     /** The smallest content width: the left column, the gap, and the minimum details panel, plus the insets. */
@@ -188,11 +192,12 @@ public final class NetworkInteractorLayout {
     }
 
     /**
-     * The smallest content height: the fixed header, the grip strip, the whole framed inventory band, and the
-     * footer. At this height the grid zone collapses to zero rows but the inventory stays fully visible.
+     * The smallest content height: the fixed header, the caption strip, an empty well, the grip strip, the
+     * whole framed inventory band, and the footer. At this height the grid has zero rows but the inventory
+     * stays fully visible.
      */
     public static int minContentHeight() {
-        return HEADER_H + GRIP_H + INV_BAND_H + FOOTER_H;
+        return HEADER_H + CAP_H + 2 * INV_PAD + GRIP_H + INV_BAND_H + FOOTER_H;
     }
 
     /** The zones with the grid at the inventory's nine columns and every inventory row shown. */
@@ -213,19 +218,23 @@ public final class NetworkInteractorLayout {
         final int leftW = 2 * INV_PAD + cols * CELL;
         int rows = Math.max(1, Math.min(INV_ROWS, invRows));
         // A window shorter than the whole band folds inventory rows away rather than letting the band ride the footer.
-        while (rows > 1 && HEADER_H + GRIP_H + bandHeight(rows) + FOOTER_H > contentH) {
+        while (rows > 1 && HEADER_H + CAP_H + 2 * INV_PAD + GRIP_H + bandHeight(rows) + FOOTER_H > contentH) {
             rows--;
         }
         final int bandH = bandHeight(rows);
 
         final int headerBottom = HEADER_H;
         final int footerTop = Math.max(headerBottom, contentH - FOOTER_H);
-        // The inventory band sits just above the footer; it never climbs above the header.
-        final int invBandY = Math.max(headerBottom + GRIP_H, footerTop - bandH);
-        // The grip strip sits right above the band; the grid fills what is left between the header and it.
+        // The caption strip sits under the toolbar; the grid's well starts under it.
+        final int capY = headerBottom;
+        final int wellY = capY + CAP_H;
+        // The inventory band sits just above the footer; it never climbs above the well's frame.
+        final int invBandY = Math.max(wellY + 2 * INV_PAD + GRIP_H, footerTop - bandH);
+        // The grip strip sits right above the band; the well fills what is left between the caption and it.
         final int gripY = invBandY - GRIP_H;
-        final int gridTop = headerBottom;
-        final int gridAreaH = Math.max(0, gripY - gridTop);
+        final int wellH = Math.max(2 * INV_PAD, gripY - 1 - wellY);
+        final int gridTop = wellY + INV_PAD;
+        final int gridAreaH = Math.max(0, wellH - 2 * INV_PAD);
 
         // Header search/filters/sort live within the left column only.
         final int searchX = INSET;
@@ -235,8 +244,10 @@ public final class NetworkInteractorLayout {
         final int modX = catX - 2 - MOD_W;
         final int searchW = Math.max(CELL, modX - 2 - searchX);
 
-        // Grid aligns with the inventory slots (inset by the band's frame padding), cols columns wide.
-        final int gridX = INSET + INV_PAD;
+        // The well spans the left column; the grid sits inside its frame padding, cols columns wide.
+        final int wellX = INSET;
+        final int wellW = leftW;
+        final int gridX = wellX + INV_PAD;
         final int gridW = cols * CELL;
         final int gridRows = Math.max(0, gridAreaH / CELL);
 
@@ -261,17 +272,18 @@ public final class NetworkInteractorLayout {
 
         final int statusY = footerTop;
         final int hintY = footerTop + STATUS_H;
-        final int consoleY = hintY + HINT_H;
 
         return new Zones(searchX, searchY, searchW,
                 modX, MOD_W, catX, CAT_W,
                 sortX, searchY, SORT_W,
-                gridX, gridTop, gridW, gridAreaH, cols, gridRows,
+                capY,
+                wellX, wellY, wellW, wellH,
+                gridX, gridTop, gridW, gridRows * CELL, cols, gridRows,
                 gripX, gripY,
                 invBandX, invBandY, invBandW, bandH,
                 invX, invY, invFirstRow,
                 detailsX, detailsY, detailsW, detailsH,
-                statusY, hintY, consoleY);
+                statusY, hintY);
     }
 
     /** The solid zones with the grid at nine columns and every inventory row shown. */
@@ -294,12 +306,18 @@ public final class NetworkInteractorLayout {
         layout.box("category", z.catX(), z.searchY(), z.catW(), SEARCH_H);
         layout.box("sort", z.sortX(), z.sortY(), z.sortW(), SEARCH_H);
 
-        // Grid: every row that fits in the grid zone (the grid scrolls its items, so its pixel box is fixed).
+        // The caption strip, then the well's four frame strips around the grid cells (the grid scrolls its
+        // items, so its pixel box is fixed); whatever the frame leaves under the last row is the well's own.
+        layout.box("caption", z.wellX(), z.capY(), z.wellW(), CAP_H);
+        layout.box("well_top", z.wellX(), z.wellY(), z.wellW(), INV_PAD);
+        layout.box("well_left", z.wellX(), z.wellY() + INV_PAD, INV_PAD, z.wellH() - 2 * INV_PAD);
+        layout.box("well_right", z.wellX() + z.wellW() - INV_PAD, z.wellY() + INV_PAD, INV_PAD, z.wellH() - 2 * INV_PAD);
+        layout.box("well_bottom", z.wellX(), z.wellY() + z.wellH() - INV_PAD, z.wellW(), INV_PAD);
         if (z.gridRows() > 0) {
             layout.box("grid", z.gridX(), z.gridY(), z.gridCols() * CELL, z.gridRows() * CELL);
         }
         layout.box("grip_h", z.invBandX(), z.gripY(), z.invBandW(), GRIP_H);
-        layout.box("grip_v", z.gripX(), z.gridY(), GAP, z.invBandY() + z.invBandH() - z.gridY());
+        layout.box("grip_v", z.gripX(), z.capY(), GAP, z.invBandY() + z.invBandH() - z.capY());
 
         // The details panel to the right of the left column.
         if (z.detailsH() > 0) {
@@ -321,7 +339,6 @@ public final class NetworkInteractorLayout {
 
         layout.box("status", 0, z.statusY(), contentW, STATUS_H);
         layout.box("hint", 0, z.hintY(), contentW, HINT_H);
-        layout.box("console", 0, z.consoleY(), contentW, CONSOLE_H);
         return layout;
     }
 }

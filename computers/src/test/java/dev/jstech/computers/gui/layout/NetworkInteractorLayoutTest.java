@@ -112,7 +112,9 @@ class NetworkInteractorLayoutTest {
     @Test
     void resolve_gridSitsBetweenTheHeaderAndTheInventoryBand() {
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(300, 280);
-        assertEquals(NetworkInteractorLayout.HEADER_H, z.gridY());
+        // The cells start under the toolbar, the caption strip and the well's own frame.
+        assertEquals(NetworkInteractorLayout.HEADER_H + NetworkInteractorLayout.CAP_H + NetworkInteractorLayout.INV_PAD,
+                z.gridY());
         assertTrue(z.gridY() + z.gridH() <= z.invBandY(),
                 "grid bottom=" + (z.gridY() + z.gridH()) + " invBandY=" + z.invBandY());
     }
@@ -334,6 +336,23 @@ class NetworkInteractorLayoutTest {
         final int foldedY = NetworkInteractorLayout.slotRowY(two, 0) + cell / 2;
         assertEquals(-1, NetworkInteractorLayout.inventorySlotAt(two.invX() + cell / 2, foldedY, two),
                 "a folded row is not a slot");
+    }
+
+    @Test
+    void resolve_captionThenWellThenGripThenBand_andTheGridSitsInsideTheWell() {
+        final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(330, 218);
+        assertEquals(NetworkInteractorLayout.HEADER_H, z.capY(), "the caption strip starts under the toolbar");
+        assertEquals(z.capY() + NetworkInteractorLayout.CAP_H, z.wellY(), "the well starts under the caption");
+        assertEquals(z.wellY() + NetworkInteractorLayout.INV_PAD, z.gridY(), "the cells sit inside the well's frame");
+        assertEquals(z.wellX() + NetworkInteractorLayout.INV_PAD, z.gridX());
+        assertEquals(z.wellW(), NetworkInteractorLayout.LEFT_W, "the well spans the left column");
+        assertEquals(z.gripY() - 1, z.wellY() + z.wellH(), "the well runs down to the grip strip");
+        assertEquals(3, z.gridRows(), "three rows at the opening size, the console's row paid for the caption");
+        assertTrue(z.gridY() + z.gridH() <= z.wellY() + z.wellH() - NetworkInteractorLayout.INV_PAD,
+                "the cells never reach the well's bottom frame");
+        assertEquals(z.capY(), z.detailsY(), "the details panel's top is the caption's, so the two columns align");
+        assertEquals(z.statusY() + NetworkInteractorLayout.STATUS_H, z.hintY(), "the hint line follows the status bar");
+        assertEquals(218, z.hintY() + NetworkInteractorLayout.HINT_H, "the hint line is the last thing in the window");
     }
 
     @Test

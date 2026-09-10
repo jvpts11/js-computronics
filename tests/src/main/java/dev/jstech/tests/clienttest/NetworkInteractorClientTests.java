@@ -207,6 +207,11 @@ public final class NetworkInteractorClientTests {
                         "the network grid to list the three kinds by name",
                         () -> "search=" + interactor(ctx).searchText() + " listed=" + interactor(ctx).listedNames())
                 .then(1, () -> ctx.assertTrue(!interactor(ctx).keyboardHint().isEmpty(), "the hint line says what the keys do"))
+                .then(1, () -> ctx.assertTrue(interactor(ctx).gridCaption().equals("NETWORK STORAGE")
+                                && interactor(ctx).storageCapacity() > 0
+                                && interactor(ctx).storageUsed() > 0,
+                        "the well is captioned and the status bar has a gauge to draw; caption=" + interactor(ctx).gridCaption()
+                                + " capacity=" + interactor(ctx).storageCapacity() + " used=" + interactor(ctx).storageUsed()))
                 // Right, Right: the keyboard lands on the coal, then the ingot.
                 .then(1, () -> ctx.key(GLFW.GLFW_KEY_RIGHT))
                 .then(1, () -> ctx.assertTrue(interactor(ctx).keyCell() == 0,
@@ -414,6 +419,8 @@ public final class NetworkInteractorClientTests {
                 .then(2, () -> ctx.clickDesktop(point(ctx, interactor(ctx).craftingTabCenter())))
                 .thenWaitUntil(() -> interactor(ctx).craftableNames().contains("Blast"), SCREEN_WAIT,
                         "the Crafting tab to list the ingot by its first recipe's name")
+                .then(1, () -> ctx.assertTrue(interactor(ctx).gridCaption().equals("CRAFTABLE"),
+                        "the Crafting tab's well is captioned CRAFTABLE; got " + interactor(ctx).gridCaption()))
                 .then(1, () -> openCraft(ctx, "Blast"))
                 .thenWaitUntil(() -> interactor(ctx).craftPopupOptionLabels().size() == 2, SCREEN_WAIT,
                         "the plan to come back with both recipes")

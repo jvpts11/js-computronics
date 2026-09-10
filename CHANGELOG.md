@@ -211,6 +211,12 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   pick is remembered per item, so the next request opens on it. Left and Right pick from the keyboard.
 - The craft dialog's plan reads a short ingredient in red and says under it what the network would craft to
   cover it, or that nothing on the network makes it.
+- Every zone of the Network Interactor has a boundary of its own now, drawn by the desktop's skin: the
+  toolbar on a band, the items in a captioned, sunken field of drawn cells (empty ones too, so an empty
+  network looks like one), the inventory in a second field, the details in a framed panel with a header
+  strip, and a status bar with segments and a storage gauge. With nothing chosen, the details panel and the
+  Status tab show the network's card: the Mainframe, the storage used of what the servers hold, the counts,
+  and what is running.
 
 ### Changed
 - The computing mod is J's Computers. It was J's Computronics, and Computronics is the name of a mod
@@ -244,6 +250,10 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 - Virtual Studio Code's side panel is the folder and nothing else: the folder's name, then its tree,
   with no caption over it and no list of open editors above it, since the tabs already say what is
   open. A file or a folder in the tree opens on a double click; one click only picks it.
+
+### Removed
+- The one-line console at the bottom of the Network Interactor. The window does by itself what it was there
+  for, and the Command Prompt is the terminal, with a history.
 
 ### Fixed
 - The installation disc's setup no longer sits in the local disk's root, and the installed program's

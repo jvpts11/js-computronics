@@ -26,10 +26,12 @@ import java.util.List;
  * @param serverCount     the number of Servers on the network
  * @param crafts          the network's craft catalog (Crafting tab), with per-entry availability dots
  * @param favourites      the data this computer keeps starred, by {@link dev.jstech.computers.storage.StorageKey#id()}
+ * @param capacityItems   the network's whole storage in item-equivalents, for the storage gauge
  */
 public record NetworkInteractorPayload(List<NetworkItemEntry> networkItems, List<NetworkItemEntry> localItems,
                                        boolean mainframeOnline, long usedItems, int serverCount,
-                                       List<CraftCatalogPayload.Entry> crafts, List<String> favourites)
+                                       List<CraftCatalogPayload.Entry> crafts, List<String> favourites,
+                                       long capacityItems)
         implements CustomPacketPayload {
 
     public static final int MAX_ENTRIES = 512;
@@ -51,6 +53,7 @@ public record NetworkInteractorPayload(List<NetworkItemEntry> networkItems, List
         buf.writeVarInt(p.serverCount);
         CraftCatalogPayload.Entry.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_ENTRIES)).encode(buf, p.crafts);
         ByteBufCodecs.stringUtf8(MAX_ID).apply(ByteBufCodecs.list(MAX_FAVOURITES)).encode(buf, p.favourites);
+        buf.writeVarLong(p.capacityItems);
     }
 
     private static NetworkInteractorPayload decode(final RegistryFriendlyByteBuf buf) {
@@ -62,7 +65,8 @@ public record NetworkInteractorPayload(List<NetworkItemEntry> networkItems, List
         final List<CraftCatalogPayload.Entry> crafts =
                 CraftCatalogPayload.Entry.STREAM_CODEC.apply(ByteBufCodecs.list(MAX_ENTRIES)).decode(buf);
         final List<String> favourites = ByteBufCodecs.stringUtf8(MAX_ID).apply(ByteBufCodecs.list(MAX_FAVOURITES)).decode(buf);
-        return new NetworkInteractorPayload(network, local, online, used, servers, crafts, favourites);
+        final long capacity = buf.readVarLong();
+        return new NetworkInteractorPayload(network, local, online, used, servers, crafts, favourites, capacity);
     }
 
     @Override
