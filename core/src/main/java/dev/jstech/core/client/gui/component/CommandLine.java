@@ -7,6 +7,7 @@
  */
 package dev.jstech.core.client.gui.component;
 
+import dev.jstech.core.client.gui.logic.TextEditState;
 import net.minecraft.client.gui.GuiGraphics;
 import org.lwjgl.glfw.GLFW;
 
@@ -17,9 +18,10 @@ import java.util.function.Supplier;
 
 /**
  * One line of a terminal: what is being typed after a prompt, submitted with Enter and recalled with the
- * arrow keys through the lines typed before. While it has the keyboard and nothing is typed yet, it can show
- * the last line the command produced instead of an empty prompt. It looks like a terminal on every desktop:
- * light text on a dark strip, not the skin's field.
+ * arrow keys through the lines typed before. The caret moves within the line the way it does at any prompt:
+ * Left and Right by a character, Home and End to the ends, Ctrl with Left or Right by a word. While it has
+ * the keyboard and nothing is typed yet, it can show the last line the command produced instead of an empty
+ * prompt. It looks like a terminal on every desktop: light text on a dark strip, not the skin's field.
  */
 public final class CommandLine extends UiComponent {
 
@@ -28,7 +30,7 @@ public final class CommandLine extends UiComponent {
 
     private final int maxLength;
     private final java.util.function.Consumer<String> onSubmit;
-    private final StringBuilder input = new StringBuilder();
+    private final TextEditState input;
     private final List<String> history = new ArrayList<>();
     private int historyIndex = -1;
     private Supplier<String> prompt = () -> ">";
@@ -40,6 +42,7 @@ public final class CommandLine extends UiComponent {
     public CommandLine(final int maxLength, final java.util.function.Consumer<String> onSubmit) {
         this.maxLength = Math.max(1, maxLength);
         this.onSubmit = onSubmit;
+        this.input = new TextEditState(this.maxLength);
     }
 
     /** The line shown instead of an empty prompt, with its colour; empty text shows the prompt. */
@@ -64,7 +67,12 @@ public final class CommandLine extends UiComponent {
 
     /** What is typed so far. */
     public String input() {
-        return input.toString();
+        return input.edit();
+    }
+
+    /** Where the caret is in what is typed, counted in characters from the start. */
+    public int caret() {
+        return input.caret();
     }
 
     @Override
@@ -76,12 +84,24 @@ public final class CommandLine extends UiComponent {
     public void render(final GuiGraphics g, final UiContext ctx) {
         g.fill(x(), y(), right(), bottom(), background);
         final String idle = idleText.get();
-        if (isFocused() && input.isEmpty() && !idle.isEmpty()) {
+        if (isFocused() && input.edit().isEmpty() && !idle.isEmpty()) {
             g.drawString(ctx.font(), Texts.trim(ctx.font(), idle, width() - 6), x() + 3, y() + 2, idleColor.getAsInt(), false);
             return;
         }
-        final String line = prompt.get() + " " + input + (isFocused() ? "_" : "");
-        g.drawString(ctx.font(), Texts.tail(ctx.font(), line, width() - 6), x() + 3, y() + 2, textColor, false);
+        /*
+         * The caret takes the room of one character so the line can be scrolled to keep it in view even
+         * when it sits at the very end, which is where it is most of the time.
+         */
+        final String full = prompt.get() + " " + input.edit() + " ";
+        final int caretAt = prompt.get().length() + 1 + input.caret();
+        final String shown = Texts.tail(ctx.font(), full, width() - 6);
+        final int dropped = full.length() - shown.length();
+        g.drawString(ctx.font(), shown, x() + 3, y() + 2, textColor, false);
+        if (isFocused()) {
+            final int visibleCaret = Math.max(0, Math.min(shown.length(), caretAt - dropped));
+            final int cx = x() + 3 + ctx.font().width(shown.substring(0, visibleCaret));
+            g.drawString(ctx.font(), "_", cx, y() + 2, textColor, false);
+        }
     }
 
     @Override
@@ -94,9 +114,7 @@ public final class CommandLine extends UiComponent {
         if (!isFocused() || c < 32 || c == 127) {
             return false;
         }
-        if (input.length() < maxLength) {
-            input.append(c);
-        }
+        input.type(c);
         return true;
     }
 
@@ -105,13 +123,27 @@ public final class CommandLine extends UiComponent {
         if (!isFocused()) {
             return false;
         }
+        final boolean control = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
         switch (key) {
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> submit();
-            case GLFW.GLFW_KEY_BACKSPACE -> {
-                if (!input.isEmpty()) {
-                    input.deleteCharAt(input.length() - 1);
+            case GLFW.GLFW_KEY_BACKSPACE -> input.backspace();
+            case GLFW.GLFW_KEY_DELETE -> input.delete();
+            case GLFW.GLFW_KEY_LEFT -> {
+                if (control) {
+                    input.wordLeft();
+                } else {
+                    input.left();
                 }
             }
+            case GLFW.GLFW_KEY_RIGHT -> {
+                if (control) {
+                    input.wordRight();
+                } else {
+                    input.right();
+                }
+            }
+            case GLFW.GLFW_KEY_HOME -> input.home();
+            case GLFW.GLFW_KEY_END -> input.end();
             case GLFW.GLFW_KEY_UP -> recall(-1);
             case GLFW.GLFW_KEY_DOWN -> recall(1);
             default -> {
@@ -122,8 +154,8 @@ public final class CommandLine extends UiComponent {
     }
 
     private void submit() {
-        final String line = input.toString().trim();
-        input.setLength(0);
+        final String line = input.edit().trim();
+        input.sync("");
         historyIndex = -1;
         if (line.isEmpty()) {
             return;
@@ -142,11 +174,11 @@ public final class CommandLine extends UiComponent {
             historyIndex = history.size();
         }
         historyIndex = Math.max(0, Math.min(history.size(), historyIndex + direction));
-        input.setLength(0);
         if (historyIndex >= history.size()) {
             historyIndex = -1;
+            input.sync("");
         } else {
-            input.append(history.get(historyIndex));
+            input.sync(history.get(historyIndex));
         }
     }
 }

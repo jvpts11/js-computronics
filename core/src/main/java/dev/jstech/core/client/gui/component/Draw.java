@@ -21,7 +21,8 @@ public final class Draw {
      */
     public static void pushScissor(final GuiGraphics g, final int x1, final int y1, final int x2, final int y2) {
         final org.joml.Matrix4f m = g.pose().last().pose();
-        final WindowGeometry.Rect r = WindowGeometry.scissor((int) m.m30(), (int) m.m31(), x1, y1, x2, y2);
+        // The pose's translation and its scale both move the clip, since the clip is in screen units.
+        final WindowGeometry.Rect r = WindowGeometry.scissor(m.m30(), m.m31(), m.m00(), m.m11(), x1, y1, x2, y2);
         g.enableScissor(r.x(), r.y(), r.x() + r.w(), r.y() + r.h());
     }
 

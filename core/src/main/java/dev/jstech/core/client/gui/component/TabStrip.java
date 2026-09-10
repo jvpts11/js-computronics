@@ -148,12 +148,19 @@ public final class TabStrip extends UiComponent {
             // A strip whose tabs come and go can be empty, and an empty strip has nothing to select.
             return true;
         }
-        int index = current.size() - 1;
+        int index = -1;
         for (int i = 0; i < current.size(); i++) {
             if (mx < tabX(i) + tabWidth(i)) {
                 index = i;
                 break;
             }
+        }
+        if (index < 0) {
+            /*
+             * Past the last tab is the strip's empty end, and a click there is a click on nothing: it
+             * used to count as the last tab's close mark, which shut the tabs one by one.
+             */
+            return true;
         }
         if (onClose != null) {
             final boolean onMark = mx >= tabX(index) + tabWidth(index) - CLOSE_W;

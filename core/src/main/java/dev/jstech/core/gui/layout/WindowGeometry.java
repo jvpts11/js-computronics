@@ -69,6 +69,20 @@ public final class WindowGeometry {
      */
     public static Rect scissor(final int poseX, final int poseY, final int x1, final int y1,
                                final int x2, final int y2) {
-        return new Rect(poseX + x1, poseY + y1, x2 - x1, y2 - y1);
+        return scissor(poseX, poseY, 1.0f, 1.0f, x1, y1, x2, y2);
+    }
+
+    /**
+     * The same, under a pose that also scales: a desktop drawn smaller puts its content closer to its
+     * origin, and a clip that ignored the scale would cut the wrong part of it. The rectangle is in the
+     * pose's own units and comes back in screen units.
+     */
+    public static Rect scissor(final float poseX, final float poseY, final float scaleX, final float scaleY,
+                               final int x1, final int y1, final int x2, final int y2) {
+        final int sx1 = Math.round(poseX + x1 * scaleX);
+        final int sy1 = Math.round(poseY + y1 * scaleY);
+        final int sx2 = Math.round(poseX + x2 * scaleX);
+        final int sy2 = Math.round(poseY + y2 * scaleY);
+        return new Rect(sx1, sy1, sx2 - sx1, sy2 - sy1);
     }
 }

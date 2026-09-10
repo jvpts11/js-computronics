@@ -268,6 +268,28 @@ class TextDocumentTest {
     }
 
     @Test
+    void deleteSelection_takesAWholeLineWithItsBreakAndUndoPutsItBack() {
+        doc.setText("one\ntwo\nthree\nfour");
+        doc.setCursor(2, 0);
+        doc.select(2, 0, 3, 0);
+        assertTrue(doc.deleteSelection());
+        assertEquals("one\ntwo\nfour", doc.text());
+        assertEquals(2, doc.cursorLine());
+        assertTrue(doc.undo());
+        assertEquals("one\ntwo\nthree\nfour", doc.text());
+        assertEquals(2, doc.cursorLine(), "undo leaves the caret where the cut began, not where the selection ended");
+        assertEquals(0, doc.cursorCol());
+        doc.select(2, 0, 3, 0);
+        assertTrue(doc.deleteSelection(), "the same cut again, after an undo, still cuts");
+        assertEquals("one\ntwo\nfour", doc.text());
+        // The last line has no break after it: cutting it takes the break before it instead.
+        doc.setCursor(2, 0);
+        doc.select(1, doc.line(1).length(), 2, doc.line(2).length());
+        assertTrue(doc.deleteSelection());
+        assertEquals("one\ntwo", doc.text());
+    }
+
+    @Test
     void home_goesToTheTextThenToTheLineStart() {
         doc.setText("    x = 1;");
         doc.setCursor(0, 9);

@@ -85,11 +85,21 @@ public final class Breadcrumbs extends UiComponent {
         return null;
     }
 
+    /** What a click on the empty part of the field does: an explorer turns the trail into text to edit. */
+    private Runnable onEmptyClick = () -> { };
+
+    public Breadcrumbs setOnEmptyClick(final Runnable action) {
+        onEmptyClick = action == null ? () -> { } : action;
+        return this;
+    }
+
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
         final String target = crumbAt(mx);
         if (target != null) {
             onNavigate.accept(target);
+        } else {
+            onEmptyClick.run();
         }
         return true;
     }

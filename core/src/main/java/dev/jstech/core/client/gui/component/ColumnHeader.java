@@ -69,8 +69,11 @@ public final class ColumnHeader extends UiComponent {
     }
 
     /** The column whose span holds {@code mx}: the last column that starts at or before it. */
-    /** How close to a column's left edge a press has to land to take hold of it. */
-    private static final int GRIP = 3;
+    /**
+     * How close to a column's left edge a press has to land to take hold of it. Wide enough to hit with
+     * a mouse on a desktop drawn at three quarters, where a pixel here is less than one on the screen.
+     */
+    private static final int GRIP = 6;
     /** The column whose left edge the mouse is dragging, or -1. */
     private int dragging = -1;
     private java.util.function.BiConsumer<Integer, Integer> onResize = (column, edge) -> { };
@@ -131,6 +134,10 @@ public final class ColumnHeader extends UiComponent {
         g.fill(x(), bottom() - 1, right(), bottom(), ctx.skin().edge());
         final String arrow = ascending ? " ^" : " v";
         for (int i = 0; i < labels.size() && i < columnX.length; i++) {
+            // A line before every column but the first: the edge that is dragged, drawn so it can be seen.
+            if (i > 0) {
+                g.fill(columnX[i] - 3, y() + 1, columnX[i] - 2, bottom() - 1, ctx.skin().edge());
+            }
             g.drawString(ctx.font(), labels.get(i) + (sortable && i == sortColumn ? arrow : ""), columnX[i], y() + 1,
                     ctx.skin().dim(), false);
         }

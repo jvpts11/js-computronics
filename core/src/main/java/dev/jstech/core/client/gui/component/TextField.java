@@ -138,7 +138,19 @@ public class TextField extends UiComponent {
             while (offset < caret && ctx.font().width(shown.substring(offset, caret)) > avail) {
                 offset++;
             }
+            this.font = ctx.font();
+            this.offset = offset;
             final String visible = Texts.clip(ctx.font(), shown.substring(offset), avail);
+            if (state.hasSelection()) {
+                // The selection sits under the text, over the stretch of it that is in view.
+                final int from = Math.max(offset, state.selectionStart());
+                final int to = Math.min(offset + visible.length(), state.selectionEnd());
+                if (to > from) {
+                    final int sx = x() + 3 + ctx.font().width(shown.substring(offset, from));
+                    final int ex = x() + 3 + ctx.font().width(shown.substring(offset, to));
+                    g.fill(sx, textY - 1, ex, textY + 8, SELECTION);
+                }
+            }
             g.drawString(ctx.font(), visible, x() + 3, textY, ctx.skin().text(), false);
             final int caretX = x() + 3 + ctx.font().width(shown.substring(offset, caret));
             g.fill(caretX, textY - 1, caretX + 1, textY + 8, ctx.skin().text());
@@ -167,9 +179,57 @@ public class TextField extends UiComponent {
         return state.caret();
     }
 
+    /** Selects the whole text, as an address bar does when it is clicked into: Ctrl+C then copies it whole. */
+    public TextField selectAll() {
+        state.selectAll();
+        return this;
+    }
+
+    /** The selected text, or empty when nothing is selected. */
+    public String selectedText() {
+        return state.selectedText();
+    }
+
+    /** The colour the selection is drawn in, the same as the code editors use. */
+    private static final int SELECTION = 0x663A72B0;
+    /** The font the field was last drawn with, which is what a click is measured against. */
+    @Nullable
+    private net.minecraft.client.gui.Font font;
+    /** How many characters had scrolled out of view on the left when the field was last drawn. */
+    private int offset;
+
+    /**
+     * A click puts the caret where it landed, and with Shift held it selects up to there; a drag that
+     * follows selects as it goes, the way any field on any desktop does.
+     */
     @Override
     public boolean mouseClicked(final double mx, final double my, final int button) {
+        if (button == 0 && this.font != null && isFocused()) {
+            state.moveTo(indexAt(mx), net.minecraft.client.gui.screens.Screen.hasShiftDown());
+        }
         return true;
+    }
+
+    @Override
+    public boolean mouseDragged(final double mx, final double my, final int button) {
+        if (button == 0 && this.font != null && isFocused()) {
+            state.moveTo(indexAt(mx), true);
+        }
+        return true;
+    }
+
+    /** The place in the edit a horizontal position on the field means: between the two nearest characters. */
+    private int indexAt(final double mx) {
+        final String shown = state.edit();
+        final int left = x() + 3;
+        for (int i = this.offset; i < shown.length(); i++) {
+            final int before = this.font.width(shown.substring(this.offset, i));
+            final int after = this.font.width(shown.substring(this.offset, i + 1));
+            if (mx < left + (before + after) / 2.0) {
+                return i;
+            }
+        }
+        return shown.length();
     }
 
     @Override
@@ -189,6 +249,40 @@ public class TextField extends UiComponent {
         if (!isFocused()) {
             return false;
         }
+        final boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
+        if ((modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
+            /*
+             * The clipboard keys every field on every desktop answers to. Copying and cutting take the
+             * selection, or the whole text when nothing is selected, which is what a path in an
+             * address bar or a name in a rename box is used for.
+             */
+            switch (key) {
+                case GLFW.GLFW_KEY_C -> net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(
+                        state.hasSelection() ? state.selectedText() : state.edit());
+                case GLFW.GLFW_KEY_X -> {
+                    net.minecraft.client.Minecraft.getInstance().keyboardHandler.setClipboard(
+                            state.hasSelection() ? state.selectedText() : state.edit());
+                    if (!state.deleteSelection()) {
+                        state.sync("");
+                    }
+                    edited();
+                }
+                case GLFW.GLFW_KEY_V -> {
+                    final String pasted = net.minecraft.client.Minecraft.getInstance().keyboardHandler.getClipboard();
+                    for (final char c : pasted.replace("\r", "").replace('\n', ' ').toCharArray()) {
+                        if (accepts(c)) {
+                            state.type(c);
+                        }
+                    }
+                    edited();
+                }
+                case GLFW.GLFW_KEY_A -> state.selectAll();
+                case GLFW.GLFW_KEY_LEFT -> state.wordLeft(shift);
+                case GLFW.GLFW_KEY_RIGHT -> state.wordRight(shift);
+                default -> { }
+            }
+            return true;
+        }
         switch (key) {
             case GLFW.GLFW_KEY_BACKSPACE -> {
                 state.backspace();
@@ -198,10 +292,10 @@ public class TextField extends UiComponent {
                 state.delete();
                 edited();
             }
-            case GLFW.GLFW_KEY_LEFT -> state.left();
-            case GLFW.GLFW_KEY_RIGHT -> state.right();
-            case GLFW.GLFW_KEY_HOME -> state.home();
-            case GLFW.GLFW_KEY_END -> state.end();
+            case GLFW.GLFW_KEY_LEFT -> state.left(shift);
+            case GLFW.GLFW_KEY_RIGHT -> state.right(shift);
+            case GLFW.GLFW_KEY_HOME -> state.home(shift);
+            case GLFW.GLFW_KEY_END -> state.end(shift);
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER, GLFW.GLFW_KEY_TAB -> blur();
             case GLFW.GLFW_KEY_ESCAPE -> {
                 if (revertOnEscape) {

@@ -82,6 +82,15 @@ public final class MenuBar extends UiComponent {
         return List.copyOf(this.titles);
     }
 
+    /** The centre of the {@code index}-th title, where a test clicks to open its menu; null for none such. */
+    public int[] titleCenter(final int index) {
+        if (index < 0 || index >= this.titles.size()) {
+            return null;
+        }
+        final net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
+        return new int[] {titleX(index) + font.width(this.titles.get(index)) / 2, y() + height() / 2};
+    }
+
     /** The drop-down, for a test that wants to pick an entry from it. */
     public ContextMenu menu() {
         return this.menu;

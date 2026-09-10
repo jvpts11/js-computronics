@@ -83,4 +83,17 @@ class WindowGeometryTest {
         assertEquals(100, r.w(), "width = x2 - x1");
         assertEquals(50, r.h(), "height = y2 - y1");
     }
+
+    @Test
+    void scissor_underAScaledPoseShrinksTheClipTowardsTheOrigin() {
+        // A desktop drawn at three quarters: local 100..200 sits on the screen at 40 + 75 .. 40 + 150.
+        final WindowGeometry.Rect r = WindowGeometry.scissor(40f, 50f, 0.75f, 0.75f, 100, 20, 200, 60);
+        assertEquals(115, r.x(), "x = poseX + x1 * scale");
+        assertEquals(65, r.y(), "y = poseY + y1 * scale");
+        assertEquals(75, r.w(), "width scales with the pose");
+        assertEquals(30, r.h(), "height scales with the pose");
+        final WindowGeometry.Rect whole = WindowGeometry.scissor(40f, 50f, 1f, 1f, 5, 6, 105, 56);
+        assertEquals(45, whole.x(), "at scale one it is the plain sum");
+        assertEquals(100, whole.w());
+    }
 }

@@ -182,9 +182,15 @@ public final class TextDocument {
         if (!hasSelection()) {
             return false;
         }
-        remember("delete");
         final Spot from = selectionStart();
         final Spot to = selectionEnd();
+        /*
+         * The step is remembered with the caret at the start of what goes, so undo puts it back
+         * there rather than at whichever end the selection was swept from.
+         */
+        line = from.line();
+        col = from.col();
+        remember("delete");
         final StringBuilder first = lines.get(from.line());
         final String tail = lines.get(to.line()).substring(to.col());
         first.delete(from.col(), first.length());
