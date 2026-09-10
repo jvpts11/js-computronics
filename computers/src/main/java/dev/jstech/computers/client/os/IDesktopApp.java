@@ -72,6 +72,24 @@ public interface IDesktopApp {
     }
 
     /**
+     * What this app has open, for the machine to remember with its window and hand back to a fresh
+     * instance after the game itself was closed: a studio's solution and tabs, an explorer's folder.
+     *
+     * <p>A few lines of the app's own making, read back by {@link #restoreState}; empty when the app
+     * has nothing worth handing back, which is what an app that does not answer this says.
+     */
+    default String saveState() {
+        return "";
+    }
+
+    /**
+     * Takes back what {@link #saveState} wrote, on a fresh instance whose window has just been put on
+     * the desktop. What it names may be gone from the disk in the meantime; an app opens what it can.
+     */
+    default void restoreState(String state) {
+    }
+
+    /**
      * Renders the app's content within the inner rectangle (already offset past the title bar and
      * the window border).
      */
@@ -122,6 +140,14 @@ public interface IDesktopApp {
 
     /** Handles a mouse-wheel scroll over this app's window ({@code delta} &gt; 0 is up); true if consumed. */
     default boolean mouseScrolled(double delta) {
+        return false;
+    }
+
+    /**
+     * Whether Escape means something to the app right now: a menu to close, an editor with modes of its
+     * own. The desktop closes on Escape otherwise, and never while an app says it wants the key.
+     */
+    default boolean wantsEscape() {
         return false;
     }
 

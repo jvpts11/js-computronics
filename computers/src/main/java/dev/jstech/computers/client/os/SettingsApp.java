@@ -154,7 +154,7 @@ public final class SettingsApp implements IDesktopApp {
             active.snapshots++;
             // Reflect accent, brightness, clock, wallpaper, taskbar layout and dark mode on the live desktop now.
             DesktopScreen.applyLivePrefs(payload.accent(), payload.brightness(), payload.clock12h(),
-                    payload.wallpaper(), payload.taskbarCentered(), payload.darkMode());
+                    payload.wallpaper(), payload.taskbarCentered(), payload.darkMode(), payload.guiScale());
         }
     }
 
@@ -407,7 +407,34 @@ public final class SettingsApp implements IDesktopApp {
                 () -> set("brightness", Integer.toString(Math.max(0, b - 10))),
                 () -> set("brightness", Integer.toString(Math.min(100, b + 10))));
         y += 20;
+        /*
+         * How big everything on the glass is drawn. Smaller fits more of a program on the screen at
+         * the cost of smaller text, which is a choice for the player and the monitor they sit at.
+         */
+        caption("Scale", x, y, w);
+        y += 10;
+        final int scale = d.guiScale() <= 0 ? DesktopScreen.DEFAULT_SCALE : d.guiScale();
+        final int at = Math.max(0, SCALES.indexOf(scale));
+        stepper(x, y, font, scale + "%",
+                () -> set("guiscale", Integer.toString(SCALES.get(Math.min(SCALES.size() - 1, at + 1)))),
+                () -> set("guiscale", Integer.toString(SCALES.get(Math.max(0, at - 1)))));
+        y += 20;
         caption("Monitor: linked display", x, y, w);
+    }
+
+    /** The sizes the desktop can be drawn at, the biggest first, as percentages of its own size. */
+    private static final List<Integer> SCALES = List.of(100, 90, 80, 75, 66, 50);
+
+    /** The pages, by the index the navigation lists them at, for a menu that opens one directly. */
+    public static final int PAGE_PERSONALIZE = 0;
+    public static final int PAGE_DISPLAY = 4;
+
+    /** Opens on {@code index}'s page instead of the first one. */
+    public SettingsApp showPage(final int index) {
+        if (index >= 0 && index < NAV.size()) {
+            page = index;
+        }
+        return this;
     }
 
     private void programs(final int x, final int top, final int w, final Font font) {

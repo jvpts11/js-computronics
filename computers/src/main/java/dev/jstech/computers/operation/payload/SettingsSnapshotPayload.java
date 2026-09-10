@@ -77,34 +77,42 @@ public record SettingsSnapshotPayload(
         return TYPE;
     }
 
+    /** The most characters a label travels with; a longer one is cut, never refused. */
+    public static final int LABEL_MAX = 48;
+
+    /*
+     * Every string is cut to its cap before it is written. A cap on writeUtf is a hard failure that
+     * drops the connection, and a running program's name is a path the player chose, which nothing
+     * here can promise to be short: a project under progs/<solution>/<project>/build already was not.
+     */
     private static void encode(final RegistryFriendlyByteBuf buf, final SettingsSnapshotPayload p) {
         buf.writeBlockPos(p.hostPos);
-        buf.writeUtf(p.wallpaper, 48);
-        buf.writeUtf(p.computerName, 48);
+        buf.writeUtf(clip(p.wallpaper, LABEL_MAX), LABEL_MAX);
+        buf.writeUtf(clip(p.computerName, LABEL_MAX), LABEL_MAX);
         buf.writeInt(p.accent);
         buf.writeBoolean(p.clock12h);
         buf.writeVarInt(p.guiScale);
         buf.writeVarInt(p.brightness);
-        buf.writeUtf(p.saveDrive, 4);
+        buf.writeUtf(clip(p.saveDrive, 4), 4);
         buf.writeBoolean(p.removableAutoOpen);
-        buf.writeUtf(p.themePreset, 32);
+        buf.writeUtf(clip(p.themePreset, 32), 32);
         buf.writeBoolean(p.taskbarCentered);
         buf.writeBoolean(p.darkMode);
         buf.writeVarInt(p.netshare);
-        buf.writeUtf(p.cpuLabel, 64);
+        buf.writeUtf(clip(p.cpuLabel, 64), 64);
         buf.writeVarInt(p.cpuMhz);
         buf.writeVarInt(p.ramMb);
         buf.writeVarInt(p.vramMb);
-        buf.writeUtf(p.osLabel, 48);
-        buf.writeUtf(p.platform, 24);
+        buf.writeUtf(clip(p.osLabel, LABEL_MAX), LABEL_MAX);
+        buf.writeUtf(clip(p.platform, 24), 24);
         buf.writeVarInt(Math.min(p.installed.size(), MAX));
         for (int i = 0; i < p.installed.size() && i < MAX; i++) {
-            buf.writeUtf(p.installed.get(i), 96);
+            buf.writeUtf(clip(p.installed.get(i), 96), 96);
         }
         buf.writeVarInt(Math.min(p.disks.size(), MAX));
         for (int i = 0; i < p.disks.size() && i < MAX; i++) {
             final DiskUse d = p.disks.get(i);
-            buf.writeUtf(d.label(), 48);
+            buf.writeUtf(clip(d.label(), LABEL_MAX), LABEL_MAX);
             buf.writeVarLong(d.capMb());
             buf.writeVarLong(d.usedMb());
             buf.writeBoolean(d.system());
@@ -113,11 +121,16 @@ public record SettingsSnapshotPayload(
         buf.writeVarInt(Math.min(p.ramUses.size(), MAX));
         for (int i = 0; i < p.ramUses.size() && i < MAX; i++) {
             final RamUse r = p.ramUses.get(i);
-            buf.writeUtf(r.label(), 48);
+            buf.writeUtf(clip(r.label(), LABEL_MAX), LABEL_MAX);
             buf.writeVarInt(r.mb());
-            buf.writeUtf(r.kind(), 16);
+            buf.writeUtf(clip(r.kind(), 16), 16);
             buf.writeVarInt(r.id());
         }
+    }
+
+    private static String clip(final String text, final int max) {
+        final String s = text == null ? "" : text;
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private static SettingsSnapshotPayload decode(final RegistryFriendlyByteBuf buf) {

@@ -22,16 +22,19 @@ import java.util.List;
  *
  * <p>{@code iconCells} carries every free-positioned desktop icon's pinned grid cell, so the client
  * places those icons exactly where the player dropped them; an icon with no entry flows into the next
- * free auto-layout cell.
+ * free auto-layout cell. {@code pinned} names the programs pinned to the panel, by program id path, in
+ * the order they sit there.
  */
 public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String wallpaper,
                                   String computerName, List<String> programs,
                                   List<WireIconCell> iconCells, Prefs prefs,
-                                  List<WireCommunity> community) implements CustomPacketPayload {
+                                  List<WireCommunity> community, List<String> pinned)
+        implements CustomPacketPayload {
 
     public static final int MAX_FILES = 256;
     public static final int MAX_PROGRAMS = 16;
     public static final int MAX_ICON_CELLS = 256;
+    public static final int MAX_PINNED = dev.jstech.computers.program.ComputerSettings.MAX_PINNED;
 
     /** How many player-written programs one desktop shows; the same cap the Mirror's shelf has. */
     public static final int MAX_COMMUNITY = 64;
@@ -49,7 +52,8 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
      * The desktop-relevant per-computer settings the chrome applies: accent override, brightness, clock,
      * whether the taskbar app strip is centered (a Frames 11 look) or left-aligned, and dark mode.
      */
-    public record Prefs(int accent, int brightness, boolean clock12h, boolean taskbarCentered, boolean darkMode) {
+    public record Prefs(int accent, int brightness, boolean clock12h, boolean taskbarCentered, boolean darkMode,
+                        int scale) {
 
         public static final StreamCodec<RegistryFriendlyByteBuf, Prefs> STREAM_CODEC =
                 StreamCodec.composite(
@@ -58,6 +62,7 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
                         ByteBufCodecs.BOOL, Prefs::clock12h,
                         ByteBufCodecs.BOOL, Prefs::taskbarCentered,
                         ByteBufCodecs.BOOL, Prefs::darkMode,
+                        ByteBufCodecs.VAR_INT, Prefs::scale,
                         Prefs::new);
     }
 
@@ -93,10 +98,17 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
         buf.writeVarInt(Math.min(payload.community.size(), MAX_COMMUNITY));
         for (int i = 0; i < payload.community.size() && i < MAX_COMMUNITY; i++) {
             final WireCommunity one = payload.community.get(i);
-            buf.writeUtf(one.name(), 32);
-            buf.writeUtf(one.icon(), 16);
-            buf.writeUtf(one.entry(), 128);
+            // Cut, never refused: a cap on writeUtf drops the connection, and these names are the player's.
+            buf.writeUtf(clip(one.name(), 32), 32);
+            buf.writeUtf(clip(one.icon(), 16), 16);
+            buf.writeUtf(clip(one.entry(), 128), 128);
         }
+        ByteBufCodecs.stringUtf8(32).apply(ByteBufCodecs.list(MAX_PINNED)).encode(buf, payload.pinned);
+    }
+
+    private static String clip(final String text, final int max) {
+        final String s = text == null ? "" : text;
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     private static DesktopFilesPayload decode(final RegistryFriendlyByteBuf buf) {
@@ -114,7 +126,8 @@ public record DesktopFilesPayload(List<DiskFilesPayload.WireFile> files, String 
         for (int i = 0; i < count; i++) {
             community.add(new WireCommunity(buf.readUtf(32), buf.readUtf(16), buf.readUtf(128)));
         }
-        return new DesktopFilesPayload(files, wallpaper, computerName, programs, cells, prefs, community);
+        final List<String> pinned = ByteBufCodecs.stringUtf8(32).apply(ByteBufCodecs.list(MAX_PINNED)).decode(buf);
+        return new DesktopFilesPayload(files, wallpaper, computerName, programs, cells, prefs, community, pinned);
     }
 
     @Override

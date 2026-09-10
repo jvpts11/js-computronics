@@ -34,8 +34,19 @@ public final class DesktopWindow {
     public static final int RESIZE_TOP = 4;
     public static final int RESIZE_BOTTOM = 8;
 
+    /** Hands each window the order it was opened in, which is the order the panel lists programs in. */
+    private static int nextSerial;
+
     private final IDesktopApp app;
     private final String appKey;
+    private final int serial = nextSerial++;
+    /**
+     * The window this one is a dialog of, or null for a program's own window. A dialog is listed with
+     * its owner on the panel, always sits in front of it, and keeps the owner from taking input while
+     * it is up, the way an Open or Save window holds the program that opened it.
+     */
+    @org.jetbrains.annotations.Nullable
+    private DesktopWindow owner;
     private int x;
     private int y;
     private int w;
@@ -91,6 +102,31 @@ public final class DesktopWindow {
     /** A stable key (the launcher label) identifying which program this window hosts, for persistence. */
     public String appKey() {
         return appKey;
+    }
+
+    /** The order this window was opened in among every window of the session, lowest first. */
+    public int serial() {
+        return serial;
+    }
+
+    /** The window this is a dialog of, or null. */
+    @org.jetbrains.annotations.Nullable
+    public DesktopWindow owner() {
+        return owner;
+    }
+
+    public void setOwner(@org.jetbrains.annotations.Nullable final DesktopWindow value) {
+        this.owner = value;
+    }
+
+    /** Whether this is a dialog of another window rather than a program's own. */
+    public boolean dialog() {
+        return owner != null;
+    }
+
+    /** The program this window is listed under on the panel: its own, or its owner's for a dialog. */
+    public String groupKey() {
+        return owner != null ? owner.groupKey() : appKey;
     }
 
     public void setMaximized(final boolean value) {
@@ -408,12 +444,17 @@ public final class DesktopWindow {
             g.fill(wx + ww - 1, wy, wx + ww, wy + wh, accent);
         }
 
-        // Title-bar controls: minimize, maximize/restore, close (left to right), drawn in the skin's shape.
+        /*
+         * Title-bar controls: minimize, maximize/restore, close (left to right), drawn in the skin's shape.
+         * A dialog has only the close box: it is put away with its owner, never on its own.
+         */
         final int by = wy + 2;
         final int hover = buttonAt(mouseX, mouseY);
-        skin.windowControl(g, font, minX(), by, BTN, BTN, OsSkin.Control.MINIMIZE, hover == 1, pressedBtn == 1);
-        skin.windowControl(g, font, maxX(), by, BTN, BTN,
-                maximized ? OsSkin.Control.RESTORE : OsSkin.Control.MAXIMIZE, hover == 2, pressedBtn == 2);
+        if (!dialog()) {
+            skin.windowControl(g, font, minX(), by, BTN, BTN, OsSkin.Control.MINIMIZE, hover == 1, pressedBtn == 1);
+            skin.windowControl(g, font, maxX(), by, BTN, BTN,
+                    maximized ? OsSkin.Control.RESTORE : OsSkin.Control.MAXIMIZE, hover == 2, pressedBtn == 2);
+        }
         skin.windowControl(g, font, closeX(), by, BTN, BTN, OsSkin.Control.CLOSE, hover == 3, pressedBtn == 3);
 
         /*
@@ -428,7 +469,7 @@ public final class DesktopWindow {
         final org.joml.Matrix4f mat = g.pose().last().pose();
         final dev.jstech.core.gui.layout.WindowGeometry.Rect clip =
                 dev.jstech.core.gui.layout.WindowGeometry.scissor(
-                        (int) mat.m30(), (int) mat.m31(), cx, cy, cx + cw, cy + ch);
+                        mat.m30(), mat.m31(), mat.m00(), mat.m11(), cx, cy, cx + cw, cy + ch);
         g.enableScissor(clip.x(), clip.y(), clip.x() + clip.w(), clip.y() + clip.h());
         app.applySkin(skin);
         app.renderContent(g, font, cx, cy, cw, ch, mouseX, mouseY, partialTick);
@@ -442,6 +483,31 @@ public final class DesktopWindow {
             g.fill(gx, gy + GRIP - 2, gx + GRIP, gy + GRIP, border);
             g.fill(gx + GRIP - 2, gy, gx + GRIP, gy + GRIP, border);
         }
+    }
+
+    /**
+     * Draws this window small enough to fit a box {@code bw} by {@code bh} at ({@code bx}, {@code by}),
+     * centred in it and keeping its proportions: the live picture of the window a panel shows when the
+     * cursor rests on the program. The window is drawn exactly as it is, by its own program, scaled down;
+     * the cursor is kept far away so nothing in it lights up as hovered.
+     */
+    public void renderThumbnail(final GuiGraphics g, final Font font, final OsSkin skin,
+                                final int bx, final int by, final int bw, final int bh,
+                                final int screenW, final int screenH, final int taskbarH, final int workTop) {
+        resolveGeometry(screenW, screenH, taskbarH, workTop);
+        if (curW <= 0 || curH <= 0 || bw <= 0 || bh <= 0) {
+            return;
+        }
+        final float s = Math.min(bw / (float) curW, bh / (float) curH);
+        final float dx = bx + (bw - curW * s) / 2f;
+        final float dy = by + (bh - curH * s) / 2f;
+        dev.jstech.core.client.gui.component.Draw.pushScissor(g, bx, by, bx + bw, by + bh);
+        g.pose().pushPose();
+        g.pose().translate(dx - curX * s, dy - curY * s, 0);
+        g.pose().scale(s, s, 1f);
+        render(g, font, skin, -10000, -10000, 0f, screenW, screenH, taskbarH, workTop);
+        g.pose().popPose();
+        dev.jstech.core.client.gui.component.Draw.popScissor(g);
     }
 
     /**
@@ -480,11 +546,11 @@ public final class DesktopWindow {
     }
 
     public boolean maximizeBoxHit(final double mx, final double my) {
-        return inBtn(mx, my, maxX());
+        return !dialog() && inBtn(mx, my, maxX());
     }
 
     public boolean minimizeBoxHit(final double mx, final double my) {
-        return inBtn(mx, my, minX());
+        return !dialog() && inBtn(mx, my, minX());
     }
 
     /** Which title-bar button is under the point: 1 = minimize, 2 = maximize, 3 = close, 0 = none. */

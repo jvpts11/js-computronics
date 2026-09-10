@@ -28,6 +28,11 @@ import java.util.Map;
  */
 public final class ComputerSettings {
 
+    /** The most programs a panel keeps pinned; past that the panel has no room for its windows. */
+    public static final int MAX_PINNED = 12;
+    /** What a fresh machine pins: its file explorer. */
+    public static final String DEFAULT_PINNED = "files";
+
     /** Accent colour as an ARGB int; {@code 0} means "use the OS skin's default accent". */
     private int accent;
     /** Whether the taskbar clock shows a 12-hour time; default is 24-hour. */
@@ -46,6 +51,11 @@ public final class ComputerSettings {
     private boolean taskbarCentered = true;
     /** Whether the desktop and its programs use the dark theme (Frames 11 only); default light. */
     private boolean darkMode;
+    /**
+     * The programs pinned to the panel, by program id path ({@code files}, {@code editor}), in the order
+     * they were pinned. A fresh machine pins its file explorer, the way every desktop these imitate did.
+     */
+    private final List<String> pinned = new ArrayList<>(List.of(DEFAULT_PINNED));
     /** Default program id per lowercase file extension (e.g. {@code "txt" -> "jsc:editor"}). */
     private final Map<String, String> defaultApps = new LinkedHashMap<>();
 
@@ -69,8 +79,13 @@ public final class ComputerSettings {
         return guiScale;
     }
 
+    /**
+     * How big the desktop draws everything, as a percentage of its designed size: 100 is that size,
+     * anything down to 50 fits more on the glass at the cost of smaller text, and 0 means the default,
+     * which the desktop keeps at three quarters.
+     */
     public void setGuiScale(final int scale) {
-        this.guiScale = clamp(scale, 0, 4);
+        this.guiScale = scale <= 0 ? 0 : clamp(scale, 50, 100);
     }
 
     public int brightness() {
@@ -123,6 +138,50 @@ public final class ComputerSettings {
         this.darkMode = value;
     }
 
+    /** The programs pinned to the panel, by program id path, in the order they were pinned. */
+    public List<String> pinned() {
+        return java.util.Collections.unmodifiableList(pinned);
+    }
+
+    /** Replaces the pinned list (used on load): blanks and repeats are dropped, and the list is capped. */
+    public void setPinned(final List<String> ids) {
+        pinned.clear();
+        if (ids != null) {
+            for (final String id : ids) {
+                pin(id);
+            }
+        }
+    }
+
+    /** Pins a program to the panel, at the end; a program already pinned stays where it is. */
+    public boolean pin(final String id) {
+        final String key = normalizeId(id);
+        if (key.isEmpty() || pinned.contains(key) || pinned.size() >= MAX_PINNED) {
+            return false;
+        }
+        pinned.add(key);
+        return true;
+    }
+
+    /** Takes a program off the panel; false when it was not pinned. */
+    public boolean unpin(final String id) {
+        return pinned.remove(normalizeId(id));
+    }
+
+    public boolean isPinned(final String id) {
+        return pinned.contains(normalizeId(id));
+    }
+
+    /** A program id as the pinned list keeps it: its path, lower-case, without a {@code jsc:} namespace. */
+    private static String normalizeId(final String id) {
+        if (id == null) {
+            return "";
+        }
+        final String trimmed = id.trim().toLowerCase(Locale.ROOT);
+        final int colon = trimmed.indexOf(':');
+        return colon >= 0 ? trimmed.substring(colon + 1) : trimmed;
+    }
+
     /** The default program id for {@code ext} (lowercased), or {@code ""} when none is set. */
     public String defaultApp(final String ext) {
         return defaultApps.getOrDefault(ext == null ? "" : ext.toLowerCase(Locale.ROOT), "");
@@ -161,8 +220,8 @@ public final class ComputerSettings {
      * <p>Keys handled here: {@code clock} ({@code 12h}/{@code 24h}), {@code theme}, {@code taskbar}
      * ({@code center}/{@code left}), {@code darkmode} ({@code on}/{@code off}), {@code guiscale},
      * {@code brightness}, {@code savedrive}, {@code autoopen} ({@code on}/{@code off}), {@code accent}
-     * (six hex digits), and {@code defaultapp:<ext>}. The computer name, wallpaper, and network share are
-     * owned elsewhere and are not handled here.
+     * (six hex digits), {@code pin}/{@code unpin} (a program id), and {@code defaultapp:<ext>}. The
+     * computer name, wallpaper, and network share are owned elsewhere and are not handled here.
      *
      * @param key   the setting key (case-insensitive)
      * @param value the raw value
@@ -254,6 +313,17 @@ public final class ComputerSettings {
                 setAccent(argb);
                 return true;
             }
+            case "pin" -> {
+                /*
+                 * Pinning what is pinned already is not a mistake worth refusing: the panel asks for the
+                 * state it wants, and either way the program ends up pinned.
+                 */
+                return !normalizeId(v).isEmpty() && (isPinned(v) || pin(v));
+            }
+            case "unpin" -> {
+                unpin(v);
+                return !normalizeId(v).isEmpty();
+            }
             default -> {
                 return false;
             }
@@ -267,11 +337,12 @@ public final class ComputerSettings {
         lines.add(pad("theme") + (themePreset.isEmpty() ? "system" : themePreset));
         lines.add(pad("taskbar") + (taskbarCentered ? "center" : "left"));
         lines.add(pad("darkmode") + (darkMode ? "on" : "off"));
-        lines.add(pad("guiscale") + (guiScale == 0 ? "auto" : Integer.toString(guiScale)));
+        lines.add(pad("guiscale") + (guiScale == 0 ? "75% (default)" : guiScale + "%"));
         lines.add(pad("brightness") + brightness + "%");
         lines.add(pad("savedrive") + defaultSaveDrive + ":");
         lines.add(pad("autoopen") + (removableAutoOpen ? "on" : "off"));
         lines.add(pad("accent") + (accent == 0 ? "default" : String.format(Locale.ROOT, "#%06X", accent & 0xFFFFFF)));
+        lines.add(pad("pinned") + (pinned.isEmpty() ? "none" : String.join(", ", pinned)));
         return lines;
     }
 

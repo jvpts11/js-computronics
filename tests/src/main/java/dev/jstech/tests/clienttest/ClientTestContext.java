@@ -262,9 +262,20 @@ public final class ClientTestContext {
         return this;
     }
 
-    /** Teleports the synthetic player to {@code relative} (its feet), looking toward {@code facing}. */
+    /**
+     * Teleports the synthetic player to {@code relative} (its feet), looking toward {@code facing}, and
+     * waits for the client to have got there.
+     *
+     * <p>The move is the server's, and the client learns of it a packet later; the steps that follow
+     * click from where the client thinks the player stands, so a click sent before the move arrived
+     * would aim from the old place. A client busy with a mod's start-up work can fall a second behind
+     * in the first test of a run, which is exactly when that happened.
+     */
     public ClientTestContext thenTeleport(final int delayTicks, final BlockPos relative, final Direction facing) {
-        return thenServer(delayTicks, level -> teleport(relative, facing));
+        thenServer(delayTicks, level -> teleport(relative, facing));
+        return thenWaitUntil(() -> player() != null
+                        && player().position().distanceTo(Vec3.atBottomCenterOf(abs(relative))) < 2.0,
+                200, "the client's player to arrive at " + relative);
     }
 
     /** Right-clicks the block at {@code relative} with the empty hand, the way the player opens a GUI. */
@@ -446,7 +457,32 @@ public final class ClientTestContext {
     public void clickDesktop(final int[] point) {
         final dev.jstech.computers.client.os.DesktopScreen desktop =
                 screen(dev.jstech.computers.client.os.DesktopScreen.class);
-        click(desktop.desktopX() + point[0] + 0.5, desktop.desktopY() + point[1] + 0.5);
+        // A desktop drawn smaller puts its points closer together on the screen; the click goes where they are drawn.
+        click(desktop.desktopX() + point[0] * desktop.desktopScale() + 0.5,
+                desktop.desktopY() + point[1] * desktop.desktopScale() + 0.5);
+    }
+
+    /** Presses on one desktop-local point, drags to another and lets go, at the desktop's scale. */
+    public void dragDesktop(final int[] from, final int[] to) {
+        final dev.jstech.computers.client.os.DesktopScreen desktop =
+                screen(dev.jstech.computers.client.os.DesktopScreen.class);
+        final double s = desktop.desktopScale();
+        final double sx = desktop.desktopX() + from[0] * s + 0.5;
+        final double sy = desktop.desktopY() + from[1] * s + 0.5;
+        final double ex = desktop.desktopX() + to[0] * s + 0.5;
+        final double ey = desktop.desktopY() + to[1] * s + 0.5;
+        desktop.mouseClicked(sx, sy, 0);
+        desktop.mouseDragged((sx + ex) / 2, (sy + ey) / 2, 0, (ex - sx) / 2, (ey - sy) / 2);
+        desktop.mouseDragged(ex, ey, 0, (ex - sx) / 2, (ey - sy) / 2);
+        desktop.mouseReleased(ex, ey, 0);
+    }
+
+    /** The right button on a desktop-local point, the way {@link #clickDesktop} is the left one. */
+    public void rightClickDesktop(final int[] point) {
+        final dev.jstech.computers.client.os.DesktopScreen desktop =
+                screen(dev.jstech.computers.client.os.DesktopScreen.class);
+        rightClick(desktop.desktopX() + point[0] * desktop.desktopScale() + 0.5,
+                desktop.desktopY() + point[1] * desktop.desktopScale() + 0.5);
     }
 
     /** Clicks at ({@code x}, {@code y}) relative to the open container screen's top-left corner. */

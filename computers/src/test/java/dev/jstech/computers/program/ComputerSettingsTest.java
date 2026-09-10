@@ -24,9 +24,15 @@ class ComputerSettingsTest {
     }
 
     @Test
-    void setGuiScale_clampsAboveRangeToFour() {
+    void setGuiScale_holdsBetweenHalfAndWhole() {
         settings.setGuiScale(9);
-        assertEquals(4, settings.guiScale());
+        assertEquals(50, settings.guiScale(), "a percentage below half is held at half");
+        settings.setGuiScale(120);
+        assertEquals(100, settings.guiScale(), "nothing bigger than the designed size");
+        settings.setGuiScale(75);
+        assertEquals(75, settings.guiScale());
+        settings.setGuiScale(0);
+        assertEquals(0, settings.guiScale(), "zero stands for the default");
     }
 
     @Test
@@ -92,7 +98,7 @@ class ComputerSettingsTest {
     @Test
     void applySetting_guiscaleClampsThroughApply() {
         assertTrue(settings.applySetting("guiscale", "10"));
-        assertEquals(4, settings.guiScale());
+        assertEquals(50, settings.guiScale());
     }
 
     @Test
@@ -157,6 +163,53 @@ class ComputerSettingsTest {
     @Test
     void applySetting_darkmodeInvalidValueIsRejected() {
         assertFalse(settings.applySetting("darkmode", "sepia"));
+    }
+
+    @Test
+    void pinned_startsWithTheFileExplorer() {
+        assertEquals(java.util.List.of("files"), settings.pinned());
+        assertTrue(settings.isPinned("jsc:files"), "a namespaced id names the same program");
+    }
+
+    @Test
+    void pin_appendsOnceAndKeepsTheOrder() {
+        assertTrue(settings.pin("editor"));
+        assertFalse(settings.pin("Editor"), "pinning again changes nothing");
+        assertTrue(settings.pin("jsc:command_prompt"));
+        assertEquals(java.util.List.of("files", "editor", "command_prompt"), settings.pinned());
+    }
+
+    @Test
+    void unpin_takesTheProgramOff() {
+        assertTrue(settings.unpin("files"));
+        assertFalse(settings.unpin("files"), "already gone");
+        assertTrue(settings.pinned().isEmpty());
+    }
+
+    @Test
+    void pin_stopsAtTheCap() {
+        for (int i = 0; i < ComputerSettings.MAX_PINNED + 3; i++) {
+            settings.pin("program" + i);
+        }
+        assertEquals(ComputerSettings.MAX_PINNED, settings.pinned().size());
+    }
+
+    @Test
+    void setPinned_replacesTheListDroppingBlanksAndRepeats() {
+        settings.setPinned(java.util.List.of("editor", "", "editor", "files"));
+        assertEquals(java.util.List.of("editor", "files"), settings.pinned());
+        settings.setPinned(java.util.List.of());
+        assertTrue(settings.pinned().isEmpty(), "an empty list is a choice, not the default");
+    }
+
+    @Test
+    void applySetting_pinAndUnpinRouteToTheList() {
+        assertTrue(settings.applySetting("pin", "editor"));
+        assertTrue(settings.applySetting("pin", "editor"), "asking for what is already so is fine");
+        assertTrue(settings.isPinned("editor"));
+        assertTrue(settings.applySetting("unpin", "editor"));
+        assertFalse(settings.isPinned("editor"));
+        assertFalse(settings.applySetting("pin", "  "), "nothing to pin");
     }
 
     @Test

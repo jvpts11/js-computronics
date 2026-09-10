@@ -22,10 +22,13 @@ public final class ClientTestSuite {
     private static final List<Class<?>> CLASSES = List.of(
             CannonEditorClientTests.class,
             CraftingChainClientTests.class,
+            DesktopMenuClientTests.class,
+            ExposureClientTests.class,
             FilesSyncClientTests.class,
             FullJourneyClientTests.class,
             InstallMediaClientTests.class,
             TaskbarClientTests.class,
+            TerminalEditorClientTests.class,
             MekanismClientTests.class,
             UiSweepClientTests.class);
 

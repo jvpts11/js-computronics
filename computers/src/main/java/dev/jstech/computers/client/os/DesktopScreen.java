@@ -118,6 +118,28 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         PENDING_CLOSE.add(key);
     }
 
+    /**
+     * Opens {@code dialog} as a window of its own over the window running {@code owner}: it is listed
+     * with the owner on the panel, sits in front of it, and holds it until it is put away. The way an
+     * Open or Save window belongs to the program that asked. Nothing happens when no desktop is up or
+     * the owner has no window on it.
+     */
+    public static void openDialogFor(final IDesktopApp owner, final IDesktopApp dialog) {
+        if (active != null) {
+            active.openDialog(owner, dialog);
+        }
+    }
+
+    /** Puts away the window running {@code dialog}, when it is up. */
+    public static void closeDialog(final IDesktopApp dialog) {
+        if (active != null) {
+            active.closeWindowOf(dialog);
+        }
+    }
+
+    /** The programs pinned to the panel, by program id path, in the order the machine keeps them. */
+    private final List<String> pinnedPrograms = new ArrayList<>();
+
     /** Whether the computer at {@code pos} is on a data network, as its block entity tells the client. */
     public static boolean hostNetworked(final net.minecraft.core.BlockPos pos) {
         final net.minecraft.world.level.Level level = Minecraft.getInstance().level;
@@ -208,7 +230,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     public static void applyLivePrefs(final int accent, final int brightness, final boolean clock12h,
                                       final String wallpaper, final boolean taskbarCentered,
-                                      final boolean darkMode) {
+                                      final boolean darkMode, final int scale) {
         if (active != null) {
             active.desktopAccent = accent;
             active.desktopBrightness = brightness;
@@ -216,8 +238,53 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             active.desktopWallpaper = wallpaper == null ? "" : wallpaper;
             active.desktopTaskbarCentered = taskbarCentered;
             active.desktopDarkMode = darkMode;
+            active.desktopScale = scale;
             active.rebuildSkin();
         }
+    }
+
+    /**
+     * How big the desktop draws everything, as a percentage of its designed size; 0 stands for 100.
+     * Smaller fits more on the same glass, the way a display setting does on any desktop.
+     */
+    private int desktopScale;
+
+    /** The percentage the desktop is drawn at when the machine has not been told another: the size that reads best. */
+    public static final int DEFAULT_SCALE = 75;
+
+    /** The scale as a factor: three quarters unless the setting says otherwise. */
+    private double scale() {
+        return (desktopScale <= 0 ? DEFAULT_SCALE : desktopScale) / 100.0;
+    }
+
+    /** The screen x of a desktop-local x, for a hook that hands a test a point to click. */
+    private int sx(final int local) {
+        return ox() + (int) Math.round(local * scale());
+    }
+
+    private int sy(final int local) {
+        return oy() + (int) Math.round(local * scale());
+    }
+
+    /** The desktop-local x of an absolute screen x, allowing for where the glass is and how it is scaled. */
+    private double lx(final double absX) {
+        return (absX - ox()) / scale();
+    }
+
+    private double ly(final double absY) {
+        return (absY - oy()) / scale();
+    }
+
+    /**
+     * An absolute screen x moved so the container's own slot test, which adds {@code leftPos} to a
+     * slot's desktop-local x, lands on the right slot under a scaled desktop.
+     */
+    private double vx(final double absX) {
+        return ox() + lx(absX);
+    }
+
+    private double vy(final double absY) {
+        return oy() + ly(absY);
     }
 
     /** Rebuilds the skin from the current accent + dark-mode prefs (dark applies only to the flat Frames 11). */
@@ -332,15 +399,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private String desktopWallpaper = "";
     private String computerName = "";
 
-    // Desktop right-click context menu.
-    private boolean deskCtxOpen;
-    private int deskCtxX;
-    private int deskCtxY;
+    /** The desktop's right-click menu, the same component every program's menus are. */
+    private final dev.jstech.core.client.gui.component.ContextMenu deskMenu =
+            new dev.jstech.core.client.gui.component.ContextMenu(DESK_CTX_W, DESK_CTX_ITEM_H);
     /** Whether the panel's own menu is up, and where it was raised. */
     private boolean panelCtxOpen;
     private int panelCtxX;
     private int panelCtxY;
-    private int deskCtxItem = -1; // index into desktopItems, or -1 for the empty background
 
     /*
      * Drag-and-drop of a desktop icon (a file/folder, or a program launcher), onto a folder, an open
@@ -446,9 +511,27 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return topPanel() ? 0 : TASKBAR_H;
     }
 
-    // Windows 11 taskbar: each centered item (Start + one per open window) occupies this slot.
+    // Windows 11 taskbar: each centered item (Start + one per program) occupies this slot.
     private static final int WIN11_SLOT = 22;
     private static final int WIN11_ICON = 16;
+    /** A pinned program with no window, on the panels that keep it in place as an icon (KDE, Cinnamon). */
+    private static final int LAUNCHER_W = 22;
+    /** The pitch of the Frames XP quick launch icons beside Start. */
+    private static final int QL_W = 16;
+    /*
+     * The panel's popup: on a modern panel one card per window with its live picture, on a period one a
+     * list of titles. It rises after the cursor has rested on a program for a moment, and goes away a
+     * moment after the cursor has left both it and the program.
+     */
+    private static final int CARD_W = 60;
+    private static final int CARD_TITLE_H = 10;
+    private static final int THUMB_H = 32;
+    private static final int CARD_H = CARD_TITLE_H + THUMB_H + 4;
+    private static final int POPUP_PAD = 3;
+    private static final int LIST_W = 120;
+    private static final int LIST_ROW_H = 11;
+    private static final long HOVER_MS = 350L;
+    private static final long LEAVE_MS = 300L;
     private static final int MENU_W = 130;
     private static final int BAND_W = 22;
     private static final int MENU_ITEM_H = 18;
@@ -601,11 +684,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return os == null ? 0 : dev.jstech.computers.os.IOsHost.windowRamMb(key, os, chrome);
     }
 
-    /** What the open windows hold together. */
+    /** What the open windows hold together; a dialog is part of its program, not another copy of it. */
     private int windowsRamMb() {
         int sum = 0;
         for (final DesktopWindow w : windows) {
-            sum += windowRamMb(w.appKey());
+            if (!w.dialog()) {
+                sum += windowRamMb(w.appKey());
+            }
         }
         return sum;
     }
@@ -684,20 +769,33 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * The on-screen monitor "screen" rectangle: a centred window, not the whole game viewport. The extra slack
      * (vs the raw viewport) leaves room for the monitor frame drawn around the glass and its chin below it.
      */
-    private int sw() {
+    /** The glass's width on the screen, in screen pixels: what the frame wraps and the scissor clips. */
+    private int pw() {
         return Math.min(width - 44, 384);
     }
 
-    private int sh() {
+    private int ph() {
         return Math.min(height - 60, 256);
     }
 
+    /**
+     * The desktop's width as the desktop sees it: the glass's, and more of it when the desktop is
+     * drawn smaller. Everything laid out on the desktop uses this pair and is drawn under the scale.
+     */
+    private int sw() {
+        return (int) Math.round(pw() / scale());
+    }
+
+    private int sh() {
+        return (int) Math.round(ph() / scale());
+    }
+
     private int ox() {
-        return (width - sw()) / 2;
+        return (width - pw()) / 2;
     }
 
     private int oy() {
-        return (height - sh()) / 2;
+        return (height - ph()) / 2;
     }
 
     // inspection (client tests drive the desktop through the same hit areas the player clicks)
@@ -720,21 +818,116 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         return panelCtxOpen;
     }
 
-    /** Whether a window's menu, the one its taskbar button opens, is open. */
+    /** Whether a program's menu, the one its panel entry opens, is open. */
     public boolean isTaskMenuOpen() {
-        return taskMenuIndex >= 0;
+        return taskMenu.isOpen();
     }
 
     /**
-     * Screen position of the centre of the taskbar button of the {@code index}-th open window, wherever
-     * this panel keeps its buttons: centred on Frames 11, from the left on every other panel.
+     * Screen position of the centre of the {@code index}-th panel entry, wherever this panel keeps its
+     * entries: centred on Frames 11, from the left on every other panel.
      */
     public int[] taskButtonPoint(final int index) {
-        final int y = oy() + (topPanel() ? TASKBAR_H / 2 : sh() - TASKBAR_H / 2);
-        if (is(dev.jstech.computers.os.PanelStyle.FRAMES_11)) {
-            return new int[] {ox() + win11AppsX(sw()) + index * WIN11_SLOT + WIN11_SLOT / 2, y};
+        final TaskStrip strip = taskStrip(sw());
+        return index >= 0 && index < strip.entries().size() ? taskEntryPoint(strip.entries().get(index).key()) : null;
+    }
+
+    /**
+     * Screen position of the centre of the panel entry of the program {@code key}, or null when the
+     * panel has none for it. On Frames XP a pinned program with no window is its quick launch icon.
+     */
+    public int[] taskEntryPoint(final String key) {
+        final TaskStrip strip = taskStrip(sw());
+        final int index = dev.jstech.computers.gui.TaskbarGroups.indexOf(strip.entries(), key);
+        if (index < 0) {
+            return null;
         }
-        return new int[] {ox() + taskButtonX(index, sw()) + taskButtonW(sw()) / 2, y};
+        final int y = sy(topPanel() ? TASKBAR_H / 2 : sh() - TASKBAR_H / 2);
+        if (strip.w()[index] > 0) {
+            return new int[] {sx(strip.x()[index] + strip.w()[index] / 2), y};
+        }
+        final int quick = strip.quickIndexOf(index);
+        return quick < 0 ? null : new int[] {sx(strip.quickX() + quick * QL_W + QL_W / 2), y};
+    }
+
+    /** The programs the panel lists, in order: the pinned ones first, then every open one. */
+    public List<String> taskEntryLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final dev.jstech.computers.gui.TaskbarGroups.Entry entry : taskEntries()) {
+            out.add(entry.key());
+        }
+        return out;
+    }
+
+    /** The programs pinned to the panel, by the label the panel shows them under. */
+    public List<String> pinnedLabels() {
+        return pinnedKeys();
+    }
+
+    /** Whether the panel's popup (the windows of one program) is up. */
+    public boolean isTaskPopupOpen() {
+        return taskPopupKey != null && !popupWindows().isEmpty();
+    }
+
+    /** The titles the panel's popup lists, in order, empty when it is not up. */
+    public List<String> taskPopupTitles() {
+        final List<String> out = new ArrayList<>();
+        for (final DesktopWindow w : popupWindows()) {
+            out.add(w.app().title());
+        }
+        return out;
+    }
+
+    /** The desktop-local centre of the popup's {@code index}-th card or row, where a test clicks it. */
+    public int[] taskPopupItemPoint(final int index) {
+        final int[] r = popupItemRect(index);
+        return r == null ? null : new int[] {r[0] + r[2] / 2, r[1] + r[3] / 2};
+    }
+
+    /** The desktop-local centre of the popup's close box for its {@code index}-th window. */
+    public int[] taskPopupClosePoint(final int index) {
+        final int[] r = popupCloseRect(index);
+        return r == null ? null : new int[] {r[0] + r[2] / 2, r[1] + r[3] / 2};
+    }
+
+    /** The labels of the open program menu, in order, empty when none is up. */
+    public List<String> taskMenuLabels() {
+        final List<String> out = new ArrayList<>();
+        if (taskMenu.isOpen()) {
+            for (final dev.jstech.core.client.gui.component.ContextMenu.Item item : taskMenu.items()) {
+                out.add(item.label());
+            }
+        }
+        return out;
+    }
+
+    /** The desktop-local centre of the program menu's entry {@code label}, or null when it is not there. */
+    public int[] taskMenuPoint(final String label) {
+        final List<String> labels = taskMenuLabels();
+        final int index = labels.indexOf(label);
+        return index < 0 ? null : taskMenu.itemCenter(index);
+    }
+
+    /** The titles of the dialog windows up on the desktop, front-most last. */
+    public List<String> dialogTitles() {
+        final List<String> out = new ArrayList<>();
+        for (final DesktopWindow w : windows) {
+            if (w.dialog()) {
+                out.add(w.app().title());
+            }
+        }
+        return out;
+    }
+
+    /** The dialog window up over a window of the program {@code label}, or null. */
+    public DesktopWindow dialogWindowFor(final String label) {
+        for (int i = windows.size() - 1; i >= 0; i--) {
+            final DesktopWindow w = windows.get(i);
+            if (w.dialog() && w.groupKey().equals(label)) {
+                return w;
+            }
+        }
+        return null;
     }
 
     /** Screen position of the centre of the panel menu's {@code label} entry, or null when it is not there. */
@@ -745,8 +938,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         for (int i = 0; i < PANEL_CTX.length; i++) {
             if (PANEL_CTX[i].equals(label)) {
-                return new int[] {ox() + panelCtxX + PANEL_CTX_W / 2,
-                        oy() + panelCtxY + 1 + i * DESK_CTX_ITEM_H + DESK_CTX_ITEM_H / 2};
+                return new int[] {sx(panelCtxX + PANEL_CTX_W / 2),
+                        sy(panelCtxY + 1 + i * DESK_CTX_ITEM_H + DESK_CTX_ITEM_H / 2)};
             }
         }
         return null;
@@ -754,15 +947,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Screen position of a point on the panel clear of Start and of the task buttons: its empty stretch. */
     public int[] emptyPanelPoint() {
-        return new int[] {ox() + Math.max(TASK_X, taskStripRight(sw()) - 8),
-                oy() + sh() - TASKBAR_H / 2};
+        return new int[] {sx(Math.max(TASK_X, taskStripRight(sw()) - 8)), sy(sh() - TASKBAR_H / 2)};
     }
 
-    /** The labels of the windows this desktop has open, in the order they were opened. */
+    /** The labels of the program windows this desktop has open (dialogs aside), back to front. */
     public List<String> openWindowLabels() {
         final List<String> out = new ArrayList<>();
         for (final DesktopWindow w : windows) {
-            out.add(w.appKey());
+            if (!w.dialog()) {
+                out.add(w.appKey());
+            }
         }
         return out;
     }
@@ -776,6 +970,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
         return "";
+    }
+
+    /**
+     * What this desktop calls its terminal (Command Prompt, Megashell, Konsole...), for a program
+     * offering to open one; empty when no desktop is up or it has none.
+     */
+    public static String terminalName() {
+        return active == null ? "" : active.terminalLabel();
     }
 
     public List<String> launcherLabels() {
@@ -794,11 +996,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** The open window hosting the program launched under {@code label}, or null. */
     @org.jetbrains.annotations.Nullable
-    /** Every window of a program, front-most last, since a program may be open more than once. */
+    /** Every window of a program (its dialogs aside), front-most last, since a program may be open more than once. */
     public List<DesktopWindow> windowsFor(final String label) {
         final List<DesktopWindow> out = new ArrayList<>();
         for (final DesktopWindow w : windows) {
-            if (w.appKey().equals(label)) {
+            if (!w.dialog() && w.appKey().equals(label)) {
                 out.add(w);
             }
         }
@@ -807,7 +1009,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     public DesktopWindow windowFor(final String label) {
         for (final DesktopWindow w : windows) {
-            if (w.appKey().equals(label)) {
+            if (!w.dialog() && w.appKey().equals(label)) {
                 return w;
             }
         }
@@ -816,17 +1018,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     /** Screen coordinates of the Start button's centre. */
     public int startButtonX() {
-        return ox() + (is(dev.jstech.computers.os.PanelStyle.FRAMES_11) ? 4 + WIN11_SLOT / 2 : 30);
+        return sx(is(dev.jstech.computers.os.PanelStyle.FRAMES_11) ? 4 + WIN11_SLOT / 2 : 30);
     }
 
     public int startButtonY() {
         // GNOME's "Activities" launcher lives in the top bar; every other panel sits at the bottom.
-        return oy() + (topPanel() ? TASKBAR_H / 2 : sh() - TASKBAR_H / 2);
+        return sy(topPanel() ? TASKBAR_H / 2 : sh() - TASKBAR_H / 2);
     }
 
     /** Screen coordinates of the centre of the {@code index}-th Start menu entry (valid while it is open). */
     public int startMenuItemX() {
-        return ox() + startMenuX() + BAND_W + 30;
+        return sx(startMenuX() + BAND_W + 30);
     }
 
     /**
@@ -837,9 +1039,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (panel == dev.jstech.computers.os.PanelStyle.FRAMES_XP
                 && index >= 0 && index < launchers.size()) {
             final boolean place = XP_PLACES.contains(launchers.get(index).label());
-            final int colX = ox() + startMenuX() + (place ? XP_LEFT_W + 3 : 3);
+            final int colX = startMenuX() + (place ? XP_LEFT_W + 3 : 3);
             final int colW = place ? XP_MENU_W - XP_LEFT_W - 6 : XP_LEFT_W - 6;
-            return colX + colW / 2;
+            return sx(colX + colW / 2);
         }
         return startMenuItemX();
     }
@@ -854,9 +1056,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int row = Math.max(0, column.indexOf(target));
             // The left column has a separator under its pinned block, so its rows are not a plain multiple.
             final int rowY = place ? row * XP_ROW_H : xpLeftRowY(row);
-            return oy() + tbY - startMenuHeight() + XP_HEADER_H + XP_ORANGE_H + 3 + rowY + XP_ROW_H / 2;
+            return sy(tbY - startMenuHeight() + XP_HEADER_H + XP_ORANGE_H + 3 + rowY + XP_ROW_H / 2);
         }
-        return oy() + tbY - startMenuHeight() + 4 + index * MENU_ITEM_H + MENU_ITEM_H / 2;
+        return sy(tbY - startMenuHeight() + 4 + index * MENU_ITEM_H + MENU_ITEM_H / 2);
     }
 
     /**
@@ -899,7 +1101,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * beside the monitor rather than over it.
      */
     public MonitorFrameStyle.Geometry frameBounds() {
-        return MonitorFrameStyle.forEra(era()).geometry(ox(), oy(), sw(), sh());
+        // The frame wraps the glass as it is on the screen, whatever the desktop inside it is scaled to.
+        return MonitorFrameStyle.forEra(era()).geometry(ox(), oy(), pw(), ph());
     }
 
     @Override
@@ -909,8 +1112,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
          * where ox()/oy() place the desktop. The inventory/title labels the base would draw are pushed
          * off-screen, since the desktop draws its own chrome.
          */
-        this.imageWidth = sw();
-        this.imageHeight = sh();
+        this.imageWidth = pw();
+        this.imageHeight = ph();
         super.init();
         this.leftPos = ox();
         this.topPos = oy();
@@ -976,6 +1179,13 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             w.setMinimized(ow.minimized());
             w.setMaximized(ow.maximized());
             screen.windows.add(w);
+            /*
+             * A kept instance still has everything it had; a fresh one, made because the game itself
+             * was closed in between, is handed what the machine remembered it having open.
+             */
+            if (!restored && !ow.state().isEmpty()) {
+                app.restoreState(ow.state());
+            }
         }
     }
 
@@ -996,7 +1206,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         final StringBuilder signature = new StringBuilder();
         for (final DesktopWindow w : windows) {
-            signature.append(w.appKey()).append(w.minimized() ? '-' : '+').append(';');
+            if (!w.dialog()) {
+                signature.append(w.appKey()).append(w.minimized() ? '-' : '+').append(';');
+            }
         }
         final String now = signature.toString();
         if (now.equals(pushedLayout)) {
@@ -1014,13 +1226,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      */
     private boolean powerCycling;
 
-    /** The current windows as the machine should remember them: floating bounds plus their state. */
+    /**
+     * The current windows as the machine should remember them: floating bounds plus their state. A
+     * dialog is a question in flight, not something a machine has open, so it is not remembered.
+     */
     private java.util.List<dev.jstech.computers.os.OpenWindow> snapshotWindows() {
         final java.util.List<dev.jstech.computers.os.OpenWindow> out =
                 new java.util.ArrayList<>(windows.size());
         for (final DesktopWindow w : windows) {
-            out.add(new dev.jstech.computers.os.OpenWindow(
-                    w.appKey(), w.floatX(), w.floatY(), w.floatW(), w.floatH(), w.minimized(), w.maximized()));
+            if (!w.dialog()) {
+                out.add(new dev.jstech.computers.os.OpenWindow(
+                        w.appKey(), w.floatX(), w.floatY(), w.floatW(), w.floatH(), w.minimized(), w.maximized(),
+                        w.app().saveState()));
+            }
         }
         return out;
     }
@@ -1198,6 +1416,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         active.desktopClock12h = payload.prefs().clock12h();
         active.desktopTaskbarCentered = payload.prefs().taskbarCentered();
         active.desktopDarkMode = payload.prefs().darkMode();
+        active.desktopScale = payload.prefs().scale();
+        active.pinnedPrograms.clear();
+        active.pinnedPrograms.addAll(payload.pinned());
         active.rebuildSkin();
         active.iconCells.clear();
         for (final DesktopFilesPayload.WireIconCell cell : payload.iconCells()) {
@@ -1259,6 +1480,17 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                     runAtTerminal(key.substring(RUN_AT_TERMINAL.length()));
                     continue;
                 }
+                if (key.startsWith(OPEN_PROPS)) {
+                    // A desktop icon's Properties: the explorer on the desktop's folder shows the window.
+                    final String path = key.substring(OPEN_PROPS.length());
+                    if (allowOpen("Files")) {
+                        final FilesApp files = new FilesApp(host, desktopId.getPath(),
+                                FilesApp.desktopDirFor(desktopId.getPath()), monitorPos);
+                        files.showPropertiesFor(FsPaths.fileName(path));
+                        openApp("Files", files);
+                    }
+                    continue;
+                }
                 if (key.startsWith(TYPE_AT_TERMINAL)) {
                     typeAtTerminal(List.of(key.substring(TYPE_AT_TERMINAL.length()).split("\n")));
                     continue;
@@ -1288,9 +1520,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!PENDING_CLOSE.isEmpty()) {
             for (final String key : PENDING_CLOSE) {
                 for (int i = windows.size() - 1; i >= 0; i--) {
-                    if (windows.get(i).appKey().equals(key)) {
-                        windows.get(i).app().onClosed();
-                        windows.remove(i);
+                    final DesktopWindow w = windows.get(i);
+                    if (!w.dialog() && w.appKey().equals(key)) {
+                        closeWindow(w);
                         break;
                     }
                 }
@@ -1307,21 +1539,24 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int sh = sh();
         final int ox = ox();
         final int oy = oy();
-        final int lmx = mouseX - ox;
-        final int lmy = mouseY - oy;
+        final int lmx = (int) Math.floor(lx(mouseX));
+        final int lmy = (int) Math.floor(ly(mouseY));
         // Cache the local cursor so the Start-menu draw (called deeper in this frame) can highlight the hovered row.
         this.hoverX = lmx;
         this.hoverY = lmy;
+        updateTaskPopup(lmx, lmy, sw, sh - TASKBAR_H);
         final HardwareEra eraNow = era();
 
         /*
          * The host computer's hardware-era monitor frame wraps the desktop glass, then translate so the desktop
          * draws in local (0,0)-(sw,sh) coordinates.
          */
-        MonitorFrame.renderBody(g, ox, oy, sw, sh, eraNow, font);
+        MonitorFrame.renderBody(g, ox, oy, pw(), ph(), eraNow, font);
         g.pose().pushPose();
         g.pose().translate(ox, oy, 0);
-        g.enableScissor(ox, oy, ox + sw, oy + sh);
+        // Everything on the desktop is drawn under its scale, so a smaller setting fits more on the glass.
+        g.pose().scale((float) scale(), (float) scale(), 1);
+        g.enableScissor(ox, oy, ox + pw(), oy + ph());
 
         WallpaperPainter.paint(g, sw, sh, desktopId, eraNow, desktopWallpaper);
 
@@ -1497,27 +1732,44 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                 g.fill(12, tbY + 12, 15, tbY + 15, 0xFFE6B928);
                 g.drawString(font, "Start", 18, tbY + 8, 0xFF000000, false);
             }
-            final int taskRight = taskStripRight(sw);
-            final int btnW = taskButtonW(sw);
-            final DesktopWindow taskFront = frontWindow();
-            for (int i = 0; i < windows.size(); i++) {
-                final int bx = taskButtonX(i, sw);
-                if (bx + btnW > taskRight) {
+            final TaskStrip strip = taskStrip(sw);
+            if (osp.equals("frames_xp")) {
+                drawQuickLaunch(g, strip, tbY, sh, lmx, lmy);
+            }
+            final boolean xp = osp.equals("frames_xp");
+            for (int i = 0; i < strip.entries().size(); i++) {
+                final dev.jstech.computers.gui.TaskbarGroups.Entry entry = strip.entries().get(i);
+                final int bx = strip.x()[i];
+                final int btnW = strip.w()[i];
+                if (btnW == 0) {
+                    continue; // on the quick launch only, or not shown at all
+                }
+                if (bx + btnW > strip.right()) {
                     break;
                 }
-                final DesktopWindow w = windows.get(i);
+                final boolean active = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.ACTIVE;
+                final boolean minimized = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.MINIMIZED;
                 /*
-                 * The window in front reads as a pushed-in button, the way a taskbar has always said which
-                 * program you are actually looking at.
+                 * The program in front reads as a pushed-in button, the way a taskbar has always said which
+                 * program you are actually looking at; one whose windows are all put away sits raised and
+                 * paler, so it reads as "on the panel only".
                  */
-                taskButton(g, bx, tbY + 3, btnW, TASKBAR_H - 6, osp, w == taskFront && !w.minimized());
-                ProgramIcons.draw(g, bx + 4, tbY + 6, 12, 12, programIdForLabel(w.appKey()), iconSet());
+                taskButton(g, bx, tbY + 3, btnW, TASKBAR_H - 6, osp, active);
+                if (minimized) {
+                    g.fill(bx + 1, tbY + 4, bx + btnW - 1, sh - 4, xp ? 0x38FFFFFF : 0x30FFFFFF);
+                }
+                ProgramIcons.draw(g, bx + 4, tbY + 6, 12, 12, programIdForLabel(entry.key()), iconSet());
                 /*
                  * No shadow: the taskbar button name sits on a solid button, where a shadow only muddies it
                  * (a dark blob behind the dark 95 text, a halo behind the light XP text).
                  */
-                g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 20, tbY + 8,
-                        theme.startText(), false);
+                final boolean several = entry.windows() > 1;
+                final int textColor = minimized ? (xp ? 0xFFD0DCF0 : 0xFF606060) : theme.startText();
+                g.drawString(font, trim(entryLabel(entry), taskTitleChars(btnW - (several ? 8 : 0))), bx + 20, tbY + 8,
+                        textColor, false);
+                if (several) {
+                    drawCaret(g, bx + btnW - 8, tbY + 10, textColor);
+                }
             }
             // The notification area, dressed in each version's own frame.
             final int trayX = trayLeft(sw);
@@ -1550,9 +1802,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             drawTrayTip(g, tbY, sw);
             g.pose().popPose();
         }
+        // The windows of one program, over the panel and the windows themselves.
+        if (taskPopupKey != null) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, DesktopZ.MENU);
+            renderTaskPopup(g, tbY, sw, sh, lmx, lmy);
+            g.pose().popPose();
+        }
 
         // Menus (Start + desktop context), above the taskbar.
-        if (startOpen || deskCtxOpen || panelCtxOpen) {
+        if (startOpen || deskMenu.isOpen() || panelCtxOpen) {
             g.pose().pushPose();
             g.pose().translate(0, 0, DesktopZ.MENU);
             if (startOpen) {
@@ -1561,8 +1820,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             if (panelCtxOpen) {
                 renderPanelContext(g, lmx, lmy);
             }
-            if (deskCtxOpen) {
-                renderDeskContext(g, lmx, lmy);
+            if (deskMenu.isOpen()) {
+                deskMenu.render(g, new dev.jstech.core.client.gui.component.UiContext(skin, font, lmx, lmy, partialTick));
             }
             g.pose().popPose();
         }
@@ -1675,11 +1934,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             renderPowerDialog(g, sw, sh, lmx, lmy);
             g.pose().popPose();
         }
-        // The taskbar's own menu sits above the windows it acts on.
-        if (taskMenuIndex >= 0) {
+        // A program's own menu, from its panel entry, sits above the windows it acts on.
+        if (taskMenu.isOpen()) {
             g.pose().pushPose();
             g.pose().translate(0, 0, DesktopZ.POPUP);
-            renderTaskMenu(g, lmx, lmy);
+            taskMenu.render(g, new dev.jstech.core.client.gui.component.UiContext(skin, font, lmx, lmy, partialTick));
             g.pose().popPose();
         }
         g.pose().popPose(); // close the (ox, oy) desktop-origin translate
@@ -2041,56 +2300,48 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
      * <p>A menu rather than a dialog: it is the same question as the one that was just asked with the
      * right button, and the answer is one of a handful of names.
      */
-    private void openWith(final String path) {
-        final java.util.List<DeskEntry> entries = new java.util.ArrayList<>();
+    private java.util.List<dev.jstech.core.client.gui.component.ContextMenu.Item> openWithItems(final String path) {
+        final java.util.List<dev.jstech.core.client.gui.component.ContextMenu.Item> entries = new java.util.ArrayList<>();
         for (final String programId
                 : dev.jstech.computers.os.fs.FileOpeners.available(path, installedPrograms)) {
             final dev.jstech.computers.os.ProgramSpec spec = dev.jstech.computers.program.Programs.get(
                     net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("jsc", programId));
             final String label = spec == null ? programId : spec.displayName();
-            entries.add(new DeskEntry(label, () -> openIn(programId, path)));
+            entries.add(new dev.jstech.core.client.gui.component.ContextMenu.Item(label, true, () -> openIn(programId, path)));
         }
         if (entries.isEmpty()) {
-            showBalloon("Cannot open", "No program on this computer opens " + FsPaths.fileName(path));
-            return;
+            entries.add(new dev.jstech.core.client.gui.component.ContextMenu.Item("No program opens this", false, () -> { }));
         }
-        deskCtxEntries = java.util.List.copyOf(entries);
-        deskCtxOpen = true;
+        return entries;
     }
 
-    /**
-     * One line of a desktop menu: what it says, and what it does.
-     *
-     * <p>The labels and the actions used to be two lists kept in step by an index, which is how a
-     * program icon came to offer the wallpaper's menu. An entry carries its own action, so a menu is
-     * built for whatever was actually right-clicked and there is nothing left to keep in step.
-     */
-    private record DeskEntry(String label, Runnable action) {
+    /** What New offers on the desktop: a folder first, then a file of every kind the machine can create. */
+    private java.util.List<dev.jstech.core.client.gui.component.ContextMenu.Item> newDeskItems() {
+        final java.util.List<dev.jstech.core.client.gui.component.ContextMenu.Item> entries = new java.util.ArrayList<>();
+        entries.add(new dev.jstech.core.client.gui.component.ContextMenu.Item("Folder", true, this::newDeskFolder));
+        entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+        for (final dev.jstech.computers.os.fs.FileType type
+                : dev.jstech.computers.os.fs.FileOpeners.creatable()) {
+            entries.add(new dev.jstech.core.client.gui.component.ContextMenu.Item(
+                    FilesApp.typeLabel(type) + " (." + type.extension() + ")", true, () -> newDeskFile(type)));
+        }
+        return entries;
     }
 
-    /** The menu currently open on the desktop, built when it was opened. */
-    private java.util.List<DeskEntry> deskCtxEntries = java.util.List.of();
-
-    private void renderDeskContext(final GuiGraphics g, final int hoverMx, final int hoverMy) {
-        final String[] items = deskCtxEntries.stream().map(DeskEntry::label).toArray(String[]::new);
-        if (items.length == 0) {
-            return;
+    /** Opens the Settings window on one of its pages, the way a menu entry names a page rather than the program. */
+    private void openSettingsPage(final int page) {
+        if (allowOpen("Settings")) {
+            openApp("Settings", new SettingsApp(host, monitorPos).showPage(page));
         }
-        final int mx = deskCtxX;
-        final int my = deskCtxY;
-        final int mh = items.length * DESK_CTX_ITEM_H + 2;
-        g.fill(mx - 1, my - 1, mx + DESK_CTX_W + 1, my + mh + 1, 0xFF000000);
-        g.fill(mx, my, mx + DESK_CTX_W, my + mh, 0xFFE8E8EC);
-        g.fill(mx, my, mx + DESK_CTX_W, my + 1, 0xFFFFFFFF);
-        final int hover = hoverMx >= mx && hoverMx <= mx + DESK_CTX_W
-                ? (int) Math.floor((hoverMy - (my + 1)) / (double) DESK_CTX_ITEM_H) : -1;
-        int iy = my + 1;
-        for (int k = 0; k < items.length; k++) {
-            if (k == hover) {
-                g.fill(mx + 1, iy, mx + DESK_CTX_W - 1, iy + DESK_CTX_ITEM_H, 0xFF000080);
+    }
+
+    /** Runs the launcher labelled {@code label}, when the desktop has one. */
+    private void runLauncherCalled(final String label) {
+        for (final Launcher launcher : launchers) {
+            if (launcher.label().equals(label)) {
+                runLauncher(launcher);
+                return;
             }
-            g.drawString(font, items[k], mx + 4, iy + 2, k == hover ? 0xFFFFFFFF : 0xFF1A2230, false);
-            iy += DESK_CTX_ITEM_H;
         }
     }
 
@@ -2173,69 +2424,115 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
     }
 
-    private int deskCtxItemAt(final double mx, final double my) {
-        if (mx < deskCtxX || mx > deskCtxX + DESK_CTX_W) {
-            return -1;
-        }
-        final int rel = (int) Math.floor((my - (deskCtxY + 1)) / (double) DESK_CTX_ITEM_H);
-        return rel >= 0 && rel < deskCtxEntries.size() ? rel : -1;
-    }
-
-    private void runDeskContext(final int item) {
-        if (item >= 0 && item < deskCtxEntries.size()) {
-            deskCtxEntries.get(item).action().run();
-        }
-    }
-
     /**
      * Opens the menu for whatever the cursor is on: a program, a file or folder, or the wallpaper.
      *
      * <p>Each gets the entries that mean something for it, which is why a program no longer offers to
-     * be renamed and the wallpaper no longer offers to be opened.
+     * be renamed and the wallpaper no longer offers to be opened. The entries are the ones a desktop
+     * has: a file opens, opens with a chosen program, is renamed, deleted or looked at; the wallpaper
+     * makes new things, refreshes, and leads to the settings that dress it.
      */
     private void openDeskContext(final int slot, final int x, final int y) {
-        final java.util.List<DeskEntry> entries = new java.util.ArrayList<>();
+        final java.util.List<dev.jstech.core.client.gui.component.ContextMenu.Item> entries = new java.util.ArrayList<>();
         if (slot >= 0 && slot < launchers.size()) {
             final Launcher launcher = launchers.get(slot);
-            entries.add(new DeskEntry("Open", () -> runLauncher(launcher)));
+            entries.add(deskItem("Open", true, () -> runLauncher(launcher)));
             /*
              * Only what the machine could actually take off: the programs that ship with a system are
              * part of it, so offering to remove one would be offering something that then fails.
              */
             final dev.jstech.computers.os.ProgramSpec spec =
                     dev.jstech.computers.program.Programs.get(launcher.programId());
+            if (pinsOnPanel() && launcher.factory() != null) {
+                final boolean pinned = pinnedPrograms.contains(launcher.programId().getPath());
+                entries.add(deskItem(pinned ? "Unpin from taskbar" : "Pin to taskbar", true,
+                        () -> togglePin(launcher.label())));
+            }
             if (spec != null && spec.installable()) {
-                entries.add(new DeskEntry("Uninstall", () -> uninstallLauncher(spec)));
+                entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+                entries.add(deskItem("Uninstall", true, () -> uninstallLauncher(spec)));
             }
         } else if (slot >= launchers.size() && slot - launchers.size() < desktopItems.size()) {
             final int di = slot - launchers.size();
             final DiskFilesPayload.WireFile file = desktopItems.get(di);
-            entries.add(new DeskEntry("Open", () -> openSlot(launchers.size() + di)));
+            entries.add(deskItem("Open", true, () -> openSlot(launchers.size() + di)));
             if (!file.directory()) {
-                entries.add(new DeskEntry("Open with...", () -> openWith(file.path())));
+                entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.submenu("Open with", openWithItems(file.path())));
             }
+            entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
             /*
              * A projection of what a drive holds is not a file anybody wrote, so it cannot be renamed or
              * deleted by hand; the filesystem refuses both, and a menu that offered them would be lying.
              */
-            if (!file.readOnly()) {
-                entries.add(new DeskEntry("Rename", () -> startDeskRename(di)));
-                entries.add(new DeskEntry("Delete", () -> deleteDeskItem(di)));
-            }
+            entries.add(deskItem("Rename", !file.readOnly(), () -> startDeskRename(di)));
+            entries.add(deskItem("Delete", !file.readOnly(), () -> deleteDeskItem(di)));
+            entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+            entries.add(deskItem("Properties", true, () -> requestFileProperties(file.path())));
         } else {
-            for (final dev.jstech.computers.os.fs.FileType type
-                    : dev.jstech.computers.os.fs.FileOpeners.creatable()) {
-                entries.add(new DeskEntry("New ." + type.extension(), () -> newDeskFile(type)));
-            }
-            entries.add(new DeskEntry("New Folder", this::newDeskFolder));
-            entries.add(new DeskEntry("Personalize", this::cycleWallpaper));
-            entries.add(new DeskEntry("Refresh", this::requestDesktop));
+            entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.submenu("New", newDeskItems()));
+            entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+            entries.add(deskItem("Refresh", true, this::requestDesktop));
+            entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+            entries.add(deskItem("Display settings", true, () -> openSettingsPage(SettingsApp.PAGE_DISPLAY)));
+            entries.add(deskItem("Personalize", true, () -> openSettingsPage(SettingsApp.PAGE_PERSONALIZE)));
+            entries.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+            entries.add(deskItem("Properties", true, () -> runLauncherCalled("This PC")));
         }
-        deskCtxEntries = java.util.List.copyOf(entries);
-        deskCtxItem = slot >= launchers.size() ? slot - launchers.size() : -1;
-        deskCtxX = x;
-        deskCtxY = y;
-        deskCtxOpen = !entries.isEmpty();
+        deskMenu.open(entries, x, y, 0, 0, sw(), sh());
+    }
+
+    private static dev.jstech.core.client.gui.component.ContextMenu.Item deskItem(
+            final String label, final boolean enabled, final Runnable action) {
+        return new dev.jstech.core.client.gui.component.ContextMenu.Item(label, enabled, action);
+    }
+
+    /* What a test reads of the desktop's menu and its scale. */
+
+    /** Whether the desktop's right-click menu is up. */
+    public boolean deskMenuOpen() {
+        return deskMenu.isOpen();
+    }
+
+    /** The desktop-local centre of the desk menu's item {@code index}, where a test clicks it. */
+    public int[] deskMenuItemCenter(final int index) {
+        return deskMenu.itemCenter(index);
+    }
+
+    /** The labels of the desk menu's items, in order, so a test finds one by name. */
+    public List<String> deskMenuLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final dev.jstech.core.client.gui.component.ContextMenu.Item item : deskMenu.items()) {
+            out.add(item.label());
+        }
+        return out;
+    }
+
+    /** The desktop-local centre of item {@code index} of the menu open beside the desk menu, or null when none is. */
+    public int[] deskSubmenuItemCenter(final int index) {
+        final dev.jstech.core.client.gui.component.ContextMenu sub = deskMenu.openSubmenu();
+        return sub == null ? null : sub.itemCenter(index);
+    }
+
+    /** The names of the files and folders on the desktop, as their icons read. */
+    public List<String> desktopItemNames() {
+        final List<String> out = new ArrayList<>();
+        for (final DiskFilesPayload.WireFile file : desktopItems) {
+            out.add(FsPaths.fileName(file.path()));
+        }
+        return out;
+    }
+
+    /** The scale the desktop is drawn at, as a factor, which a test needs to land a click on a scaled desktop. */
+    public double desktopScale() {
+        return scale();
+    }
+
+    /** A queued request to show a file's Properties window: the explorer opens on its folder and shows it. */
+    private static final String OPEN_PROPS = "Props\0";
+
+    /** Asks for the Properties window of a file on the desktop, which the explorer knows how to show. */
+    public static void requestFileProperties(final String path) {
+        PENDING_OPEN.add(OPEN_PROPS + path);
     }
 
     /** Takes a program off this computer, the way {@code uninstall} at the prompt does. */
@@ -2450,7 +2747,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!desktopTaskbarCentered) {
             return 4;
         }
-        final int group = (windows.size() + 1) * WIN11_SLOT;
+        final int group = (taskEntries().size() + 1) * WIN11_SLOT;
         return Math.max(4, (sw - group) / 2);
     }
 
@@ -2564,28 +2861,102 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         drawWin11Start(g, startX + (WIN11_SLOT - 11) / 2, iconY + 2);
 
-        // Open windows' app icons, CENTERED, each with hover/active background and an indicator underneath.
-        final int appsX = win11AppsX(sw);
-        final DesktopWindow front = frontWindow();
-        for (int i = 0; i < windows.size(); i++) {
-            final DesktopWindow w = windows.get(i);
-            final int ix = appsX + i * WIN11_SLOT;
+        /*
+         * One icon per program, CENTERED: the pinned ones first, then the open ones, each with a hover or
+         * active background and an indicator underneath that says how it stands. A pinned program with
+         * nothing open is the icon alone; an open one carries a dot; the one in front a wide pill; a
+         * program with several windows has its mark split in two; and a program whose windows are all
+         * put away sits dimmed.
+         */
+        final TaskStrip strip = taskStrip(sw);
+        for (int i = 0; i < strip.entries().size(); i++) {
+            final dev.jstech.computers.gui.TaskbarGroups.Entry entry = strip.entries().get(i);
+            final int ix = strip.x()[i];
             final boolean hover = lmx >= ix && lmx < ix + WIN11_SLOT && lmy >= tbY;
-            final boolean active = w == front && !w.minimized();
-            if (hover || active) {
+            final boolean active = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.ACTIVE;
+            final boolean shown = entry.key().equals(taskPopupKey);
+            if (hover || active || shown) {
                 g.fill(ix + 1, tbY + 2, ix + WIN11_SLOT - 1, bottom - 2, active ? 0x26FFFFFF : 0x18FFFFFF);
             }
-            ProgramIcons.draw(g, ix + (WIN11_SLOT - WIN11_ICON) / 2, iconY, WIN11_ICON, WIN11_ICON - 2,
-                    programIdForLabel(w.appKey()), "frames_11");
-            final int cx = ix + WIN11_SLOT / 2;
-            if (active) {
-                g.fill(cx - 6, bottom - 2, cx + 6, bottom - 1, 0xFF4C84F0); // wide pill = focused
-            } else if (!w.minimized()) {
-                g.fill(cx - 2, bottom - 2, cx + 2, bottom - 1, 0xFF8A93A4); // short dot = open
+            final int iconX = ix + (WIN11_SLOT - WIN11_ICON) / 2;
+            ProgramIcons.draw(g, iconX, iconY, WIN11_ICON, WIN11_ICON - 2, programIdForLabel(entry.key()), "frames_11");
+            if (entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.MINIMIZED) {
+                g.fill(iconX, iconY, iconX + WIN11_ICON, iconY + WIN11_ICON - 2, 0x901E1F23);
             }
+            drawWin11Indicator(g, ix + WIN11_SLOT / 2, bottom, entry);
         }
 
         drawTray(g, tbY, sw, 0xFFE6E8EC);
+    }
+
+    /** The mark under a Frames 11 icon: what the program is doing, in the bar's own language. */
+    private static void drawWin11Indicator(final GuiGraphics g, final int cx, final int bottom,
+                                           final dev.jstech.computers.gui.TaskbarGroups.Entry entry) {
+        final boolean several = entry.windows() > 1;
+        switch (entry.state()) {
+            case ACTIVE -> {
+                if (several) {
+                    g.fill(cx - 6, bottom - 2, cx - 1, bottom - 1, 0xFF4C84F0);
+                    g.fill(cx + 1, bottom - 2, cx + 6, bottom - 1, 0xFF4C84F0);
+                } else {
+                    g.fill(cx - 6, bottom - 2, cx + 6, bottom - 1, 0xFF4C84F0);
+                }
+            }
+            case OPEN, MINIMIZED -> {
+                final int color = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.OPEN
+                        ? 0xFF8A93A4 : 0xFF5E6570;
+                if (several) {
+                    g.fill(cx - 4, bottom - 2, cx - 1, bottom - 1, color);
+                    g.fill(cx + 1, bottom - 2, cx + 4, bottom - 1, color);
+                } else {
+                    g.fill(cx - 2, bottom - 2, cx + 2, bottom - 1, color);
+                }
+            }
+            default -> {
+            }
+        }
+    }
+
+    /**
+     * The Frames XP quick launch: the pinned programs as small icons right after Start, with a rule
+     * between them and the task buttons, the way that desktop kept them.
+     */
+    private void drawQuickLaunch(final GuiGraphics g, final TaskStrip strip, final int tbY, final int sh,
+                                 final int lmx, final int lmy) {
+        if (strip.quickCount() == 0) {
+            return;
+        }
+        int j = 0;
+        for (final dev.jstech.computers.gui.TaskbarGroups.Entry entry : strip.entries()) {
+            if (!entry.pinned()) {
+                continue;
+            }
+            final int qx = strip.quickX() + j * QL_W;
+            if (lmx >= qx && lmx < qx + QL_W && lmy >= tbY) {
+                g.fill(qx, tbY + 3, qx + QL_W, sh - 3, 0x30FFFFFF);
+            }
+            ProgramIcons.draw(g, qx + 2, tbY + 6, 12, 12, programIdForLabel(entry.key()), iconSet());
+            j++;
+        }
+        final int rule = strip.quickX() + strip.quickCount() * QL_W + 2;
+        g.fill(rule, tbY + 5, rule + 1, sh - 5, 0xFF2C5FA8);
+        g.fill(rule + 1, tbY + 5, rule + 2, sh - 5, 0xFF6FA3EF);
+    }
+
+    /** A small downward caret: a program with several windows says so at the end of its button. */
+    private static void drawCaret(final GuiGraphics g, final int x, final int y, final int color) {
+        g.fill(x, y, x + 5, y + 1, color);
+        g.fill(x + 1, y + 1, x + 4, y + 2, color);
+        g.fill(x + 2, y + 2, x + 3, y + 3, color);
+    }
+
+    /** What a task button says: the window's title, or the count and the program when there are several. */
+    private String entryLabel(final dev.jstech.computers.gui.TaskbarGroups.Entry entry) {
+        if (entry.windows() > 1) {
+            return entry.windows() + " " + entry.key();
+        }
+        final List<DesktopWindow> mine = groupWindows(entry.key());
+        return mine.isEmpty() ? entry.key() : mine.get(mine.size() - 1).app().title();
     }
 
     /** The balloon's box in desktop-local coordinates, or null when none is up. Draw and hit-test share it. */
@@ -2677,30 +3048,198 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private static final int TASK_MAX_W = 84;
 
     /**
-     * How wide each task button is: the strip shared out between the open windows, never wider than is
-     * comfortable nor narrower than a name can be read in. A taskbar that keeps one fixed width simply runs
-     * out of room, which is what hid the open programs behind the notification area.
+     * Where every panel entry sits this frame, so the drawing and the hit tests share one reckoning.
+     *
+     * @param entries    the programs on the panel, in panel order
+     * @param x          the left edge of each entry's button or cell
+     * @param w          the width of each; zero for an entry the strip does not show (a Frames XP pin,
+     *                   which lives on the quick launch instead)
+     * @param quickX     where the Frames XP quick launch starts
+     * @param quickCount how many icons the quick launch holds
+     * @param right      where the strip must stop, clear of the notification area
      */
-    private int taskButtonW(final int sw) {
-        final int strip = Math.max(0, taskStripRight(sw) - TASK_X);
-        final int count = Math.max(1, windows.size());
-        return Math.max(TASK_MIN_W, Math.min(TASK_MAX_W, strip / count - TASK_GAP));
-    }
+    private record TaskStrip(List<dev.jstech.computers.gui.TaskbarGroups.Entry> entries, int[] x, int[] w,
+                             int quickX, int quickCount, int right) {
 
-    /** The left edge of the {@code i}-th task button. */
-    private int taskButtonX(final int i, final int sw) {
-        return TASK_X + i * (taskButtonW(sw) + TASK_GAP);
-    }
-
-    /** The task button under a desktop-local x, or {@code -1} where the strip is empty or has run out. */
-    private int taskIndexAt(final double mx, final int sw) {
-        final int w = taskButtonW(sw);
-        final int idx = (int) ((mx - TASK_X) / (w + TASK_GAP));
-        if (idx < 0 || idx >= windows.size()) {
+        /** The entry whose button or cell is under a desktop-local x, or -1. */
+        int indexAt(final double mx) {
+            for (int i = 0; i < entries.size(); i++) {
+                if (w[i] > 0 && x[i] + w[i] <= right && mx >= x[i] && mx < x[i] + w[i]) {
+                    return i;
+                }
+            }
             return -1;
         }
-        final int bx = taskButtonX(idx, sw);
-        return mx <= bx + w && bx + w <= taskStripRight(sw) ? idx : -1;
+
+        /** The place of entry {@code index} on the quick launch (its rank among the pinned), or -1. */
+        int quickIndexOf(final int index) {
+            if (quickCount == 0 || !entries.get(index).pinned()) {
+                return -1;
+            }
+            int j = 0;
+            for (int i = 0; i < index; i++) {
+                if (entries.get(i).pinned()) {
+                    j++;
+                }
+            }
+            return j;
+        }
+
+        /** The entry whose quick launch icon is under a desktop-local x, or -1. */
+        int quickEntryAt(final double mx) {
+            if (quickCount == 0 || mx < quickX || mx >= quickX + quickCount * QL_W) {
+                return -1;
+            }
+            final int wanted = (int) ((mx - quickX) / QL_W);
+            int j = 0;
+            for (int i = 0; i < entries.size(); i++) {
+                if (entries.get(i).pinned()) {
+                    if (j == wanted) {
+                        return i;
+                    }
+                    j++;
+                }
+            }
+            return -1;
+        }
+    }
+
+    /**
+     * The strip shared out between the programs, never wider than is comfortable nor narrower than a name
+     * can be read in. A taskbar that keeps one fixed width simply runs out of room, which is what hid the
+     * open programs behind the notification area. Frames 11 gives every program one slot; Frames XP keeps
+     * the pinned programs on a quick launch beside Start; KDE and Cinnamon keep a pinned program in place
+     * as an icon until it opens; the older panels list only what is open.
+     */
+    private TaskStrip taskStrip(final int sw) {
+        final List<dev.jstech.computers.gui.TaskbarGroups.Entry> entries = taskEntries();
+        final int n = entries.size();
+        final int[] x = new int[n];
+        final int[] w = new int[n];
+        final int right = taskStripRight(sw);
+        if (is(dev.jstech.computers.os.PanelStyle.FRAMES_11)) {
+            final int appsX = win11AppsX(sw);
+            for (int i = 0; i < n; i++) {
+                x[i] = appsX + i * WIN11_SLOT;
+                w[i] = WIN11_SLOT;
+            }
+            return new TaskStrip(entries, x, w, 0, 0, sw);
+        }
+        int left = TASK_X;
+        int quickX = 0;
+        int quickCount = 0;
+        if (is(dev.jstech.computers.os.PanelStyle.FRAMES_XP)) {
+            quickX = XP_START_W + 4;
+            for (final dev.jstech.computers.gui.TaskbarGroups.Entry entry : entries) {
+                if (entry.pinned()) {
+                    quickCount++;
+                }
+            }
+            left = quickCount > 0 ? quickX + quickCount * QL_W + 6 : TASK_X;
+        }
+        final boolean launcherCells = linuxDesktop() && !periodPanel();
+        int openCount = 0;
+        int launcherCount = 0;
+        for (final dev.jstech.computers.gui.TaskbarGroups.Entry entry : entries) {
+            if (entry.open()) {
+                openCount++;
+            } else if (launcherCells) {
+                launcherCount++;
+            }
+        }
+        final int strip = Math.max(0, right - left - launcherCount * LAUNCHER_W);
+        final int btnW = openCount == 0 ? 0
+                : Math.max(TASK_MIN_W, Math.min(TASK_MAX_W, strip / openCount - TASK_GAP));
+        int cx = left;
+        for (int i = 0; i < n; i++) {
+            final dev.jstech.computers.gui.TaskbarGroups.Entry entry = entries.get(i);
+            if (entry.open()) {
+                x[i] = cx;
+                w[i] = btnW;
+                cx += btnW + TASK_GAP;
+            } else if (launcherCells) {
+                x[i] = cx;
+                w[i] = LAUNCHER_W;
+                cx += LAUNCHER_W;
+            }
+        }
+        return new TaskStrip(entries, x, w, quickX, quickCount, right);
+    }
+
+    /** The programs on the panel, in its order, grouped from the windows and the pins. */
+    private List<dev.jstech.computers.gui.TaskbarGroups.Entry> taskEntries() {
+        final List<dev.jstech.computers.gui.TaskbarGroups.Window> list = new ArrayList<>(windows.size());
+        for (final DesktopWindow w : windows) {
+            list.add(new dev.jstech.computers.gui.TaskbarGroups.Window(w.groupKey(), w.minimized(), w.serial()));
+        }
+        final DesktopWindow front = frontWindow();
+        return dev.jstech.computers.gui.TaskbarGroups.group(list, pinnedKeys(), front == null ? null : front.groupKey());
+    }
+
+    /**
+     * Whether this panel keeps pinned programs in view. The Frames 95 taskbar and the period panels
+     * never had a place for them, and the GNOME top bar lists no programs at all.
+     */
+    private boolean pinsOnPanel() {
+        if (periodPanel()) {
+            return false;
+        }
+        return is(dev.jstech.computers.os.PanelStyle.FRAMES_11) || is(dev.jstech.computers.os.PanelStyle.FRAMES_XP)
+                || is(dev.jstech.computers.os.PanelStyle.KDE) || is(dev.jstech.computers.os.PanelStyle.CINNAMON);
+    }
+
+    /** Whether the panel's popup shows the windows' live pictures (a modern panel) rather than their titles. */
+    private boolean thumbnailPopups() {
+        return !periodPanel() && (is(dev.jstech.computers.os.PanelStyle.FRAMES_11)
+                || is(dev.jstech.computers.os.PanelStyle.KDE) || is(dev.jstech.computers.os.PanelStyle.CINNAMON));
+    }
+
+    /** The pinned programs by the label the panel lists them under; only those this desktop can start. */
+    private List<String> pinnedKeys() {
+        final List<String> out = new ArrayList<>();
+        if (!pinsOnPanel()) {
+            return out;
+        }
+        for (final String id : pinnedPrograms) {
+            for (final Launcher launcher : launchers) {
+                if (launcher.factory() != null && launcher.programId().getPath().equals(id)) {
+                    out.add(launcher.label());
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The launcher a panel entry stands for, or null for a program with no launcher (the Task Manager). */
+    @org.jetbrains.annotations.Nullable
+    private Launcher pinnableLauncher(final String key) {
+        for (final Launcher launcher : launchers) {
+            if (launcher.factory() != null && launcher.label().equals(key)) {
+                return launcher;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Pins a program to the panel or takes it off, and tells the machine, which keeps the list. The
+     * panel changes at once rather than waiting for the machine's reply.
+     */
+    private void togglePin(final String key) {
+        final Launcher launcher = pinnableLauncher(key);
+        if (launcher == null) {
+            return;
+        }
+        final String id = launcher.programId().getPath();
+        final boolean pinned = pinnedPrograms.contains(id);
+        if (pinned) {
+            pinnedPrograms.remove(id);
+        } else {
+            pinnedPrograms.add(id);
+        }
+        PacketDistributor.sendToServer(new dev.jstech.computers.operation.payload.SetSettingPayload(
+                host, pinned ? "unpin" : "pin", id));
     }
 
     /** How many characters of a title fit on a task button of {@code w} pixels, after its icon. */
@@ -3065,24 +3604,55 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             g.fill(13, tbY + 10, 17, tbY + 14, theme.startButton());
             g.drawString(font, "Menu", 26, tbY + 8, theme.startText(), false);
         }
-        // Task buttons.
-        final int taskRight = taskStripRight(sw);
-        final int btnW = taskButtonW(sw);
-        final DesktopWindow front = frontWindow();
-        for (int i = 0; i < windows.size(); i++) {
-            final int bx = taskButtonX(i, sw);
-            if (bx + btnW > taskRight) {
+        /*
+         * The task manager: a pinned program with nothing open is its icon alone; an open program is a
+         * button with a line under it; the one in front fills with the accent; one whose windows are all
+         * put away goes faint; and one with several windows stacks and carries their number.
+         */
+        final TaskStrip strip = taskStrip(sw);
+        final int accent = theme.startButton();
+        for (int i = 0; i < strip.entries().size(); i++) {
+            final dev.jstech.computers.gui.TaskbarGroups.Entry entry = strip.entries().get(i);
+            final int bx = strip.x()[i];
+            final int bw = strip.w()[i];
+            if (bw == 0) {
+                continue;
+            }
+            if (bx + bw > strip.right()) {
                 break;
             }
-            final DesktopWindow w = windows.get(i);
-            final boolean active = w == front && !w.minimized();
-            g.fill(bx, tbY + 3, bx + btnW, sh - 3, active ? 0x30FFFFFF : theme.taskButton());
-            if (active) {
-                g.fill(bx, sh - 4, bx + btnW, sh - 3, theme.startButton());
+            final boolean hot = lmx >= bx && lmx < bx + bw && lmy >= tbY;
+            final boolean shown = entry.key().equals(taskPopupKey);
+            if (!entry.open()) {
+                if (hot || shown) {
+                    g.fill(bx, tbY + 3, bx + bw, sh - 3, 0x22FFFFFF);
+                }
+                ProgramIcons.draw(g, bx + 3, tbY + 4, 16, 16, programIdForLabel(entry.key()), iconSet());
+                continue;
             }
-            ProgramIcons.draw(g, bx + 3, tbY + 4, 16, 16, programIdForLabel(w.appKey()), iconSet());
-            g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 22, tbY + 8,
-                    theme.startText(), false);
+            final boolean active = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.ACTIVE;
+            final boolean minimized = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.MINIMIZED;
+            final boolean several = entry.windows() > 1;
+            if (several) {
+                g.fill(bx + 2, tbY + 1, bx + bw + 2, tbY + 3, theme.taskButton());
+                g.fill(bx + bw, tbY + 3, bx + bw + 2, sh - 5, theme.taskButton());
+            }
+            g.fill(bx, tbY + 3, bx + bw, sh - 3, active ? accent : (hot || shown) ? 0x30FFFFFF : theme.taskButton());
+            final int line = active ? 0xFFFFFFFF : minimized ? (accent & 0x00FFFFFF) | 0x60000000 : accent;
+            g.fill(bx, sh - 4, bx + bw, sh - 3, line);
+            ProgramIcons.draw(g, bx + 3, tbY + 4, 16, 16, programIdForLabel(entry.key()), iconSet());
+            if (minimized) {
+                g.fill(bx + 3, tbY + 4, bx + 19, tbY + 20, (theme.taskbar() & 0x00FFFFFF) | 0x90000000);
+            }
+            final int textColor = active ? 0xFFFFFFFF : minimized ? 0xFF7C838A : theme.startText();
+            final int textW = bw - 22 - (several ? 12 : 0);
+            g.drawString(font, trim(entryLabel(entry), taskTitleChars(textW + 20)), bx + 22, tbY + 8, textColor, false);
+            if (several) {
+                final int badgeX = bx + bw - 12;
+                g.fill(badgeX, tbY + 5, badgeX + 10, tbY + 13, active ? 0xFFFFFFFF : accent);
+                dev.jstech.core.client.gui.component.Texts.small(g, font, String.valueOf(entry.windows()),
+                        badgeX + 3, tbY + 6, active ? accent : 0xFFFFFFFF);
+            }
         }
         drawTray(g, tbY, sw, theme.startText());
     }
@@ -3107,21 +3677,29 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
          * The strip's origin and its shared-out width are the ones the taskbar click handler tests against,
          * so the button a player sees and the button they hit are the same rectangle.
          */
-        final int taskRight = taskStripRight(sw);
-        final int btnW = taskButtonW(sw);
-        final DesktopWindow front = frontWindow();
-        for (int i = 0; i < windows.size(); i++) {
-            final int bx = taskButtonX(i, sw);
-            if (bx + btnW > taskRight) {
+        final TaskStrip strip = taskStrip(sw);
+        for (int i = 0; i < strip.entries().size(); i++) {
+            final dev.jstech.computers.gui.TaskbarGroups.Entry entry = strip.entries().get(i);
+            final int bx = strip.x()[i];
+            final int btnW = strip.w()[i];
+            if (btnW == 0) {
+                continue;
+            }
+            if (bx + btnW > strip.right()) {
                 break;
             }
-            final DesktopWindow w = windows.get(i);
-            final boolean active = w == front && !w.minimized();
+            final boolean active = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.ACTIVE;
+            final boolean minimized = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.MINIMIZED;
+            final boolean several = entry.windows() > 1;
             final boolean hot = lmx >= bx && lmx <= bx + btnW && lmy >= tbY;
             skin.button(g, font, bx, tbY + 3, btnW, TASKBAR_H - 6, "", hot, active, false);
-            ProgramIcons.draw(g, bx + 3, tbY + 5, 12, 12, programIdForLabel(w.appKey()), iconSet());
-            g.drawString(font, trim(w.app().title(), taskTitleChars(btnW)), bx + 19,
-                    tbY + 8 + (active ? 1 : 0), skin.text(), false);
+            ProgramIcons.draw(g, bx + 3, tbY + 5, 12, 12, programIdForLabel(entry.key()), iconSet());
+            final int textColor = minimized ? skin.dim() : skin.text();
+            g.drawString(font, trim(entryLabel(entry), taskTitleChars(btnW - (several ? 8 : 0))), bx + 19,
+                    tbY + 8 + (active ? 1 : 0), textColor, false);
+            if (several) {
+                drawCaret(g, bx + btnW - 8, tbY + 10 + (active ? 1 : 0), textColor);
+            }
         }
 
         /*
@@ -3693,93 +4271,501 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     private int powerSurfaceW;
     private int powerSurfaceH;
 
-    // Taskbar context menu
+    // The panel's entries: a program's menu, its windows, and the popup that lists them
 
     private static final int TASK_MENU_W = 118;
-    private static final int TASK_MENU_ROW_H = 12;
-    private static final String[] TASK_MENU_ITEMS = {
-            "Bring to front", "Minimize", "Maximize", "Minimize others", "Close",
-    };
 
-    /** The taskbar entry whose menu is open, or -1. */
-    private int taskMenuIndex = -1;
-    private int taskMenuX;
-    private int taskMenuY;
+    /** A program's own menu, from its panel entry: the same component every menu on this desktop is. */
+    private final dev.jstech.core.client.gui.component.ContextMenu taskMenu =
+            new dev.jstech.core.client.gui.component.ContextMenu(TASK_MENU_W, DESK_CTX_ITEM_H);
 
-    private int taskMenuHeight() {
-        return 4 + TASK_MENU_ITEMS.length * TASK_MENU_ROW_H;
-    }
+    /** The program whose windows the panel's popup shows, or null while none is up. */
+    @org.jetbrains.annotations.Nullable
+    private String taskPopupKey;
+    /** Whether the popup was opened by a click, so it stays until one puts it away. */
+    private boolean taskPopupSticky;
+    /** The program the cursor has been resting on, and since when. */
+    @org.jetbrains.annotations.Nullable
+    private String taskHoverKey;
+    private long taskHoverSince;
+    /** When the cursor left the popup and its program, or zero while it is on one of them. */
+    private long taskPopupLeftAt;
 
-    /** Draws the taskbar's context menu; returns false when none is open. */
-    private boolean renderTaskMenu(final GuiGraphics g, final int mouseX, final int mouseY) {
-        if (taskMenuIndex < 0 || taskMenuIndex >= windows.size()) {
-            taskMenuIndex = -1;
-            return false;
-        }
-        final int x = taskMenuX;
-        final int y = taskMenuY - taskMenuHeight();
-        skin.windowShadow(g, x, y, TASK_MENU_W, taskMenuHeight());
-        skin.panel(g, x, y, TASK_MENU_W, taskMenuHeight());
-        for (int i = 0; i < TASK_MENU_ITEMS.length; i++) {
-            final int rowY = y + 2 + i * TASK_MENU_ROW_H;
-            final boolean hovered = mouseX >= x + 2 && mouseX < x + TASK_MENU_W - 2
-                    && mouseY >= rowY && mouseY < rowY + TASK_MENU_ROW_H;
-            if (hovered) {
-                g.fill(x + 2, rowY, x + TASK_MENU_W - 2, rowY + TASK_MENU_ROW_H, skin.listHover());
+    /** Opens a program's menu over its panel entry: what can be done with its windows and its pin. */
+    private void openTaskMenu(final dev.jstech.computers.gui.TaskbarGroups.Entry entry, final int atX, final int tbY) {
+        final String key = entry.key();
+        final List<dev.jstech.core.client.gui.component.ContextMenu.Item> items = new ArrayList<>();
+        final boolean pinnable = pinsOnPanel() && pinnableLauncher(key) != null;
+        if (entry.open()) {
+            final boolean several = entry.windows() > 1;
+            final boolean minimized = entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.MINIMIZED;
+            items.add(deskItem(several ? "Restore all" : minimized ? "Restore" : "Bring to front", true,
+                    () -> restoreGroup(key)));
+            items.add(deskItem(several ? "Minimize all" : "Minimize", true, () -> minimizeGroup(key)));
+            if (!several) {
+                items.add(deskItem("Maximize", true, () -> {
+                    restoreGroup(key);
+                    final List<DesktopWindow> mine = groupWindows(key);
+                    if (!mine.isEmpty()) {
+                        mine.get(0).setMaximized(!mine.get(0).maximized());
+                    }
+                }));
             }
-            final boolean destructive = i == TASK_MENU_ITEMS.length - 1;
-            g.drawString(font, TASK_MENU_ITEMS[i], x + 8, rowY + 2,
-                    destructive ? 0xFFC04A3E : skin.text(), false);
+            items.add(deskItem("Minimize others", true, () -> minimizeOthers(key)));
+            if (pinnable) {
+                items.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+                items.add(deskItem(entry.pinned() ? "Unpin from taskbar" : "Pin to taskbar", true, () -> togglePin(key)));
+            }
+            items.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+            items.add(deskItem(several ? "Close all windows" : "Close", true, () -> closeGroup(key)));
+        } else {
+            items.add(deskItem("Open", true, () -> runLauncherCalled(key)));
+            if (pinnable) {
+                items.add(dev.jstech.core.client.gui.component.ContextMenu.Item.separator());
+                items.add(deskItem("Unpin from taskbar", true, () -> togglePin(key)));
+            }
         }
-        return true;
+        taskPopupKey = null;
+        taskPopupSticky = false;
+        final int h = items.size() * DESK_CTX_ITEM_H + 2;
+        // Above a bottom panel, below a top one: the menu never covers the entry it came from.
+        final int y = topPanel() ? TASKBAR_H + 2 : tbY - h - 2;
+        taskMenu.open(items, atX, y, 0, 0, sw(), sh());
     }
 
-    /** Handles a click while the taskbar menu is open; returns whether it consumed the click. */
-    private boolean clickTaskMenu(final double mouseXAbs, final double mouseYAbs) {
-        if (taskMenuIndex < 0) {
-            return false;
+    /* The windows of one program */
+
+    /** Every window listed under {@code key}, back to front, a program's own and its dialogs alike. */
+    private List<DesktopWindow> groupWindows(final String key) {
+        final List<DesktopWindow> out = new ArrayList<>();
+        for (final DesktopWindow w : windows) {
+            if (w.groupKey().equals(key)) {
+                out.add(w);
+            }
         }
-        final int index = taskMenuIndex;
-        taskMenuIndex = -1;
-        if (index >= windows.size()) {
-            return true;
+        return out;
+    }
+
+    /** The dialog up over {@code w}, or null: while there is one, {@code w} takes nothing itself. */
+    @org.jetbrains.annotations.Nullable
+    private DesktopWindow dialogOf(final DesktopWindow w) {
+        for (final DesktopWindow other : windows) {
+            if (other.owner() == w) {
+                return other;
+            }
         }
-        final double mouseX = mouseXAbs - ox();
-        final double mouseY = mouseYAbs - oy();
-        final int x = taskMenuX;
-        final int y = taskMenuY - taskMenuHeight();
-        for (int i = 0; i < TASK_MENU_ITEMS.length; i++) {
-            final int rowY = y + 2 + i * TASK_MENU_ROW_H;
-            if (mouseX < x + 2 || mouseX >= x + TASK_MENU_W - 2
-                    || mouseY < rowY || mouseY >= rowY + TASK_MENU_ROW_H) {
+        return null;
+    }
+
+    /** Puts {@code w} in front, and its dialogs in front of it, in the order they were opened. */
+    private void bringWindowToFront(final DesktopWindow w) {
+        if (!windows.remove(w)) {
+            return;
+        }
+        windows.add(w);
+        final List<DesktopWindow> dialogs = new ArrayList<>();
+        for (final DesktopWindow other : windows) {
+            if (other.owner() == w) {
+                dialogs.add(other);
+            }
+        }
+        for (final DesktopWindow dialog : dialogs) {
+            bringWindowToFront(dialog);
+        }
+    }
+
+    /** Brings {@code w} up and forward: a dialog comes with the window it belongs to. */
+    private void focusWindow(final DesktopWindow w) {
+        final DesktopWindow root = w.owner() != null ? w.owner() : w;
+        for (final DesktopWindow other : groupWindows(root.groupKey())) {
+            if (other == root || other.owner() == root) {
+                other.setMinimized(false);
+            }
+        }
+        bringWindowToFront(root);
+        if (w != root) {
+            bringWindowToFront(w);
+        }
+    }
+
+    private void bringGroupToFront(final String key) {
+        for (final DesktopWindow w : groupWindows(key)) {
+            if (!w.dialog()) {
+                bringWindowToFront(w);
+            }
+        }
+    }
+
+    private void restoreGroup(final String key) {
+        for (final DesktopWindow w : groupWindows(key)) {
+            w.setMinimized(false);
+        }
+        bringGroupToFront(key);
+    }
+
+    private void minimizeGroup(final String key) {
+        for (final DesktopWindow w : groupWindows(key)) {
+            w.setMinimized(true);
+        }
+    }
+
+    private void minimizeOthers(final String key) {
+        for (final DesktopWindow w : windows) {
+            w.setMinimized(!w.groupKey().equals(key));
+        }
+        bringGroupToFront(key);
+    }
+
+    private void closeGroup(final String key) {
+        final List<DesktopWindow> mine = groupWindows(key);
+        for (int i = mine.size() - 1; i >= 0; i--) {
+            if (windows.contains(mine.get(i))) {
+                closeWindow(mine.get(i));
+            }
+        }
+    }
+
+    /** Ends {@code w}: its dialogs go first, since a window put away takes its questions with it. */
+    private void closeWindow(final DesktopWindow w) {
+        for (final DesktopWindow other : new ArrayList<>(windows)) {
+            if (other.owner() == w) {
+                closeWindow(other);
+            }
+        }
+        if (windows.remove(w)) {
+            w.app().onClosed();
+        }
+    }
+
+    /** Ends the window running {@code app}, when there is one. */
+    private void closeWindowOf(final IDesktopApp app) {
+        for (final DesktopWindow w : new ArrayList<>(windows)) {
+            if (w.app() == app) {
+                closeWindow(w);
+            }
+        }
+    }
+
+    /**
+     * Opens {@code dialog} as a window over the one running {@code ownerApp}, centred on it and in front
+     * of it. The owner comes forward first, so the pair reads as one program that just asked something.
+     */
+    private void openDialog(final IDesktopApp ownerApp, final IDesktopApp dialog) {
+        DesktopWindow ownerWin = null;
+        for (final DesktopWindow w : windows) {
+            if (w.app() == ownerApp) {
+                ownerWin = w;
+            } else if (w.app() == dialog) {
+                focusWindow(w);
+                return;
+            }
+        }
+        if (ownerWin == null) {
+            return;
+        }
+        final int top = workTop();
+        final int w = Math.max(dialog.minWidth(), Math.min(dialog.defaultWidth(), sw() - 8));
+        final int h = Math.max(dialog.minHeight(), Math.min(dialog.defaultHeight(), workBottom() - top - 8));
+        /*
+         * Centred across the owner and hung just under its title bar, so the owner's name and edges stay
+         * in view around the question it is asking, and the two read as two windows rather than one.
+         */
+        final int x = Math.max(0, Math.min(ownerWin.x() + (ownerWin.width() - w) / 2, sw() - w));
+        final int y = Math.max(top, Math.min(ownerWin.y() + DesktopWindow.TITLE_H + 6, workBottom() - h));
+        dialog.applySkin(skin);
+        final DesktopWindow made = new DesktopWindow(dialog, ownerWin.appKey(), x, y, w, h);
+        made.setOwner(ownerWin);
+        ownerWin.setMinimized(false);
+        bringWindowToFront(ownerWin);
+        windows.add(made);
+    }
+
+    /* The popup */
+
+    /** The windows the popup lists, back to front: the program's, as many as the desktop has room for. */
+    private List<DesktopWindow> popupWindows() {
+        if (taskPopupKey == null) {
+            return List.of();
+        }
+        final List<DesktopWindow> mine = groupWindows(taskPopupKey);
+        if (thumbnailPopups()) {
+            final int most = Math.max(1, (sw() - 4 - POPUP_PAD) / (CARD_W + POPUP_PAD));
+            return mine.size() > most ? mine.subList(0, most) : mine;
+        }
+        return mine;
+    }
+
+    /** The popup's box, desktop-local {x, y, w, h}, or null while none is up. */
+    @org.jetbrains.annotations.Nullable
+    private int[] popupRect(final int sw, final int tbY) {
+        final List<DesktopWindow> list = popupWindows();
+        if (list.isEmpty()) {
+            return null;
+        }
+        final TaskStrip strip = taskStrip(sw);
+        final int index = dev.jstech.computers.gui.TaskbarGroups.indexOf(strip.entries(), taskPopupKey);
+        if (index < 0) {
+            return null;
+        }
+        final int center = strip.x()[index] + strip.w()[index] / 2;
+        final int n = list.size();
+        final int w;
+        final int h;
+        if (thumbnailPopups()) {
+            w = n * CARD_W + (n + 1) * POPUP_PAD;
+            h = CARD_H + 2 * POPUP_PAD;
+        } else {
+            w = LIST_W;
+            h = 2 + n * LIST_ROW_H + 5 + LIST_ROW_H + 2;
+        }
+        final int x = Math.max(2, Math.min(center - w / 2, sw - w - 2));
+        final int y = topPanel() ? TASKBAR_H + 3 : tbY - 3 - h;
+        return new int[] {x, y, w, h};
+    }
+
+    /** The popup's {@code index}-th card or row, desktop-local {x, y, w, h}, or null. */
+    @org.jetbrains.annotations.Nullable
+    private int[] popupItemRect(final int index) {
+        final int[] r = popupRect(sw(), sh() - TASKBAR_H);
+        if (r == null || index < 0 || index >= popupWindows().size()) {
+            return null;
+        }
+        if (thumbnailPopups()) {
+            return new int[] {r[0] + POPUP_PAD + index * (CARD_W + POPUP_PAD), r[1] + POPUP_PAD, CARD_W, CARD_H};
+        }
+        return new int[] {r[0] + 2, r[1] + 2 + index * LIST_ROW_H, r[2] - 4, LIST_ROW_H};
+    }
+
+    /** The close box of the popup's {@code index}-th window: on a card its corner, on a list the last row. */
+    @org.jetbrains.annotations.Nullable
+    private int[] popupCloseRect(final int index) {
+        final int[] item = popupItemRect(index);
+        if (item == null) {
+            return null;
+        }
+        if (thumbnailPopups()) {
+            return new int[] {item[0] + CARD_W - 10, item[1] + 1, 9, 9};
+        }
+        return popupCloseAllRect();
+    }
+
+    /** The "Close all" row of a list popup, or null on a modern panel. */
+    @org.jetbrains.annotations.Nullable
+    private int[] popupCloseAllRect() {
+        final int[] r = popupRect(sw(), sh() - TASKBAR_H);
+        if (r == null || thumbnailPopups()) {
+            return null;
+        }
+        return new int[] {r[0] + 2, r[1] + 2 + popupWindows().size() * LIST_ROW_H + 5, r[2] - 4, LIST_ROW_H};
+    }
+
+    private static boolean inRect(final double mx, final double my, @org.jetbrains.annotations.Nullable final int[] r) {
+        return r != null && mx >= r[0] && mx < r[0] + r[2] && my >= r[1] && my < r[1] + r[3];
+    }
+
+    /**
+     * Keeps the popup in step with the cursor, once a frame: it rises after the cursor has rested on an
+     * open program for a moment, moves to the program the cursor moves to, and goes away a moment after
+     * the cursor has left both the popup and its program. One opened by a click stays put instead.
+     */
+    private void updateTaskPopup(final int lmx, final int lmy, final int sw, final int tbY) {
+        if (startOpen || panelCtxOpen || taskMenu.isOpen() || popup != null || powerOpen || crashing) {
+            if (!taskPopupSticky) {
+                taskPopupKey = null;
+            }
+            return;
+        }
+        if (taskPopupKey != null && groupWindows(taskPopupKey).isEmpty()) {
+            taskPopupKey = null;
+            taskPopupSticky = false;
+        }
+        if (topPanel()) {
+            return; // the top bar lists no programs
+        }
+        final TaskStrip strip = taskStrip(sw);
+        final int idx = lmy >= tbY ? strip.indexAt(lmx) : -1;
+        final String under = idx >= 0 && strip.entries().get(idx).open() ? strip.entries().get(idx).key() : null;
+        final long now = System.currentTimeMillis();
+        if (under != null) {
+            if (!under.equals(taskHoverKey)) {
+                taskHoverKey = under;
+                taskHoverSince = now;
+            }
+            final boolean switching = taskPopupKey != null && !taskPopupSticky;
+            if (thumbnailPopups() && !under.equals(taskPopupKey) && (switching || now - taskHoverSince >= HOVER_MS)) {
+                taskPopupKey = under;
+                taskPopupSticky = false;
+                taskPopupLeftAt = 0;
+            }
+        } else {
+            taskHoverKey = null;
+        }
+        if (taskPopupKey != null && !taskPopupSticky) {
+            final boolean over = taskPopupKey.equals(under) || inRect(lmx, lmy, popupRect(sw, tbY));
+            if (over) {
+                taskPopupLeftAt = 0;
+            } else if (taskPopupLeftAt == 0) {
+                taskPopupLeftAt = now;
+            } else if (now - taskPopupLeftAt > LEAVE_MS) {
+                taskPopupKey = null;
+                taskPopupLeftAt = 0;
+            }
+        }
+    }
+
+    /** Draws the popup: cards with the windows' live pictures on a modern panel, a list of titles on a period one. */
+    private void renderTaskPopup(final GuiGraphics g, final int tbY, final int sw, final int sh,
+                                 final int lmx, final int lmy) {
+        final int[] r = popupRect(sw, tbY);
+        final List<DesktopWindow> list = popupWindows();
+        if (r == null) {
+            return;
+        }
+        skin.windowShadow(g, r[0], r[1], r[2], r[3]);
+        skin.panel(g, r[0], r[1], r[2], r[3]);
+        final net.minecraft.resources.ResourceLocation icon = programIdForLabel(taskPopupKey);
+        if (thumbnailPopups()) {
+            for (int i = 0; i < list.size(); i++) {
+                final DesktopWindow w = list.get(i);
+                final int[] card = popupItemRect(i);
+                if (card == null) {
+                    continue;
+                }
+                final boolean hot = inRect(lmx, lmy, card);
+                if (hot) {
+                    g.fill(card[0], card[1], card[0] + card[2], card[1] + card[3], skin.listHover());
+                }
+                ProgramIcons.draw(g, card[0] + 2, card[1] + 1, 8, 8, icon, iconSet());
+                final int titleW = CARD_W - 12 - (hot ? 10 : 2);
+                final String title = font.plainSubstrByWidth(w.app().title(),
+                        dev.jstech.core.client.gui.component.Texts.smallFits(titleW));
+                dev.jstech.core.client.gui.component.Texts.small(g, font, title, card[0] + 12, card[1] + 2, skin.text());
+                if (hot) {
+                    final int[] close = popupCloseRect(i);
+                    if (close != null) {
+                        if (inRect(lmx, lmy, close)) {
+                            g.fill(close[0], close[1], close[0] + close[2], close[1] + close[3], 0xFFC04A3E);
+                        }
+                        g.drawString(font, "x", close[0] + 2, close[1], inRect(lmx, lmy, close) ? 0xFFFFFFFF : skin.text(), false);
+                    }
+                }
+                final int tx = card[0] + 3;
+                final int ty = card[1] + CARD_TITLE_H + 1;
+                final int tw = CARD_W - 6;
+                OsSkin.outline(g, tx - 1, ty - 1, tw + 2, THUMB_H + 2, skin.edge());
+                g.fill(tx, ty, tx + tw, ty + THUMB_H, skin.fieldBg());
+                w.renderThumbnail(g, font, skin, tx, ty, tw, THUMB_H, sw, sh, bottomReserve(), workTop());
+            }
+            return;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            final DesktopWindow w = list.get(i);
+            final int[] row = popupItemRect(i);
+            if (row == null) {
                 continue;
             }
-            final DesktopWindow w = windows.get(index);
-            switch (i) {
-                case 0 -> {
-                    w.setMinimized(false);
-                    bringToFront(index);
-                }
-                case 1 -> w.setMinimized(true);
-                case 2 -> {
-                    w.setMinimized(false);
-                    w.setMaximized(!w.maximized());
-                    bringToFront(index);
-                }
-                case 3 -> {
-                    for (final DesktopWindow other : windows) {
-                        other.setMinimized(other != w);
+            final boolean hot = inRect(lmx, lmy, row);
+            if (hot) {
+                g.fill(row[0], row[1], row[0] + row[2], row[1] + row[3], skin.listHover());
+            }
+            ProgramIcons.draw(g, row[0] + 2, row[1] + 1, 9, 9, icon, iconSet());
+            g.drawString(font, font.plainSubstrByWidth(w.app().title(), row[2] - 16), row[0] + 14, row[1] + 2,
+                    w.minimized() ? skin.dim() : skin.text(), false);
+        }
+        final int[] all = popupCloseAllRect();
+        if (all != null) {
+            g.fill(all[0] + 2, all[1] - 3, all[0] + all[2] - 2, all[1] - 2, skin.edge());
+            if (inRect(lmx, lmy, all)) {
+                g.fill(all[0], all[1], all[0] + all[2], all[1] + all[3], skin.listHover());
+            }
+            g.drawString(font, "Close all", all[0] + 14, all[1] + 2, 0xFFC04A3E, false);
+        }
+    }
+
+    /**
+     * A click while the popup is up. On one of its windows it brings that window forward; on a close box
+     * it ends that window; anywhere else it puts the popup away, and a click on the program's own entry
+     * that opened it is that and nothing more.
+     */
+    private boolean clickTaskPopup(final double mx, final double my, final int button) {
+        final int tbY = sh() - TASKBAR_H;
+        final int[] r = popupRect(sw(), tbY);
+        final List<DesktopWindow> list = popupWindows();
+        if (r == null) {
+            taskPopupKey = null;
+            taskPopupSticky = false;
+            return false;
+        }
+        if (inRect(mx, my, r)) {
+            if (button != 0) {
+                return true;
+            }
+            for (int i = 0; i < list.size(); i++) {
+                if (thumbnailPopups() && inRect(mx, my, popupCloseRect(i))) {
+                    closeWindow(list.get(i));
+                    if (groupWindows(taskPopupKey).isEmpty()) {
+                        taskPopupKey = null;
+                        taskPopupSticky = false;
                     }
-                    w.setMinimized(false);
+                    return true;
                 }
-                default -> {
-                    windows.get(index).app().onClosed();
-                    windows.remove(index);
+                if (inRect(mx, my, popupItemRect(i))) {
+                    focusWindow(list.get(i));
+                    taskPopupKey = null;
+                    taskPopupSticky = false;
+                    return true;
                 }
+            }
+            if (inRect(mx, my, popupCloseAllRect())) {
+                closeGroup(taskPopupKey);
+                taskPopupKey = null;
+                taskPopupSticky = false;
             }
             return true;
         }
-        return true; // a click outside the menu just dismisses it
+        final String was = taskPopupKey;
+        final boolean sticky = taskPopupSticky;
+        taskPopupKey = null;
+        taskPopupSticky = false;
+        if (sticky && button == 0 && my >= tbY) {
+            final TaskStrip strip = taskStrip(sw());
+            final int idx = strip.indexAt(mx);
+            if (idx >= 0 && strip.entries().get(idx).key().equals(was)) {
+                return true; // the entry that opened it closes it; nothing more
+            }
+        }
+        return false;
+    }
+
+    /** A click on a panel entry: the program's menu, its window, or the popup listing several of them. */
+    private void clickTaskEntry(final dev.jstech.computers.gui.TaskbarGroups.Entry entry, final int atX,
+                                final int button, final int tbY) {
+        if (button == 1) {
+            openTaskMenu(entry, atX, tbY);
+            return;
+        }
+        if (button != 0) {
+            return;
+        }
+        if (!entry.open()) {
+            runLauncherCalled(entry.key());
+            return;
+        }
+        if (entry.windows() == 1) {
+            final List<DesktopWindow> mine = groupWindows(entry.key());
+            if (entry.state() == dev.jstech.computers.gui.TaskbarGroups.State.ACTIVE) {
+                minimizeGroup(entry.key());
+            } else if (mine.get(0).minimized()) {
+                restoreGroup(entry.key());
+            } else {
+                bringGroupToFront(entry.key());
+            }
+            return;
+        }
+        // Several windows: the popup lists them, and stays until a click puts it away.
+        taskPopupKey = entry.key();
+        taskPopupSticky = true;
+        taskPopupLeftAt = 0;
     }
 
     private void openPowerDialog() {
@@ -3834,8 +4820,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!powerOpen) {
             return false;
         }
-        final double mouseX = mouseXAbs - ox();
-        final double mouseY = mouseYAbs - oy();
+        final double mouseX = lx(mouseXAbs);
+        final double mouseY = ly(mouseYAbs);
         final int x = powerX();
         final int y = powerY();
         for (int i = 0; i < POWER_CHOICES.length; i++) {
@@ -4075,14 +5061,22 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         /*
          * The power dialog is modal: it decides the fate of the whole machine, so nothing behind it
-         * takes the click. An open taskbar menu takes the next click the same way.
+         * takes the click. An open program menu takes the next click the same way, and the panel's
+         * popup answers a click on it or is put away by one anywhere else.
          */
-        if (clickPowerDialog(mouseXAbs, mouseYAbs) || clickTaskMenu(mouseXAbs, mouseYAbs)) {
+        if (clickPowerDialog(mouseXAbs, mouseYAbs)) {
+            return true;
+        }
+        if (taskMenu.isOpen()) {
+            taskMenu.mouseClicked(lx(mouseXAbs), ly(mouseYAbs), button);
+            return true;
+        }
+        if (taskPopupKey != null && clickTaskPopup(lx(mouseXAbs), ly(mouseYAbs), button)) {
             return true;
         }
         // A modal dialog swallows every click; only its OK button dismisses it.
         if (popup != null) {
-            popup.mouseClicked(mouseXAbs - ox(), mouseYAbs - oy(), button);
+            popup.mouseClicked(lx(mouseXAbs), ly(mouseYAbs), button);
             if (!popup.isOpen()) {
                 popup = null;
             }
@@ -4095,12 +5089,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (focusModal()) {
             final DesktopWindow f = frontWindow();
             if (f != null) {
-                f.app().mouseClicked(f, mouseXAbs - ox(), mouseYAbs - oy(), button);
+                f.app().mouseClicked(f, lx(mouseXAbs), ly(mouseYAbs), button);
             }
             return true;
         }
-        final double mouseX = mouseXAbs - ox();
-        final double mouseY = mouseYAbs - oy();
+        final double mouseX = lx(mouseXAbs);
+        final double mouseY = ly(mouseYAbs);
         final int tbY = sh() - TASKBAR_H;
 
         // A balloon is dismissed by clicking it, and it swallows that click so nothing under it reacts.
@@ -4134,46 +5128,14 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
             return true;
         }
-        // Windows 11 taskbar: Start sits left, the app icons are centered, so they have their own hit test.
+        // Windows 11 keeps Start with the centered group, so it has its own hit test.
         if (is(dev.jstech.computers.os.PanelStyle.FRAMES_11) && mouseY >= tbY) {
             final int startX = win11StartX(sw());
             if (mouseX >= startX && mouseX < startX + WIN11_SLOT) {
                 toggleStart();
                 return true;
             }
-            final int appsX = win11AppsX(sw());
-            final int idx = (int) ((mouseX - appsX) / WIN11_SLOT);
-            if (mouseX >= appsX && idx >= 0 && idx < windows.size()) {
-                // The right button asks about the window; its menu opens over the icon it belongs to.
-                if (button == 1) {
-                    taskMenuIndex = idx;
-                    taskMenuX = appsX + idx * WIN11_SLOT;
-                    taskMenuY = tbY + 3;
-                    return true;
-                }
-                final DesktopWindow w = windows.get(idx);
-                if (w.minimized()) {
-                    w.setMinimized(false);
-                    windows.add(windows.remove(idx));
-                } else if (idx == windows.size() - 1) {
-                    w.setMinimized(true);
-                } else {
-                    windows.add(windows.remove(idx));
-                }
-                return true;
-            }
-            /*
-             * The rest of the bar is the bar. It used to fall through to the classic layout's hit test,
-             * which still believed a button sat at the left where Frames 95 keeps its first one, so a
-             * right-click on empty bar there opened a window's menu, drawn where no window's icon was.
-             */
-            if (button == 1) {
-                openPanelMenu((int) mouseX, tbY);
-            }
-            return true;
-        }
-
-        if (startButtonHit(mouseX, mouseY, tbY)) {
+        } else if (startButtonHit(mouseX, mouseY, tbY)) {
             toggleStart();
             return true;
         }
@@ -4194,39 +5156,29 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             startOpen = false;
         }
 
-        // Taskbar buttons: click toggles minimize / brings the window forward (Windows-style).
-        if (mouseY >= tbY + 3 && mouseX >= TASK_X) {
-            final int idx = taskIndexAt(mouseX, sw());
-            final int bxStart = idx < 0 ? 0 : taskButtonX(idx, sw());
+        /*
+         * The panel's entries, one per program: the left button brings its window up or down, or lists
+         * its windows when it has several; the right button opens the program's own menu, so a program
+         * can be closed or pinned without first going to it. A right-click on the panel itself, clear of
+         * Start and of the entries, opens the panel's own menu, the way every one of these desktops offers
+         * it; the Task Manager is one entry on that menu. The rest of the bar is the bar and swallows the
+         * click, so nothing under it reacts.
+         */
+        if (!topPanel() && mouseY >= tbY) {
+            final TaskStrip strip = taskStrip(sw());
+            int idx = strip.indexAt(mouseX);
+            int atX = idx >= 0 ? strip.x()[idx] : 0;
+            if (idx < 0 && strip.quickCount() > 0) {
+                idx = strip.quickEntryAt(mouseX);
+                atX = idx >= 0 ? strip.quickX() + strip.quickIndexOf(idx) * QL_W : 0;
+            }
             if (idx >= 0) {
-                /*
-                 * Right-click opens the window's own menu, so a program can be closed without first
-                 * going to it, the thing every taskbar does and this one did not.
-                 */
-                if (button == 1) {
-                    taskMenuIndex = idx;
-                    taskMenuX = bxStart;
-                    taskMenuY = tbY + 3;
-                    return true;
-                }
-                final DesktopWindow w = windows.get(idx);
-                if (w.minimized()) {
-                    w.setMinimized(false);
-                    windows.add(windows.remove(idx));
-                } else if (idx == windows.size() - 1) {
-                    w.setMinimized(true);
-                } else {
-                    windows.add(windows.remove(idx));
-                }
+                clickTaskEntry(strip.entries().get(idx), atX, button, tbY);
                 return true;
             }
-        }
-        /*
-         * A right-click on the panel itself, clear of Start and of the buttons, opens the panel's own menu,
-         * the way every one of these desktops offers it. The Task Manager is one entry on that menu.
-         */
-        if (button == 1 && mouseY >= tbY) {
-            openPanelMenu((int) mouseX, tbY);
+            if (button == 1) {
+                openPanelMenu((int) mouseX, tbY);
+            }
             return true;
         }
 
@@ -4234,6 +5186,16 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final DesktopWindow w = windows.get(i);
             if (w.minimized()) {
                 continue;
+            }
+            /*
+             * A window with a dialog up takes nothing itself: a click on it brings the dialog forward,
+             * the way every desktop answers a click on a program that is waiting for its own question.
+             */
+            final DesktopWindow held = dialogOf(w);
+            if (held != null && mouseX >= w.x() && mouseX <= w.x() + w.width()
+                    && mouseY >= w.y() && mouseY <= w.y() + w.height()) {
+                focusWindow(held);
+                return true;
             }
             final int titleBtn = w.buttonAt(mouseX, mouseY);
             if (titleBtn != 0) {
@@ -4268,7 +5230,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                  */
                 if (w.app() instanceof IInventoryBandApp && !(w.app() instanceof NetworkInteractorApp)
                         && !w.app().modalActive() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
-                    return super.mouseClicked(mouseXAbs, mouseYAbs, button);
+                    return super.mouseClicked(vx(mouseXAbs), vy(mouseYAbs), button);
                 }
                 if (w.app() instanceof NetworkInteractorApp ni) {
                     /*
@@ -4290,7 +5252,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
                      * inventory band) so the app gets the click instead of the vanilla container.
                      */
                     if (!ni.hasPopup() && slotUnderMouse(mouseXAbs, mouseYAbs) != null) {
-                        return super.mouseClicked(mouseXAbs, mouseYAbs, button);
+                        return super.mouseClicked(vx(mouseXAbs), vy(mouseYAbs), button);
                     }
                     /*
                      * A held stack dropped on the item grid goes to the network (Network tab) or local storage
@@ -4317,14 +5279,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             }
         }
 
-        // An open desktop context menu takes the click first.
-        if (deskCtxOpen) {
-            final int item = deskCtxItemAt(mouseX, mouseY);
-            deskCtxOpen = false;
-            if (item >= 0) {
-                runDeskContext(item);
-                return true;
-            }
+        // An open desktop context menu takes the click first, and closes on it whatever it landed on.
+        if (deskMenu.isOpen()) {
+            deskMenu.mouseClicked(mouseX, mouseY, button);
+            return true;
         }
         // A click on the desktop commits any in-progress icon rename.
         if (deskRenaming >= 0) {
@@ -4380,7 +5338,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             bandX = mouseX;
             bandY = mouseY;
         }
-        return super.mouseClicked(mouseXAbs, mouseYAbs, button);
+        return super.mouseClicked(vx(mouseXAbs), vy(mouseYAbs), button);
     }
 
     @Override
@@ -4390,18 +5348,18 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return true;
         }
         if (dragging != null) {
-            dragging.moveTo((int) (mouseXAbs - ox()) - dragOffsetX, (int) (mouseYAbs - oy()) - dragOffsetY,
+            dragging.moveTo((int) (lx(mouseXAbs)) - dragOffsetX, (int) (ly(mouseYAbs)) - dragOffsetY,
                     workTop(), sw(), workBottom());
             return true;
         }
         if (resizing != null) {
-            resizing.applyResize(mouseXAbs - ox(), mouseYAbs - oy(), workTop(), sw(), workBottom());
+            resizing.applyResize(lx(mouseXAbs), ly(mouseYAbs), workTop(), sw(), workBottom());
             return true;
         }
         // Dragging a desktop icon across the desktop, once the cursor has left the click dead zone.
         if (deskDragSlot >= 0) {
-            deskDragX = mouseXAbs - ox();
-            deskDragY = mouseYAbs - oy();
+            deskDragX = lx(mouseXAbs);
+            deskDragY = ly(mouseYAbs);
             if (!deskDragging
                     && (Math.abs(deskDragX - deskDragStartX) > DRAG_THRESHOLD
                         || Math.abs(deskDragY - deskDragStartY) > DRAG_THRESHOLD)) {
@@ -4411,8 +5369,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // Sweeping the wallpaper: extend the band and reselect what it now covers.
         if (bandActive) {
-            bandX = mouseXAbs - ox();
-            bandY = mouseYAbs - oy();
+            bandX = lx(mouseXAbs);
+            bandY = ly(mouseYAbs);
             updateBandSelection();
             return true;
         }
@@ -4422,19 +5380,19 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
          */
         final DesktopWindow w = frontWindow();
         if (w != null && w.app() instanceof IInventoryBandApp && !menu.getCarried().isEmpty()) {
-            return super.mouseDragged(mouseXAbs, mouseYAbs, button, dx, dy);
+            return super.mouseDragged(vx(mouseXAbs), vy(mouseYAbs), button, dx, dy);
         }
         if (w != null) {
-            w.app().mouseDragged(w, mouseXAbs - ox(), mouseYAbs - oy(), button);
+            w.app().mouseDragged(w, lx(mouseXAbs), ly(mouseYAbs), button);
             return true;
         }
-        return super.mouseDragged(mouseXAbs, mouseYAbs, button, dx, dy);
+        return super.mouseDragged(vx(mouseXAbs), vy(mouseYAbs), button, dx, dy);
     }
 
     @Override
     public boolean mouseReleased(final double mouseX, final double mouseY, final int button) {
         if (popup != null) {
-            popup.mouseReleased(mouseX - ox(), mouseY - oy(), button);
+            popup.mouseReleased(lx(mouseX), ly(mouseY), button);
             return true;
         }
         // Letting go ends the sweep; whatever it covered stays selected.
@@ -4451,10 +5409,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             final int btn = pb.pressedButton();
             pb.setPressedButton(0);
             pressedBtnWindow = null;
-            if (btn != 0 && pb.buttonAt(mouseX - ox(), mouseY - oy()) == btn) {
+            if (btn != 0 && pb.buttonAt(lx(mouseX), ly(mouseY)) == btn) {
                 if (btn == 3) {
-                    pb.app().onClosed();
-                    windows.remove(pb);
+                    closeWindow(pb);
                 } else if (btn == 1) {
                     pb.setMinimized(true);
                 } else if (btn == 2) {
@@ -4465,7 +5422,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // A dragged desktop icon: handle the drop (move into a folder / open explorer, or pin to a cell).
         if (deskDragging && deskDragSlot >= 0) {
-            handleDeskDrop(mouseX - ox(), mouseY - oy());
+            handleDeskDrop(lx(mouseX), ly(mouseY));
         }
         final boolean wasDeskDrag = deskDragging;
         deskDragging = false;
@@ -4477,7 +5434,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
          * falls through to the app below.
          */
         if (!wasDeskDrag && dragging == null && resizing == null
-                && handleExplorerDropToDesktop(mouseX - ox(), mouseY - oy())) {
+                && handleExplorerDropToDesktop(lx(mouseX), ly(mouseY))) {
             return super.mouseReleased(mouseX, mouseY, button);
         }
         /*
@@ -4487,7 +5444,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         if (!wasDeskDrag && dragging == null && resizing == null) {
             final DesktopWindow w = frontWindow();
             if (w != null) {
-                w.app().mouseReleased(w, mouseX - ox(), mouseY - oy(), button);
+                w.app().mouseReleased(w, lx(mouseX), ly(mouseY), button);
             }
         }
         /*
@@ -4495,8 +5452,8 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
          * left/right = that half). A modern-OS gesture the earlier editions do not have.
          */
         if (dragging != null && (is(dev.jstech.computers.os.PanelStyle.FRAMES_11) || linuxDesktop())) {
-            final int lx = (int) (mouseX - ox());
-            final int ly = (int) (mouseY - oy());
+            final int lx = (int) (lx(mouseX));
+            final int ly = (int) (ly(mouseY));
             final int top = workTop();
             final int workH = workBottom() - top;
             final int halfW = sw() / 2;
@@ -4543,6 +5500,18 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             if (!popup.isOpen()) {
                 popup = null;
             }
+            return true;
+        }
+        // The desktop's menu and a program's are walked with the arrows and left with Escape, like any menu.
+        if (deskMenu.isOpen() && deskMenu.keyPressed(key, scanCode, modifiers)) {
+            return true;
+        }
+        if (taskMenu.isOpen() && taskMenu.keyPressed(key, scanCode, modifiers)) {
+            return true;
+        }
+        if (taskPopupKey != null && key == 256) {
+            taskPopupKey = null;
+            taskPopupSticky = false;
             return true;
         }
         // An in-progress desktop-icon rename consumes keys first (Enter commits, Esc cancels).
@@ -4595,7 +5564,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         }
         // The front window's app gets first refusal on keys, except ESC which always closes the desktop.
         final DesktopWindow w = frontWindow();
-        if (key != 256 && w != null && w.app().keyPressed(key, scanCode, modifiers)) {
+        if (w != null && (key != 256 || w.app().wantsEscape()) && w.app().keyPressed(key, scanCode, modifiers)) {
             return true;
         }
         /*
@@ -4791,9 +5760,9 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             if (!slot.isActive()) {
                 continue;
             }
-            final int sx = slot.x + leftPos;
-            final int sy = slot.y + topPos;
-            if (absX >= sx && absX < sx + 16 && absY >= sy && absY < sy + 16) {
+            final double mx = lx(absX);
+            final double my = ly(absY);
+            if (mx >= slot.x && mx < slot.x + 16 && my >= slot.y && my < slot.y + 16) {
                 return slot;
             }
         }
@@ -4853,12 +5822,10 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
             return;
         }
         final String key = chrome != null ? chrome.launcherLabel(spec) : spec.displayName();
-        for (int i = 0; i < windows.size(); i++) {
-            if (windows.get(i).appKey().equals(key)) {
-                windows.get(i).setMinimized(false);
-                windows.add(windows.remove(i));
-                return;
-            }
+        final DesktopWindow open = windowFor(key);
+        if (open != null) {
+            focusWindow(open);
+            return;
         }
         final IDesktopApp app = factoryFor(key);
         if (app != null && allowOpen(key)) {
@@ -4880,7 +5847,7 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
 
     private void bringToFront(final int index) {
         if (index >= 0 && index < windows.size()) {
-            windows.add(windows.remove(index));
+            bringWindowToFront(windows.get(index));
         }
     }
 
@@ -4963,7 +5930,11 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
          */
         final java.util.Map<String, IDesktopApp> apps = new java.util.LinkedHashMap<>();
         for (final DesktopWindow w : windows) {
-            apps.put(w.appKey(), w.app());
+            if (w.dialog()) {
+                w.app().onClosed(); // a question left unanswered is not kept; the program is
+            } else {
+                apps.put(w.appKey(), w.app());
+            }
         }
         if (apps.isEmpty()) {
             SAVED_APPS.remove(host);
@@ -4979,5 +5950,46 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /*
+     * Ctrl+B is the game's narrator switch, and the game flips it before any screen sees the key unless
+     * the screen's focused control is a text box taking input. Every key on the desktop is the desktop's
+     * (C-b in Emacs above all), so the desktop always reports one: an invisible box that draws nothing,
+     * keeps nothing and answers no key, there only to say that typing is spoken for.
+     */
+    @org.jetbrains.annotations.Nullable
+    private KeySink keySink;
+
+    @Override
+    @org.jetbrains.annotations.Nullable
+    public net.minecraft.client.gui.components.events.GuiEventListener getFocused() {
+        if (this.font == null) {
+            return super.getFocused();
+        }
+        if (this.keySink == null) {
+            this.keySink = new KeySink(this.font);
+        }
+        return this.keySink;
+    }
+
+    private static final class KeySink extends net.minecraft.client.gui.components.EditBox {
+
+        KeySink(final net.minecraft.client.gui.Font font) {
+            super(font, 0, 0, 1, 1, Component.empty());
+            this.setVisible(true);
+            this.setEditable(true);
+            this.setFocused(true);
+        }
+
+        @Override
+        public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
+            return false;
+        }
+
+        @Override
+        public boolean charTyped(final char c, final int modifiers) {
+            return false;
+        }
     }
 }

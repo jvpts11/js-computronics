@@ -495,6 +495,12 @@ public final class ComputerConsoleState {
         s.putBoolean("RemovableAutoOpen", settings.removableAutoOpen());
         s.putBoolean("TaskbarCentered", settings.taskbarCentered());
         s.putBoolean("DarkMode", settings.darkMode());
+        // Always written, even empty: a machine whose player unpinned everything must not get the default back.
+        final ListTag pinned = new ListTag();
+        for (final String id : settings.pinned()) {
+            pinned.add(net.minecraft.nbt.StringTag.valueOf(id));
+        }
+        s.put("Pinned", pinned);
         if (!settings.themePreset().isEmpty()) {
             s.putString("Theme", settings.themePreset());
         }
@@ -593,6 +599,13 @@ public final class ComputerConsoleState {
         settings.setRemovableAutoOpen(!s.contains("RemovableAutoOpen") || s.getBoolean("RemovableAutoOpen"));
         settings.setTaskbarCentered(!s.contains("TaskbarCentered") || s.getBoolean("TaskbarCentered"));
         settings.setDarkMode(s.getBoolean("DarkMode"));
+        if (s.contains("Pinned")) {
+            final java.util.List<String> pinned = new java.util.ArrayList<>();
+            for (final net.minecraft.nbt.Tag entry : s.getList("Pinned", net.minecraft.nbt.Tag.TAG_STRING)) {
+                pinned.add(entry.getAsString());
+            }
+            settings.setPinned(pinned);
+        }
         settings.setThemePreset(s.getString("Theme"));
         final Map<String, String> apps = new LinkedHashMap<>();
         final CompoundTag appsTag = s.getCompound("DefaultApps");

@@ -258,7 +258,14 @@ public final class FilesApp implements IDesktopApp {
         backButton = root.add(new Button("<", this::goBack));
         forwardButton = root.add(new Button(">", this::goForward));
         upButton = root.add(new Button("^", this::goUp));
-        address = root.add(new Breadcrumbs(this::crumbs, this::go));
+        address = root.add(new Breadcrumbs(this::crumbs, this::go).setOnEmptyClick(this::startAddressEdit));
+        /*
+         * The same field as text: a click past the last crumb turns the trail into a path that can be
+         * typed over, copied and pasted, the way an address bar behaves everywhere.
+         */
+        addressEdit = root.add(new TextField(200).setOnCommit(this::goTyped).setRevertOnEscape(true)
+                .setOnBlur(this::stopAddressEdit));
+        addressEdit.setVisible(false);
         search = root.add(new SearchField(SEARCH_MAX));
         search.setOnEdit(this::applyFilterAndSort);
         search.setOnEscape(() -> {
@@ -397,6 +404,18 @@ public final class FilesApp implements IDesktopApp {
     public void onRestored() {
         FilesApps.register(this);
         request(dir); // the folder may have gained or lost files while the window was away
+    }
+
+    @Override
+    public String saveState() {
+        return dir;
+    }
+
+    @Override
+    public void restoreState(final String state) {
+        if (!state.isEmpty()) {
+            request(state);
+        }
     }
 
     private void request(final String target) {
@@ -599,7 +618,14 @@ public final class FilesApp implements IDesktopApp {
         return BuiltInRegistries.ITEM.getOptional(id).map(ItemStack::new).orElse(ItemStack.EMPTY);
     }
 
-    private static String typeLabel(final DiskFilesPayload.WireFile f) {
+    /** What a kind of file is called in the Type column and in a New menu: "Text" for a .txt. */
+    public static String typeLabel(final dev.jstech.computers.os.fs.FileType type) {
+        return typeLabel(new DiskFilesPayload.WireFile("new." + type.extension(), type.extension(), 0, false, false,
+                "", 0));
+    }
+
+    /** What a file is called in the Type column, by its extension, for any window that lists files the same way. */
+    public static String typeLabel(final DiskFilesPayload.WireFile f) {
         return switch (f.ext().toLowerCase(Locale.ROOT)) {
             case "iql" -> "IQL script";
             case "txt" -> "Text";
@@ -615,6 +641,8 @@ public final class FilesApp implements IDesktopApp {
             case "inf" -> "Setup information";
             case "bin" -> "Installer data";
             case "cpk" -> "Program package";
+            case "sln" -> "Solution";
+            case "canproj" -> "Cannon project";
             /*
              * A language names its own files. Whatever is registered gets this for nothing, and the
              * explorer stops needing to know which language the machines happen to speak.
@@ -741,6 +769,7 @@ public final class FilesApp implements IDesktopApp {
     public void renderContent(final GuiGraphics g, final Font font, final int x, final int y,
                               final int width, final int height, final int mouseX, final int mouseY,
                               final float partialTick) {
+        openPendingProperties();
         lastX = x;
         lastY = y;
         contentW = width;
@@ -793,6 +822,7 @@ public final class FilesApp implements IDesktopApp {
         upButton.setBounds(x + FilesLayout.navX(2), ny, FilesLayout.NAV_W, FilesLayout.NAV_H);
         upButton.setEnabled(!dir.isEmpty());
         address.setBounds(x + FilesLayout.addressX(), ny, FilesLayout.addressW(width), FilesLayout.NAV_H);
+        addressEdit.setBounds(x + FilesLayout.addressX(), ny, FilesLayout.addressW(width), FilesLayout.NAV_H);
         search.setBounds(x + FilesLayout.searchX(width), ny, FilesLayout.SEARCH_W, FilesLayout.NAV_H);
         viewButton.setBounds(x + FilesLayout.viewX(width), ny, FilesLayout.NAV_W, FilesLayout.NAV_H);
 
@@ -1012,6 +1042,16 @@ public final class FilesApp implements IDesktopApp {
         }
         clickX = mouseX;
         clickY = mouseY;
+        /*
+         * A click on the address bar past its last crumb turns the trail into text. It is answered
+         * here rather than by the trail itself, because the panel would then move the keyboard to
+         * whatever was clicked and take it straight back off the field.
+         */
+        if (!editingAddress() && address.visible() && address.contains(mouseX, mouseY)
+                && address.crumbAt(mouseX) == null && button == 0) {
+            startAddressEdit();
+            return;
+        }
         if (!root.mouseClicked(mouseX, mouseY, button) && iconView && inListWell(mouseX, mouseY)) {
             // The icon view reports no click past its last tile; the rest of the well is the list's empty space.
             rowClicked(-1, button, mouseX, mouseY);
@@ -1095,6 +1135,178 @@ public final class FilesApp implements IDesktopApp {
         context.open(items, (int) mx, (int) my, lastX, lastY, contentW, contentH);
     }
 
+    /** Brings the desktop's terminal up with its prompt in this folder. */
+    private void openInTerminal() {
+        DesktopScreen.requestTypeAtTerminal(List.of("cd \"" + promptFolder() + "\""));
+    }
+
+    /** The folder's path the way a prompt takes it: as the address bar writes it, without the trailing separator. */
+    private String promptFolder() {
+        final String typed = typedPath();
+        final boolean root = typed.length() <= 3;
+        return !root && (typed.endsWith("\\") || typed.endsWith("/")) ? typed.substring(0, typed.length() - 1) : typed;
+    }
+
+    /** Opens the folder's own menu, as the right button on an empty part of it does; for a test. */
+    public void openBackgroundMenu() {
+        openContext(buildContext(null), lastX + 60, lastY + 60);
+    }
+
+    /** Whether the right-button menu is up. */
+    public boolean contextOpen() {
+        return context.isOpen();
+    }
+
+    /** The labels of the right-button menu, so a test can read what it offers. */
+    public List<String> contextLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final ContextMenu.Item entry : context.items()) {
+            out.add(entry.label());
+        }
+        return out;
+    }
+
+    /** The middle of the menu's entry with that label, or null. */
+    public int[] contextPoint(final String label) {
+        final int index = contextLabels().indexOf(label);
+        return index < 0 ? null : context.itemCenter(index);
+    }
+
+    /** What the New entry offers: a folder first, then a file of every kind the machine can create. */
+    private List<ContextMenu.Item> newItems(final boolean readOnly) {
+        final List<ContextMenu.Item> out = new ArrayList<>();
+        out.add(new ContextMenu.Item("Folder", !readOnly, this::newFolder));
+        out.add(ContextMenu.Item.separator());
+        for (final dev.jstech.computers.os.fs.FileType type : dev.jstech.computers.os.fs.FileOpeners.creatable()) {
+            out.add(new ContextMenu.Item(typeLabel(type) + " (." + type.extension() + ")", !readOnly,
+                    () -> newFile(type)));
+        }
+        return out;
+    }
+
+    /* The address bar as text */
+
+    private final TextField addressEdit;
+    /** The name of a row whose properties are to open once the listing has it, or null. */
+    @Nullable
+    private String pendingProperties;
+
+    /** Turns the trail into a path that can be typed over. */
+    private void startAddressEdit() {
+        addressEdit.set(typedPath());
+        addressEdit.setVisible(true);
+        address.setVisible(false);
+        root.focus(addressEdit);
+        // The whole path is selected on the way in, so Ctrl+C copies it and typing replaces it.
+        addressEdit.selectAll();
+    }
+
+    private void stopAddressEdit() {
+        addressEdit.setVisible(false);
+        address.setVisible(true);
+    }
+
+    /** The folder the explorer is on, the way a person types it: {@code C:\progs\}, {@code D:\support\}, or {@code /progs/} on Linux. */
+    private String typedPath() {
+        if (linux()) {
+            return "/" + (onMedia() ? mediaRest() : dir) + (dir.isEmpty() ? "" : "/");
+        }
+        if (onMedia()) {
+            final String rootKey = "media:" + mediaReaderPos();
+            final String letter = letterOf(rootKey);
+            final String rest = mediaRest();
+            return (letter.isEmpty() ? "D:" : letter) + "\\" + rest.replace('/', '\\') + (rest.isEmpty() ? "" : "\\");
+        }
+        return "C:\\" + dir.replace('/', '\\') + (dir.isEmpty() ? "" : "\\");
+    }
+
+    /** The part of a media path after the reader's key. */
+    private String mediaRest() {
+        final int slash = dir.indexOf('/');
+        return slash >= 0 ? dir.substring(slash + 1) : "";
+    }
+
+    /** Goes where the typed path says, reading a drive letter as the volume it names. */
+    private void goTyped(final String typed) {
+        stopAddressEdit();
+        String path = typed.trim().replace('\\', '/');
+        String rootKey = "";
+        if (path.length() >= 2 && path.charAt(1) == ':') {
+            final String letter = path.substring(0, 2).toUpperCase(java.util.Locale.ROOT);
+            path = path.substring(2);
+            if (!letter.equals("C:")) {
+                boolean found = false;
+                for (final DiskFilesPayload.WireVolume v : volumes) {
+                    if (letterOf(v.key()).equalsIgnoreCase(letter)) {
+                        rootKey = v.key();
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    return;
+                }
+            }
+        }
+        while (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        while (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        final String target = rootKey.isEmpty() ? path : (path.isEmpty() ? rootKey : rootKey + "/" + path);
+        go(target);
+    }
+
+    /** How wide the Type column is, which a test reads back after dragging its edge. */
+    public int typeColumnWidth() {
+        return typeColW;
+    }
+
+    /** A desktop-local point on the left edge of column {@code index} of the headings, where a drag takes hold. */
+    public int[] columnEdgePoint(final int index) {
+        return new int[] {columns.columnX(index) - 1, columns.y() + columns.height() / 2};
+    }
+
+    /** Whether the address bar is being typed into. */
+    public boolean editingAddress() {
+        return addressEdit.visible();
+    }
+
+    /** Escape closes the menu, the Properties window or the address being typed before it means anything to the desktop. */
+    @Override
+    public boolean wantsEscape() {
+        return context.isOpen() || properties.isOpen() || editingAddress();
+    }
+
+    /** A point on the address bar past its last crumb, where a click turns the trail into text. */
+    public int[] addressEditPoint() {
+        return new int[] {address.right() - 4, address.y() + address.height() / 2};
+    }
+
+    /** Opens the Properties window for the row called {@code name} as soon as the listing holds it. */
+    public void showPropertiesFor(final String name) {
+        pendingProperties = name;
+    }
+
+    private void openPendingProperties() {
+        if (pendingProperties == null) {
+            return;
+        }
+        for (final Row row : rows) {
+            if (row.name().equals(pendingProperties) && (row.kind() == Kind.FILE || row.kind() == Kind.DIR)) {
+                pendingProperties = null;
+                openProperties(row);
+                return;
+            }
+        }
+    }
+
+    /** The folder the desktop's icons live in, by the desktop's id, for a window opened onto it. */
+    public static String desktopDirFor(final String os) {
+        return os.startsWith("frames_") ? SystemLayout.DESKTOP_DIR : SystemLayout.POSIX_DESKTOP_DIR;
+    }
+
     /** The context menu for {@code target} (a row, or {@code null} for empty space), greyed where the volume forbids. */
     private List<ContextMenu.Item> buildContext(@Nullable final Row target) {
         final boolean ro = readOnlyVolume();
@@ -1130,11 +1342,15 @@ public final class FilesApp implements IDesktopApp {
             items.add(ContextMenu.Item.separator());
         } else {
             items.add(new ContextMenu.Item("Paste", !clipboard.isEmpty() && !ro, this::paste));
-            for (final dev.jstech.computers.os.fs.FileType type
-                    : dev.jstech.computers.os.fs.FileOpeners.creatable()) {
-                items.add(new ContextMenu.Item("New ." + type.extension(), !ro, () -> newFile(type)));
+            items.add(ContextMenu.Item.submenu("New", newItems(ro)));
+            /*
+             * The prompt where the window is, without typing the path over: the desktop's own terminal
+             * comes up in this folder. And the folder's path for whatever else needs it.
+             */
+            final String terminal = DesktopScreen.terminalName();
+            if (!terminal.isEmpty()) {
+                items.add(new ContextMenu.Item("Open in " + terminal, true, this::openInTerminal));
             }
-            items.add(new ContextMenu.Item("New Folder", !ro, this::newFolder));
             items.add(ContextMenu.Item.separator());
             if (onMedia()) {
                 items.add(new ContextMenu.Item("Eject", true, () -> eject("media:" + mediaReaderPos())));

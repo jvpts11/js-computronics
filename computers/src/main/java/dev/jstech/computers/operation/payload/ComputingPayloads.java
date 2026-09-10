@@ -1105,10 +1105,11 @@ public final class ComputingPayloads {
         context.enqueueWork(() -> {
             final java.util.List<DiskFilesPayload.WireFile> wire = new java.util.ArrayList<>();
             final String[] prefs = {"", ""};
-            // accent override (0=none), brightness, clock12h (0/1), taskbar centered (1) vs left (0), dark (0/1)
-            final int[] deskPrefs = {0, 100, 0, 1, 0};
+            // accent override (0=none), brightness, clock12h (0/1), taskbar centered (1) vs left (0), dark (0/1), scale (%)
+            final int[] deskPrefs = {0, 100, 0, 1, 0, 0};
             final java.util.List<String> programs = new java.util.ArrayList<>();
             final java.util.List<DesktopFilesPayload.WireIconCell> iconCells = new java.util.ArrayList<>();
+            final java.util.List<String> pinned = new java.util.ArrayList<>();
             if (context.player() instanceof ServerPlayer player
                     && player.level().getBlockEntity(payload.hostPos())
                             instanceof dev.jstech.computers.os
@@ -1118,11 +1119,13 @@ public final class ComputingPayloads {
                         filesystemKindOf(computer);
                 prefs[0] = computer.console().wallpaper();
                 prefs[1] = computer.console().computerName();
+                pinned.addAll(computer.console().settings().pinned());
                 deskPrefs[0] = computer.console().settings().accent();
                 deskPrefs[1] = computer.console().settings().brightness();
                 deskPrefs[2] = computer.console().settings().clock12h() ? 1 : 0;
                 deskPrefs[3] = computer.console().settings().taskbarCentered() ? 1 : 0;
                 deskPrefs[4] = computer.console().settings().darkMode() ? 1 : 0;
+                deskPrefs[5] = computer.console().settings().guiScale();
                 /*
                  * Installed programs that open as their own desktop window (vs. the always-present built-in
                  * apps). Each is gated by the installed OS, hardware and host scope; the built-in apps are
@@ -1208,7 +1211,7 @@ public final class ComputingPayloads {
             }
             context.reply(new DesktopFilesPayload(wire, prefs[0], prefs[1], programs, iconCells,
                     new DesktopFilesPayload.Prefs(deskPrefs[0], deskPrefs[1], deskPrefs[2] != 0,
-                            deskPrefs[3] != 0, deskPrefs[4] != 0), community));
+                            deskPrefs[3] != 0, deskPrefs[4] != 0, deskPrefs[5]), community, pinned));
         });
     }
 
@@ -1730,13 +1733,14 @@ public final class ComputingPayloads {
      * Answers a line typed while a program has the terminal, and says whether it still has it.
      *
      * <p>What a program prints reaches the terminal from the machine's own tick, so nothing is
-     * collected here: this is only the keyboard, and while a program is in front the one thing the
-     * keyboard can say to it is to stop.
+     * collected here: this is only the keyboard. While a program is in front, a line typed is the
+     * program's to read, and the interrupt is the one thing that means something to the terminal itself.
      */
     private static boolean drainForeground(
             final dev.jstech.computers.cannon.machine.MachinePrograms processes, final String typed,
             final java.util.List<DesktopShellOutputPayload.WireLine> wire) {
         if (!INTERRUPT.equals(typed)) {
+            processes.offerInput(typed);
             return true;
         }
         final int id = processes.held();

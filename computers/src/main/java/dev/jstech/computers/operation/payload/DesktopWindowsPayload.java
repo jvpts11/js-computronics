@@ -35,27 +35,43 @@ public record DesktopWindowsPayload(BlockPos host, List<WireWindow> windows) imp
     private static final int FLAG_MINIMIZED = 1;
     private static final int FLAG_MAXIMIZED = 2;
 
-    /** One window on the wire. The two booleans travel as flags so the codec stays a plain composite. */
-    public record WireWindow(String key, int x, int y, int w, int h, int flags) {
+    /**
+     * One window on the wire. The two booleans travel as flags so the codec stays a plain composite,
+     * and the program's state is already cut to what the wire carries by the time it is a window.
+     */
+    public record WireWindow(String key, int x, int y, int w, int h, int flags, String state) {
 
-        public static final StreamCodec<RegistryFriendlyByteBuf, WireWindow> STREAM_CODEC =
-                StreamCodec.composite(
-                        ByteBufCodecs.stringUtf8(64), WireWindow::key,
-                        ByteBufCodecs.VAR_INT, WireWindow::x,
-                        ByteBufCodecs.VAR_INT, WireWindow::y,
-                        ByteBufCodecs.VAR_INT, WireWindow::w,
-                        ByteBufCodecs.VAR_INT, WireWindow::h,
-                        ByteBufCodecs.VAR_INT, WireWindow::flags,
-                        WireWindow::new);
+        /*
+         * Seven fields is one more than a composite takes, so the two halves are written out; the key
+         * and the state are cut to their caps before writing, since a string over its cap is not a
+         * bad packet but a dropped connection.
+         */
+        public static final StreamCodec<RegistryFriendlyByteBuf, WireWindow> STREAM_CODEC = StreamCodec.of(
+                (buf, window) -> {
+                    buf.writeUtf(clip(window.key(), 64), 64);
+                    buf.writeVarInt(window.x());
+                    buf.writeVarInt(window.y());
+                    buf.writeVarInt(window.w());
+                    buf.writeVarInt(window.h());
+                    buf.writeVarInt(window.flags());
+                    buf.writeUtf(OpenWindow.clipState(window.state()), OpenWindow.STATE_MAX);
+                },
+                buf -> new WireWindow(buf.readUtf(64), buf.readVarInt(), buf.readVarInt(), buf.readVarInt(),
+                        buf.readVarInt(), buf.readVarInt(), buf.readUtf(OpenWindow.STATE_MAX)));
+
+        private static String clip(final String text, final int max) {
+            return text.length() <= max ? text : text.substring(0, max);
+        }
 
         public static WireWindow of(final OpenWindow window) {
             return new WireWindow(window.key(), window.x(), window.y(), window.w(), window.h(),
-                    (window.minimized() ? FLAG_MINIMIZED : 0) | (window.maximized() ? FLAG_MAXIMIZED : 0));
+                    (window.minimized() ? FLAG_MINIMIZED : 0) | (window.maximized() ? FLAG_MAXIMIZED : 0),
+                    OpenWindow.clipState(window.state()));
         }
 
         public OpenWindow toOpenWindow() {
             return new OpenWindow(key, x, y, w, h,
-                    (flags & FLAG_MINIMIZED) != 0, (flags & FLAG_MAXIMIZED) != 0);
+                    (flags & FLAG_MINIMIZED) != 0, (flags & FLAG_MAXIMIZED) != 0, state);
         }
     }
 

@@ -7,10 +7,10 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 ## [Unreleased]
 
 ### Added
-- The computers can be programmed. Cannon is a language of the world: you write it at the machine, compile
-  it there with `cannonc`, and run what comes out. The compiler produces a listing you can open and read a
-  line at a time, because a program you cannot look inside is one you cannot trust.
-- A program is one of two things, and says which by how it is written. One with a `Main` runs at the
+- Computers can now be programmed with the series' own programming language, Cannon. You write it at any computer, compile
+  it there with `cannonc` down to assembly, and run what comes out. The compiler produces a listing you can open and read a
+  line at a time, so any output can be verified.
+- For now, a program is one of two things, and says which by how it is written. One with a `Main` runs at the
   terminal that started it, holds the prompt, prints as it goes and is gone when it returns. One that
   implements `IScript` stays up: set up once, called every tick, told when it is stopped, and still running
   after the world has been away and come back.
@@ -84,6 +84,93 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   Starting a console program runs it in the dock's terminal.
 - The Create a new project page shows the templates used lately beside the list, filters by language,
   platform and project type, and the Configure page asks where the project goes, with a "..." to browse.
+- Cannon has namespaces and usings, and every type lives in one. `namespace Tools;` at the top of a file
+  puts its types there, or a `namespace Tools { }` block does, and blocks nest. Types in the same
+  namespace see each other plainly; anything else is brought in with a using: `using Tools.*;` for the
+  whole namespace, `using Tools.Counter;` for one type, and `Tools.Counter` names one from anywhere. A
+  file with no namespace, or a name used without its using, is told so by the compiler.
+- The language's own library is the `System` namespace, with a namespace inside it per subject: the
+  console and files under `System.IO`, lists and maps under `System.Collections`, `Math` under
+  `System.Utils`, the machine under `System.Machine`, the network under `System.Network`, what the
+  Mainframe has been doing under `System.Operations`. A program says which of it it uses.
+- Structs and records. A struct is a value: assigning one copies it, two are equal when their fields
+  are. A record is written as a line, `record Point(int X, int Y);`, and gets its fields, its
+  constructor, its `ToString` and its equality from that line.
+- Classes nest: a class declared inside another is named through it, `Farm.Counter`, and is a type in
+  every way the outer one is.
+- Programs take input. `Console.ReadLine()` waits for a line typed at the terminal the program runs in,
+  and `Console.HasLine()` says whether one is waiting; a program waiting reads as "input" in the Task
+  Manager. Typing at a terminal with a program in front goes to the program. `ReadInt`, `ReadLong`,
+  `ReadDouble` and `ReadBool` wait the same way and hand the line back as a value, and stop the program
+  with the text they could not read when it was not one.
+- A program can say what it is called. `Program.SetName("Sorter")`, under `System.Execution`, is the
+  name the Task Manager, `cannon ps` and the machine's own process list show for it, and `Program.Name`
+  reads it back. A program that gives itself no name is listed as `cannonrt`, the runtime running it,
+  the way an interpreted program shows up under its interpreter on any machine. The name survives the
+  world being away and back.
+- `Convert` turns text into values the other way round: `ToInt`, `ToLong`, `ToFloat`, `ToDouble`,
+  `ToBool` and `ToString`, which stop on text that is not one, and `TryInt`, `TryLong`, `TryDouble` and
+  `TryBool`, which say whether it was and hand the value out sideways, for a program that would rather
+  ask again.
+- The file explorer's address bar is a text field once it is clicked into, with the whole path
+  selected: Ctrl+C copies it, typing replaces it, a click in the text puts the caret there, and Shift
+  with the arrows (or a drag) selects part of it to copy. Every text field on every desktop selects
+  the same way, and Ctrl+A selects all of one.
+- The file explorer's right button, on an empty part of a folder, offers "Open in" the desktop's
+  terminal, which comes up with its prompt in that folder.
+- The Solution Explorer works with the right button: a source offers Open, Exclude From Project and
+  Delete (which asks first, then takes the file off the disk, off its tab and out of the project); a
+  project offers Build, Set as Startup Project, Add New Item, Add Existing Item, Add Project Reference
+  and Properties; the solution offers Build, Clean and Add New Project.
+- A machine remembers what its windows had open, not only that they were open: after the game itself
+  was closed, Virtual Studio comes back on its solution with the same files on its tabs, Virtual
+  Studio Code and Exposure on their folder and files, and the explorer on its folder.
+- The editors suggest the program's own names, not only the language's: after a dot, what the variable,
+  the field, `this`, `base` or the type before it has, read one name at a time through a chain; on a
+  bare name, the variables in reach, the members of the class around the caret and every type the
+  program declares, in the other files of the folder and in the libraries the project references too.
+  The suggestions come while the line is still broken, which is when they are asked for.
+- Every terminal moves the caret within the line: Left and Right, Home and End, Ctrl with Left or Right
+  by a word, and Delete.
+- Vim knows more of itself: w, b, e, ^, G and gg to move, dw and D to cut, yy, p and P to copy a line
+  and put it back, u and Ctrl+R to undo and redo, and `:12` to go to a line. Emacs answers C-f, C-b,
+  C-n, C-p, C-a, C-e, C-d, C-k, C-y, C-x u, M-< and M->, and asks before leaving with changes unwritten.
+  Both slide a long line sideways to keep the caret in view.
+- The code editors have a scroll bar down the side and one along the bottom, slide sideways with Shift
+  and the wheel, and take a whole step of indentation back on Backspace. The right button on the code
+  opens Cut, Copy, Paste, Toggle Line Comment and the refactorings, which is where Implement Interface
+  lives now (Ctrl+. still works). Virtual Studio's zoom is a control in the status bar and under View;
+  Virtual Studio Code keeps it under View > Appearance.
+- The explorer's New entry opens a menu of what can be made, a folder first. A click past the last crumb
+  of the address bar turns it into a path to type, copy or paste; every text field answers Ctrl+C, X
+  and V.
+- The desktop's right button offers what a desktop offers: Open, Open with, Rename, Delete and
+  Properties on an icon; New, Refresh, Display settings, Personalize and Properties on the wallpaper.
+- The system has a file window of its own, the one every program opens to choose a file, a folder or
+  where to save: the places on the left as the explorer lists them, the way back, forward and up, the
+  address as crumbs that can be typed over, the folder's contents with the explorer's icons and columns
+  and only the files of the kind asked for, then the name, the kind and Open, Save or Select Folder. A
+  double click enters a folder or takes a file, Save asks before replacing, and it wears each desktop's
+  clothes. Virtual Studio, Virtual Studio Code and Exposure open and save through it; any program can.
+  It is a window of its own: it comes up over the program that asked, listed with that program on the
+  panel rather than as a program of its own, and holds the program until it is answered or put away.
+- The panel lists programs, not windows. A program opened twice has one entry, and the entry says how
+  the program stands: pinned with nothing open, open, in front, or put away, each in the panel's own
+  language (Frames 11 marks the icon underneath and splits the mark for several windows; Frames XP
+  pushes the button in and groups several under a count; KDE and Cinnamon underline, fill and stack).
+  Resting the cursor on an entry of Frames 11, KDE or Cinnamon shows a card per window with its live
+  picture; a click on a card brings that window forward, its cross closes it alone. Frames XP and 95
+  list the titles instead, the way those desktops did.
+- Programs pin to the panel. The right button on an entry, on a desktop icon or in Start offers Pin to
+  taskbar, and a pinned program keeps its place with nothing open (on the quick launch beside Start on
+  Frames XP; in place on Frames 11, KDE and Cinnamon). The pins are the machine's, kept with its other
+  settings, and a fresh machine pins its file explorer. `settings pin files` and `unpin` at the prompt
+  do the same.
+- Exposure is an editor: File makes, opens, saves and closes files and picks the folder, Source comments,
+  goes to a line and refactors, Project rebuilds the folder and runs the open program at the terminal.
+- Settings > Display has a Scale: the desktop draws everything at 100, 90, 80, 75, 66 or 50 percent of
+  its designed size, so a machine can fit more on its glass. Every machine starts at 75, which is the
+  size that reads best on the monitor. The `settings guiscale` line at the prompt sets it too.
 
 - Every system, desktop, service and program holds a share of the computer's RAM, in megabytes, and a program
   opens only while it still fits: a bundled program weighs a share of the system it ships with, an installed one
@@ -128,6 +215,9 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   read, not built.
 - `cannonc` says how to run what it wrote. Compiling and running are two commands, and the prompt now
   names the second one after the first has finished.
+- Virtual Studio Code's side panel is the folder and nothing else: the folder's name, then its tree,
+  with no caption over it and no list of open editors above it, since the tabs already say what is
+  open. A file or a folder in the tree opens on a double click; one click only picks it.
 
 ### Fixed
 - The installation disc's setup no longer sits in the local disk's root, and the installed program's
@@ -138,6 +228,33 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
 - The name of a new file starts with the cursor before the extension, and the arrow keys move it.
 - The "Open with Virtual Studio" entry of the explorer's menu is one entry, not a row of them.
 - Errors are listed in a table with room for the description instead of running into each other.
+- Backspace on the indented line under an opening brace no longer pulls the closing brace up onto the
+  line above: a space before the caret and the end of a line after it were being taken for a pair.
+- The editors read the whole folder when they mark errors, so a class that extends one written in the
+  file beside it is no longer told that class does not exist.
+- Two methods with the same name and the same parameters are refused as one declared twice.
+- Typing a B with Ctrl held at a computer no longer switches the game's narrator on and off: the game
+  saw no text box and took the key for itself.
+- A running program with a long name no longer drops the player's connection when the machine's
+  settings are read: every name in that message is cut to what the message can carry.
+- A program with a struct or a record in it runs. The compiler wrote them into the listing under
+  their own words and the machine did not know those words, so it said the listing was not something
+  Cannon could run.
+- A record joined to a string reads as its fields, `Item { Name = iron, Qty = 3 }`, the way its own
+  `ToString` writes it, rather than as the name of its type. Any class with a `ToString` of its own
+  reads that way in a sentence.
+- A click on the empty end of an editor's tab strip no longer closes the last tab. It counted as that
+  tab's close mark, so a few stray clicks there emptied the editor.
+- Vim and Emacs open the file that was named. A file named from inside its folder (`vim Program.can`
+  after `cd progs`) was asked for by its bare name, so the editor opened an empty file of that name
+  instead of the one on the disk.
+- Emacs takes a command after `M-x`. The letters typed after it were run into it (`M-xcompile`), so
+  `M-x compile` and `C-x u` could never be read.
+- A terminal program stopped on a read no longer stays on the machine's list for ever when it loses
+  the terminal. Only the program in front of the terminal gets what is typed, so one that was left
+  behind by another program taking the terminal could never be answered; it sat at no cost and some
+  memory, listed as running. It is stopped the moment the terminal moves on, and a machine finding one
+  in that state clears it.
 
 ## [0.2.0a] - 2026-09-06
 
