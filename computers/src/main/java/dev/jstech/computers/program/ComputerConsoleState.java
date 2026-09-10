@@ -501,6 +501,18 @@ public final class ComputerConsoleState {
             pinned.add(net.minecraft.nbt.StringTag.valueOf(id));
         }
         s.put("Pinned", pinned);
+        if (!settings.favourites().isEmpty()) {
+            final ListTag favourites = new ListTag();
+            for (final String id : settings.favourites()) {
+                favourites.add(net.minecraft.nbt.StringTag.valueOf(id));
+            }
+            s.put("Favourites", favourites);
+        }
+        if (!settings.recipeChoices().isEmpty()) {
+            final CompoundTag choices = new CompoundTag();
+            settings.recipeChoices().forEach(choices::putInt);
+            s.put("RecipeChoices", choices);
+        }
         if (!settings.themePreset().isEmpty()) {
             s.putString("Theme", settings.themePreset());
         }
@@ -606,6 +618,17 @@ public final class ComputerConsoleState {
             }
             settings.setPinned(pinned);
         }
+        final java.util.List<String> favourites = new java.util.ArrayList<>();
+        for (final net.minecraft.nbt.Tag entry : s.getList("Favourites", net.minecraft.nbt.Tag.TAG_STRING)) {
+            favourites.add(entry.getAsString());
+        }
+        settings.setFavourites(favourites);
+        final Map<String, Integer> choices = new LinkedHashMap<>();
+        final CompoundTag choicesTag = s.getCompound("RecipeChoices");
+        for (final String key : choicesTag.getAllKeys()) {
+            choices.put(key, choicesTag.getInt(key));
+        }
+        settings.putRecipeChoices(choices);
         settings.setThemePreset(s.getString("Theme"));
         final Map<String, String> apps = new LinkedHashMap<>();
         final CompoundTag appsTag = s.getCompound("DefaultApps");

@@ -721,8 +721,10 @@ public final class FullJourneyClientTests {
         final NetworkInteractorApp app = app(ctx, "Network", NetworkInteractorApp.class);
         final int index = app.craftableNames().indexOf(name);
         ctx.assertTrue(index >= 0, "the Crafting tab must list " + name + "; got " + app.craftableNames());
+        // A click selects the craftable; a second one right after opens it.
         ctx.clickDesktop(appPoint(ctx, "Network", app.craftableCellCenter(index)));
-        ctx.assertTrue(app.isCraftPopupOpen(), "clicking " + name + " opens the request popup");
+        ctx.clickDesktop(appPoint(ctx, "Network", app.craftableCellCenter(index)));
+        ctx.assertTrue(app.isCraftPopupOpen(), "double-clicking " + name + " opens the request popup");
         for (int i = 0; i < plusOnes; i++) {
             ctx.clickDesktop(appPoint(ctx, "Network", app.craftPopupStepCenter(2)));
         }

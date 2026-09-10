@@ -30,6 +30,10 @@ public final class ComputerSettings {
 
     /** The most programs a panel keeps pinned; past that the panel has no room for its windows. */
     public static final int MAX_PINNED = 12;
+    /** The most data the Network Interactor keeps starred on one machine. */
+    public static final int MAX_FAVOURITES = 64;
+    /** The most items whose recipe choice one machine remembers; the oldest choice makes room past that. */
+    public static final int MAX_RECIPE_CHOICES = 64;
     /** What a fresh machine pins: its file explorer. */
     public static final String DEFAULT_PINNED = "files";
 
@@ -58,6 +62,16 @@ public final class ComputerSettings {
     private final List<String> pinned = new ArrayList<>(List.of(DEFAULT_PINNED));
     /** Default program id per lowercase file extension (e.g. {@code "txt" -> "jsc:editor"}). */
     private final Map<String, String> defaultApps = new LinkedHashMap<>();
+    /**
+     * The data the Network Interactor keeps starred, by data id ({@code item|minecraft:iron_ingot}), in the
+     * order the player starred it. Kept by the machine, so every window on it shows the same stars.
+     */
+    private final List<String> favourites = new ArrayList<>();
+    /**
+     * Which recipe the player picked last for an item that more than one recipe makes, by data id: the index
+     * into the recipes the network lists for it. The next craft of that item opens on the same recipe.
+     */
+    private final Map<String, Integer> recipeChoices = new LinkedHashMap<>();
 
     public int accent() {
         return accent;
@@ -180,6 +194,74 @@ public final class ComputerSettings {
         final String trimmed = id.trim().toLowerCase(Locale.ROOT);
         final int colon = trimmed.indexOf(':');
         return colon >= 0 ? trimmed.substring(colon + 1) : trimmed;
+    }
+
+    /** The starred data ids, in the order they were starred. */
+    public List<String> favourites() {
+        return java.util.Collections.unmodifiableList(favourites);
+    }
+
+    /** Replaces the starred list (used on load): blanks and repeats are dropped, and the list is capped. */
+    public void setFavourites(final List<String> ids) {
+        favourites.clear();
+        if (ids != null) {
+            for (final String id : ids) {
+                favourite(id);
+            }
+        }
+    }
+
+    /** Stars a data id, at the end; one already starred stays where it is. False when there is no room. */
+    public boolean favourite(final String id) {
+        final String key = id == null ? "" : id.trim();
+        if (key.isEmpty() || favourites.contains(key) || favourites.size() >= MAX_FAVOURITES) {
+            return false;
+        }
+        favourites.add(key);
+        return true;
+    }
+
+    /** Takes the star off a data id; false when it was not starred. */
+    public boolean unfavourite(final String id) {
+        return favourites.remove(id == null ? "" : id.trim());
+    }
+
+    public boolean isFavourite(final String id) {
+        return favourites.contains(id == null ? "" : id.trim());
+    }
+
+    /** The recipe the player picked last for a data id, or {@code -1} when none was picked. */
+    public int recipeChoice(final String id) {
+        return recipeChoices.getOrDefault(id == null ? "" : id.trim(), -1);
+    }
+
+    /** Remembers the recipe picked for a data id; a negative index forgets it. The oldest choice goes past the cap. */
+    public void setRecipeChoice(final String id, final int index) {
+        final String key = id == null ? "" : id.trim();
+        if (key.isEmpty()) {
+            return;
+        }
+        recipeChoices.remove(key);
+        if (index < 0) {
+            return;
+        }
+        while (recipeChoices.size() >= MAX_RECIPE_CHOICES) {
+            recipeChoices.remove(recipeChoices.keySet().iterator().next());
+        }
+        recipeChoices.put(key, index);
+    }
+
+    /** An unmodifiable view of the remembered recipe choices, for serialisation. */
+    public Map<String, Integer> recipeChoices() {
+        return java.util.Collections.unmodifiableMap(recipeChoices);
+    }
+
+    /** Replaces the remembered recipe choices (used on load). */
+    public void putRecipeChoices(final Map<String, Integer> map) {
+        recipeChoices.clear();
+        if (map != null) {
+            map.forEach(this::setRecipeChoice);
+        }
     }
 
     /** The default program id for {@code ext} (lowercased), or {@code ""} when none is set. */
@@ -324,6 +406,27 @@ public final class ComputerSettings {
                 unpin(v);
                 return !normalizeId(v).isEmpty();
             }
+            case "favourite" -> {
+                // Starring what is starred already asks for the state it wants, and either way it is starred.
+                return !v.isEmpty() && (isFavourite(v) || favourite(v));
+            }
+            case "unfavourite" -> {
+                unfavourite(v);
+                return !v.isEmpty();
+            }
+            case "recipe" -> {
+                // "<data id>=<index>": which recipe to open the craft of that item on; a negative index forgets.
+                final int eq = v.lastIndexOf('=');
+                if (eq <= 0) {
+                    return false;
+                }
+                final Integer index = parseInt(v.substring(eq + 1));
+                if (index == null) {
+                    return false;
+                }
+                setRecipeChoice(v.substring(0, eq), index);
+                return true;
+            }
             default -> {
                 return false;
             }
@@ -343,6 +446,7 @@ public final class ComputerSettings {
         lines.add(pad("autoopen") + (removableAutoOpen ? "on" : "off"));
         lines.add(pad("accent") + (accent == 0 ? "default" : String.format(Locale.ROOT, "#%06X", accent & 0xFFFFFF)));
         lines.add(pad("pinned") + (pinned.isEmpty() ? "none" : String.join(", ", pinned)));
+        lines.add(pad("favourites") + (favourites.isEmpty() ? "none" : favourites.size() + " starred"));
         return lines;
     }
 

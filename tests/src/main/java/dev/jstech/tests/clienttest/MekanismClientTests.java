@@ -184,9 +184,11 @@ public final class MekanismClientTests {
                 // Request four frames through the popup: it must plan through the machine patterns.
                 .then(0, () -> {
                     final NetworkInteractorApp app = networkInteractor(ctx);
+                    // A click selects the frame; a second one right after opens it.
+                    ctx.clickDesktop(networkInteractorPoint(ctx, app.craftableCellCenter(app.craftableNames().indexOf(FRAME_NAME))));
                     ctx.clickDesktop(networkInteractorPoint(ctx, app.craftableCellCenter(app.craftableNames().indexOf(FRAME_NAME))));
                 })
-                .thenAssert(1, () -> networkInteractor(ctx).isCraftPopupOpen(), "clicking the frame opens the request popup")
+                .thenAssert(1, () -> networkInteractor(ctx).isCraftPopupOpen(), "double-clicking the frame opens the request popup")
                 .then(1, () -> {
                     final NetworkInteractorApp app = networkInteractor(ctx);
                     for (int i = 0; i < 3; i++) {

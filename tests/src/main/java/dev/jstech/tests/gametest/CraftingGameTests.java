@@ -546,6 +546,107 @@ public final class CraftingGameTests {
     /**
      * The assembled test network, with handles on the parts the assertions need.
      */
+    /** The recipes that make one result come in a stable order: the machine ones as the ROM holds them, then the bench ones. */
+    @GameTest(template = ARENA, timeoutTicks = 200)
+    public static void recipesFor_listsMachineRecipesThenBenchPatternsForTheResult(final GameTestHelper helper) {
+        final Network net = buildCraftingNetwork(helper);
+        final var ingot = storageKey(Items.IRON_INGOT);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    helper.assertTrue(net.cc.loadMachineRecipe(dev.jstech.computers.crafting.NetworkRecipe.ofProcessing(
+                            smelt(Items.RAW_IRON, Items.IRON_INGOT, "minecraft:furnace", 200).withName("Blast", ""))),
+                            "the processing recipe loads");
+                    helper.assertTrue(net.cc.loadMachineRecipe(dev.jstech.computers.crafting.NetworkRecipe.ofMultiStage(
+                            new dev.jstech.computers.crafting.MultiStagePattern(List.of(
+                                    dev.jstech.computers.crafting.MultiStagePattern.Stage.proc(
+                                            smelt(Items.RAW_IRON, Items.IRON_INGOT, "minecraft:blast_furnace", 100))))
+                                    .withName("Iron line", ""))),
+                            "the multi-stage recipe loads");
+                    helper.assertTrue(net.cc.loadPattern(nuggetsToIngot()), "the bench pattern loads");
+                    helper.assertTrue(net.cc.loadPattern(new dev.jstech.computers.crafting.CraftingPattern(
+                            grid(Items.OAK_LOG), new ItemStack(Items.OAK_PLANKS, 4))), "an unrelated bench pattern loads");
+                })
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var recipes = net.mainframe.recipesFor(ingot);
+                    helper.assertTrue(recipes.size() == 3, "three recipes make the ingot; got " + recipes.size());
+                    helper.assertTrue(recipes.get(0).proc().isPresent() && recipes.get(0).displayName().equals("Blast"),
+                            "the processing recipe comes first; got " + recipes.get(0).displayName());
+                    helper.assertTrue(recipes.get(1).multi().isPresent() && recipes.get(1).displayName().equals("Iron line"),
+                            "the multi-stage recipe comes second; got " + recipes.get(1).displayName());
+                    helper.assertTrue(recipes.get(2).bench().isPresent(), "the bench pattern comes last");
+                    helper.assertTrue(net.mainframe.recipesFor(storageKey(Items.OAK_PLANKS)).size() == 1,
+                            "the planks have their one bench pattern");
+                    helper.assertTrue(net.mainframe.recipesFor(storageKey(Items.DIAMOND)).isEmpty(),
+                            "nothing makes a diamond");
+                })
+                .thenSucceed();
+    }
+
+    /** A craft request that names a recipe runs that recipe: the pipeline, the machine, or the bench pattern's plan. */
+    @GameTest(template = ARENA, timeoutTicks = 300)
+    public static void submitCraftRequest_runsTheRecipeThePlayerPicked(final GameTestHelper helper) {
+        final Network net = buildCraftingNetwork(helper);
+        final var ingot = storageKey(Items.IRON_INGOT);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE + 2, () -> {
+                    net.seed(helper, Items.RAW_IRON, 16);
+                    net.seed(helper, Items.IRON_NUGGET, 18);
+                    net.cc.loadMachineRecipe(dev.jstech.computers.crafting.NetworkRecipe.ofProcessing(
+                            smelt(Items.RAW_IRON, Items.IRON_INGOT, "minecraft:furnace", 200).withName("Blast", "")));
+                    net.cc.loadMachineRecipe(dev.jstech.computers.crafting.NetworkRecipe.ofMultiStage(
+                            new dev.jstech.computers.crafting.MultiStagePattern(List.of(
+                                    dev.jstech.computers.crafting.MultiStagePattern.Stage.proc(
+                                            smelt(Items.RAW_IRON, Items.IRON_INGOT, "minecraft:blast_furnace", 100))))
+                                    .withName("Iron line", "")));
+                    net.cc.loadPattern(nuggetsToIngot());
+                })
+                .thenExecuteAfter(SETTLE, () -> {
+                    final var multi = net.mainframe.submitCraftRequest(ingot, 1, false, "test", null, 1);
+                    helper.assertTrue(multi instanceof dev.jstech.computers.crafting.NetworkMultiStageOperation,
+                            "index 1 runs the pipeline; got " + multi);
+                    final var machine = net.mainframe.submitCraftRequest(ingot, 1, false, "test", null, 0);
+                    helper.assertTrue(machine instanceof dev.jstech.computers.crafting.NetworkProcessingOperation,
+                            "index 0 runs the machine; got " + machine);
+                    final var bench = net.mainframe.submitCraftRequest(ingot, 1, false, "test", null, 2);
+                    helper.assertTrue(bench instanceof dev.jstech.computers.crafting.PendingCraftOperation,
+                            "index 2 plans the bench pattern; got " + bench);
+                    final var auto = net.mainframe.submitCraftRequest(ingot, 1, false, "test", null, 7);
+                    helper.assertTrue(auto instanceof dev.jstech.computers.crafting.NetworkProcessingOperation,
+                            "an index past the list is the machine's own choice, the first machine recipe; got " + auto);
+                })
+                // The bench plan runs on the Crafting Computer: the nuggets become an ingot without any furnace.
+                .thenExecuteAfter(40, () -> helper.assertTrue(net.storage(helper).count(ingot) >= 1,
+                        "the bench recipe picked must craft the ingot from nuggets; ingots="
+                                + net.storage(helper).count(ingot)))
+                .thenSucceed();
+    }
+
+    private static dev.jstech.computers.crafting.ProcessingPattern smelt(
+            final net.minecraft.world.item.Item in, final net.minecraft.world.item.Item out,
+            final String machineType, final int ticks) {
+        return new dev.jstech.computers.crafting.ProcessingPattern(
+                List.of(new dev.jstech.computers.crafting.ProcessingPattern.ProcessingInput(storageKey(in), 1L)),
+                List.of(new dev.jstech.computers.crafting.ProcessingPattern.ProcessingOutput(storageKey(out), 1L, 100)),
+                machineType, ticks);
+    }
+
+    private static dev.jstech.computers.crafting.CraftingPattern nuggetsToIngot() {
+        final java.util.List<ItemStack> grid = new java.util.ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            grid.add(new ItemStack(Items.IRON_NUGGET));
+        }
+        return new dev.jstech.computers.crafting.CraftingPattern(grid, new ItemStack(Items.IRON_INGOT));
+    }
+
+    private static java.util.List<ItemStack> grid(final net.minecraft.world.item.Item first) {
+        final java.util.List<ItemStack> grid = new java.util.ArrayList<>();
+        grid.add(new ItemStack(first));
+        for (int i = 1; i < 9; i++) {
+            grid.add(ItemStack.EMPTY);
+        }
+        return grid;
+    }
+
     private record Network(
             dev.jstech.computers.blockentity.MainframeBlockEntity mainframe,
             dev.jstech.computers.blockentity.ServerRackBlockEntity rack,

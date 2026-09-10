@@ -5702,11 +5702,12 @@ public final class DesktopScreen extends AbstractContainerScreen<DesktopMenu> {
         final int originX = w.x() + 4 + app.invCellContentX(0);
         final int originY = contentTop + app.invCellContentY(0, contentHeight);
         /*
-         * The band's screen-space bounds span the full slot grid, so every one of the 36 slot rows qualifies as
-         * visible, since the inventory band never scrolls and is never clipped.
+         * The band's screen-space bounds span the rows the app shows: the band never scrolls and is never
+         * clipped, but it can fold its top rows away, and a slot above the band's top goes inert.
          */
+        final int bandTop = contentTop + app.invBandTop(contentHeight);
         final int bandBottom = contentTop + app.invBandBottom(contentHeight);
-        menu.layoutInventory(originX, originY, originY, bandBottom);
+        menu.layoutInventory(originX, originY, bandTop, bandBottom);
     }
 
     /**

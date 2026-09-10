@@ -16,50 +16,61 @@ import dev.jstech.core.gui.layout.GuiLayout;
  * cells, the real container slots, and the click/hover hit-tests aligned at every window size.
  *
  * <p>All coordinates are content-local (origin at the window's content top-left, past the border and title
- * bar). The window has a fixed-width LEFT column and a flexible-width DETAILS column to its right:
+ * bar). The window has a LEFT column and a flexible-width DETAILS column to its right:
  * <ul>
- *   <li>the left column holds the search/sort header, the GRID (which fills the height between the header and
- *       the inventory band and SCROLLS its items when there are more than fit), and a fixed, framed INVENTORY
- *       band pinned just above the footer (a {@value #INV_PAD}px border around the 36 slots, always visible);</li>
+ *   <li>the left column holds the search/filter/sort header, the GRID (which fills the height between the
+ *       header and the inventory band and SCROLLS its items when there are more than fit), a grip strip, and a
+ *       framed INVENTORY band pinned just above the footer (a {@value #INV_PAD}px border around the slots);</li>
  *   <li>the details column fills the space to the right of the left column, from the header down to the footer,
- *       showing the hovered item's details (it is the panel that used to be dead space);</li>
- *   <li>the status bar and console line are pinned full-width at the bottom.</li>
+ *       showing the hovered item's details;</li>
+ *   <li>the status bar, a keyboard hint line and the console line are pinned full-width at the bottom.</li>
  * </ul>
  *
- * <p>The inventory does NOT scroll: it is pinned with a constant height. Only the grid scrolls, and it scrolls
- * its ITEMS, not its pixels. Making the window TALLER grows the grid zone, showing more item rows. The natural
- * minimum keeps the header, the whole inventory band, the details panel, and the footer on screen at once.
+ * <p>Two grips let the player reshape the window's insides, and the places they set are kept with the window:
+ * the vertical grip between the left column and the details panel gives the grid whole columns beyond the
+ * inventory's nine ({@code extraCols}; the band stays nine wide and sits centred under the wider grid), and the
+ * horizontal grip above the inventory folds the band's top rows away ({@code invRows}, one to four, the hotbar
+ * always staying) so the grid gets their room. The inventory does NOT scroll; only the grid scrolls, and it
+ * scrolls its ITEMS, not its pixels.
  */
 public final class NetworkInteractorLayout {
 
     public static final int TAB_H = 13;
     public static final int SEARCH_H = 13;
     public static final int STATUS_H = 11;
+    /** The keyboard hint line between the status bar and the console. */
+    public static final int HINT_H = 8;
     public static final int CONSOLE_H = 10;
     public static final int CELL = 18;
     public static final int INV_COLS = 9;
     public static final int INV_ROWS = 4;          // 3 main rows + the hotbar, like the vanilla layout
     public static final int INV_H = INV_ROWS * CELL;
     public static final int INSET = 4;             // left/right content inset
-    public static final int SORT_W = 46;           // width of the sort toggle box on a grid tab
-    /** Padding of the framed inventory band around the 36 slots (vanilla-style border, sharp corners). */
+    public static final int SORT_W = 32;           // width of the sort toggle box on a grid tab (small label)
+    /** Width of the mod filter drop-down in the header row. */
+    public static final int MOD_W = 34;
+    /** Width of the category filter drop-down in the header row: "Category" at the small scale. */
+    public static final int CAT_W = 46;
+    /** Padding of the framed inventory band around the slots (vanilla-style border, sharp corners). */
     public static final int INV_PAD = 4;
-    /** Gap between the left column and the details panel. */
+    /** Gap between the left column and the details panel, where the vertical grip sits. */
     public static final int GAP = 5;
+    /** The strip between the grid and the inventory band: the band's label and the horizontal grip. */
+    public static final int GRIP_H = 9;
     /** Minimum width of the right-hand item details panel. */
     public static final int DETAILS_MIN_W = 122;
-    /** The left column width: the framed inventory band (2*INV_PAD + 9 slots) sets it; the grid aligns inside. */
+    /** The left column's base width: the framed inventory band (2*INV_PAD + 9 slots); the grid aligns inside. */
     public static final int LEFT_W = 2 * INV_PAD + INV_COLS * CELL;
     /** The first content row below the tab strip (where the search/sort header sits). */
     public static final int BODY_TOP = TAB_H + 2;
 
     /** Fixed header height: tab strip + search/sort row. The grid zone starts here. */
     public static final int HEADER_H = BODY_TOP + SEARCH_H + 3;
-    /** Fixed footer height: the status bar plus the console line, pinned to the bottom. */
-    public static final int FOOTER_H = STATUS_H + CONSOLE_H;
+    /** Fixed footer height: the status bar, the hint line and the console line, pinned to the bottom. */
+    public static final int FOOTER_H = STATUS_H + HINT_H + CONSOLE_H;
     /** Gap between the 3 main inventory rows and the hotbar row, like the vanilla inventory. */
     public static final int HOTBAR_GAP = 4;
-    /** Fixed inventory-band height: the frame on each side, the 4 slot rows, and the hotbar gap. */
+    /** Fixed inventory-band height with every row shown: the frame on each side, the 4 slot rows, and the gap. */
     public static final int INV_BAND_H = 2 * INV_PAD + INV_H + HOTBAR_GAP;
 
     /**
@@ -71,11 +82,22 @@ public final class NetworkInteractorLayout {
         return r * CELL + (r >= 3 ? HOTBAR_GAP : 0);
     }
 
+    /** The band height when its {@code rows} bottom rows are shown (the hotbar and the main rows above it). */
+    public static int bandHeight(final int rows) {
+        final int shown = Math.max(1, Math.min(INV_ROWS, rows));
+        return 2 * INV_PAD + shown * CELL + (shown >= 2 ? HOTBAR_GAP : 0);
+    }
+
+    /** The content-local top of slot row {@code r}, or a row above the band when {@code r} is folded away. */
+    public static int slotRowY(final Zones z, final int r) {
+        return z.invY() + rowYOffset(r) - rowYOffset(z.invFirstRow());
+    }
+
     /**
      * The inventory slot index (0..35, row-major: rows 0-2 are the 27 main slots, row 3 is the 9 hotbar slots)
      * under a content-local point, or -1 when the point is not on a slot, outside the columns, above/below the
-     * rows, or in the hotbar gap. This is the EXACT inverse of where {@link #rowYOffset} places the slots, so
-     * the hover/click hit-test always lands on the drawn cell and can never drift from the rendered position.
+     * rows, in the hotbar gap, or on a row the band has folded away. This is the EXACT inverse of where
+     * {@link #slotRowY} places the slots, so the hover/click hit-test always lands on the drawn cell.
      */
     public static int inventorySlotAt(final int lx, final int ly, final Zones z) {
         final int relX = lx - z.invX();
@@ -83,8 +105,8 @@ public final class NetworkInteractorLayout {
             return -1;
         }
         final int col = relX / CELL;
-        for (int r = 0; r < INV_ROWS; r++) {
-            final int rowTop = z.invY() + rowYOffset(r);
+        for (int r = z.invFirstRow(); r < INV_ROWS; r++) {
+            final int rowTop = slotRowY(z, r);
             if (ly >= rowTop && ly < rowTop + CELL) {
                 return r * INV_COLS + col;
             }
@@ -112,21 +134,52 @@ public final class NetworkInteractorLayout {
         return (gridScroll + row) * z.gridCols() + col;
     }
 
+    /** Whether a content-local point is on the vertical grip (the gap between the left column and the details). */
+    public static boolean onVerticalGrip(final int lx, final int ly, final Zones z) {
+        return lx >= z.gripX() && lx < z.gripX() + GAP && ly >= z.gridY() && ly < z.invBandY() + z.invBandH();
+    }
+
+    /** Whether a content-local point is on the horizontal grip strip above the inventory band. */
+    public static boolean onHorizontalGrip(final int lx, final int ly, final Zones z) {
+        return ly >= z.gripY() && ly < z.gripY() + GRIP_H && lx >= z.invBandX() && lx < z.invBandX() + z.invBandW();
+    }
+
+    /** The most columns the grid can have beyond the inventory's nine at this content width. */
+    public static int maxExtraCols(final int contentW) {
+        return Math.max(0, (contentW - minContentWidth()) / CELL);
+    }
+
+    /** The extra columns a vertical-grip drag to content-local {@code lx} asks for, before clamping. */
+    public static int extraColsForGrip(final int lx) {
+        return Math.round((lx - (INSET + LEFT_W)) / (float) CELL);
+    }
+
+    /** The inventory rows a horizontal-grip drag to content-local {@code ly} asks for, before clamping. */
+    public static int invRowsForGrip(final int ly, final int contentH) {
+        final int footerTop = contentH - FOOTER_H;
+        // The band's slots end INV_PAD above the footer; count whole rows between the grip and that edge.
+        final int rowsBelow = Math.round((footerTop - INV_PAD - ly - INV_PAD - HOTBAR_GAP) / (float) CELL);
+        return Math.max(1, Math.min(INV_ROWS, rowsBelow));
+    }
+
     private NetworkInteractorLayout() {
     }
 
     /**
      * Resolved content-local zones for one window size. The grid is the only scrolling region (its items
      * scroll, not its pixels); the inventory band, the details panel, and the footer are pinned.
-     * {@code gridRows}/{@code gridCols} are how many item rows/columns currently fit in the grid zone.
+     * {@code gridRows}/{@code gridCols} are how many item rows/columns currently fit in the grid zone;
+     * {@code invFirstRow} is the first inventory row the band shows (rows above it are folded away).
      */
     public record Zones(int searchX, int searchY, int searchW,
+                        int modX, int modW, int catX, int catW,
                         int sortX, int sortY, int sortW,
                         int gridX, int gridY, int gridW, int gridH, int gridCols, int gridRows,
+                        int gripX, int gripY,
                         int invBandX, int invBandY, int invBandW, int invBandH,
-                        int invX, int invY,
+                        int invX, int invY, int invFirstRow,
                         int detailsX, int detailsY, int detailsW, int detailsH,
-                        int statusY, int consoleY) {
+                        int statusY, int hintY, int consoleY) {
     }
 
     /** The smallest content width: the left column, the gap, and the minimum details panel, plus the insets. */
@@ -135,45 +188,64 @@ public final class NetworkInteractorLayout {
     }
 
     /**
-     * The smallest content height: the fixed header, the whole framed inventory band, and the footer. At this
-     * height the grid zone collapses to zero rows but the inventory stays fully visible inside its frame.
+     * The smallest content height: the fixed header, the grip strip, the whole framed inventory band, and the
+     * footer. At this height the grid zone collapses to zero rows but the inventory stays fully visible.
      */
     public static int minContentHeight() {
-        return HEADER_H + INV_BAND_H + FOOTER_H;
+        return HEADER_H + GRIP_H + INV_BAND_H + FOOTER_H;
+    }
+
+    /** The zones with the grid at the inventory's nine columns and every inventory row shown. */
+    public static Zones resolve(final int contentW, final int contentH) {
+        return resolve(contentW, contentH, 0, INV_ROWS);
     }
 
     /**
-     * Computes every zone for the given content size. The left column is fixed-width (the grid above the framed
-     * inventory band); the details panel fills the rest of the width from the header to the footer; the footer
-     * is full-width at the bottom. When the window is too short the grid shrinks to zero rows (and scrolls its
-     * items) while the inventory keeps its frame; making it taller grows the grid.
+     * Computes every zone for the given content size, with the grips at {@code extraCols} columns beyond the
+     * inventory's nine (clamped to what leaves the details panel its minimum) and {@code invRows} inventory
+     * rows shown (one to four). The left column holds the grid above the framed inventory band; the details
+     * panel fills the rest of the width from the header to the footer; the footer is full-width at the bottom.
+     * When the window is too short the grid shrinks to zero rows (and scrolls its items) while the inventory
+     * keeps its frame; making it taller, or folding inventory rows away, grows the grid.
      */
-    public static Zones resolve(final int contentW, final int contentH) {
+    public static Zones resolve(final int contentW, final int contentH, final int extraCols, final int invRows) {
+        final int cols = INV_COLS + Math.max(0, Math.min(extraCols, maxExtraCols(contentW)));
+        final int leftW = 2 * INV_PAD + cols * CELL;
+        int rows = Math.max(1, Math.min(INV_ROWS, invRows));
+        // A window shorter than the whole band folds inventory rows away rather than letting the band ride the footer.
+        while (rows > 1 && HEADER_H + GRIP_H + bandHeight(rows) + FOOTER_H > contentH) {
+            rows--;
+        }
+        final int bandH = bandHeight(rows);
+
         final int headerBottom = HEADER_H;
         final int footerTop = Math.max(headerBottom, contentH - FOOTER_H);
         // The inventory band sits just above the footer; it never climbs above the header.
-        final int invBandY = Math.max(headerBottom, footerTop - INV_BAND_H);
-        // The grid fills whatever is left between the header and the inventory band (zero when squashed).
+        final int invBandY = Math.max(headerBottom + GRIP_H, footerTop - bandH);
+        // The grip strip sits right above the band; the grid fills what is left between the header and it.
+        final int gripY = invBandY - GRIP_H;
         final int gridTop = headerBottom;
-        final int gridAreaH = Math.max(0, invBandY - gridTop);
+        final int gridAreaH = Math.max(0, gripY - gridTop);
 
-        // Header search/sort live within the left column only.
+        // Header search/filters/sort live within the left column only.
         final int searchX = INSET;
         final int searchY = BODY_TOP;
-        final int searchW = Math.max(CELL, LEFT_W - SORT_W - 6);
-        final int sortX = INSET + LEFT_W - SORT_W;
-        final int sortW = SORT_W;
+        final int sortX = INSET + leftW - SORT_W;
+        final int catX = sortX - 2 - CAT_W;
+        final int modX = catX - 2 - MOD_W;
+        final int searchW = Math.max(CELL, modX - 2 - searchX);
 
-        // Grid aligns with the inventory slots (inset by the band's frame padding), 9 columns wide.
+        // Grid aligns with the inventory slots (inset by the band's frame padding), cols columns wide.
         final int gridX = INSET + INV_PAD;
-        final int gridW = INV_COLS * CELL;
-        final int gridCols = INV_COLS;
+        final int gridW = cols * CELL;
         final int gridRows = Math.max(0, gridAreaH / CELL);
 
-        final int invBandX = INSET;
+        // The band keeps the inventory's nine columns and sits centred under a grid that grew wider than it.
+        final int invBandX = INSET + (leftW - LEFT_W) / 2;
         final int invBandW = LEFT_W;
         final int invX = invBandX + INV_PAD;
         final int invY = invBandY + INV_PAD;
+        final int invFirstRow = INV_ROWS - rows;
 
         /*
          * The details panel fills the width to the right of the left column, from the header to the footer.
@@ -181,58 +253,74 @@ public final class NetworkInteractorLayout {
          * border (the bug that cut "WEIGHT"/"STORED"). The window manager keeps the whole window at or above
          * minContentWidth so the panel still has its minimum room in practice.
          */
-        final int detailsX = Math.min(INSET + LEFT_W + GAP, Math.max(0, contentW - INSET));
+        final int gripX = INSET + leftW;
+        final int detailsX = Math.min(gripX + GAP, Math.max(0, contentW - INSET));
         final int detailsY = headerBottom;
         final int detailsW = Math.max(0, contentW - detailsX - INSET);
         final int detailsH = Math.max(0, footerTop - detailsY);
 
         final int statusY = footerTop;
-        final int consoleY = footerTop + STATUS_H;
+        final int hintY = footerTop + STATUS_H;
+        final int consoleY = hintY + HINT_H;
 
-        return new Zones(searchX, searchY, searchW, sortX, searchY, sortW,
-                gridX, gridTop, gridW, gridAreaH, gridCols, gridRows,
-                invBandX, invBandY, invBandW, INV_BAND_H,
-                invX, invY,
+        return new Zones(searchX, searchY, searchW,
+                modX, MOD_W, catX, CAT_W,
+                sortX, searchY, SORT_W,
+                gridX, gridTop, gridW, gridAreaH, cols, gridRows,
+                gripX, gripY,
+                invBandX, invBandY, invBandW, bandH,
+                invX, invY, invFirstRow,
                 detailsX, detailsY, detailsW, detailsH,
-                statusY, consoleY);
+                statusY, hintY, consoleY);
+    }
+
+    /** The solid zones with the grid at nine columns and every inventory row shown. */
+    public static GuiLayout toGuiLayout(final int contentW, final int contentH) {
+        return toGuiLayout(contentW, contentH, 0, INV_ROWS);
     }
 
     /**
-     * Builds a {@link GuiLayout} of the solid zones the player actually sees for one window size, so a unit
-     * test can assert nothing overlaps and nothing spills past the content area: the grid, the framed inventory
-     * band and its 36 slots, the details panel, the header fields, and the footer.
+     * Builds a {@link GuiLayout} of the solid zones the player actually sees for one window size and grip
+     * setting, so a unit test can assert nothing overlaps and nothing spills past the content area: the
+     * grid, the grip strip, the framed inventory band and its shown slots, the details panel, the header
+     * fields, and the footer.
      */
-    public static GuiLayout toGuiLayout(final int contentW, final int contentH) {
-        final Zones z = resolve(contentW, contentH);
+    public static GuiLayout toGuiLayout(final int contentW, final int contentH, final int extraCols, final int invRows) {
+        final Zones z = resolve(contentW, contentH, extraCols, invRows);
         final GuiLayout layout = new GuiLayout(contentW, contentH);
         layout.box("tabs", 0, 0, contentW, TAB_H);
         layout.box("search", z.searchX(), z.searchY(), z.searchW(), SEARCH_H);
+        layout.box("mod", z.modX(), z.searchY(), z.modW(), SEARCH_H);
+        layout.box("category", z.catX(), z.searchY(), z.catW(), SEARCH_H);
         layout.box("sort", z.sortX(), z.sortY(), z.sortW(), SEARCH_H);
 
         // Grid: every row that fits in the grid zone (the grid scrolls its items, so its pixel box is fixed).
         if (z.gridRows() > 0) {
             layout.box("grid", z.gridX(), z.gridY(), z.gridCols() * CELL, z.gridRows() * CELL);
         }
+        layout.box("grip_h", z.invBandX(), z.gripY(), z.invBandW(), GRIP_H);
+        layout.box("grip_v", z.gripX(), z.gridY(), GAP, z.invBandY() + z.invBandH() - z.gridY());
 
         // The details panel to the right of the left column.
         if (z.detailsH() > 0) {
             layout.box("details", z.detailsX(), z.detailsY(), z.detailsW(), z.detailsH());
         }
 
-        // The framed inventory band: four border strips around the 36 slots (the bevel), then the slots.
+        // The framed inventory band: four border strips around the shown slots (the bevel), then the slots.
         final int slotsW = INV_COLS * CELL;
-        final int slotsH = INV_ROWS * CELL + HOTBAR_GAP;
+        final int slotsH = z.invBandH() - 2 * INV_PAD;
         layout.box("inv_frame_top", z.invBandX(), z.invBandY(), z.invBandW(), INV_PAD);
         layout.box("inv_frame_bottom", z.invBandX(), z.invBandY() + INV_PAD + slotsH, z.invBandW(), INV_PAD);
         layout.box("inv_frame_left", z.invBandX(), z.invBandY() + INV_PAD, INV_PAD, slotsH);
         layout.box("inv_frame_right", z.invBandX() + INV_PAD + slotsW, z.invBandY() + INV_PAD, INV_PAD, slotsH);
-        for (int r = 0; r < INV_ROWS; r++) {
+        for (int r = z.invFirstRow(); r < INV_ROWS; r++) {
             for (int c = 0; c < INV_COLS; c++) {
-                layout.box("inv_" + r + "_" + c, z.invX() + c * CELL, z.invY() + rowYOffset(r), CELL, CELL);
+                layout.box("inv_" + r + "_" + c, z.invX() + c * CELL, slotRowY(z, r), CELL, CELL);
             }
         }
 
         layout.box("status", 0, z.statusY(), contentW, STATUS_H);
+        layout.box("hint", 0, z.hintY(), contentW, HINT_H);
         layout.box("console", 0, z.consoleY(), contentW, CONSOLE_H);
         return layout;
     }

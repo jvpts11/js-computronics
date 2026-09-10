@@ -26,4 +26,12 @@ public interface IInventoryBandApp extends IDesktopApp {
 
     /** The content-local y just past the hotbar row, for a content area {@code contentHeight} tall. */
     int invBandBottom(int contentHeight);
+
+    /**
+     * The content-local y where the band's slots begin, for a content area {@code contentHeight} tall. A row
+     * placed above it is folded away (the band can show fewer rows than the inventory has) and goes inert.
+     */
+    default int invBandTop(final int contentHeight) {
+        return invCellContentY(0, contentHeight);
+    }
 }

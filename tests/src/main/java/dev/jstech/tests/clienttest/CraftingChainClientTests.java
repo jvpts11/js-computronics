@@ -399,9 +399,11 @@ public final class CraftingChainClientTests {
                             index = i;
                         }
                     }
+                    // A click selects the craftable; a second one right after opens it.
+                    ctx.clickDesktop(networkInteractorPoint(ctx, app.craftableCellCenter(index)));
                     ctx.clickDesktop(networkInteractorPoint(ctx, app.craftableCellCenter(index)));
                 })
-                .thenAssert(1, () -> networkInteractor(ctx).isCraftPopupOpen(), "clicking a craftable opens the request popup")
+                .thenAssert(1, () -> networkInteractor(ctx).isCraftPopupOpen(), "double-clicking a craftable opens the request popup")
                 .then(1, () -> {
                     final NetworkInteractorApp app = networkInteractor(ctx);
                     // +1 four times, then +64 would overshoot; the popup steps are -64, -1, +1, +64.

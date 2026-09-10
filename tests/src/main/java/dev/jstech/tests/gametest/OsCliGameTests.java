@@ -619,6 +619,33 @@ public final class OsCliGameTests {
                 .thenSucceed();
     }
 
+    /** What the Network Interactor stars and which recipe it picked for an item are the machine's, and survive a reload. */
+    @GameTest(template = ARENA)
+    public static void config_favouritesAndRecipeChoicesPersistAcrossConsoleReload(final GameTestHelper helper) {
+        final BlockPos pos = new BlockPos(2, 2, 2);
+        final MainframeBlockEntity mainframe = placeMainframeWithMcDos(helper, pos);
+        helper.startSequence()
+                .thenExecuteAfter(SETTLE, () -> {
+                    final ServerCliComputer cli = cliFor(mainframe, helper.getLevel());
+                    helper.assertTrue(cli.setConfig("favourite", "item|minecraft:iron_ingot").ok(), "starring routes through config");
+                    helper.assertTrue(cli.setConfig("favourite", "fluid|minecraft:water").ok(), "a fluid stars too");
+                    helper.assertTrue(cli.setConfig("unfavourite", "fluid|minecraft:water").ok(), "and unstars");
+                    helper.assertTrue(cli.setConfig("recipe", "item|minecraft:iron_ingot=1").ok(), "a recipe choice routes through config");
+                    final net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+                    mainframe.console().save(tag);
+                    final dev.jstech.computers.program.ComputerConsoleState reloaded =
+                            new dev.jstech.computers.program.ComputerConsoleState();
+                    reloaded.load(tag);
+                    helper.assertTrue(reloaded.settings().favourites().equals(java.util.List.of("item|minecraft:iron_ingot")),
+                            "the stars must survive a reload; got " + reloaded.settings().favourites());
+                    helper.assertTrue(reloaded.settings().recipeChoice("item|minecraft:iron_ingot") == 1,
+                            "the recipe choice must survive a reload");
+                    helper.assertTrue(reloaded.settings().recipeChoice("item|minecraft:gold_ingot") == -1,
+                            "an item never chosen for has no choice");
+                })
+                .thenSucceed();
+    }
+
     /** The MC-DOS {@code config} command lists the settings and changes one through the shell. */
     @GameTest(template = ARENA)
     public static void configCommand_listsAndSetsThroughTheShell(final GameTestHelper helper) {

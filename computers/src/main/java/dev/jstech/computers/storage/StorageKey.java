@@ -162,6 +162,23 @@ public final class StorageKey {
         };
     }
 
+    /** The registry id of the data behind the key: the item's, the fluid's or the chemical's. */
+    public ResourceLocation registryId() {
+        return switch (kind) {
+            case FLUID -> net.minecraft.core.registries.BuiltInRegistries.FLUID.getKey(fluidPrototype.getFluid());
+            case CHEMICAL -> Objects.requireNonNull(chemical);
+            case ITEM -> net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(itemPrototype.getItem());
+        };
+    }
+
+    /**
+     * A short text id for the data, kind and registry id ({@code item|minecraft:iron_ingot}), the way a
+     * machine's settings name what is starred. Two keys that differ only in their components share one id.
+     */
+    public String id() {
+        return kind.name().toLowerCase(java.util.Locale.ROOT) + "|" + registryId();
+    }
+
     /** A chemical key on disk: {@code {"chemical": "<id>"}}. */
     private static final Codec<StorageKey> CHEMICAL_CODEC = RecordCodecBuilder.create(instance -> instance.group(
             ResourceLocation.CODEC.fieldOf("chemical").forGetter(key -> Objects.requireNonNull(key.chemical))

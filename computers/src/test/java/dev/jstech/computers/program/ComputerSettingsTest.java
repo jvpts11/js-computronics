@@ -213,6 +213,54 @@ class ComputerSettingsTest {
     }
 
     @Test
+    void favourite_starsOnceInOrderAndUnfavouriteTakesTheStarOff() {
+        assertTrue(settings.favourite("item|minecraft:iron_ingot"));
+        assertFalse(settings.favourite("item|minecraft:iron_ingot"), "starring again changes nothing");
+        assertTrue(settings.favourite("fluid|minecraft:water"));
+        assertEquals(java.util.List.of("item|minecraft:iron_ingot", "fluid|minecraft:water"), settings.favourites());
+        assertTrue(settings.isFavourite("fluid|minecraft:water"));
+        assertTrue(settings.unfavourite("item|minecraft:iron_ingot"));
+        assertFalse(settings.unfavourite("item|minecraft:iron_ingot"), "already gone");
+        assertEquals(java.util.List.of("fluid|minecraft:water"), settings.favourites());
+    }
+
+    @Test
+    void favourite_stopsAtTheCap() {
+        for (int i = 0; i < ComputerSettings.MAX_FAVOURITES + 5; i++) {
+            settings.favourite("item|mod:thing" + i);
+        }
+        assertEquals(ComputerSettings.MAX_FAVOURITES, settings.favourites().size());
+    }
+
+    @Test
+    void applySetting_favouriteUnfavouriteAndRecipeRouteToTheirStores() {
+        assertTrue(settings.applySetting("favourite", "item|minecraft:coal"));
+        assertTrue(settings.applySetting("favourite", "item|minecraft:coal"), "asking for what is already so is fine");
+        assertTrue(settings.isFavourite("item|minecraft:coal"));
+        assertTrue(settings.applySetting("unfavourite", "item|minecraft:coal"));
+        assertFalse(settings.isFavourite("item|minecraft:coal"));
+        assertFalse(settings.applySetting("favourite", " "), "nothing to star");
+
+        assertTrue(settings.applySetting("recipe", "item|jsc:steel_ingot=1"));
+        assertEquals(1, settings.recipeChoice("item|jsc:steel_ingot"));
+        assertEquals(-1, settings.recipeChoice("item|jsc:iron_ingot"), "an item never chosen for has no choice");
+        assertTrue(settings.applySetting("recipe", "item|jsc:steel_ingot=-1"));
+        assertEquals(-1, settings.recipeChoice("item|jsc:steel_ingot"), "a negative index forgets the choice");
+        assertFalse(settings.applySetting("recipe", "item|jsc:steel_ingot"), "no index given");
+        assertFalse(settings.applySetting("recipe", "item|jsc:steel_ingot=two"), "not a number");
+    }
+
+    @Test
+    void setRecipeChoice_forgetsTheOldestPastTheCap() {
+        for (int i = 0; i < ComputerSettings.MAX_RECIPE_CHOICES + 1; i++) {
+            settings.setRecipeChoice("item|mod:thing" + i, i);
+        }
+        assertEquals(ComputerSettings.MAX_RECIPE_CHOICES, settings.recipeChoices().size());
+        assertEquals(-1, settings.recipeChoice("item|mod:thing0"), "the first choice made room");
+        assertEquals(ComputerSettings.MAX_RECIPE_CHOICES, settings.recipeChoice("item|mod:thing" + ComputerSettings.MAX_RECIPE_CHOICES));
+    }
+
+    @Test
     void summaryLines_reportEveryOwnedSetting() {
         settings.setClock12h(true);
         settings.setBrightness(80);

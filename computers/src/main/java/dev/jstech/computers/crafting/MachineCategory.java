@@ -51,6 +51,41 @@ public final class MachineCategory {
         return isGenericId(genericMachineId) ? genericMachineId.substring(GENERIC_PREFIX.length()) : NONE;
     }
 
+    /**
+     * A readable name for a machine id, the way a craft dialog lists it: a block id by its path, title-cased
+     * with the underscores as spaces ({@code minecraft:blast_furnace} is "Blast Furnace"); a generic category
+     * as "Any" and the category's own path ({@code generic:minecraft:smelting} is "Any Smelting").
+     */
+    public static String label(final String machineType) {
+        if (machineType == null || machineType.isEmpty()) {
+            return "Machine";
+        }
+        if (isGenericId(machineType)) {
+            return "Any " + titleCase(pathOf(categoryOf(machineType)));
+        }
+        return titleCase(pathOf(machineType));
+    }
+
+    private static String pathOf(final String id) {
+        final int colon = id.indexOf(':');
+        return colon < 0 ? id : id.substring(colon + 1);
+    }
+
+    private static String titleCase(final String path) {
+        final StringBuilder out = new StringBuilder(path.length());
+        boolean start = true;
+        for (final char c : path.toCharArray()) {
+            if (c == '_' || c == '/' || c == '.') {
+                out.append(' ');
+                start = true;
+            } else {
+                out.append(start ? Character.toUpperCase(c) : c);
+                start = false;
+            }
+        }
+        return out.toString().trim();
+    }
+
     /** Every category currently available: the installed recipe type ids, sorted. */
     public static List<String> categoryIds() {
         final List<String> ids = new ArrayList<>();

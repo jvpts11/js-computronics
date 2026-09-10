@@ -257,6 +257,11 @@ public final class ComputingPayloads {
                 ComputingPayloads::handleSetCraftingSwitchFace);
         registrar.playToServer(RequestNiServersPayload.TYPE, RequestNiServersPayload.STREAM_CODEC,
                 ComputingPayloads::handleRequestNiServers);
+        registrar.playToServer(RequestItemRecipesPayload.TYPE, RequestItemRecipesPayload.STREAM_CODEC,
+                ComputingPayloads::handleRequestItemRecipes);
+        registrar.playToClient(ItemRecipesPayload.TYPE, ItemRecipesPayload.STREAM_CODEC,
+                (payload, context) -> context.enqueueWork(
+                        () -> dev.jstech.computers.client.os.NetworkInteractorApp.acceptItemRecipes(payload)));
         registrar.playToServer(NiSelectPayload.TYPE, NiSelectPayload.STREAM_CODEC,
                 ComputingPayloads::handleNiSelect);
         registrar.playToServer(RequestNiOperationsPayload.TYPE, RequestNiOperationsPayload.STREAM_CODEC,
@@ -2549,21 +2554,46 @@ public final class ComputingPayloads {
             if (mainframe == null) {
                 return;
             }
-            final var patterns = mainframe.networkPatterns();
             final var machines = mainframe.networkProcessingPatterns();
             final var stock = dev.jstech.computers.operation.NetworkStorage
                     .of(level, host.networkUuid()).query();
             final StorageKey key = StorageKey.of(payload.result());
+            final long quantity = payload.quantity();
+            final ItemStack result = payload.result();
             /*
-             * A machine recipe whose inputs are in stock, or a multi-stage pipeline, plans by its own inputs.
-             * Otherwise the recursive planner expands bench and machine patterns alike, so a machine-made
-             * ingredient shows up as the raw materials of its own recipe rather than as missing.
+             * Which recipe to plan with: the one the dialog named, else the one this machine remembers the
+             * player picking for the item, else the first. The reply carries every recipe that makes the item
+             * when there is more than one, so the dialog can offer the choice.
              */
-            final var machinePlan = planMachineRecipe(mainframe, key, payload.quantity(), stock);
-            if (machinePlan != null && (machinePlan.feasible() || !machinePlan.plainMachine())) {
+            final java.util.List<dev.jstech.computers.crafting.NetworkRecipe> recipes = mainframe.recipesFor(key);
+            int chosen = payload.recipe();
+            if (chosen < 0 || chosen >= recipes.size()) {
+                chosen = rememberedRecipe(host, key, recipes.size());
+            }
+            final java.util.List<dev.jstech.computers.crafting.RecipeChoice> options = recipes.size() > 1
+                    ? recipeChoices(level, mainframe, recipes, key, quantity, machines, stock) : java.util.List.of();
+            final dev.jstech.computers.crafting.NetworkRecipe recipe = recipes.isEmpty() ? null : recipes.get(chosen);
+            final var patterns = mainframe.patternsPreferring(recipe == null ? null : recipe.bench().orElse(null));
+            final int recipeIndex = chosen;
+            /*
+             * A machine recipe plans by its own direct inputs, red where short, with a line per shortfall saying
+             * what the network would craft to cover it (a processing run's whole tree covers it; a pipeline runs
+             * on what is in stock). Otherwise the recursive planner expands bench and machine patterns alike, so
+             * a machine-made ingredient shows up as the raw materials of its own recipe rather than as missing.
+             */
+            final var machinePlan = recipe == null || !recipe.usesMachine() ? null
+                    : planMachineRecipe(recipe, quantity, stock);
+            if (machinePlan != null) {
+                final Cover cover = coverShortfalls(machinePlan.rows(), patterns, machines, stock,
+                        machinePlan.plainMachine());
+                final boolean feasible = machinePlan.feasible()
+                        || (machinePlan.plainMachine() && cover.covered()
+                                && dev.jstech.computers.crafting.CraftPlanner.plan(key, quantity, patterns, machines, stock)
+                                        .feasible());
                 PacketDistributor.sendToPlayer(player, new CraftPlanPayload(
-                        payload.result(), payload.quantity(), machinePlan.rows(),
-                        machinePlan.feasible(), machinePlan.maxFeasible(), machinePlan.estimateTicks()));
+                        result, quantity, machinePlan.rows(), feasible,
+                        feasible ? quantity : machinePlan.maxFeasible(), machinePlan.estimateTicks(),
+                        recipeIndex, options, cover.lines(), machinePlan.stages()));
                 return;
             }
             /*
@@ -2571,13 +2601,12 @@ public final class ComputingPayloads {
              * goes out from the main thread when it is ready (the dialog shows "planning..." meanwhile). Without
              * a dispatcher the plan is made here and now instead.
              */
-            final long quantity = payload.quantity();
-            final ItemStack result = payload.result();
             final java.util.function.Supplier<PlanPreview> preview =
                     () -> planPreview(key, quantity, patterns, machines, stock);
             final java.util.function.Consumer<PlanPreview> reply = made ->
                     PacketDistributor.sendToPlayer(player, new CraftPlanPayload(result, quantity, made.rows(),
-                            made.feasible(), made.maxFeasible(), estimateTicks(level, mainframe, made.plan())));
+                            made.feasible(), made.maxFeasible(), estimateTicks(level, mainframe, made.plan()),
+                            recipeIndex, options, unmakeableLines(made.plan()), Math.max(1, made.plan().steps().size())));
             final boolean queued = mainframe.submitOperation(task -> {
                 final PlanPreview made = preview.get();
                 task.onMainThread(() -> reply.accept(made));
@@ -2587,6 +2616,176 @@ public final class ComputingPayloads {
                 reply.accept(preview.get());
             }
         });
+    }
+
+    /** The recipe index this machine remembers for {@code key} when it is still one of {@code count}, else 0. */
+    private static int rememberedRecipe(final IComputerTerminalHost host, final StorageKey key, final int count) {
+        if (host instanceof IOsHost computer && computer.console() != null) {
+            final int remembered = computer.console().settings().recipeChoice(key.id());
+            if (remembered >= 0 && remembered < count) {
+                return remembered;
+            }
+        }
+        return 0;
+    }
+
+    /** What the network would craft to cover the short rows, one line each, and whether every one is coverable. */
+    private record Cover(java.util.List<String> lines, boolean covered) {
+    }
+
+    /**
+     * One line per short row. A processing run's tree crafts what is short when a pattern makes it
+     * ({@code treeCovers}); a pipeline runs on what is in stock, so its line says to request the thing first.
+     */
+    private static Cover coverShortfalls(final java.util.List<CraftPlanPayload.Row> rows,
+                                         final java.util.List<CraftingPattern> patterns,
+                                         final java.util.List<dev.jstech.computers.crafting.ProcessingPattern> machines,
+                                         final java.util.Map<StorageKey, Long> stock, final boolean treeCovers) {
+        final java.util.List<String> lines = new java.util.ArrayList<>();
+        boolean covered = true;
+        for (final CraftPlanPayload.Row row : rows) {
+            if (row.satisfied()) {
+                continue;
+            }
+            final long shortfall = row.need() - row.have();
+            final String name = row.item().getHoverName().getString();
+            final var plan = dev.jstech.computers.crafting.CraftPlanner.plan(
+                    StorageKey.of(row.item()), shortfall, patterns, machines, stock);
+            if (plan.feasible() && !plan.steps().isEmpty()) {
+                if (lines.size() < CraftPlanPayload.MAX_COVER) {
+                    lines.add(treeCovers
+                            ? "Missing " + shortfall + " " + name + " · will be crafted from " + rawSummary(plan)
+                                    + " (" + firstStepName(plan) + " pattern) before the stages start"
+                            : "Missing " + shortfall + " " + name + " · a pipeline runs on stock, craft it first ("
+                                    + firstStepName(plan) + " pattern)");
+                }
+                covered &= treeCovers;
+            } else {
+                covered = false;
+                if (lines.size() < CraftPlanPayload.MAX_COVER) {
+                    lines.add("Missing " + shortfall + " " + name + " · nothing on the network makes it");
+                }
+            }
+        }
+        return new Cover(java.util.List.copyOf(lines), covered);
+    }
+
+    /** One line per thing a recursive plan found nothing to make (or not enough of in stock). */
+    private static java.util.List<String> unmakeableLines(final dev.jstech.computers.crafting.CraftPlanner.Plan plan) {
+        final java.util.List<String> lines = new java.util.ArrayList<>();
+        for (final var missing : plan.missing().entrySet()) {
+            if (lines.size() >= CraftPlanPayload.MAX_COVER) {
+                break;
+            }
+            lines.add("Missing " + missing.getValue() + " " + missing.getKey().displayName().getString()
+                    + " · nothing on the network makes it");
+        }
+        return lines;
+    }
+
+    /** "4 Logs, 2 Coal": the raw stock a plan consumes, at most three named. */
+    private static String rawSummary(final dev.jstech.computers.crafting.CraftPlanner.Plan plan) {
+        final StringBuilder out = new StringBuilder();
+        int named = 0;
+        for (final var raw : plan.rawConsumption().entrySet()) {
+            if (named == 3) {
+                out.append(", ...");
+                break;
+            }
+            if (named > 0) {
+                out.append(", ");
+            }
+            out.append(raw.getValue()).append(' ').append(raw.getKey().displayName().getString());
+            named++;
+        }
+        return out.length() == 0 ? "stock" : out.toString();
+    }
+
+    private static String firstStepName(final dev.jstech.computers.crafting.CraftPlanner.Plan plan) {
+        final var step = plan.steps().get(0);
+        return step.isMachine() ? step.machine().displayName() : step.pattern().displayName();
+    }
+
+    /**
+     * Every recipe that makes {@code key}, described for the craft dialog's cards: name, kind, machines, stages,
+     * time, and the direct inputs for {@code quantity} against the stock, with whether each input that is
+     * short can be crafted by something else on the network.
+     */
+    private static java.util.List<dev.jstech.computers.crafting.RecipeChoice> recipeChoices(
+            final ServerLevel level, final MainframeBlockEntity mainframe,
+            final java.util.List<dev.jstech.computers.crafting.NetworkRecipe> recipes, final StorageKey key,
+            final long quantity, final java.util.List<dev.jstech.computers.crafting.ProcessingPattern> machines,
+            final java.util.Map<StorageKey, Long> stock) {
+        final java.util.List<dev.jstech.computers.crafting.RecipeChoice> out = new java.util.ArrayList<>();
+        for (final var recipe : recipes) {
+            if (out.size() >= CraftPlanPayload.MAX_OPTIONS) {
+                break;
+            }
+            final String kind;
+            final java.util.List<String> machineNames = new java.util.ArrayList<>();
+            final java.util.List<CraftPlanPayload.Row> rows;
+            final int estimate;
+            final int stages;
+            boolean feasible;
+            if (recipe.usesMachine()) {
+                final MachinePlan plan = planMachineRecipe(recipe, quantity, stock);
+                if (plan == null) {
+                    continue;
+                }
+                rows = plan.rows();
+                estimate = plan.estimateTicks();
+                stages = plan.stages();
+                feasible = plan.feasible();
+                if (recipe.proc().isPresent()) {
+                    kind = dev.jstech.computers.crafting.RecipeChoice.KIND_PROCESSING;
+                    machineNames.add(dev.jstech.computers.crafting.MachineCategory.label(recipe.proc().get().machineType()));
+                } else {
+                    kind = dev.jstech.computers.crafting.RecipeChoice.KIND_MULTI_STAGE;
+                    for (final var stage : recipe.multi().get().stages()) {
+                        machineNames.add(stage.proc().isPresent()
+                                ? dev.jstech.computers.crafting.MachineCategory.label(stage.proc().get().machineType())
+                                : "Bench");
+                    }
+                }
+            } else {
+                kind = dev.jstech.computers.crafting.RecipeChoice.KIND_BENCH;
+                final CraftingPattern bench = recipe.bench().get();
+                final long runs = ceilDiv(quantity, Math.max(1, bench.result().getCount()));
+                rows = new java.util.ArrayList<>();
+                for (final var in : bench.ingredientTotals().entrySet()) {
+                    final long need = in.getValue() * runs;
+                    rows.add(new CraftPlanPayload.Row(in.getKey().stack(1), need,
+                            Math.min(stock.getOrDefault(in.getKey(), 0L), need)));
+                }
+                final var patterns = mainframe.patternsPreferring(bench);
+                final var plan = dev.jstech.computers.crafting.CraftPlanner.plan(key, quantity, patterns, machines, stock);
+                estimate = estimateTicks(level, mainframe, plan);
+                stages = Math.max(1, plan.steps().size());
+                feasible = plan.feasible();
+            }
+            final java.util.List<dev.jstech.computers.crafting.RecipeChoice.Input> inputs = new java.util.ArrayList<>();
+            boolean shortCraftable = true;
+            for (final CraftPlanPayload.Row row : rows) {
+                if (inputs.size() >= CraftPlanPayload.MAX_INPUTS) {
+                    break;
+                }
+                final StorageKey inputKey = StorageKey.of(row.item());
+                final boolean craftable = mainframe.anythingMakes(inputKey);
+                if (!row.satisfied() && !craftable) {
+                    shortCraftable = false;
+                }
+                inputs.add(new dev.jstech.computers.crafting.RecipeChoice.Input(
+                        row.item().getHoverName().getString(), row.need(), stock.getOrDefault(inputKey, 0L), craftable));
+            }
+            // A processing run whose short inputs something makes runs as one tree, so it is feasible after all.
+            if (!feasible && recipe.proc().isPresent() && shortCraftable) {
+                feasible = dev.jstech.computers.crafting.CraftPlanner
+                        .plan(key, quantity, mainframe.networkPatterns(), machines, stock).feasible();
+            }
+            out.add(new dev.jstech.computers.crafting.RecipeChoice(recipe.displayName(), kind, machineNames, stages,
+                    estimate, inputs, feasible));
+        }
+        return out;
     }
 
     /** A plan preview: the raw-ingredient rows (need vs have), whether it is feasible, and how many are. */
@@ -2644,81 +2843,78 @@ public final class ComputingPayloads {
         return (int) Math.max(1, (units + rate - 1) / rate + machineTicks);
     }
 
-    /** A machine recipe's plan for the request popup: raw rows (need vs have), feasibility, max and estimate. */
+    /** A machine recipe's plan for the request popup: direct rows (need vs have), feasibility, max, estimate, stages. */
     private record MachinePlan(java.util.List<CraftPlanPayload.Row> rows, boolean feasible, long maxFeasible,
-                               int estimateTicks, boolean plainMachine) {
+                               int estimateTicks, boolean plainMachine, int stages) {
     }
 
     /**
-     * Plans {@code quantity} of a machine-made result from the raw inputs of its recipe: a processing pattern's
-     * inputs over the runs its primary output needs, or a multi-stage pipeline's FIRST stage inputs over that
-     * stage's demand (later stages consume what earlier ones make). Returns null when no machine recipe on the
-     * network produces the key, so the bench planner handles it.
+     * Plans {@code quantity} of a machine-made result from the direct inputs of its recipe: a processing
+     * pattern's inputs over the runs its primary output needs, or a multi-stage pipeline's FIRST stage inputs
+     * over that stage's demand (later stages consume what earlier ones make). Returns null when the recipe is a
+     * bench one or an empty pipeline, so the bench planner handles it.
      */
     @org.jetbrains.annotations.Nullable
-    private static MachinePlan planMachineRecipe(final MainframeBlockEntity mainframe, final StorageKey key,
+    private static MachinePlan planMachineRecipe(final dev.jstech.computers.crafting.NetworkRecipe recipe,
                                                  final long quantity, final java.util.Map<StorageKey, Long> stock) {
-        for (final var recipe : mainframe.networkMachineRecipes()) {
-            if (!key.equals(recipe.resultKey())) {
-                continue;
+        final dev.jstech.computers.crafting.ProcessingPattern first;
+        final long firstDemand;
+        int estimate;
+        final int stages;
+        if (recipe.proc().isPresent()) {
+            first = recipe.proc().get();
+            firstDemand = quantity;
+            estimate = first.timeoutTicks();
+            stages = 1;
+        } else if (recipe.multi().isPresent() && !recipe.multi().get().stages().isEmpty()) {
+            final var multi = recipe.multi().get();
+            final long[] demands = multi.stageDemands(quantity);
+            final var stage = multi.stages().get(0);
+            firstDemand = demands[0];
+            estimate = 0;
+            stages = multi.stages().size();
+            for (final var s : multi.stages()) {
+                estimate += s.proc().map(dev.jstech.computers.crafting.ProcessingPattern
+                        ::timeoutTicks).orElse(20);
             }
-            final dev.jstech.computers.crafting.ProcessingPattern first;
-            final long firstDemand;
-            int estimate;
-            if (recipe.proc().isPresent()) {
-                first = recipe.proc().get();
-                firstDemand = quantity;
-                estimate = first.timeoutTicks();
-            } else if (recipe.multi().isPresent() && !recipe.multi().get().stages().isEmpty()) {
-                final var multi = recipe.multi().get();
-                final long[] demands = multi.stageDemands(quantity);
-                final var stage = multi.stages().get(0);
-                firstDemand = demands[0];
-                estimate = 0;
-                for (final var s : multi.stages()) {
-                    estimate += s.proc().map(dev.jstech.computers.crafting.ProcessingPattern
-                            ::timeoutTicks).orElse(20);
-                }
-                if (stage.proc().isPresent()) {
-                    first = stage.proc().get();
-                } else {
-                    // A bench-first pipeline: its raw inputs are the bench pattern's ingredients per run.
-                    final var bench = stage.bench().get();
-                    final long runs = ceilDiv(firstDemand, Math.max(1, bench.result().getCount()));
-                    final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
-                    long maxRuns = Long.MAX_VALUE;
-                    for (final var in : bench.ingredientTotals().entrySet()) {
-                        final long need = in.getValue() * runs;
-                        final long have = stock.getOrDefault(in.getKey(), 0L);
-                        maxRuns = Math.min(maxRuns, have / Math.max(1, in.getValue()));
-                        rows.add(new CraftPlanPayload.Row(in.getKey().stack(1), need, Math.min(have, need)));
-                    }
-                    final long maxFirst = maxRuns == Long.MAX_VALUE ? 0 : maxRuns * bench.result().getCount();
-                    return new MachinePlan(java.util.List.copyOf(rows), maxFirst >= firstDemand,
-                            Math.min(quantity, forwardYield(multi, maxFirst)), estimate, false);
-                }
+            if (stage.proc().isPresent()) {
+                first = stage.proc().get();
             } else {
-                return null;
+                // A bench-first pipeline: its raw inputs are the bench pattern's ingredients per run.
+                final var bench = stage.bench().get();
+                final long runs = ceilDiv(firstDemand, Math.max(1, bench.result().getCount()));
+                final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
+                long maxRuns = Long.MAX_VALUE;
+                for (final var in : bench.ingredientTotals().entrySet()) {
+                    final long need = in.getValue() * runs;
+                    final long have = stock.getOrDefault(in.getKey(), 0L);
+                    maxRuns = Math.min(maxRuns, have / Math.max(1, in.getValue()));
+                    rows.add(new CraftPlanPayload.Row(in.getKey().stack(1), need, Math.min(have, need)));
+                }
+                final long maxFirst = maxRuns == Long.MAX_VALUE ? 0 : maxRuns * bench.result().getCount();
+                return new MachinePlan(java.util.List.copyOf(rows), maxFirst >= firstDemand,
+                        Math.min(quantity, forwardYield(multi, maxFirst)), estimate, false, stages);
             }
-            final var primary = first.primaryOutput();
-            final long perRun = primary == null ? 1 : Math.max(1, primary.amount());
-            final long runs = ceilDiv(firstDemand, perRun);
-            final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
-            long maxRuns = Long.MAX_VALUE;
-            for (final var in : first.inputs()) {
-                final long need = in.amount() * runs;
-                final long have = stock.getOrDefault(in.key(), 0L);
-                maxRuns = Math.min(maxRuns, have / Math.max(1, in.amount()));
-                final ItemStack icon = in.key().stack(1);
-                rows.add(new CraftPlanPayload.Row(icon, need, Math.min(have, need)));
-            }
-            final long maxFirst = maxRuns == Long.MAX_VALUE ? 0 : maxRuns * perRun;
-            final long maxFinal = recipe.multi().isPresent()
-                    ? forwardYield(recipe.multi().get(), maxFirst) : maxFirst;
-            return new MachinePlan(java.util.List.copyOf(rows), maxFirst >= firstDemand,
-                    Math.min(quantity, maxFinal), estimate, recipe.proc().isPresent());
+        } else {
+            return null;
         }
-        return null;
+        final var primary = first.primaryOutput();
+        final long perRun = primary == null ? 1 : Math.max(1, primary.amount());
+        final long runs = ceilDiv(firstDemand, perRun);
+        final java.util.List<CraftPlanPayload.Row> rows = new java.util.ArrayList<>();
+        long maxRuns = Long.MAX_VALUE;
+        for (final var in : first.inputs()) {
+            final long need = in.amount() * runs;
+            final long have = stock.getOrDefault(in.key(), 0L);
+            maxRuns = Math.min(maxRuns, have / Math.max(1, in.amount()));
+            final ItemStack icon = in.key().stack(1);
+            rows.add(new CraftPlanPayload.Row(icon, need, Math.min(have, need)));
+        }
+        final long maxFirst = maxRuns == Long.MAX_VALUE ? 0 : maxRuns * perRun;
+        final long maxFinal = recipe.multi().isPresent()
+                ? forwardYield(recipe.multi().get(), maxFirst) : maxFirst;
+        return new MachinePlan(java.util.List.copyOf(rows), maxFirst >= firstDemand,
+                Math.min(quantity, maxFinal), estimate, recipe.proc().isPresent(), stages);
     }
 
     private static long ceilDiv(final long amount, final long perRun) {
@@ -2755,11 +2951,15 @@ public final class ComputingPayloads {
             };
             /*
              * The shared entry point runs a machine or multi-stage recipe directly, else plans a recursive
-             * craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. The
-             * multiStage flag picks the pipeline over the flat recursive path when a result has both.
+             * craft; onSettle refreshes the screen when it settles, and refresh.run() updates it now. A recipe
+             * the dialog named runs as picked; without one, the multiStage flag picks the pipeline over the flat
+             * recursive path when a result has both.
              */
-            final var op = mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(),
-                    host.originLabel(MoveLabels.TERMINAL), refresh, payload.multiStage());
+            final var op = payload.recipe() >= 0
+                    ? mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(),
+                            host.originLabel(MoveLabels.TERMINAL), refresh, payload.recipe())
+                    : mainframe.submitCraftRequest(resultKey, payload.quantity(), payload.partial(),
+                            host.originLabel(MoveLabels.TERMINAL), refresh, payload.multiStage());
             if (op != null) {
                 op.setPriority(payload.priority());
             }
@@ -4486,8 +4686,90 @@ public final class ComputingPayloads {
         }
         final boolean online = network != null && resolveMainframe(level, network) != null;
         final List<CraftCatalogPayload.Entry> crafts = buildCraftCatalog(level, network);
+        final List<String> favourites = computer.console() == null ? List.of()
+                : computer.console().settings().favourites();
         PacketDistributor.sendToPlayer(player, new NetworkInteractorPayload(
-                networkItems, localItems, online, usedItems, serverCount, crafts));
+                networkItems, localItems, online, usedItems, serverCount, crafts, favourites));
+    }
+
+    /** Answers the details panel: what makes the item on this network, and what uses it. */
+    private static void handleRequestItemRecipes(final RequestItemRecipesPayload payload,
+                                                 final IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)
+                    || !(player.level() instanceof ServerLevel level)) {
+                return;
+            }
+            final var host = niHost(player, level, payload.hostPos(), payload.monitorPos());
+            if (host == null || host.networkUuid() == null) {
+                return;
+            }
+            final MainframeBlockEntity mainframe = resolveMainframe(level, host.networkUuid());
+            final List<String> madeBy = new ArrayList<>();
+            final List<String> usedIn = new ArrayList<>();
+            if (mainframe != null) {
+                for (final var recipe : mainframe.recipesFor(payload.key())) {
+                    if (madeBy.size() >= ItemRecipesPayload.MAX_LINES) {
+                        break;
+                    }
+                    madeBy.add(wire(recipeLine(recipe), ItemRecipesPayload.MAX_TEXT));
+                }
+                for (final CraftingPattern pattern : mainframe.networkPatterns()) {
+                    if (pattern.ingredientTotals().containsKey(payload.key())) {
+                        addUse(usedIn, pattern.result().getHoverName().getString());
+                    }
+                }
+                for (final var recipe : mainframe.networkMachineRecipes()) {
+                    if (consumes(recipe, payload.key())) {
+                        final StorageKey made = recipe.resultKey();
+                        addUse(usedIn, made == null ? recipe.displayName() : made.displayName().getString());
+                    }
+                }
+            }
+            PacketDistributor.sendToPlayer(player, new ItemRecipesPayload(payload.key(), madeBy, usedIn));
+        });
+    }
+
+    /** "Blast · processing · Blast Furnace": how the details panel lists one recipe that makes an item. */
+    private static String recipeLine(final dev.jstech.computers.crafting.NetworkRecipe recipe) {
+        if (recipe.proc().isPresent()) {
+            return recipe.displayName() + " · processing · "
+                    + dev.jstech.computers.crafting.MachineCategory.label(recipe.proc().get().machineType());
+        }
+        if (recipe.multi().isPresent()) {
+            final List<String> machines = new ArrayList<>();
+            for (final var stage : recipe.multi().get().stages()) {
+                machines.add(stage.proc().isPresent()
+                        ? dev.jstech.computers.crafting.MachineCategory.label(stage.proc().get().machineType())
+                        : "Bench");
+            }
+            return recipe.displayName() + " · multi-stage · " + String.join(" -> ", machines);
+        }
+        return recipe.displayName() + " · bench";
+    }
+
+    private static void addUse(final List<String> usedIn, final String name) {
+        if (usedIn.size() < ItemRecipesPayload.MAX_LINES && !usedIn.contains(name)) {
+            usedIn.add(wire(name, ItemRecipesPayload.MAX_TEXT));
+        }
+    }
+
+    /** Whether a machine recipe takes {@code key} in, at any of its stages. */
+    private static boolean consumes(final dev.jstech.computers.crafting.NetworkRecipe recipe, final StorageKey key) {
+        if (recipe.proc().isPresent()) {
+            return recipe.proc().get().ingredientTotals().containsKey(key);
+        }
+        if (recipe.multi().isPresent()) {
+            for (final var stage : recipe.multi().get().stages()) {
+                if (stage.proc().isPresent() && stage.proc().get().ingredientTotals().containsKey(key)) {
+                    return true;
+                }
+                if (stage.bench().isPresent() && stage.bench().get().ingredientTotals().containsKey(key)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** A human label for a storage node in the details panel's per-server breakdown, such as a server's rack position

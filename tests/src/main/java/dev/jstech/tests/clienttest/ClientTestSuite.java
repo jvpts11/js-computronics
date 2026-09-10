@@ -30,6 +30,7 @@ public final class ClientTestSuite {
             TaskbarClientTests.class,
             TerminalEditorClientTests.class,
             MekanismClientTests.class,
+            NetworkInteractorClientTests.class,
             UiSweepClientTests.class);
 
     private ClientTestSuite() {

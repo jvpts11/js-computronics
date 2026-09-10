@@ -8,6 +8,7 @@
 package dev.jstech.computers.gui.layout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jstech.core.gui.layout.GuiLayout;
@@ -263,5 +264,115 @@ class NetworkInteractorLayoutTest {
         final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(300, 280);
         assertEquals(z.invBandX() + NetworkInteractorLayout.INV_PAD, z.invX());
         assertEquals(z.invBandY() + NetworkInteractorLayout.INV_PAD, z.invY());
+    }
+
+    @Test
+    void resolve_headerRowHoldsSearchTwoFiltersAndSortInOrderInsideTheLeftColumn() {
+        for (int w = MIN_W; w <= 520; w += 37) {
+            final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(w, MIN_H);
+            assertTrue(z.searchW() >= NetworkInteractorLayout.CELL, "the search field needs room at width " + w);
+            assertTrue(z.searchX() + z.searchW() <= z.modX(), "search runs into the mod filter at width " + w);
+            assertTrue(z.modX() + z.modW() <= z.catX(), "the mod filter runs into the category filter at width " + w);
+            assertTrue(z.catX() + z.catW() <= z.sortX(), "the category filter runs into the sort button at width " + w);
+            assertTrue(z.sortX() + z.sortW() <= z.gripX(), "the header must stay in the left column at width " + w);
+        }
+    }
+
+    @Test
+    void resolve_extraColumnsWidenTheGridAndTheHeaderButNotTheInventory() {
+        final int w = MIN_W + 3 * NetworkInteractorLayout.CELL + 4;
+        final NetworkInteractorLayout.Zones plain = NetworkInteractorLayout.resolve(w, 260);
+        final NetworkInteractorLayout.Zones wide = NetworkInteractorLayout.resolve(w, 260, 2, NetworkInteractorLayout.INV_ROWS);
+        assertEquals(NetworkInteractorLayout.INV_COLS, plain.gridCols());
+        assertEquals(NetworkInteractorLayout.INV_COLS + 2, wide.gridCols());
+        assertEquals(plain.invBandW(), wide.invBandW(), "the inventory band keeps its nine columns");
+        assertEquals(NetworkInteractorLayout.INSET + NetworkInteractorLayout.CELL, wide.invBandX(),
+                "the band sits centred under the grid, one cell in from each side");
+        assertEquals(wide.invBandX() + NetworkInteractorLayout.INV_PAD, wide.invX(), "the slots follow the band");
+        assertTrue(wide.searchW() > plain.searchW(), "the search field grows with the column");
+        assertTrue(wide.detailsW() < plain.detailsW(), "the details panel gives the room");
+        assertTrue(wide.detailsW() >= NetworkInteractorLayout.DETAILS_MIN_W, "the details panel keeps its minimum");
+        assertEquals(wide.gripX() + NetworkInteractorLayout.GAP, wide.detailsX(), "the grip fills the gap");
+    }
+
+    @Test
+    void resolve_extraColumnsAreClampedToWhatLeavesTheDetailsPanelItsMinimum() {
+        final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(MIN_W, 260, 5, NetworkInteractorLayout.INV_ROWS);
+        assertEquals(NetworkInteractorLayout.INV_COLS, z.gridCols(), "no room for an extra column at the minimum width");
+        assertEquals(0, NetworkInteractorLayout.maxExtraCols(MIN_W));
+        assertEquals(2, NetworkInteractorLayout.maxExtraCols(MIN_W + 2 * NetworkInteractorLayout.CELL + 3));
+    }
+
+    @Test
+    void resolve_fewerInventoryRowsFoldTheTopRowsAwayAndGrowTheGrid() {
+        final NetworkInteractorLayout.Zones full = NetworkInteractorLayout.resolve(300, 240);
+        final NetworkInteractorLayout.Zones two = NetworkInteractorLayout.resolve(300, 240, 0, 2);
+        final NetworkInteractorLayout.Zones one = NetworkInteractorLayout.resolve(300, 240, 0, 1);
+        assertEquals(0, full.invFirstRow());
+        assertEquals(2, two.invFirstRow(), "two rows shown: the bottom main row and the hotbar");
+        assertEquals(3, one.invFirstRow(), "one row shown: the hotbar alone");
+        assertEquals(NetworkInteractorLayout.bandHeight(2), two.invBandH());
+        assertEquals(2 * NetworkInteractorLayout.INV_PAD + NetworkInteractorLayout.CELL, one.invBandH(), "no hotbar gap with one row");
+        assertTrue(two.gridRows() > full.gridRows(), "the grid gets the folded rows' room");
+        assertTrue(one.gridRows() > two.gridRows());
+        assertEquals(full.statusY(), one.invBandY() + one.invBandH(), "the band stays pinned above the footer");
+        // The shown rows keep the vanilla shape: the hotbar a gap below the main row above it.
+        assertEquals(two.invY(), NetworkInteractorLayout.slotRowY(two, 2));
+        assertEquals(two.invY() + NetworkInteractorLayout.CELL + NetworkInteractorLayout.HOTBAR_GAP,
+                NetworkInteractorLayout.slotRowY(two, 3));
+        assertTrue(NetworkInteractorLayout.slotRowY(two, 0) < two.invBandY(), "a folded row sits above the band");
+    }
+
+    @Test
+    void inventorySlotAt_ignoresRowsTheBandFoldedAway() {
+        final NetworkInteractorLayout.Zones two = NetworkInteractorLayout.resolve(300, 240, 0, 2);
+        final int cell = NetworkInteractorLayout.CELL;
+        final int hotbarY = NetworkInteractorLayout.slotRowY(two, 3) + cell / 2;
+        assertEquals(27, NetworkInteractorLayout.inventorySlotAt(two.invX() + cell / 2, hotbarY, two));
+        final int mainY = NetworkInteractorLayout.slotRowY(two, 2) + cell / 2;
+        assertEquals(18, NetworkInteractorLayout.inventorySlotAt(two.invX() + cell / 2, mainY, two));
+        final int foldedY = NetworkInteractorLayout.slotRowY(two, 0) + cell / 2;
+        assertEquals(-1, NetworkInteractorLayout.inventorySlotAt(two.invX() + cell / 2, foldedY, two),
+                "a folded row is not a slot");
+    }
+
+    @Test
+    void grips_sitBetweenTheColumnsAndAboveTheBand() {
+        final NetworkInteractorLayout.Zones z = NetworkInteractorLayout.resolve(360, 260);
+        assertTrue(NetworkInteractorLayout.onVerticalGrip(z.gripX() + 2, z.gridY() + 10, z));
+        assertFalse(NetworkInteractorLayout.onVerticalGrip(z.gridX() + 2, z.gridY() + 10, z));
+        assertTrue(NetworkInteractorLayout.onHorizontalGrip(z.invBandX() + 40, z.gripY() + 4, z));
+        assertFalse(NetworkInteractorLayout.onHorizontalGrip(z.invBandX() + 40, z.invBandY() + 4, z));
+        assertEquals(z.gripY() + NetworkInteractorLayout.GRIP_H, z.invBandY(), "the grip strip ends where the band begins");
+    }
+
+    @Test
+    void gripDrags_translateToWholeColumnsAndRows() {
+        final int left = NetworkInteractorLayout.INSET + NetworkInteractorLayout.LEFT_W;
+        assertEquals(0, NetworkInteractorLayout.extraColsForGrip(left + 3));
+        assertEquals(1, NetworkInteractorLayout.extraColsForGrip(left + NetworkInteractorLayout.CELL - 2));
+        assertEquals(2, NetworkInteractorLayout.extraColsForGrip(left + 2 * NetworkInteractorLayout.CELL + 4));
+        final int h = 260;
+        final NetworkInteractorLayout.Zones full = NetworkInteractorLayout.resolve(300, h);
+        assertEquals(NetworkInteractorLayout.INV_ROWS, NetworkInteractorLayout.invRowsForGrip(full.gripY() + 4, h),
+                "the grip where it sits with every row shown asks for every row");
+        final NetworkInteractorLayout.Zones two = NetworkInteractorLayout.resolve(300, h, 0, 2);
+        assertEquals(2, NetworkInteractorLayout.invRowsForGrip(two.gripY() + 4, h));
+        assertEquals(1, NetworkInteractorLayout.invRowsForGrip(h, h), "dragged to the bottom leaves the hotbar");
+    }
+
+    @Test
+    void layout_isCleanAcrossEveryGripSettingAndSize() {
+        for (int h = MIN_H; h <= 400; h += 11) {
+            for (int w = MIN_W; w <= 540; w += 19) {
+                for (int rows = 1; rows <= NetworkInteractorLayout.INV_ROWS; rows++) {
+                    for (int cols = 0; cols <= 3; cols++) {
+                        final GuiLayout layout = NetworkInteractorLayout.toGuiLayout(w, h, cols, rows);
+                        assertTrue(layout.isClean(), "not clean at " + w + "x" + h + " cols=" + cols + " rows=" + rows
+                                + " overlaps=" + layout.overlaps() + " outOfBounds=" + layout.outOfBounds());
+                    }
+                }
+            }
+        }
     }
 }

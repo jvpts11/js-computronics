@@ -185,6 +185,32 @@ All notable changes to the J's Tech Series are recorded here, newest first. The 
   of its own: right-click the panel and it is one entry on the menu, the way these desktops offered it.
 - Every panel's notification area shows whether the computer is on a data network, alongside a speaker and
   the memory bar; resting the cursor on it reads out the link and the figures.
+- The Network Interactor's grid is driven from the keyboard: a dotted cell marks where it is, the arrows
+  move it, Enter opens the request dialog, C the craft dialog, F stars the item and the slash puts the
+  keyboard in the search. A line under the status says so.
+- A click on the grid selects an item and a double click opens it. Several are selected at once by
+  dragging a band across them, with Shift and the arrows, with Control and a click, or with Control+A;
+  a click on empty grid drops the selection. Enter or Request then asks for all of them in one dialog, a
+  quantity each, and F stars them together. The details panel lists what is selected and what it weighs.
+- Two drop-downs beside the search narrow the grid to the mod that made the item and to what the item is
+  (ingots, ores, raw materials, blocks, machines, tools, food and so on); both stack with the search.
+- Items can be starred. A star sits on the cell, a Favourites tab at the strip's right end shows the starred
+  items alone (a craftable one even when none is in stock), and the machine keeps the stars, so every window
+  on it shows the same.
+- Two grips reshape the window's insides: the one between the grid and the details panel gives the grid
+  more columns (the inventory keeps its nine and sits centred under the wider grid), and the one above the
+  inventory folds its top rows away so the grid gets their room. Where they were put, the search, the
+  filters, the sort and the tab all come back with the window.
+- The details panel says what the network holds of the item and where, which recipes make it and through
+  which machines, what other patterns use it in, and offers Request, Craft and the star. The item's id,
+  weight, tags and components follow below.
+- An item the network makes more than one way (a processing recipe and a multi-stage one, say) shows the
+  recipes side by side in the craft dialog, each with its machines, stages, time and inputs against the
+  stock. Picking one plans with it and a strip says what it does differently from the other: the ingredients
+  swapped, the stages added, the seconds gained or lost for the amount asked, and what it is short of. The
+  pick is remembered per item, so the next request opens on it. Left and Right pick from the keyboard.
+- The craft dialog's plan reads a short ingredient in red and says under it what the network would craft to
+  cover it, or that nothing on the network makes it.
 
 ### Changed
 - The computing mod is J's Computers. It was J's Computronics, and Computronics is the name of a mod

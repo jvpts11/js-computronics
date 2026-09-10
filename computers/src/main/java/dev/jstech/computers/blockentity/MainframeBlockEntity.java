@@ -1164,13 +1164,26 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     private dev.jstech.computers.crafting.PendingCraftOperation submitCraftAsync(
             final dev.jstech.computers.storage.StorageKey key, final long demand,
             final boolean partial, final String label) {
+        return submitCraftAsync(key, demand, partial, label, null);
+    }
+
+    /**
+     * As above, planned with {@code preferred} ahead of every other bench pattern, so a result that several
+     * bench patterns make is built by the one the player picked (the planner takes the first pattern that
+     * makes a thing).
+     */
+    @Nullable
+    private dev.jstech.computers.crafting.PendingCraftOperation submitCraftAsync(
+            final dev.jstech.computers.storage.StorageKey key, final long demand,
+            final boolean partial, final String label,
+            @Nullable final dev.jstech.computers.crafting.CraftingPattern preferred) {
         if (!isRunning() || !hasOs() || !(level instanceof ServerLevel) || networkUuid() == null
                 || demand <= 0 || !anythingMakes(key)) {
             return null;
         }
         final var stock = networkIndex.snapshot();
         final var patterns = dev.jstech.computers.crafting.AnyTagResolver
-                .resolveAll(networkPatterns(), stock);
+                .resolveAll(patternsPreferring(preferred), stock);
         final var pending = new dev.jstech.computers.crafting.PendingCraftOperation(
                 this, key, demand, partial, label);
         track(pending);
@@ -1225,6 +1238,45 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
         return operation;
     }
 
+    /** The network's bench patterns with {@code preferred} first (when it is one of them, or given at all). */
+    public java.util.List<dev.jstech.computers.crafting.CraftingPattern> patternsPreferring(
+            @Nullable final dev.jstech.computers.crafting.CraftingPattern preferred) {
+        final java.util.List<dev.jstech.computers.crafting.CraftingPattern> all = networkPatterns();
+        if (preferred == null) {
+            return all;
+        }
+        final java.util.List<dev.jstech.computers.crafting.CraftingPattern> ordered = new java.util.ArrayList<>(all.size() + 1);
+        ordered.add(preferred);
+        for (final var pattern : all) {
+            if (!pattern.equals(preferred)) {
+                ordered.add(pattern);
+            }
+        }
+        return ordered;
+    }
+
+    /**
+     * Every recipe on the network that makes {@code key}, in a stable order: the machine recipes first
+     * (processing and multi-stage, in the order the Recipe ROMs hold them), then each bench pattern with that
+     * result. A craft dialog lists these so the player can pick one, and the index into this list is what a
+     * craft request names; the list only changes when a ROM does.
+     */
+    public java.util.List<dev.jstech.computers.crafting.NetworkRecipe> recipesFor(
+            final dev.jstech.computers.storage.StorageKey key) {
+        final java.util.List<dev.jstech.computers.crafting.NetworkRecipe> out = new java.util.ArrayList<>();
+        for (final var recipe : networkMachineRecipes()) {
+            if (key.equals(recipe.resultKey()) && recipe.usesMachine()) {
+                out.add(recipe);
+            }
+        }
+        for (final var pattern : networkPatterns()) {
+            if (key.equals(dev.jstech.computers.storage.StorageKey.of(pattern.result()))) {
+                out.add(dev.jstech.computers.crafting.NetworkRecipe.ofBench(pattern));
+            }
+        }
+        return out;
+    }
+
     /**
      * The single craft entry point every OS surface (the terminal, the Network Interactor, and the CLI/IQL)
      * routes a request through, so all three behave the same. If a machine recipe on the network produces
@@ -1243,6 +1295,68 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
     }
 
     /**
+     * As above, run through one particular recipe: {@code recipe} indexes {@link #recipesFor}. A processing
+     * recipe runs the machine (or the whole tree when an input is short and something makes it), a multi-stage
+     * one runs its pipeline, and a bench one is planned recursively with that pattern first. An index out of
+     * range runs the machine's own choice, the way the five-argument form does.
+     */
+    @Nullable
+    public dev.jstech.computers.operation.INetworkOperation submitCraftRequest(
+            final dev.jstech.computers.storage.StorageKey key, final long demand,
+            final boolean partial, final String label, @Nullable final Runnable onSettle,
+            final int recipe) {
+        final java.util.List<dev.jstech.computers.crafting.NetworkRecipe> recipes = recipesFor(key);
+        if (recipe < 0 || recipe >= recipes.size()) {
+            return submitCraftRequest(key, demand, partial, label, onSettle, true);
+        }
+        final dev.jstech.computers.crafting.NetworkRecipe chosen = recipes.get(recipe);
+        final dev.jstech.computers.operation.INetworkOperation op;
+        if (chosen.proc().isPresent()) {
+            op = runProcessing(chosen.proc().get(), key, demand, label);
+        } else if (chosen.multi().isPresent()) {
+            op = submitNetworkMultiStage(chosen.multi().get(), demand, label);
+        } else {
+            op = submitCraftAsync(key, demand, partial, label, chosen.bench().orElse(null));
+        }
+        settle(op, onSettle);
+        return op;
+    }
+
+    /** Hooks {@code onSettle} onto whichever kind of craft operation came out, when there is one to hook. */
+    private static void settle(@Nullable final dev.jstech.computers.operation.INetworkOperation op,
+                               @Nullable final Runnable onSettle) {
+        if (op == null || onSettle == null) {
+            return;
+        }
+        if (op instanceof dev.jstech.computers.crafting.NetworkCraftOperation craft) {
+            craft.onSettle(onSettle);
+        } else if (op instanceof dev.jstech.computers.crafting.NetworkProcessingOperation processing) {
+            processing.onSettle(onSettle);
+        } else if (op instanceof dev.jstech.computers.crafting.NetworkMultiStageOperation multi) {
+            multi.onSettle(onSettle);
+        } else if (op instanceof dev.jstech.computers.crafting.PendingCraftOperation pending) {
+            pending.onSettle(onSettle);
+        }
+    }
+
+    /**
+     * Runs a processing recipe for {@code demand} of {@code key}: the whole tree as one craft when an input is
+     * short and other patterns make it (all-or-nothing), else the bare machine run with what the network holds.
+     */
+    @Nullable
+    private dev.jstech.computers.operation.INetworkOperation runProcessing(
+            final dev.jstech.computers.crafting.ProcessingPattern machine,
+            final dev.jstech.computers.storage.StorageKey key, final long demand, final String label) {
+        if (!inputsInStock(machine, demand)) {
+            final var planned = submitNetworkCraft(key, demand, false, label);
+            if (planned != null) {
+                return planned;
+            }
+        }
+        return submitNetworkProcessing(machine, demand, label);
+    }
+
+    /**
      * As above, but {@code preferMultiStage} chooses which recipe wins when an item can be made BOTH by a
      * multi-stage pipeline and by composing the individual step patterns: true runs the multi-stage recipe; false
      * skips it and lets the recursive planner build the tree from the flat patterns. Only affects results that
@@ -1258,23 +1372,8 @@ public class MainframeBlockEntity extends AbstractComputerBlockEntity
                 continue;
             }
             if (recipe.proc().isPresent()) {
-                if (!inputsInStock(recipe.proc().get(), demand)) {
-                    /*
-                     * A machine input is missing: if other patterns can make it, run the whole tree as one craft
-                     * (all-or-nothing, so partial is false here); otherwise fall through to the bare machine run.
-                     */
-                    final var planned = submitNetworkCraft(key, demand, false, label);
-                    if (planned != null) {
-                        if (onSettle != null) {
-                            planned.onSettle(onSettle);
-                        }
-                        return planned;
-                    }
-                }
-                final var op = submitNetworkProcessing(recipe.proc().get(), demand, label);
-                if (op != null && onSettle != null) {
-                    op.onSettle(onSettle);
-                }
+                final var op = runProcessing(recipe.proc().get(), key, demand, label);
+                settle(op, onSettle);
                 return op;
             }
             if (recipe.multi().isPresent() && preferMultiStage) {

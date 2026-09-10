@@ -100,8 +100,28 @@ public final class TabStrip extends UiComponent {
         return Math.max(1, width() / Math.max(1, labels().size()));
     }
 
+    /** The first tab laid out from the strip's right end; every tab from it on sits there, in order. */
+    private int trailingFrom = Integer.MAX_VALUE;
+
+    /**
+     * Lays the tabs from {@code index} on at the right end of the strip instead of after the others, the
+     * way a favourites tab sits apart from a screen's sections. Tabs before it stay at the left.
+     */
+    public TabStrip setTrailing(final int index) {
+        trailingFrom = index;
+        return this;
+    }
+
     /** The left edge of tab {@code index} as laid out now. */
     private int tabX(final int index) {
+        final int count = labels().size();
+        if (index >= trailingFrom && trailingFrom < count) {
+            int tx = x() + width();
+            for (int i = count - 1; i >= index; i--) {
+                tx -= tabWidth(i);
+            }
+            return tx;
+        }
         int tx = x();
         for (int i = 0; i < index; i++) {
             tx += tabWidth(i);
@@ -150,15 +170,17 @@ public final class TabStrip extends UiComponent {
         }
         int index = -1;
         for (int i = 0; i < current.size(); i++) {
-            if (mx < tabX(i) + tabWidth(i)) {
+            final int tx = tabX(i);
+            if (mx >= tx && mx < tx + tabWidth(i)) {
                 index = i;
                 break;
             }
         }
         if (index < 0) {
             /*
-             * Past the last tab is the strip's empty end, and a click there is a click on nothing: it
-             * used to count as the last tab's close mark, which shut the tabs one by one.
+             * Past the last tab (or between the leading tabs and a trailing one) is the strip's empty end, and
+             * a click there is a click on nothing: it used to count as the last tab's close mark, which shut
+             * the tabs one by one.
              */
             return true;
         }
