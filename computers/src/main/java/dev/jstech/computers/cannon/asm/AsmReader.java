@@ -89,7 +89,7 @@ public final class AsmReader {
                 program.setEntryPoint(split < 0 ? rest : rest.substring(0, split),
                         Shape.of(split < 0 ? "" : rest.substring(split + 1).trim()));
             }
-            case "class", "interface", "enum" -> {
+            case "class", "struct", "record", "interface", "enum" -> {
                 this.closeMethod();
                 this.type = this.readTypeHead(AsmType.Kind.written(word), rest);
                 program.addType(this.type);
@@ -396,9 +396,14 @@ public final class AsmReader {
     }
 
     // The name of a method or a delegate is the word just before its brackets.
+    /*
+     * A constructor is named after its type, namespace and all, so a dot is part of a method's name as
+     * much as a letter is; reading back to the last one would have cut Farm.Counter down to Counter.
+     */
     private static int nameStart(final String text, final int open) {
         int at = open - 1;
-        while (at >= 0 && (Character.isLetterOrDigit(text.charAt(at)) || text.charAt(at) == '_')) {
+        while (at >= 0 && (Character.isLetterOrDigit(text.charAt(at)) || text.charAt(at) == '_'
+                || text.charAt(at) == '.')) {
             at--;
         }
         return at + 1;

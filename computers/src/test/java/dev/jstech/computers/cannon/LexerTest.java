@@ -182,6 +182,13 @@ class LexerTest {
     }
 
     @Test
+    void tokenize_readsNamespaceAndUsingAsKeywords() {
+        assertEquals(List.of(TokenKind.USING, TokenKind.IDENTIFIER, TokenKind.SEMICOLON, TokenKind.NAMESPACE,
+                TokenKind.IDENTIFIER, TokenKind.DOT, TokenKind.IDENTIFIER, TokenKind.SEMICOLON, TokenKind.END_OF_FILE),
+                kinds(this.scan("using Tools; namespace Base.Lab;")));
+    }
+
+    @Test
     void tokenize_complainsOfAnInterpolatedStringThatNeverCloses() {
         this.scan("$\"open {x");
         assertEquals("C1001", this.bag.sorted().getFirst().code());

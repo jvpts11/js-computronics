@@ -49,7 +49,9 @@ public final class CannonSnapshotGameTests {
     private static final int PATIENCE = 4000;
 
     private static Loaded load(final String body) {
-        final String source = "class Monitor : IScript {\n"
+        final String source = "using System.*; using System.IO.*; using System.Collections.*; using System.Utils.*; "
+                + "using System.Machine.*; using System.Network.*; using System.Operations.*; namespace Programs; "
+                + "class Monitor : IScript {\n"
                 + "    public void OnInit() { }\n"
                 + "    public void OnTick() {\n" + body + "\n    }\n"
                 + "    public void OnDestroy() { }\n}\n";
@@ -157,7 +159,7 @@ public final class CannonSnapshotGameTests {
                 new Snapshot.IValue.Ref(1),
                 List.of(new Snapshot.WatchShot(1, "minecraft:iron_ingot", "BELOW", 1000L,
                         new Snapshot.IValue.Ref(5), new Snapshot.IValue.Ref(1), 640L, false, true)),
-                List.of("first", "second"), 7, "RUNNING", "", 91);
+                List.of("first", "second"), 7, "RUNNING", "", 91, "Sorter");
         final Snapshot read = SnapshotTag.read(SnapshotTag.write(written));
         helper.assertTrue(read.equals(written), "what came back out of the tag is what went in; got " + read);
         helper.succeed();

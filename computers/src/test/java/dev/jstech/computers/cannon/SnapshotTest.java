@@ -39,9 +39,14 @@ class SnapshotTest {
                 + "    public void OnDestroy() { }\n}\n");
     }
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "using System.Execution.*; namespace Tests; ";
+
     private static Loaded loadSource(final String source) {
         final CannonCompiler.Result built =
-                CannonCompiler.compile(List.of(new SourceFile("Monitor.can", source)));
+                CannonCompiler.compile(List.of(new SourceFile("Monitor.can", PRELUDE + source)));
         assertTrue(built.ok(), () -> String.join("\n", built.lines()));
         final DiagnosticBag bag = new DiagnosticBag("Monitor.asm");
         final AsmProgram program = new AsmReader(built.assembly(), bag).read();
@@ -81,6 +86,18 @@ class SnapshotTest {
         assertEquals(straight.console(), saved.console());
         assertEquals(straight.heap().used(), saved.heap().used());
         return saved;
+    }
+
+    @Test
+    void save_keepsTheNameTheProgramGaveItself() {
+        final Loaded program = load("", """
+                        Program.SetName("Sorter");
+                        for (int i = 0; i < 20; i++) { Console.PrintLine("" + i); }
+                        Console.PrintLine(Program.Name);
+                """);
+        final Process saved = bothWays(program);
+        assertEquals("Sorter", saved.name(), "the name is written down with the rest and read back");
+        assertEquals("Sorter", saved.console().getLast());
     }
 
     @Test

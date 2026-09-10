@@ -95,7 +95,9 @@ class HostComputerTest {
     }
 
     private static Process run(final String body) {
-        final String source = "class Monitor : IScript {\n"
+        final String source = "using System.*; using System.IO.*; using System.Collections.*; using System.Utils.*; "
+                + "using System.Machine.*; using System.Network.*; using System.Operations.*; namespace Tests; "
+                + "class Monitor : IScript {\n"
                 + "    public void OnInit() { }\n"
                 + "    public void OnTick() {\n" + body + "\n    }\n"
                 + "    public void OnDestroy() { }\n}\n";

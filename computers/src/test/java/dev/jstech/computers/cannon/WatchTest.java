@@ -33,7 +33,9 @@ class WatchTest {
     private static final int PLENTY = 1_000_000;
 
     private static Process start(final String body) {
-        final String source = "class Watcher : IScript {\n"
+        final String source = "using System.*; using System.IO.*; using System.Collections.*; using System.Utils.*; "
+                + "using System.Machine.*; using System.Network.*; using System.Operations.*; namespace Tests; "
+                + "class Watcher : IScript {\n"
                 + "    public void OnInit() {\n" + body + "\n    }\n"
                 + "    public void OnTick() { }\n"
                 + "    public void Told(StockEvent e) {\n"

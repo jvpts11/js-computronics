@@ -2859,8 +2859,8 @@ public final class ServerCliComputer implements ICliComputer {
         }
         final List<CannonProcess> running = new java.util.ArrayList<>();
         for (final MachinePrograms.Live one : computer.cannon().all()) {
-            running.add(new CannonProcess(one.id(), one.name(), one.process().state().name().toLowerCase(
-                    java.util.Locale.ROOT), one.process().heldBytes(), one.process().heapBytes()));
+            running.add(new CannonProcess(one.id(), one.name(), MachinePrograms.stateOf(one.process()),
+                    one.process().heldBytes(), one.process().heapBytes()));
         }
         return running;
     }

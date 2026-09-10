@@ -41,8 +41,13 @@ class CannonSemanticsTest {
             }
             """;
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
+
     private static CannonSemantics.Result check(final String source) {
-        return CannonSemantics.check(List.of(new SourceFile("Test.can", source)));
+        return CannonSemantics.check(List.of(new SourceFile("Test.can", PRELUDE + source)));
     }
 
     private static List<String> codes(final CannonSemantics.Result result) {
@@ -66,7 +71,7 @@ class CannonSemanticsTest {
     @Test
     void checkProgram_findsTheClassTheRuntimeStartsFrom() {
         final CannonSemantics.Result result =
-                CannonSemantics.checkProgram(List.of(new SourceFile("Monitor.can", SCRIPT)));
+                CannonSemantics.checkProgram(List.of(new SourceFile("Monitor.can", PRELUDE + SCRIPT)));
         assertClean(result);
         assertNotNull(result.model().entryPoint());
         assertEquals("Monitor", result.model().entryPoint().name());
@@ -75,14 +80,14 @@ class CannonSemanticsTest {
     @Test
     void checkProgram_refusesAFileWithNoEntryPoint() {
         final CannonSemantics.Result result =
-                CannonSemantics.checkProgram(List.of(new SourceFile("Helper.can", "class Helper { }")));
+                CannonSemantics.checkProgram(List.of(new SourceFile("Helper.can", PRELUDE + "class Helper { }")));
         assertReports("C3017", result);
         assertNull(result.model().entryPoint());
     }
 
     @Test
     void checkProgram_refusesTwoClassesThatBothWantToStart() {
-        final CannonSemantics.Result result = CannonSemantics.checkProgram(List.of(new SourceFile("Two.can", """
+        final CannonSemantics.Result result = CannonSemantics.checkProgram(List.of(new SourceFile("Two.can", PRELUDE + """
                 class A : IScript { public void OnInit() { } public void OnTick() { } public void OnDestroy() { } }
                 class B : IScript { public void OnInit() { } public void OnTick() { } public void OnDestroy() { } }
                 """)));
@@ -92,7 +97,7 @@ class CannonSemanticsTest {
     @Test
     void checkProgram_takesAStaticMainAsAProgramThatRunsAtATerminal() {
         final CannonSemantics.Result result =
-                CannonSemantics.checkProgram(List.of(new SourceFile("Hello.can", """
+                CannonSemantics.checkProgram(List.of(new SourceFile("Hello.can", PRELUDE + """
                         class Hello {
                             static void Main() { Console.PrintLine("hi"); }
                         }
@@ -105,7 +110,7 @@ class CannonSemanticsTest {
     @Test
     void checkProgram_refusesAFileThatIsBothKindsOfProgram() {
         final CannonSemantics.Result result =
-                CannonSemantics.checkProgram(List.of(new SourceFile("Both.can", """
+                CannonSemantics.checkProgram(List.of(new SourceFile("Both.can", PRELUDE + """
                         class Hello { static void Main() { } }
                         class Watch : IScript {
                             public void OnInit() { }
@@ -119,7 +124,7 @@ class CannonSemanticsTest {
     @Test
     void checkProgram_takesAScriptWithAMainAsAScript() {
         final CannonSemantics.Result result =
-                CannonSemantics.checkProgram(List.of(new SourceFile("Watch.can", """
+                CannonSemantics.checkProgram(List.of(new SourceFile("Watch.can", PRELUDE + """
                         class Watch : IScript {
                             static void Main() { }
                             public void OnInit() { }
@@ -134,7 +139,7 @@ class CannonSemanticsTest {
     @Test
     void checkProgram_doesNotTakeAMainOfTheWrongShapeAsOne() {
         final CannonSemantics.Result result =
-                CannonSemantics.checkProgram(List.of(new SourceFile("Nearly.can", """
+                CannonSemantics.checkProgram(List.of(new SourceFile("Nearly.can", PRELUDE + """
                         class Nearly {
                             void Main() { }
                             static int Main(int n) { return n; }
@@ -158,8 +163,52 @@ class CannonSemanticsTest {
     }
 
     @Test
-    void check_reportsATypeThatTakesTheNameOfALanguageType() {
-        assertReports("C3002", check("class Console { }"));
+    void check_letsAProgramNameATypeAfterOneOfTheLanguages() {
+        // The language's Console lives in System.IO; a program's own, in its namespace, is another type.
+        assertClean(check("class Console { public int Value; }"
+                + " class M { void F() { Console c = new Console(); c.Value = 1; } }"));
+    }
+
+    @Test
+    void check_wantsAUsingBeforeALanguageTypeIsNamedBare() {
+        final CannonSemantics.Result bare = CannonSemantics.check(List.of(new SourceFile("Test.can",
+                "namespace Tests; class M { void F() { Console.PrintLine(\"x\"); } }")));
+        assertReports("C3040", bare);
+        assertTrue(bare.lines().getFirst().contains("System.IO"), () -> String.join("\n", bare.lines()));
+        final CannonSemantics.Result byType = CannonSemantics.check(List.of(new SourceFile("Test.can",
+                "using System.IO.Console; namespace Tests; class M { void F() { Console.PrintLine(\"x\"); } }")));
+        assertClean(byType);
+        final CannonSemantics.Result byFullName = CannonSemantics.check(List.of(new SourceFile("Test.can",
+                "namespace Tests; class M { void F() { System.IO.Console.PrintLine(\"x\"); } }")));
+        assertClean(byFullName);
+        final CannonSemantics.Result withoutStar = CannonSemantics.check(List.of(new SourceFile("Test.can",
+                "using System.IO; namespace Tests; class M { void F() { Console.PrintLine(\"x\"); } }")));
+        assertReports("C2012", withoutStar);
+    }
+
+    @Test
+    void check_wantsEveryTypeInANamespace() {
+        assertReports("C2011", CannonSemantics.check(List.of(new SourceFile("Test.can", "class M { }"))));
+    }
+
+    @Test
+    void check_readsAStructARecordAndANestedType() {
+        assertClean(check("""
+                struct Vec { public int X; public int Y; }
+                record Point(int X, int Y);
+                class Outer { public class Inner { public int V; } public Inner Make() { return new Inner(); } }
+                class M {
+                    void F() {
+                        Vec v = new Vec(); v.X = 1;
+                        Point p = new Point(1, 2);
+                        string s = p.ToString();
+                        bool same = p.Equals(new Point(1, 2)) && p.X == 1;
+                        Outer.Inner i = new Outer().Make(); i.V = 3;
+                    }
+                }
+                """));
+        assertReports("C3041", check("class B { } struct S : B { }"));
+        assertReports("C3016", check("record Point(int X); class M { void F() { Point p = new Point(1); p.X = 2; } }"));
     }
 
     @Test
@@ -235,11 +284,73 @@ class CannonSemanticsTest {
                 () -> String.join("\n", result.lines()));
     }
 
+    private static final String TOOLS = """
+            namespace Tools;
+            public class Counter {
+                private int n;
+                public void Add(int k) { n = n + k; }
+                public int Count() { return n; }
+                public static int Twice(int x) { return x * 2; }
+            }
+            """;
+
+    @Test
+    void check_findsATypeThroughAUsingOrItsFullName() {
+        final CannonSemantics.Result viaUsing = CannonSemantics.check(List.of(
+                new SourceFile("Tools.can", TOOLS),
+                new SourceFile("Main.can", "using Tools.*; namespace Main; class M { static void Main() { Counter c = new Counter(); c.Add(1); } }")));
+        assertEquals(List.of(), viaUsing.diagnostics().stream().map(Diagnostic::code).toList());
+        final CannonSemantics.Result viaType = CannonSemantics.check(List.of(
+                new SourceFile("Tools.can", TOOLS),
+                new SourceFile("Main.can", "using Tools.Counter; namespace Main; class M { static void Main() { Counter c = new Counter(); } }")));
+        assertEquals(List.of(), viaType.diagnostics().stream().map(Diagnostic::code).toList());
+        final CannonSemantics.Result viaName = CannonSemantics.check(List.of(
+                new SourceFile("Tools.can", TOOLS),
+                new SourceFile("Main.can", "namespace Main; class M { static void Main() { Tools.Counter c = new Tools.Counter(); "
+                        + "int t = Tools.Counter.Twice(c.Count()); } }")));
+        assertEquals(List.of(), viaName.diagnostics().stream().map(Diagnostic::code).toList());
+        final CannonSemantics.Result bare = CannonSemantics.check(List.of(
+                new SourceFile("Tools.can", TOOLS),
+                new SourceFile("Main.can", "namespace Main; class M { static void Main() { Counter c = new Counter(); } }")));
+        assertTrue(bare.diagnostics().stream().anyMatch(d -> d.code().equals("C3040")),
+                "without a using, a name in another namespace is not visible, and the message says where it is");
+        assertTrue(bare.lines().getFirst().contains("Tools"), () -> String.join("\n", bare.lines()));
+        final CannonSemantics.Result plain = CannonSemantics.check(List.of(
+                new SourceFile("Tools.can", TOOLS),
+                new SourceFile("Main.can", "using Tools; namespace Main; class M { static void Main() { Counter c = new Counter(); } }")));
+        assertTrue(plain.diagnostics().stream().anyMatch(d -> d.code().equals("C2012")),
+                "a using that names a namespace without its star is told how to");
+    }
+
+    @Test
+    void check_seesATypeInTheSameNamespaceWithoutAUsing() {
+        final CannonSemantics.Result result = CannonSemantics.check(List.of(
+                new SourceFile("Tools.can", TOOLS),
+                new SourceFile("More.can", "namespace Tools; class Pair { Counter left; Counter right; }"),
+                new SourceFile("Main.can", "namespace Main; class M { static void Main() { Tools.Pair p = new Tools.Pair(); } }")));
+        assertEquals(List.of(), result.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    @Test
+    void check_letsAClassExtendOneWrittenInAnotherFile() {
+        final CannonSemantics.Result result = CannonSemantics.check(List.of(
+                new SourceFile("B.can", PRELUDE + "class B { public void Thing() { } }"),
+                new SourceFile("A.can", PRELUDE + "class A : B { static void Main() { A a = new A(); a.Thing(); } }")));
+        assertEquals(List.of(), result.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    @Test
+    void check_refusesTwoMethodsWithTheSameParameters() {
+        final CannonSemantics.Result result = check(
+                "class M { void Go(int a) { } void Go(int b) { } void Go(string s) { } static void Main() { } }");
+        assertEquals(List.of("C3002"), result.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
     @Test
     void check_namesTheFileEachMessageCameFrom() {
         final CannonSemantics.Result result = CannonSemantics.check(List.of(
-                new SourceFile("First.can", "class A { void M() { nope(); } }"),
-                new SourceFile("Second.can", "class B { void M() { alsoNope(); } }")));
+                new SourceFile("First.can", PRELUDE + "class A { void M() { nope(); } }"),
+                new SourceFile("Second.can", PRELUDE + "class B { void M() { alsoNope(); } }")));
         assertEquals(List.of("First.can", "Second.can"),
                 result.diagnostics().stream().map(Diagnostic::file).toList());
     }

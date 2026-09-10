@@ -24,7 +24,8 @@ import java.util.Map;
  */
 public record Snapshot(long heapBudget, List<IHeld> held, List<FrameShot> frames, List<FrameShot> waiting,
                        Map<String, Map<String, IValue>> statics, IValue script, List<WatchShot> watches,
-                       List<String> console, int written, String state, String message, int spent) {
+                       List<String> console, int written, String state, String message, int spent,
+                       String name) {
 
     public Snapshot {
         held = List.copyOf(held);
@@ -33,6 +34,7 @@ public record Snapshot(long heapBudget, List<IHeld> held, List<FrameShot> frames
         statics = Map.copyOf(statics);
         watches = List.copyOf(watches);
         console = List.copyOf(console);
+        name = name == null ? "" : name;
     }
 
     /**

@@ -30,8 +30,27 @@ public final class SemanticModel {
     private final Map<IExpr, IMemberSymbol> calls = new IdentityHashMap<>();
     private final Map<INode, IBinding.Variable> places = new IdentityHashMap<>();
     private final List<NamedType> declared = new ArrayList<>();
+    private final List<DeclaredVariable> variables = new ArrayList<>();
+    private String file = "";
     private NamedType entryPoint;
     private Shape shape = Shape.SCRIPT;
+
+    /**
+     * One variable and where it came into being, for an editor asking what a name at the caret could
+     * be: the file and the line it was declared on, and the variable itself.
+     */
+    public record DeclaredVariable(String file, int line, IBinding.Variable variable) {
+    }
+
+    /** Says which file the bodies being checked are in, so a variable is recorded with it. */
+    public void setFile(final String value) {
+        this.file = value == null ? "" : value;
+    }
+
+    /** Every variable the program declares, in the order the checker met them. */
+    public List<DeclaredVariable> variables() {
+        return List.copyOf(this.variables);
+    }
 
     /** Records what an expression's type is. */
     public void setType(final IExpr expression, final ITypeSymbol type) {
@@ -73,6 +92,7 @@ public final class SemanticModel {
      */
     public void setDeclared(final INode site, final IBinding.Variable variable) {
         this.places.put(site, variable);
+        this.variables.add(new DeclaredVariable(this.file, site.line(), variable));
     }
 
     /** The variable a declaration site brings into being, or null. */
@@ -92,6 +112,11 @@ public final class SemanticModel {
 
     /** The declared type of that name, or null. */
     public NamedType declaredType(final String name) {
+        for (final NamedType type : this.declared) {
+            if (type.qualifiedName().equals(name)) {
+                return type;
+            }
+        }
         for (final NamedType type : this.declared) {
             if (type.name().equals(name)) {
                 return type;

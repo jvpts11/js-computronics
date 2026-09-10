@@ -29,9 +29,13 @@ public enum TokenKind {
     CHAR_LITERAL("a character"),
     IDENTIFIER("a name"),
 
+    NAMESPACE("namespace", true),
+    USING("using", true),
     CLASS("class", true),
     INTERFACE("interface", true),
     ENUM("enum", true),
+    STRUCT("struct", true),
+    RECORD("record", true),
     DELEGATE("delegate", true),
     EVENT("event", true),
     NEW("new", true),

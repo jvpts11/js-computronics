@@ -74,6 +74,7 @@ public final class BodyChecker {
         for (final NamedType type : types) {
             final IDecl.ITypeDecl source = this.declarations.source(type);
             this.diagnostics.setFile(this.declarations.fileOf(type));
+            this.model.setFile(this.declarations.fileOf(type));
             if (source instanceof IDecl.ClassDecl declaration) {
                 this.checkClass(type, declaration);
             } else if (source instanceof IDecl.EnumDecl declaration) {
@@ -91,6 +92,7 @@ public final class BodyChecker {
                 case IDecl.ConstructorDecl constructor -> this.checkConstructor(type, constructor);
                 case IDecl.PropertyDecl ignored -> { }
                 case IDecl.EventDecl ignored -> { }
+                case IDecl.TypeMember ignored -> { } // checked as a type of its own, in its turn
             }
         }
     }
@@ -133,7 +135,7 @@ public final class BodyChecker {
         if (field.initializer() == null) {
             return;
         }
-        final ITypeSymbol declared = this.declarations.resolve(field.type());
+        final ITypeSymbol declared = this.declarations.resolve(field.type(), this.currentType);
         this.begin(field.modifiers().contains(IDecl.Modifier.STATIC), ITypeSymbol.Primitive.VOID, false);
         this.expect(this.check(field.initializer(), declared), declared, field.initializer());
     }
@@ -142,7 +144,7 @@ public final class BodyChecker {
         if (method.body() == null) {
             return;
         }
-        final ITypeSymbol declared = this.declarations.resolve(method.returnType());
+        final ITypeSymbol declared = this.declarations.resolve(method.returnType(), this.currentType);
         this.begin(method.modifiers().contains(IDecl.Modifier.STATIC), declared, false);
         this.declareParameters(method.parameters());
         this.checkBlock(method.body(), false);
@@ -177,7 +179,7 @@ public final class BodyChecker {
 
     private void declareParameters(final List<IDecl.Parameter> parameters) {
         for (final IDecl.Parameter parameter : parameters) {
-            final ITypeSymbol type = this.declarations.resolve(parameter.type());
+            final ITypeSymbol type = this.declarations.resolve(parameter.type(), this.currentType);
             final IBinding.Variable variable = new IBinding.Variable(parameter.name(), type, true);
             if (!this.scope.declare(variable)) {
                 this.report(parameter.line(), parameter.column(),
@@ -277,7 +279,8 @@ public final class BodyChecker {
             this.report(loop.line(), loop.column(), CannonError.NOT_A_COLLECTION, source.describe());
         }
         final ITypeSymbol found = element == null ? ITypeSymbol.Special.ERROR : element;
-        final ITypeSymbol declared = isInferred(loop.type()) ? found : this.declarations.resolve(loop.type());
+        final ITypeSymbol declared = isInferred(loop.type()) ? found
+                : this.declarations.resolve(loop.type(), this.currentType);
         if (!this.rules.isAssignable(found, declared)) {
             this.report(loop.line(), loop.column(),
                     CannonError.CANNOT_CONVERT, found.describe(), declared.describe());
@@ -365,7 +368,7 @@ public final class BodyChecker {
     }
 
     private ITypeSymbol written(final IStmt.LocalDecl local) {
-        final ITypeSymbol declared = this.declarations.resolve(local.type());
+        final ITypeSymbol declared = this.declarations.resolve(local.type(), this.currentType);
         if (local.initializer() != null) {
             this.expect(this.check(local.initializer(), declared), declared, local.initializer());
         }
@@ -476,13 +479,28 @@ public final class BodyChecker {
             this.model.setBinding(name, new IBinding.TypeName(type));
             return type;
         }
-        this.report(name.line(), name.column(), CannonError.UNKNOWN_NAME, name.identifier());
+        this.declarations.reportUnknown(name.line(), name.column(), name.identifier());
         return ITypeSymbol.Special.ERROR;
     }
 
+    /** The type a bare name means here, the language's included once the file brought it in, or null. */
     private ITypeSymbol namedType(final String name) {
-        final NamedType declared = this.model.declaredType(name);
-        return declared != null ? declared : this.builtIns.type(name, 0);
+        return this.declarations.lookup(name, this.currentType);
+    }
+
+    /**
+     * The dotted name an expression spells when it is nothing but names, {@code Tools.Counter} for the
+     * member access written that way, or null when any part of it is something else.
+     */
+    private static String spell(final IExpr expression) {
+        return switch (expression) {
+            case IExpr.Name name -> name.identifier();
+            case IExpr.Member member -> {
+                final String head = spell(member.target());
+                yield head == null ? null : head + "." + member.name();
+            }
+            default -> null;
+        };
     }
 
     private ITypeSymbol thisType(final IExpr.This self) {
@@ -557,9 +575,9 @@ public final class BodyChecker {
     }
 
     private ITypeSymbol newType(final IExpr.New created) {
-        final ITypeSymbol type = this.declarations.resolve(created.type());
+        final ITypeSymbol type = this.declarations.resolve(created.type(), this.currentType);
         final NamedType named = this.rules.named(type);
-        if (named == null || named.kind() != NamedType.Kind.CLASS) {
+        if (named == null || !named.kind().classLike()) {
             if (!this.rules.isError(type)) {
                 this.report(created.line(), created.column(),
                         CannonError.CANNOT_CREATE, type.describe());
@@ -593,14 +611,14 @@ public final class BodyChecker {
     }
 
     private ITypeSymbol newArrayType(final IExpr.NewArray created) {
-        final ITypeSymbol element = this.declarations.resolve(created.elementType());
+        final ITypeSymbol element = this.declarations.resolve(created.elementType(), this.currentType);
         this.expect(this.check(created.length(), ITypeSymbol.Primitive.INT),
                 ITypeSymbol.Primitive.INT, created.length());
         return new ITypeSymbol.ArrayType(element);
     }
 
     private ITypeSymbol castType(final IExpr.Cast cast) {
-        final ITypeSymbol target = this.declarations.resolve(cast.type());
+        final ITypeSymbol target = this.declarations.resolve(cast.type(), this.currentType);
         final ITypeSymbol value = this.check(cast.value(), null);
         if (!this.rules.isAssignable(value, target) && !this.rules.isAssignable(target, value)) {
             this.report(cast.line(), cast.column(),
@@ -611,7 +629,7 @@ public final class BodyChecker {
 
     private ITypeSymbol typeTestType(final IExpr.TypeTest test) {
         final ITypeSymbol value = this.check(test.value(), null);
-        final ITypeSymbol target = this.declarations.resolve(test.type());
+        final ITypeSymbol target = this.declarations.resolve(test.type(), this.currentType);
         final String written = test.conversion() ? "as" : "is";
         if (!this.rules.isError(value) && !this.rules.isReference(value)) {
             this.report(test.line(), test.column(),
@@ -628,12 +646,38 @@ public final class BodyChecker {
     // members
 
     private ITypeSymbol memberType(final IExpr.Member member, final ITypeSymbol expected) {
+        /*
+         * A type named with its namespace in front, Tools.Counter, is read as a member access, so the
+         * names before the dot are tried as a namespace before they are tried as anything else. Only
+         * when they spell nothing a local or a field could be, since a local called Tools comes first.
+         */
+        final String spelled = spell(member.target());
+        if (spelled != null && this.scope.lookup(spelled) == null && this.declarations.isNamespace(spelled)) {
+            final NamedType named = this.declarations.lookup(spelled + "." + member.name(), this.currentType);
+            if (named != null) {
+                this.model.setBinding(member, new IBinding.TypeName(named));
+                return named;
+            }
+        }
         final ITypeSymbol target = this.check(member.target(), null);
         if (this.rules.isError(target)) {
             return ITypeSymbol.Special.ERROR;
         }
         final Access access = this.model.bindingOf(member.target()) instanceof IBinding.TypeName
                 ? Access.TYPE : Access.INSTANCE;
+        /*
+         * A type named through the type it is nested in, Outer.Inner: the name before the dot is a
+         * type, and what follows is one of the types inside it rather than one of its members.
+         */
+        if (access == Access.TYPE && this.rules.named(target) instanceof NamedType outer
+                && lookup(outer, member.name()).isEmpty()) {
+            final NamedType inside = this.declarations.lookup(outer.qualifiedName() + "." + member.name(),
+                    this.currentType);
+            if (inside != null) {
+                this.model.setBinding(member, new IBinding.TypeName(inside));
+                return inside;
+            }
+        }
         final List<IMemberSymbol> found = this.membersOf(target, member.name(), member);
         return found.isEmpty()
                 ? ITypeSymbol.Special.ERROR
@@ -1094,7 +1138,7 @@ public final class BodyChecker {
             final ITypeSymbol fromShape = shape.parameters().get(i).type();
             ITypeSymbol type = fromShape;
             if (parameter.type() != null) {
-                type = this.declarations.resolve(parameter.type());
+                type = this.declarations.resolve(parameter.type(), this.currentType);
                 if (!type.equals(fromShape)) {
                     this.report(parameter.line(), parameter.column(),
                             CannonError.CANNOT_CONVERT, fromShape.describe(), type.describe());
@@ -1119,7 +1163,7 @@ public final class BodyChecker {
     private ITypeSymbol outArgumentType(final IExpr.OutArgument argument, final ITypeSymbol expected) {
         if (argument.type() != null) {
             final ITypeSymbol type = isInferred(argument.type())
-                    ? expected : this.declarations.resolve(argument.type());
+                    ? expected : this.declarations.resolve(argument.type(), this.currentType);
             if (type == null || this.rules.isError(type)) {
                 return ITypeSymbol.Special.ERROR;
             }

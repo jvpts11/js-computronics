@@ -48,6 +48,9 @@ public final class CannonProcessGameTests {
 
     /** A script that says which tick it is on, so its console counts the ticks it was given. */
     private static final String COUNTER = """
+            using System.*;
+            using System.IO.*;
+            namespace Programs;
             class Counter : IScript {
                 int seen;
 
@@ -59,6 +62,8 @@ public final class CannonProcessGameTests {
 
     /** A program that runs at a terminal: it starts at Main, prints, and is done. */
     private static final String HELLO = """
+            using System.IO.*;
+            namespace Programs;
             class Hello {
                 static void Main() {
                     for (int i = 0; i < 3; i++) { Console.PrintLine("hi " + i); }
@@ -66,9 +71,18 @@ public final class CannonProcessGameTests {
             }
             """;
 
+    /**
+     * What a script starts with when it does not say so itself: the whole library brought in and a
+     * namespace, on one line so the source keeps its line numbers.
+     */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "using System.Execution.*; namespace Programs; ";
+
     private static String listing(final String source) {
+        final String whole = source.contains("namespace ") ? source : PRELUDE + source;
         final CannonCompiler.Result built =
-                CannonCompiler.compile(List.of(new SourceFile("Script.can", source)));
+                CannonCompiler.compile(List.of(new SourceFile("Script.can", whole)));
         if (!built.ok()) {
             throw new IllegalStateException(String.join("\n", built.lines()));
         }

@@ -24,7 +24,17 @@ import org.junit.jupiter.api.Test;
 
 class ParserTest {
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
+
     private static CannonFrontEnd.Result parse(final String source) {
+        return raw(PRELUDE + source);
+    }
+
+    /** Parses the source exactly as given, for the tests about what a file opens with. */
+    private static CannonFrontEnd.Result raw(final String source) {
         return CannonFrontEnd.parse(new SourceFile("Test.can", source));
     }
 
@@ -328,6 +338,99 @@ class ParserTest {
         final CannonFrontEnd.Result result = parse("}}} ]] ;;; class ((");
         assertFalse(result.ok());
         assertNotNull(result.unit());
+    }
+
+    @Test
+    void parse_readsTheNamespaceAndTheUsings() {
+        final CannonFrontEnd.Result result = raw("""
+                using Tools.*;
+                using Base.Lab.Bench;
+                namespace Programs.Mine;
+                class C { Tools.Counter counter; }
+                """);
+        assertEquals(List.of(), codes(result));
+        assertEquals("Programs.Mine", result.unit().namespace());
+        assertEquals(List.of("Tools.*", "Base.Lab.Bench"), result.unit().usings().stream()
+                .map(dev.jstech.computers.cannon.ast.CompilationUnit.Using::describe).toList());
+        assertTrue(result.unit().usings().getFirst().all() && !result.unit().usings().getLast().all(),
+                "a star brings the whole namespace in; a name brings one type");
+        final IDecl.ClassDecl c = (IDecl.ClassDecl) result.unit().types().getFirst();
+        assertEquals("Tools.Counter", ((IDecl.FieldDecl) c.members().getFirst()).type().name(),
+                "a type named with its namespace in front is one name with dots in it");
+    }
+
+    @Test
+    void parse_readsANamespaceWrittenAsABlockAndBlocksInsideBlocks() {
+        final CannonFrontEnd.Result result = raw("namespace Tools { class A { } namespace Deep { class B { } } }");
+        assertEquals(List.of(), codes(result));
+        assertEquals("Tools", result.unit().declared().get(0).namespace());
+        assertEquals("Tools.Deep", result.unit().declared().get(1).namespace());
+        assertEquals(2, result.unit().types().size());
+        final CannonFrontEnd.Result mixed = raw("namespace Farm; namespace Tools { class A { } } class B { }");
+        assertEquals(List.of(), codes(mixed));
+        assertEquals("Farm.Tools", mixed.unit().declared().get(0).namespace());
+        assertEquals("Farm", mixed.unit().declared().get(1).namespace());
+    }
+
+    @Test
+    void parse_refusesASecondNamespaceLineAndALateUsing() {
+        assertEquals(List.of("C2010"), codes(raw("namespace A; namespace B; class C { }")));
+        assertEquals(List.of("C2009"), codes(raw("namespace A; class C { } using Tools.*;")));
+    }
+
+    @Test
+    void parse_wantsEveryTypeInANamespaceAndSaysSoOnce() {
+        assertEquals(List.of("C2011"), codes(raw("class C { } class D { }")));
+        assertEquals(List.of(), codes(raw("namespace A; class C { }")));
+    }
+
+    @Test
+    void parse_readsAStructAsAClassOfItsOwnFlavour() {
+        final CannonFrontEnd.Result result = parse("struct Vec : IThing { public int X; public int Y; }");
+        assertEquals(List.of(), codes(result));
+        final IDecl.ClassDecl vec = (IDecl.ClassDecl) result.unit().type("Vec");
+        assertEquals(IDecl.ClassDecl.Flavour.STRUCT, vec.flavour());
+        assertEquals(2, vec.members().size());
+        assertEquals(1, vec.bases().size());
+    }
+
+    @Test
+    void parse_writesARecordOutAsItsFieldsItsConstructorAndItsMembers() {
+        final CannonFrontEnd.Result result = parse("record Point(int X, int Y);");
+        assertEquals(List.of(), codes(result));
+        final IDecl.ClassDecl point = (IDecl.ClassDecl) result.unit().type("Point");
+        assertEquals(IDecl.ClassDecl.Flavour.RECORD, point.flavour());
+        assertEquals(List.of("X", "Y", "Point", "ToString", "Equals"),
+                point.members().stream().map(IDecl::name).toList());
+        final IDecl.FieldDecl x = (IDecl.FieldDecl) point.members().getFirst();
+        assertTrue(x.modifiers().contains(IDecl.Modifier.READONLY) && x.modifiers().contains(IDecl.Modifier.PUBLIC));
+        final IDecl.ConstructorDecl made = (IDecl.ConstructorDecl) point.members().get(2);
+        assertEquals(2, made.parameters().size());
+        assertEquals(2, made.body().statements().size(), "the constructor stores each component");
+        // A member the body writes under one of those names is kept instead of the made one.
+        final CannonFrontEnd.Result own = parse("record Point(int X) { public string ToString() { return \"p\"; } }");
+        assertEquals(List.of(), codes(own));
+        final IDecl.ClassDecl withOwn = (IDecl.ClassDecl) own.unit().type("Point");
+        assertEquals(1, withOwn.members().stream().filter(m -> m.name().equals("ToString")).count());
+    }
+
+    @Test
+    void parse_readsATypeDeclaredInsideAnother() {
+        final CannonFrontEnd.Result result = parse("class Outer { public class Inner { int v; } enum Kind { A } int n; }");
+        assertEquals(List.of(), codes(result));
+        final IDecl.ClassDecl outer = (IDecl.ClassDecl) result.unit().type("Outer");
+        assertEquals(3, outer.members().size());
+        final IDecl.TypeMember inner = (IDecl.TypeMember) outer.members().getFirst();
+        assertEquals("Inner", inner.name());
+        assertTrue(inner.modifiers().contains(IDecl.Modifier.PUBLIC));
+        assertInstanceOf(IDecl.EnumDecl.class, ((IDecl.TypeMember) outer.members().get(1)).type());
+    }
+
+    @Test
+    void parse_keepsADottedCallFromLookingLikeADeclaration() {
+        final List<IStmt> statements = body("Console.PrintLine(1); Tools.Counter c = new Tools.Counter();");
+        assertInstanceOf(IStmt.ExprStmt.class, statements.get(0));
+        assertInstanceOf(IStmt.LocalDecl.class, statements.get(1));
     }
 
     private static IExpr.Lambda lambdaArgument(final IStmt statement, final int index) {

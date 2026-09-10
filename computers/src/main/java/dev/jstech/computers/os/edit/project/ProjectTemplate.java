@@ -99,13 +99,22 @@ public enum ProjectTemplate {
     public String source(final String projectName) {
         return switch (this) {
             case CONSOLE_APP -> """
+                    using System.IO.*;
+
+                    namespace %s;
+
                     class %s {
                         static void Main() {
                             Console.PrintLine("Hello from %s");
                         }
                     }
-                    """.formatted(projectName, projectName);
+                    """.formatted(projectName, projectName, projectName);
             case SCRIPT -> """
+                    using System.*;
+                    using System.IO.*;
+
+                    namespace %s;
+
                     class %s : IScript {
                         public void OnInit() {
                             Console.PrintLine("%s is up");
@@ -117,14 +126,16 @@ public enum ProjectTemplate {
                         public void OnDestroy() {
                         }
                     }
-                    """.formatted(projectName, projectName);
+                    """.formatted(projectName, projectName, projectName);
             case CLASS_LIBRARY -> """
-                    class %s {
+                    namespace %s;
+
+                    public class %s {
                         public static int Answer() {
                             return 42;
                         }
                     }
-                    """.formatted(projectName);
+                    """.formatted(projectName, projectName);
             case EMPTY_PROJECT -> "";
         };
     }

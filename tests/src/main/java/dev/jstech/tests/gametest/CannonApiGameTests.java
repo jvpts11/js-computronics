@@ -45,10 +45,19 @@ public final class CannonApiGameTests {
     private static final String ARENA = "empty";
     private static final int SETTLE = 2;
 
+    /**
+     * What a script starts with when it does not say so itself: the whole library brought in and a
+     * namespace, on one line so the source keeps its line numbers.
+     */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "using System.Execution.*; namespace Programs; ";
+
     /** Compiles a script and gives back the listing the machine is asked to run. */
     private static String listing(final String source) {
+        final String whole = source.contains("namespace ") ? source : PRELUDE + source;
         final CannonCompiler.Result built =
-                CannonCompiler.compile(List.of(new SourceFile("Script.can", source)));
+                CannonCompiler.compile(List.of(new SourceFile("Script.can", whole)));
         if (!built.ok()) {
             throw new IllegalStateException(String.join("\n", built.lines()));
         }
@@ -210,9 +219,10 @@ public final class CannonApiGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
-                    final int quiet = spend(computer, "class A { static void Main() { int n = 1 + 1; } }");
-                    final int loud = spend(computer,
-                            "class B { static void Main() { File.Write(\"a.txt\", \"x\"); } }");
+                    final int quiet = spend(computer,
+                            "namespace Costs; class A { static void Main() { int n = 1 + 1; } }");
+                    final int loud = spend(computer, "using System.IO.*; namespace Costs; "
+                            + "class B { static void Main() { File.Write(\"a.txt\", \"x\"); } }");
                     helper.assertTrue(loud > quiet + 50,
                             "writing to a disk is charged for; " + loud + " against " + quiet);
                 })
@@ -265,9 +275,11 @@ public final class CannonApiGameTests {
         }
         helper.startSequence()
                 .thenExecuteAfter(SETTLE, () -> {
+                    // It is listed by the name it gives itself, not by the file it was started from.
                     final MachinePrograms.Started started = computer.cannon().start("ps.asm", listing("""
                             class Ps {
                                 static void Main() {
+                                    Program.SetName("Ps");
                                     foreach (ProcessInfo one in Computer.Processes()) {
                                         Console.PrintLine(one.Id + " " + one.Name + " " + one.State);
                                     }
@@ -277,7 +289,7 @@ public final class CannonApiGameTests {
                     helper.assertTrue(started.ok(), "the program starts: " + started.message());
                     computer.cannon().tick(100000);
                     final List<String> said = computer.cannon().byId(started.id()).process().console();
-                    helper.assertTrue(said.equals(List.of(started.id() + " ps.asm running")),
+                    helper.assertTrue(said.equals(List.of(started.id() + " Ps running")),
                             "a program listing the machine's programs finds itself, running; got " + said);
                 })
                 .thenSucceed();
@@ -401,6 +413,7 @@ public final class CannonApiGameTests {
                     /*
                      * The row the network wrote down has to name the script, not just say a program did
                      * it: a base runs many at once and the player has to know which one to go and fix.
+                     * The name is the class's whole name, namespace and all, as the Task Manager lists it.
                      */
                     final List<dev.jstech.computers.operation.payload.OperationRecord> log =
                             wired.mainframe().recentOperations();
@@ -408,8 +421,8 @@ public final class CannonApiGameTests {
                     boolean named = false;
                     for (final var record : log) {
                         for (final var move : record.moves()) {
-                            named = named || move.to().contains("Cannon: Restock")
-                                    || move.from().contains("Cannon: Restock");
+                            named = named || move.to().contains("Cannon: Programs.Restock")
+                                    || move.from().contains("Cannon: Programs.Restock");
                         }
                     }
                     helper.assertTrue(named, "a row names the script that asked; got " + log);

@@ -27,6 +27,12 @@ import java.util.Set;
  * its name, the second gives each one its base, its interfaces and its members, by which point every
  * name it could mention already exists. Only then can a member's type be resolved without caring
  * what order the player wrote their classes in.
+ *
+ * <p>Names are found the way a file says they may be: a type sees the types of its own namespace and
+ * of the namespaces around it, the types it is nested with, and what its file brought in with using,
+ * one type or a whole namespace at a time. The language's own types live in namespaces of their own
+ * under {@code System} and are brought in the same way; only the roots every program is made of, the
+ * text and the object, are there without asking.
  */
 public final class Declarations {
 
@@ -34,9 +40,21 @@ public final class Declarations {
     private final TypeRules rules;
     private final DiagnosticBag diagnostics;
     private final SemanticModel model;
+    /** Every type the program declares, by its name with its namespace in front. */
     private final Map<String, NamedType> declared = new LinkedHashMap<>();
     private final Map<NamedType, IDecl.ITypeDecl> sources = new LinkedHashMap<>();
     private final Map<NamedType, String> files = new LinkedHashMap<>();
+    /** What each type can see without saying the namespace: its own, and the ones its file brought in. */
+    private final Map<NamedType, Scope> scopes = new LinkedHashMap<>();
+    /** The type each nested type was declared inside, whose other nested types it may name plainly. */
+    private final Map<NamedType, NamedType> outers = new LinkedHashMap<>();
+    /** The type being filled, whose scope decides what a bare name means. */
+    private NamedType current;
+
+    /** The namespace a file's types live in, and what the file brought in with using. */
+    private record Scope(String namespace, List<CompilationUnit.Using> usings) {
+        static final Scope TOP = new Scope("", List.of());
+    }
 
     public Declarations(final BuiltIns builtIns, final TypeRules rules, final DiagnosticBag diagnostics,
                         final SemanticModel model) {
@@ -50,36 +68,163 @@ public final class Declarations {
     public void declare(final List<CompilationUnit> units) {
         for (final CompilationUnit unit : units) {
             this.diagnostics.setFile(unit.file());
-            for (final IDecl.ITypeDecl declaration : unit.types()) {
-                this.declareType(declaration, unit.file());
+            for (final CompilationUnit.Declared one : unit.declared()) {
+                this.declareType(one.type(), unit.file(), new Scope(one.namespace(), unit.usings()), null);
+            }
+        }
+        /*
+         * Only once every name exists can a using be read: one without a star has to name a type, and
+         * naming a namespace that way is the one mistake worth pointing out, since the star is all it
+         * is missing. A using that names nothing at all is left alone; the names it was meant to bring
+         * in are reported where they are used.
+         */
+        for (final CompilationUnit unit : units) {
+            this.diagnostics.setFile(unit.file());
+            for (final CompilationUnit.Using using : unit.usings()) {
+                if (!using.all() && this.find(using.name(), -1) == null && this.isNamespace(using.name())) {
+                    this.diagnostics.error(using.line(), using.column(), CannonError.USING_NEEDS_STAR,
+                            using.name(), using.name());
+                }
             }
         }
     }
 
-    private void declareType(final IDecl.ITypeDecl declaration, final String file) {
+    private void declareType(final IDecl.ITypeDecl declaration, final String file, final Scope scope,
+                             final NamedType outer) {
         final String name = declaration.name();
-        if (this.declared.containsKey(name) || this.builtIns.isReserved(name)) {
+        final String prefix = outer != null ? outer.qualifiedName() : scope.namespace();
+        final String qualified = prefix.isEmpty() ? name : prefix + "." + name;
+        if (this.declared.containsKey(qualified) || this.builtIns.qualified(qualified, -1) != null) {
             this.diagnostics.error(declaration.line(), declaration.column(),
-                    CannonError.DUPLICATE_DECLARATION, name);
+                    CannonError.DUPLICATE_DECLARATION, qualified);
             return;
         }
         final NamedType.Kind kind = switch (declaration) {
-            case IDecl.ClassDecl ignored -> NamedType.Kind.CLASS;
+            case IDecl.ClassDecl made -> switch (made.flavour()) {
+                case CLASS -> NamedType.Kind.CLASS;
+                case STRUCT -> NamedType.Kind.STRUCT;
+                case RECORD -> NamedType.Kind.RECORD;
+            };
             case IDecl.InterfaceDecl ignored -> NamedType.Kind.INTERFACE;
             case IDecl.EnumDecl ignored -> NamedType.Kind.ENUM;
             case IDecl.DelegateDecl ignored -> NamedType.Kind.DELEGATE;
         };
         final NamedType type = NamedType.of(name, kind, false);
-        this.declared.put(name, type);
+        type.setNamespace(prefix);
+        this.declared.put(qualified, type);
         this.sources.put(type, declaration);
         this.files.put(type, file);
+        this.scopes.put(type, scope);
+        if (outer != null) {
+            this.outers.put(type, outer);
+        }
         this.model.addDeclared(type);
+        if (declaration instanceof IDecl.ClassDecl made) {
+            for (final IDecl.IMemberDecl member : made.members()) {
+                if (member instanceof IDecl.TypeMember nested) {
+                    this.declareType(nested.type(), file, scope, type);
+                }
+            }
+        }
+    }
+
+    /** The type a name means where {@code from} was written, or null when it means none. */
+    public NamedType lookup(final String name, final NamedType from) {
+        return this.lookup(name, from, -1);
+    }
+
+    /**
+     * The type a name means where {@code from} was written, or null when it means none.
+     *
+     * <p>A name with its namespace in front means exactly that type. A bare name is looked for among
+     * the types nested with the type it was written in, then in the namespace that type sits in and in
+     * each namespace enclosing that one, then in what its file brought in with using, and last among
+     * the roots that belong to no namespace. A built-in type with {@code arity} arguments is preferred
+     * where the name has more than one; {@code -1} asks for whichever there is.
+     */
+    public NamedType lookup(final String name, final NamedType from, final int arity) {
+        NamedType found = this.find(name, arity);
+        if (found != null) {
+            return found;
+        }
+        for (NamedType around = from; around != null; around = this.outers.get(around)) {
+            found = this.declared.get(around.qualifiedName() + "." + name);
+            if (found != null) {
+                return found;
+            }
+        }
+        final Scope scope = from == null ? Scope.TOP : this.scopes.getOrDefault(from, Scope.TOP);
+        String enclosing = scope.namespace();
+        while (!enclosing.isEmpty()) {
+            found = this.find(enclosing + "." + name, arity);
+            if (found != null) {
+                return found;
+            }
+            final int dot = enclosing.lastIndexOf('.');
+            enclosing = dot >= 0 ? enclosing.substring(0, dot) : "";
+        }
+        for (final CompilationUnit.Using using : scope.usings()) {
+            if (using.all()) {
+                found = this.find(using.name() + "." + name, arity);
+            } else if (using.name().equals(name) || using.name().endsWith("." + name)) {
+                found = this.find(using.name(), arity);
+            }
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /** The type known by exactly that name with its namespace in front, the program's or the language's. */
+    private NamedType find(final String qualified, final int arity) {
+        final NamedType own = this.declared.get(qualified);
+        return own != null ? own : this.builtIns.qualified(qualified, arity);
+    }
+
+    /**
+     * Whether {@code prefix} is the start of some namespace: {@code Tools} for {@code Tools.Counter},
+     * {@code System.IO} for the console. A type with types nested inside it reads as one as well, so
+     * that {@code Outer.Inner} written from outside finds its way.
+     */
+    public boolean isNamespace(final String prefix) {
+        for (final NamedType type : this.declared.values()) {
+            final String namespace = type.namespace();
+            if (namespace.equals(prefix) || namespace.startsWith(prefix + ".")) {
+                return true;
+            }
+        }
+        return this.builtIns.isNamespace(prefix);
+    }
+
+    /**
+     * The namespace a bare name would be found in if the file brought it in, or null when it is in
+     * none: what a message about an unknown name points the player to.
+     */
+    public String homeOf(final String name) {
+        for (final NamedType type : this.declared.values()) {
+            if (type.name().equals(name) && !type.namespace().isEmpty() && !this.outers.containsKey(type)) {
+                return type.namespace();
+            }
+        }
+        return this.builtIns.homeOf(name);
+    }
+
+    /** Reports a name that means nothing here, saying where it would be found when it is somewhere. */
+    public void reportUnknown(final int line, final int column, final String name) {
+        final String home = this.homeOf(name);
+        if (home != null) {
+            this.diagnostics.error(line, column, CannonError.NEEDS_USING, name, home, home, home, name);
+        } else {
+            this.diagnostics.error(line, column, CannonError.UNKNOWN_NAME, name);
+        }
     }
 
     /** Second pass: every type gets what it is made of. */
     public void fill() {
         for (final Map.Entry<NamedType, IDecl.ITypeDecl> entry : this.sources.entrySet()) {
             this.diagnostics.setFile(this.files.get(entry.getKey()));
+            this.current = entry.getKey();
             switch (entry.getValue()) {
                 case IDecl.ClassDecl declaration -> this.fillClass(entry.getKey(), declaration);
                 case IDecl.InterfaceDecl declaration -> this.fillInterface(entry.getKey(), declaration);
@@ -99,6 +244,11 @@ public final class Declarations {
         return this.files.get(type);
     }
 
+    /** The type {@code type} was declared inside, or null for one at the top of its namespace. */
+    public NamedType outerOf(final NamedType type) {
+        return this.outers.get(type);
+    }
+
     private void fillClass(final NamedType type, final IDecl.ClassDecl declaration) {
         for (final TypeRef base : declaration.bases()) {
             final ITypeSymbol resolved = this.resolve(base);
@@ -107,7 +257,9 @@ public final class Declarations {
             }
             if (named.kind() == NamedType.Kind.INTERFACE) {
                 type.addInterface(named);
-            } else if (named.kind() == NamedType.Kind.CLASS && type.base() == null) {
+            } else if (named.kind().classLike() && type.kind() == NamedType.Kind.STRUCT) {
+                this.diagnostics.error(base.line(), base.column(), CannonError.STRUCT_NO_BASE, base.describe());
+            } else if (named.kind().classLike() && type.base() == null) {
                 type.setBase(named);
             } else {
                 this.diagnostics.error(base.line(), base.column(), CannonError.INVALID_BASE, base.describe());
@@ -122,7 +274,7 @@ public final class Declarations {
         switch (member) {
             case IDecl.FieldDecl field -> this.addUnique(type, new IMemberSymbol.FieldSymbol(
                     type, field.name(), this.resolve(field.type()), field.modifiers()), field);
-            case IDecl.MethodDecl method -> type.addMember(this.methodOf(type, method));
+            case IDecl.MethodDecl method -> this.addMethod(type, this.methodOf(type, method), method);
             case IDecl.ConstructorDecl constructor -> type.addMember(new IMemberSymbol.ConstructorSymbol(
                     type, this.parametersOf(constructor.parameters()), constructor.modifiers()));
             case IDecl.PropertyDecl property -> this.addUnique(type, new IMemberSymbol.PropertySymbol(
@@ -130,6 +282,7 @@ public final class Declarations {
                     property.getter() != null, property.setter() != null, property.modifiers(),
                     property.setter() == null ? Set.of() : property.setter().modifiers()), property);
             case IDecl.EventDecl event -> this.addEvent(type, event);
+            case IDecl.TypeMember ignored -> { } // a nested type was named in the first pass and is filled as itself
         }
     }
 
@@ -159,6 +312,22 @@ public final class Declarations {
             }
         }
         type.addMember(member);
+    }
+
+    /*
+     * Two methods may share a name as long as their parameters tell them apart; two that take the same
+     * types are one method written twice, and a call could never say which it meant.
+     */
+    private void addMethod(final NamedType type, final IMemberSymbol.MethodSymbol method, final INode declaration) {
+        for (final IMemberSymbol existing : type.members()) {
+            if (existing instanceof IMemberSymbol.MethodSymbol other && other.name().equals(method.name())
+                    && this.sameParameters(other, method)) {
+                this.diagnostics.error(declaration.line(), declaration.column(),
+                        CannonError.DUPLICATE_DECLARATION, method.describe());
+                return;
+            }
+        }
+        type.addMember(method);
     }
 
     private IMemberSymbol.MethodSymbol methodOf(final NamedType type, final IDecl.MethodDecl method) {
@@ -204,9 +373,24 @@ public final class Declarations {
 
     /** Resolves a type as it was written. Reports what it cannot resolve and gives back the error type. */
     public ITypeSymbol resolve(final TypeRef reference) {
+        return this.resolve(reference, this.current);
+    }
+
+    /** Resolves a type as it was written inside {@code from}, whose scope decides what a bare name means. */
+    public ITypeSymbol resolve(final TypeRef reference, final NamedType from) {
         if (reference == null) {
             return ITypeSymbol.Special.ERROR;
         }
+        final NamedType was = this.current;
+        this.current = from;
+        try {
+            return this.resolveIn(reference);
+        } finally {
+            this.current = was;
+        }
+    }
+
+    private ITypeSymbol resolveIn(final TypeRef reference) {
         ITypeSymbol resolved = this.resolveName(reference);
         for (int rank = 0; rank < reference.arrayRank(); rank++) {
             resolved = new ITypeSymbol.ArrayType(resolved);
@@ -220,10 +404,9 @@ public final class Declarations {
         if (primitive != null) {
             return this.withoutArguments(reference, primitive);
         }
-        final NamedType user = this.declared.get(name);
-        final NamedType type = user != null ? user : this.builtIns.type(name, reference.arguments().size());
+        final NamedType type = this.lookup(name, this.current, reference.arguments().size());
         if (type == null) {
-            this.diagnostics.error(reference.line(), reference.column(), CannonError.UNKNOWN_NAME, name);
+            this.reportUnknown(reference.line(), reference.column(), name);
             return ITypeSymbol.Special.ERROR;
         }
         if (type.typeParameters().size() != reference.arguments().size()) {
@@ -254,7 +437,7 @@ public final class Declarations {
     public void checkInterfaces() {
         for (final Map.Entry<NamedType, IDecl.ITypeDecl> entry : this.sources.entrySet()) {
             final NamedType type = entry.getKey();
-            if (type.kind() != NamedType.Kind.CLASS) {
+            if (!type.kind().classLike()) {
                 continue;
             }
             this.diagnostics.setFile(this.files.get(type));
@@ -273,7 +456,7 @@ public final class Declarations {
     private boolean hasMethod(final NamedType type, final IMemberSymbol.MethodSymbol required) {
         for (final IMemberSymbol member : type.allMembers()) {
             if (member instanceof IMemberSymbol.MethodSymbol candidate
-                    && candidate.owner().kind() == NamedType.Kind.CLASS
+                    && candidate.owner().kind().classLike()
                     && candidate.name().equals(required.name())
                     && candidate.returnType().equals(required.returnType())
                     && this.sameParameters(candidate, required)) {

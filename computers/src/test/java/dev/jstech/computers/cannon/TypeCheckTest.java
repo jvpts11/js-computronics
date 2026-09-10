@@ -15,8 +15,13 @@ import org.junit.jupiter.api.Test;
 
 class TypeCheckTest {
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
+
     private static CannonSemantics.Result check(final String source) {
-        return CannonSemantics.check(List.of(new SourceFile("Test.can", source)));
+        return CannonSemantics.check(List.of(new SourceFile("Test.can", PRELUDE + source)));
     }
 
     /** Checks the statements as the body of a method of a class with nothing else in it. */

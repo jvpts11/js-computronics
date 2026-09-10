@@ -26,12 +26,19 @@ public enum CannonError {
     EXPECTED_TYPE("C2002", "expected a type but found %s"),
     EXPECTED_EXPRESSION("C2003", "expected an expression but found %s"),
     EXPECTED_MEMBER("C2004", "expected a field, a method, a property or an event but found %s"),
-    EXPECTED_TYPE_DECLARATION("C2005", "expected a class, an interface, an enum or a delegate but found %s"),
+    EXPECTED_TYPE_DECLARATION("C2005", "expected a class, a struct, a record, an interface, an enum or a "
+            + "delegate but found %s"),
     NOT_A_STATEMENT("C2006", "only a call, an assignment, an increment, a decrement or a new object "
             + "can be used as a statement"),
     DUPLICATE_MODIFIER("C2007", "'%s' was given twice"),
+    USING_TOO_LATE("C2009", "a using has to come before the namespace and the types"),
+    ONE_NAMESPACE("C2010", "a file declares one namespace on its own line, before its types; put more "
+            + "of them in blocks"),
     INVALID_ASSIGNMENT_TARGET("C2008", "the left side of an assignment must be a variable, a field, "
             + "a property or an element"),
+    NAMESPACE_REQUIRED("C2011", "every type is in a namespace: put 'namespace Name;' at the top of the file"),
+    USING_NEEDS_STAR("C2012", "'%s' names a namespace; write 'using %s.*;' to bring in everything in it, or "
+            + "name one of its types"),
 
     UNKNOWN_NAME("C3001", "'%s' does not name anything here"),
     DUPLICATE_DECLARATION("C3002", "'%s' is already declared here"),
@@ -76,6 +83,8 @@ public enum CannonError {
             + "every way out"),
     OUT_NOT_A_PLACE("C3038", "'%s' is not somewhere a method can write"),
     ENUM_VALUE_MUST_BE_WRITTEN("C3039", "an enum's number has to be written as a number"),
+    NEEDS_USING("C3040", "'%s' is in %s; add 'using %s.*;' or 'using %s.%s;' at the top of the file"),
+    STRUCT_NO_BASE("C3041", "a struct can implement interfaces but stands on no class, and '%s' is a class"),
 
     MISSING_VERSION_LINE("C4001", "the listing has to begin with a version line"),
     VERSION_TOO_NEW("C4002", "this runtime reads assembly version %s, and this listing is version %s"),

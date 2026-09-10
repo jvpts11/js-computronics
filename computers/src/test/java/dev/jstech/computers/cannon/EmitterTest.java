@@ -25,8 +25,13 @@ class EmitterTest {
                 public void OnDestroy() { }
             """;
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
+
     private static CannonCompiler.Result build(final String source) {
-        return CannonCompiler.compile(List.of(new SourceFile("Monitor.can", source)));
+        return CannonCompiler.compile(List.of(new SourceFile("Monitor.can", PRELUDE + source)));
     }
 
     /** Compiles the members as a whole script and hands back the listing. */
@@ -135,7 +140,7 @@ class EmitterTest {
     @Test
     void emit_putsAFieldsStartingValueInAMethodOfTheTypeItself() {
         final String listing = compile("    int threshold = 5;\n");
-        assertEquals(List.of("ldthis", "ldc.i4 5", "stfld threshold", "ret"), bodyOf(listing, "Monitor"));
+        assertEquals(List.of("ldthis", "ldc.i4 5", "stfld threshold", "ret"), bodyOf(listing, "Tests.Monitor"));
     }
 
     @Test
@@ -145,7 +150,7 @@ class EmitterTest {
                     void M() { int a; Find(out a); }
                 """);
         assertEquals(List.of("ldc.i4 0", "stloc 0", "ldc.i4 1", "ret"), bodyOf(listing, "Find"));
-        assertEquals(List.of("ldthis", "call Monitor.Find(out int) -> bool", "stloc 0", "pop", "ret"),
+        assertEquals(List.of("ldthis", "call Tests.Monitor.Find(out int) -> bool", "stloc 0", "pop", "ret"),
                 bodyOf(listing, "M"));
     }
 
@@ -157,9 +162,9 @@ class EmitterTest {
                     void M() { Changed += OnValue; Changed(1); }
                 """);
         assertEquals(List.of("ldthis", "dup", "ldfld Changed", "ldthis",
-                        "ldfn Monitor.OnValue(int) -> void",
-                        "call Delegate.Combine(Handler, Handler) -> Handler", "stfld Changed",
-                        "ldthis", "ldfld Changed", "ldc.i4 1", "callvirt Handler.Invoke(int) -> void", "ret"),
+                        "ldfn Tests.Monitor.OnValue(int) -> void",
+                        "call Delegate.Combine(Tests.Handler, Tests.Handler) -> Tests.Handler", "stfld Changed",
+                        "ldthis", "ldfld Changed", "ldc.i4 1", "callvirt Tests.Handler.Invoke(int) -> void", "ret"),
                 bodyOf(listing, "M"));
     }
 
@@ -169,8 +174,8 @@ class EmitterTest {
                     void Use(Count c) { }
                     void M() { Use((t) => t.Length); }
                 """);
-        assertEquals(List.of("ldthis", "ldthis", "ldfn Monitor.0lambda1(string) -> int",
-                        "call Monitor.Use(Count) -> void", "ret"), bodyOf(listing, "M"));
+        assertEquals(List.of("ldthis", "ldthis", "ldfn Tests.Monitor.0lambda1(string) -> int",
+                        "call Tests.Monitor.Use(Tests.Count) -> void", "ret"), bodyOf(listing, "M"));
         assertEquals(List.of("ldloc 0", "ldfld string.Length", "ret"), bodyOf(listing, "0lambda1"));
     }
 
@@ -185,7 +190,7 @@ class EmitterTest {
         assertEquals(List.of("newobj 0closure1()", "stloc 0",
                         "ldloc 0", "ldc.i4 5", "stfld 0closure1.limit",
                         "ldthis", "ldloc 0", "ldfn 0closure1.0lambda1(string) -> int",
-                        "call Monitor.Use(Count) -> void", "ret"),
+                        "call Tests.Monitor.Use(Tests.Count) -> void", "ret"),
                 bodyOf(listing, "M"));
         assertEquals(List.of("ldloc 0", "ldfld string.Length", "ldthis", "ldfld 0closure1.limit",
                         "add", "ret"), bodyOf(listing, "0lambda1"));
@@ -198,7 +203,7 @@ class EmitterTest {
                     void Use(Count c) { }
                     void M() { int limit = 1; Use((t) => limit + threshold); }
                 """);
-        assertTrue(listing.contains(".field Monitor 0this"), listing);
+        assertTrue(listing.contains(".field Tests.Monitor 0this"), listing);
         assertEquals(List.of("ldthis", "ldfld 0closure1.limit",
                         "ldthis", "ldfld 0closure1.0this", "ldfld threshold", "add", "ret"),
                 bodyOf(listing, "0lambda1"));
@@ -256,17 +261,17 @@ class EmitterTest {
 
     @Test
     void emit_namesTheClassTheRuntimeStartsFromAndWhatKindOfProgramItIs() {
-        assertTrue(compile("").startsWith(".asm 1\n.start Monitor script\n"));
+        assertTrue(compile("").startsWith(".asm 1\n.start Tests.Monitor script\n"));
     }
 
     @Test
     void emit_marksAProgramThatRunsAtATerminalAsOne() {
-        final CannonCompiler.Result built = CannonCompiler.compile(List.of(new SourceFile("Hello.can", """
+        final CannonCompiler.Result built = CannonCompiler.compile(List.of(new SourceFile("Hello.can", PRELUDE + """
                 class Hello {
                     static void Main() { Console.PrintLine("hi"); }
                 }
                 """)));
         assertTrue(built.ok(), () -> String.join("\n", built.lines()));
-        assertTrue(built.assembly().startsWith(".asm 1\n.start Hello console\n"), built.assembly());
+        assertTrue(built.assembly().startsWith(".asm 1\n.start Tests.Hello console\n"), built.assembly());
     }
 }

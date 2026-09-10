@@ -62,9 +62,43 @@ public sealed interface IDecl extends INode {
     record Parameter(boolean outward, TypeRef type, String name, int line, int column) implements INode {
     }
 
-    /** A class, with the base type and interfaces it was written with. */
+    /**
+     * A class, with the base type and interfaces it was written with.
+     *
+     * <p>A struct and a record are written here too, told apart by their flavour: a struct is a value,
+     * copied whenever it is stored or handed over, and stands on no class; a record is a class whose
+     * components the parser has already turned into readonly fields, a constructor, and the members
+     * that compare and print it by value.
+     */
     record ClassDecl(Set<Modifier> modifiers, String name, List<TypeRef> bases, List<IMemberDecl> members,
-                     int line, int column) implements ITypeDecl {
+                     Flavour flavour, int line, int column) implements ITypeDecl {
+
+        /** A class as it was before there were structs and records. */
+        public ClassDecl(final Set<Modifier> modifiers, final String name, final List<TypeRef> bases,
+                         final List<IMemberDecl> members, final int line, final int column) {
+            this(modifiers, name, bases, members, Flavour.CLASS, line, column);
+        }
+
+        /** Which of the three class-like declarations this is. */
+        public enum Flavour {
+            CLASS,
+            STRUCT,
+            RECORD
+        }
+    }
+
+    /** A type declared inside another, which is named through it: {@code Outer.Inner}. */
+    record TypeMember(ITypeDecl type, int line, int column) implements IMemberDecl {
+
+        @Override
+        public String name() {
+            return this.type.name();
+        }
+
+        @Override
+        public Set<Modifier> modifiers() {
+            return this.type.modifiers();
+        }
     }
 
     /** An interface and the methods it requires. */

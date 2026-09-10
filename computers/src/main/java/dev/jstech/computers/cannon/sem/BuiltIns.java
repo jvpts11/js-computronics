@@ -56,6 +56,7 @@ public final class BuiltIns {
         this.fillMath();
         this.fillConsole();
         this.fillConvert();
+        this.fillProgram();
         this.fillTime();
         this.fillRandom();
         this.fillFile();
@@ -118,12 +119,82 @@ public final class BuiltIns {
         return this.type(name, 0) != null;
     }
 
+    /*
+     * Where the language keeps its types. Everything a program reaches for lives under System, sorted
+     * by what it is about, and has to be brought in with a using before its bare name means anything;
+     * only the two roots every program is made of, the text and the object, belong to no namespace.
+     */
+    /** The root of the language's own namespaces. */
+    public static final String SYSTEM = "System";
+    private static final String COLLECTIONS = "System.Collections";
+    private static final String IO = "System.IO";
+    private static final String UTILS = "System.Utils";
+    private static final String MACHINE = "System.Machine";
+    private static final String NETWORK = "System.Network";
+    private static final String OPERATIONS = "System.Operations";
+    private static final String EXECUTION = "System.Execution";
+
+    private static final Map<String, String> HOMES = Map.ofEntries(
+            Map.entry("IScript", SYSTEM), Map.entry("Action", SYSTEM), Map.entry("Func", SYSTEM),
+            Map.entry("Program", EXECUTION),
+            Map.entry("List", COLLECTIONS), Map.entry("Map", COLLECTIONS),
+            Map.entry("Console", IO), Map.entry("File", IO),
+            Map.entry("Math", UTILS), Map.entry("Convert", UTILS), Map.entry("Random", UTILS), Map.entry("Time", UTILS),
+            Map.entry("Computer", MACHINE), Map.entry("CpuInfo", MACHINE), Map.entry("DiskInfo", MACHINE),
+            Map.entry("OsInfo", MACHINE), Map.entry("ProcessInfo", MACHINE),
+            Map.entry("Network", NETWORK), Map.entry("ServerInfo", NETWORK), Map.entry("HoldingInfo", NETWORK),
+            Map.entry("StockEvent", NETWORK), Map.entry("Subscription", NETWORK), Map.entry("WorkStat", NETWORK),
+            Map.entry("Mainframe", NETWORK),
+            Map.entry("Operations", OPERATIONS), Map.entry("OperationInfo", OPERATIONS), Map.entry("AskResult", OPERATIONS));
+
+    /**
+     * The type known by exactly {@code fullName}, its namespace in front ({@code System.IO.Console}),
+     * with {@code arity} arguments or, when there is none of that count, whichever there is; {@code -1}
+     * asks for whichever. A bare name of a type that lives in a namespace is not found here.
+     */
+    public NamedType qualified(final String fullName, final int arity) {
+        NamedType any = null;
+        for (final NamedType type : this.types.values()) {
+            if (!type.fullName().equals(fullName)) {
+                continue;
+            }
+            if (type.typeParameters().size() == arity) {
+                return type;
+            }
+            if (any == null) {
+                any = type;
+            }
+        }
+        return any;
+    }
+
+    /** Whether {@code prefix} is one of the language's namespaces, or the start of one: System, System.IO. */
+    public boolean isNamespace(final String prefix) {
+        for (final String home : HOMES.values()) {
+            if (home.equals(prefix) || home.startsWith(prefix + ".")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The namespace a bare name would be found in, or null when the language has no type of that name there. */
+    public String homeOf(final String name) {
+        return HOMES.get(name);
+    }
+
+    /** Every namespace the language has, System first, for a list that offers them. */
+    public List<String> namespaces() {
+        return List.of(SYSTEM, COLLECTIONS, IO, UTILS, MACHINE, NETWORK, OPERATIONS, EXECUTION);
+    }
+
     private static String key(final String name, final int arity) {
         return name + "/" + arity;
     }
 
     private NamedType declare(final String name, final NamedType.Kind kind, final String... parameters) {
         final NamedType type = new NamedType(name, kind, List.of(parameters), true);
+        type.setNamespace(HOMES.getOrDefault(name, ""));
         this.types.put(key(name, parameters.length), type);
         return type;
     }
@@ -243,18 +314,56 @@ public final class BuiltIns {
         this.method(console, "Print", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
         this.method(console, "PrintLine", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
         this.method(console, "Clear", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC);
+        /*
+         * Reading waits: a program that asks for a line stops until one is typed at the terminal it is
+         * in front of. HasLine asks without waiting, for a program that has other things to do meanwhile.
+         */
+        this.method(console, "ReadLine", this.stringType, PUBLIC_STATIC);
+        this.method(console, "HasLine", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
+        /*
+         * The same wait, with the line read as a value: a program asking for a number gets one, and a
+         * line that is not one stops the program with the text it could not read, as Convert would.
+         */
+        this.method(console, "ReadInt", ITypeSymbol.Primitive.INT, PUBLIC_STATIC);
+        this.method(console, "ReadLong", ITypeSymbol.Primitive.LONG, PUBLIC_STATIC);
+        this.method(console, "ReadDouble", ITypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC);
+        this.method(console, "ReadBool", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC);
     }
 
     private void fillConvert() {
         final NamedType convert = this.declare("Convert", NamedType.Kind.CLASS);
         this.method(convert, "ToInt", ITypeSymbol.Primitive.INT, PUBLIC_STATIC, this.stringType);
         this.method(convert, "ToLong", ITypeSymbol.Primitive.LONG, PUBLIC_STATIC, this.stringType);
+        this.method(convert, "ToFloat", ITypeSymbol.Primitive.FLOAT, PUBLIC_STATIC, this.stringType);
         this.method(convert, "ToDouble", ITypeSymbol.Primitive.DOUBLE, PUBLIC_STATIC, this.stringType);
+        this.method(convert, "ToBool", ITypeSymbol.Primitive.BOOL, PUBLIC_STATIC, this.stringType);
         this.method(convert, "ToString", this.stringType, PUBLIC_STATIC, this.objectType);
-        convert.addMember(new IMemberSymbol.MethodSymbol(convert, "TryInt", ITypeSymbol.Primitive.BOOL,
+        /*
+         * The Try forms answer whether the text was a value and hand the value out sideways, for a
+         * program that would rather ask again than stop on a line somebody mistyped.
+         */
+        this.tries(convert, "TryInt", ITypeSymbol.Primitive.INT);
+        this.tries(convert, "TryLong", ITypeSymbol.Primitive.LONG);
+        this.tries(convert, "TryDouble", ITypeSymbol.Primitive.DOUBLE);
+        this.tries(convert, "TryBool", ITypeSymbol.Primitive.BOOL);
+    }
+
+    /** Declares {@code bool Name(string text, out T value)} on the converter. */
+    private void tries(final NamedType convert, final String name, final ITypeSymbol value) {
+        convert.addMember(new IMemberSymbol.MethodSymbol(convert, name, ITypeSymbol.Primitive.BOOL,
                 List.of(IMemberSymbol.ParameterSymbol.of("text", this.stringType),
-                        new IMemberSymbol.ParameterSymbol("value", ITypeSymbol.Primitive.INT, true)),
+                        new IMemberSymbol.ParameterSymbol("value", value, true)),
                 PUBLIC_STATIC));
+    }
+
+    /**
+     * The program itself, as a thing it can speak about. A program that says what it is called is
+     * listed by that name on the machine's process list; one that does not is listed by the runtime.
+     */
+    private void fillProgram() {
+        final NamedType program = this.declare("Program", NamedType.Kind.CLASS);
+        this.method(program, "SetName", ITypeSymbol.Primitive.VOID, PUBLIC_STATIC, this.stringType);
+        this.property(program, "Name", this.stringType, PUBLIC_STATIC);
     }
 
     private void fillTime() {

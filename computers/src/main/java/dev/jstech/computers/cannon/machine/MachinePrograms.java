@@ -44,13 +44,28 @@ public final class MachinePrograms {
     /** What a program is allowed to spend on its farewell before the machine stops waiting. */
     private static final int FAREWELL = 4096;
 
-    /** One program the machine is running: what it is called, what it was started from, and where it is. */
-    public record Live(int id, String name, String binary, int heapMb, ILanguageProcess process) {
+    /**
+     * What a program is listed as when it gave itself no name: the runtime that is running it, the
+     * way an interpreted program shows up under its interpreter on any machine.
+     */
+    public static final String RUNTIME_NAME = "cannonrt";
+
+    /**
+     * One program the machine is running: the file it was started from, what it was started from, and
+     * where it is.
+     */
+    public record Live(int id, String file, String binary, int heapMb, ILanguageProcess process) {
 
         /** The extension its file ended in, which is how the language that runs it is found again. */
         public String extension() {
-            final int dot = this.name.lastIndexOf('.');
-            return dot < 0 ? "" : this.name.substring(dot + 1).toLowerCase(Locale.ROOT);
+            final int dot = this.file.lastIndexOf('.');
+            return dot < 0 ? "" : this.file.substring(dot + 1).toLowerCase(Locale.ROOT);
+        }
+
+        /** What the machine lists it as: the name the program gave itself, or the runtime's. */
+        public String name() {
+            final String own = this.process.name();
+            return own == null || own.isBlank() ? RUNTIME_NAME : own;
         }
     }
 
@@ -114,8 +129,33 @@ public final class MachinePrograms {
 
     /** Says the terminal is now waiting on that program. */
     public void hold(final int id) {
+        final Live before = this.byId(this.held);
+        if (before != null && before.id() != id && !before.process().isService()) {
+            /*
+             * The terminal is one, and a program that loses it can never read from it again: what is
+             * typed goes to the program in front. Left alone it would wait for ever at no cost and some
+             * memory, listed as running, so it is stopped the moment the terminal moves on.
+             */
+            this.stop(before.id());
+        }
         this.held = id;
         this.shown = 0;
+    }
+
+    /** Hands a line typed at the terminal to the program it is holding; false when it holds none. */
+    public boolean offerInput(final String line) {
+        final Live one = this.byId(this.held);
+        if (one == null) {
+            return false;
+        }
+        one.process().offerInput(line);
+        return true;
+    }
+
+    /** How a program's state reads to a person: a program stopped on a read is waiting for input. */
+    public static String stateOf(final ILanguageProcess process) {
+        return process.waitingForInput() ? "input"
+                : process.state().name().toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Lets the terminal go, clearing the program away if it had already finished. */
@@ -234,6 +274,16 @@ public final class MachinePrograms {
         final List<Live> done = new ArrayList<>();
         for (final Live one : this.live) {
             final ILanguageProcess.State state = one.process().state();
+            if (!one.process().isService() && one.id() != this.held && one.process().waitingForInput()) {
+                /*
+                 * A terminal program stopped on a read with no terminal in front of it: only the program
+                 * in front gets what is typed, so nothing can ever reach this one. However it came to be
+                 * here, it is stopped rather than kept for ever as something the machine is running.
+                 */
+                one.process().onStop(FAREWELL);
+                done.add(one);
+                continue;
+            }
             if (state == ILanguageProcess.State.HALTED || state == ILanguageProcess.State.FINISHED) {
                 /*
                  * A program that runs at a terminal is done when it returns, and is asked nothing more;
@@ -279,7 +329,7 @@ public final class MachinePrograms {
         for (final Live one : this.live) {
             final CompoundTag each = new CompoundTag();
             each.putInt(ID, one.id());
-            each.putString(NAME, one.name());
+            each.putString(NAME, one.file());
             each.putString(BINARY, one.binary());
             each.putInt(HEAP, one.heapMb());
             final CompoundTag state = new CompoundTag();

@@ -20,12 +20,21 @@ import java.util.Objects;
  */
 public final class AsmType {
 
-    /** Which of the four kinds a type is, written as the directive that opens it. */
+    /** Which of the kinds a type is, written as the directive that opens it. */
     public enum Kind {
         CLASS("class"),
+        /** A value: copied whenever it is stored or handed over, compared by what it holds. */
+        STRUCT("struct"),
+        /** A class compared by what it holds. */
+        RECORD("record"),
         INTERFACE("interface"),
         ENUM("enum"),
         DELEGATE("delegate");
+
+        /** Whether two of these are the same when what they hold is the same. */
+        public boolean byValue() {
+            return this == STRUCT || this == RECORD;
+        }
 
         private final String text;
 

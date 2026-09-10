@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Test;
 class CannonCommandsTest {
 
     private static final String SCRIPT = """
+            using System.*;
+            using System.IO.*;
+            namespace Tests;
             class Monitor : IScript {
                 public void OnInit() { }
                 public void OnTick() { Console.PrintLine("hello"); }
@@ -150,7 +153,7 @@ class CannonCommandsTest {
         this.computer.files.put("Monitor.can", SCRIPT);
         assertTrue(this.run("cannonc Monitor.can").contains("wrote Monitor.asm"));
         assertTrue(this.computer.files.get("Monitor.asm").startsWith(".asm 1"));
-        assertTrue(this.computer.files.get("Monitor.asm").contains(".start Monitor"));
+        assertTrue(this.computer.files.get("Monitor.asm").contains(".start Tests.Monitor"));
     }
 
     @Test

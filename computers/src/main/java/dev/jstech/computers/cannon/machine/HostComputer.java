@@ -114,7 +114,7 @@ public final class HostComputer {
             final Values.Obj made = new Values.Obj("ProcessInfo");
             made.set("Id", one.id());
             made.set("Name", one.name());
-            made.set("State", one.process().state().name().toLowerCase(Locale.ROOT));
+            made.set("State", MachinePrograms.stateOf(one.process()));
             made.set("HeldBytes", one.process().heldBytes());
             all.items().add(made);
         }

@@ -113,6 +113,21 @@ final class CannonProgram implements ILanguageProcess {
     }
 
     @Override
+    public void offerInput(final String line) {
+        this.process.offerInput(line);
+    }
+
+    @Override
+    public boolean waitingForInput() {
+        return this.process.waitingForInput();
+    }
+
+    @Override
+    public String name() {
+        return this.process.name();
+    }
+
+    @Override
     public void deliver(final Map<String, Long> totals) {
         this.process.deliver(totals);
     }

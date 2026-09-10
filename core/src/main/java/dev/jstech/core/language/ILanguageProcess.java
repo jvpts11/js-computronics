@@ -103,6 +103,32 @@ public interface ILanguageProcess {
     default void deliver(final Map<String, Long> totals) {
     }
 
+    /**
+     * Hands the program a line typed at the terminal it is in front of.
+     *
+     * <p>A program that asked for one takes it and carries on; one that has not asked yet keeps it for
+     * when it does, the way a terminal keeps what was typed ahead. A language with no way to read a
+     * line ignores it.
+     */
+    default void offerInput(final String line) {
+    }
+
+    /** Whether the program is stopped on a read, waiting for a line to be typed. */
+    default boolean waitingForInput() {
+        return false;
+    }
+
+    /**
+     * The name the program gave itself, or empty when it gave none.
+     *
+     * <p>A machine lists what it is running by name, and a program that says what it is called is
+     * listed by that; one that does not is listed by the runtime that runs it, the way an interpreted
+     * program shows up under its interpreter on any machine.
+     */
+    default String name() {
+        return "";
+    }
+
     /** Writes the whole of it down, so it can be read back after the world has been away. */
     void save(CompoundTag tag);
 }

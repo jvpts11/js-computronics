@@ -93,8 +93,12 @@ class HostOperationsTest {
         }
     }
 
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
+
     private static Process run(final Asked net, final String className, final String body) {
-        final String source = "class " + className + " : IScript {\n"
+        final String source = PRELUDE + "class " + className + " : IScript {\n"
                 + "    public void OnInit() { }\n"
                 + "    public void OnTick() {\n" + body + "\n    }\n"
                 + "    public void OnDestroy() { }\n}\n";
@@ -121,7 +125,7 @@ class HostOperationsTest {
                 """);
         assertEquals(Process.State.FINISHED, process.state(), String.valueOf(process.message()));
         assertEquals(List.of("asked"), process.console());
-        assertEquals(List.of("Pull 64 minecraft:iron_ingot for Restock"), net.log);
+        assertEquals(List.of("Pull 64 minecraft:iron_ingot for Tests.Restock"), net.log);
     }
 
     @Test
@@ -130,8 +134,8 @@ class HostOperationsTest {
         run(net, "Smelter", "        Operations.Craft(\"minecraft:iron_ingot\", 8);");
         run(net, "Tidier", "        Operations.Push(\"minecraft:cobblestone\", 512);");
         // Two programs on one machine, and the network can tell which of them asked for what.
-        assertEquals(List.of("Craft 8 minecraft:iron_ingot for Smelter",
-                "Push 512 minecraft:cobblestone for Tidier"), net.log);
+        assertEquals(List.of("Craft 8 minecraft:iron_ingot for Tests.Smelter",
+                "Push 512 minecraft:cobblestone for Tests.Tidier"), net.log);
     }
 
     @Test
@@ -176,15 +180,16 @@ class HostOperationsTest {
 
     @Test
     void operations_isNotThereAtAllOnAMachineOffTheNetwork() {
-        final Process process = new Process(compile(), ROOM, IHost.still());
-        process.begin(process.create("Lonely"), "OnTick");
+        final Loaded lonely = compile();
+        final Process process = new Process(lonely, ROOM, IHost.still());
+        process.begin(process.create(lonely.entryPoint()), "OnTick");
         process.step(PLENTY);
         assertEquals(Process.State.HALTED, process.state());
         assertTrue(process.message().contains("Operations"), process.message());
     }
 
     private static Loaded compile() {
-        final CannonCompiler.Result built = CannonCompiler.compile(List.of(new SourceFile("Lonely.can", """
+        final CannonCompiler.Result built = CannonCompiler.compile(List.of(new SourceFile("Lonely.can", PRELUDE + """
                 class Lonely : IScript {
                     public void OnInit() { }
                     public void OnTick() { Operations.Pull("minecraft:stone", 1); }

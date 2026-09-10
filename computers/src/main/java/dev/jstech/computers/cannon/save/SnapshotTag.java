@@ -69,6 +69,7 @@ public final class SnapshotTag {
     private static final String MESSAGE = "message";
     private static final String SPENT = "spent";
     private static final String BUDGET = "budget";
+    private static final String PROGRAM_NAME = "programName";
 
     private SnapshotTag() {
     }
@@ -117,6 +118,9 @@ public final class SnapshotTag {
         tag.putString(STATE, shot.state());
         tag.putString(MESSAGE, shot.message());
         tag.putInt(SPENT, shot.spent());
+        if (!shot.name().isEmpty()) {
+            tag.putString(PROGRAM_NAME, shot.name());
+        }
         return tag;
     }
 
@@ -150,7 +154,7 @@ public final class SnapshotTag {
         return new Snapshot(tag.getLong(BUDGET), held, readFrames(tag.getList(FRAMES, Tag.TAG_COMPOUND)),
                 readFrames(tag.getList(WAITING, Tag.TAG_COMPOUND)), statics,
                 readValue(tag.getCompound(SCRIPT)), watches, console, tag.getInt(WRITTEN),
-                tag.getString(STATE), tag.getString(MESSAGE), tag.getInt(SPENT));
+                tag.getString(STATE), tag.getString(MESSAGE), tag.getInt(SPENT), tag.getString(PROGRAM_NAME));
     }
 
     // what the program allocated

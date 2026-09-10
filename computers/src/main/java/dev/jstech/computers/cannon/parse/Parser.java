@@ -50,7 +50,8 @@ public final class Parser {
             TokenKind.STRING_LITERAL, TokenKind.CHAR_LITERAL, TokenKind.TRUE, TokenKind.FALSE, TokenKind.NULL);
 
     private static final Set<TokenKind> TYPE_DECLARATION_STARTS = EnumSet.of(
-            TokenKind.CLASS, TokenKind.INTERFACE, TokenKind.ENUM, TokenKind.DELEGATE);
+            TokenKind.CLASS, TokenKind.STRUCT, TokenKind.RECORD, TokenKind.INTERFACE, TokenKind.ENUM,
+            TokenKind.DELEGATE);
 
     private final List<Token> tokens;
     private final DiagnosticBag diagnostics;
@@ -61,31 +62,127 @@ public final class Parser {
         this.diagnostics = diagnostics;
     }
 
-    /** Reads the whole file. The unit holds every type the parser managed to read. */
+    /**
+     * Reads the whole file. The unit holds what the file brought in with {@code using} and every type
+     * the parser managed to read, each with the namespace it was declared in.
+     *
+     * <p>A file may open with one namespace on a line of its own, and may put namespace blocks inside
+     * one another; a type is in the namespace made of all of those around it. A type in none is a
+     * mistake, reported once for the file.
+     */
     public CompilationUnit parse(final String file) {
-        final List<IDecl.ITypeDecl> types = new ArrayList<>();
+        final List<CompilationUnit.Using> usings = new ArrayList<>();
+        final List<CompilationUnit.Declared> declared = new ArrayList<>();
+        String fileNamespace = "";
+        final java.util.Deque<String> blocks = new java.util.ArrayDeque<>();
+        boolean askedForNamespace = false;
         while (!this.atEnd()) {
             final int before = this.position;
-            final IDecl.ITypeDecl type = this.parseTypeDeclaration();
-            if (type != null) {
-                types.add(type);
+            if (this.check(TokenKind.USING)) {
+                final Token start = this.advance();
+                final String name = this.parseDottedName();
+                boolean all = false;
+                if (this.check(TokenKind.DOT) && this.kindAt(this.position + 1) == TokenKind.STAR) {
+                    this.advance();
+                    this.advance();
+                    all = true;
+                }
+                if (!name.isEmpty()) {
+                    usings.add(new CompilationUnit.Using(name, all, start.line(), start.column()));
+                }
+                this.expect(TokenKind.SEMICOLON);
+                if (!declared.isEmpty() || !fileNamespace.isEmpty() || !blocks.isEmpty()) {
+                    this.diagnostics.error(start.line(), start.column(), CannonError.USING_TOO_LATE);
+                }
+            } else if (this.check(TokenKind.NAMESPACE)) {
+                final Token start = this.advance();
+                final String name = this.parseDottedName();
+                if (this.match(TokenKind.LEFT_BRACE)) {
+                    blocks.addLast(name);
+                } else {
+                    this.expect(TokenKind.SEMICOLON);
+                    if (!fileNamespace.isEmpty() || !blocks.isEmpty() || !declared.isEmpty()) {
+                        this.diagnostics.error(start.line(), start.column(), CannonError.ONE_NAMESPACE);
+                    } else {
+                        fileNamespace = name;
+                    }
+                }
+            } else if (!blocks.isEmpty() && this.check(TokenKind.RIGHT_BRACE)) {
+                this.advance();
+                blocks.removeLast();
             } else {
-                this.skipToTypeDeclaration();
+                final Token at = this.peek();
+                final IDecl.ITypeDecl type = this.parseTypeDeclaration();
+                if (type != null) {
+                    final String namespace = joined(fileNamespace, blocks);
+                    if (namespace.isEmpty() && !askedForNamespace) {
+                        this.diagnostics.error(at.line(), at.column(), CannonError.NAMESPACE_REQUIRED);
+                        askedForNamespace = true;
+                    }
+                    declared.add(new CompilationUnit.Declared(namespace, type));
+                } else {
+                    this.skipToTypeDeclaration();
+                }
             }
             if (this.position == before) {
                 this.advance();
             }
         }
-        return new CompilationUnit(file, types);
+        if (!blocks.isEmpty()) {
+            final Token end = this.peek();
+            this.diagnostics.error(end.line(), end.column(), CannonError.EXPECTED_TOKEN, "}", end.describe());
+        }
+        return new CompilationUnit(file, usings, declared);
+    }
+
+    /** The namespace a type is in: the file's, then every block open around it, joined with dots. */
+    private static String joined(final String fileNamespace, final java.util.Deque<String> blocks) {
+        final StringBuilder out = new StringBuilder(fileNamespace);
+        for (final String block : blocks) {
+            if (block.isEmpty()) {
+                continue;
+            }
+            if (!out.isEmpty()) {
+                out.append('.');
+            }
+            out.append(block);
+        }
+        return out.toString();
+    }
+
+    /** A name with dots in it, the way a namespace is written; empty, with a complaint, when none is there. */
+    private String parseDottedName() {
+        final StringBuilder name = new StringBuilder();
+        final Token first = this.peek();
+        if (first.kind() != TokenKind.IDENTIFIER) {
+            this.diagnostics.error(first.line(), first.column(), CannonError.EXPECTED_TOKEN, "a name", first.describe());
+            return "";
+        }
+        name.append(this.advance().text());
+        while (this.check(TokenKind.DOT) && this.kindAt(this.position + 1) == TokenKind.IDENTIFIER) {
+            this.advance();
+            name.append('.').append(this.advance().text());
+        }
+        return name.toString();
     }
 
     // declarations
 
     private IDecl.ITypeDecl parseTypeDeclaration() {
-        final Set<IDecl.Modifier> modifiers = this.parseModifiers();
+        return this.parseTypeDeclaration(this.parseModifiers());
+    }
+
+    /** A type declaration whose modifiers have been read already, at the top of a file or inside a type. */
+    private IDecl.ITypeDecl parseTypeDeclaration(final Set<IDecl.Modifier> modifiers) {
         final Token start = this.peek();
         if (this.match(TokenKind.CLASS)) {
-            return this.parseClass(modifiers, start);
+            return this.parseClass(modifiers, start, IDecl.ClassDecl.Flavour.CLASS);
+        }
+        if (this.match(TokenKind.STRUCT)) {
+            return this.parseClass(modifiers, start, IDecl.ClassDecl.Flavour.STRUCT);
+        }
+        if (this.match(TokenKind.RECORD)) {
+            return this.parseRecord(modifiers, start);
         }
         if (this.match(TokenKind.INTERFACE)) {
             return this.parseInterface(modifiers, start);
@@ -101,26 +198,128 @@ public final class Parser {
         return null;
     }
 
-    private IDecl.ITypeDecl parseClass(final Set<IDecl.Modifier> modifiers, final Token start) {
+    private IDecl.ITypeDecl parseClass(final Set<IDecl.Modifier> modifiers, final Token start,
+                                       final IDecl.ClassDecl.Flavour flavour) {
         final String name = this.expectIdentifier();
         final List<TypeRef> bases = this.parseBaseList();
         final List<IDecl.IMemberDecl> members = new ArrayList<>();
         if (this.expect(TokenKind.LEFT_BRACE)) {
-            while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
-                final int before = this.position;
-                final IDecl.IMemberDecl member = this.parseMember(name);
-                if (member != null) {
-                    members.add(member);
-                } else {
-                    this.skipToMember();
-                }
-                if (this.position == before) {
-                    this.advance();
-                }
-            }
-            this.expect(TokenKind.RIGHT_BRACE);
+            this.parseClassBody(name, members);
         }
-        return new IDecl.ClassDecl(modifiers, name, bases, members, start.line(), start.column());
+        return new IDecl.ClassDecl(modifiers, name, bases, members, flavour, start.line(), start.column());
+    }
+
+    /** The members between a class's braces, the opening one already taken; takes the closing one. */
+    private void parseClassBody(final String name, final List<IDecl.IMemberDecl> members) {
+        while (!this.check(TokenKind.RIGHT_BRACE) && !this.atEnd()) {
+            final int before = this.position;
+            final IDecl.IMemberDecl member = this.parseMember(name);
+            if (member != null) {
+                members.add(member);
+            } else {
+                this.skipToMember();
+            }
+            if (this.position == before) {
+                this.advance();
+            }
+        }
+        this.expect(TokenKind.RIGHT_BRACE);
+    }
+
+    /**
+     * A record: {@code record Point(int X, int Y);}, or the same with a body of further members.
+     *
+     * <p>The components are written out here as what they mean, so that nothing after the parser has
+     * to know a record from a class: each is a public readonly field, all of them are taken by one
+     * constructor, ToString prints them by name, and Equals compares them one by one. A member the
+     * body writes under one of those names is kept instead of the one that would have been made.
+     */
+    private IDecl.ITypeDecl parseRecord(final Set<IDecl.Modifier> modifiers, final Token start) {
+        final String name = this.expectIdentifier();
+        final List<IDecl.Parameter> components = this.check(TokenKind.LEFT_PAREN)
+                ? this.parseParameters() : List.of();
+        final List<TypeRef> bases = this.parseBaseList();
+        final List<IDecl.IMemberDecl> written = new ArrayList<>();
+        if (this.match(TokenKind.LEFT_BRACE)) {
+            this.parseClassBody(name, written);
+        } else {
+            this.expect(TokenKind.SEMICOLON);
+        }
+        final List<IDecl.IMemberDecl> members = new ArrayList<>(recordMembers(name, components, written, start));
+        members.addAll(written);
+        return new IDecl.ClassDecl(modifiers, name, bases, members, IDecl.ClassDecl.Flavour.RECORD,
+                start.line(), start.column());
+    }
+
+    private static List<IDecl.IMemberDecl> recordMembers(final String name, final List<IDecl.Parameter> components,
+                                                         final List<IDecl.IMemberDecl> written, final Token start) {
+        final int line = start.line();
+        final int column = start.column();
+        final List<IDecl.IMemberDecl> made = new ArrayList<>();
+        final List<IStmt> stores = new ArrayList<>();
+        for (final IDecl.Parameter component : components) {
+            if (!declares(written, IDecl.FieldDecl.class, component.name())) {
+                made.add(new IDecl.FieldDecl(EnumSet.of(IDecl.Modifier.PUBLIC, IDecl.Modifier.READONLY),
+                        component.type(), component.name(), null, component.line(), component.column()));
+            }
+            stores.add(new IStmt.ExprStmt(new IExpr.Assign(
+                    new IExpr.Member(new IExpr.This(line, column), component.name(), line, column),
+                    Operator.ASSIGN, new IExpr.Name(component.name(), line, column), line, column), line, column));
+        }
+        final boolean hasConstructor = written.stream().anyMatch(member -> member instanceof IDecl.ConstructorDecl c
+                && c.parameters().size() == components.size());
+        if (!hasConstructor) {
+            final List<IDecl.Parameter> taken = new ArrayList<>();
+            for (final IDecl.Parameter component : components) {
+                taken.add(new IDecl.Parameter(false, component.type(), component.name(),
+                        component.line(), component.column()));
+            }
+            made.add(new IDecl.ConstructorDecl(EnumSet.of(IDecl.Modifier.PUBLIC), name, taken, null,
+                    new IStmt.Block(stores, line, column), line, column));
+        }
+        if (!declares(written, IDecl.MethodDecl.class, "ToString")) {
+            // Name { X = 1, Y = 2 }, or Name { } with nothing to show.
+            IExpr text = new IExpr.Literal(TokenKind.STRING_LITERAL, name + " {", line, column);
+            for (int i = 0; i < components.size(); i++) {
+                final IDecl.Parameter component = components.get(i);
+                text = plus(text, new IExpr.Literal(TokenKind.STRING_LITERAL,
+                        (i > 0 ? ", " : " ") + component.name() + " = ", line, column), line, column);
+                text = plus(text, new IExpr.Name(component.name(), line, column), line, column);
+            }
+            text = plus(text, new IExpr.Literal(TokenKind.STRING_LITERAL, " }", line, column), line, column);
+            made.add(new IDecl.MethodDecl(EnumSet.of(IDecl.Modifier.PUBLIC), TypeRef.named("string", line, column),
+                    "ToString", List.of(), new IStmt.Block(List.of(new IStmt.Return(text, line, column)), line, column),
+                    line, column));
+        }
+        if (!declares(written, IDecl.MethodDecl.class, "Equals")) {
+            // other != null && X == other.X && Y == other.Y
+            IExpr same = new IExpr.Binary(Operator.NOT_EQUAL, new IExpr.Name("other", line, column),
+                    new IExpr.Literal(TokenKind.NULL, null, line, column), line, column);
+            for (final IDecl.Parameter component : components) {
+                same = new IExpr.Binary(Operator.AND, same, new IExpr.Binary(Operator.EQUAL,
+                        new IExpr.Name(component.name(), line, column),
+                        new IExpr.Member(new IExpr.Name("other", line, column), component.name(), line, column),
+                        line, column), line, column);
+            }
+            made.add(new IDecl.MethodDecl(EnumSet.of(IDecl.Modifier.PUBLIC), TypeRef.named("bool", line, column),
+                    "Equals", List.of(new IDecl.Parameter(false, TypeRef.named(name, line, column), "other", line, column)),
+                    new IStmt.Block(List.of(new IStmt.Return(same, line, column)), line, column), line, column));
+        }
+        return made;
+    }
+
+    private static IExpr plus(final IExpr left, final IExpr right, final int line, final int column) {
+        return new IExpr.Binary(Operator.ADD, left, right, line, column);
+    }
+
+    private static boolean declares(final List<IDecl.IMemberDecl> members, final Class<? extends IDecl> kind,
+                                    final String name) {
+        for (final IDecl.IMemberDecl member : members) {
+            if (kind.isInstance(member) && member.name().equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private IDecl.ITypeDecl parseInterface(final Set<IDecl.Modifier> modifiers, final Token start) {
@@ -214,6 +413,12 @@ public final class Parser {
     private IDecl.IMemberDecl parseMember(final String className) {
         final Set<IDecl.Modifier> modifiers = this.parseModifiers();
         final Token start = this.peek();
+
+        // A type inside a type: named through the one around it, and read exactly as one at the top is.
+        if (TYPE_DECLARATION_STARTS.contains(start.kind())) {
+            final IDecl.ITypeDecl nested = this.parseTypeDeclaration(modifiers);
+            return nested == null ? null : new IDecl.TypeMember(nested, start.line(), start.column());
+        }
 
         if (this.match(TokenKind.EVENT)) {
             final TypeRef type = this.parseTypeRef();
@@ -379,6 +584,13 @@ public final class Parser {
             return null;
         }
         this.advance();
+        // A type may be named with its namespace in front: Tools.Counter is one name with dots in it.
+        final StringBuilder name = new StringBuilder(start.text());
+        while (start.kind() == TokenKind.IDENTIFIER && this.check(TokenKind.DOT)
+                && this.kindAt(this.position + 1) == TokenKind.IDENTIFIER) {
+            this.advance();
+            name.append('.').append(this.advance().text());
+        }
         final List<TypeRef> arguments = new ArrayList<>();
         if (this.check(TokenKind.LESS)) {
             this.advance();
@@ -397,7 +609,7 @@ public final class Parser {
             this.advance();
             arrayRank++;
         }
-        return new TypeRef(start.text(), arguments, arrayRank, start.line(), start.column());
+        return new TypeRef(name.toString(), arguments, arrayRank, start.line(), start.column());
     }
 
     /*
@@ -430,7 +642,11 @@ public final class Parser {
         if (!this.isTypeStart(this.kindAt(at))) {
             return -1;
         }
+        final boolean named = this.kindAt(at) == TokenKind.IDENTIFIER;
         at++;
+        while (named && this.kindAt(at) == TokenKind.DOT && this.kindAt(at + 1) == TokenKind.IDENTIFIER) {
+            at += 2;
+        }
         if (this.kindAt(at) == TokenKind.LESS) {
             int depth = 1;
             at++;

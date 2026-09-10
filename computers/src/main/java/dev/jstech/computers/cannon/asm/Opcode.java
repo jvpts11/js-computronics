@@ -89,7 +89,9 @@ public enum Opcode {
     RET("ret", Shape.NONE),
 
     POP("pop", Shape.NONE),
-    DUP("dup", Shape.NONE);
+    DUP("dup", Shape.NONE),
+    /** Replaces the struct on top of the stack with a copy of it: what storing or handing over a value does. */
+    COPY("copy", Shape.NONE);
 
     /** What kind of operand an instruction takes, if any. */
     public enum Shape {

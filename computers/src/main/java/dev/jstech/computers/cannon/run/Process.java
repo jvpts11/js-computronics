@@ -259,6 +259,61 @@ public final class Process {
         }
     }
 
+    /*
+     * Lines typed at the terminal this process is in front of, in the order they came, waiting for the
+     * program to read them. Bounded: a terminal keeps what was typed ahead, not everything ever typed.
+     */
+    private final Deque<String> input = new ArrayDeque<>();
+    private static final int INPUT_LINES = 16;
+
+    /** Hands the process a typed line; a process stopped on a read carries on with it. */
+    public void offerInput(final String line) {
+        if (this.input.size() < INPUT_LINES) {
+            this.input.addLast(line == null ? "" : line);
+        }
+        if (this.waitingForInput()) {
+            this.resume();
+        }
+    }
+
+    /**
+     * Whether the process is stopped on a read. Read off the code rather than kept as a flag, so a
+     * process put away mid-read and brought back after the world was away is still seen to be waiting.
+     */
+    public boolean waitingForInput() {
+        final Frame frame = this.frames.peek();
+        if (this.state != State.PARKED || frame == null || frame.at >= frame.method.code().size()) {
+            return false;
+        }
+        final Instruction next = frame.method.code().get(frame.at);
+        return (next.opcode() == Opcode.CALL || next.opcode() == Opcode.CALLVIRT)
+                && next.operand() instanceof IOperand.Method named && Library.readsLine(named);
+    }
+
+    /** The name the program gave itself, kept with it so a machine lists it by that after a reload. */
+    private String name = "";
+
+    /** Names the program, as its own call to {@code Program.SetName} does; blank means no name. */
+    void setName(final String value) {
+        this.name = value == null ? "" : value.strip();
+    }
+
+    /** The name the program gave itself, or empty when it gave none. */
+    public String name() {
+        return this.name;
+    }
+
+    /** The next line typed, or an empty string when none has been. */
+    String takeInput() {
+        final String line = this.input.pollFirst();
+        return line == null ? "" : line;
+    }
+
+    /** Whether a typed line is waiting to be read. */
+    boolean hasInput() {
+        return !this.input.isEmpty();
+    }
+
     /**
      * Puts a handler in the queue, to run when the process next has nothing else to do.
      *
@@ -505,12 +560,13 @@ public final class Process {
         }
         return new Snapshot(this.heap.budget(), held, frames, queued, kept, value(this.script, numbers),
                 watching, this.library.console(), this.library.written(), this.state.name(),
-                this.message == null ? "" : this.message, this.spent);
+                this.message == null ? "" : this.message, this.spent, this.name);
     }
 
     /** Reads a process back out of what {@link #save()} wrote, ready to carry on where it stopped. */
     public static Process restore(final Loaded program, final Snapshot shot, final IHost host) {
         final Process process = new Process(program, shot.heapBudget(), host, false);
+        process.setName(shot.name());
         final Map<Integer, Object> byNumber = new LinkedHashMap<>();
         for (final Snapshot.IHeld written : shot.held()) {
             byNumber.put(written.id(), shell(written));
@@ -770,6 +826,7 @@ public final class Process {
             case LDLOC -> frame.push(frame.slots[((IOperand.Slot) instruction.operand()).index()]);
             case STLOC -> frame.slots[((IOperand.Slot) instruction.operand()).index()] = frame.pop();
             case POP -> frame.pop();
+            case COPY -> frame.push(this.copyOf(frame.pop(), line));
             case DUP -> frame.push(frame.peek());
             case LDFLD -> this.loadField(frame, (IOperand.Field) instruction.operand(), line);
             case STFLD -> this.storeField(frame, (IOperand.Field) instruction.operand(), line);
@@ -830,7 +887,7 @@ public final class Process {
         final Object right = frame.pop();
         final Object left = frame.pop();
         frame.push(switch (opcode) {
-            case CEQ -> same(left, right);
+            case CEQ -> this.same(left, right);
             case CLT -> Numbers.compare(left, right) < 0;
             default -> Numbers.compare(left, right) > 0;
         });
@@ -887,6 +944,26 @@ public final class Process {
 
     private void newObject(final Frame frame, final IOperand.Constructor made, final int line) {
         frame.push(this.instance(made.owner(), this.take(frame, made.parameters()), line));
+    }
+
+    /**
+     * A copy of a struct: a new object holding what the old one holds, counted like any other. A value
+     * that is not a struct, null included, is handed back as it is, since there is nothing to copy.
+     */
+    private Object copyOf(final Object value, final int line) {
+        if (!(value instanceof Values.Obj original)) {
+            return value;
+        }
+        final Loaded.Type known = this.program.type(original.type());
+        if (known == null || known.kind() != AsmType.Kind.STRUCT) {
+            return value;
+        }
+        final Values.Obj made = new Values.Obj(original.type());
+        this.heap.allocate(made, this.sizeOf(known), line);
+        for (final Map.Entry<String, Object> field : original.all().entrySet()) {
+            made.set(field.getKey(), this.copyOf(field.getValue(), line));
+        }
+        return made;
     }
 
     private Object instance(final String type, final List<Object> arguments, final int line) {
@@ -1001,6 +1078,16 @@ public final class Process {
         }
         final Loaded.Method direct = this.program.method(named.owner(), named.name(), named.parameters());
         if (direct == null) {
+            if (Library.readsLine(named) && this.input.isEmpty()) {
+                /*
+                 * Nothing has been typed: the call is put back so it is asked again once a line comes,
+                 * and the process waits without spending anything. The read takes nothing off the
+                 * stack, which is what makes asking it again the same as asking it once.
+                 */
+                frame.at--;
+                this.park();
+                return;
+            }
             final Object self = this.library.takesTarget(named.owner(), named.name())
                     ? this.alive(frame.pop(), line) : null;
             this.push(frame, named, this.library.call(named, self, arguments, line));
@@ -1160,9 +1247,10 @@ public final class Process {
 
     /*
      * Two values are the same when they say the same thing, which for a bool and the number that
-     * stands for it means comparing what they both mean rather than what they are.
+     * stands for it means comparing what they both mean rather than what they are. Two structs or two
+     * records are the same when everything they hold is, field by field, however far down that goes.
      */
-    private static boolean same(final Object left, final Object right) {
+    private boolean same(final Object left, final Object right) {
         if (left == null || right == null) {
             return left == right;
         }
@@ -1171,6 +1259,22 @@ public final class Process {
         }
         if (left instanceof String || right instanceof String) {
             return left.equals(right);
+        }
+        if (left instanceof Values.Obj one && right instanceof Values.Obj other && one.type().equals(other.type())) {
+            final Loaded.Type kind = this.program.type(one.type());
+            if (kind != null && kind.kind().byValue()) {
+                final Map<String, Object> mine = one.all();
+                final Map<String, Object> theirs = other.all();
+                if (!mine.keySet().equals(theirs.keySet())) {
+                    return false;
+                }
+                for (final Map.Entry<String, Object> field : mine.entrySet()) {
+                    if (!this.same(field.getValue(), theirs.get(field.getKey()))) {
+                        return false;
+                    }
+                }
+                return true;
+            }
         }
         if (left instanceof Number && right instanceof Number) {
             return Numbers.compare(left, right) == 0;

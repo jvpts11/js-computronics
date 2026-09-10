@@ -46,10 +46,15 @@ class ProcessTest {
                 + "    public void OnDestroy() { }\n}\n");
     }
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "using System.Execution.*; namespace Tests; ";
+
     /** Compiles a whole file, for the scripts that need a shape of their own. */
     private static Loaded loadSource(final String source) {
         final CannonCompiler.Result built =
-                CannonCompiler.compile(List.of(new SourceFile("Monitor.can", source)));
+                CannonCompiler.compile(List.of(new SourceFile("Monitor.can", PRELUDE + source)));
         assertTrue(built.ok(), () -> String.join("\n", built.lines()));
         final DiagnosticBag bag = new DiagnosticBag("Monitor.asm");
         final AsmProgram program = new AsmReader(built.assembly(), bag).read();
@@ -82,6 +87,156 @@ class ProcessTest {
         final Process process = run("        Console.PrintLine(\"hello\");");
         assertFinished(process);
         assertEquals(List.of("hello"), process.console());
+    }
+
+    @Test
+    void readLine_waitsForALineAndCarriesOnWithIt() {
+        final Process process = run("        Console.PrintLine(\"got \" + Console.ReadLine());");
+        assertEquals(Process.State.PARKED, process.state(), "nothing typed yet: the read waits");
+        assertTrue(process.waitingForInput(), "the wait is a read, not anything else");
+        assertEquals(List.of(), process.console(), "nothing is printed before the line comes");
+        process.offerInput("Ada");
+        assertEquals(Process.State.RUNNING, process.state(), "a typed line lets the read go on");
+        process.step(PLENTY);
+        assertFinished(process);
+        assertEquals(List.of("got Ada"), process.console());
+        assertFalse(process.waitingForInput());
+    }
+
+    @Test
+    void readLine_takesALineTypedAheadWithoutWaiting() {
+        final Loaded program = load("", "        Console.PrintLine(\"got \" + Console.ReadLine());");
+        final Process process = new Process(program, ROOM, IHost.still());
+        process.offerInput("early");
+        process.begin(process.create(program.entryPoint()), "OnTick");
+        process.step(PLENTY);
+        assertFinished(process);
+        assertEquals(List.of("got early"), process.console());
+    }
+
+    @Test
+    void hasLine_saysWhetherALineIsWaitingWithoutTakingIt() {
+        final Loaded program = load("", """
+                        Console.PrintLine(Console.HasLine() ? "yes" : "no");
+                        Console.PrintLine(Console.ReadLine());
+                        Console.PrintLine(Console.HasLine() ? "yes" : "no");
+                """);
+        final Process process = new Process(program, ROOM, IHost.still());
+        process.offerInput("one");
+        process.begin(process.create(program.entryPoint()), "OnTick");
+        process.step(PLENTY);
+        assertFinished(process);
+        assertEquals(List.of("yes", "one", "no"), process.console());
+    }
+
+    @Test
+    void program_isCalledWhatItCallsItself() {
+        final Process process = run("""
+                        Console.PrintLine("[" + Program.Name + "]");
+                        Program.SetName("Farm Watch");
+                        Console.PrintLine(Program.Name);
+                """);
+        assertFinished(process);
+        assertEquals(List.of("[]", "Farm Watch"), process.console());
+        assertEquals("Farm Watch", process.name());
+    }
+
+    @Test
+    void program_hasNoNameUntilItGivesItselfOne() {
+        final Process process = run("        Console.PrintLine(\"quiet\");");
+        assertFinished(process);
+        assertEquals("", process.name());
+    }
+
+    @Test
+    void readInt_waitsForALineAndReadsItAsANumber() {
+        final Process process = run("        Console.PrintLine(\"twice \" + (Console.ReadInt() * 2));");
+        assertEquals(Process.State.PARKED, process.state(), "nothing typed yet: the read waits");
+        assertTrue(process.waitingForInput());
+        process.offerInput(" 21 ");
+        process.step(PLENTY);
+        assertFinished(process);
+        assertEquals(List.of("twice 42"), process.console());
+    }
+
+    @Test
+    void readInt_stopsTheProgramOnALineThatIsNotANumber() {
+        final Process process = run("        Console.PrintLine(\"n \" + Console.ReadInt());");
+        process.offerInput("twelve");
+        process.step(PLENTY);
+        assertEquals(Process.State.HALTED, process.state());
+        assertTrue(process.message().contains("'twelve' is not a number"), process.message());
+    }
+
+    @Test
+    void readBool_readsTheUsualSpellingsOfYesAndNo() {
+        final Loaded program = load("", """
+                        Console.PrintLine(Console.ReadBool() ? "yes" : "no");
+                        Console.PrintLine(Console.ReadBool() ? "yes" : "no");
+                        Console.PrintLine("" + (Console.ReadDouble() + Console.ReadLong()));
+                """);
+        final Process process = new Process(program, ROOM, IHost.still());
+        process.offerInput("Yes");
+        process.offerInput("off");
+        process.offerInput("1.5");
+        process.offerInput("40");
+        process.begin(process.create(program.entryPoint()), "OnTick");
+        process.step(PLENTY);
+        assertFinished(process);
+        assertEquals(List.of("yes", "no", "41.5"), process.console());
+    }
+
+    @Test
+    void convert_readsBoolsAndTriesNumbersWithoutStopping() {
+        final Process process = run("""
+                        long big;
+                        bool okBig = Convert.TryLong("9000000000", out big);
+                        double half;
+                        bool okHalf = Convert.TryDouble("x", out half);
+                        Console.PrintLine(okBig + " " + big + " " + okHalf + " " + half);
+                        Console.PrintLine(Convert.ToBool("true") + " " + Convert.ToBool("No"));
+                        Console.PrintLine("" + (Convert.ToFloat("2.5") * 2));
+                """);
+        assertFinished(process);
+        assertEquals(List.of("true 9000000000 false 0.0", "true false", "5.0"), process.console());
+    }
+
+    @Test
+    void struct_isCopiedWhenAssignedAndComparedByWhatItHolds() {
+        final Process process = run("struct Point { public int X; public int Y; }", """
+                        Point a = new Point();
+                        a.X = 1;
+                        Point b = a;
+                        b.X = 2;
+                        Point c = new Point();
+                        c.X = 1;
+                        Console.PrintLine("a " + a.X + " b " + b.X);
+                        Console.PrintLine(a == c ? "same" : "different");
+                        Console.PrintLine(a == b ? "same" : "different");
+                """, ROOM);
+        assertFinished(process);
+        assertEquals(List.of("a 1 b 2", "same", "different"), process.console());
+    }
+
+    @Test
+    void record_readsAsItsFieldsWhenJoinedToAString() {
+        /*
+         * A record in a sentence reads as what it holds, through the ToString it was given, and two
+         * with the same fields are equal: what a player expects of one, and what the listing has to
+         * say for the machine to do it.
+         */
+        final Process process = run("record Item(string Name, int Qty);", """
+                        Item item = new Item("iron", 3);
+                        Console.PrintLine("got " + item);
+                        Console.PrintLine($"as {item}");
+                        string text = "and ";
+                        text += item;
+                        Console.PrintLine(text);
+                        Console.PrintLine(item.Equals(new Item("iron", 3)) ? "equal" : "different");
+                """, ROOM);
+        assertFinished(process);
+        assertEquals(List.of("got Item { Name = iron, Qty = 3 }", "as Item { Name = iron, Qty = 3 }",
+                "and Item { Name = iron, Qty = 3 }", "equal"), process.console());
     }
 
     @Test
@@ -385,6 +540,49 @@ class ProcessTest {
         }
         assertFinished(process);
         assertEquals(List.of("round 0", "round 1", "round 2"), process.console());
+    }
+
+    @Test
+    void run_callsIntoANamespacedClassWrittenInAnotherFile() {
+        final CannonCompiler.Result built = CannonCompiler.compile(List.of(
+                new SourceFile("Tools.can", """
+                        namespace Tools;
+                        public class Counter {
+                            private int n;
+                            public void Add(int k) { n = n + k; }
+                            public int Count() { return n; }
+                            public static int Twice(int x) { return x * 2; }
+                        }
+                        """),
+                new SourceFile("Monitor.can", """
+                        using Tools.*;
+                        using System.*;
+                        using System.IO.*;
+                        namespace Main;
+                        class Monitor : IScript {
+                            public void OnInit() { }
+                            public void OnTick() {
+                                Counter c = new Counter();
+                                c.Add(5);
+                                Console.PrintLine("n " + c.Count());
+                                Console.PrintLine("q " + Tools.Counter.Twice(3));
+                            }
+                            public void OnDestroy() { }
+                        }
+                        """)));
+        assertTrue(built.ok(), () -> String.join("\n", built.lines()));
+        final DiagnosticBag bag = new DiagnosticBag("Monitor.asm");
+        final AsmProgram program = new AsmReader(built.assembly(), bag).read();
+        assertFalse(bag.hasErrors(), () -> String.join("\n",
+                bag.sorted().stream().map(Diagnostic::format).toList()));
+        final Loaded loaded = Loaded.of(program);
+        final Process process = new Process(loaded, ROOM, IHost.still());
+        final Values.Obj self = process.create(loaded.entryPoint());
+        assertNotNull(self);
+        process.begin(self, "OnTick");
+        process.step(PLENTY);
+        assertFinished(process);
+        assertEquals(List.of("n 5", "q 6"), process.console());
     }
 
     @Test

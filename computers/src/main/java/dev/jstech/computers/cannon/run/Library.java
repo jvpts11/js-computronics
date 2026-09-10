@@ -101,7 +101,7 @@ public final class Library {
     /** Whether the runtime, rather than the program, answers for this type. */
     public boolean answersFor(final String owner) {
         return switch (owner) {
-            case "string", "List", "Map", "Math", "Console", "Convert", "Time", "Random", "Delegate" -> true;
+            case "string", "List", "Map", "Math", "Console", "Convert", "Time", "Random", "Delegate", "Program" -> true;
             default -> this.host.provides(owner);
         };
     }
@@ -150,6 +150,12 @@ public final class Library {
 
     /** Reads one of the values the runtime keeps on a type of its own rather than on an object. */
     public Object readStatic(final String owner, final String name, final int line) {
+        if ("Program".equals(owner)) {
+            if ("Name".equals(name)) {
+                return this.made(this.owner == null ? "" : this.owner.name(), line);
+            }
+            throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Program has no " + name);
+        }
         if ("Time".equals(owner)) {
             return switch (name) {
                 case "Tick" -> this.host.tick();
@@ -174,7 +180,8 @@ public final class Library {
     public Answer call(final IOperand.Method named, final Object self, final List<Object> arguments,
                        final int line) {
         return switch (named.owner()) {
-            case "Console" -> this.console(named.name(), arguments);
+            case "Console" -> this.console(named.name(), arguments, line);
+            case "Program" -> this.program(named.name(), arguments, line);
             case "Math" -> Answer.of(this.maths(named.name(), arguments, line));
             case "Convert" -> this.convert(named.name(), arguments, line);
             case "Random" -> Answer.of(this.chance(named.name(), arguments));
@@ -286,12 +293,51 @@ public final class Library {
         return made;
     }
 
-    private Answer console(final String name, final List<Object> arguments) {
+    private Answer console(final String name, final List<Object> arguments, final int line) {
         switch (name) {
             case "Print", "PrintLine" -> this.write(String.valueOf(arguments.getFirst()));
+            case "ReadLine" -> {
+                return Answer.of(this.typed());
+            }
+            case "ReadInt" -> {
+                return Answer.of(this.number("ToInt", this.typed(), line));
+            }
+            case "ReadLong" -> {
+                return Answer.of(this.number("ToLong", this.typed(), line));
+            }
+            case "ReadDouble" -> {
+                return Answer.of(this.number("ToDouble", this.typed(), line));
+            }
+            case "ReadBool" -> {
+                return Answer.of(this.truth(this.typed(), line));
+            }
+            case "HasLine" -> {
+                return Answer.of(this.owner != null && this.owner.hasInput());
+            }
             default -> this.console.clear();
         }
         return Answer.of(null);
+    }
+
+    /** What a program says about itself: for now, what it is called. */
+    private Answer program(final String name, final List<Object> arguments, final int line) {
+        if ("SetName".equals(name)) {
+            if (this.owner != null) {
+                this.owner.setName(String.valueOf(arguments.getFirst()));
+            }
+            return Answer.of(null);
+        }
+        throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Program has no " + name);
+    }
+
+    /** The next line typed at the terminal this program is in front of, or nothing when it has none. */
+    private String typed() {
+        return this.owner == null ? "" : this.owner.takeInput();
+    }
+
+    /** Whether that call reads a line, and so has to wait for one when none has been typed. */
+    public static boolean readsLine(final IOperand.Method named) {
+        return "Console".equals(named.owner()) && named.name().startsWith("Read");
     }
 
     private Object maths(final String name, final List<Object> arguments, final int line) {
@@ -324,11 +370,31 @@ public final class Library {
             case "ToString" -> {
                 return Answer.of(this.made(String.valueOf(first), line));
             }
-            case "TryInt" -> {
+            case "ToBool" -> {
+                return Answer.of(this.truth(String.valueOf(first), line));
+            }
+            case "TryInt", "TryLong", "TryDouble", "TryBool" -> {
+                /*
+                 * The value goes out sideways and the answer says whether it is worth anything: a
+                 * program asking again is a program that never stopped on a mistyped line.
+                 */
+                final String text = String.valueOf(first);
                 try {
-                    return new Answer(true, List.of(Integer.parseInt(String.valueOf(first).trim())));
-                } catch (final NumberFormatException notANumber) {
-                    return new Answer(false, List.of(0));
+                    final Object value = switch (name) {
+                        case "TryInt" -> Integer.parseInt(text.trim());
+                        case "TryLong" -> Long.parseLong(text.trim());
+                        case "TryDouble" -> Double.parseDouble(text.trim());
+                        default -> this.truth(text, line);
+                    };
+                    return new Answer(true, List.of(value));
+                } catch (final NumberFormatException | Halt notAValue) {
+                    final Object none = switch (name) {
+                        case "TryInt" -> 0;
+                        case "TryLong" -> 0L;
+                        case "TryDouble" -> 0.0d;
+                        default -> false;
+                    };
+                    return new Answer(false, List.of(none));
                 }
             }
             default -> {
@@ -342,12 +408,22 @@ public final class Library {
             return switch (name) {
                 case "ToInt" -> Integer.parseInt(text.trim());
                 case "ToLong" -> Long.parseLong(text.trim());
+                case "ToFloat" -> Float.parseFloat(text.trim());
                 case "ToDouble" -> Double.parseDouble(text.trim());
                 default -> throw new Halt(Halt.Reason.NO_SUCH_MEMBER, line, "Convert has no " + name);
             };
         } catch (final NumberFormatException notANumber) {
             throw new Halt(Halt.Reason.BAD_CAST, line, "'" + text + "' is not a number");
         }
+    }
+
+    /** What a line says when it is asked for yes or no: the usual spellings of either, or a halt. */
+    private boolean truth(final String text, final int line) {
+        return switch (text.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "true", "yes", "y", "on", "1" -> true;
+            case "false", "no", "n", "off", "0" -> false;
+            default -> throw new Halt(Halt.Reason.BAD_CAST, line, "'" + text + "' is not true or false");
+        };
     }
 
     private Object chance(final String name, final List<Object> arguments) {

@@ -21,12 +21,26 @@ import java.util.List;
  */
 public final class NamedType implements ITypeSymbol {
 
-    /** Which of the four kinds of named type this is. */
+    /** Which of the kinds of named type this is. */
     public enum Kind {
         CLASS,
+        /** A value: copied whenever it is stored or handed over, compared by what it holds. */
+        STRUCT,
+        /** A class made of readonly components, compared and printed by what it holds. */
+        RECORD,
         INTERFACE,
         ENUM,
-        DELEGATE
+        DELEGATE;
+
+        /** Whether a type of this kind is made with new and holds members the way a class does. */
+        public boolean classLike() {
+            return this == CLASS || this == STRUCT || this == RECORD;
+        }
+
+        /** Whether two of these are the same when what they hold is the same. */
+        public boolean byValue() {
+            return this == STRUCT || this == RECORD;
+        }
     }
 
     private final String name;
@@ -50,14 +64,41 @@ public final class NamedType implements ITypeSymbol {
         return new NamedType(name, kind, List.of(), builtIn);
     }
 
-    /** What the type is called. */
+    /** The namespace the type was declared in, or empty for one declared at the top or built in. */
+    private String namespace = "";
+
+    /** What the type is called, without its namespace. */
     public String name() {
         return this.name;
     }
 
+    /** The namespace the type was declared in, or empty. */
+    public String namespace() {
+        return this.namespace;
+    }
+
+    /** Puts the type in a namespace; the declarations pass does this as it names it. */
+    public void setNamespace(final String value) {
+        this.namespace = value == null ? "" : value;
+    }
+
+    /**
+     * The name with its namespace in front, which is how the assembly and the runtime know the type:
+     * two types called the same in two namespaces are two types there as well. A built-in type is known
+     * to the runtime by its bare name, whatever namespace a program has to bring it in from.
+     */
+    public String qualifiedName() {
+        return this.builtIn || this.namespace.isEmpty() ? this.name : this.namespace + "." + this.name;
+    }
+
+    /** The name with its namespace in front, for a built-in type as well: what a using has to name. */
+    public String fullName() {
+        return this.namespace.isEmpty() ? this.name : this.namespace + "." + this.name;
+    }
+
     @Override
     public String describe() {
-        return this.name;
+        return qualifiedName();
     }
 
     /** Which of the four kinds this is. */

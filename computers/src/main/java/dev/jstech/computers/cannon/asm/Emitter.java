@@ -75,7 +75,7 @@ public final class Emitter {
     public AsmProgram emit() {
         final AsmProgram program = new AsmProgram();
         if (this.model.entryPoint() != null) {
-            program.setEntryPoint(this.model.entryPoint().name(), this.model.shape());
+            program.setEntryPoint(this.model.entryPoint().qualifiedName(), this.model.shape());
         }
         for (final NamedType type : this.model.declaredTypes()) {
             final IDecl.ITypeDecl source = this.declarations.source(type);
@@ -98,23 +98,35 @@ public final class Emitter {
 
     // types
 
+    /** The kind a class-like type is written as: a struct and a record keep their own directive. */
+    private static AsmType.Kind kindOf(final NamedType type) {
+        return switch (type.kind()) {
+            case STRUCT -> AsmType.Kind.STRUCT;
+            case RECORD -> AsmType.Kind.RECORD;
+            default -> AsmType.Kind.CLASS;
+        };
+    }
+
     private AsmType emitClass(final NamedType type, final IDecl.ClassDecl declaration) {
-        final AsmType written = new AsmType(AsmType.Kind.CLASS, type.name());
+        final AsmType written = new AsmType(kindOf(type), type.qualifiedName());
         if (type.base() != null) {
-            written.addBase(type.base().name());
+            written.addBase(type.base().qualifiedName());
         }
         for (final NamedType face : type.interfaces()) {
-            written.addBase(face.name());
+            written.addBase(face.qualifiedName());
         }
         final List<IDecl.FieldDecl> instanceStart = new ArrayList<>();
         final List<IDecl.FieldDecl> staticStart = new ArrayList<>();
         for (final IDecl.IMemberDecl member : declaration.members()) {
             switch (member) {
                 case IDecl.FieldDecl field -> {
-                    written.addField(new AsmType.Field(field.name(),
-                            this.declarations.resolve(field.type()).describe(),
+                    final ITypeSymbol held = this.declarations.resolve(field.type());
+                    written.addField(new AsmType.Field(field.name(), held.describe(),
                             field.modifiers().contains(IDecl.Modifier.STATIC)));
-                    if (field.initializer() != null) {
+                    // A struct field is never nothing: one declared without a value starts as an empty one.
+                    final boolean starts = field.initializer() != null
+                            || this.rules.named(held) instanceof NamedType named && named.kind() == NamedType.Kind.STRUCT;
+                    if (starts) {
                         (field.modifiers().contains(IDecl.Modifier.STATIC) ? staticStart : instanceStart)
                                 .add(field);
                     }
@@ -159,21 +171,21 @@ public final class Emitter {
         if (!hasConstructor && !instanceStart.isEmpty()) {
             final Body body = new Body(type, ITypeSymbol.Primitive.VOID);
             body.fieldStarts(instanceStart);
-            written.addMethod(new AsmMethod(type.name(), "void", List.of(), false,
+            written.addMethod(new AsmMethod(type.qualifiedName(), "void", List.of(), false,
                     body.slotCount(), body.finish()));
         }
         if (!staticStart.isEmpty()) {
             final Body body = new Body(type, ITypeSymbol.Primitive.VOID);
             body.fieldStarts(staticStart);
-            written.addMethod(new AsmMethod(type.name(), "void", List.of(), true,
+            written.addMethod(new AsmMethod(type.qualifiedName(), "void", List.of(), true,
                     body.slotCount(), body.finish()));
         }
     }
 
     private static AsmType emitInterface(final NamedType type) {
-        final AsmType written = new AsmType(AsmType.Kind.INTERFACE, type.name());
+        final AsmType written = new AsmType(AsmType.Kind.INTERFACE, type.qualifiedName());
         for (final NamedType face : type.interfaces()) {
-            written.addBase(face.name());
+            written.addBase(face.qualifiedName());
         }
         for (final IMemberSymbol member : type.members()) {
             if (member instanceof IMemberSymbol.MethodSymbol method) {
@@ -185,7 +197,7 @@ public final class Emitter {
     }
 
     private static AsmType emitEnum(final NamedType type, final IDecl.EnumDecl declaration) {
-        final AsmType written = new AsmType(AsmType.Kind.ENUM, type.name());
+        final AsmType written = new AsmType(AsmType.Kind.ENUM, type.qualifiedName());
         int next = 0;
         for (final IDecl.EnumConstant constant : declaration.constants()) {
             final Integer given = constant.value() == null ? null
@@ -198,7 +210,7 @@ public final class Emitter {
     }
 
     private AsmType emitDelegate(final NamedType type, final IDecl.DelegateDecl declaration) {
-        final AsmType written = new AsmType(AsmType.Kind.DELEGATE, type.name());
+        final AsmType written = new AsmType(AsmType.Kind.DELEGATE, type.qualifiedName());
         written.setInvoke(new AsmMethod("Invoke", this.declarations.resolve(declaration.returnType())
                 .describe(), writtenParameters(type.invoke()), false, 0, null));
         return written;
@@ -246,7 +258,7 @@ public final class Emitter {
                     constructor));
             body.block(constructor.body());
         }
-        return new AsmMethod(type.name(), "void", this.written(constructor.parameters()), false,
+        return new AsmMethod(type.qualifiedName(), "void", this.written(constructor.parameters()), false,
                 body.slotCount(), body.finish());
     }
 
@@ -366,9 +378,13 @@ public final class Emitter {
                 if (!fieldIsStatic) {
                     this.emit(Opcode.LDTHIS);
                 }
-                this.value(field.initializer(), type);
+                if (field.initializer() == null) {
+                    this.emit(Opcode.NEWOBJ, new IOperand.Constructor(type.describe(), List.of()));
+                } else {
+                    this.copied(field.initializer(), type);
+                }
                 this.emit(fieldIsStatic ? Opcode.STSFLD : Opcode.STFLD,
-                        new IOperand.Field(fieldIsStatic ? this.owner.name() : null, field.name()));
+                        new IOperand.Field(fieldIsStatic ? this.owner.qualifiedName() : null, field.name()));
             }
         }
 
@@ -380,7 +396,7 @@ public final class Emitter {
             this.emit(Opcode.LDTHIS);
             final IMemberSymbol.MethodSymbol chosen = this.constructorOf(target, call.arguments().size());
             this.arguments(call.arguments(), chosen);
-            this.emit(Opcode.CALL, new IOperand.Method(target.name(), target.name(),
+            this.emit(Opcode.CALL, new IOperand.Method(target.qualifiedName(), target.qualifiedName(),
                     chosen == null ? List.of() : writtenParameters(chosen), "void"));
         }
 
@@ -388,7 +404,7 @@ public final class Emitter {
             for (final IMemberSymbol member : target.members()) {
                 if (member instanceof IMemberSymbol.ConstructorSymbol constructor
                         && constructor.parameters().size() == count) {
-                    return new IMemberSymbol.MethodSymbol(target, target.name(),
+                    return new IMemberSymbol.MethodSymbol(target, target.qualifiedName(),
                             ITypeSymbol.Primitive.VOID, constructor.parameters(), constructor.modifiers());
                 }
             }
@@ -502,17 +518,39 @@ public final class Emitter {
             if (this.kept(variable)) {
                 if (local.initializer() != null) {
                     this.pushClosure();
-                    this.value(local.initializer(), variable.type());
+                    this.copied(local.initializer(), variable.type());
                     this.storeKept(variable);
                 }
                 return;
             }
             final int place = this.slot(variable);
             if (local.initializer() == null) {
+                if (variable != null && this.isStruct(variable.type())) {
+                    // A struct is never nothing: a local declared without a value starts as an empty one.
+                    this.emit(Opcode.NEWOBJ, new IOperand.Constructor(variable.type().describe(), List.of()));
+                    this.emit(Opcode.STLOC, new IOperand.Slot(place));
+                }
                 return;
             }
-            this.value(local.initializer(), variable == null ? null : variable.type());
+            this.copied(local.initializer(), variable == null ? null : variable.type());
             this.emit(Opcode.STLOC, new IOperand.Slot(place));
+        }
+
+        /** Whether a value of that type is a struct: copied whenever it is stored or handed over. */
+        private boolean isStruct(final ITypeSymbol type) {
+            return Emitter.this.rules.named(type) instanceof NamedType named
+                    && named.kind() == NamedType.Kind.STRUCT;
+        }
+
+        /**
+         * The expression's value as a store or a hand-over keeps it: a struct is copied, unless it is
+         * fresh from new and nobody else holds it, and everything else is itself.
+         */
+        private void copied(final IExpr expression, final ITypeSymbol wanted) {
+            this.value(expression, wanted);
+            if (!(expression instanceof IExpr.New) && this.isStruct(Emitter.this.model.typeOf(expression))) {
+                this.emit(Opcode.COPY);
+            }
         }
 
         /*
@@ -615,7 +653,11 @@ public final class Emitter {
             this.emit(Opcode.LDLOC, new IOperand.Slot(held));
             this.emit(Opcode.LDLOC, new IOperand.Slot(index));
             this.element(source);
-            this.emit(Opcode.STLOC, new IOperand.Slot(this.slot(Emitter.this.model.declaredAt(loop))));
+            final IBinding.Variable walker = Emitter.this.model.declaredAt(loop);
+            if (walker != null && this.isStruct(walker.type())) {
+                this.emit(Opcode.COPY); // the loop's own copy: changing it changes nothing in the collection
+            }
+            this.emit(Opcode.STLOC, new IOperand.Slot(this.slot(walker)));
 
             this.inLoop(again, end, loop.body());
             this.mark(again);
@@ -693,7 +735,7 @@ public final class Emitter {
 
         private void give(final IStmt.Return give) {
             if (give.value() != null) {
-                this.value(give.value(), this.returns);
+                this.copied(give.value(), this.returns);
             }
             this.emit(Opcode.RET);
         }
@@ -720,7 +762,7 @@ public final class Emitter {
                                 final Opcode pushValue) {
             if (field.isStatic()) {
                 this.emit(pushValue);
-                this.emit(Opcode.STSFLD, new IOperand.Field(field.owner().name(), field.name()));
+                this.emit(Opcode.STSFLD, new IOperand.Field(field.owner().qualifiedName(), field.name()));
                 return;
             }
             this.receiver(target);
@@ -729,7 +771,7 @@ public final class Emitter {
         }
 
         private String ownerOf(final IMemberSymbol member) {
-            return member.owner() == this.owner ? null : member.owner().name();
+            return member.owner() == this.owner ? null : member.owner().qualifiedName();
         }
 
         // expressions
@@ -807,7 +849,7 @@ public final class Emitter {
                 return;
             }
             if (member.isStatic()) {
-                this.emit(Opcode.LDSFLD, new IOperand.Field(member.owner().name(), member.name()));
+                this.emit(Opcode.LDSFLD, new IOperand.Field(member.owner().qualifiedName(), member.name()));
                 return;
             }
             if (target == null) {
@@ -831,7 +873,7 @@ public final class Emitter {
         }
 
         private IOperand.Method methodRef(final IMemberSymbol.MethodSymbol method) {
-            return new IOperand.Method(method.owner().name(), method.name(),
+            return new IOperand.Method(method.owner().qualifiedName(), method.name(),
                     writtenParameters(method), method.returnType().describe());
         }
 
@@ -861,7 +903,7 @@ public final class Emitter {
             final NamedType named = Emitter.this.rules.named(target);
             final List<ITypeSymbol> held = Emitter.this.rules.arguments(target);
             final boolean isMap = named == Emitter.this.builtIns.mapType();
-            this.emit(Opcode.CALL, new IOperand.Method(named == null ? "object" : named.name(), "Get",
+            this.emit(Opcode.CALL, new IOperand.Method(named == null ? "object" : named.qualifiedName(), "Get",
                     List.of(isMap ? held.getFirst().describe() : "int"),
                     held.isEmpty() ? "object" : held.getLast().describe()));
         }
@@ -988,7 +1030,7 @@ public final class Emitter {
 
         private void putBack(final IExpr place, final IMemberSymbol.FieldSymbol field) {
             if (field.isStatic()) {
-                this.emit(Opcode.STSFLD, new IOperand.Field(field.owner().name(), field.name()));
+                this.emit(Opcode.STSFLD, new IOperand.Field(field.owner().qualifiedName(), field.name()));
                 return;
             }
             this.emit(Opcode.STFLD, new IOperand.Field(this.ownerOf(field), field.name()));
@@ -1033,17 +1075,47 @@ public final class Emitter {
         private void plus(final IExpr.Binary expression) {
             final ITypeSymbol result = Emitter.this.model.typeOf(expression);
             if (result == Emitter.this.builtIns.stringType()) {
-                final ITypeSymbol left = Emitter.this.model.typeOf(expression.left());
-                final ITypeSymbol right = Emitter.this.model.typeOf(expression.right());
-                this.value(expression.left(), null);
-                this.value(expression.right(), null);
-                this.emit(Opcode.CALL, new IOperand.Method(STRING, "Concat",
-                        List.of(describe(left), describe(right)), STRING));
+                final String left = this.joined(expression.left());
+                final String right = this.joined(expression.right());
+                this.emit(Opcode.CALL, new IOperand.Method(STRING, "Concat", List.of(left, right), STRING));
                 return;
             }
             this.value(expression.left(), result);
             this.value(expression.right(), result);
             this.emit(Opcode.ADD);
+        }
+
+        /**
+         * Pushes a value that is about to be joined to a string, and says what type was pushed.
+         *
+         * <p>An object of a type that says how it reads, with a {@code ToString()} of its own, is asked
+         * for that text here, so a record in a sentence reads as its fields rather than as its type's
+         * name; anything else is joined as it is, and the runtime writes it the way it writes values.
+         */
+        private String joined(final IExpr expression) {
+            final ITypeSymbol type = Emitter.this.model.typeOf(expression);
+            this.value(expression, null);
+            final IMemberSymbol.MethodSymbol reads = readsItself(type);
+            if (reads == null) {
+                return describe(type);
+            }
+            this.emit(Opcode.CALL, this.methodRef(reads));
+            return STRING;
+        }
+
+        /** The {@code ToString()} a type declares for itself, or null when it reads as its name. */
+        private static IMemberSymbol.MethodSymbol readsItself(final ITypeSymbol type) {
+            if (!(type instanceof NamedType named) || named.kind() == NamedType.Kind.ENUM
+                    || named.kind() == NamedType.Kind.DELEGATE || named.isBuiltIn()) {
+                return null;
+            }
+            for (final IMemberSymbol member : named.allMembers()) {
+                if (member instanceof IMemberSymbol.MethodSymbol method && "ToString".equals(method.name())
+                        && method.parameters().isEmpty() && !method.isStatic()) {
+                    return method;
+                }
+            }
+            return null;
         }
 
         private void compare(final IExpr.Binary expression) {
@@ -1137,7 +1209,7 @@ public final class Emitter {
                 if (parameter != null && parameter.outward()) {
                     continue;
                 }
-                this.value(arguments.get(i), parameter == null ? null : parameter.type());
+                this.copied(arguments.get(i), parameter == null ? null : parameter.type());
             }
         }
 
@@ -1162,7 +1234,7 @@ public final class Emitter {
                 } else if (binding instanceof IBinding.Member member
                         && member.member() instanceof IMemberSymbol.FieldSymbol field) {
                     this.emit(field.isStatic() ? Opcode.STSFLD : Opcode.STFLD,
-                            new IOperand.Field(field.isStatic() ? field.owner().name()
+                            new IOperand.Field(field.isStatic() ? field.owner().qualifiedName()
                                     : this.ownerOf(field), field.name()));
                 } else {
                     this.emit(Opcode.POP);
@@ -1220,7 +1292,7 @@ public final class Emitter {
                     this.emit(Opcode.DUP);
                 }
                 this.emit(field.isStatic() ? Opcode.LDSFLD : Opcode.LDFLD,
-                        new IOperand.Field(field.isStatic() ? field.owner().name()
+                        new IOperand.Field(field.isStatic() ? field.owner().qualifiedName()
                                 : this.ownerOf(field), field.name()));
             }
             this.combine(expression, target);
@@ -1241,13 +1313,12 @@ public final class Emitter {
 
         private void combine(final IExpr.Assign expression, final ITypeSymbol target) {
             if (expression.operator() == Operator.ASSIGN) {
-                this.value(expression.value(), target);
+                this.copied(expression.value(), target);
                 return;
             }
             if (target == Emitter.this.builtIns.stringType()) {
-                this.value(expression.value(), null);
-                this.emit(Opcode.CALL, new IOperand.Method(STRING, "Concat",
-                        List.of(STRING, describe(Emitter.this.model.typeOf(expression.value()))), STRING));
+                final String added = this.joined(expression.value());
+                this.emit(Opcode.CALL, new IOperand.Method(STRING, "Concat", List.of(STRING, added), STRING));
                 return;
             }
             this.value(expression.value(), target);
@@ -1273,7 +1344,7 @@ public final class Emitter {
             final NamedType named = Emitter.this.rules.named(target);
             final List<ITypeSymbol> held = Emitter.this.rules.arguments(target);
             final boolean isMap = named == Emitter.this.builtIns.mapType();
-            this.emit(Opcode.CALL, new IOperand.Method(named == null ? "object" : named.name(),
+            this.emit(Opcode.CALL, new IOperand.Method(named == null ? "object" : named.qualifiedName(),
                     isMap ? "Put" : "Set",
                     List.of(isMap ? held.getFirst().describe() : "int",
                             held.isEmpty() ? "object" : held.getLast().describe()), "void"));
@@ -1284,20 +1355,20 @@ public final class Emitter {
          * it rather than pretending an event is a kind of arithmetic.
          */
         private void subscribe(final IExpr.Assign expression, final IMemberSymbol.EventSymbol event) {
-            final String delegate = event.delegateType().name();
+            final String delegate = event.delegateType().qualifiedName();
             if (!event.isStatic()) {
                 this.receiverOf(expression.target());
                 this.emit(Opcode.DUP);
             }
             this.emit(event.isStatic() ? Opcode.LDSFLD : Opcode.LDFLD,
-                    new IOperand.Field(event.isStatic() ? event.owner().name() : this.ownerOf(event),
+                    new IOperand.Field(event.isStatic() ? event.owner().qualifiedName() : this.ownerOf(event),
                             event.name()));
             this.value(expression.value(), event.delegateType());
             this.emit(Opcode.CALL, new IOperand.Method(DELEGATE,
                     expression.operator() == Operator.ADD ? "Combine" : "Remove",
                     List.of(delegate, delegate), delegate));
             this.emit(event.isStatic() ? Opcode.STSFLD : Opcode.STFLD,
-                    new IOperand.Field(event.isStatic() ? event.owner().name() : this.ownerOf(event),
+                    new IOperand.Field(event.isStatic() ? event.owner().qualifiedName() : this.ownerOf(event),
                             event.name()));
         }
 
@@ -1345,7 +1416,7 @@ public final class Emitter {
                 Emitter.this.synthesized.add(made);
                 this.pushThis();
                 this.emit(Opcode.LDFN,
-                        new IOperand.Method(this.owner.name(), name, written, gives.describe()));
+                        new IOperand.Method(this.owner.qualifiedName(), name, written, gives.describe()));
                 return;
             }
             Emitter.this.closureTypes.get(this.closure.type()).addMethod(made);
@@ -1436,7 +1507,7 @@ public final class Emitter {
         final Closure closure = new Closure("0closure" + this.closureCount, fields, holdsThis);
         final AsmType written = new AsmType(AsmType.Kind.CLASS, closure.type());
         if (holdsThis) {
-            written.addField(new AsmType.Field(Closure.OUTER, type.name(), false));
+            written.addField(new AsmType.Field(Closure.OUTER, type.qualifiedName(), false));
         }
         for (final Map.Entry<IBinding.Variable, String> field : fields.entrySet()) {
             written.addField(new AsmType.Field(field.getValue(), field.getKey().type().describe(), false));

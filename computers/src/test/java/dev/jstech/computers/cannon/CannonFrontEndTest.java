@@ -16,8 +16,13 @@ import org.junit.jupiter.api.Test;
 
 class CannonFrontEndTest {
 
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
+
     private static CannonFrontEnd.Result parse(final String source) {
-        return CannonFrontEnd.parse(new SourceFile("Monitor.can", source));
+        return CannonFrontEnd.parse(new SourceFile("Monitor.can", PRELUDE + source));
     }
 
     @Test
