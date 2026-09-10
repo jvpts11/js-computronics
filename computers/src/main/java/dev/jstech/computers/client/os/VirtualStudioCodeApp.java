@@ -86,7 +86,8 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     private final ShellView terminal;
     private final CodeCompletions completions = new CodeCompletions();
     private final CommandPalette palette = new CommandPalette();
-    private final FolderPicker picker;
+    /** The system's file window, for everything the editor opens or saves by choosing on the disk. */
+    private final FileDialog dialog;
 
     /* The small windows a command opens for one thing: a name, a line, a word. */
     private final Popup ask = new Popup(() -> this.askTitle, 150, 44).setLayouter(this::layoutAsk);
@@ -124,14 +125,19 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     private record Link(int x, int y, int width, int height, Runnable action) {
     }
 
-    /** One row of the side panel: a section title, an open editor, or an entry of the folder's tree. */
-    private record SideRow(String label, int depth, DiskFilesPayload.WireFile file, int docIndex, boolean header) {
+    /** One row of the side panel: the folder's name at the top, or an entry of its tree. */
+    private record SideRow(String label, int depth, DiskFilesPayload.WireFile file, boolean header) {
     }
+
+    /** Two clicks on the same row within this open it; one alone only picks it. */
+    private static final long DOUBLE_CLICK_MS = 300L;
+    private int lastSideRow = -1;
+    private long lastSideClickAt;
 
     public VirtualStudioCodeApp(final BlockPos host) {
         this.host = host;
         this.workspace = new CodeWorkspace(host);
-        this.picker = new FolderPicker(host, "Open Folder");
+        this.dialog = new FileDialog(host, this);
         this.explorer = this.root.add(new ListView<>(this::sideRows, ROW_H, this::drawSideRow))
                 .setOnClick(this::onSideRow);
         this.extensions = this.root.add(new ListView<>(() -> JsCore.languages().all(), ROW_H + 2, this::drawLanguage));
@@ -202,6 +208,11 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         return this.terminal.scrollbackText();
     }
 
+    /** The names the suggestion list offers, top to bottom; empty when none is up. */
+    public List<String> completionLabels() {
+        return this.completions.labels();
+    }
+
     /** The folder the window works in, or empty on the Welcome page. */
     public String folder() {
         return this.folderOpen ? this.workspace.folder() : "";
@@ -222,6 +233,22 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         }
         this.workspace.open(path);
         remember(path);
+    }
+
+    /** The folder and the tabs, for the machine to hand back after the game itself was closed. */
+    @Override
+    public String saveState() {
+        return this.folderOpen ? this.workspace.describeOpen()
+                : this.workspace.describeOpen().substring(this.workspace.folder().length());
+    }
+
+    @Override
+    public void restoreState(final String state) {
+        final String folder = CodeWorkspace.folderOf(state);
+        if (!folder.isEmpty()) {
+            openFolder(folder);
+        }
+        this.workspace.reopen(state);
     }
 
     /** Points the window at a folder: from then on everything means that folder. */
@@ -264,20 +291,19 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         return slash >= 0 && slash < path.length() - 1 ? path.substring(slash + 1) : path;
     }
 
+    /**
+     * The side panel is the folder: its name, then its tree. The tabs already say what is open, so
+     * the panel does not say it again above the folder.
+     */
     private List<SideRow> sideRows() {
         final List<SideRow> out = new ArrayList<>();
-        out.add(new SideRow("OPEN EDITORS", 0, null, -1, true));
-        final List<CodeWorkspace.Doc> docs = this.workspace.docs();
-        for (int i = 0; i < docs.size(); i++) {
-            out.add(new SideRow(docs.get(i).name() + (docs.get(i).dirty() ? " *" : ""), 1, null, i, false));
-        }
         final String folder = this.workspace.folder();
         out.add(new SideRow(folder.isEmpty() ? "C:\\" : shortName(folder).toUpperCase(java.util.Locale.ROOT),
-                0, null, -1, true));
+                0, null, true));
         for (final CodeWorkspace.TreeRow row : this.workspace.tree()) {
             final String mark = row.file().directory()
                     ? (this.workspace.isExpanded(row.file().path()) ? "v " : "> ") : "";
-            out.add(new SideRow(mark + shortName(row.file().path()), row.depth() + 1, row.file(), -1, false));
+            out.add(new SideRow(mark + shortName(row.file().path()), row.depth() + 1, row.file(), false));
         }
         return out;
     }
@@ -299,27 +325,52 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                 color, false);
     }
 
+    /**
+     * A click on a row of the tree picks it; a second click on the same row straight after opens it, a
+     * file onto a tab and a folder out into its contents. One click opening things was one click too
+     * few: a look at a row is not a wish to open it.
+     */
     private void onSideRow(final int index, final int button, final double mx, final double my) {
         final List<SideRow> rows = sideRows();
         if (index < 0 || index >= rows.size()) {
+            this.lastSideRow = -1;
             return;
         }
+        final long now = System.currentTimeMillis();
+        final boolean doubleClick = index == this.lastSideRow && now - this.lastSideClickAt < DOUBLE_CLICK_MS;
+        this.lastSideRow = index;
+        this.lastSideClickAt = now;
         final SideRow row = rows.get(index);
-        if (row.header()) {
+        if (!doubleClick || row.header() || row.file() == null) {
             return;
         }
-        if (row.docIndex() >= 0) {
-            this.workspace.setCurrent(row.docIndex());
-            return;
-        }
-        if (row.file() == null) {
-            return;
-        }
+        this.lastSideRow = -1;
         if (row.file().directory()) {
             this.workspace.toggleFolder(row.file().path());
         } else {
             this.workspace.open(row.file().path());
         }
+    }
+
+    /** The labels of the side panel's rows, top to bottom, so a test can find one. */
+    public List<String> sideLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final SideRow row : sideRows()) {
+            out.add(row.label());
+        }
+        return out;
+    }
+
+    /** The middle of the side panel's row with that label, or null when there is none. */
+    public int[] sideRowPoint(final String label) {
+        final int index = sideLabels().indexOf(label);
+        return index < 0 ? null : this.explorer.rowCenter(index);
+    }
+
+    /** A point on the empty end of the tab strip, past the last tab, or null when the strip is not up. */
+    public int[] tabStripEnd() {
+        return this.tabs.visible()
+                ? new int[] {this.tabs.x() + this.tabs.width() - 3, this.tabs.y() + TAB_H / 2} : null;
     }
 
     private void drawLanguage(final GuiGraphics g, final UiContext ctx, final IProgrammingLanguage language,
@@ -383,8 +434,7 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     private List<ContextMenu.Item> editMenu() {
         return List.of(
                 item("Find...", hasDoc(), this::find),
-                item("Toggle Line Comment", hasDoc(), this::toggleComment),
-                item("Implement Interface", hasDoc(), this::implementInterface));
+                item("Toggle Line Comment", hasDoc(), this::toggleComment));
     }
 
     private List<ContextMenu.Item> viewMenu() {
@@ -395,7 +445,60 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
                 item("Extensions", true, () -> this.side = Side.EXTENSIONS),
                 ContextMenu.Item.separator(),
                 item("Problems", true, () -> this.panelTabs.setSelected(PANEL_PROBLEMS)),
-                item("Terminal", true, () -> this.panelTabs.setSelected(PANEL_TERMINAL)));
+                item("Terminal", true, () -> this.panelTabs.setSelected(PANEL_TERMINAL)),
+                ContextMenu.Item.separator(),
+                ContextMenu.Item.submenu("Appearance", List.of(
+                        item("Zoom In", hasDoc(), () -> zoomEditor(1)),
+                        item("Zoom Out", hasDoc(), () -> zoomEditor(-1)),
+                        item("Reset Zoom", hasDoc(), () -> setEditorScale(1.0f)))));
+    }
+
+    /** The menu the right button opens on the code: the clipboard, then what can be done to the code. */
+    private List<ContextMenu.Item> editorMenu() {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        final boolean selected = doc != null && doc.area().document().hasSelection();
+        return List.of(
+                item("Cut", selected, () -> pressInEditor(GLFW.GLFW_KEY_X)),
+                item("Copy", hasDoc(), () -> pressInEditor(GLFW.GLFW_KEY_C)),
+                item("Paste", hasDoc(), () -> pressInEditor(GLFW.GLFW_KEY_V)),
+                ContextMenu.Item.separator(),
+                item("Toggle Line Comment", hasDoc(), this::toggleComment),
+                ContextMenu.Item.submenu("Refactor", List.of(
+                        item("Implement Interface", hasDoc(), this::implementInterface))),
+                ContextMenu.Item.separator(),
+                item("Command Palette...", true, this::openPalette));
+    }
+
+    /** Sends a Ctrl key to the code area, which is where the clipboard commands live. */
+    private void pressInEditor(final int key) {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null) {
+            doc.area().keyPressed(key, 0, GLFW.GLFW_MOD_CONTROL);
+        }
+    }
+
+    /** The size the code is drawn at, shared by every open file. */
+    private float editorScale = 1.0f;
+
+    private void zoomEditor(final int steps) {
+        setEditorScale(this.editorScale + steps * 0.25f);
+    }
+
+    private void setEditorScale(final float value) {
+        this.editorScale = Math.max(0.75f, Math.min(2.0f, value));
+        for (final CodeWorkspace.Doc doc : this.workspace.docs()) {
+            doc.area().setScale(this.editorScale);
+        }
+    }
+
+    /** The menu the right button opens on the code. */
+    private final ContextMenu editorContext = new ContextMenu(110, 11);
+
+    /** Escape closes whatever menu or window is up before it means anything to the desktop. */
+    @Override
+    public boolean wantsEscape() {
+        return this.editorContext.isOpen() || this.menuBar.isOpen() || this.palette.isOpen()
+                || this.ask.isOpen() || this.settings.isOpen() || this.askClose.isOpen();
     }
 
     private List<ContextMenu.Item> goMenu() {
@@ -471,7 +574,13 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     }
 
     private void pickFolder() {
-        this.picker.open(this.folderOpen ? this.workspace.folder() : CodeWorkspace.HOME, this::openFolder);
+        this.dialog.openFolder("Open Folder", this.folderOpen ? this.workspace.folder() : CodeWorkspace.HOME,
+                this::openFolder);
+    }
+
+    /** The system's file window this editor opens, for a test to drive. */
+    public FileDialog dialog() {
+        return this.dialog;
     }
 
     private void closeFolder() {
@@ -493,7 +602,8 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     }
 
     private void openFileByName() {
-        goToFile();
+        this.dialog.openFile("Open File", this.folderOpen ? this.workspace.folder() : CodeWorkspace.HOME,
+                FileDialog.Filter.sources(), this::openFile);
     }
 
     private void goToLine() {
@@ -550,12 +660,8 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         if (doc == null) {
             return;
         }
-        ask("Save As", doc.name(), name -> {
-            if (!name.isEmpty()) {
-                final String folder = this.workspace.folder();
-                this.workspace.saveAs(folder.isEmpty() ? name : folder + "/" + name);
-            }
-        });
+        this.dialog.saveAs("Save As", this.workspace.folder(), doc.name(), FileDialog.Filter.sources(),
+                this.workspace::saveAs);
     }
 
     private void openSettings() {
@@ -738,7 +844,7 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     public void onClosed() {
         this.workspace.release();
         this.terminal.release();
-        this.picker.release();
+        this.dialog.release();
     }
 
     @Override
@@ -758,15 +864,18 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         // The dividers hold their places between frames, within what the window can afford.
         this.sideW = Math.max(50, Math.min(width - RAIL_W - 100, this.sideW));
         final int sideW = sideShown ? this.sideW : 0;
+        // The folder's tree needs no caption over it, its own name being its first row; the extensions do.
+        final boolean captioned = this.side == Side.EXTENSIONS;
         if (sideShown) {
             this.skin.panel(g, x + RAIL_W, top, sideW, bodyTotal);
-            g.drawString(font, this.side == Side.EXTENSIONS ? "EXTENSIONS" : "EXPLORER", x + RAIL_W + 4, top + 1,
-                    this.skin.dim(), false);
+            if (captioned) {
+                g.drawString(font, "EXTENSIONS", x + RAIL_W + 4, top + 1, this.skin.dim(), false);
+            }
         }
         // A list that is not on show is hidden outright: one with no room still has rows to draw.
         this.explorer.setVisible(sideShown && this.side != Side.EXTENSIONS);
         this.extensions.setVisible(sideShown && this.side == Side.EXTENSIONS);
-        this.explorer.setBounds(x + RAIL_W, top + CAPTION_H, sideW, bodyTotal - CAPTION_H);
+        this.explorer.setBounds(x + RAIL_W, top, sideW, bodyTotal);
         this.extensions.setBounds(x + RAIL_W, top + CAPTION_H, sideW, bodyTotal - CAPTION_H);
         this.dividerX = sideShown ? x + RAIL_W + sideW : -1000;
         this.bodyTop = top;
@@ -808,7 +917,6 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         // Whatever floats belongs over everything the window drew, the menus last of all.
         this.completions.render(g, ctx);
         this.palette.render(g, ctx, x, top, width);
-        this.picker.render(g, ctx, x, y, width, height);
         if (this.ask.isOpen()) {
             this.ask.renderIn(g, ctx, x, y, width, height);
         }
@@ -818,6 +926,7 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
         if (this.askClose.isOpen()) {
             this.askClose.renderIn(g, ctx, x, y, width, height);
         }
+        this.editorContext.render(g, ctx);
         this.menuBar.render(g, ctx);
     }
 
@@ -962,14 +1071,25 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
 
     /* Input */
 
+    /*
+     * The file window is not counted here: it is a window of its own, in front of this one, and the
+     * desktop keeps this window from taking anything while it is up.
+     */
     private boolean popupOpen() {
-        return this.picker.isOpen() || this.ask.isOpen() || this.settings.isOpen() || this.askClose.isOpen();
+        return this.ask.isOpen() || this.settings.isOpen() || this.askClose.isOpen();
     }
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
-        if (this.picker.isOpen()) {
-            this.picker.mouseClicked(mouseX, mouseY, button);
+        if (this.editorContext.isOpen()) {
+            this.editorContext.mouseClicked(mouseX, mouseY, button);
+            return;
+        }
+        final CodeWorkspace.Doc onCode = this.workspace.current();
+        final boolean modal = this.ask.isOpen() || this.settings.isOpen() || this.askClose.isOpen() || this.palette.isOpen();
+        if (button == 1 && onCode != null && !modal && onCode.area().contains(mouseX, mouseY)) {
+            this.editorContext.open(editorMenu(), (int) mouseX, (int) mouseY, window.x(), window.y(),
+                    window.width(), window.height());
             return;
         }
         if (this.ask.isOpen()) {
@@ -1064,9 +1184,6 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
 
     @Override
     public boolean charTyped(final char c) {
-        if (this.picker.isOpen()) {
-            return this.picker.charTyped(c);
-        }
         if (this.ask.isOpen()) {
             return this.ask.charTyped(c);
         }
@@ -1097,8 +1214,8 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
         final boolean ctrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
         final boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
-        if (this.picker.isOpen()) {
-            return this.picker.keyPressed(key, scanCode, modifiers);
+        if (this.editorContext.isOpen()) {
+            return this.editorContext.keyPressed(key, scanCode, modifiers);
         }
         if (this.ask.isOpen()) {
             return this.ask.keyPressed(key, scanCode, modifiers);
@@ -1194,7 +1311,8 @@ public final class VirtualStudioCodeApp implements IDesktopApp {
 
     private void offerCompletions(final CodeWorkspace.Doc doc) {
         final CodeArea area = doc.area();
-        this.completions.offer(area, doc.path(), new int[] {area.x(), area.y(), area.width(), area.height()});
+        this.completions.offer(area, doc.path(), this.workspace.siblingsOf(doc),
+                new int[] {area.x(), area.y(), area.width(), area.height()});
     }
 
     @Override

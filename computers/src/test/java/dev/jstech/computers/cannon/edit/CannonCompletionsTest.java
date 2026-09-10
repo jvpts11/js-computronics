@@ -9,6 +9,7 @@ package dev.jstech.computers.cannon.edit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.jstech.computers.cannon.CannonSemantics;
@@ -22,6 +23,11 @@ import org.junit.jupiter.api.Test;
 class CannonCompletionsTest {
 
     private BuiltIns builtIns;
+
+    /** What every file starts with, on one line so the sources keep their line numbers. */
+    private static final String PRELUDE = "using System.*; using System.IO.*; using System.Collections.*; "
+            + "using System.Utils.*; using System.Machine.*; using System.Network.*; using System.Operations.*; "
+            + "namespace Tests; ";
 
     @BeforeEach
     void setUp() {
@@ -93,7 +99,7 @@ class CannonCompletionsTest {
 
     @Test
     void members_readsTheProgramsOwnTypes() {
-        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", """
+        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", PRELUDE + """
                 class Monitor : IScript {
                     private int floor = 512;
                     public void OnInit() { }
@@ -108,7 +114,7 @@ class CannonCompletionsTest {
 
     @Test
     void members_reachesWhatAProgramsTypeInheritsFromWhatItImplements() {
-        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", """
+        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", PRELUDE + """
                 class Monitor : IScript {
                     public void OnInit() { }
                     public void OnTick() { }
@@ -125,12 +131,12 @@ class CannonCompletionsTest {
     }
 
     @Test
-    void types_keepsTheLanguagesOwnWhenAProgramTriesToTakeItsName() {
+    void types_offersAProgramsOwnTypeOnceWhenItIsNamedAfterOneOfTheLanguages() {
         /*
-         * The checker refuses a type named after one the language brings, so the name never reaches the
-         * model and the list must still offer exactly one Console: the language's.
+         * A program may call a type Console in its own namespace, and then that is the Console its
+         * names reach: the list offers exactly one, the program's, and not the language's beside it.
          */
-        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", """
+        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", PRELUDE + """
                 class Console {
                     public int Value;
                 }
@@ -142,12 +148,12 @@ class CannonCompletionsTest {
                 """))).model();
         final List<CannonCompletions.Item> items = CannonCompletions.types(this.builtIns, model, "Console");
         assertEquals(1, items.size());
-        assertEquals("Cannon", items.get(0).owner());
+        assertEquals("this program", items.get(0).owner());
     }
 
     @Test
     void types_listsTheProgramsOwnTypesBesideTheLanguages() {
-        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", """
+        final SemanticModel model = CannonSemantics.check(List.of(new SourceFile("Monitor.can", PRELUDE + """
                 class Monitor : IScript {
                     public void OnInit() { }
                     public void OnTick() { }
@@ -165,5 +171,176 @@ class CannonCompletionsTest {
         final List<String> found = labels(CannonCompletions.types(this.builtIns, null, ""));
         final List<String> sorted = found.stream().sorted().toList();
         assertEquals(sorted, found);
+    }
+
+    /* A program the way an editor sees it: the line the caret is on is broken. */
+
+    private static final String FARM = PRELUDE + """
+            class Counter {
+                public int Count;
+                public void Bump() { this.Count = this.Count + 1; }
+            }
+            class Farm : IScript {
+                private Counter counter = new Counter();
+                public void OnInit() {
+                    int total = 0;
+                    counter.
+                }
+                public void OnTick() { string name = "x"; }
+                public void OnDestroy() { }
+            }
+            """;
+
+    /** The line the broken statement is on, counting from one, with the prelude on the first line. */
+    private static final int BROKEN_LINE = 9;
+
+    private record Read(SemanticModel model, CannonCompletions.Scope scope) {
+    }
+
+    /** Checks one file the way an editor does and finds the scope at {@code line}, counting from one. */
+    private static Read readAt(final String text, final int line) {
+        final CannonSemantics.Result result =
+                CannonSemantics.checkTolerant(List.of(new SourceFile("Farm.can", text)));
+        return new Read(result.model(),
+                CannonCompletions.scopeAt(result.model(), result.unit("Farm.can"), "Farm.can", line));
+    }
+
+    private static List<String> names(final CannonCompletions.Scope scope) {
+        return scope.variables().stream().map(v -> v.name()).toList();
+    }
+
+    @Test
+    void scopeAt_findsTheTypeAroundTheCaretAndTheLocalsAboveItEvenWhenTheLineIsBroken() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        assertEquals("Farm", read.scope().enclosing().name());
+        assertTrue(names(read.scope()).contains("total"));
+        assertFalse(names(read.scope()).contains("name"), "a local of another method is out of reach");
+    }
+
+    @Test
+    void scopeAt_doesNotSeeALocalDeclaredBelowTheCaret() {
+        assertFalse(names(readAt(FARM, 7).scope()).contains("total"));
+    }
+
+    @Test
+    void scopeAt_isNowhereOutsideEveryType() {
+        final Read read = readAt(PRELUDE + "\n\nclass Farm { }", 2);
+        assertEquals(CannonCompletions.Scope.NONE, read.scope());
+    }
+
+    @Test
+    void resolve_readsAFieldOfTheTypeAroundTheCaretAndListsWhatItsTypeHas() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        final CannonCompletions.Target target =
+                CannonCompletions.resolve(this.builtIns, read.model(), read.scope(), List.of("counter"));
+        assertEquals("Tests.Counter", target.type().describe());
+        assertFalse(target.staticSide());
+        assertEquals(List.of("Bump", "Count"), labels(CannonCompletions.members(target, "")));
+    }
+
+    @Test
+    void resolve_readsALocalAboveTheCaret() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        final CannonCompletions.Target target =
+                CannonCompletions.resolve(this.builtIns, read.model(), read.scope(), List.of("total"));
+        assertEquals("int", target.type().describe());
+    }
+
+    @Test
+    void resolve_readsThisAndThenAChainThroughIt() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        assertEquals("Tests.Farm", CannonCompletions.resolve(this.builtIns, read.model(), read.scope(),
+                List.of("this")).type().describe());
+        assertEquals("Tests.Counter", CannonCompletions.resolve(this.builtIns, read.model(), read.scope(),
+                List.of("this", "counter")).type().describe());
+    }
+
+    @Test
+    void resolve_readsATypeOnItsStaticSide() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        final CannonCompletions.Target target =
+                CannonCompletions.resolve(this.builtIns, read.model(), read.scope(), List.of("Network"));
+        assertTrue(target.staticSide());
+        assertTrue(labels(CannonCompletions.members(target, "Watch")).contains("Watch"));
+    }
+
+    @Test
+    void resolve_givesNothingForANameThatMeansNothing() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        assertNull(CannonCompletions.resolve(this.builtIns, read.model(), read.scope(), List.of("nowhere")));
+        assertNull(CannonCompletions.resolve(this.builtIns, read.model(), read.scope(),
+                List.of("counter", "nowhere")));
+        assertNull(CannonCompletions.resolve(this.builtIns, read.model(), read.scope(), List.of()));
+    }
+
+    @Test
+    void resolve_worksWithoutAScopeForATypeName() {
+        final CannonCompletions.Target target = CannonCompletions.resolve(this.builtIns, null,
+                CannonCompletions.Scope.NONE, List.of("Network"));
+        assertEquals("Network", target.type().describe());
+    }
+
+    @Test
+    void names_offersTheVariablesInReachFirstAndThenTheTypesOwnMembers() {
+        final Read read = readAt(FARM, BROKEN_LINE);
+        final List<CannonCompletions.Item> items =
+                CannonCompletions.names(this.builtIns, read.model(), read.scope(), "");
+        assertEquals("total", items.get(0).label());
+        assertEquals(CannonCompletions.Sort.VARIABLE, items.get(0).sort());
+        assertEquals(List.of("OnDestroy", "OnInit", "OnTick"),
+                labels(CannonCompletions.names(this.builtIns, read.model(), read.scope(), "On")));
+        assertEquals("Farm", named(items, "counter").owner());
+    }
+
+    @Test
+    void names_stillOffersTheTypesWhenThereIsNoScope() {
+        final List<String> found =
+                labels(CannonCompletions.names(this.builtIns, null, CannonCompletions.Scope.NONE, "Net"));
+        assertEquals(List.of("Network"), found);
+    }
+
+    @Test
+    void scopeAt_descendsIntoATypeNestedInAnother() {
+        final String text = PRELUDE + """
+                class Outer {
+                    public int Width;
+                    class Inner {
+                        public int Depth;
+                        public void Go() {
+                            int d = 1;
+                            Depth.
+                        }
+                    }
+                }
+                """;
+        final Read read = readAt(text, 7);
+        assertEquals("Inner", read.scope().enclosing().name());
+        assertTrue(names(read.scope()).contains("d"));
+        assertEquals("int", CannonCompletions.resolve(this.builtIns, read.model(), read.scope(),
+                List.of("Depth")).type().describe());
+    }
+
+    @Test
+    void resolve_readsATypeDeclaredInAnotherFileOfTheProgram() {
+        final CannonSemantics.Result result = CannonSemantics.checkTolerant(List.of(
+                new SourceFile("Farm.can", PRELUDE + """
+                        class Farm : IScript {
+                            private Silo silo = new Silo();
+                            public void OnInit() { silo. }
+                            public void OnTick() { }
+                            public void OnDestroy() { }
+                        }
+                        """),
+                new SourceFile("Silo.can", PRELUDE + """
+                        class Silo {
+                            public long Stored;
+                            public void Fill(long amount) { this.Stored = this.Stored + amount; }
+                        }
+                        """)));
+        final CannonCompletions.Scope scope =
+                CannonCompletions.scopeAt(result.model(), result.unit("Farm.can"), "Farm.can", 3);
+        final CannonCompletions.Target target =
+                CannonCompletions.resolve(this.builtIns, result.model(), scope, List.of("silo"));
+        assertEquals(List.of("Fill", "Stored"), labels(CannonCompletions.members(target, "")));
     }
 }

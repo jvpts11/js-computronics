@@ -91,6 +91,32 @@ public final class ShellApp implements IDesktopApp {
         }
     }
 
+    /** Whether an editor has taken the terminal over, which is what a test waits for after typing vim. */
+    public boolean editing() {
+        return this.view.editing();
+    }
+
+    /** The prompt as it stands, which says where the terminal is. */
+    public String prompt() {
+        return this.view.prompt();
+    }
+
+    /** The text of the file the editor holding the terminal has, or empty. */
+    public String editorText() {
+        return this.view.editorText();
+    }
+
+    /** What the editor's second buffer shows (what the compiler said), or empty. */
+    public String editorLowerText() {
+        return this.view.editorLowerText();
+    }
+
+    /** An editor that has the terminal uses Escape for its own modes, so it must not close the desktop. */
+    @Override
+    public boolean wantsEscape() {
+        return this.view.editing();
+    }
+
     /** Everything the terminal has printed so far, one line after another. */
     public String scrollbackText() {
         return this.view.scrollbackText();

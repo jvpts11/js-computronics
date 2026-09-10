@@ -89,6 +89,16 @@ public record ProjectFile(String name, Kind kind, String language, List<String> 
         return new ProjectFile(this.name, this.kind, this.language, more, this.references, this.entry);
     }
 
+    /** The project without that source, or the same one when it was not there. */
+    public ProjectFile withoutSource(final String source) {
+        if (!this.sources.contains(source)) {
+            return this;
+        }
+        final List<String> fewer = new ArrayList<>(this.sources);
+        fewer.remove(source);
+        return new ProjectFile(this.name, this.kind, this.language, fewer, this.references, this.entry);
+    }
+
     /** The project with one more reference, or the same one when it is already there. */
     public ProjectFile withReference(final String reference) {
         if (this.references.contains(reference) || reference.equals(this.name)) {

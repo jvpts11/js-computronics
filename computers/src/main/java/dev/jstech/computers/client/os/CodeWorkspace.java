@@ -245,6 +245,53 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
         PacketDistributor.sendToServer(new RequestFileContentPayload(this.host, path));
     }
 
+    /** The files still to open, one after the other, and the one to end on. */
+    private final java.util.ArrayDeque<String> toOpen = new java.util.ArrayDeque<>();
+    private String endOn = "";
+
+    /**
+     * Opens several files, ending on {@code current}, or on the last when it names none of them.
+     *
+     * <p>The machine answers one request for a file at a time, so the files are asked for one after
+     * the other: the next goes out when the one before has arrived. A file that is no longer on the
+     * disk comes back empty, as a new one, which is the most a window can do about it.
+     */
+    public void openAll(final List<String> paths, final String current) {
+        this.toOpen.clear();
+        this.toOpen.addAll(paths);
+        this.endOn = current == null ? "" : current;
+        openNext();
+    }
+
+    private void openNext() {
+        while (true) {
+            final String next = this.toOpen.pollFirst();
+            if (next == null) {
+                break;
+            }
+            final int at = indexOf(next);
+            if (at < 0) {
+                open(next);
+                return;
+            }
+            this.current = at;
+        }
+        final int end = indexOf(this.endOn);
+        if (end >= 0) {
+            this.current = end;
+        }
+        this.endOn = "";
+    }
+
+    private int indexOf(final String path) {
+        for (int i = 0; i < this.docs.size(); i++) {
+            if (this.docs.get(i).path.equals(path)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     @Override
     public void onContent(final String path, final String content, final boolean exists) {
         final Doc doc = new Doc(path);
@@ -254,7 +301,49 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
         this.docs.add(doc);
         this.current = this.docs.size() - 1;
         recompile(doc);
+        ensureSurveyed(dirOf(path));
         this.status = exists ? "Opened " + doc.name() : "New file " + doc.name();
+        if (!this.toOpen.isEmpty() || !this.endOn.isEmpty()) {
+            openNext();
+        }
+    }
+
+    /**
+     * What is open here, as a window remembers it for the machine: the folder, then every file on a
+     * tab, then the one in front, a line each.
+     */
+    public String describeOpen() {
+        final StringBuilder out = new StringBuilder(this.folder);
+        for (final Doc doc : this.docs) {
+            out.append('\n').append(doc.path);
+        }
+        final Doc current = current();
+        return out.append('\n').append(current == null ? "" : current.path).toString();
+    }
+
+    /**
+     * Reads what {@link #describeOpen} wrote: the files go on tabs again, one after the other, and the
+     * one that was in front ends in front. The folder is the caller's to set, since each editor treats
+     * its folder differently.
+     */
+    public void reopen(final String described) {
+        final String[] lines = described.split("\n", -1);
+        if (lines.length < 3) {
+            return;
+        }
+        final List<String> paths = new ArrayList<>();
+        for (int i = 1; i < lines.length - 1; i++) {
+            if (!lines[i].isEmpty()) {
+                paths.add(lines[i]);
+            }
+        }
+        openAll(paths, lines[lines.length - 1]);
+    }
+
+    /** The first line of what {@link #describeOpen} wrote: the folder it was on. */
+    public static String folderOf(final String described) {
+        final int end = described.indexOf('\n');
+        return end < 0 ? described : described.substring(0, end);
     }
 
     /** Puts the file being edited back on the disk. */
@@ -275,6 +364,11 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
         final Doc doc = current();
         if (ok && doc != null) {
             doc.dirty = false;
+            // A save can be a file the folder did not have; the list and the survey read the disk again.
+            refresh();
+            if (this.surveyed.contains(dirOf(doc.path))) {
+                surveyFolder(dirOf(doc.path));
+            }
         }
     }
 
@@ -427,13 +521,90 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
             doc.area.setMarks(List.of());
             return;
         }
-        doc.complaints = language.compile(
-                List.of(new IProgrammingLanguage.SourceText(doc.name(), doc.area.text()))).complaints();
+        /*
+         * The file is read together with the others in its folder, the way the build reads them, so a
+         * class that extends one written in the file beside it is not told that class does not exist.
+         * Only what is said about this file goes in its margin; the others have margins of their own.
+         */
+        final List<IProgrammingLanguage.SourceText> sources = new ArrayList<>();
+        sources.add(new IProgrammingLanguage.SourceText(doc.name(), doc.area.text()));
+        sources.addAll(siblingsOf(doc, language));
+        final List<IProgrammingLanguage.Complaint> all = language.compile(sources).complaints();
+        final List<IProgrammingLanguage.Complaint> mine = new ArrayList<>();
+        for (final IProgrammingLanguage.Complaint complaint : all) {
+            if (complaint.file().isEmpty() || complaint.file().equals(doc.name())) {
+                mine.add(complaint);
+            }
+        }
+        doc.complaints = mine;
         final List<CodeArea.Mark> marks = new ArrayList<>(doc.complaints.size());
         for (final IProgrammingLanguage.Complaint complaint : doc.complaints) {
             marks.add(markOf(doc, complaint));
         }
         doc.area.setMarks(marks);
+    }
+
+    /** The text of every file on the disk the surveys have read, by path, for compiling beside an open one. */
+    private final java.util.Map<String, String> folderTexts = new java.util.LinkedHashMap<>();
+    /** The folders whose files have been asked for, so a folder is read once and not on every keystroke. */
+    private final java.util.Set<String> surveyed = new java.util.HashSet<>();
+
+    /**
+     * The other sources in {@code doc}'s folder that its language reads, for an editor asking what the
+     * program around a file declares; empty when the file is in no language the machine knows.
+     */
+    public List<IProgrammingLanguage.SourceText> siblingsOf(final Doc doc) {
+        final IProgrammingLanguage language = sourceLanguageOf(doc.path);
+        return language == null ? List.of() : this.siblingsOf(doc, language);
+    }
+
+    /**
+     * The other sources in {@code doc}'s folder: an open one as it stands in its editor, any other as the
+     * disk had it when the folder was last read.
+     */
+    private List<IProgrammingLanguage.SourceText> siblingsOf(final Doc doc, final IProgrammingLanguage language) {
+        final String dir = dirOf(doc.path);
+        final List<IProgrammingLanguage.SourceText> out = new ArrayList<>();
+        final java.util.Set<String> seen = new java.util.HashSet<>();
+        seen.add(doc.path);
+        for (final Doc other : this.docs) {
+            if (other != doc && dirOf(other.path).equals(dir) && sourceLanguageOf(other.path) == language
+                    && seen.add(other.path)) {
+                out.add(new IProgrammingLanguage.SourceText(other.name(), other.area.text()));
+            }
+        }
+        for (final java.util.Map.Entry<String, String> entry : this.folderTexts.entrySet()) {
+            if (dirOf(entry.getKey()).equals(dir) && sourceLanguageOf(entry.getKey()) == language
+                    && seen.add(entry.getKey())) {
+                out.add(new IProgrammingLanguage.SourceText(ProblemReport.nameOf(entry.getKey()), entry.getValue()));
+            }
+        }
+        return out;
+    }
+
+    private static String dirOf(final String path) {
+        final int slash = path.lastIndexOf('/');
+        return slash >= 0 ? path.substring(0, slash) : "";
+    }
+
+    /** Reads a folder's sources once, so the file opened from it can be compiled beside them. */
+    public void ensureSurveyed(final String dir) {
+        if (this.surveyed.add(dir)) {
+            surveyFolder(dir);
+        }
+    }
+
+    /**
+     * The text of the source at {@code path} as the player sees it: the open copy when there is one,
+     * else what the disk had when its folder was last read, else null when nothing has read it yet.
+     */
+    public String textOf(final String path) {
+        for (final Doc doc : this.docs) {
+            if (doc.path.equals(path)) {
+                return doc.area.text();
+            }
+        }
+        return this.folderTexts.get(path);
     }
 
     /** What the compiler says when a class leaves an interface's method out, with the three names in it. */
@@ -600,12 +771,22 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
     private final java.util.Map<String, List<IProgrammingLanguage.Complaint>> folderComplaints =
             new java.util.LinkedHashMap<>();
 
-    /** Asks the machine for every program at once, to compile the lot. */
+    /** Whether the next survey's outcome is announced in the status, as a survey somebody asked for is. */
+    private boolean announceSurvey;
+
+    /** Asks the machine for every program at once, to compile the lot and say how many are broken. */
     public void surveyFolder() {
-        CodeFileReplies.expectFolder(this, this.folder);
+        this.announceSurvey = true;
+        surveyFolder(this.folder);
+    }
+
+    /** Asks the machine for every program in {@code dir} at once. */
+    public void surveyFolder(final String dir) {
+        this.surveyed.add(dir);
+        CodeFileReplies.expectFolder(this, dir);
         PacketDistributor.sendToServer(
                 new dev.jstech.computers.operation.payload.RequestFolderContentPayload(
-                        this.host, this.folder, ".can"));
+                        this.host, dir, ".can"));
     }
 
     /** Saves the file being edited under another name, which then becomes the one being edited. */
@@ -665,6 +846,16 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
     @Override
     public void onFolder(final dev.jstech.computers.operation.payload.FolderContentPayload folder) {
         this.folderComplaints.clear();
+        this.folderTexts.keySet().removeIf(path -> dirOf(path).equals(folder.dir()));
+        for (final var file : folder.files()) {
+            this.folderTexts.put(file.path(), file.text());
+        }
+        // What is open is read again beside what just arrived, so its margin agrees with the disk.
+        for (final Doc doc : this.docs) {
+            if (dirOf(doc.path).equals(folder.dir())) {
+                recompile(doc);
+            }
+        }
         for (final var file : folder.files()) {
             final IProgrammingLanguage language = languageOf(file.path());
             if (language == null) {
@@ -678,8 +869,11 @@ public final class CodeWorkspace implements CodeFileReplies.IReader {
                     List.of(new IProgrammingLanguage.SourceText(
                             ProblemReport.nameOf(file.path()), file.text()))).complaints());
         }
-        this.status = ProblemReport.brokenFiles(this.folderComplaints) + " of "
-                + folder.files().size() + " program(s) with problems";
+        if (this.announceSurvey) {
+            this.announceSurvey = false;
+            this.status = ProblemReport.brokenFiles(this.folderComplaints) + " of "
+                    + folder.files().size() + " program(s) with problems";
+        }
     }
 
     /** Every complaint from every program on the disk, worst file first. */

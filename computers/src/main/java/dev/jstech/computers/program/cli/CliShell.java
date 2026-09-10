@@ -97,8 +97,14 @@ public final class CliShell {
          * A command that gives the terminal away says so by being one; which file is the argument it
          * was just run with, which the shell already has, so nothing has to be remembered anywhere.
          */
+        /*
+         * The file is named the way the player typed it, against the folder the prompt is in; the
+         * terminal that draws the editor asks the machine for it by its whole path, since it knows
+         * nothing about where the prompt stands.
+         */
         final CliShell.HandOver handOver = command instanceof IHandOver && !args.isEmpty()
-                ? new HandOver(command.name(), args.getFirst())
+                ? new HandOver(command.name(),
+                        DosPath.resolve(computer.currentLocation(), args.getFirst()).storagePath())
                 : null;
         return new Response(out.lines(), clear, handOver);
     }

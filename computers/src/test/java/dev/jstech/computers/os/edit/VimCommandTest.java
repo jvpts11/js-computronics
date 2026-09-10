@@ -102,6 +102,16 @@ class VimCommandTest {
     }
 
     @Test
+    void of_readsABareNumberAsALineToGoTo() {
+        assertEquals(12, VimCommand.of("12").goTo());
+        assertTrue(VimCommand.of("12").ok());
+        assertFalse(VimCommand.of("12").quit());
+        assertEquals(1, VimCommand.of("0").goTo(), "there is no line zero, so the first is meant");
+        assertEquals(0, VimCommand.of("wq").goTo());
+        assertFalse(VimCommand.of("12x").ok(), "a number with letters after it is not a line");
+    }
+
+    @Test
     void unknown_namesWhatWasTyped() {
         assertEquals("E492: not an editor command: zz", VimCommand.unknown("zz").error());
     }

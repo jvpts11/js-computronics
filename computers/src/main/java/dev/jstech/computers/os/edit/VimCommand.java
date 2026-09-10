@@ -14,12 +14,14 @@ package dev.jstech.computers.os.edit;
  * things, {@code :q!} means one thing and {@code :q} another, and a line that means nothing has to say
  * so rather than quietly doing half of it. So it is read here, on its own, where every one of those can
  * be written down as a case.
+ *
+ * @param goTo the line asked for by a bare number, counted from one, or zero when none was
  */
-public record VimCommand(boolean write, boolean quit, boolean force, String error) {
+public record VimCommand(boolean write, boolean quit, boolean force, int goTo, String error) {
 
     /** A line that asked for nothing anybody knows. */
     public static VimCommand unknown(final String typed) {
-        return new VimCommand(false, false, false, "E492: not an editor command: " + typed);
+        return new VimCommand(false, false, false, 0, "E492: not an editor command: " + typed);
     }
 
     /** Whether it could be read at all. */
@@ -30,19 +32,23 @@ public record VimCommand(boolean write, boolean quit, boolean force, String erro
     /**
      * Reads the line, without the colon.
      *
-     * <p>The forms that exist are the ones a person actually types: write, quit, both, and either of
-     * the last two insisted on with a bang. Anything else is refused by name, the way the real thing
-     * refuses it, instead of being guessed at.
+     * <p>The forms that exist are the ones a person actually types: write, quit, both, either of the
+     * last two insisted on with a bang, and a number to go to that line. Anything else is refused by
+     * name, the way the real thing refuses it, instead of being guessed at.
      */
     public static VimCommand of(final String typed) {
         final String line = typed == null ? "" : typed.trim();
+        if (!line.isEmpty() && line.chars().allMatch(Character::isDigit)) {
+            final int number = line.length() > 6 ? Integer.MAX_VALUE : Integer.parseInt(line);
+            return new VimCommand(false, false, false, Math.max(1, number), "");
+        }
         return switch (line) {
-            case "w" -> new VimCommand(true, false, false, "");
-            case "q" -> new VimCommand(false, true, false, "");
-            case "q!" -> new VimCommand(false, true, true, "");
-            case "wq", "x" -> new VimCommand(true, true, false, "");
-            case "wq!", "x!" -> new VimCommand(true, true, true, "");
-            case "" -> new VimCommand(false, false, false, "");
+            case "w" -> new VimCommand(true, false, false, 0, "");
+            case "q" -> new VimCommand(false, true, false, 0, "");
+            case "q!" -> new VimCommand(false, true, true, 0, "");
+            case "wq", "x" -> new VimCommand(true, true, false, 0, "");
+            case "wq!", "x!" -> new VimCommand(true, true, true, 0, "");
+            case "" -> new VimCommand(false, false, false, 0, "");
             default -> unknown(line);
         };
     }

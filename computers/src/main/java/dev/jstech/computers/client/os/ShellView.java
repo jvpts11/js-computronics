@@ -191,6 +191,21 @@ public final class ShellView extends Panel {
         return this.editor != null;
     }
 
+    /** The prompt as it stands, which says where the terminal is. */
+    public String prompt() {
+        return this.prompt == null ? "" : this.prompt;
+    }
+
+    /** The text the editor holding this terminal has, or empty when none has it. */
+    public String editorText() {
+        return this.editor == null ? "" : this.editor.document().text();
+    }
+
+    /** What the editor's second buffer shows, one line after another, or empty when there is none. */
+    public String editorLowerText() {
+        return this.editor == null ? "" : this.editor.lowerText();
+    }
+
     /** Told each time a command finishes and the prompt is back, so a window can run lines in turn. */
     private Runnable onIdle;
 
@@ -378,8 +393,8 @@ public final class ShellView extends Panel {
         if (this.editor != null) {
             return this.editor.charTyped(c);
         }
-        // While a program has the terminal the keyboard is its, and it listens for one thing only.
-        return this.busy || super.charTyped(c);
+        // While a program has the terminal, what is typed is the program's to read when it asks.
+        return super.charTyped(c);
     }
 
     @Override
@@ -387,10 +402,8 @@ public final class ShellView extends Panel {
         if (this.editor != null) {
             return this.editor.keyPressed(key, modifiers);
         }
-        if (this.busy) {
-            if (key == GLFW.GLFW_KEY_C && net.minecraft.client.gui.screens.Screen.hasControlDown()) {
-                interrupt();
-            }
+        if (this.busy && key == GLFW.GLFW_KEY_C && net.minecraft.client.gui.screens.Screen.hasControlDown()) {
+            interrupt();
             return true;
         }
         return super.keyPressed(key, scanCode, modifiers);
@@ -407,6 +420,15 @@ public final class ShellView extends Panel {
 
     private void submit(final String line) {
         this.scrollOffset = 0;
+        if (this.busy) {
+            /*
+             * A line for the program in front: it shows as typed, with no prompt, and goes to the machine
+             * for the program to read. None of the terminal's own words mean anything here.
+             */
+            push(line, INPUT_TEXT);
+            PacketDistributor.sendToServer(new DesktopShellRunPayload(this.host, line, this.session));
+            return;
+        }
         push(this.prompt + " " + line, colorOf(CliStyle.PROMPT.ordinal()));
         final String[] parts = line.split("\\s+", 2);
         final String verb = parts[0].toLowerCase(Locale.ROOT);

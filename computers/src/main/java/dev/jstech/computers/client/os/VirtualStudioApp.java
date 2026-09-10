@@ -153,7 +153,8 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     private final Button start;
     private final CodeCompletions completions = new CodeCompletions().withCosts(true);
     private final CommandPalette palette = new CommandPalette();
-    private final FolderPicker picker;
+    /** The system's file window, for everything the studio opens or saves by choosing on the disk. */
+    private final FileDialog dialog;
     private final List<Link> links = new ArrayList<>();
 
     private record Link(String title, int x, int y, int width, int height, Runnable action) {
@@ -192,6 +193,17 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     /** The question a closing tab with changes asks. */
     private final Popup askClose = new Popup(() -> "Save changes to " + closingName() + "?", 176, 40)
             .setLayouter(this::layoutAskClose);
+    /** The question the tree asks before a file goes, and the row it is about. */
+    private final Popup askDelete = new Popup(() -> "Delete " + deletingName() + "?", 150, 40)
+            .setLayouter(this::layoutAskDelete);
+    private Node deleting;
+    /** The right-button menu of the Solution Explorer. */
+    private final ContextMenu treeContext = new ContextMenu(124, 11);
+    /** Where the window was last drawn, for a menu opened from a row of the tree to stay inside it. */
+    private int winX;
+    private int winY;
+    private int winW;
+    private int winH;
     /** The tab being closed while the question is up. */
     private int closing = -1;
     private final TextField askField = new TextField(64);
@@ -210,7 +222,7 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     public VirtualStudioApp(final BlockPos host) {
         this.host = host;
         this.workspace = new CodeWorkspace(host);
-        this.picker = new FolderPicker(host, "Open");
+        this.dialog = new FileDialog(host, this);
         this.explorer = this.root.add(new ListView<>(this::nodes, ROW_H, this::drawNode)).setOnClick(this::onNode);
         this.tabs = this.root.add(new TabStrip(this.workspace::tabLabels).fitToLabels(10).setUnderline(false));
         this.tabs.setOnSelect(this.workspace::setCurrent);
@@ -231,6 +243,11 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
             this.workspace.close(this.closing);
         }));
         this.askClose.add(new Button("Cancel", this.askClose::close));
+        this.askDelete.add(new Button("Delete", () -> {
+            this.askDelete.close();
+            deleteNode();
+        }).setPrimary(true));
+        this.askDelete.add(new Button("Cancel", this.askDelete::close));
         this.start = this.root.add(new Button("Start", this::startProgram).setPrimary(true));
         this.root.add(this.menuBar);
         this.menuBar.add("File", this::fileMenu).add("Edit", this::editMenu).add("View", this::viewMenu)
@@ -437,10 +454,53 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
         remember(this.solutionDir);
         this.workspace.say("Opened " + this.solution.name());
         if (!this.openWhenLoaded.isEmpty()) {
-            final String path = this.openWhenLoaded;
-            this.openWhenLoaded = "";
-            this.workspace.open(path);
+            final List<String> paths = new ArrayList<>(this.openWhenLoaded);
+            this.openWhenLoaded.clear();
+            this.workspace.openAll(paths, this.currentWhenLoaded);
+            this.currentWhenLoaded = "";
         }
+    }
+
+    /**
+     * The solution and the tabs, for the machine to hand back after the game itself was closed: which
+     * kind of thing is open, where, then the workspace's own account of its files.
+     */
+    @Override
+    public String saveState() {
+        if (this.page != Page.SOLUTION || this.solutionDir.isEmpty()) {
+            return "";
+        }
+        return (this.solution != null ? "solution" : "folder") + "\n" + this.solutionDir + "\n"
+                + this.workspace.describeOpen().substring(this.workspace.folder().length() + 1);
+    }
+
+    @Override
+    public void restoreState(final String state) {
+        final int firstBreak = state.indexOf('\n');
+        if (firstBreak < 0) {
+            return;
+        }
+        final String kind = state.substring(0, firstBreak);
+        final String rest = state.substring(firstBreak + 1);
+        final String dir = CodeWorkspace.folderOf(rest);
+        if (dir.isEmpty()) {
+            return;
+        }
+        if ("solution".equals(kind)) {
+            // The files wait for the solution: the machine answers one file at a time, and the solution goes first.
+            final String[] lines = rest.split("\n", -1);
+            this.openWhenLoaded.clear();
+            for (int i = 1; i < lines.length - 1; i++) {
+                if (!lines[i].isEmpty()) {
+                    this.openWhenLoaded.add(lines[i]);
+                }
+            }
+            this.currentWhenLoaded = lines.length > 2 ? lines[lines.length - 1] : "";
+            openSolutionFolder(dir);
+            return;
+        }
+        openFolder(dir);
+        this.workspace.reopen(rest);
     }
 
     private String projectDir(final String name) {
@@ -578,6 +638,13 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
             return;
         }
         final Node node = all.get(index);
+        if (button == 1) {
+            final List<ContextMenu.Item> items = treeMenu(node);
+            if (!items.isEmpty()) {
+                this.treeContext.open(items, (int) mx, (int) my, this.winX, this.winY, this.winW, this.winH);
+            }
+            return;
+        }
         switch (node.kind()) {
             case PROJECT -> {
                 if (!this.collapsed.remove(node.project())) {
@@ -1159,12 +1226,17 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
          * The files are on their way; asking for the solution now reads them once they have landed. The
          * first source waits for the solution to be in, since one file is waited for at a time.
          */
-        this.openWhenLoaded = first.isEmpty() ? "" : join(join(dir, project), first);
+        this.openWhenLoaded.clear();
+        if (!first.isEmpty()) {
+            this.openWhenLoaded.add(join(join(dir, project), first));
+        }
         openSolutionFolder(dir);
     }
 
     /** A source to open once the solution being read is in, or empty. */
-    private String openWhenLoaded = "";
+    /** The files to put on tabs once the solution being read is in, and the one to end on. */
+    private final List<String> openWhenLoaded = new ArrayList<>();
+    private String currentWhenLoaded = "";
 
     private void layoutTemplates(final Popup p) {
         final List<dev.jstech.core.client.gui.component.UiComponent> c = p.children();
@@ -1257,7 +1329,7 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     /** Opens the folder picker for where the new solution goes. */
     private void browseLocation() {
-        this.picker.open(typedLocation(this.locationField.edit()), dir -> {
+        this.dialog.openFolder("Project Location", typedLocation(this.locationField.edit()), dir -> {
             this.location = dir;
             this.locationField.set(shownLocation(dir));
         });
@@ -1418,8 +1490,7 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
         return List.of(
                 item("Find...", hasDoc(), this::find),
                 item("Go To Line...", hasDoc(), this::goToLine),
-                item("Toggle Line Comment", hasDoc(), this::toggleComment),
-                item("Implement Interface", hasDoc(), this::implementInterface));
+                item("Toggle Line Comment", hasDoc(), this::toggleComment));
     }
 
     private List<ContextMenu.Item> viewMenu() {
@@ -1431,7 +1502,93 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
                     this.typingInTerminal = true;
                 }),
                 item("Assembly", hasSolution() && this.projects.containsKey(currentProject()), this::openAssembly),
+                ContextMenu.Item.separator(),
+                item("Zoom In", hasDoc(), () -> zoomEditor(1)),
+                item("Zoom Out", hasDoc(), () -> zoomEditor(-1)),
+                item("Reset Zoom", hasDoc(), () -> setEditorScale(1.0f)),
+                ContextMenu.Item.separator(),
                 item("Start Window", true, this::closeSolution));
+    }
+
+    /**
+     * The menu the right button opens on the code: the clipboard, then what the studio can do to the
+     * code where the caret is, the way a studio keeps its refactorings a click away from the code.
+     */
+    private List<ContextMenu.Item> editorMenu() {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        final boolean selected = doc != null && doc.area().document().hasSelection();
+        return List.of(
+                item("Cut", selected, () -> pressInEditor(GLFW.GLFW_KEY_X)),
+                item("Copy", hasDoc(), () -> pressInEditor(GLFW.GLFW_KEY_C)),
+                item("Paste", hasDoc(), () -> pressInEditor(GLFW.GLFW_KEY_V)),
+                item("Select All", hasDoc(), () -> pressInEditor(GLFW.GLFW_KEY_A)),
+                ContextMenu.Item.separator(),
+                item("Toggle Line Comment", hasDoc(), this::toggleComment),
+                ContextMenu.Item.submenu("Quick Actions and Refactorings", List.of(
+                        item("Implement Interface", hasDoc(), this::implementInterface))),
+                ContextMenu.Item.separator(),
+                item("Go To Line...", hasDoc(), this::goToLine));
+    }
+
+    /** Sends a Ctrl key to the code area, which is where the clipboard commands live. */
+    private void pressInEditor(final int key) {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc != null) {
+            doc.area().keyPressed(key, 0, GLFW.GLFW_MOD_CONTROL);
+        }
+    }
+
+    /** The size the code is drawn at, shared by every open file, as the status bar shows it. */
+    private float editorScale = 1.0f;
+
+    private void zoomEditor(final int steps) {
+        setEditorScale(this.editorScale + steps * 0.25f);
+    }
+
+    private void setEditorScale(final float value) {
+        this.editorScale = Math.max(0.75f, Math.min(2.0f, value));
+        for (final CodeWorkspace.Doc doc : this.workspace.docs()) {
+            doc.area().setScale(this.editorScale);
+        }
+    }
+
+    /** The menu the right button opens on the code. */
+    private final ContextMenu editorContext = new ContextMenu(110, 11);
+
+    /** The desktop-local centre of the code area, where a test right-clicks the code; null with no file open. */
+    public int[] editorCenter() {
+        final CodeWorkspace.Doc doc = this.workspace.current();
+        if (doc == null) {
+            return null;
+        }
+        final CodeArea area = doc.area();
+        return new int[] {area.x() + area.width() / 2, area.y() + area.height() / 2};
+    }
+
+    /** Whether the right-button menu on the code is up. */
+    public boolean editorMenuOpen() {
+        return this.editorContext.isOpen();
+    }
+
+    /** Escape closes whatever menu or window is up before it means anything to the desktop. */
+    @Override
+    public boolean wantsEscape() {
+        return this.editorContext.isOpen() || this.treeContext.isOpen() || this.menuBar.isOpen()
+                || this.palette.isOpen() || openPopup() != null;
+    }
+
+    /** The labels of the code's right-button menu, so a test can read what it offers. */
+    public List<String> editorMenuLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final ContextMenu.Item entry : this.editorContext.items()) {
+            out.add(entry.label());
+        }
+        return out;
+    }
+
+    /** The size the code is drawn at, as the status bar shows it. */
+    public int zoomPercent() {
+        return Math.round(this.editorScale * 100);
     }
 
     private List<ContextMenu.Item> projectMenu() {
@@ -1478,12 +1635,27 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     /* What the menus do */
 
+    /** The kinds the Open Project/Solution window offers: what the studio opens as a solution, then everything. */
+    private static final List<FileDialog.Filter> SOLUTION_FILTERS = List.of(
+            FileDialog.Filter.of("Solutions", SolutionFile.EXTENSION, ProjectFile.EXTENSION),
+            FileDialog.Filter.ALL);
+
     private void openSolutionByPicker() {
-        this.picker.open(LOCATION, this::openSolutionFolder);
+        this.dialog.openFile("Open Project/Solution", LOCATION, SOLUTION_FILTERS, this::openFile);
     }
 
     private void openFolderByPicker() {
-        this.picker.open(LOCATION, this::openFolder);
+        this.dialog.openFolder("Open Folder", LOCATION, this::openFolder);
+    }
+
+    /** Shows the Open Project/Solution window, as the File menu does; a test drives it from here. */
+    public void showOpenSolutionDialog() {
+        openSolutionByPicker();
+    }
+
+    /** The system's file window this studio opens, for a test to drive. */
+    public FileDialog dialog() {
+        return this.dialog;
     }
 
     private void goToFile() {
@@ -1516,7 +1688,10 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     }
 
     private void addNewItem() {
-        final String name = currentProject();
+        addNewItem(currentProject());
+    }
+
+    private void addNewItem(final String name) {
         final ProjectFile project = this.projects.get(name);
         if (project == null) {
             return;
@@ -1531,7 +1706,10 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     }
 
     private void addExistingItem() {
-        final String name = currentProject();
+        addExistingItem(currentProject());
+    }
+
+    private void addExistingItem(final String name) {
         final ProjectFile project = this.projects.get(name);
         if (project == null) {
             return;
@@ -1550,7 +1728,10 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     }
 
     private void addReference() {
-        final String name = currentProject();
+        addReference(currentProject());
+    }
+
+    private void addReference(final String name) {
         final ProjectFile project = this.projects.get(name);
         if (project == null) {
             return;
@@ -1565,9 +1746,175 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     }
 
     private void setStartup() {
-        if (this.solution != null) {
-            this.solution = this.solution.withStartup(currentProject());
+        setStartup(currentProject());
+    }
+
+    private void setStartup(final String name) {
+        if (this.solution != null && this.projects.containsKey(name)) {
+            this.solution = this.solution.withStartup(name);
             saveSolution();
+        }
+    }
+
+    /* The tree's right-button menu */
+
+    /** What the right button offers on a row of the Solution Explorer, by what the row is. */
+    private List<ContextMenu.Item> treeMenu(final Node node) {
+        final boolean several = this.projects.size() > 1;
+        return switch (node.kind()) {
+            case SOLUTION -> this.solution == null
+                    ? List.of(item("Refresh", true, this.workspace::refresh))
+                    : List.of(item("Build Solution", true, this::buildSolution),
+                            item("Clean Solution", true, this::cleanSolution),
+                            ContextMenu.Item.separator(),
+                            item("Add New Project...", true, () -> newProject(true)));
+            case PROJECT -> List.of(
+                    item("Build", true, () -> buildProject(node.project())),
+                    item("Set as Startup Project", true, () -> setStartup(node.project())),
+                    ContextMenu.Item.separator(),
+                    item("Add New Item...", true, () -> addNewItem(node.project())),
+                    item("Add Existing Item...", true, () -> addExistingItem(node.project())),
+                    item("Add Project Reference...", several, () -> addReference(node.project())),
+                    ContextMenu.Item.separator(),
+                    item("Properties", true, () -> showProperties(node.project())));
+            case SOURCE -> List.of(
+                    item("Open", true, () -> this.workspace.open(node.path())),
+                    ContextMenu.Item.separator(),
+                    item("Exclude From Project", true, () -> excludeSource(node)),
+                    item("Delete", true, () -> askDelete(node)));
+            case OUTPUT -> List.of(
+                    item("Open", true, () -> this.workspace.open(node.path())),
+                    ContextMenu.Item.separator(),
+                    item("Delete", true, () -> askDelete(node)));
+            case FOLDER_FILE -> {
+                final DiskFilesPayload.WireFile file = fileAt(node.path());
+                yield file == null || file.directory()
+                        ? List.of(item("Open", true, () -> this.workspace.toggleFolder(node.path())))
+                        : List.of(item("Open", true, () -> this.workspace.open(node.path())),
+                                ContextMenu.Item.separator(),
+                                item("Delete", true, () -> askDelete(node)));
+            }
+            default -> List.of();
+        };
+    }
+
+    /** Takes the source out of its project's file, leaving the file itself on the disk. */
+    private void excludeSource(final Node node) {
+        final ProjectFile project = this.projects.get(node.project());
+        if (project != null) {
+            saveProject(project.withoutSource(relativeSource(project, node.path())));
+        }
+    }
+
+    /** A source's name as the project file lists it: its path inside the project's folder. */
+    private String relativeSource(final ProjectFile project, final String path) {
+        final String prefix = projectDir(project.name()) + "/";
+        return path.startsWith(prefix) ? path.substring(prefix.length()) : shortName(path);
+    }
+
+    /** Asks before a file goes: deleting is the one thing the tree does that cannot be undone. */
+    private void askDelete(final Node node) {
+        this.deleting = node;
+        this.askDelete.open();
+    }
+
+    private String deletingName() {
+        return this.deleting == null ? "" : shortName(this.deleting.path());
+    }
+
+    private void layoutAskDelete(final Popup p) {
+        final List<dev.jstech.core.client.gui.component.UiComponent> c = p.children();
+        final int y = p.bottom() - 15;
+        c.get(0).setBounds(p.x() + 4, y, 44, 11);
+        c.get(1).setBounds(p.right() - 44, y, 40, 11);
+    }
+
+    /**
+     * Deletes the file the question was about: off the disk, off its tab if it was open, and out of
+     * its project's file when the project listed it.
+     */
+    private void deleteNode() {
+        final Node node = this.deleting;
+        this.deleting = null;
+        if (node == null || node.path().isEmpty()) {
+            return;
+        }
+        final List<CodeWorkspace.Doc> docs = this.workspace.docs();
+        for (int i = 0; i < docs.size(); i++) {
+            if (docs.get(i).path().equals(node.path())) {
+                this.workspace.close(i);
+                break;
+            }
+        }
+        PacketDistributor.sendToServer(new DeleteFilePayload(this.host, node.path()));
+        final ProjectFile project = this.projects.get(node.project());
+        if (node.kind() == NodeKind.SOURCE && project != null) {
+            saveProject(project.withoutSource(relativeSource(project, node.path())));
+        }
+        this.output.add("Deleted " + shortName(node.path()));
+        FilesApps.diskChanged();
+        this.workspace.refresh();
+    }
+
+    /** The labels of the tree's rows, top to bottom, so a test can find one. */
+    public List<String> explorerLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final Node node : nodes()) {
+            out.add(node.label());
+        }
+        return out;
+    }
+
+    /** The middle of the tree row with that label, window-relative, or null when there is none. */
+    public int[] explorerRowPoint(final String label) {
+        final int index = explorerLabels().indexOf(label);
+        return index < 0 ? null : this.explorer.rowCenter(index);
+    }
+
+    /** Whether the tree's right-button menu is up. */
+    public boolean treeMenuOpen() {
+        return this.treeContext.isOpen();
+    }
+
+    /** The labels of the tree's right-button menu, so a test can read what it offers. */
+    public List<String> treeMenuLabels() {
+        final List<String> out = new ArrayList<>();
+        for (final ContextMenu.Item entry : this.treeContext.items()) {
+            out.add(entry.label());
+        }
+        return out;
+    }
+
+    /** The middle of the tree menu's entry with that label, or null. */
+    public int[] treeMenuPoint(final String label) {
+        final int index = treeMenuLabels().indexOf(label);
+        return index < 0 ? null : this.treeContext.itemCenter(index);
+    }
+
+    /** Whether the question before a delete is up. */
+    public boolean deleteQuestionOpen() {
+        return this.askDelete.isOpen();
+    }
+
+    /** Whether a question asking for a name is up. */
+    public boolean askOpen() {
+        return this.ask.isOpen();
+    }
+
+    /** Answers the name question up with {@code name}, as typing it and pressing OK does. */
+    public void answerAsk(final String name) {
+        if (this.ask.isOpen()) {
+            this.askField.set(name);
+            this.ask.close();
+            this.askAction.accept(name.trim());
+        }
+    }
+
+    /** Answers the question before a delete, as its Delete button does. */
+    public void confirmDelete() {
+        if (this.askDelete.isOpen()) {
+            this.askDelete.close();
+            deleteNode();
         }
     }
 
@@ -1667,7 +2014,7 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     @Override
     public void onClosed() {
         this.workspace.release();
-        this.picker.release();
+        this.dialog.release();
         this.terminal.release();
         CodeFileReplies.forget(this);
     }
@@ -1679,8 +2026,10 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     @Override
     public boolean modalActive() {
-        return this.picker.isOpen() || this.templates.isOpen() || this.configure.isOpen() || this.ask.isOpen()
-                || this.properties.isOpen() || this.options.isOpen() || this.askClose.isOpen();
+        // The file window is a window of its own over this one; the desktop holds this one while it is up.
+        return this.templates.isOpen() || this.configure.isOpen() || this.ask.isOpen()
+                || this.properties.isOpen() || this.options.isOpen() || this.askClose.isOpen()
+                || this.askDelete.isOpen();
     }
 
     @Override
@@ -1692,6 +2041,10 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
         this.root.setBounds(x, y, width, height);
         this.menuBar.setBounds(x, y, width, MenuBar.HEIGHT);
         this.menuBar.setWindow(x, y, width, height);
+        this.winX = x;
+        this.winY = y;
+        this.winW = width;
+        this.winH = height;
         final int top = y + MenuBar.HEIGHT;
 
         final CodeWorkspace.Doc doc = this.workspace.current();
@@ -1750,13 +2103,13 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
         drawStatus(g, font, x, y + height - STATUS_H, width, doc);
         this.completions.render(g, ctx);
         this.palette.render(g, ctx, x, top, width);
-        for (final Popup popup : List.of(this.templates, this.configure, this.ask, this.properties, this.options, this.askClose)) {
+        for (final Popup popup : List.of(this.templates, this.configure, this.ask, this.properties, this.options, this.askClose, this.askDelete)) {
             if (popup.isOpen()) {
                 popup.renderIn(g, ctx, x, y, width, height);
             }
         }
-        // The folder picker can be opened from the wizard, so it goes over the popups.
-        this.picker.render(g, ctx, x, y, width, height);
+        this.editorContext.render(g, ctx);
+        this.treeContext.render(g, ctx);
         this.menuBar.render(g, ctx);
     }
 
@@ -1841,10 +2194,7 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     /** Open a file from the Start Window: pick its folder, then the file. */
     private void openFileFromStart() {
-        this.picker.open(LOCATION, dir -> {
-            openFolder(dir);
-            goToFile();
-        });
+        this.dialog.openFile("Open File", LOCATION, FileDialog.Filter.sources(), this::openFile);
     }
 
     private void drawEmpty(final GuiGraphics g, final Font font, final int x, final int y,
@@ -1863,9 +2213,25 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
         final int errorCount = errorRows().size();
         final String left = errorCount == 0 ? "Ready" : errorCount + " error(s)";
         g.drawString(font, left, x + 3, y + 1, this.skin.dim(), false);
+        /*
+         * The right-hand pieces are laid out first, so the message on the left is cut to the room
+         * left before them: a saved path can be longer than the bar, and it stops rather than runs
+         * under the zoom.
+         */
+        final int right = drawStatusRight(g, font, x, y, width, doc);
         if (!this.workspace.status().isEmpty()) {
-            g.drawString(font, this.workspace.status(), x + 5 + font.width(left) + 6, y + 1, this.skin.dim(), false);
+            final int from = x + 5 + font.width(left) + 6;
+            final int room = right - 6 - from;
+            if (room > 8) {
+                g.drawString(font, font.plainSubstrByWidth(this.workspace.status(), room), from, y + 1,
+                        this.skin.dim(), false);
+            }
         }
+    }
+
+    /** Draws what the status bar keeps on its right, and says where that begins. */
+    private int drawStatusRight(final GuiGraphics g, final Font font, final int x, final int y,
+                                final int width, final CodeWorkspace.Doc doc) {
         int right = x + width - 3;
         if (this.solution != null) {
             right -= font.width(this.solution.name());
@@ -1877,13 +2243,52 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
                     + ", Col " + (doc.area().document().cursorCol() + 1);
             right -= font.width(where);
             g.drawString(font, where, right, y + 1, this.skin.dim(), false);
+            right -= 8;
+            /*
+             * The zoom, the way the studio keeps it at the bottom of the editor: the size in percent
+             * with a minus and a plus either side, so a bigger or smaller text is one click away.
+             */
+            final String percent = Math.round(this.editorScale * 100) + "%";
+            final int plusX = right - font.width("+") - 1;
+            final int percentX = plusX - 3 - font.width(percent);
+            final int minusX = percentX - 3 - font.width("-");
+            g.drawString(font, "-", minusX, y + 1, this.skin.text(), false);
+            g.drawString(font, percent, percentX, y + 1, this.skin.dim(), false);
+            g.drawString(font, "+", plusX, y + 1, this.skin.text(), false);
+            this.zoomMinus = new int[] {minusX - 2, y, font.width("-") + 4, STATUS_H};
+            this.zoomPlus = new int[] {plusX - 2, y, font.width("+") + 4, STATUS_H};
+            right = minusX - 2;
+        } else {
+            this.zoomMinus = null;
+            this.zoomPlus = null;
         }
+        return right;
+    }
+
+    /* Where the status bar's zoom minus and plus were drawn, so a click on them is known for what it is. */
+    private int[] zoomMinus;
+    private int[] zoomPlus;
+
+    private boolean clickZoomControl(final double mx, final double my) {
+        if (inRect(this.zoomMinus, mx, my)) {
+            zoomEditor(-1);
+            return true;
+        }
+        if (inRect(this.zoomPlus, mx, my)) {
+            zoomEditor(1);
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean inRect(final int[] rect, final double mx, final double my) {
+        return rect != null && mx >= rect[0] && mx < rect[0] + rect[2] && my >= rect[1] && my < rect[1] + rect[3];
     }
 
     /* Input */
 
     private Popup openPopup() {
-        for (final Popup popup : List.of(this.templates, this.configure, this.ask, this.properties, this.options, this.askClose)) {
+        for (final Popup popup : List.of(this.templates, this.configure, this.ask, this.properties, this.options, this.askClose, this.askDelete)) {
             if (popup.isOpen()) {
                 return popup;
             }
@@ -1893,10 +2298,6 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     @Override
     public void mouseClicked(final DesktopWindow window, final double mouseX, final double mouseY, final int button) {
-        if (this.picker.isOpen()) {
-            this.picker.mouseClicked(mouseX, mouseY, button);
-            return;
-        }
         final Popup popup = openPopup();
         if (popup != null) {
             popup.mouseClicked(mouseX, mouseY, button);
@@ -1904,6 +2305,23 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
         }
         if (this.palette.isOpen()) {
             this.palette.mouseClicked(mouseX, mouseY, button);
+            return;
+        }
+        if (this.editorContext.isOpen()) {
+            this.editorContext.mouseClicked(mouseX, mouseY, button);
+            return;
+        }
+        if (this.treeContext.isOpen()) {
+            this.treeContext.mouseClicked(mouseX, mouseY, button);
+            return;
+        }
+        final CodeWorkspace.Doc onCode = this.workspace.current();
+        if (button == 1 && onCode != null && this.page == Page.SOLUTION && onCode.area().contains(mouseX, mouseY)) {
+            this.editorContext.open(editorMenu(), (int) mouseX, (int) mouseY, window.x(), window.y(),
+                    window.width(), window.height());
+            return;
+        }
+        if (clickZoomControl(mouseX, mouseY)) {
             return;
         }
         // An open menu gets the click first: on one of its items, on another title, or outside to close.
@@ -1972,9 +2390,6 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     @Override
     public boolean charTyped(final char c) {
-        if (this.picker.isOpen()) {
-            return this.picker.charTyped(c);
-        }
         final Popup popup = openPopup();
         if (popup != null) {
             return popup.charTyped(c);
@@ -2000,15 +2415,18 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
     public boolean keyPressed(final int key, final int scanCode, final int modifiers) {
         final boolean ctrl = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
         final boolean shift = (modifiers & GLFW.GLFW_MOD_SHIFT) != 0;
-        if (this.picker.isOpen()) {
-            return this.picker.keyPressed(key, scanCode, modifiers);
-        }
         final Popup popup = openPopup();
         if (popup != null) {
             return popup.keyPressed(key, scanCode, modifiers);
         }
         if (this.palette.isOpen()) {
             return this.palette.keyPressed(key, scanCode, modifiers);
+        }
+        if (this.editorContext.isOpen()) {
+            return this.editorContext.keyPressed(key, scanCode, modifiers);
+        }
+        if (this.treeContext.isOpen()) {
+            return this.treeContext.keyPressed(key, scanCode, modifiers);
         }
         if (this.menuBar.keyPressed(key, scanCode, modifiers)) {
             return true;
@@ -2077,7 +2495,46 @@ public final class VirtualStudioApp implements IDesktopApp, CodeFileReplies.IRea
 
     private void offerCompletions(final CodeWorkspace.Doc doc) {
         final CodeArea area = doc.area();
-        this.completions.offer(area, doc.path(), new int[] {area.x(), area.y(), area.width(), area.height()});
+        this.completions.offer(area, doc.path(), sourcesAround(doc),
+                new int[] {area.x(), area.y(), area.width(), area.height()});
+    }
+
+    /**
+     * The sources a completion list reads beside the open file: the rest of its folder, and the sources
+     * of every library its project references, so a type a library declares is offered like the file's
+     * own. A library folder nobody has read yet is asked for, and is there the next time the list opens.
+     */
+    private List<IProgrammingLanguage.SourceText> sourcesAround(final CodeWorkspace.Doc doc) {
+        final List<IProgrammingLanguage.SourceText> out = new ArrayList<>(this.workspace.siblingsOf(doc));
+        final String own = projectOf(doc.path());
+        if (own == null) {
+            return out;
+        }
+        final Deque<String> order = new ArrayDeque<>();
+        collectOrder(own, order, new LinkedHashSet<>());
+        for (final String each : order) {
+            if (each.equals(own)) {
+                continue;
+            }
+            this.workspace.ensureSurveyed(projectDir(each));
+            for (final String source : this.projects.get(each).sources()) {
+                final String text = this.workspace.textOf(join(projectDir(each), source));
+                if (text != null) {
+                    out.add(new IProgrammingLanguage.SourceText(each + "/" + source, text));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The project whose folder holds {@code path}, or null when it is in none of the solution's. */
+    private String projectOf(final String path) {
+        for (final String name : this.projects.keySet()) {
+            if (path.startsWith(projectDir(name) + "/")) {
+                return name;
+            }
+        }
+        return null;
     }
 
     @Override

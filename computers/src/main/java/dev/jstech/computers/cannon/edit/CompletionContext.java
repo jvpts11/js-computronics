@@ -7,6 +7,8 @@
  */
 package dev.jstech.computers.cannon.edit;
 
+import java.util.List;
+
 /**
  * What the player was in the middle of writing when they asked for help.
  *
@@ -22,7 +24,8 @@ public final class CompletionContext {
     /**
      * Where a list would be offered.
      *
-     * @param receiver what is being reached into, or empty when the name stands on its own
+     * @param receiver what is being reached into, names joined with dots ({@code a.b}), or empty when
+     *                 the name stands on its own
      * @param prefix   how much of the name has been typed
      * @param from     the column the prefix starts at, counting from one, which is what a chosen name
      *                 replaces
@@ -32,6 +35,11 @@ public final class CompletionContext {
         /** Whether this is a reach into something rather than a name being typed on its own. */
         public boolean intoMember() {
             return !this.receiver.isEmpty();
+        }
+
+        /** The names of the receiver, first to last: {@code a}, {@code b} for {@code a.b}. */
+        public List<String> chain() {
+            return this.receiver.isEmpty() ? List.of() : List.of(this.receiver.split("\\."));
         }
     }
 
@@ -58,12 +66,20 @@ public final class CompletionContext {
         }
         final String prefix = line.substring(start, caret);
         if (start > 0 && line.charAt(start - 1) == '.') {
+            /*
+             * Everything reached through before this: names joined with dots, read back until something
+             * that is neither. A call or an index on the way is not read through; the list stops there.
+             */
             int owner = start - 1;
-            while (owner > 0 && isNameChar(line.charAt(owner - 1))) {
+            while (owner > 0 && (isNameChar(line.charAt(owner - 1)) || line.charAt(owner - 1) == '.')) {
                 owner--;
             }
-            final String receiver = line.substring(owner, start - 1);
-            return receiver.isEmpty() ? null : new Where(receiver, prefix, start + 1);
+            String receiver = line.substring(owner, start - 1);
+            while (receiver.startsWith(".")) {
+                receiver = receiver.substring(1);
+            }
+            return receiver.isEmpty() || receiver.endsWith(".") || receiver.contains("..")
+                    ? null : new Where(receiver, prefix, start + 1);
         }
         /*
          * A bare name is worth offering types for, but only once there is something to narrow them by:

@@ -78,10 +78,25 @@ class CompletionContextTest {
     }
 
     @Test
-    void at_takesTheNearestReceiverInAChain() {
+    void at_readsTheWholeChainBeforeTheDot() {
         final CompletionContext.Where where = at("Network.Current.Qu|");
-        assertEquals("Current", where.receiver());
+        assertEquals("Network.Current", where.receiver());
+        assertEquals(java.util.List.of("Network", "Current"), where.chain());
         assertEquals("Qu", where.prefix());
+    }
+
+    @Test
+    void at_stopsAChainAtACall() {
+        // What a call gives back is not read through; the list stays closed rather than guessing.
+        assertNull(at("Network.Find(name).|"));
+        assertNull(at("        items[0].|"));
+    }
+
+    @Test
+    void chain_isEmptyForANameOnItsOwn() {
+        final CompletionContext.Where where = at("        Net|");
+        assertFalse(where.intoMember());
+        assertTrue(where.chain().isEmpty());
     }
 
     @Test

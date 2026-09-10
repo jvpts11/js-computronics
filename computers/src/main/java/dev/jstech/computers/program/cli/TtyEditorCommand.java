@@ -52,8 +52,14 @@ public final class TtyEditorCommand implements ICliCommand, CliShell.IHandOver {
     /** Only where it was installed: a machine that never got the editor does not offer the verb. */
     @Override
     public boolean available(final ICliComputer computer) {
+        /*
+         * The machine lists a program by its full id, jsc:vim, and by the name it is typed as; the
+         * editor is known here by that name, so both are looked at rather than only the one that
+         * never matched.
+         */
         for (final ICliComputer.ProgramInfo program : computer.programs()) {
-            if (program.id().equals(this.programId)) {
+            if (program.id().equals(this.programId) || program.id().endsWith(":" + this.programId)
+                    || program.name().equals(this.programId)) {
                 return true;
             }
         }

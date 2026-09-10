@@ -61,6 +61,8 @@ public final class TtyEditor {
     private final IHost host;
 
     private int scroll;
+    /** How far the rows are slid to the left, in pixels, to keep the caret on a long line in view. */
+    private int shift;
     private boolean dirty;
     private String message = "";
 
@@ -92,6 +94,11 @@ public final class TtyEditor {
     /** Whether a second buffer is showing. */
     public boolean split() {
         return !this.lower.isEmpty();
+    }
+
+    /** What the second buffer shows, one line after another; empty when there is none. */
+    public String lowerText() {
+        return String.join("\n", this.lower);
     }
 
     /** The colouring of the open file, read again only when the text changes. */
@@ -196,17 +203,19 @@ public final class TtyEditor {
         }
         final int rows = Math.max(1, (upperH - PAD - LINE_H) / LINE_H);
         followCaret(rows);
+        followCaretAcross(font, width - 2 * PAD);
 
         final List<List<CodeRuns.Run>> runs = runs();
         Draw.pushScissor(g, x, y, x + width, y + height);
+        final int startX = x + PAD - this.shift;
         int ry = y + PAD;
         for (int i = this.scroll; i < this.doc.lineCount() && i - this.scroll < rows; i++) {
             drawLine(g, font, this.doc.line(i), i < runs.size() ? runs.get(i) : List.of(),
-                    x + PAD, ry, palette);
+                    startX, ry, palette);
             if (i == this.doc.cursorLine()) {
                 final String line = this.doc.line(i);
                 final int col = Math.min(this.doc.cursorCol(), line.length());
-                final int cx = x + PAD + font.width(line.substring(0, col));
+                final int cx = startX + font.width(line.substring(0, col));
                 g.fill(cx, ry - 1, cx + font.width("m"), ry + LINE_H - 1, 0x66CDD6E2);
             }
             ry += LINE_H;
@@ -249,8 +258,10 @@ public final class TtyEditor {
                             final int width, final InkPalette palette) {
         g.fill(x, y, x + width, y + LINE_H, palette.gutter());
         final String left = this.keys.status(this);
-        g.drawString(font, font.plainSubstrByWidth(left, width - 60), x + PAD, y, palette.plain(), false);
         final String where = (this.doc.cursorLine() + 1) + "," + (this.doc.cursorCol() + 1);
+        // The message has the whole line but the corner where the position sits, so a question reads whole.
+        g.drawString(font, font.plainSubstrByWidth(left, width - 2 * PAD - font.width(where) - 6), x + PAD, y,
+                palette.plain(), false);
         g.drawString(font, where, x + width - font.width(where) - PAD, y, palette.gutterText(), false);
     }
 
@@ -304,6 +315,23 @@ public final class TtyEditor {
         }
         this.colouredText = text;
         return this.cached;
+    }
+
+    /**
+     * Slides the text sideways so the caret stays on the glass, the way a terminal editor shows a long
+     * line: the rows all move together, and nothing wraps.
+     */
+    private void followCaretAcross(final Font font, final int room) {
+        final String line = this.doc.line(this.doc.cursorLine());
+        final int col = Math.min(this.doc.cursorCol(), line.length());
+        final int caretX = font.width(line.substring(0, col));
+        final int caretW = font.width("m");
+        if (caretX - this.shift < 0) {
+            this.shift = caretX;
+        } else if (caretX + caretW - this.shift > room) {
+            this.shift = caretX + caretW - room;
+        }
+        this.shift = Math.max(0, this.shift);
     }
 
     private void followCaret(final int rows) {

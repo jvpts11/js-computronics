@@ -19,8 +19,9 @@ import org.lwjgl.glfw.GLFW;
  * commands. That is kept as a small state rather than spread through the editor, so the editor itself
  * knows nothing about modes and the other flavour can be a different one of these.
  *
- * <p>What is here is what a person uses to write a program and get out: moving, opening a line,
- * deleting one, and the colon commands. It is not all of Vim and does not pretend to be.
+ * <p>What is here is what a person uses to write a program and get out: moving by character, word and
+ * line, opening a line, deleting and yanking one, undoing, and the colon commands. It is not all of Vim
+ * and does not pretend to be.
  */
 public final class VimKeys implements TtyEditor.IKeys {
 
@@ -30,8 +31,10 @@ public final class VimKeys implements TtyEditor.IKeys {
     private Mode mode = Mode.NORMAL;
     /** What has been typed after the colon, before it is run. */
     private String command = "";
-    /** The first half of a two-key command, such as the first d of dd. */
+    /** The first half of a two-key command, such as the first d of dd or the first g of gg. */
     private char waiting;
+    /** The last line yanked or deleted whole, which is what p puts back. */
+    private String register = "";
 
     @Override
     public String status(final TtyEditor editor) {
@@ -64,11 +67,10 @@ public final class VimKeys implements TtyEditor.IKeys {
     /** A letter pressed while not typing is a command. */
     private void normalChar(final TtyEditor editor, final char c) {
         final TextDocument doc = editor.document();
-        if (this.waiting == 'd') {
+        if (this.waiting != 0) {
+            final char first = this.waiting;
             this.waiting = 0;
-            if (c == 'd') {
-                deleteLine(editor);
-            }
+            secondChar(editor, first, c);
             return;
         }
         switch (c) {
@@ -102,14 +104,34 @@ public final class VimKeys implements TtyEditor.IKeys {
             case 'l' -> doc.right();
             case 'j' -> doc.down();
             case 'k' -> doc.up();
+            case 'w' -> wordForward(doc);
+            case 'b' -> wordBack(doc);
+            case 'e' -> wordEnd(doc);
             case '0' -> doc.setCursor(doc.cursorLine(), 0);
+            case '^' -> doc.setCursor(doc.cursorLine(), firstNonBlank(doc.line(doc.cursorLine())));
             case '$' -> doc.setCursor(doc.cursorLine(), doc.line(doc.cursorLine()).length());
+            case 'G' -> doc.setCursor(doc.lineCount() - 1, 0);
             case 'x' -> {
-                doc.right();
-                doc.backspace();
+                if (doc.cursorCol() < doc.line(doc.cursorLine()).length()) {
+                    doc.delete();
+                    editor.touched();
+                }
+            }
+            case 'D' -> {
+                deleteToEnd(doc);
                 editor.touched();
             }
-            case 'd' -> this.waiting = 'd';
+            case 'u' -> {
+                if (doc.undo()) {
+                    editor.touched();
+                    editor.say("1 change; before");
+                } else {
+                    editor.say("Already at oldest change");
+                }
+            }
+            case 'p' -> put(editor, true);
+            case 'P' -> put(editor, false);
+            case 'd', 'y', 'g' -> this.waiting = c;
             case ':' -> {
                 this.mode = Mode.COMMAND;
                 this.command = "";
@@ -119,22 +141,161 @@ public final class VimKeys implements TtyEditor.IKeys {
         }
     }
 
+    /** The second key of a two-key command. */
+    private void secondChar(final TtyEditor editor, final char first, final char second) {
+        final TextDocument doc = editor.document();
+        switch ("" + first + second) {
+            case "dd" -> {
+                this.register = doc.line(doc.cursorLine()) + "\n";
+                deleteLine(editor);
+            }
+            case "dw" -> {
+                final int line = doc.cursorLine();
+                final int from = doc.cursorCol();
+                wordForward(doc);
+                if (doc.cursorLine() != line) {
+                    doc.setCursor(line, doc.line(line).length());
+                }
+                doc.select(line, from, line, doc.cursorCol());
+                doc.deleteSelection();
+                editor.touched();
+            }
+            case "yy" -> {
+                this.register = doc.line(doc.cursorLine()) + "\n";
+                editor.say("1 line yanked");
+            }
+            case "gg" -> doc.setCursor(0, 0);
+            default -> { }
+        }
+    }
+
+    /** Puts the register back below (or above) the caret's line when it holds a line, else at the caret. */
+    private void put(final TtyEditor editor, final boolean below) {
+        final TextDocument doc = editor.document();
+        if (this.register.isEmpty()) {
+            return;
+        }
+        if (this.register.endsWith("\n")) {
+            final String text = this.register.substring(0, this.register.length() - 1);
+            if (below) {
+                doc.setCursor(doc.cursorLine(), doc.line(doc.cursorLine()).length());
+                doc.newline();
+                doc.insertText(text);
+            } else {
+                doc.setCursor(doc.cursorLine(), 0);
+                doc.insertText(text);
+                doc.newline();
+                doc.up();
+            }
+            doc.setCursor(doc.cursorLine(), 0);
+        } else {
+            doc.insertText(this.register);
+        }
+        editor.touched();
+    }
+
     /** Removes the line the caret is on, the way {@code dd} does. */
     private static void deleteLine(final TtyEditor editor) {
         final TextDocument doc = editor.document();
         final int line = doc.cursorLine();
-        doc.setCursor(line, doc.line(line).length());
-        for (int i = doc.line(line).length(); i > 0; i--) {
-            doc.backspace();
-        }
-        /*
-         * The line is empty now, and one more backspace takes the break that made it a line at all,
-         * which is what leaves the file with one fewer rather than with a blank in the middle.
-         */
-        if (doc.lineCount() > 1) {
-            doc.backspace();
+        if (doc.lineCount() == 1) {
+            doc.select(0, 0, 0, doc.line(0).length());
+            doc.deleteSelection();
+        } else if (line + 1 < doc.lineCount()) {
+            doc.select(line, 0, line + 1, 0);
+            doc.deleteSelection();
+        } else {
+            doc.select(line - 1, doc.line(line - 1).length(), line, doc.line(line).length());
+            doc.deleteSelection();
+            doc.setCursor(line - 1, 0);
         }
         editor.touched();
+    }
+
+    private static void deleteToEnd(final TextDocument doc) {
+        final int line = doc.cursorLine();
+        doc.select(line, doc.cursorCol(), line, doc.line(line).length());
+        doc.deleteSelection();
+    }
+
+    private static int firstNonBlank(final String line) {
+        int at = 0;
+        while (at < line.length() && Character.isWhitespace(line.charAt(at))) {
+            at++;
+        }
+        return at;
+    }
+
+    /** The start of the next word, going on to the next line when this one has none left. */
+    private static void wordForward(final TextDocument doc) {
+        int line = doc.cursorLine();
+        int col = doc.cursorCol();
+        String text = doc.line(line);
+        final boolean onWord = col < text.length() && isWordChar(text.charAt(col));
+        while (col < text.length() && isWordChar(text.charAt(col)) == onWord && !Character.isWhitespace(text.charAt(col))) {
+            col++;
+        }
+        while (true) {
+            while (col < text.length() && Character.isWhitespace(text.charAt(col))) {
+                col++;
+            }
+            if (col < text.length() || line + 1 >= doc.lineCount()) {
+                break;
+            }
+            line++;
+            col = 0;
+            text = doc.line(line);
+        }
+        doc.setCursor(line, Math.min(col, text.length()));
+    }
+
+    /** The start of the word before the caret, going back a line when this one has none before. */
+    private static void wordBack(final TextDocument doc) {
+        int line = doc.cursorLine();
+        int col = doc.cursorCol();
+        String text = doc.line(line);
+        while (true) {
+            while (col > 0 && Character.isWhitespace(text.charAt(col - 1))) {
+                col--;
+            }
+            if (col > 0 || line == 0) {
+                break;
+            }
+            line--;
+            text = doc.line(line);
+            col = text.length();
+        }
+        if (col > 0) {
+            final boolean onWord = isWordChar(text.charAt(col - 1));
+            while (col > 0 && isWordChar(text.charAt(col - 1)) == onWord && !Character.isWhitespace(text.charAt(col - 1))) {
+                col--;
+            }
+        }
+        doc.setCursor(line, col);
+    }
+
+    /** The last character of the word the caret is on, or of the next one. */
+    private static void wordEnd(final TextDocument doc) {
+        final int line = doc.cursorLine();
+        final String text = doc.line(line);
+        int col = Math.min(doc.cursorCol() + 1, text.length());
+        while (col < text.length() && Character.isWhitespace(text.charAt(col))) {
+            col++;
+        }
+        if (col >= text.length()) {
+            doc.setCursor(line, Math.max(0, text.length() - 1));
+            return;
+        }
+        final boolean onWord = isWordChar(text.charAt(col));
+        while (col + 1 < text.length() && isWordChar(text.charAt(col + 1)) == onWord
+                && !Character.isWhitespace(text.charAt(col + 1))) {
+            col++;
+        }
+        doc.setCursor(line, col);
+    }
+
+    private static boolean isWordChar(final char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
     }
 
     private void enter(final TtyEditor editor, final Mode next) {
@@ -146,6 +307,9 @@ public final class VimKeys implements TtyEditor.IKeys {
     public boolean key(final TtyEditor editor, final int key, final int modifiers) {
         final TextDocument doc = editor.document();
         if (key == GLFW.GLFW_KEY_ESCAPE) {
+            if (this.mode == Mode.INSERT) {
+                doc.breakUndo();
+            }
             this.mode = Mode.NORMAL;
             this.command = "";
             this.waiting = 0;
@@ -154,6 +318,16 @@ public final class VimKeys implements TtyEditor.IKeys {
         if (this.mode == Mode.COMMAND) {
             return commandKey(editor, key);
         }
+        final boolean control = (modifiers & GLFW.GLFW_MOD_CONTROL) != 0;
+        if (control && key == GLFW.GLFW_KEY_R && this.mode == Mode.NORMAL) {
+            if (doc.redo()) {
+                editor.touched();
+                editor.say("1 change; after");
+            } else {
+                editor.say("Already at newest change");
+            }
+            return true;
+        }
         switch (key) {
             case GLFW.GLFW_KEY_LEFT -> doc.left();
             case GLFW.GLFW_KEY_RIGHT -> doc.right();
@@ -161,15 +335,27 @@ public final class VimKeys implements TtyEditor.IKeys {
             case GLFW.GLFW_KEY_DOWN -> doc.down();
             case GLFW.GLFW_KEY_HOME -> doc.setCursor(doc.cursorLine(), 0);
             case GLFW.GLFW_KEY_END -> doc.setCursor(doc.cursorLine(), doc.line(doc.cursorLine()).length());
+            case GLFW.GLFW_KEY_PAGE_UP -> doc.setCursor(Math.max(0, doc.cursorLine() - 10), 0);
+            case GLFW.GLFW_KEY_PAGE_DOWN -> doc.setCursor(Math.min(doc.lineCount() - 1, doc.cursorLine() + 10), 0);
             case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
                 if (this.mode == Mode.INSERT) {
-                    doc.newline();
+                    doc.newlineIndented(4);
                     editor.touched();
+                } else {
+                    doc.down();
                 }
             }
             case GLFW.GLFW_KEY_BACKSPACE -> {
                 if (this.mode == Mode.INSERT) {
                     doc.backspace();
+                    editor.touched();
+                } else {
+                    doc.left();
+                }
+            }
+            case GLFW.GLFW_KEY_DELETE -> {
+                if (this.mode == Mode.INSERT) {
+                    doc.delete();
                     editor.touched();
                 }
             }
@@ -213,6 +399,11 @@ public final class VimKeys implements TtyEditor.IKeys {
         this.command = "";
         if (!asked.ok()) {
             editor.say(asked.error());
+            return;
+        }
+        if (asked.goTo() > 0) {
+            final TextDocument doc = editor.document();
+            doc.setCursor(Math.min(asked.goTo(), doc.lineCount()) - 1, 0);
             return;
         }
         if (asked.write()) {

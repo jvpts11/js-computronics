@@ -32,6 +32,30 @@ public final class EmacsChord {
         COMPILE,
         /** {@code C-g}: forget whatever was half-typed. */
         CANCEL,
+        /** {@code C-b}: one character back. */
+        BACKWARD_CHAR,
+        /** {@code C-f}: one character forward. */
+        FORWARD_CHAR,
+        /** {@code C-p}: one line up. */
+        PREVIOUS_LINE,
+        /** {@code C-n}: one line down. */
+        NEXT_LINE,
+        /** {@code C-a}: to the start of the line. */
+        LINE_START,
+        /** {@code C-e}: to the end of the line. */
+        LINE_END,
+        /** {@code C-d}: the character after the caret is gone. */
+        DELETE_CHAR,
+        /** {@code C-k}: the rest of the line is cut and kept for a yank. */
+        KILL_LINE,
+        /** {@code C-y}: what was last killed comes back at the caret. */
+        YANK,
+        /** {@code C-x u}: the last change is taken back. */
+        UNDO,
+        /** {@code M-<}: to the start of the buffer. */
+        BUFFER_START,
+        /** {@code M->}: to the end of the buffer. */
+        BUFFER_END,
         /** The run means nothing anybody knows; say so and forget it. */
         UNKNOWN
     }
@@ -59,7 +83,19 @@ public final class EmacsChord {
             case "C-x" -> Action.PENDING;
             case "C-x C-s" -> Action.SAVE;
             case "C-x C-c" -> Action.QUIT;
+            case "C-x u" -> Action.UNDO;
             case "C-g" -> Action.CANCEL;
+            case "C-b" -> Action.BACKWARD_CHAR;
+            case "C-f" -> Action.FORWARD_CHAR;
+            case "C-p" -> Action.PREVIOUS_LINE;
+            case "C-n" -> Action.NEXT_LINE;
+            case "C-a" -> Action.LINE_START;
+            case "C-e" -> Action.LINE_END;
+            case "C-d" -> Action.DELETE_CHAR;
+            case "C-k" -> Action.KILL_LINE;
+            case "C-y" -> Action.YANK;
+            case "M-<" -> Action.BUFFER_START;
+            case "M->" -> Action.BUFFER_END;
             case "M-x" -> Action.PENDING;
             case "M-x compile" -> Action.COMPILE;
             case "" -> Action.PENDING;
@@ -87,10 +123,16 @@ public final class EmacsChord {
     }
 
     /** Every run that finishes as a command, which is what a shorter run is measured against. */
-    private static final String[] KNOWN = {"C-x C-s", "C-x C-c", "C-g", "M-x compile"};
+    private static final String[] KNOWN = {"C-x C-s", "C-x C-c", "C-x u", "C-g", "C-b", "C-f", "C-p", "C-n",
+        "C-a", "C-e", "C-d", "C-k", "C-y", "M-<", "M->", "M-x compile"};
 
     /** How the echo area says a run nobody knows, in the words the real thing uses. */
     public static String unknown(final String chord) {
         return chord + " is undefined";
+    }
+
+    /** How the echo area asks about leaving with changes unwritten, in the words the real thing uses. */
+    public static String modifiedOnQuit() {
+        return "Modified buffers exist; exit anyway? (y or n)";
     }
 }

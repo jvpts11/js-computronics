@@ -89,6 +89,28 @@ class EmacsChordTest {
     }
 
     @Test
+    void of_readsTheMovingAndEditingKeys() {
+        assertEquals(EmacsChord.Action.BACKWARD_CHAR, EmacsChord.of("C-b"));
+        assertEquals(EmacsChord.Action.FORWARD_CHAR, EmacsChord.of("C-f"));
+        assertEquals(EmacsChord.Action.PREVIOUS_LINE, EmacsChord.of("C-p"));
+        assertEquals(EmacsChord.Action.NEXT_LINE, EmacsChord.of("C-n"));
+        assertEquals(EmacsChord.Action.LINE_START, EmacsChord.of("C-a"));
+        assertEquals(EmacsChord.Action.LINE_END, EmacsChord.of("C-e"));
+        assertEquals(EmacsChord.Action.DELETE_CHAR, EmacsChord.of("C-d"));
+        assertEquals(EmacsChord.Action.KILL_LINE, EmacsChord.of("C-k"));
+        assertEquals(EmacsChord.Action.YANK, EmacsChord.of("C-y"));
+        assertEquals(EmacsChord.Action.UNDO, EmacsChord.of("C-x u"));
+        assertEquals(EmacsChord.Action.BUFFER_START, EmacsChord.of("M-<"));
+        assertEquals(EmacsChord.Action.BUFFER_END, EmacsChord.of("M->"));
+        assertTrue(EmacsChord.couldGrow("C-x"), "C-x still waits for u, C-s or C-c");
+    }
+
+    @Test
+    void modifiedOnQuit_asksTheWayTheRealThingDoes() {
+        assertTrue(EmacsChord.modifiedOnQuit().contains("(y or n)"));
+    }
+
+    @Test
     void unknown_saysWhatWasPressed() {
         assertEquals("C-x C-z is undefined", EmacsChord.unknown("C-x C-z"));
     }

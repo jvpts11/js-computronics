@@ -7,6 +7,7 @@
  */
 package dev.jstech.computers.client.os;
 
+import dev.jstech.computers.JsComputers;
 import dev.jstech.computers.cannon.CannonCosts;
 import dev.jstech.computers.cannon.CannonSemantics;
 import dev.jstech.computers.cannon.SourceFile;
@@ -17,6 +18,7 @@ import dev.jstech.computers.cannon.sem.SemanticModel;
 import dev.jstech.core.client.gui.component.ContextMenu;
 import dev.jstech.core.client.gui.component.UiContext;
 import dev.jstech.core.client.gui.logic.TextDocument;
+import dev.jstech.core.language.IProgrammingLanguage;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.GuiGraphics;
@@ -25,9 +27,9 @@ import net.minecraft.client.gui.GuiGraphics;
  * The list an editor offers after a name and a dot, and what happens when one is taken.
  *
  * <p>Cannon is the language that can answer this: the checker knows every type it brings and every type
- * the program declares, with the members of each. A language a pack registers gets its source coloured
- * and its complaints listed all the same, and simply offers nothing here, which is honest about what the
- * registry promises and what it does not.
+ * the program declares, with the members of each, and the variables it met on its way through the
+ * bodies. A language a pack registers gets its source coloured and its complaints listed all the same,
+ * and simply offers nothing here, which is honest about what the registry promises and what it does not.
  *
  * <p>The list itself is the toolkit's menu, so it looks like every other menu on the system and is
  * driven the same way: the arrows walk it, Enter or Tab takes what is on, Escape leaves.
@@ -45,6 +47,13 @@ public final class CodeCompletions {
     private boolean showCosts;
     /** What each offered call is, kept beside the list so the strip can price the one being looked at. */
     private final List<String> offered = new ArrayList<>();
+    /** The names on the list, in its order, for a test asking what an editor offered. */
+    private final List<String> labels = new ArrayList<>();
+
+    /** The names the list up offers, top to bottom; empty when no list is up. */
+    public List<String> labels() {
+        return this.menu.isOpen() ? List.copyOf(this.labels) : List.of();
+    }
 
     /**
      * Says what each call costs, under the list.
@@ -71,8 +80,12 @@ public final class CodeCompletions {
     /**
      * Offers what could follow what the player has written, or nothing when that is not a question with
      * an answer. The list opens beside the caret and inside {@code bounds}, given as x, y, width, height.
+     *
+     * @param others the other sources of the program the file at {@code path} belongs to, as the editor
+     *               sees them, so what they declare is offered like what the file itself declares
      */
-    public void offer(final CodeArea area, final String path, final int[] bounds) {
+    public void offer(final CodeArea area, final String path,
+                      final List<IProgrammingLanguage.SourceText> others, final int[] bounds) {
         close();
         if (!isCannon(path)) {
             return;
@@ -84,37 +97,62 @@ public final class CodeCompletions {
         if (where == null || caret == null) {
             return;
         }
-        final SemanticModel model = CannonSemantics.check(
-                List.of(new SourceFile("editor.can", doc.text()))).model();
-        final List<CannonCompletions.Item> found = where.intoMember()
-                ? membersOf(model, where)
-                : CannonCompletions.types(this.builtIns, model, where.prefix());
+        final List<CannonCompletions.Item> found = find(path, doc, others, where);
         if (found.isEmpty()) {
             return;
         }
         final List<ContextMenu.Item> entries = new ArrayList<>(Math.min(found.size(), MAX_ITEMS));
         this.offered.clear();
+        this.labels.clear();
         for (final CannonCompletions.Item item : found.subList(0, Math.min(found.size(), MAX_ITEMS))) {
             entries.add(new ContextMenu.Item(item.signature(), true,
                     () -> take(doc, where, item.label())));
             this.offered.add(item.owner() + "." + item.label());
+            this.labels.add(item.label());
         }
         this.menu.open(entries, caret[0], caret[1] + CodeArea.lineHeight(),
                 bounds[0], bounds[1], bounds[2], bounds[3]);
     }
 
     /**
-     * The members of what is being reached into.
+     * What could be offered at {@code where}, read from the whole program around the file.
      *
-     * <p>A name written into the source reaches what belongs to the type; the same name as a variable
-     * reaches the rest. Which of the two it is, is read from whether the language or the program has a
-     * type of that name, so {@code Network.} offers what the network can do and a variable does not.
+     * <p>The file is checked as it stands, with the others beside it, the tolerant way: the line being
+     * typed is broken by definition, and the answer still has to know what the types around it are and
+     * which variables the caret can see. What is reached into is then read one name at a time from
+     * that: a variable, a field of the type around the caret, {@code this}, or a type on its static side,
+     * so {@code Network.} offers what the network can do and {@code counter.} what a counter can.
      */
-    private List<CannonCompletions.Item> membersOf(final SemanticModel model,
-                                                   final CompletionContext.Where where) {
-        final boolean isType = model != null && model.declaredType(where.receiver()) != null
-                || this.builtIns.type(where.receiver(), 0) != null;
-        return CannonCompletions.members(this.builtIns, model, where.receiver(), where.prefix(), isType);
+    private List<CannonCompletions.Item> find(final String path, final TextDocument doc,
+                                              final List<IProgrammingLanguage.SourceText> others,
+                                              final CompletionContext.Where where) {
+        final List<SourceFile> sources = new ArrayList<>(others.size() + 1);
+        sources.add(new SourceFile(path, doc.text()));
+        for (final IProgrammingLanguage.SourceText other : others) {
+            if (!other.name().equals(path)) {
+                sources.add(new SourceFile(other.name(), other.text()));
+            }
+        }
+        SemanticModel model = null;
+        CannonCompletions.Scope scope = CannonCompletions.Scope.NONE;
+        try {
+            final CannonSemantics.Result result = CannonSemantics.checkTolerant(sources);
+            model = result.model();
+            scope = CannonCompletions.scopeAt(model, result.unit(path), path, doc.cursorLine() + 1);
+        } catch (final RuntimeException e) {
+            /*
+             * A half-written file can put the checker somewhere it was never meant to be. The list then
+             * knows only the language's types, which is what it knew before; a popup taking the screen
+             * down with it would be the worse outcome by far.
+             */
+            JsComputers.LOGGER.debug("Completions could not read {}", path, e);
+        }
+        if (!where.intoMember()) {
+            return CannonCompletions.names(this.builtIns, model, scope, where.prefix());
+        }
+        final CannonCompletions.Target target =
+                CannonCompletions.resolve(this.builtIns, model, scope, where.chain());
+        return target == null ? List.of() : CannonCompletions.members(target, where.prefix());
     }
 
     /** Puts the chosen name in, in place of however much of it had been typed. */

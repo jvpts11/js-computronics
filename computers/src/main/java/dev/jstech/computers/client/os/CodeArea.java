@@ -44,6 +44,11 @@ public final class CodeArea extends UiComponent {
     private static final int SELECTION = 0x663A72B0;
     private static final float MIN_SCALE = 0.75f;
     private static final float MAX_SCALE = 2.0f;
+    /** How thick the two scroll bars are, in screen pixels. */
+    private static final int BAR = 3;
+    /** The colours of a bar's track and of its thumb, translucent so the code under them still reads. */
+    private static final int BAR_TRACK = 0x30808080;
+    private static final int BAR_THUMB = 0xA0909090;
 
     /** Says how the rows of a document are coloured. */
     @FunctionalInterface
@@ -82,6 +87,10 @@ public final class CodeArea extends UiComponent {
      */
     private boolean active = true;
     private int scroll;
+    /** How far the rows are slid to the left, in unscaled pixels, so a long line can be read to its end. */
+    private int shift;
+    /** Which of the two bars the mouse is dragging: 'v', 'h', or 0 for neither. */
+    private char draggingBar;
     private Font lastFont;
     /** How big the text is drawn, 1 being the game's own size. */
     private float scale = 1.0f;
@@ -107,8 +116,19 @@ public final class CodeArea extends UiComponent {
     public CodeArea setText(final String value) {
         this.doc.setText(value);
         this.scroll = 0;
+        this.shift = 0;
         this.colouredText = null;
         return this;
+    }
+
+    /** The first row shown, for an owner that keeps a view in step with another. */
+    public int scroll() {
+        return this.scroll;
+    }
+
+    /** Moves the view {@code rows} down (or up, when negative) without moving the caret. */
+    public void scrollBy(final int rows) {
+        this.scroll = Math.max(0, Math.min(Math.max(0, this.doc.lineCount() - visibleLines()), this.scroll + rows));
     }
 
     /** Says how to colour the rows. */
@@ -198,6 +218,36 @@ public final class CodeArea extends UiComponent {
         this.scroll = Math.max(0, Math.min(Math.max(0, this.doc.lineCount() - visible), this.scroll));
     }
 
+    /** The width of the room the code has beside the gutter, in unscaled units. */
+    private int codeRoom(final Font font) {
+        return Math.round((width() - BAR) / this.scale) - gutterWidth(font) - INSET - 2;
+    }
+
+    /** The widest row, in unscaled units, which is how far the view can slide. */
+    private int widestLine(final Font font) {
+        int widest = 0;
+        for (int i = 0; i < this.doc.lineCount(); i++) {
+            widest = Math.max(widest, font.width(this.doc.line(i)));
+        }
+        return widest;
+    }
+
+    /** Slides the rows so the caret stays in view, and never past the end of the widest one. */
+    private void followCaretAcross(final Font font) {
+        final String line = this.doc.line(this.doc.cursorLine());
+        final int col = Math.min(this.doc.cursorCol(), line.length());
+        final int caretX = font.width(line.substring(0, col));
+        final int room = Math.max(8, codeRoom(font));
+        if (this.active) {
+            if (caretX - this.shift < 0) {
+                this.shift = caretX;
+            } else if (caretX - this.shift > room - 4) {
+                this.shift = caretX - room + 4;
+            }
+        }
+        this.shift = Math.max(0, Math.min(Math.max(0, widestLine(font) + 4 - room), this.shift));
+    }
+
     /** The rows, coloured, reading the program again only when it is not the one already coloured. */
     private List<List<CodeRuns.Run>> runs() {
         final String text = this.doc.text();
@@ -218,6 +268,7 @@ public final class CodeArea extends UiComponent {
         final boolean focused = this.active;
         followCaret();
         final Font font = ctx.font();
+        followCaretAcross(font);
         final int gutter = gutterWidth(font);
         g.fill(x(), y(), right(), bottom(), this.palette.ground());
         g.fill(x(), y(), x() + Math.round(gutter * this.scale), bottom(), this.palette.gutter());
@@ -226,7 +277,11 @@ public final class CodeArea extends UiComponent {
         final TextDocument.Spot from = this.doc.selectionStart();
         final TextDocument.Spot to = this.doc.selectionEnd();
         final boolean selected = this.doc.hasSelection();
-        Draw.pushScissor(g, x(), y(), right(), bottom());
+        /*
+         * The code is clipped to the right of the gutter, so a row slid to the left disappears under
+         * the numbers rather than over them.
+         */
+        Draw.pushScissor(g, x() + Math.round(gutter * this.scale), y(), right(), bottom());
         /*
          * Everything inside is drawn in unscaled units under one scaling of the pose, so the font, the
          * rows and the caret all grow together; the area's own frame stays where the window put it.
@@ -238,7 +293,7 @@ public final class CodeArea extends UiComponent {
         int ry = 1;
         for (int i = this.scroll; i < this.doc.lineCount() && i - this.scroll < visible; i++) {
             final String line = this.doc.line(i);
-            final int textX = gutter + INSET;
+            final int textX = gutter + INSET - this.shift;
             if (i == this.doc.cursorLine() && focused && !selected) {
                 g.fill(gutter, ry, innerRight, ry + LINE_H, this.palette.currentLine());
             }
@@ -251,10 +306,6 @@ public final class CodeArea extends UiComponent {
                         : textX + font.width(line) + 4;
                 g.fill(sx, ry, Math.max(sx + 1, ex), ry + LINE_H, SELECTION);
             }
-            drawMark(g, i, ry);
-            final String number = String.valueOf(i + 1);
-            g.drawString(font, number, gutter - GUTTER_PAD - font.width(number), ry + 1,
-                    this.palette.gutterText(), false);
             drawLine(g, font, line, i < runs.size() ? runs.get(i) : List.of(), textX, ry + 1);
             drawSquiggles(g, font, i, line, textX, ry);
             if (focused && i == this.doc.cursorLine()) {
@@ -266,6 +317,79 @@ public final class CodeArea extends UiComponent {
         }
         g.pose().popPose();
         Draw.popScissor(g);
+        // The gutter is drawn after the code, over whatever slid under it, and never slides itself.
+        Draw.pushScissor(g, x(), y(), x() + Math.round(gutter * this.scale), bottom());
+        g.pose().pushPose();
+        g.pose().translate(x(), y(), 0);
+        g.pose().scale(this.scale, this.scale, 1);
+        ry = 1;
+        for (int i = this.scroll; i < this.doc.lineCount() && i - this.scroll < visible; i++) {
+            drawMark(g, i, ry);
+            final String number = String.valueOf(i + 1);
+            g.drawString(font, number, gutter - GUTTER_PAD - font.width(number), ry + 1,
+                    this.palette.gutterText(), false);
+            ry += LINE_H;
+        }
+        g.pose().popPose();
+        Draw.popScissor(g);
+        drawBars(g, font);
+    }
+
+    /**
+     * The two scroll bars: a thin one down the right edge when there are more rows than fit, and one
+     * along the bottom when a row is wider than the room. Each shows where the view is and can be
+     * dragged.
+     */
+    private void drawBars(final GuiGraphics g, final Font font) {
+        final int rows = this.doc.lineCount();
+        final int visible = visibleLines();
+        if (rows > visible) {
+            final int trackH = height() - BAR;
+            final int thumbH = Math.max(6, trackH * visible / rows);
+            final int thumbY = y() + (trackH - thumbH) * this.scroll / Math.max(1, rows - visible);
+            g.fill(right() - BAR, y(), right(), y() + trackH, BAR_TRACK);
+            g.fill(right() - BAR, thumbY, right(), thumbY + thumbH, BAR_THUMB);
+        }
+        final int room = Math.max(8, codeRoom(font));
+        final int widest = widestLine(font) + 4;
+        if (widest > room) {
+            final int trackX = x() + Math.round(gutterWidth(font) * this.scale);
+            final int trackW = right() - BAR - trackX;
+            final int thumbW = Math.max(6, trackW * room / widest);
+            final int thumbX = trackX + (trackW - thumbW) * this.shift / Math.max(1, widest - room);
+            g.fill(trackX, bottom() - BAR, trackX + trackW, bottom(), BAR_TRACK);
+            g.fill(thumbX, bottom() - BAR, thumbX + thumbW, bottom(), BAR_THUMB);
+        }
+    }
+
+    /** Whether the point is on the vertical bar's track. */
+    private boolean onVerticalBar(final double mx, final double my) {
+        return this.doc.lineCount() > visibleLines() && mx >= right() - BAR && mx < right()
+                && my >= y() && my < bottom() - BAR;
+    }
+
+    /** Whether the point is on the horizontal bar's track. */
+    private boolean onHorizontalBar(final double mx, final double my) {
+        return this.lastFont != null && widestLine(this.lastFont) + 4 > Math.max(8, codeRoom(this.lastFont))
+                && my >= bottom() - BAR && my < bottom() && mx >= x() && mx < right() - BAR;
+    }
+
+    /** Puts the view where a point on a bar's track asks, the way dragging a thumb does. */
+    private void dragBar(final double mx, final double my) {
+        if (this.draggingBar == 'v') {
+            final int rows = this.doc.lineCount();
+            final int visible = visibleLines();
+            final double along = (my - y()) / Math.max(1, height() - BAR);
+            this.scroll = (int) Math.round(along * (rows - visible));
+            this.scroll = Math.max(0, Math.min(Math.max(0, rows - visible), this.scroll));
+        } else if (this.draggingBar == 'h' && this.lastFont != null) {
+            final int room = Math.max(8, codeRoom(this.lastFont));
+            final int widest = widestLine(this.lastFont) + 4;
+            final int trackX = x() + Math.round(gutterWidth(this.lastFont) * this.scale);
+            final double along = (mx - trackX) / Math.max(1, right() - BAR - trackX);
+            this.shift = (int) Math.round(along * (widest - room));
+            this.shift = Math.max(0, Math.min(Math.max(0, widest - room), this.shift));
+        }
     }
 
     /** One row, run by run, each stretch in the colour its piece of source asked for. */
@@ -334,7 +458,7 @@ public final class CodeArea extends UiComponent {
         }
         final String line = this.doc.line(this.doc.cursorLine());
         final int col = Math.min(this.doc.cursorCol(), line.length());
-        final int cx = gutterWidth(this.lastFont) + INSET + this.lastFont.width(line.substring(0, col));
+        final int cx = gutterWidth(this.lastFont) + INSET - this.shift + this.lastFont.width(line.substring(0, col));
         final int cy = 1 + (this.doc.cursorLine() - this.scroll) * LINE_H;
         return new int[] {x() + Math.round(cx * this.scale), y() + Math.round(cy * this.scale)};
     }
@@ -365,7 +489,7 @@ public final class CodeArea extends UiComponent {
 
     /** The column a screen x falls on within {@code text}, snapping to the nearer edge of a character. */
     private int columnAt(final String text, final double mx) {
-        final double target = (mx - x()) / this.scale - (gutterWidth(this.lastFont) + INSET);
+        final double target = (mx - x()) / this.scale - (gutterWidth(this.lastFont) + INSET - this.shift);
         int col = 0;
         while (col < text.length()
                 && this.lastFont.width(text.substring(0, col + 1))
@@ -380,6 +504,16 @@ public final class CodeArea extends UiComponent {
         if (this.lastFont == null) {
             return true;
         }
+        if (button == 0 && onVerticalBar(mx, my)) {
+            this.draggingBar = 'v';
+            dragBar(mx, my);
+            return true;
+        }
+        if (button == 0 && onHorizontalBar(mx, my)) {
+            this.draggingBar = 'h';
+            dragBar(mx, my);
+            return true;
+        }
         final int line = Math.max(0, Math.min(this.doc.lineCount() - 1, lineAt(my)));
         final int col = columnAt(this.doc.line(line), mx);
         // Shift and a click stretch the selection to the click; a plain click starts one for a sweep.
@@ -391,6 +525,10 @@ public final class CodeArea extends UiComponent {
 
     @Override
     public boolean mouseDragged(final double mx, final double my, final int button) {
+        if (this.draggingBar != 0) {
+            dragBar(mx, my);
+            return true;
+        }
         if (!this.sweeping || this.lastFont == null) {
             return false;
         }
@@ -403,6 +541,7 @@ public final class CodeArea extends UiComponent {
     @Override
     public boolean mouseReleased(final double mx, final double my, final int button) {
         this.sweeping = false;
+        this.draggingBar = 0;
         return false;
     }
 
@@ -436,6 +575,21 @@ public final class CodeArea extends UiComponent {
         }
         this.doc.insert(c);
         this.onEdit.run();
+        return true;
+    }
+
+    /** Whether the caret sits after nothing but spaces on its line, and after at least one. */
+    private boolean inLeadingSpaces() {
+        final int col = this.doc.cursorCol();
+        if (col <= 0) {
+            return false;
+        }
+        final String line = this.doc.line(this.doc.cursorLine());
+        for (int i = 0; i < Math.min(col, line.length()); i++) {
+            if (line.charAt(i) != ' ') {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -496,12 +650,25 @@ public final class CodeArea extends UiComponent {
                 this.onEdit.run();
             }
             case GLFW.GLFW_KEY_BACKSPACE -> {
-                // Backspace between a pair that came together takes both away.
+                /*
+                 * Backspace between a pair that came together takes both away; inside a line's leading
+                 * spaces it takes a whole step of indentation, the way an editor that indents for you
+                 * lets you back out of it. Only a real partner counts: a space before the caret and the
+                 * end of the line after it are both "nothing", and nothing is not a pair.
+                 */
                 final char before = this.doc.charBefore();
-                if (!this.doc.hasSelection() && before != 0 && partnerOf(before) == this.doc.charAfter()) {
+                final char partner = before == 0 ? 0 : partnerOf(before);
+                if (!this.doc.hasSelection() && partner != 0 && partner == this.doc.charAfter()) {
                     this.doc.delete();
+                    this.doc.backspace();
+                } else if (!this.doc.hasSelection() && inLeadingSpaces()) {
+                    final int steps = (this.doc.cursorCol() - 1) % this.tabSize + 1;
+                    for (int i = 0; i < steps; i++) {
+                        this.doc.backspace();
+                    }
+                } else {
+                    this.doc.backspace();
                 }
-                this.doc.backspace();
                 this.onEdit.run();
             }
             case GLFW.GLFW_KEY_DELETE -> {
@@ -565,6 +732,13 @@ public final class CodeArea extends UiComponent {
         // Ctrl and the wheel change the size of the text, the way every editor lets them.
         if (Screen.hasControlDown()) {
             zoom(delta > 0 ? 1 : -1);
+            return true;
+        }
+        // Shift and the wheel slide the rows sideways, the way every editor lets them.
+        if (Screen.hasShiftDown() && this.lastFont != null) {
+            final int room = Math.max(8, codeRoom(this.lastFont));
+            final int widest = widestLine(this.lastFont) + 4;
+            this.shift = Math.max(0, Math.min(Math.max(0, widest - room), this.shift - (int) Math.signum(delta) * 24));
             return true;
         }
         final int visible = visibleLines();
